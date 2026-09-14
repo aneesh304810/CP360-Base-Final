@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CP Catalog — API 360 Business Flow Mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#10193b; --accent:#0f4775; --pop:#31bced; --hover:#0091bf;
+    --bg:#f5f8f8; --panel:#fff; --border:#dbdae0; --bgsoft:#eef3f3; --infobg:#e0f5fd;
+    --text:#2b2f38; --sub:#5a6472; --muted:#9aa3b0;
+    --sei:#0091bf; --get:#159943; --post:#0091bf; --put:#e67e22; --delete:#c1113a;
+    --success:#159943; --modApi:#0091bf;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Roboto,Arial,sans-serif;font-size:14px}
+  .mono{font-family:'Roboto Mono',monospace}
+  .top{background:var(--navy);color:#fff;display:flex;align-items:center;padding:0 24px;height:54px;gap:14px}
+  .logo{width:32px;height:32px;background:var(--pop);border-radius:3px;display:grid;place-items:center;color:var(--navy);font-weight:700}
+  .top b{font-size:15px}.top small{color:#8ea3c4;font-size:11px;display:block}
+  .badge{margin-left:6px;font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;background:rgba(21,153,67,.25);color:#bfe}
+  nav.modnav{margin-left:auto;display:flex;gap:4px}
+  nav.modnav a{color:#bcccdf;font-size:13px;padding:7px 12px;border-radius:3px;text-decoration:none}
+  nav.modnav a.active{background:var(--accent);color:#fff}
+  .wrap{max-width:1263px;margin:0 auto;padding:24px 24px 60px}
+  .h1{font-size:24px;font-weight:500;color:var(--accent);border-bottom:2px solid var(--accent);padding-bottom:12px;margin:0 0 16px;display:flex;align-items:center;gap:10px}
+  .switch{display:inline-flex;background:var(--panel);border:1px solid var(--border);border-radius:4px;overflow:hidden;margin-bottom:16px}
+  .switch button{border:none;background:none;padding:8px 16px;font-size:13px;cursor:pointer;font-family:inherit;color:var(--sub);border-right:1px solid var(--border)}
+  .switch button:last-child{border-right:none}.switch button.on{background:var(--accent);color:#fff}
+  .switch .ct{font-size:11px;opacity:.7;margin-left:5px}
+  /* subview tabs */
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:18px}
+  .tabs button{background:none;border:none;font-size:13px;font-weight:500;padding:10px 18px;cursor:pointer;color:var(--sub);border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit}
+  .tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
+  /* flow mode tabs */
+  .fmode{display:flex;gap:2px;margin-bottom:18px}
+  .fmode button{background:none;border:none;font-size:13px;font-weight:500;padding:6px 14px;cursor:pointer;font-family:inherit;color:var(--sub);border-bottom:2px solid transparent}
+  .fmode button.on{color:var(--modApi);border-bottom-color:var(--modApi)}
+  /* layout */
+  .layout{display:flex;gap:16px;align-items:flex-start}
+  .rblist{width:280px;flex-shrink:0}
+  .rblabel{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px}
+  .rbitem{display:block;width:100%;text-align:left;padding:10px 12px;margin-bottom:6px;cursor:pointer;font-family:inherit;border:1px solid var(--border);border-radius:6px;background:var(--panel)}
+  .rbitem.on{border-color:var(--modApi);background:var(--infobg)}
+  .rbitem .nm{font-size:13px;font-weight:600;color:var(--navy)}
+  .rbitem .mt{font-size:11px;color:var(--sub);margin-top:2px}
+  .rbitem .auto{color:var(--muted)}.rbitem .cur{color:var(--success)}
+  .detail{flex:1}
+  .dtitle{font-size:18px;font-weight:600;color:var(--navy);margin-bottom:4px}
+  .gentag{font-size:11px;font-weight:700;color:var(--muted);margin-left:8px;padding:2px 7px;border:1px solid var(--border);border-radius:3px;vertical-align:middle}
+  .dgoal{font-size:13px;color:var(--sub);margin-bottom:2px}
+  .dpersona{font-size:12px;color:var(--muted);margin-bottom:16px}
+  /* graph */
+  .graph{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:18px;margin-bottom:18px;display:flex;align-items:center;flex-wrap:wrap}
+  .gnode{background:var(--bgsoft);border:1px solid var(--border);border-radius:4px;padding:8px 11px;min-width:120px}
+  .gnode .gm{font-size:9px;font-weight:700}
+  .gnode .gp{font-size:12px;font-weight:600;color:var(--navy);margin-top:2px}
+  .gnode .gd{font-size:10px;color:var(--muted)}
+  .gedge{padding:0 6px;text-align:center}
+  .gedge .ar{color:var(--muted);font-size:16px}
+  .gedge .ent{font-size:9px;color:var(--modApi);font-weight:600}
+  /* table */
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--border);border-radius:4px;overflow:hidden}
+  th{background:var(--bgsoft);text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--accent)}
+  td{padding:8px 10px;font-size:13px;border-bottom:1px solid var(--bg)}
+  tr:last-child td{border-bottom:none}
+  .mb{font-size:9px;font-weight:700;color:#fff;padding:2px 6px;border-radius:3px}
+  .mb.GET{background:var(--get)}.mb.POST{background:var(--post)}.mb.PUT{background:var(--put)}.mb.DELETE{background:var(--delete)}
+  .prod{color:var(--modApi);font-size:11px}.cons{color:var(--sub);font-size:11px}
+  .note{font-size:12px;color:var(--sub);margin-top:14px;line-height:1.5}
+  .editbtn{margin-left:auto;font-size:12px;padding:5px 12px;border:1px solid var(--border);border-radius:4px;background:var(--panel);cursor:pointer;color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="logo">CP</div>
+  <div><b>CP Catalog</b><small>BBH Capital Partners</small></div>
+  <span class="badge">● LIVE</span>
+  <nav class="modnav">
+    <a href="#">Home</a><a href="#">System Design</a><a href="#">Interface 360</a>
+    <a href="#" class="active">API 360</a><a href="#">Data 360</a>
+    <a href="#">Datapoint 360</a><a href="#">PII Explorer</a>
+  </nav>
+</div>
+
+<div class="wrap">
+  <div class="h1">◆ API 360</div>
+
+  <div class="switch">
+    <button class="on">All <span class="ct">196</span></button>
+    <button>SEI <span class="ct">196</span></button>
+    <button>Non-SEI <span class="ct">0</span></button>
+  </div>
+
+  <div class="tabs">
+    <button>Sources</button>
+    <button>API Dependency</button>
+    <button class="on">Business Flow</button>
+  </div>
+
+  <!-- flow mode toggle -->
+  <div class="fmode">
+    <button class="on">Business Functions</button>
+    <button>Per-domain APIs</button>
+  </div>
+
+  <div class="layout">
+    <!-- runbook list -->
+    <div class="rblist">
+      <div class="rblabel">Business functions (6)</div>
+      <button class="rbitem on" onclick="pick(0,this)">
+        <div class="nm">Tax Lot Audit for a Portfolio</div>
+        <div class="mt">core-accounting · 4 steps <span class="cur">· curated</span></div></button>
+      <button class="rbitem" onclick="pick(1,this)">
+        <div class="nm">Daily Position Reconciliation</div>
+        <div class="mt">core-accounting · 5 steps <span class="auto">· auto</span></div></button>
+      <button class="rbitem" onclick="pick(2,this)">
+        <div class="nm">Cash Balance &amp; Projection Check</div>
+        <div class="mt">cash · 4 steps <span class="cur">· curated</span></div></button>
+      <button class="rbitem" onclick="pick(3,this)">
+        <div class="nm">Client Portfolio Snapshot</div>
+        <div class="mt">core-accounting · 5 steps <span class="auto">· auto</span></div></button>
+      <button class="rbitem" onclick="pick(4,this)">
+        <div class="nm">Household Aggregated Holdings</div>
+        <div class="mt">core-accounting · 4 steps <span class="auto">· auto</span></div></button>
+      <button class="rbitem" onclick="pick(5,this)">
+        <div class="nm">Loader Submission &amp; Status</div>
+        <div class="mt">loader-framework · 3 steps <span class="auto">· auto</span></div></button>
+    </div>
+
+    <!-- detail -->
+    <div class="detail" id="detail"></div>
+  </div>
+</div>
+
+<script>
+  const FLOWS = [
+    { name:"Tax Lot Audit for a Portfolio", origin:"curated", domain:"core-accounting",
+      goal:"Audit open tax lots (cost basis, acquisition date, quantity) for a portfolio.",
+      persona:"Audit, middle office", steps:[
+      {n:1,m:"POST",path:"/v2/oauthtoken",op:"oauthTokenUsingPOST",dom:"documents",prod:"access_token",cons:"—",note:"Authenticate; captures access_token"},
+      {n:2,m:"POST",path:"/retrieveAccountDetails",op:"retrieveAccountDetailsUsingPOST",dom:"client-management",prod:"accountNumber",cons:"clientId",note:"Validate account, look up portfolios"},
+      {n:3,m:"GET",path:"/portfolio/taxlots",op:"getTaxLotsUsingGET",dom:"core-accounting",prod:"—",cons:"accountNumber, portfolioId",note:"Pull every open tax lot for cost-basis audit"},
+      {n:4,m:"GET",path:"/transactions",op:"getTransactionsUsingGET",dom:"core-accounting",prod:"—",cons:"accountNumber",note:"Reconcile tax lots against buy/sell activity"}
+    ]},
+    { name:"Daily Position Reconciliation", origin:"generated", domain:"core-accounting",
+      goal:"Auto-generated sequence to call GET /realtimeholdings with its prerequisites.",
+      persona:null, steps:[
+      {n:1,m:"POST",path:"/v2/oauthtoken",op:"oauthTokenUsingPOST",dom:"documents",prod:"access_token",cons:"—",note:"Authenticate"},
+      {n:2,m:"GET",path:"/firm-base-curr-cache",op:"firmBaseCurrUsingGET",dom:"infrastructure",prod:"firmId",cons:"—",note:"Establish firm base currency"},
+      {n:3,m:"GET",path:"/realtimeholdings",op:"realtimeHoldingsUsingGET",dom:"core-accounting",prod:"—",cons:"firmId, accountNumber",note:"Pull current positions (source of truth)"},
+      {n:4,m:"POST",path:"/netavailablecurrencybalance",op:"netAvailBalUsingPOST",dom:"core-accounting",prod:"—",cons:"accountNumber",note:"Confirm available cash by currency"},
+      {n:5,m:"GET",path:"/transactions",op:"getTransactionsUsingGET",dom:"core-accounting",prod:"—",cons:"accountNumber",note:"List today's activity to explain deltas"}
+    ]},
+    { name:"Cash Balance & Projection Check", origin:"curated", domain:"cash",
+      goal:"Determine spendable cash today and project forward from fixed-income flows.",
+      persona:"Operations analyst", steps:[
+      {n:1,m:"POST",path:"/v2/oauthtoken",op:"oauthTokenUsingPOST",dom:"documents",prod:"access_token",cons:"—",note:"Authenticate"},
+      {n:2,m:"GET",path:"/firm-base-curr-cache",op:"firmBaseCurrUsingGET",dom:"infrastructure",prod:"firmId",cons:"—",note:"Determine firm reporting currency"},
+      {n:3,m:"POST",path:"/netavailablecurrencybalance",op:"netAvailBalUsingPOST",dom:"core-accounting",prod:"—",cons:"firmId",note:"Spendable cash today, by currency"},
+      {n:4,m:"GET",path:"/amortizationaccretionsch",op:"amortSchUsingGET",dom:"cash",prod:"—",cons:"accountNumber",note:"Projected future cash flows"}
+    ]},
+    { name:"Client Portfolio Snapshot", origin:"generated", domain:"core-accounting",
+      goal:"Auto-generated sequence to call GET /historicmarketvalues with its prerequisites.",
+      persona:null, steps:[
+      {n:1,m:"POST",path:"/v2/oauthtoken",op:"oauthTokenUsingPOST",dom:"documents",prod:"access_token",cons:"—",note:"Authenticate"},
+      {n:2,m:"POST",path:"/retrievePartyDetails",op:"retrievePartyUsingPOST",dom:"client-management",prod:"clientId",cons:"—",note:"Lookup client master record"},
+      {n:3,m:"GET",path:"/realtimeholdings",op:"realtimeHoldingsUsingGET",dom:"core-accounting",prod:"—",cons:"clientId",note:"Aggregate holdings across accounts"},
+      {n:4,m:"GET",path:"/historicmarketvalues",op:"histMvUsingGET",dom:"core-accounting",prod:"—",cons:"accountNumber",note:"Trend portfolio value over time"},
+      {n:5,m:"GET",path:"/transactions",op:"getTransactionsUsingGET",dom:"core-accounting",prod:"—",cons:"accountNumber",note:"Activity log for client review"}
+    ]},
+    { name:"Household Aggregated Holdings", origin:"generated", domain:"core-accounting",
+      goal:"Auto-generated sequence to call POST /holdingsdetail with its prerequisites.",
+      persona:null, steps:[
+      {n:1,m:"POST",path:"/v2/oauthtoken",op:"oauthTokenUsingPOST",dom:"documents",prod:"access_token",cons:"—",note:"Authenticate"},
+      {n:2,m:"POST",path:"/getAccountListForHousehold",op:"acctListUsingPOST",dom:"client-management",prod:"accountNumber",cons:"clientId",note:"Resolve household accounts"},
+      {n:3,m:"POST",path:"/holdingsdetail",op:"holdingsDetailUsingPOST",dom:"core-accounting",prod:"—",cons:"accountNumber",note:"Aggregate positions across accounts"},
+      {n:4,m:"POST",path:"/accountsHistoricMarketValues",op:"acctsHistMvUsingPOST",dom:"core-accounting",prod:"—",cons:"accountNumber",note:"Historic performance, all accounts"}
+    ]},
+    { name:"Loader Submission & Status", origin:"generated", domain:"loader-framework",
+      goal:"Auto-generated sequence to call GET /loader/{loaderId}/status with its prerequisites.",
+      persona:null, steps:[
+      {n:1,m:"POST",path:"/v2/oauthtoken",op:"oauthTokenUsingPOST",dom:"documents",prod:"access_token",cons:"—",note:"Authenticate"},
+      {n:2,m:"POST",path:"/loader",op:"submitFileUsingPOST",dom:"loader-framework",prod:"loaderId",cons:"—",note:"Submit loader file for processing"},
+      {n:3,m:"GET",path:"/loader/{loaderId}/status",op:"fetchLoaderStatusUsingGET",dom:"loader-framework",prod:"—",cons:"loaderId",note:"Fetch loader status by id"}
+    ]}
+  ];
+
+  function render(f){
+    const gen = f.origin==="generated";
+    let graph = f.steps.map((s,i)=>{
+      let node = `<div class="gnode"><div class="gm" style="color:var(--${s.m.toLowerCase()})">${s.m} · step ${s.n}</div><div class="gp">${s.path}</div><div class="gd">${s.dom}</div></div>`;
+      let edge = i<f.steps.length-1 ? `<div class="gedge"><div class="ar">→</div>${s.prod!=="—"?`<div class="ent">${s.prod}</div>`:""}</div>` : "";
+      return node+edge;
+    }).join("");
+    let rows = f.steps.map(s=>`<tr>
+      <td>${s.n}</td>
+      <td><span class="mb ${s.m}">${s.m}</span></td>
+      <td class="mono" style="font-size:12px">${s.path}</td>
+      <td style="font-size:11px;color:var(--sub)">${s.op}</td>
+      <td>${s.dom}</td>
+      <td class="prod">${s.prod}</td>
+      <td class="cons">${s.cons}</td>
+      <td style="font-size:12px;color:var(--sub)">${s.note}</td></tr>`).join("");
+    document.getElementById("detail").innerHTML = `
+      <div style="display:flex;align-items:center">
+        <div class="dtitle">${f.name}${gen?'<span class="gentag">AUTO-GENERATED · BA can edit</span>':''}</div>
+        <button class="editbtn">✎ Edit (BA)</button>
+      </div>
+      ${f.goal?`<div class="dgoal">${f.goal}</div>`:""}
+      ${f.persona?`<div class="dpersona">Audience: ${f.persona}</div>`:'<div class="dpersona" style="color:var(--muted)">Audience: not set — BA to add</div>'}
+      <div class="graph">${graph}</div>
+      <table>
+        <thead><tr><th>#</th><th>Method</th><th>Path</th><th>Operation</th><th>Domain</th><th>Produces</th><th>Consumes</th><th>Purpose</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="note">The sequence and the entities passed between steps (shown on the graph edges) are <b>auto-derived</b> from the Postman collections' Depends-on / produces metadata. The BA renames the flow, sets the goal &amp; audience, and reorders if needed — those edits are preserved across re-ingestion.</div>`;
+  }
+  function pick(i,el){
+    document.querySelectorAll('.rbitem').forEach(x=>x.classList.remove('on'));
+    el.classList.add('on'); render(FLOWS[i]);
+  }
+  render(FLOWS[0]);
+</script>
+</body>
+</html>

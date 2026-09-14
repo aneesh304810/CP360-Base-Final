@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SEI ↔ BBH — L2 Plane Drill-downs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EDF0F3;--card:#FFFFFF;--ink:#0F151C;--ink-2:#4A5765;--rule:#C9D2DB;
+  --hub:#16305B;--block:#A82316;--new:#9A5B00;--ocp:#5E4F72;--ok:#2C6E5B;
+  --grid:rgba(15,21,28,.055);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:28px 28px;
+  color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:15px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.sheet{max-width:1180px;margin:0 auto;padding:34px 22px 80px}
+.mast{border-top:3px solid var(--ink);padding-top:14px;margin-bottom:22px}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2)}
+h1{font-family:"Archivo",sans-serif;font-weight:700;font-size:clamp(25px,4vw,38px);line-height:1.05;letter-spacing:-.022em;margin:8px 0 10px;max-width:20ch}
+.sub{max-width:66ch;color:var(--ink-2);font-size:14.5px;margin:0}
+
+/* level ladder */
+.ladder{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin:20px 0 26px;border:1px solid var(--rule);background:var(--card)}
+.ladder div{padding:11px 13px;border-right:1px solid var(--rule)}
+.ladder div:last-child{border-right:0}
+.ladder b{display:block;font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-2)}
+.ladder span{display:block;font-size:13px;margin-top:4px}
+.ladder .on{background:#16305B}
+.ladder .on b{color:#9DB6D8}.ladder .on span{color:#fff}
+
+/* nav */
+nav{position:sticky;top:0;z-index:20;background:rgba(237,240,243,.94);backdrop-filter:blur(6px);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);margin-bottom:26px}
+nav ul{list-style:none;display:flex;flex-wrap:wrap;gap:0;margin:0;padding:0}
+nav a{display:block;padding:10px 13px;font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);text-decoration:none;border-right:1px solid var(--rule)}
+nav a:hover,nav a:focus{background:var(--hub);color:#fff;outline:none}
+
+/* plane block */
+.plane{background:var(--card);border:1px solid var(--rule);border-top:4px solid var(--hub);margin-bottom:22px;scroll-margin-top:60px}
+.plane.ocp{border-top-color:var(--ocp)}
+.plane.dq{border-top-color:var(--block)}
+.ph{padding:16px 18px 14px;border-bottom:1px solid var(--rule)}
+.ph .tag{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.17em;text-transform:uppercase;color:var(--hub);font-weight:600}
+.plane.dq .ph .tag{color:var(--block)}.plane.ocp .ph .tag{color:var(--ocp)}
+.ph h2{font-family:"Archivo",sans-serif;font-size:20px;margin:5px 0 6px;letter-spacing:-.015em}
+.ph p{margin:0;font-size:13.5px;color:var(--ink-2);max-width:80ch}
+.body{padding:16px 18px 18px}
+h4{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-2);margin:20px 0 9px}
+h4:first-child{margin-top:0}
+
+/* flow */
+.flow{font-family:"IBM Plex Mono",monospace;font-size:12px;line-height:1.75;background:#F7F9FB;border:1px solid var(--rule);padding:13px 15px;overflow-x:auto;white-space:pre;color:#1B2733}
+.flow .b{color:var(--block);font-weight:600}
+.flow .n{color:var(--new);font-weight:600}
+.flow .g{color:var(--ok);font-weight:600}
+
+/* tables */
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{background:#16305B;color:#fff;font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;text-align:left;padding:8px 10px}
+.plane.dq th{background:#A82316}.plane.ocp th{background:#5E4F72}
+td{border:1px solid var(--rule);padding:8px 10px;vertical-align:top}
+tr:nth-child(even) td{background:#FAFBFC}
+td .id{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:11.5px}
+.hi{border-left:3px solid var(--block)}
+.badge{font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:600;color:#fff;padding:1px 5px;border-radius:2px;letter-spacing:.04em}
+.b-py{background:#1B4D8F}.b-dbt{background:#2C6E5B}.b-air{background:#7A4B12}.b-ddl{background:#5C4470}.b-inf{background:#546070}
+
+/* risk list */
+ul.risk{margin:0;padding-left:16px;font-size:13px;color:var(--ink-2)}
+ul.risk li{margin-bottom:6px}
+ul.risk b{color:var(--ink)}
+.ad{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;background:#FFF1DC;border:1px solid #E8CDA1;color:#7A4A00;padding:1px 5px;border-radius:2px}
+
+.foot{background:var(--card);border:1px solid var(--rule);border-top:4px solid var(--ink);padding:16px 18px 18px;margin-top:26px}
+.foot h3{font-family:"Archivo",sans-serif;font-size:16px;margin:0 0 10px}
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+@media(max-width:820px){.ladder{grid-template-columns:1fr 1fr}.cols2{grid-template-columns:1fr}}
+@media print{body{background:#fff}nav{position:static}.plane{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+<header class="mast">
+  <div class="eyebrow">Level 2 · plane internals · draft for engineering review</div>
+  <h1>Drill-down: how each plane is built</h1>
+  <p class="sub">One level below the zone map. Each plane gets its internal flow, a component contract table, the failure modes it owns, and the decisions holding it up. Component IDs match the design tracker throughout.</p>
+</header>
+
+<div class="ladder">
+  <div><b>L0 · L1</b><span>Context and zones — the mockup</span></div>
+  <div class="on"><b>L2 · this document</b><span>Plane internals, six planes</span></div>
+  <div><b>L3</b><span>Component design — 13 high-custom only</span></div>
+  <div><b>L4</b><span>Code. No diagram.</span></div>
+</div>
+
+<nav>
+  <ul>
+    <li><a href="#p1">1 · Ingress / Egress</a></li>
+    <li><a href="#p2">2 · Processing</a></li>
+    <li><a href="#p3">3 · Orchestration</a></li>
+    <li><a href="#p4">4 · Data Quality</a></li>
+    <li><a href="#p5">5 · Foundation</a></li>
+    <li><a href="#p6">6 · OpenShift</a></li>
+    <li><a href="#l3">L3 scope</a></li>
+  </ul>
+</nav>
+
+<!-- ============ PLANE 1 ============ -->
+<section class="plane" id="p1">
+  <div class="ph">
+    <div class="tag">Plane 1 · components 8–12</div>
+    <h2>Ingress / Egress</h2>
+    <p>The contract boundary. Nothing here knows what an account is — this plane moves bytes, authenticates, and decides only whether a delivery is complete. Business meaning starts in Processing.</p>
+  </div>
+  <div class="body">
+    <h4>Internal flow</h4>
+<div class="flow">  SEI extract job
+        │
+        │  <span class="g">7 files + manifest</span>
+        ▼
+  ┌─────────────────────┐        ┌──────────────────────┐
+  │  8 Landing Zone     │───────▶│  9 Arrival sensors   │  <span class="n">NEW</span>
+  │  sFTP · quarantine  │        │  per-file, deferrable│
+  │  dirs · retention   │        │  manifest-aware      │
+  └─────────────────────┘        └──────────┬───────────┘
+        ▲                                   │ triggers per-domain branch
+        │ landing only — no parsing         ▼
+        │                            [ Plane 3 · DAG ]
+
+  ── outbound ───────────────────────────────────────────────
+  [ Zone 3 systems ] ──▶ 10 Outbound producers ──▶ 11 Apigee ──▶ SEI
+                          extracts · JSON · loader        ▲
+  SEI status ─────────────────────────────────────────────┘
+  ── real-time ──────────────────────────────────────────────
+  Consumers ──▶ 12 API Gateway / Data Plane ──▶ SEI SWP APIs  (no batch dependency)
+</div>
+
+    <h4>Component contracts</h4>
+    <table>
+      <tr><th style="width:44px">ID</th><th>Component</th><th>Responsibility</th><th>Interface out</th><th style="width:58px">Build</th></tr>
+      <tr><td class="id">8</td><td>Landing Zone + transport</td><td>Receive, authenticate, retain. Write-once directory per business date. No parsing.</td><td>File on volume + manifest</td><td><span class="badge b-inf">INF</span></td></tr>
+      <tr><td class="id">9</td><td>Arrival sensors</td><td>Detect per-file arrival and manifest completeness. Trigger the domain branch, not the whole batch.</td><td>Airflow trigger event</td><td><span class="badge b-air">AIR</span></td></tr>
+      <tr class="hi"><td class="id">10</td><td>Outbound producers</td><td>Build extracts, JSON payloads and loader files to SEI's spec from Zone 3 sources.</td><td>File / JSON to Apigee</td><td><span class="badge b-py">PY</span></td></tr>
+      <tr><td class="id">11</td><td>Apigee proxy</td><td>Submit path and status-return path. Auth, throttling, payload size limits.</td><td>HTTPS to SEI · status to 35</td><td><span class="badge b-inf">VEN</span></td></tr>
+      <tr><td class="id">12</td><td>API Gateway / Data Plane</td><td>Real-time route to SWP APIs. Independent lifecycle from batch.</td><td>HTTPS to SEI APIs</td><td><span class="badge b-inf">VEN</span></td></tr>
+    </table>
+
+    <h4>Failure modes this plane owns</h4>
+    <ul class="risk">
+      <li><b>Partial delivery.</b> Six of seven files land. The sensor must distinguish "late" from "missing" — that needs a manifest with an expected-file list, or you are guessing on a timeout.</li>
+      <li><b>Silent truncation.</b> A file that lands mid-write looks complete. Requires a done-marker or size-stable check, not just existence.</li>
+      <li><b>Redelivery.</b> SEI resends a file for a date already loaded. The plane must not decide — it stamps and passes through; idempotency belongs to Processing.</li>
+    </ul>
+
+    <h4>Blocked on</h4>
+    <p style="margin:0;font-size:13px;color:var(--ink-2)"><span class="ad">AD-10</span> transport protocol — SEI unspecified, BBH says sFTP. &nbsp; <span class="ad">AD-3</span> Apigee firm or placeholder. &nbsp; <span class="ad">AD-11</span> is outbound in scope at all.</p>
+  </div>
+</section>
+
+<!-- ============ PLANE 2 ============ -->
+<section class="plane" id="p2">
+  <div class="ph">
+    <div class="tag">Plane 2 · components 13–17</div>
+    <h2>Processing</h2>
+    <p>The only plane allowed to hold business logic. Python owns everything up to and including the RAW insert; dbt owns everything after. That line is not negotiable — it is what keeps lineage traceable.</p>
+  </div>
+  <div class="body">
+    <h4>Internal flow</h4>
+<div class="flow">   file + manifest
+        │
+   ┌────▼──────────────────────────────────┐
+   │ 13 Python ingestion framework  <span class="b">HIGH</span>   │
+   │   ├ read spec from 33 config          │
+   │   ├ <span class="b">G1</span> validate (23) ──▶ quarantine (29)│
+   │   ├ profile · row count · checksum    │
+   │   ├ stamp LOAD_ID + 8 audit columns   │
+   │   └ load ──▶ external table / SQL*Ldr │
+   └────┬──────────────────────────────────┘
+        ▼
+   ┌─────────────────┐   append only, never updated
+   │ 14 Stage 1 RAW  │   7 tables · partitioned by BUSINESS_DATE
+   └────┬────────────┘
+        │ <span class="b">G2</span> profiling gate (24)
+        ▼
+   ┌─────────────────────────────────────────┐
+   │ 15 Stage 2 (dbt) · 5 STG2_* models      │
+   │   standardise → typecast → dedup →      │
+   │   <span class="b">17 corrections</span> → lookups → rules →     │
+   │   derive → latest-record select         │
+   └────┬────────────────────────────────────┘
+        │ <span class="b">G3</span> dbt tests (25)
+        ▼
+   ┌─────────────────────────────────────────┐
+   │ 16 Gold (dbt)  <span class="b">HIGH</span>                      │
+   │   DIM_ACCOUNT · DIM_INTERESTED_PARTY    │  custom SCD2 macro
+   │   FACT_TRANSACTIONS · FACT_CP_HOLDINGS  │  merge
+   │   FACT_TAX_LOT                          │  append by date
+   └────┬────────────────────────────────────┘
+        │ <span class="b">G4</span> tie-out (26) ── withhold publish on fail
+        ▼   dims publish before facts
+     Zone 3
+</div>
+
+    <h4>Component contracts</h4>
+    <table>
+      <tr><th style="width:44px">ID</th><th>Component</th><th>Responsibility</th><th>Key design point</th><th style="width:58px">Build</th></tr>
+      <tr class="hi"><td class="id">13</td><td>Python ingestion framework</td><td>Validate, profile, stamp, load. One framework driven by config — not seven scripts.</td><td>Loader abstraction so cx_Oracle / SQL*Loader / external tables are swappable per domain by size.</td><td><span class="badge b-py">PY</span></td></tr>
+      <tr><td class="id">14</td><td>Stage 1 RAW</td><td>Store as received. Immutable, append only.</td><td>Partition by BUSINESS_DATE. Retention drives replay depth — set it from the replay requirement, not from disk.</td><td><span class="badge b-ddl">DDL</span></td></tr>
+      <tr><td class="id">15</td><td>Stage 2 Enriched</td><td>Standardise, integrate corrections, apply rules, select latest.</td><td>Dedup and latest-record are macros, written once. Snapshot domains want incremental with a change hash, not full refresh.</td><td><span class="badge b-dbt">DBT</span></td></tr>
+      <tr class="hi"><td class="id">16</td><td>Gold</td><td>Kimball dims and facts, business-ready.</td><td><code>dbt snapshot</code> will not cover this. Custom incremental SCD2 macro; merge strategy differs per fact.</td><td><span class="badge b-dbt">DBT</span></td></tr>
+      <tr class="hi"><td class="id">17</td><td>Correction handling</td><td>Apply corrected transactions and positions consistently in Stage 2 and Gold.</td><td>No dbt idiom for bitemporal. One custom strategy, reused — not per-model logic.</td><td><span class="badge b-dbt">DBT</span></td></tr>
+    </table>
+
+    <h4>Failure modes this plane owns</h4>
+    <ul class="risk">
+      <li><b>Correction arrives before the record it corrects.</b> Out-of-order delivery. Needs a park-and-retry position, or corrections silently no-op.</li>
+      <li><b>Full-snapshot volume.</b> Account, Client and Tax Lot arrive complete every day. Full refresh on a full snapshot is the worst combination available; ask SEI for a change hash before optimising anything else.</li>
+      <li><b>Late-arriving dimension.</b> A fact references an account not yet in the dim. Decide: reject, or inferred-member row. Rejecting mid-window is expensive.</li>
+      <li><b>Merge destroys history.</b> Under in-place merge, an as-of question from last Tuesday is unanswerable. This is <span class="ad">AD-2</span>, and it is the single most consequential open item.</li>
+    </ul>
+
+    <h4>Blocked on</h4>
+    <p style="margin:0;font-size:13px;color:var(--ink-2)"><span class="ad">AD-1</span> Gold write target — decides whether dbt touches production schemas. &nbsp; <span class="ad">AD-2</span> correction semantics — one answer must hold across 15, 16 and 21.</p>
+  </div>
+</section>
+
+<!-- ============ PLANE 3 ============ -->
+<section class="plane" id="p3">
+  <div class="ph">
+    <div class="tag">Plane 3 · components 18–22</div>
+    <h2>Orchestration</h2>
+    <p>Airflow holds control flow and nothing else. No transformations, no business rules, no thresholds — those live in dbt and in config. The plane's job is deciding what runs, in what order, and what happens when something does not.</p>
+  </div>
+  <div class="body">
+    <h4>Internal flow</h4>
+<div class="flow">  <span class="n">9 sensors</span>  ── per file ──┐
+                             │  dynamic task mapping over domain config (33)
+  ┌──────────────────────────▼─────────────────────────────┐
+  │ 18 DAG · fan-out  <span class="b">HIGH</span>                             │
+  │                                                        │
+  │  acct ─▶ ingest ─▶ <span class="b">G1</span> ─▶ RAW ─▶ <span class="b">G2</span> ─┐                │
+  │  clnt ─▶ ingest ─▶ <span class="b">G1</span> ─▶ RAW ─▶ <span class="b">G2</span> ─┤                │
+  │  txlt ─▶ ingest ─▶ <span class="b">G1</span> ─▶ RAW ─▶ <span class="b">G2</span> ─┤  7 branches,   │
+  │  txn  ─▶ ingest ─▶ <span class="b">G1</span> ─▶ RAW ─▶ <span class="b">G2</span> ─┤  independent   │
+  │  posn ─▶ ingest ─▶ <span class="b">G1</span> ─▶ RAW ─▶ <span class="b">G2</span> ─┤                │
+  │  ctxn ─▶ ingest ─▶ <span class="b">G1</span> ─▶ RAW ─▶ <span class="b">G2</span> ─┤                │
+  │  cpos ─▶ ingest ─▶ <span class="b">G1</span> ─▶ RAW ─▶ <span class="b">G2</span> ─┘                │
+  │                            │                           │
+  │                   <span class="n">22 partial-batch branch</span>                │
+  │                     halt-all │ proceed per domain      │
+  │                            ▼                           │
+  │   dbt Stage 2 (selector) ─▶ <span class="b">G3</span> ─▶ dbt dims ─▶ dbt facts │
+  │                                   19 dims before facts │
+  │                            ▼                           │
+  │                          <span class="b">G4</span> ─▶ publish ─▶ <span class="b">G5</span>          │
+  └────────────────────────────┬───────────────────────────┘
+                               │ on G5 breach
+                               ▼
+                    <span class="n">21 replay engine</span>  <span class="b">HIGH</span>
+                    re-run from LOAD_ID · idempotent
+</div>
+
+    <h4>Component contracts</h4>
+    <table>
+      <tr><th style="width:44px">ID</th><th>Component</th><th>Responsibility</th><th>Key design point</th><th style="width:58px">Build</th></tr>
+      <tr class="hi"><td class="id">18</td><td>DAG + per-domain fan-out</td><td>Seven independent branches to G2; join only where Stage 2 genuinely needs it.</td><td>Dynamic task mapping over domain config. A hand-written static DAG will not survive the eighth feed.</td><td><span class="badge b-air">AIR</span></td></tr>
+      <tr><td class="id">19</td><td>Build order / threads</td><td>Dims before facts; dbt thread count tuned to the Oracle ceiling.</td><td>Ceiling comes from component 55, not from cluster capacity.</td><td><span class="badge b-air">AIR</span></td></tr>
+      <tr><td class="id">20</td><td>Intraday cadence</td><td>Schedule and overlap prevention against the EOD run.</td><td>Must not allow an intraday run and EOD run to write the same target concurrently.</td><td><span class="badge b-air">AIR</span></td></tr>
+      <tr class="hi"><td class="id">21</td><td>Replay engine</td><td>Re-run a business date end to end from RAW.</td><td>Airflow <code>clear</code> reruns tasks; it does not undo a merge into a Gold fact. This is a bespoke component.</td><td><span class="badge b-py">PY</span></td></tr>
+      <tr><td class="id">22</td><td>Partial-batch policy</td><td>Decide halt-all vs per-domain proceed on a branch failure.</td><td>Needs a per-domain publish-completeness marker consumers can read.</td><td><span class="badge b-air">AIR</span></td></tr>
+    </table>
+
+    <h4>Failure modes this plane owns</h4>
+    <ul class="risk">
+      <li><b>Replay is not backfill.</b> Backfill assumes the target was empty. Replay must reverse or supersede an existing Gold state — which only works if <span class="ad">AD-2</span> lands on append.</li>
+      <li><b>Overlapping runs.</b> Intraday firing while EOD is mid-Gold. Needs a run-level lock per target, not just DAG-level concurrency.</li>
+      <li><b>Parallelism inversion.</b> Past the Oracle session ceiling, more pods make the window longer. Measure before setting the fan-out width.</li>
+      <li><b>Retry masking a data problem.</b> Airflow retries are for transient infrastructure faults. A DQ failure must never be retried — it must block.</li>
+    </ul>
+
+    <h4>Blocked on</h4>
+    <p style="margin:0;font-size:13px;color:var(--ink-2)"><span class="ad">AD-4</span> intraday lane. &nbsp; <span class="ad">AD-5</span> partial-batch policy. &nbsp; <span class="ad">AD-2</span> determines whether replay is even implementable.</p>
+  </div>
+</section>
+
+<!-- ============ PLANE 4 ============ -->
+<section class="plane dq" id="p4">
+  <div class="ph">
+    <div class="tag">Plane 4 · components 23–28</div>
+    <h2>Data Quality — blocking</h2>
+    <p>Five gates, four of them blocking. The design principle: a gate that fires after the damage is a report, not a control. G4 exists because SEI v5 placed its only DQ step after the Gold load, where it stops nothing.</p>
+  </div>
+  <div class="body">
+    <h4>Gate interlock</h4>
+<div class="flow">  gate   position                 blocks                     on failure
+  ─────  ───────────────────────  ─────────────────────────  ──────────────────────────
+  <span class="b">G1</span> 23  before RAW insert        the insert                 quarantine file · alert
+  <span class="b">G2</span> 24  after RAW, before STG2   dbt Stage 2 run            RAW keeps the load · halt
+  <span class="b">G3</span> 25  during Stage 2 build     Gold run                   model fails · Gold untouched
+  <span class="b">G4</span> 26  before Gold publish      the merge / SCD2 write     yesterday's state stands
+  G5 27  after publish            nothing — advisory         alert · trigger replay (21)
+
+  all five read rules, thresholds and severity from:
+  ┌────────────────────────────────────────────────────────┐
+  │ 28 DQ framework  <span class="b">HIGH</span>                                   │
+  │   rule registry  ·  severity: error blocks / warn logs │
+  │   results store  ·  audited override  ·  33 config     │
+  └────────────────────────────────────────────────────────┘
+</div>
+
+    <h4>Component contracts</h4>
+    <table>
+      <tr><th style="width:44px">ID</th><th>Gate</th><th>Checks</th><th>Key design point</th><th style="width:58px">Build</th></tr>
+      <tr class="hi"><td class="id">23</td><td>G1 file / structural</td><td>Encoding, delimiter, column count, header, row count vs manifest, checksum.</td><td>Rule-driven from the registry, not hardcoded per feed.</td><td><span class="badge b-py">PY</span></td></tr>
+      <tr><td class="id">24</td><td>G2 RAW profiling</td><td>Null rates, cardinality, volume vs trailing average, date range sanity.</td><td>Aggregate SQL pushed to Oracle. Never pull rows into Python to profile.</td><td><span class="badge b-air">AIR</span></td></tr>
+      <tr><td class="id">25</td><td>G3 dbt tests + rules</td><td>Uniqueness, referential integrity, accepted values, business rule assertions.</td><td>Generic tests for structure; singular tests for business rules.</td><td><span class="badge b-dbt">DBT</span></td></tr>
+      <tr class="hi"><td class="id">26</td><td>G4 tie-out</td><td>RAW → Gold row and control-total reconciliation, per target.</td><td>Compare against captured ingest metadata rather than rescanning — turns a table scan into a lookup.</td><td><span class="badge b-air">AIR</span></td></tr>
+      <tr><td class="id">27</td><td>G5 post-publish recon</td><td>Cross-system totals, consumer-visible consistency.</td><td>Define what auto-triggers a replay versus what pages a human.</td><td><span class="badge b-air">AIR</span></td></tr>
+      <tr class="hi"><td class="id">28</td><td>DQ framework</td><td>Registry, severity tiers, results store, override path.</td><td>Severity must be changeable without a code release, and readable by Airflow so the gate can branch on it.</td><td><span class="badge b-py">PY</span></td></tr>
+    </table>
+
+    <h4>Failure modes this plane owns</h4>
+    <ul class="risk">
+      <li><b>Everything fatal.</b> Without severity tiers you block on a null in a cosmetic column at 2am. Two tiers minimum, held in config.</li>
+      <li><b>No override.</b> Blocking with no release path means a failure waits for the morning. Needs an audited approve-and-proceed, logged to the same lineage store.</li>
+      <li><b>Thresholds drifting into dbt.</b> A threshold buried in a dbt test cannot be read by Airflow, so the gate cannot branch on severity. Keep thresholds in config.</li>
+      <li><b>G4 against the window.</b> The tie-out is the expensive gate and the only one protecting production. If it does not fit the window, the honest answer is to widen the window — not to demote the gate.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ PLANE 5 ============ -->
+<section class="plane" id="p5">
+  <div class="ph">
+    <div class="tag">Plane 5 · components 29–36</div>
+    <h2>Foundation</h2>
+    <p>Cross-cutting services every other plane calls. No domain knowledge lives here — a foundation component that knows what a tax lot is has been built wrong.</p>
+  </div>
+  <div class="body">
+    <h4>Dependency shape</h4>
+<div class="flow">              ┌──────────────────────────────────────┐
+              │ 33 Metadata &amp; config store  <span class="b">HIGH</span>      │  ◀── build this first
+              │  domain specs · rules · thresholds   │
+              │  mappings · schedules · severities   │
+              └───┬─────────┬──────────┬─────────────┘
+                  │         │          │
+        reads ────┘         │          └──── reads
+       13 ingest        18 DAG            23–28 gates
+
+  ┌────────────────┐   ┌────────────────┐   ┌────────────────┐
+  │ 29 Error &amp;     │──▶│ 30 Recon       │──▶│ 35 Integration │──▶ user
+  │    quarantine  │   │    framework   │   │    360         │
+  └────────────────┘   └────────────────┘   └───────▲────────┘
+                                                    │ status
+  ┌────────────────┐   ┌────────────────┐           │
+  │ 31 Audit &amp;     │   │ 34 Observ-     │      SEI 7 dashboard
+  │    lineage     │   │    ability     │      <span class="n">two surfaces — AD-6</span>
+  └────────────────┘   └────────────────┘
+  ┌────────────────┐   ┌────────────────┐
+  │ 32 Security    │   │ 36 SSO         │
+  └────────────────┘   └────────────────┘
+</div>
+
+    <h4>Component contracts</h4>
+    <table>
+      <tr><th style="width:44px">ID</th><th>Component</th><th>Responsibility</th><th>Key design point</th><th style="width:58px">Build</th></tr>
+      <tr class="hi"><td class="id">29</td><td>Error &amp; quarantine</td><td>Error taxonomy, quarantine store, resubmission path.</td><td>Quarantine is a first-class store with retention and a route back in — not a reject folder.</td><td><span class="badge b-py">PY</span></td></tr>
+      <tr class="hi"><td class="id">30</td><td>Reconciliation framework</td><td>Control totals, exception lifecycle, publication to Integration360.</td><td>An exception has states and an owner. Model the lifecycle, not just the alert.</td><td><span class="badge b-py">PY</span></td></tr>
+      <tr><td class="id">31</td><td>Audit &amp; lineage</td><td>Row-level lineage via the LOAD_ID chain; evidence retention.</td><td>dbt docs gives model-level lineage only. Row-level is yours to build.</td><td><span class="badge b-py">PY</span></td></tr>
+      <tr><td class="id">32</td><td>Security &amp; access</td><td>AuthN/AuthZ, classification, masking if PII is present.</td><td>Classify the SWP extracts before designing — masking changes the RAW model.</td><td><span class="badge b-inf">INF</span></td></tr>
+      <tr class="hi"><td class="id">33</td><td>Metadata &amp; config store</td><td>Single source for specs, rules, thresholds, mappings, schedules.</td><td>Everything config-driven depends on this. If it is late, 13/18/23/28 get hardcoded and never get un-hardcoded.</td><td><span class="badge b-ddl">DDL</span></td></tr>
+      <tr><td class="id">34</td><td>Observability</td><td>Logs, metrics, traces, SLIs.</td><td>Emit run-level metrics from Python and Airflow deliberately; do not rely on container logs.</td><td><span class="badge b-inf">INF</span></td></tr>
+      <tr><td class="id">35</td><td>Integration360</td><td>Monitoring, exceptions, process tracking, recon surface.</td><td>Existing BBH platform; the Hub builds the adapter.</td><td><span class="badge b-inf">VEN</span></td></tr>
+      <tr><td class="id">36</td><td>SSO</td><td>Federated access to SWP UI.</td><td>Configuration only.</td><td><span class="badge b-inf">INF</span></td></tr>
+    </table>
+
+    <h4>Failure modes this plane owns</h4>
+    <ul class="risk">
+      <li><b>Two config stores.</b> SEI keeps its own Metadata/Config/Mapping (component 5b) and the Hub keeps 33. They will diverge. Decide which is authoritative for shared mappings.</li>
+      <li><b>Two monitoring surfaces.</b> SEI's dashboard and Integration360 both claim status. <span class="ad">AD-6</span> resolves the recon record, but not the operator's question of which screen to trust.</li>
+      <li><b>Lineage that cannot answer the audit question.</b> Under in-place merge, lineage records that a row changed but not what it was. That is not audit-defensible.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ PLANE 6 ============ -->
+<section class="plane ocp" id="p6">
+  <div class="ph">
+    <div class="tag">Plane 6 · components 44–65</div>
+    <h2>OpenShift — infrastructure &amp; deployment</h2>
+    <p>Twenty-two components, none of them in either source deck. This plane does not appear in the architecture conversation until it is late, which is exactly why it is drawn here.</p>
+  </div>
+  <div class="body">
+    <h4>Runtime shape</h4>
+<div class="flow">  ┌─ namespace: prod ─────────────────────────────────────────┐
+  │                                                           │
+  │  51 Airflow          52 worker autoscaling                │
+  │  scheduler HA   ───▶ KubernetesExecutor ───▶ task pods    │
+  │                       │                        │          │
+  │                       │  53 quotas             │ 54 warm  │
+  │                       │  priority class        │    start │
+  │                       ▼                        ▼          │
+  │              ┌───────────────┐        ┌───────────────┐   │
+  │              │ ingest pod    │        │ dbt pod       │   │
+  │              │ Python 13     │        │ dbt 15/16     │   │
+  │              └───────┬───────┘        └───────┬───────┘   │
+  │                      └────────┬───────────────┘           │
+  │                        55 Oracle pooling                  │
+  │                        <span class="b">◀── real parallelism ceiling</span>      │
+  │                               │                           │
+  └───────────────────────────────┼───────────────────────────┘
+                                  ▼
+                            Oracle: RAW · STG2 · Gold · PBDW · IMDS
+
+  release path:  git ─▶ 57 CI/CD ─▶ 46 scan ─▶ 58 GitOps ─▶ namespace
+                              │
+                              └─▶ 59 dbt release  <span class="b">HIGH</span>  ─── rollback of a
+                                                        merged SCD2 dim has no
+                                                        native path · ties to 21
+</div>
+
+    <h4>The two constraints this plane imposes upward</h4>
+    <ul class="risk">
+      <li><b>Pods are cheap, Oracle sessions are not.</b> Component 55 sets the ceiling on the fan-out designed in component 18. That is an empirical number from the DBA plus a load test — get it before committing to a window.</li>
+      <li><b>Deployment velocity is an <span class="ad">AD-1</span> consequence.</b> If dbt writes PBDW and IMDS directly, your dbt release pipeline sits inside BBH production change control with whatever approval cycle that carries. A Hub-owned schema keeps the Hub's own cadence. ARB should see that this decision lands on release speed, not only on data ownership.</li>
+      <li><b>Long lead items.</b> Network egress to SEI (49) and Oracle session grants (55) are approval-bound, not build-bound. Start both now regardless of where the rest of the design sits.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ L3 SCOPE ============ -->
+<section class="foot" id="l3">
+  <h3>What gets an L3 document, and what does not</h3>
+  <div class="cols2">
+    <div>
+      <h4 style="margin-top:0">L3 required — 13 components</h4>
+      <p style="font-size:13px;color:var(--ink-2);margin:0 0 10px">Behaviour is not derivable from the L2 flow. Each needs a design doc reviewed before code: interface, data model, state transitions, failure and recovery, test strategy.</p>
+      <table>
+        <tr><th style="width:44px">ID</th><th>Component</th><th>Why L3</th></tr>
+        <tr><td class="id">13</td><td>Ingestion framework</td><td>Config-driven abstraction across three load mechanisms</td></tr>
+        <tr><td class="id">16</td><td>Gold</td><td>Custom SCD2 macro; no dbt default</td></tr>
+        <tr><td class="id">17</td><td>Corrections</td><td>Bitemporal strategy, reused everywhere</td></tr>
+        <tr><td class="id">18</td><td>DAG fan-out</td><td>Dynamic mapping over config</td></tr>
+        <tr><td class="id">21</td><td>Replay engine</td><td>State reversal; no framework support</td></tr>
+        <tr><td class="id">23</td><td>G1 validation</td><td>Rule engine + blocking semantics</td></tr>
+        <tr><td class="id">26</td><td>G4 tie-out</td><td>Crosses the model graph; gates publish</td></tr>
+        <tr><td class="id">28</td><td>DQ framework</td><td>Registry, severity, override, audit</td></tr>
+        <tr><td class="id">29</td><td>Error &amp; quarantine</td><td>Lifecycle and resubmission</td></tr>
+        <tr><td class="id">30</td><td>Recon framework</td><td>Exception state model</td></tr>
+        <tr><td class="id">33</td><td>Config store</td><td>Schema everything else depends on</td></tr>
+        <tr><td class="id">10</td><td>Outbound producers</td><td>Three output formats to SEI spec</td></tr>
+        <tr><td class="id">59</td><td>dbt release &amp; rollback</td><td>Restore path for a merged dim</td></tr>
+      </table>
+    </div>
+    <div>
+      <h4 style="margin-top:0">L3 not required — 52 components</h4>
+      <p style="font-size:13px;color:var(--ink-2)">A diagram would restate the L2 flow. These need a one-page spec instead:</p>
+      <ul class="risk">
+        <li><b>Config and platform (24 items).</b> Namespaces, RBAC, secrets, storage, quotas, GitOps, backup. Deliverable is a values file and a runbook, not a diagram.</li>
+        <li><b>DDL (4 items).</b> RAW, IMDS Stage, PBDW publication, config schema. Deliverable is the DDL plus a partitioning note.</li>
+        <li><b>Contract-only (10 items).</b> All of Zone 1 plus real-time consumers. Deliverable is an agreed interface spec, owned jointly with SEI.</li>
+        <li><b>Standard dbt (5 items).</b> Stage 2 models, Pivotal feed, IMDS load, tests. Deliverable is the model plus its schema.yml.</li>
+        <li><b>Vendor config (5 items).</b> Apigee, API Gateway, Integration360 adapter, SSO, BI.</li>
+      </ul>
+      <p style="font-size:13px;color:var(--ink-2);border-top:1px solid var(--rule);padding-top:10px;margin-top:14px"><b>Sequence.</b> Component 33 first — it is the schema four other high-custom components read. Then 13 and 28 together, since G1 lives inside the framework. Then 17, because 16, 21 and 59 all inherit its answer. Nothing in that chain moves until <span class="ad">AD-2</span> closes.</p>
+    </div>
+  </div>
+</section>
+
+</div>
+</body>
+</html>

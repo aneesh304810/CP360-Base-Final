@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CP Catalog — API 360 (Full Mockup)</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#10193b; --accent:#0f4775; --pop:#31bced; --hover:#0091bf;
+    --bg:#f5f8f8; --panel:#fff; --border:#dbdae0; --bgsoft:#eef3f3; --infobg:#e0f5fd;
+    --text:#2b2f38; --sub:#5a6472; --muted:#9aa3b0;
+    --sei:#0091bf; --pivotal:#7c3aed; --bloomberg:#000;
+    --get:#159943; --post:#0091bf; --put:#e67e22; --delete:#c1113a;
+    --success:#159943; --danger:#c1113a; --modApi:#0091bf; --warn:#e67e22; --warnbg:#fff7e6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Roboto,Arial,sans-serif;font-size:14px}
+  .mono{font-family:'Roboto Mono',monospace}
+  /* header */
+  .top{background:var(--navy);color:#fff;display:flex;align-items:center;padding:0 24px;height:54px;gap:14px}
+  .logo{width:32px;height:32px;background:var(--pop);border-radius:3px;display:grid;place-items:center;color:var(--navy);font-weight:700}
+  .top b{font-size:15px}.top small{color:#8ea3c4;font-size:11px;display:block}
+  .badge{margin-left:6px;font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;background:rgba(21,153,67,.25);color:#bfe}
+  .search{margin-left:18px;background:rgba(255,255,255,.12);border-radius:16px;height:32px;display:flex;align-items:center;padding:0 12px;width:240px;color:#9fb3cf}
+  .search input{background:none;border:none;outline:none;color:#fff;font-size:13px;flex:1;margin-left:6px}
+  nav.modnav{margin-left:auto;display:flex;gap:4px}
+  nav.modnav a{color:#bcccdf;font-size:13px;padding:7px 12px;border-radius:3px;text-decoration:none;cursor:pointer}
+  nav.modnav a.active{background:var(--accent);color:#fff}
+  .wrap{max-width:1263px;margin:0 auto;padding:24px 24px 60px}
+  .h1{font-size:24px;font-weight:500;color:var(--accent);border-bottom:2px solid var(--accent);padding-bottom:12px;margin:0 0 16px;display:flex;align-items:center;gap:10px}
+  /* project switch */
+  .switch{display:inline-flex;background:var(--panel);border:1px solid var(--border);border-radius:4px;overflow:hidden;margin-bottom:16px}
+  .switch button{border:none;background:none;padding:8px 16px;font-size:13px;cursor:pointer;font-family:inherit;color:var(--sub);border-right:1px solid var(--border)}
+  .switch button:last-child{border-right:none}.switch button.on{background:var(--accent);color:#fff}
+  .switch .ct{font-size:11px;opacity:.7;margin-left:5px}
+  /* kpis */
+  .kpis{display:flex;gap:14px;margin-bottom:18px;flex-wrap:wrap}
+  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:12px 18px;min-width:110px}
+  .kpi .n{font-size:22px;font-weight:700;color:var(--navy)}.kpi .n.d{color:var(--danger)}
+  .kpi .l{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-top:3px}
+  /* subview tabs */
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:20px}
+  .tabs button{background:none;border:none;font-size:13px;font-weight:500;padding:10px 18px;cursor:pointer;color:var(--sub);border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit}
+  .tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
+  .view{display:none}.view.on{display:block}
+  /* tables */
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--border);border-radius:4px;overflow:hidden}
+  th{background:var(--bgsoft);text-align:left;padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--accent);border-bottom:1px solid var(--border)}
+  td{padding:9px 12px;font-size:13px;border-bottom:1px solid var(--bg)}
+  tr:last-child td{border-bottom:none}
+  tr.click{cursor:pointer}tr.click:hover td{background:var(--infobg)}
+  .pb{font-size:10px;font-weight:700;text-transform:uppercase;padding:2px 7px;border-radius:3px;color:#fff}
+  .pb.sei{background:var(--sei)}.pb.bloomberg{background:var(--bloomberg)}
+  .mb{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;color:#fff;min-width:40px;text-align:center;display:inline-block}
+  .mb.GET{background:var(--get)}.mb.POST{background:var(--post)}.mb.PUT{background:var(--put)}.mb.DELETE{background:var(--delete)}
+  .pii{font-size:9px;font-weight:700;color:#fff;background:var(--danger);padding:2px 6px;border-radius:3px}
+  /* drawer */
+  .row2{display:flex;gap:0;align-items:flex-start}
+  .drawer{width:380px;background:var(--panel);border:1px solid var(--border);border-left:none;padding:18px;display:none}
+  .drawer.show{display:block}
+  .drawer h3{margin:8px 0 2px;font-size:17px;font-weight:500}
+  .kv{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--bg);font-size:13px}
+  .kv span{color:var(--sub)}.kv b{color:var(--navy)}
+  .sec{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:16px 0 8px}
+  /* dependency graph */
+  .depwrap{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:22px}
+  .note{font-size:12px;color:var(--sub);margin-bottom:14px;line-height:1.5}
+  .epnode{position:absolute;width:220px;height:40px;background:var(--panel);border:1px solid var(--border);border-radius:4px;display:flex;align-items:center;padding:0 10px;font-size:12px;box-shadow:0 1px 3px rgba(16,25,59,.08)}
+  /* flow mode */
+  .fmode{display:flex;gap:2px;margin-bottom:18px}
+  .fmode button{background:none;border:none;font-size:13px;font-weight:500;padding:6px 14px;cursor:pointer;font-family:inherit;color:var(--sub);border-bottom:2px solid transparent}
+  .fmode button.on{color:var(--modApi);border-bottom-color:var(--modApi)}
+  .fview{display:none}.fview.on{display:block}
+  /* runbooks */
+  .rbwrap{display:flex;gap:16px;align-items:flex-start}
+  .rblist{width:280px;flex-shrink:0}
+  .newbtn{width:100%;padding:9px 12px;margin-bottom:10px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;color:#fff;background:var(--modApi);border:none;border-radius:6px}
+  .rblabel{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px}
+  .rbitem{display:block;width:100%;text-align:left;padding:10px 12px;margin-bottom:6px;cursor:pointer;font-family:inherit;border:1px solid var(--border);border-radius:6px;background:var(--panel)}
+  .rbitem.on{border-color:var(--modApi);background:var(--infobg)}
+  .rbitem .nm{font-size:13px;font-weight:600;color:var(--navy)}
+  .rbitem .mt{font-size:11px;color:var(--sub);margin-top:2px}
+  .auto{color:var(--muted)}.cur{color:var(--success)}
+  .detail{flex:1}
+  .dtitle{font-size:18px;font-weight:600;color:var(--navy);margin-bottom:4px}
+  .gentag{font-size:11px;font-weight:700;color:var(--muted);margin-left:8px;padding:2px 7px;border:1px solid var(--border);border-radius:3px;vertical-align:middle}
+  .graph{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:18px;margin:14px 0 18px;display:flex;align-items:center;flex-wrap:wrap}
+  .gnode{background:var(--bgsoft);border:1px solid var(--border);border-radius:4px;padding:8px 11px;min-width:120px}
+  .gnode .gm{font-size:9px;font-weight:700}.gnode .gp{font-size:12px;font-weight:600;color:var(--navy);margin-top:2px}.gnode .gd{font-size:10px;color:var(--muted)}
+  .gedge{padding:0 6px;text-align:center}.gedge .ar{color:var(--muted);font-size:16px}.gedge .ent{font-size:9px;color:var(--modApi);font-weight:600}
+  .prod{color:var(--modApi);font-size:11px}.cons{color:var(--sub);font-size:11px}
+  /* builder */
+  .binp{width:100%;padding:8px 10px;font-size:13px;font-family:inherit;border:1px solid var(--border);border-radius:4px;margin-bottom:10px}
+  .bcol{flex:1}
+  .pickbox{max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:4px}
+  .pickrow{padding:7px 10px;border-bottom:1px solid var(--bg);cursor:pointer;display:flex;align-items:center;gap:8px}
+  .pickrow:hover{background:var(--infobg)}.pickrow.dim{opacity:.4}
+  .seqbox{border:1px solid var(--border);border-radius:4px;min-height:120px}
+  .seqrow{padding:7px 10px;border-bottom:1px solid var(--bg);display:flex;align-items:center;gap:8px}
+  .arrowbtn{border:1px solid var(--border);border-radius:3px;background:var(--panel);cursor:pointer;font-size:11px;width:22px;height:22px;color:var(--sub)}
+  .warnbox{background:var(--warnbg);border:1px solid var(--warn);border-radius:4px;padding:8px 10px;margin-bottom:8px;font-size:11px;color:#8a5200}
+  .savebtn{margin-top:12px;width:100%;padding:10px;font-size:14px;font-weight:600;color:#fff;background:var(--success);border:none;border-radius:6px;cursor:pointer}
+  .savebtn:disabled{background:var(--muted);cursor:default}
+  .ghostbtn{font-size:12px;padding:5px 12px;border:1px solid var(--border);border-radius:4px;background:var(--panel);cursor:pointer;color:var(--sub)}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="logo">CP</div>
+  <div><b>CP Catalog</b><small>BBH Capital Partners</small></div>
+  <span class="badge">● LIVE</span>
+  <div class="search"><span>⚲</span><input placeholder="Search datasets, feeds, models…"></div>
+  <nav class="modnav">
+    <a>Home</a><a>System Design</a><a>Interface 360</a>
+    <a class="active">API 360</a><a>Data 360</a><a>Datapoint 360</a><a>PII Explorer</a>
+  </nav>
+</div>
+
+<div class="wrap">
+  <div class="h1">◆ API 360</div>
+
+  <div class="switch">
+    <button class="on">All <span class="ct">196</span></button>
+    <button>SEI <span class="ct">196</span></button>
+    <button>Non-SEI <span class="ct">0</span></button>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="n">198</div><div class="l">API Sources</div></div>
+    <div class="kpi"><div class="n">269</div><div class="l">Endpoints</div></div>
+    <div class="kpi"><div class="n d">36</div><div class="l">PII Fields</div></div>
+    <div class="kpi"><div class="n">20</div><div class="l">Collections</div></div>
+    <div class="kpi"><div class="n">6</div><div class="l">Business Flows</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="on" onclick="tab(this,'sources')">Sources</button>
+    <button onclick="tab(this,'dep')">API Dependency</button>
+    <button onclick="tab(this,'flow')">Business Flow</button>
+  </div>
+
+  <!-- ============ SOURCES ============ -->
+  <div class="view on" id="sources">
+    <div class="row2">
+      <div style="flex:1">
+        <table>
+          <thead><tr><th>Source</th><th>Project</th><th>Feature Group</th><th>Release</th><th>Kind</th><th>Endpoints</th></tr></thead>
+          <tbody>
+            <tr class="click" onclick="openDrawer()"><td><b>AccountOverride</b></td><td><span class="pb sei">SEI</span></td><td>activity-management</td><td>PSI45</td><td>OpenAPI</td><td>3</td></tr>
+            <tr class="click" onclick="openDrawer()"><td><b>LoaderFramework</b></td><td><span class="pb sei">SEI</span></td><td>loader-framework</td><td>PSI45</td><td>OpenAPI</td><td>4</td></tr>
+            <tr class="click" onclick="openDrawer()"><td><b>OrderEntry</b></td><td><span class="pb sei">SEI</span></td><td>order-management</td><td>PSI45</td><td>OpenAPI</td><td>9</td></tr>
+            <tr class="click" onclick="openDrawer()"><td><b>CoreAccounting</b></td><td><span class="pb sei">SEI</span></td><td>core-accounting</td><td>PSI45</td><td>OpenAPI</td><td>42</td></tr>
+            <tr class="click" onclick="openDrawer()"><td><b>BloombergRef</b></td><td><span class="pb bloomberg">BLOOMBERG</span></td><td>market-data</td><td>v2</td><td>OpenAPI</td><td>4</td></tr>
+          </tbody>
+        </table>
+        <div class="note" style="margin-top:12px">Click a source to drill into its endpoints, request fields, and documented errors.</div>
+      </div>
+      <div class="drawer" id="drawer">
+        <div style="display:flex;gap:8px;align-items:center"><span class="pb sei">SEI</span><span class="pii">CLIENT PII</span></div>
+        <h3>POST /accountOverride/update</h3>
+        <div style="font-size:12px;color:var(--muted)">Activity Management · PSI45</div>
+        <div class="kv"><span>Function Point Id</span><b>491</b></div>
+        <div class="kv"><span>Operation</span><b>updateAccountOverride</b></div>
+        <div class="kv"><span>Request fields</span><b>6</b></div>
+        <div class="kv"><span>Documented errors</span><b>29</b></div>
+        <div class="kv"><span>Auth</span><b>OAuth2 + AppKey</b></div>
+        <div class="sec">Request fields</div>
+        <table style="border:none"><thead><tr><th>Field</th><th>Type</th><th>Req</th><th></th></tr></thead><tbody>
+          <tr><td class="mono">accountId</td><td>string</td><td>Y</td><td></td></tr>
+          <tr><td class="mono">clientName</td><td>string</td><td>Y</td><td><span class="pii">PII</span></td></tr>
+          <tr><td class="mono">overrideType</td><td>string</td><td>Y</td><td></td></tr>
+          <tr><td class="mono">overrideValue</td><td>number</td><td>Y</td><td></td></tr>
+        </tbody></table>
+        <div class="sec">Documented errors</div>
+        <table style="border:none"><thead><tr><th>Status</th><th>Code</th><th>Exception</th></tr></thead><tbody>
+          <tr><td>400</td><td class="mono">ERR-AO-001</td><td>Invalid Account</td></tr>
+          <tr><td>401</td><td class="mono">ERR-AO-002</td><td>Unauthorized</td></tr>
+          <tr><td>422</td><td class="mono">ERR-AO-003</td><td>Validation</td></tr>
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ DEPENDENCY ============ -->
+  <div class="view" id="dep">
+    <div class="depwrap">
+      <div class="note">Endpoint dependency graph — derived from the Postman collections' Depends-on / produces metadata. An edge means the source endpoint needs an entity the target produces. Solid = needs, color = method.</div>
+      <div style="position:relative;height:260px;min-width:640px">
+        <svg width="660" height="260" style="position:absolute;top:0;left:0">
+          <defs><marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="#9aa3b0"/></marker></defs>
+          <path d="M250 40 C340 40 340 130 430 130" fill="none" stroke="#9aa3b0" stroke-width="1.5" marker-end="url(#ar)"/>
+          <path d="M250 130 C340 130 340 130 430 130" fill="none" stroke="#9aa3b0" stroke-width="1.5" marker-end="url(#ar)"/>
+          <path d="M250 220 C340 220 340 130 430 130" fill="none" stroke="#9aa3b0" stroke-width="1.5" marker-end="url(#ar)"/>
+          <text x="330" y="80" font-size="9" fill="#0091bf" font-weight="700">accountNumber</text>
+        </svg>
+        <div class="epnode" style="left:20px;top:20px;border-left:3px solid var(--get)"><span class="mb GET">GET</span>&nbsp;/portfolio/taxlots</div>
+        <div class="epnode" style="left:20px;top:110px;border-left:3px solid var(--get)"><span class="mb GET">GET</span>&nbsp;/transactions</div>
+        <div class="epnode" style="left:20px;top:200px;border-left:3px solid var(--get)"><span class="mb GET">GET</span>&nbsp;/realtimeholdings</div>
+        <div class="epnode" style="left:430px;top:110px;border-left:3px solid var(--post)"><span class="mb POST">POST</span>&nbsp;/retrieveAccountDetails</div>
+      </div>
+      <div class="note" style="margin-top:10px"><b>Reads:</b> three core-accounting GETs all consume <span class="mono">accountNumber</span>, which <span class="mono">POST /retrieveAccountDetails</span> produces — so they depend on it.</div>
+    </div>
+  </div>
+
+  <!-- ============ BUSINESS FLOW ============ -->
+  <div class="view" id="flow">
+    <div class="fmode">
+      <button class="on" onclick="fmode(this,'runbooks')">Business Functions</button>
+      <button onclick="fmode(this,'perdomain')">Per-domain APIs</button>
+    </div>
+
+    <!-- runbooks -->
+    <div class="fview on" id="runbooks">
+      <div class="rbwrap">
+        <div class="rblist">
+          <button class="newbtn" onclick="openBuilder()">+ New Flow</button>
+          <div class="rblabel">Business functions (6)</div>
+          <div id="rbitems"></div>
+        </div>
+        <div class="detail" id="rbdetail"></div>
+      </div>
+    </div>
+
+    <!-- per-domain -->
+    <div class="fview" id="perdomain">
+      <div class="note">Each Postman collection as ingested — one flow per domain, endpoints listed in collection order. Secondary browse; the runbooks above are the cross-domain business sequences.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+        <button class="ghostbtn" style="background:var(--hover);color:#fff;border-color:var(--hover)">loader-framework</button>
+        <button class="ghostbtn">activity-management</button>
+        <button class="ghostbtn">core-accounting</button>
+        <button class="ghostbtn">order-management</button>
+        <button class="ghostbtn">cash</button>
+      </div>
+      <table><thead><tr><th>#</th><th>Method</th><th>Endpoint</th><th>Operation</th></tr></thead><tbody>
+        <tr><td>1</td><td><span class="mb GET">GET</span></td><td class="mono">/loader/{activityId}/exceptionextract</td><td style="font-size:11px;color:var(--sub)">retrieveExceptionExtractUsingGET</td></tr>
+        <tr><td>2</td><td><span class="mb POST">POST</span></td><td class="mono">/loader/reload</td><td style="font-size:11px;color:var(--sub)">reloadUsingPOST</td></tr>
+        <tr><td>3</td><td><span class="mb POST">POST</span></td><td class="mono">/loader</td><td style="font-size:11px;color:var(--sub)">submitFileUsingPOST</td></tr>
+        <tr><td>4</td><td><span class="mb GET">GET</span></td><td class="mono">/loader/{loaderId}/status</td><td style="font-size:11px;color:var(--sub)">fetchLoaderStatusUsingGET</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+</div>
+
+<script>
+  function tab(b,id){document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));document.getElementById(id).classList.add('on');}
+  function fmode(b,id){document.querySelectorAll('.fmode button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+    document.querySelectorAll('.fview').forEach(v=>v.classList.remove('on'));document.getElementById(id).classList.add('on');}
+  function openDrawer(){document.getElementById('drawer').classList.add('show');}
+
+  // ---- runbook data ----
+  const FLOWS=[
+    {name:"Tax Lot Audit for a Portfolio",origin:"curated",domain:"core-accounting",steps:4,
+     goal:"Audit open tax lots (cost basis, acquisition date, quantity) for a portfolio.",persona:"Audit, middle office",
+     s:[{n:1,m:"POST",p:"/v2/oauthtoken",op:"oauthTokenUsingPOST",d:"documents",pr:"access_token",co:"—",nt:"Authenticate; captures access_token"},
+        {n:2,m:"POST",p:"/retrieveAccountDetails",op:"retrieveAccountDetailsUsingPOST",d:"client-management",pr:"accountNumber",co:"clientId",nt:"Validate account, look up portfolios"},
+        {n:3,m:"GET",p:"/portfolio/taxlots",op:"getTaxLotsUsingGET",d:"core-accounting",pr:"—",co:"accountNumber, portfolioId",nt:"Pull every open tax lot"},
+        {n:4,m:"GET",p:"/transactions",op:"getTransactionsUsingGET",d:"core-accounting",pr:"—",co:"accountNumber",nt:"Reconcile against buy/sell activity"}]},
+    {name:"Daily Position Reconciliation",origin:"generated",domain:"core-accounting",steps:5,
+     goal:"Auto-generated sequence to call GET /realtimeholdings with its prerequisites.",persona:null,
+     s:[{n:1,m:"POST",p:"/v2/oauthtoken",op:"oauthTokenUsingPOST",d:"documents",pr:"access_token",co:"—",nt:"Authenticate"},
+        {n:2,m:"GET",p:"/firm-base-curr-cache",op:"firmBaseCurrUsingGET",d:"infrastructure",pr:"firmId",co:"—",nt:"Establish firm base currency"},
+        {n:3,m:"GET",p:"/realtimeholdings",op:"realtimeHoldingsUsingGET",d:"core-accounting",pr:"—",co:"firmId, accountNumber",nt:"Pull current positions"},
+        {n:4,m:"POST",p:"/netavailablecurrencybalance",op:"netAvailBalUsingPOST",d:"core-accounting",pr:"—",co:"accountNumber",nt:"Confirm available cash"},
+        {n:5,m:"GET",p:"/transactions",op:"getTransactionsUsingGET",d:"core-accounting",pr:"—",co:"accountNumber",nt:"Explain holding deltas"}]},
+    {name:"Cash Balance & Projection Check",origin:"curated",domain:"cash",steps:4,
+     goal:"Determine spendable cash today and project forward from fixed-income flows.",persona:"Operations analyst",
+     s:[{n:1,m:"POST",p:"/v2/oauthtoken",op:"oauthTokenUsingPOST",d:"documents",pr:"access_token",co:"—",nt:"Authenticate"},
+        {n:2,m:"GET",p:"/firm-base-curr-cache",op:"firmBaseCurrUsingGET",d:"infrastructure",pr:"firmId",co:"—",nt:"Firm reporting currency"},
+        {n:3,m:"POST",p:"/netavailablecurrencybalance",op:"netAvailBalUsingPOST",d:"core-accounting",pr:"—",co:"firmId",nt:"Spendable cash by currency"},
+        {n:4,m:"GET",p:"/amortizationaccretionsch",op:"amortSchUsingGET",d:"cash",pr:"—",co:"accountNumber",nt:"Projected future cash flows"}]},
+    {name:"Client Portfolio Snapshot",origin:"generated",domain:"core-accounting",steps:5,goal:"Auto-generated sequence to call GET /historicmarketvalues with its prerequisites.",persona:null,
+     s:[{n:1,m:"POST",p:"/v2/oauthtoken",op:"oauthTokenUsingPOST",d:"documents",pr:"access_token",co:"—",nt:"Authenticate"},
+        {n:2,m:"POST",p:"/retrievePartyDetails",op:"retrievePartyUsingPOST",d:"client-management",pr:"clientId",co:"—",nt:"Lookup client master"},
+        {n:3,m:"GET",p:"/realtimeholdings",op:"realtimeHoldingsUsingGET",d:"core-accounting",pr:"—",co:"clientId",nt:"Aggregate holdings"},
+        {n:4,m:"GET",p:"/historicmarketvalues",op:"histMvUsingGET",d:"core-accounting",pr:"—",co:"accountNumber",nt:"Trend portfolio value"},
+        {n:5,m:"GET",p:"/transactions",op:"getTransactionsUsingGET",d:"core-accounting",pr:"—",co:"accountNumber",nt:"Activity log"}]},
+    {name:"Household Aggregated Holdings",origin:"generated",domain:"core-accounting",steps:4,goal:"Auto-generated sequence to call POST /holdingsdetail with its prerequisites.",persona:null,
+     s:[{n:1,m:"POST",p:"/v2/oauthtoken",op:"oauthTokenUsingPOST",d:"documents",pr:"access_token",co:"—",nt:"Authenticate"},
+        {n:2,m:"POST",p:"/getAccountListForHousehold",op:"acctListUsingPOST",d:"client-management",pr:"accountNumber",co:"clientId",nt:"Resolve household accounts"},
+        {n:3,m:"POST",p:"/holdingsdetail",op:"holdingsDetailUsingPOST",d:"core-accounting",pr:"—",co:"accountNumber",nt:"Aggregate positions"},
+        {n:4,m:"POST",p:"/accountsHistoricMarketValues",op:"acctsHistMvUsingPOST",d:"core-accounting",pr:"—",co:"accountNumber",nt:"Historic performance"}]},
+    {name:"Loader Submission & Status",origin:"generated",domain:"loader-framework",steps:3,goal:"Auto-generated sequence to call GET /loader/{loaderId}/status with its prerequisites.",persona:null,
+     s:[{n:1,m:"POST",p:"/v2/oauthtoken",op:"oauthTokenUsingPOST",d:"documents",pr:"access_token",co:"—",nt:"Authenticate"},
+        {n:2,m:"POST",p:"/loader",op:"submitFileUsingPOST",d:"loader-framework",pr:"loaderId",co:"—",nt:"Submit loader file"},
+        {n:3,m:"GET",p:"/loader/{loaderId}/status",op:"fetchLoaderStatusUsingGET",d:"loader-framework",pr:"—",co:"loaderId",nt:"Fetch loader status"}]}
+  ];
+  const MC={GET:"var(--get)",POST:"var(--post)",PUT:"var(--put)",DELETE:"var(--delete)"};
+
+  function renderList(active){
+    document.getElementById('rbitems').innerHTML = FLOWS.map((f,i)=>`
+      <button class="rbitem ${i===active?'on':''}" onclick="pickFlow(${i})">
+        <div class="nm">${f.name}</div>
+        <div class="mt">${f.domain} · ${f.steps} steps ${f.origin==='generated'?'<span class="auto">· auto</span>':'<span class="cur">· curated</span>'}</div>
+      </button>`).join("");
+  }
+  function renderDetail(f){
+    const gen=f.origin==="generated";
+    const graph=f.s.map((s,i)=>{
+      const node=`<div class="gnode"><div class="gm" style="color:${MC[s.m]}">${s.m} · step ${s.n}</div><div class="gp">${s.p}</div><div class="gd">${s.d}</div></div>`;
+      const edge=i<f.s.length-1?`<div class="gedge"><div class="ar">→</div>${s.pr!=="—"?`<div class="ent">${s.pr}</div>`:""}</div>`:"";
+      return node+edge;}).join("");
+    const rows=f.s.map(s=>`<tr><td>${s.n}</td><td><span class="mb ${s.m}">${s.m}</span></td><td class="mono" style="font-size:12px">${s.p}</td><td style="font-size:11px;color:var(--sub)">${s.op}</td><td>${s.d}</td><td class="prod">${s.pr}</td><td class="cons">${s.co}</td><td style="font-size:12px;color:var(--sub)">${s.nt}</td></tr>`).join("");
+    document.getElementById('rbdetail').innerHTML=`
+      <div class="dtitle">${f.name}${gen?'<span class="gentag">AUTO-GENERATED · BA can edit</span>':''}</div>
+      <div class="note" style="margin-bottom:2px">${f.goal}</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Audience: ${f.persona||'<span style="color:var(--muted)">not set — BA to add</span>'}</div>
+      <div class="graph">${graph}</div>
+      <table><thead><tr><th>#</th><th>Method</th><th>Path</th><th>Operation</th><th>Domain</th><th>Produces</th><th>Consumes</th><th>Purpose</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+  function pickFlow(i){renderList(i);renderDetail(FLOWS[i]);}
+
+  // ---- builder ----
+  const PICK=[
+    {m:"POST",p:"/v2/oauthtoken",d:"documents"},{m:"GET",p:"/firm-base-curr-cache",d:"infrastructure"},
+    {m:"POST",p:"/retrieveAccountDetails",d:"client-management"},{m:"GET",p:"/realtimeholdings",d:"core-accounting"},
+    {m:"GET",p:"/portfolio/taxlots",d:"core-accounting"},{m:"GET",p:"/transactions",d:"core-accounting"},
+    {m:"POST",p:"/netavailablecurrencybalance",d:"core-accounting"},{m:"POST",p:"/loader",d:"loader-framework"}
+  ];
+  let chosen=[];
+  function openBuilder(){
+    chosen=[];
+    document.getElementById('rbdetail').innerHTML=`
+      <div style="display:flex;align-items:center;margin-bottom:14px">
+        <div class="dtitle">Build a new business flow</div>
+        <button class="ghostbtn" style="margin-left:auto" onclick="pickFlow(0)">Cancel</button>
+      </div>
+      <input class="binp" id="bname" placeholder="Flow name (e.g. Daily Position Reconciliation)">
+      <input class="binp" placeholder="Goal — what business outcome does this achieve?">
+      <input class="binp" placeholder="Audience / persona (optional)">
+      <div style="display:flex;gap:16px;align-items:flex-start;margin-top:6px">
+        <div class="bcol">
+          <div class="rblabel">Pick endpoints</div>
+          <input class="binp" placeholder="Search path / operation…" oninput="filterPick(this.value)">
+          <select class="binp" onchange="filterDomain(this.value)"><option value="">All domains</option>
+            <option>core-accounting</option><option>client-management</option><option>documents</option>
+            <option>infrastructure</option><option>loader-framework</option></select>
+          <div class="pickbox" id="pickbox"></div>
+        </div>
+        <div class="bcol">
+          <div style="display:flex;align-items:center;margin-bottom:6px">
+            <div class="rblabel" style="margin:0">Sequence (<span id="seqct">0</span>)</div>
+            <button class="ghostbtn" style="margin-left:auto;font-size:11px;color:var(--modApi);border-color:var(--modApi)" onclick="autoOrder()">⤲ Auto-order</button>
+          </div>
+          <div id="warnbox"></div>
+          <div class="seqbox" id="seqbox"><div style="padding:14px;color:var(--muted);font-size:12px">Click endpoints on the left to add them.</div></div>
+          <button class="savebtn" id="savebtn" disabled onclick="saveFlow()">Save flow to catalog</button>
+        </div>
+      </div>`;
+    renderPick(PICK);renderSeq();
+  }
+  let curPick=PICK;
+  function renderPick(list){curPick=list;
+    document.getElementById('pickbox').innerHTML=list.map(e=>{
+      const inc=chosen.some(c=>c.p===e.p);
+      return `<div class="pickrow ${inc?'dim':''}" onclick='addEp(${JSON.stringify(e)})'><span class="mb ${e.m}">${e.m}</span><span class="mono" style="font-size:12px">${e.p}</span><span style="font-size:10px;color:var(--muted);margin-left:auto">${e.d}</span></div>`;
+    }).join("")||'<div style="padding:12px;color:var(--muted);font-size:12px">No matches.</div>';}
+  function filterPick(q){renderPick(PICK.filter(e=>(e.p+e.d).toLowerCase().includes(q.toLowerCase())));}
+  function filterDomain(d){renderPick(d?PICK.filter(e=>e.d===d):PICK);}
+  function addEp(e){if(!chosen.some(c=>c.p===e.p)){chosen.push(e);renderSeq();renderPick(curPick);}}
+  function rmEp(i){chosen.splice(i,1);renderSeq();renderPick(curPick);}
+  function mv(i,d){const j=i+d;if(j<0||j>=chosen.length)return;[chosen[i],chosen[j]]=[chosen[j],chosen[i]];renderSeq();}
+  function renderSeq(){
+    document.getElementById('seqct').textContent=chosen.length;
+    document.getElementById('savebtn').disabled=chosen.length===0;
+    const box=document.getElementById('seqbox');
+    if(!chosen.length){box.innerHTML='<div style="padding:14px;color:var(--muted);font-size:12px">Click endpoints on the left to add them.</div>';return;}
+    box.innerHTML=chosen.map((c,i)=>`<div class="seqrow"><span style="font-size:11px;color:var(--muted);width:16px">${i+1}</span><span class="mb ${c.m}">${c.m}</span><span class="mono" style="font-size:12px">${c.p}</span><span style="margin-left:auto;display:flex;gap:4px"><button class="arrowbtn" onclick="mv(${i},-1)">↑</button><button class="arrowbtn" onclick="mv(${i},1)">↓</button><button class="arrowbtn" style="color:var(--danger)" onclick="rmEp(${i})">✕</button></span></div>`).join("");
+  }
+  function autoOrder(){
+    // demo: move auth to front, show a warning if taxlots present without account step
+    chosen.sort((a,b)=>(a.p==="/v2/oauthtoken"?-1:b.p==="/v2/oauthtoken"?1:0));
+    const hasTaxlot=chosen.some(c=>c.p==="/portfolio/taxlots");
+    const hasAccount=chosen.some(c=>c.p==="/retrieveAccountDetails");
+    document.getElementById('warnbox').innerHTML=(hasTaxlot&&!hasAccount)?
+      '<div class="warnbox">⚠ Missing prerequisites: accountNumber — no chosen step produces it. Add POST /retrieveAccountDetails or reorder.</div>':'';
+    renderSeq();
+  }
+  function saveFlow(){
+    const nm=document.getElementById('bname').value||"New Flow";
+    document.getElementById('savebtn').textContent="✓ Saved";
+    setTimeout(()=>{alert('Saved "'+nm+'" with '+chosen.length+' steps to the catalog (origin=curated). It now appears for everyone.');pickFlow(0);},300);
+  }
+
+  // init
+  renderList(0);renderDetail(FLOWS[0]);
+</script>
+</body>
+</html>

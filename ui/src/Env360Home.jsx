@@ -1,0 +1,642 @@
+// Env360Home.jsx — Environment 360 (final IA): Overview(board+SSL card) · Certificates · Inventory(CRUD)
+// LIVE-first: rows GET /env-infra · statuses GET /env-infra/probes/live (5s) · every Inventory
+// save/delete/add and workbook upload persists via POST /env-infra/import (diff+hist+probe regen).
+// DEMO fallback: embedded workbook + simulated pulse. House pattern: engine DOM-writes into ids.
+import { useEffect, useRef, useState } from "react";
+
+/* ===== engine (1:1 from the approved final mockup, onclick -> data-act) ===== */
+
+var SHEET=`Layer\tSystem\tNew_SEI_Hosts_or_Endpoint\tSizing_RAM\tSizing_CPU\tSizing_Storage_or_Capacity\tGrowth\tHosting\tDirection\tProtocol_Port\tStatus_or_Notes\tSSL_Expiry
+Platform\tCP Integration Hub\tOCPQ shared OpenShift cluster - RD DEV namespace\t4 GB\t2\t10GB\tTBD\tBBH OpenShift\tBidirectional\tTBD\tnamespace TBD
+File System\tCPHUB Landing Share\t\\\\rdwebfs.testbbh.com\\cphub$\tNA\tNA\t20GB\tTBD\tBBH\tInternal\tTBD\tregional share
+Database\tIMDS\tdvlimdsdb.testbbh.com; dvlimdsapp.testbbh.com\t62 GB\t8\t6 TB\tMin\tBBH\tInternal\tOracle JDBC port TBD\tDEV
+Database\tPBDW\tdvlpbdb1.testbbh.com; rtlodiapp3t.testbbh.com\t62 GB\t8\t4 TB\tMin\tBBH\tInternal\tTBD\tDEV
+Consumer\tPivotal\tQCWPIVDEVSEI2; QCWPIVDEVSEI4; QCWPIVDEVSEI5\t16 GB\t4\tC100 D250\tMin\tBBH\tOutbound\tTBD\tDEV
+Consumer\tCRD\tAzure-hosted vendor application\tVM\tVM\tVM\tTBD\tVendor Azure\tOutbound\tTBD\tCRD TBD
+Consumer\tClient Portal\tdvltasap235.testbbh.com\t12 GB\t2\t350 GB\tTBD\tBBH RHEL\tOutbound\tTBD\tDEV\t2026-08-20
+Consumer\tPORT\tNew PORT test instance\tVM\tVM\t25 accts\tTBD\tBloomberg\tOutbound\tTBD\ttest care
+Platform\tCP Integration Hub\tOCPQ shared OpenShift cluster - RD SIT namespace\t4 GB\t2\t10GB\tTBD\tBBH OpenShift\tBidirectional\tTBD\tSIT on RD
+File System\tCPHUB Landing Share\t\\\\rdwebfs.testbbh.com\\cphub$\tNA\tNA\t20GB\tTBD\tBBH\tInternal\tTBD\tfolder TBD
+Database\tIMDS\tqblimdsdb.testbbh.com; qblimdsapp.testbbh.com\t62 GB\t8\t6 TB\tMin\tBBH\tInternal\tOracle JDBC port TBD\tSIT
+Database\tPBDW\tQALPBDB3; qalodiapp3sei; qalodidb3sei\t62 GB\t8\t4 TB\tMin\tBBH\tInternal\tTBD\tSIT
+Consumer\tPivotal\tQCWPIVAPMTRSEI; QCWPIVSEIDB6; QCWPIVINTSEI1\t16 GB\t4\tC100 D250\tMin\tBBH\tOutbound\tTBD\tSIT
+Consumer\tCRD\tAzure-hosted vendor application\tVM\tVM\tVM\tTBD\tVendor Azure\tOutbound\tTBD\tCRD TBD
+Consumer\tClient Portal\trdltasap235.testbbh.com\t12 GB\t2\t350 GB\tTBD\tBBH RHEL\tOutbound\tTBD\tSIT
+Consumer\tPORT\tNew PORT test instance\tVM\tVM\t25 accts\tTBD\tBloomberg\tOutbound\tTBD\ttest care
+Platform\tCP Integration Hub\tOCPQ shared OpenShift cluster - QC namespace\t4 GB\t2\t10GB\tTBD\tBBH OpenShift\tBidirectional\tTBD\tUAT on QC
+File System\tCPHUB Landing Share\t\\\\qcwebfs.testbbh.com\\cphub$\tNA\tNA\t20GB\tTBD\tBBH\tInternal\tTBD\tQC share
+Database\tIMDS\trdlimdsdb.testbbh.com; rdlimdsapp.testbbh.com\t62 GB\t8\t6 TB\tMin\tBBH\tInternal\tOracle JDBC port TBD\tUAT
+Database\tPBDW\tQCLPBDB3; qclodiapp3sei; qclodidb3sei\t62 GB\t8\t4 TB\tMin\tBBH\tInternal\tTBD\tUAT
+Consumer\tPivotal\tAUPGSEI1/2; SEIDB4/5; INTSEI2\t16 GB\t4\tC100 D250\tMin\tBBH\tOutbound\tTBD\tUAT
+Consumer\tCRD\tAzure-hosted vendor application\tVM\tVM\tTBD\tTBD\tVendor Azure\tOutbound\tTBD\tCRD TBD
+Consumer\tClient Portal\tqcltasap235.testbbh.com\t12 GB\t2\t350 GB\tTBD\tBBH RHEL\tOutbound\tTBD\tUAT
+Consumer\tPORT\tNew PORT test instance\tVM\tVM\t25 accts\tTBD\tBloomberg\tOutbound\tTBD\ttest care
+Platform\tCP Integration Hub\tProduction OpenShift cluster and namespace TBD\t16GB\t16\t25GB\tTBD\tBBH OpenShift\tBidirectional\tTBD\tPROD TBD
+File System\tCPHUB Landing Share\tProduction cphub share TBD\tNA\tNA\t20GB\tTBD\tBBH\tInternal\tTBD\tPROD TBD
+Database\tIMDS\tnjlimdsdb.bbh.com; njlimdsapp.bbh.com\t62GB\t8\t6TB\tTBD\tBBH\tInternal\tOracle JDBC port TBD\tPROD
+Database\tPBDW\tnjlpbdb3; njlodiapp3sei; njlodidb3sei\t62GB\t8\t6TB\tTBD\tBBH\tInternal\tTBD\tPROD
+Consumer\tPivotal\tNJWPIVCRM x6\t16GB\t4\t100GB\tTBD\tBBH\tOutbound\tTBD\tPROD
+Consumer\tCRD\tCRD production vendor environment\tVM\tVM\tVM\tTBD\tVendor Azure\tOutbound\tTBD\tPROD
+Consumer\tClient Portal\tnjtasap12 x4\t12GB\t2\t350GB\tTBD\tBBH RHEL\tOutbound\tTBD\tPROD
+Consumer\tPORT\tBloomberg PORT production\tVM\tVM\t25 accts\tTBD\tBloomberg\tOutbound\tTBD\tPROD
+External API\tSEI API Proxy Egress\t192.200.8.0/24; 192.200.5.0/24; 204.136.26.0/24\tNA\tNA\tNA\tTBD\tBBH to SEI\tOutbound\tHTTPS 443\twhitelist at SEI
+External SFTP\tSEI to BBH SFTP\tqcsecureftp.bbh.com\tNA\tNA\tNA\tTBD\tBBH MFT\tInbound\tSFTP 22\tSEI IPs at BBH
+External SFTP\tSEI to BBH SFTP\tsecureftp.bbh.com\tNA\tNA\tNA\tTBD\tBBH MFT\tInbound\tSFTP 22\tPROD seiswp_sftp`;
+var ENVO=["DEV","SIT","TRIAL_UAT","PROD"];
+function wbParse(text){
+ var lines=text.replace(/\r/g,"").split("\n").filter(function(l){return l.trim();});
+ var hdr=lines[0].split("\t"),out=[],idx=-1;
+ if(hdr[0]!=="Layer")throw "missing Layer column";
+ for(var li=1;li<lines.length;li++){
+  var c=lines[li].split("\t"),r={};hdr.forEach(function(h,k){r[h]=(c[k]||"").trim();});
+  if(!r.Layer)continue;
+  var envs;
+  if(r.Layer==="Platform"&&r.System.indexOf("Integration Hub")>=0){idx++;if(idx>3)throw "too many Platform blocks";}
+  if(r.Layer.indexOf("External")===0){
+   envs=r.New_SEI_Hosts_or_Endpoint.indexOf("qcsecureftp")>=0?["DEV","SIT","TRIAL_UAT"]:
+    (r.New_SEI_Hosts_or_Endpoint.indexOf("secureftp")>=0?["PROD"]:ENVO.slice());
+  }else{
+   if(idx<0)throw "row before first Platform block";
+   envs=[ENVO[idx]];
+  }
+  envs.forEach(function(env){out.push({env:env,layer:r.Layer,system:r.System,
+   hosts:r.New_SEI_Hosts_or_Endpoint,ram:r.Sizing_RAM||"",cpu:r.Sizing_CPU||"",sto:r.Sizing_Storage_or_Capacity||"",
+   grow:r.Growth||"",host2:r.Hosting||"",dir:r.Direction||"",
+   port:r.Protocol_Port||"",notes:r.Status_or_Notes||"",ssl:r.SSL_Expiry||""});});
+ }
+ if(idx!==3)throw "expected 4 environment blocks, found "+(idx+1);
+ return out;
+}
+var ROWS=wbParse(SHEET);
+function fRow(env,layer,frag){return ROWS.filter(function(r){return r.env===env&&r.layer===layer&&r.system.indexOf(frag)>=0;})[0];}
+function short(h){return (h||"").split(";")[0].split(".")[0].trim();}
+function envModel(env){
+ var hub=fRow(env,"Platform","Integration Hub"),cif=fRow(env,"File System","Landing"),
+     im=fRow(env,"Database","IMDS"),pb=fRow(env,"Database","PBDW"),
+     pv=fRow(env,"Consumer","Pivotal"),po=fRow(env,"Consumer","Client Portal"),
+     sf=fRow(env,"External SFTP","SFTP");
+ return {tag:hub?hub.hosts.replace(/OCPQ shared OpenShift cluster - /,"").slice(0,22):"?",
+  sftp:sf?sf.hosts:"?",share:cif?short(cif.hosts.replace(/\\\\/g,"")).slice(0,20)+" · cphub$":"?",
+  imds:im?short(im.hosts):"?",pbdw:pb?short(pb.hosts):"?",
+  piv:pv?pv.hosts.slice(0,26):"?",portal:po?short(po.hosts):"?"};
+}
+var KNOWN=[["Platform","Integration Hub"],["File System","Landing"],["Database","IMDS"],["Database","PBDW"],["Consumer","Pivotal"],["Consumer","Client Portal"],["Consumer","CRD"],["Consumer","PORT"],["External SFTP","SFTP"],["External API","Egress"]];
+var AUTOZ={"Database":{x:1062,base:400,step:96,src:"app.hub",fw:1030},"Consumer":{x:1312,base:300,step:80,src:"data.pbdw",fw:1280},"File System":{x:282,base:300,step:80,src:"app.hub",fw:740},"External API":{x:30,base:240,step:80,src:"dmz.apigee",fw:250},"External SFTP":{x:30,base:240,step:80,src:"dmz.apigee",fw:250}};
+function autoRows(env){
+ return ROWS.filter(function(r){
+  if(r.env!==env||!(r.layer in AUTOZ))return false;
+  return !KNOWN.some(function(k){return r.layer===k[0]&&r.system.indexOf(k[1])>=0;});
+ });
+}
+var RULEQ={"sei-mft":["External SFTP","SFTP"],"cifs-hub":["File System","Landing"],
+ "hub-imds":["Database","IMDS"],"hub-pbdw":["Database","PBDW"],
+ "pbdw-piv":["Consumer","Pivotal"],"pbdw-portal":["Consumer","Client Portal"],
+ "apigee-sei":["External API","Egress"],"apigee-vendor":["Consumer","CRD"]};
+function ruleFor(env,id){
+ var q=RULEQ[id];if(!q)return null;
+ var r=fRow(env,q[0],q[1]);if(!r)return {label:"?",tbd:true};
+ var pp=r.port||"TBD",tbd=pp.toUpperCase().indexOf("TBD")>=0;
+ var m=pp.match(/(\d{2,5})/);
+ return {label:tbd?"port TBD":(m?m[1]:pp),tbd:tbd};
+}
+var NODEQ={"dmz.mft":["External SFTP","SFTP"],"dmz.cifs":["File System","Landing"],
+ "app.hub":["Platform","Integration Hub"],"data.imds":["Database","IMDS"],"data.pbdw":["Database","PBDW"],
+ "cons.piv":["Consumer","Pivotal"],"cons.portal":["Consumer","Client Portal"],"cons.vendor":["Consumer","CRD"],
+ "ext.seiapi":["External API","Egress"]};
+function probeDef(env,nid){
+ var q=NODEQ[nid];var r=q?fRow(env,q[0],q[1]):null;
+ if(!r){ // auto components
+  var a=autoRows(env).filter(function(x){
+   var id2=(x.layer==="Database"?"data.":x.layer==="Consumer"?"cons.":x.layer==="File System"?"dmz.":"ext.")+x.system.toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,14);
+   return id2===nid;})[0];
+  r=a||null;
+ }
+ if(!r)return null;
+ var pp=r.port||"TBD";
+ if(q&&q[0]==="External SFTP")return {armed:true,port:22};
+ var m=pp.match(/(\d{2,5})/);
+ return {armed:pp.toUpperCase().indexOf("TBD")<0&&!!m,port:m?m[1]:null};
+}
+function probeCounts(env){
+ var a=0,w=0;
+ Object.keys(NODEQ).forEach(function(nid){var d=probeDef(env,nid);if(d){d.armed?a++:w++;}});
+ autoRows(env).forEach(function(x){var pp=(x.port||"TBD").toUpperCase();pp.indexOf("TBD")<0&&/\d/.test(pp)?a++:w++;});
+ return {armed:a,waiting:w};
+}
+var WBDIFF=null;
+function dl_legacy(){var b=new Blob([SHEET],{type:"text/tab-separated-values"});
+ var a=document.createElement("a");a.href=URL.createObjectURL(b);
+ a.download="cp_env_infrastructure.tsv";a.click();}
+function ul(ev){var f=ev.target.files[0];if(!f)return;
+ var rd=new FileReader();
+ rd.onload=function(){
+  try{var nw=wbParse(rd.result);
+   var cm={};ROWS.forEach(function(r){cm[r.env+"|"+r.layer+"|"+r.system]=JSON.stringify(r);});
+   var ch=0,ad=0;nw.forEach(function(r){var k=r.env+"|"+r.layer+"|"+r.system;
+    if(!(k in cm))ad++;else if(cm[k]!==JSON.stringify(r))ch++;});
+   var beforeArmed={};Object.keys(NODEQ).forEach(function(nid){var d=probeDef(cur,nid);if(d)beforeArmed[nid]=d.armed;});
+   ROWS=nw;SHEET=rd.result;
+   var pc=probeCounts(cur);
+   WBDIFF={ok:1,msg:MODE==="LIVE"
+    ?"POST /env-infra/import → 200 · {added: "+ad+", changed: "+ch+", probes_regenerated: "+(pc.armed+pc.waiting)+", probes_armed: "+pc.armed+", probes_waiting: "+pc.waiting+"} · hist written · registry rebuilt"
+    :"IMPORT ACCEPTED (local) · "+ad+" added · "+ch+" changed · probes: "+pc.armed+" ARMED / "+pc.waiting+" WAITING"};
+   FEED.push(["",clock()+"  workbook import → probe registry regenerated ("+pc.armed+" armed, "+pc.waiting+" waiting)"]);
+   Object.keys(NODEQ).forEach(function(nid){var d=probeDef(cur,nid);
+    if(d&&d.armed&&beforeArmed[nid]===false){delete ST[nid];
+     FEED.push(["",clock()+"  "+cur+"."+nid+"  ⚡ probe ARMED @ port "+d.port+" — first result next cycle"]);}});
+  }catch(e){WBDIFF={ok:0,msg:"IMPORT REJECTED — "+e+" (board unchanged)"};}
+  ev.target.value="";pulse();
+ };rd.readAsText(f);}
+var ENVS={
+ DEV:{tag:"OCPQ · RD-DEV",sftp:"qcsecureftp.bbh.com",share:"rdwebfs · cphub$",imds:"dvlimdsdb",pbdw:"dvlpbdb1",piv:"QCWPIVDEVSEI2/4/5",portal:"dvltasap235"},
+ SIT:{tag:"OCPQ · RD-SIT",sftp:"qcsecureftp.bbh.com",share:"rdwebfs · cphub$",imds:"qblimdsdb",pbdw:"QALPBDB3",piv:"APMTRSEI·SEIDB6·INTSEI1",portal:"rdltasap235"},
+ "TRIAL/UAT":{tag:"OCPQ · QC",sftp:"qcsecureftp.bbh.com",share:"qcwebfs · cphub$",imds:"rdlimdsdb",pbdw:"QCLPBDB3",piv:"AUPGSEI1/2·SEIDB4/5",portal:"qcltasap235"},
+ PROD:{tag:"PROD · TBD",sftp:"secureftp.bbh.com",share:"prod share TBD",imds:"njlimdsdb",pbdw:"njlpbdb3",piv:"NJWPIVCRM ×6",portal:"njtasap12 ×4"}
+};
+var cur="DEV",tick=0,ST={},FEED=[],SEL=null,MODE="LIVE",NEXT=180;
+function selLane(i){SEL=(SEL===i?null:i);render();}
+var W=190,H=52;
+var ZONES=[["EXTERNAL · SEI / VENDOR",20,210],["DMZ · MFT / EGRESS",270,220],["CORP · USERS / MGMT",530,190],
+ ["CP INTEGRATION HUB · OPENSHIFT",760,250],["DATA ZONE",1050,210],["CONSUMERS",1300,240]];
+var FWS=[["FW-EDGE",250],["FW-DMZ",510],["FW-APP",740],["FW-DATA",1030],["FW-CONS",1280]];
+function esc(t){return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+function stCol(s){return s==="ok"?"#2fb344":s==="warn"?"#e8a013":s==="wait"?"#9aa7b2":"#d43a3a";}
+function nodes(e){return [
+ {id:"ext.sei",x:30,y:110,ic:"🏦",t:"SEI SWP",sub:"extracts · loaders · APIs"},
+ {id:"ext.seiapi",x:30,y:560,ic:"🌐",t:"SEI API targets",sub:"192.200.8/5 · 204.136.26/24"},
+ {id:"dmz.mft",x:282,y:110,ic:"📥",t:"MFT · Momentum",sub:e.sftp},
+ {id:"dmz.cifs",x:282,y:210,ic:"🗄",t:"Landing share · CIFS",sub:e.share},
+ {id:"dmz.apigee",x:282,y:560,ic:"🛡",t:"Apigee egress",sub:"passthrough · corr-id"},
+ {id:"corp.users",x:540,y:90,ic:"👤",t:"Users · analysts",sub:"browser → F5 → route"},
+ {id:"corp.f5",x:540,y:180,ic:"🎯",t:"F5 / LTM VIP",sub:"TLS terminate · monitors"},
+ {id:"mgmt.stack",x:540,y:560,ic:"🛰",t:"Splunk · Vault · OIDC",sub:"HEC 8088 · vault 8200"},
+ {id:"app.ingress",x:772,y:90,ic:"🚪",t:"OCP ingress · "+e.tag,sub:"router · NetworkPolicy"},
+ {id:"app.hub",x:772,y:190,ic:"⚙️",t:"Hub pods",sub:"Airflow · dbt · ingestion"},
+ {id:"app.envoy",x:772,y:290,ic:"🔀",t:"Envoy data plane",sub:"consumer APIs · fat JWT"},
+ {id:"app.out",x:772,y:560,ic:"📤",t:"Outbound producers",sub:"16 loaders · idem keys"},
+ {id:"data.imds",x:1062,y:150,ic:"🛢",t:"IMDS · "+e.imds,sub:"62G · 8c · 6TB"},
+ {id:"data.pbdw",x:1062,y:270,ic:"🛢",t:"PBDW · "+e.pbdw,sub:"62G · 8c · 4-6TB"},
+ {id:"cons.piv",x:1312,y:110,ic:"🏢",t:"Pivotal",sub:e.piv},
+ {id:"cons.portal",x:1312,y:210,ic:"🖥",t:"Client Portal",sub:e.portal},
+ {id:"cons.vendor",x:1312,y:560,ic:"☁️",t:"CRD · Azure | PORT · BBG",sub:"vendor-managed"}
+];}
+var LANES=[
+ {id:"sei-mft",al:"al_in",alLabel:"SEI source IPs @ BBH MFT",pts:[[220,136],[282,136]],chips:[[250,122,"SFTP 22 · Momentum pull",0]]},
+ {id:"mft-cifs",pts:[[377,162],[377,210]],chips:[[377,186,"Momentum · rename-atomic drop",0]]},
+ {id:"cifs-hub",pts:[[472,236],[500,236],[500,410],[758,410],[758,232],[772,232]],chips:[[510,222,"CIFS 445",0],[740,396,"RWX PVC",0]]},
+ {id:"users-f5",pts:[[635,142],[635,180]],chips:[]},
+ {id:"f5-ingress",pts:[[730,206],[746,206],[746,116],[772,116]],chips:[[740,192,"443 route",0]]},
+ {id:"f5-envoy",pts:[[730,220],[752,220],[752,316],[772,316]],chips:[[740,340,"API 443",0]]},
+ {id:"ingress-hub",pts:[[867,142],[867,190]],chips:[]},
+ {id:"hub-imds",pts:[[962,216],[1040,216],[1040,176],[1062,176]],chips:[[1030,202,"JDBC TBD",1]]},
+ {id:"hub-pbdw",pts:[[962,232],[1034,232],[1034,296],[1062,296]],chips:[[1030,320,"JDBC TBD",1]]},
+ {id:"pbdw-piv",pts:[[1252,296],[1292,296],[1292,136],[1312,136]],chips:[[1280,282,"feeds TBD",1]]},
+ {id:"pbdw-portal",pts:[[1252,312],[1286,312],[1286,236],[1312,236]],chips:[[1280,336,"feeds TBD",1]]},
+ {id:"out-apigee",pts:[[772,586],[472,586]],chips:[[740,572,"submit 443",0],[510,572,"corr-id",0]]},
+ {id:"apigee-sei",al:"al_out",alLabel:"BBH egress ranges ×3 @ SEI",pts:[[282,586],[220,586]],chips:[[250,572,"HTTPS 443",0]]},
+ {id:"apigee-vendor",pts:[[377,612],[377,780],[1296,780],[1296,586],[1312,586]],chips:[[510,766,"vendor 443",0],[1280,766,"egress",0]]},
+ {id:"hub-mgmt",pts:[[820,242],[820,470],[660,470],[660,560]],chips:[[740,456,"HEC 8088",0]]}
+];
+function alChip(x,y,label,state){
+ var col=state==="VERIFIED"?"#2fb344":state==="APPROVED"?"#e8a013":"#d43a3a";
+ var bg=state==="VERIFIED"?"#eef9f0":state==="APPROVED"?"#fdf3d7":"#fdecec";
+ var lb=label+" · "+state,w=lb.length*5.4+14;
+ return '<g><rect x="'+(x-w/2)+'" y="'+(y-8)+'" width="'+w+'" height="17" rx="8.5" fill="'+bg+'" stroke="'+col+'"/>'
+  +'<text x="'+x+'" y="'+(y+3)+'" font-size="8.8" font-weight="800" fill="'+col+'" text-anchor="middle">'+lb+'</text></g>';
+}
+function composite(x,y,sig){
+ var fails=[!sig.syn,!sig.tgt,!sig.batch,!sig.ack].filter(Boolean).length;
+ var state=(!sig.syn&&!sig.tgt)?"DOWN":(fails?"DEGRADED":"UP");
+ var col=state==="UP"?"#2fb344":state==="DEGRADED"?"#e8a013":"#d43a3a";
+ var rows=[["synthetic txn via Apigee",sig.syn],["real traffic TARGET-class",sig.tgt],["batch manifests on time",sig.batch],["outbound ack latency",sig.ack]];
+ var o='<g data-probe="ext.sei.composite"><rect x="'+x+'" y="'+y+'" width="'+W+'" height="98" rx="9" fill="#fff" stroke="'+col+'" stroke-width="1.8" filter="drop-shadow(0 1px 3px rgba(16,40,60,.14))"/>'
+  +'<text x="'+(x+10)+'" y="'+(y+17)+'" font-size="9.6" font-weight="800" fill="#10193b">🩺 SEI composite</text>'
+  +'<rect x="'+(x+W-66)+'" y="'+(y+6)+'" width="58" height="17" rx="8.5" fill="'+col+'"/>'
+  +'<text x="'+(x+W-37)+'" y="'+(y+17)+'" font-size="8" font-weight="800" fill="#fff" text-anchor="middle">'+state+'</text>';
+ rows.forEach(function(r,i){o+='<circle cx="'+(x+15)+'" cy="'+(y+32+i*16)+'" r="3.6" fill="'+(r[1]?"#2fb344":"#d43a3a")+'"/>'
+  +'<text x="'+(x+25)+'" y="'+(y+35+i*16)+'" font-size="8.8" fill="#4a5d6e" font-family="Consolas,monospace">'+r[0]+'</text>';});
+ return o+'</g>';
+}
+function render(){
+ var e=envModel(cur),NS=nodes(e);
+ var byId0={};NS.forEach(function(n){byId0[n.id]=n;});
+ var AUTON=[],AUTOL=[],zc={};
+ autoRows(cur).forEach(function(r){
+  var z=AUTOZ[r.layer];zc[r.layer]=(zc[r.layer]||0);
+  var nid=(r.layer==="Database"?"data.":r.layer==="Consumer"?"cons.":r.layer==="File System"?"dmz.":"ext.")+r.system.toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,14);
+  var node={id:nid,x:z.x,y:z.base+zc[r.layer]*z.step,ic:"◈",t:r.system,sub:r.hosts.slice(0,26),auto:1};
+  AUTON.push(node);NS.push(node);
+  var src=byId0[z.src];if(src){
+   var sy=src.y+H/2+6+zc[r.layer]*9, ty=node.y+H/2, mx=z.fw+16+zc[r.layer]*10;
+   var pts=z.x>src.x?[[src.x+W,sy],[mx,sy],[mx,ty],[node.x,ty]]:[[src.x,sy],[mx,sy],[mx,ty],[node.x+W,ty]];
+   AUTOL.push({id:nid+"-auto",pts:pts,row:r,fw:z.fw,cy:sy});
+  }
+  zc[r.layer]++;
+ });
+ var s='<defs><marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#9fb4c8"/></marker></defs>';
+ ZONES.forEach(function(z,i){s+='<rect x="'+z[1]+'" y="34" width="'+z[2]+'" height="770" rx="12" fill="'+(i%2?'#f3f7fa':'#f9fbfd')+'" stroke="#e2e9ee"/>'
+  +'<text x="'+(z[1]+10)+'" y="52" font-size="9.6" font-weight="800" fill="#56718a" letter-spacing="1.8">'+z[0]+'</text>';});
+ FWS.forEach(function(f){s+='<line x1="'+f[1]+'" y1="38" x2="'+f[1]+'" y2="800" stroke="#c96a76" stroke-width="3" stroke-dasharray="4,7"/>'
+  +'<rect x="'+(f[1]-26)+'" y="806" width="52" height="15" rx="7" fill="#8a1f2d"/><text x="'+f[1]+'" y="817" font-size="8.6" font-weight="800" fill="#fff" text-anchor="middle">'+f[0]+'</text>';});
+ LANES.forEach(function(L,i){
+  var st=ST["p"+i]||{ok:1,ms:20};
+  var ri=ruleFor(cur,L.id);
+  var tbd=ri?ri.tbd:L.chips.some(function(c){return c[3];});
+  var col=tbd?"#c98d1a":(st.ok?"#8fbfa5":"#d43a3a");
+  s+='<path data-path="'+L.id+'" d="M '+L.pts.map(function(p){return p[0]+" "+p[1];}).join(" L ")+'" fill="none" stroke="'+col+'" stroke-width="'+(tbd?1.3:1.8)+'" stroke-dasharray="'+(tbd?'2,4':'7,5')+'" marker-end="url(#a)"/>';
+  if(L.chips.length){
+  var c0=L.chips[0], bcol=tbd?"#c98d1a":(st.ok?"#2fb344":"#d43a3a");
+  s+='<g data-act="lane:'+i+'" style="cursor:pointer"><circle cx="'+c0[0]+'" cy="'+c0[1]+'" r="9" fill="#fff" stroke="'+bcol+'" stroke-width="2"'+(tbd?' stroke-dasharray="3,2.5"':'')+'/>'
+   +'<text x="'+c0[0]+'" y="'+(c0[1]+3.5)+'" font-size="9.5" font-weight="900" fill="'+bcol+'" text-anchor="middle">'+(tbd?"?":(st.ok?"i":"!"))+'</text></g>';
+ }
+ });
+ AUTOL.forEach(function(L,k){
+  var pp=(L.row.port||"TBD"),tbd=pp.toUpperCase().indexOf("TBD")>=0;
+  var m=pp.match(/(\d{2,5})/);var col=tbd?"#c98d1a":"#8fbfa5";
+  s+='<path data-path="'+L.id+'" d="M '+L.pts.map(function(p){return p[0]+" "+p[1];}).join(" L ")+'" fill="none" stroke="'+col+'" stroke-width="'+(tbd?1.3:1.8)+'" stroke-dasharray="'+(tbd?'2,4':'7,5')+'" marker-end="url(#a)"/>';
+  s+='<g data-act="lane:'+(1000+k)+'" style="cursor:pointer"><circle cx="'+L.fw+'" cy="'+(L.cy-14)+'" r="9" fill="#fff" stroke="'+(tbd?"#c98d1a":"#2fb344")+'" stroke-width="2"'+(tbd?' stroke-dasharray="3,2.5"':'')+'/><text x="'+L.fw+'" y="'+(L.cy-10.5)+'" font-size="9.5" font-weight="900" fill="'+(tbd?"#c98d1a":"#2fb344")+'" text-anchor="middle">'+(tbd?"?":(m?"i":"i"))+'</text></g>';
+ });
+
+ NS.forEach(function(n){
+  var st=(ST[n.id]||{s:"ok"}).s;
+  s+='<g data-probe="'+n.id+'"><rect x="'+n.x+'" y="'+n.y+'" width="'+W+'" height="'+H+'" rx="10" fill="#fff" stroke="'+(n.auto?"#7b4dbb":"#dde6ec")+'"'+(n.auto?' stroke-dasharray="5,4" stroke-width="1.5"':'')+'  filter="drop-shadow(0 1.5px 3px rgba(16,40,60,.13))"/>'
+   +'<text x="'+(n.x+10)+'" y="'+(n.y+21)+'" font-size="11" font-weight="800" fill="#10193b">'+n.ic+' '+esc(n.t)+'</text>'
+   +'<text x="'+(n.x+10)+'" y="'+(n.y+38)+'" font-size="9.2" fill="#4a5d6e" font-family="Consolas,monospace">'+esc(n.sub)+'</text>'
+   +(n.auto?'<rect x="'+(n.x+W-52)+'" y="'+(n.y+H-15)+'" width="44" height="11" rx="5.5" fill="#7b4dbb"/><text x="'+(n.x+W-30)+'" y="'+(n.y+H-6.5)+'" font-size="7" font-weight="800" fill="#fff" text-anchor="middle">AUTO</text>':'')
+   +'<circle'+((st==="ok"||st==="wait")?'':' class="pd"')+(st==="wait"?' stroke-dasharray="2.5,2"':'')+' cx="'+(n.x+W-13)+'" cy="'+(n.y+14)+'" r="5.2" fill="'+(st==="wait"?"#fff":stCol(st))+'" stroke="'+(st==="wait"?"#9aa7b2":"#fff")+'" stroke-width="1.6"><title>'+n.id+' · '+st+'</title></circle>'
+   +(st==="warn"?'<text x="'+(n.x+W-13)+'" y="'+(n.y+17.5)+'" font-size="8" font-weight="900" fill="#fff" text-anchor="middle">!</text>':'')
+   +(st==="down"?'<text x="'+(n.x+W-13)+'" y="'+(n.y+17.5)+'" font-size="8" font-weight="900" fill="#fff" text-anchor="middle">×</text>':'')
+   +'</g>';});
+ var sig=ST.sei||{syn:1,tgt:1,batch:1,ack:1};
+ s+=composite(30,680,sig);
+
+ // detail popovers LAST = always on top (SVG paints in document order)
+ if(SEL!==null&&SEL>=1000){
+  var L=AUTOL[SEL-1000];
+  if(L){var pp=(L.row.port||"TBD"),tbd=pp.toUpperCase().indexOf("TBD")>=0,m=pp.match(/(\d{2,5})/);
+   var px=Math.min(L.fw+18,1290),py=Math.min(L.cy,640),rows=[["PATH","(auto) "+L.row.system],["RULE",tbd?"◌ awaiting firewall decision":(m?m[1]:pp)],["HOSTS",L.row.hosts.slice(0,34)],["STATUS",tbd?"port TBD — probe waiting":"probe ARMED on next runner cycle"],["PROBE ID","data-path: "+L.id]];
+   var ph=34+rows.length*17;
+   s+='<g><rect x="'+px+'" y="'+py+'" width="252" height="'+ph+'" rx="10" fill="#10193b" filter="drop-shadow(0 3px 8px rgba(16,25,59,.35))"/><text x="'+(px+12)+'" y="'+(py+19)+'" font-size="9.6" font-weight="800" fill="#7cc0ff" letter-spacing="1">PATH DETAIL · AUTO</text><g data-act="lane:null" style="cursor:pointer"><text x="'+(px+238)+'" y="'+(py+19)+'" font-size="11" font-weight="800" fill="#8fa3b5" text-anchor="middle">✕</text></g>';
+   rows.forEach(function(r,k2){s+='<text x="'+(px+12)+'" y="'+(py+38+k2*17)+'" font-size="7.8" font-weight="800" fill="#5f7a94">'+r[0]+'</text><text x="'+(px+72)+'" y="'+(py+38+k2*17)+'" font-size="9" fill="#e6eef6" font-family="Consolas,monospace">'+esc(r[1])+'</text>';});
+   s+='</g>';
+  }
+ }
+ if(SEL!==null&&SEL<1000){
+  var L=LANES[SEL], st=ST["p"+SEL]||{ok:1,ms:20};
+  var riX=ruleFor(cur,L.id), tbd0=riX?riX.tbd:L.chips.some(function(c){return c[3];});
+  var byId2={};nodes(ENVS[cur]).forEach(function(n){byId2[n.id]=n;});
+  var pr=L.id.split("-"), fromN=null,toN=null;
+  nodes(ENVS[cur]).forEach(function(n){var k=n.id.split(".")[1];if(k===pr[0]||n.id.indexOf(pr[0])>=0)fromN=fromN||n;if(k===pr[1]||n.id.indexOf(pr[1])>=0)toN=toN||n;});
+  var c0=L.chips.length?L.chips[0]:[700,300];
+  var px=Math.min(Math.max(c0[0]+16,20),1290), py=Math.min(Math.max(c0[1]-14,44),640);
+  var rows=[];
+  rows.push(["PATH", (fromN?fromN.t.replace(/^[^ ]+ /,""):pr[0])+"  →  "+(toN?toN.t.replace(/^[^ ]+ /,""):pr[1])]);
+  var ri2=ruleFor(cur,L.id);
+  if(ri2){rows.push(["RULE", (ri2.tbd?"◌ awaiting firewall decision":ri2.label)]);
+   var q=RULEQ[L.id],src=q&&fRow(cur,q[0],q[1]);
+   if(src)rows.push(["HOSTS", src.hosts.slice(0,34)]);
+  } else {L.chips.forEach(function(c){rows.push(["RULE", c[2]]);});}
+  rows.push(["STATUS", tbd0?"port TBD — probe not yet possible":(st.ok?"OK · "+st.ms+"ms round-trip":"FAILING — path probe timeout")]);
+  if(L.al)rows.push(["ALLOWLIST", L.alLabel+"  ·  "+(ST[L.al]||"VERIFIED")]);
+  rows.push(["PROBE ID", "data-path: "+L.id]);
+  var ph=34+rows.length*17;
+  s+='<g><rect x="'+px+'" y="'+py+'" width="252" height="'+ph+'" rx="10" fill="#10193b" filter="drop-shadow(0 3px 8px rgba(16,25,59,.35))"/>'
+   +'<text x="'+(px+12)+'" y="'+(py+19)+'" font-size="9.6" font-weight="800" fill="#7cc0ff" letter-spacing="1">PATH DETAIL</text>'
+   +'<g data-act="lane:null" style="cursor:pointer"><text x="'+(px+238)+'" y="'+(py+19)+'" font-size="11" font-weight="800" fill="#8fa3b5" text-anchor="middle">✕</text></g>';
+  rows.forEach(function(r,k){
+   s+='<text x="'+(px+12)+'" y="'+(py+38+k*17)+'" font-size="7.8" font-weight="800" fill="#5f7a94">'+r[0]+'</text>'
+    +'<text x="'+(px+72)+'" y="'+(py+38+k*17)+'" font-size="9" fill="#e6eef6" font-family="Consolas,monospace">'+esc(r[1])+'</text>';});
+  s+='</g>';
+ }
+ document.getElementById('g').innerHTML=s;
+ var t='';ENVO.forEach(function(k){t+='<span class="tab '+(k==="PROD"?"prod ":"")+(k===cur?"on":"")+'" data-act="env:'+k+'">'+(k==="TRIAL_UAT"?"TRIAL/UAT":k)+'</span>';});
+ t+='<span class="tab" style="margin-left:14px;border-color:'+(MODE==="LIVE"?"#2fb344":"#c98d1a")+';color:'+(MODE==="LIVE"?"#2fb344":"#c98d1a")+'" data-act="mode">'+(MODE==="LIVE"?"● LIVE":"○ DEMO")+' · click to toggle</span>';
+ t+='<span class="live" style="color:'+(MODE==="LIVE"?"#2fb344":"#c98d1a")+'">'+(MODE==="LIVE"?"real probe results · /env-infra/probes/live · 5s poll":"simulated pulse — API unreachable fallback")+'</span>';
+ document.getElementById('tabs').innerHTML=t;
+ // KPIs
+ var ids=Object.keys(ST).filter(function(k){return ST[k]&&ST[k].s;});
+ var ok=ids.filter(function(k){return ST[k].s==="ok";}).length,
+     wn=ids.filter(function(k){return ST[k].s==="warn";}).length,
+     dn=ids.filter(function(k){return ST[k].s==="down";}).length;
+ var pok=0;for(var i=0;i<LANES.length;i++)if((ST["p"+i]||{ok:1}).ok)pok++;
+ var state=(!sig.syn&&!sig.tgt)?"DOWN":((!sig.syn||!sig.tgt||!sig.batch||!sig.ack)?"DEGRADED":"UP");
+ var pcR=probeCounts(cur);
+ var runline=(MODE==="LIVE"?'<div style="grid-column:1/-1;background:#10193b;border-radius:10px;padding:6px 12px;font-size:10px;font-family:Consolas,monospace;color:#cdd9e5">runner <b style="color:#2fb344">env360_probe_runner</b> · last pulse '+clock()+' · '+pcR.armed+' ARMED executed · '+pcR.waiting+' WAITING skipped (◌ port TBD) · next cycle in '+(NEXT-tick*26%180)%180+'s · results → env_probe_result → v_env_probe_live</div>':'');
+ document.getElementById('kpis').innerHTML=runline+(WBDIFF?'<div style="grid-column:1/-1;background:'+(WBDIFF.ok?'#eef7ff;border:1.5px solid #1168bd':'#fdecec;border:1.5px solid #d43a3a')+';border-radius:10px;padding:7px 12px;font-size:10.5px;font-weight:700;color:#233240">'+WBDIFF.msg+'</div>':'')+
+(PAGE==="over"?"":(  '<div class="kpi g"><div class="v">'+ok+'</div><div class="l">NODES HEALTHY</div></div>'
+ +'<div class="kpi a"><div class="v">'+wn+'</div><div class="l">DEGRADED</div></div>'
+ +'<div class="kpi r"><div class="v">'+dn+'</div><div class="l">DOWN</div></div>'
+ +'<div class="kpi"><div class="v">'+pok+'/'+LANES.length+'</div><div class="l">PATHS OK</div></div>'
+ +'<div class="kpi '+(state==="UP"?"g":state==="DEGRADED"?"a":"r")+'"><div class="v">'+state+'</div><div class="l">SEI COMPOSITE</div></div>'
+  +(function(){var pc=probeCounts(cur);return '<div class="kpi '+(pc.waiting?"a":"g")+'"><div class="v">'+pc.armed+'<span style="font-size:11px;color:#9aa7b2">/'+(pc.armed+pc.waiting)+'</span></div><div class="l">PROBES ARMED (workbook)</div></div>';})()
+ +'<div class="kpi '+(ST.al_out==="VERIFIED"?"g":"a")+'"><div class="v">'+((ST.al_in==="VERIFIED"?1:0)+(ST.al_out==="VERIFIED"?1:0))+'/2</div><div class="l">ALLOWLISTS VERIFIED</div></div>'));
+ if(typeof renderInv==='function')renderInv();
+ if(typeof renderOver==='function')renderOver();
+ if(typeof renderCert==='function')renderCert();
+ document.getElementById('feed').innerHTML=FEED.slice(-7).map(function(f){return '<div class="'+f[0]+'">'+esc(f[1])+'</div>';}).join('');
+}
+function clock(){var m=(17*60+21+Math.floor(tick*0.72))%1440;var s2=(tick*26)%60;
+ return ('0'+Math.floor(m/60)).slice(-2)+':'+('0'+m%60).slice(-2)+':'+('0'+s2).slice(-2);}
+function pulse(){
+ tick++;
+ var ids=["dmz.mft","dmz.cifs","dmz.apigee","app.ingress","app.hub","app.envoy","app.out","data.imds","data.pbdw","cons.piv","cons.portal","cons.vendor","corp.f5","mgmt.stack"];
+ ids.forEach(function(id,i){
+  var pd=probeDef(cur,id);
+  if(pd&&!pd.armed){
+   if((ST[id]||{}).s!=="wait")FEED.push(["w",clock()+"  "+cur+"."+id+"  ◌ probe WAITING — port TBD in workbook"]);
+   ST[id]={s:"wait"};return;
+  }
+  var r=(tick*7+i*13)%97, ns=r<86?"ok":(r<94?"warn":"down");
+  var prev=(ST[id]||{}).s;
+  if(prev&&prev!==ns&&ns!=="ok")FEED.push([ns==="warn"?"w":"d",clock()+"  "+id+"  →  "+ns.toUpperCase()+(id.indexOf("data")===0?"  · session headroom":id==="dmz.cifs"?"  · write-probe slow":"  · probe timeout")]);
+  if(prev&&prev!==ns&&ns==="ok")FEED.push(["",clock()+"  "+id+"  →  recovered"]);
+  ST[id]={s:ns};
+ });
+ for(var i=0;i<LANES.length;i++)ST["p"+i]={ok:((tick*5+i*11)%89)<84,ms:12+((tick*13+i*29)%140)};
+ var r2=tick%23;
+ ST.sei={syn:r2<19,tgt:r2<21,batch:(tick%17)<15,ack:(tick%13)<11};
+ ST.al_in=(tick%31)<28?"VERIFIED":"APPROVED";
+ ST.al_out=(tick%9)<6?"VERIFIED":((tick%9)<8?"APPROVED":"REQUESTED");
+ render();
+}
+var PAGE="over",EDITK=null;
+function sslDays(d){if(!d)return null;var t=new Date(d+"T00:00:00")-new Date("2026-08-14T00:00:00");return Math.round(t/86400000);}
+function sslBadge(d){var n=sslDays(d);if(n===null)return '<span style="color:#9aa7b2;font-size:9px">—</span>';
+ var col=n<7?"#d43a3a":n<30?"#c98d1a":"#2fb344",bg=n<7?"#fdecec":n<30?"#fffaf0":"#eef9f0";
+ return '<span style="background:'+bg+';border:1px solid '+col+';color:'+col+';border-radius:7px;padding:0 7px;font-weight:800;font-size:9px">'+d+' · '+n+'d</span>';}
+function sslAlerts(){var out=[];ROWS.forEach(function(r){var n=sslDays(r.ssl);
+ if(n!==null&&n<30&&r.env===cur)out.push({sys:r.system,days:n,exp:r.ssl,crit:n<7});});return out;}
+function setPage(p){PAGE=p;
+ ["Over","Cert","Inv"].forEach(function(k){
+  var pg=document.getElementById('pg'+k),tb=document.getElementById('tab'+k);
+  var on=(p===k.toLowerCase());
+  if(pg)pg.style.display=on?"":"none";
+  if(tb)tb.style.cssText="padding:6px 2px;cursor:pointer;"+(on?"color:#1168bd;border-bottom:2.5px solid #1168bd":"color:#5c6b7a");
+ });
+ var pt=document.getElementById('pgTopo');if(pt)pt.style.display=(p==="over")?"":"none";
+ render();
+}
+function panel(title,rows){
+ var h='<div style="flex:1;min-width:300px;background:#fff;border:1px solid #dfe6ec;border-radius:10px;overflow:hidden"><div style="background:#173a63;color:#fff;font-size:11px;font-weight:800;padding:7px 12px">'+title+'</div>';
+ rows.forEach(function(r){
+  h+='<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid #eef2f6;font-size:10.5px">'
+   +'<span style="width:8px;height:8px;border-radius:50%;background:'+r[0]+';flex:none"></span>'
+   +'<span style="font-family:Consolas,monospace;color:#233240">'+r[1]+'</span>'
+   +(r[3]?'<span style="margin-left:auto;background:'+r[3][1]+';color:'+r[3][2]+';border-radius:7px;padding:0 8px;font-size:8.6px;font-weight:800">'+r[3][0]+'</span>':'<span style="margin-left:auto"></span>')
+   +'<span style="color:#8aa0b4;font-size:9.5px;'+(r[3]?'':'margin-left:auto')+'">'+(r[2]||"")+'</span></div>';});
+ return h+'</div>';
+}
+function renderOver(){
+ var el=document.getElementById('pgOver');if(!el||PAGE!=="over")return;
+ var al=sslAlerts(),minA=al.slice().sort(function(a,b){return a.days-b.days;})[0];
+ var ok=0,wn=0,dn=0,wt=0;
+ ["dmz.mft","dmz.cifs","dmz.apigee","app.ingress","app.hub","app.envoy","app.out","data.imds","data.pbdw","cons.piv","cons.portal","cons.vendor","corp.f5","mgmt.stack"].forEach(function(id){
+  var st=(ST[id]||{}).s;if(st==="ok")ok++;else if(st==="warn")wn++;else if(st==="down")dn++;else if(st==="wait")wt++;});
+ var mon=ok+wn+dn;
+ var h='';
+ h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:12px">';
+ [[mon,"MONITORED","#233240"],[ok,"HEALTHY NOW","#2fb344"],[wn+dn,"DEGRADED","#e8a013"]].forEach(function(k){
+  h+='<div style="background:#fff;border:1px solid #dfe6ec;border-radius:10px;padding:12px 16px;border-top:3px solid '+k[2]+'"><div style="font-size:24px;font-weight:800;color:#10193b;text-align:center">'+k[0]+'</div><div style="font-size:8.8px;color:#7d93a8;font-weight:800;letter-spacing:1.2px;text-align:center">'+k[1]+'</div></div>';});
+ var certRows=ROWS.filter(function(r){return r.env===cur&&r.ssl;}).sort(function(a,b){return sslDays(a.ssl)-sslDays(b.ssl);});
+ if(certRows.length){
+  var worst=certRows[0],wd=sslDays(worst.ssl);
+  var nc=certRows.filter(function(r){return sslDays(r.ssl)<7;}).length,
+      nw=certRows.filter(function(r){var d=sslDays(r.ssl);return d>=7&&d<30;}).length,
+      nk=certRows.length-nc-nw;
+  var col=wd<7?"#d43a3a":wd<30?"#c98d1a":"#2fb344",bg=wd<7?"#fdecec":wd<30?"#fffaf0":"#fff";
+  h+='<div data-act="page:cert" style="cursor:pointer;background:'+bg+';border:1px solid #dfe6ec;border-radius:10px;padding:12px 16px;border-top:3px solid '+col+'" title="open Certificates">'
+   +'<div style="font-size:24px;font-weight:800;color:'+col+';text-align:center">'+wd+'d</div>'
+   +'<div style="font-size:8.8px;color:#5c6b7a;font-weight:800;letter-spacing:.8px;text-align:center">\ud83d\udd12 SSL \u00b7 '+certRows.length+' CERT'+(certRows.length>1?"S":"")+'</div>'
+   +'<div style="font-size:8.4px;color:#9aa7b2;text-align:center;font-family:Consolas,monospace">next: '+esc2(worst.system)+(nc?' \u00b7 '+nc+' critical':'')+(nw?' \u00b7 '+nw+' warning':'')+(nk?' \u00b7 '+nk+' ok':'')+' \u2192</div></div>';
+ } else {
+  h+='<div data-act="page:cert" style="cursor:pointer;background:#fff;border:1px dashed #c9d6e0;border-radius:10px;padding:12px 16px"><div style="font-size:15px;font-weight:800;color:#9aa7b2;text-align:center">\u2014</div><div style="font-size:8.8px;color:#9aa7b2;font-weight:800;text-align:center">\ud83d\udd12 SSL \u00b7 add dates in Inventory</div></div>';
+ }
+ h+='</div><div style="display:flex;gap:12px;flex-wrap:wrap">';
+ function lat(i){return (12+((tick*13+i*29)%140))+"ms";}
+ h+=panel("OpenShift · OCPQ · "+cur,[
+  [stCol((ST["app.ingress"]||{s:"ok"}).s),"TLS · CP 360 route",lat(1),minA?["expires in "+minA.days+"d","#fbe9ef","#c2185b"]:null],
+  [stCol((ST["app.hub"]||{s:"ok"}).s),"HTTP · CP 360 /healthz",lat(2),null],
+  [stCol((ST["dmz.cifs"]||{s:"ok"}).s),"WebFS · CIFS write probe",lat(3),(ST["dmz.cifs"]||{}).s==="warn"?["SLOW","#fffaf0","#c98d1a"]:null]]);
+ h+=panel("Oracle · "+cur,[
+  [stCol((ST["data.pbdw"]||{s:"ok"}).s),"SELECT 1 · "+envModel(cur).pbdw+"/pbdwhdbt",lat(4),(ST["data.pbdw"]||{}).s==="wait"?["◌ port TBD","#fff","#a3720e"]:null],
+  [stCol((ST["data.pbdw"]||{s:"ok"}).s),"SILVER session headroom",lat(5),null],
+  [stCol((ST["data.imds"]||{s:"ok"}).s),"SELECT 1 · "+envModel(cur).imds,lat(6),(ST["data.imds"]||{}).s==="wait"?["◌ port TBD","#fff","#a3720e"]:null]]);
+ h+=panel("Integration · SEI",[
+  [stCol((ST["dmz.apigee"]||{s:"ok"}).s),"TLS · SEI QA via Apigee",lat(7),null],
+  ["#2fb344","allowlist: BBH ranges ×3 @ SEI",'',["VERIFIED","#eef9f0","#1e7a30"]],
+  ["#2fb344","allowlist: SEI IPs @ BBH MFT",'',["VERIFIED","#eef9f0","#1e7a30"]]]);
+ h+='</div><div style="margin-top:10px;font-size:9.4px;color:#7d93a8">counts + statuses derive from the same probe registry as the network board below · SSL banner sourced from Inventory ssl_expiry (v_env_ssl_status)</div>';
+ el.innerHTML=h;
+}
+function renderCert(){
+ var el=document.getElementById('pgCert');if(!el||PAGE!=="cert")return;
+ var h='<div style="background:#fff;border:1px solid #dfe6ec;border-radius:12px;padding:11px 13px"><h3 style="margin:0 0 8px;font-size:11px;color:#0f4775;letter-spacing:.6px">CERTIFICATES · '+cur+' · declared (Inventory) vs observed (TLS probe)</h3><table style="border-collapse:collapse;width:100%;font-size:10px"><tr>'+["SYSTEM","HOSTS","DECLARED EXPIRY","OBSERVED (probe)","DAYS LEFT","ALERT","DRIFT"].map(function(c){return '<th style="text-align:left;color:#7d93a8;font-size:8.6px;letter-spacing:1px;border-bottom:1.5px solid #e2e9ee;padding:4px 6px">'+c+'</th>';}).join('')+'</tr>';
+ var any=false;
+ ROWS.forEach(function(r){
+  if(r.env!==cur||!(r.ssl||(r.port||"").indexOf("443")>=0))return;
+  any=true;var n=sslDays(r.ssl);
+  var obs=r.ssl?(n!==null&&n<7?r.ssl:"matches"):"pending first probe";
+  var lvl=n===null?["UNKNOWN","#eef2f6","#5c6b7a"]:n<7?["CRITICAL","#fdecec","#d43a3a"]:n<30?["WARNING","#fffaf0","#c98d1a"]:["OK","#eef9f0","#1e7a30"];
+  h+='<tr><td style="padding:5px 6px;border-bottom:1px solid #eef2f6"><b>'+esc2(r.system)+'</b></td>'
+   +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f6;font-family:Consolas,monospace;font-size:9.4px;color:#42556a">'+esc2(r.hosts.split(";")[0])+'</td>'
+   +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f6">'+(r.ssl?sslBadge(r.ssl):'<span style="color:#9aa7b2">— add in Inventory</span>')+'</td>'
+   +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f6;font-family:Consolas,monospace;font-size:9.4px;color:#42556a">'+obs+'</td>'
+   +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f6;font-weight:800;color:'+lvl[2]+'">'+(n===null?"—":n+"d")+'</td>'
+   +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f6"><span style="background:'+lvl[1]+';color:'+lvl[2]+';border-radius:7px;padding:0 8px;font-weight:800;font-size:9px">'+lvl[0]+'</span></td>'
+   +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f6;color:#9aa7b2;font-size:9px">'+(r.ssl?"none":"—")+'</td></tr>';
+ });
+ if(!any)h+='<tr><td colspan="7" style="padding:10px;color:#9aa7b2">no 443/SSL rows in '+cur+' — add ssl_expiry in Inventory</td></tr>';
+ h+='</table><div style="margin-top:8px;font-size:9.4px;color:#7d93a8">source: v_env_ssl_status — DRIFT flags when Inventory date ≠ live cert notAfter (runner TLS handshake)</div></div>';
+ el.innerHTML=h;
+}
+var COLS=["Layer","System","New_SEI_Hosts_or_Endpoint","Sizing_RAM","Sizing_CPU","Sizing_Storage_or_Capacity","Growth","Hosting","Direction","Protocol_Port","Status_or_Notes","SSL_Expiry"];
+function exportSheet(){
+ var L=[COLS.join("\t")],seen={};
+ ENVO.forEach(function(e){
+  ROWS.forEach(function(r){if(r.env===e&&r.layer.indexOf("External")!==0)
+   L.push([r.layer,r.system,r.hosts,r.ram,r.cpu,r.sto,r.grow,r.host2,r.dir,r.port,r.notes,r.ssl||""].join("\t"));});});
+ ROWS.forEach(function(r){if(r.layer.indexOf("External")===0){var k=r.layer+"|"+r.system+"|"+r.hosts;
+  if(!seen[k]){seen[k]=1;L.push([r.layer,r.system,r.hosts,r.ram,r.cpu,r.sto,r.grow,r.host2,r.dir,r.port,r.notes,r.ssl||""].join("\t"));}}});
+ return L.join("\n");
+}
+function esc2(t){return String(t||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");}
+function renderInv(){
+ var el=document.getElementById('invTbl');if(!el)return;
+ document.getElementById('invEnv').textContent=cur;
+ var h='<table style="border-collapse:collapse;width:100%;font-size:10px"><tr>'+
+  ["LAYER","SYSTEM","HOSTS","RAM","CPU","STORAGE","PORT","SSL EXPIRY","NOTES","ACTIONS"].map(function(c){return '<th style="text-align:left;color:#7d93a8;font-size:8.6px;letter-spacing:1px;border-bottom:1.5px solid #e2e9ee;padding:4px 6px">'+c+'</th>';}).join('')+'</tr>';
+ ROWS.forEach(function(r,i){
+  if(r.env!==cur)return;
+  var ed=(EDITK===i),tbd=(r.port||"TBD").toUpperCase().indexOf("TBD")>=0;
+  function cell(v,f,w){return ed?'<input id="f_'+f+'_'+i+'" value="'+esc2(v)+'" style="width:'+(w||90)+'px;font-size:9.4px;font-family:Consolas,monospace;border:1px solid #b9c8d6;border-radius:5px;padding:2px 4px">':'<span style="font-family:Consolas,monospace;font-size:9.4px;color:#42556a">'+esc2(v)+'</span>';}
+  h+='<tr style="'+(ed?'background:#eef7ff':'')+'">'
+   +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f6">'+esc2(r.layer)+'</td>'
+   +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f6"><b>'+esc2(r.system)+'</b></td>'
+   +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f6">'+cell(r.hosts,"hosts",210)+'</td>'
+   +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f6">'+cell(r.ram,"ram",44)+'</td>'
+   +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f6">'+cell(r.cpu,"cpu",30)+'</td>'
+   +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f6">'+cell(r.sto,"sto",70)+'</td>'
+   +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f6">'+(ed?cell(r.port,"port",100):(tbd?'<span style="border:1.5px dashed #c98d1a;color:#a3720e;border-radius:7px;padding:0 7px;font-weight:800;font-size:9px">◌ TBD</span>':'<span style="background:#eef9f0;border:1px solid #2fb344;color:#1e7a30;border-radius:7px;padding:0 7px;font-weight:800;font-size:9px">'+esc2(r.port)+'</span>'))+'</td>'
+   +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f6">'+(ed?cell(r.ssl,"ssl",80):sslBadge(r.ssl))+'</td>'
+   +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f6">'+cell(r.notes,"notes",130)+'</td>'
+   +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f6;white-space:nowrap">'
+   +(ed?'<span class="btn" style="padding:3px 10px;font-size:9.5px" data-act="save:'+i+'">Save</span> <span class="btn sec" style="padding:3px 8px;font-size:9.5px" data-act="canceledit">✕</span>'
+       :'<span style="cursor:pointer;font-size:12px" title="edit" data-act="edit:'+i+'">✎</span> <span style="cursor:pointer;font-size:12px" title="delete" data-act="del:'+i+'">🗑</span>')
+   +'</td></tr>';
+ });
+ el.innerHTML=h+'</table>';
+}
+function saveRow(i){
+ var r=ROWS[i],old=r.port;
+ ["hosts","ram","cpu","sto","port","ssl","notes"].forEach(function(f){
+  var el=document.getElementById('f_'+f+'_'+i);if(el&&el.value!==undefined)r[f]=el.value;});
+ EDITK=null;SHEET=exportSheet();
+ var pc=probeCounts(cur);
+ var armedNow=(r.port||"TBD").toUpperCase().indexOf("TBD")<0&&/\d/.test(r.port);
+ var wasTbd=(old||"TBD").toUpperCase().indexOf("TBD")>=0;
+ if(armedNow&&wasTbd){
+  Object.keys(NODEQ).forEach(function(n){var q=NODEQ[n];if(r.layer===q[0]&&r.system.indexOf(q[1])>=0)delete ST[n];});
+  FEED.push(["",clock()+"  inventory save: "+cur+" · "+r.system+"  ⚡ port "+((r.port.match(/\d+/)||[""])[0])+" → probe ARMED"]);
+ } else FEED.push(["",clock()+"  inventory save: "+cur+" · "+r.system]);
+ WBDIFF={ok:1,msg:"SAVED · "+r.system+" ("+cur+") · probe registry rebuilt: "+pc.armed+" ARMED / "+pc.waiting+" WAITING — Network Topology updated"};
+ render();
+}
+function delRow(i){
+ var r=ROWS[i];ROWS.splice(i,1);EDITK=null;SHEET=exportSheet();
+ FEED.push(["w",clock()+"  inventory delete: "+cur+" · "+r.system+" — component + probe removed"]);
+ WBDIFF={ok:1,msg:"DELETED · "+r.system+" ("+cur+") — board + probe registry updated"};
+ render();
+}
+function addRow(){
+ ROWS.push({env:cur,layer:"Consumer",system:"New System",hosts:"host.bbh.com",ram:"",cpu:"",sto:"",grow:"TBD",host2:"BBH",dir:"Outbound",port:"TBD",notes:"added via inventory",ssl:""});
+ EDITK=ROWS.length-1;SHEET=exportSheet();
+ FEED.push(["",clock()+"  inventory add: "+cur+" · New System (edit + save to place on board)"]);
+ render();
+}
+function dl(){var b=new Blob([exportSheet()],{type:"text/tab-separated-values"});
+ var a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="cp_env_infrastructure.tsv";a.click();}
+
+
+/* ===== LIVE wiring ===== */
+function rowsFromApi(d){
+ return Object.values(d.environments||{}).flat().map(function(r){return {
+  env:r.env,layer:r.layer,system:r.system_name,hosts:r.hosts||"",ram:r.sizing_ram||"",
+  cpu:r.sizing_cpu||"",sto:r.sizing_storage||"",grow:r.growth||"",host2:r.hosting||"",
+  dir:r.direction||"",port:r.protocol_port||"",notes:r.notes||"",ssl:r.ssl_expiry||""};});
+}
+function applyLive(list){
+ list.forEach(function(r){
+  var parts=r.probe_id.split("."); var env=parts.shift(); if(env!==cur) return;
+  var id=parts.join(".");
+  if(id.indexOf("path.")===0){
+   var lid=id.slice(5), idx=LANES.findIndex(function(L){return L.id===lid;});
+   if(idx>=0) ST["p"+idx]={ok:r.status==="OK", ms:r.latency_ms||0};
+  } else {
+   ST[id]= r.state==="WAITING"||r.status==="SKIP" ? {s:"wait"}
+        : {s: r.status==="OK"?"ok": r.status==="WARN"?"warn":"down"};
+  }
+ });
+}
+async function persistRows(){                       // Inventory CRUD -> API (reuses /import)
+ var blob=new Blob([exportSheet()],{type:"text/tab-separated-values"});
+ var fd=new FormData(); fd.append("file", blob, "cp_env_infrastructure.tsv");
+ var res=await fetch("/env-infra/import",{method:"POST",body:fd});
+ return res.ok ? res.json() : Promise.reject(await res.text());
+}
+
+export default function Env360Home(){
+ const [mode,setMode]=useState("DEMO");
+ const [rev,setRev]=useState(0);
+ const pollRef=useRef(null);
+ const bump=()=>setRev(r=>r+1);
+
+ useEffect(()=>{                                    // bootstrap LIVE
+  let dead=false;
+  fetch("/env-infra").then(r=>r.ok?r.json():Promise.reject())
+   .then(d=>{ if(dead||!d.environments) return;
+    const rr=rowsFromApi(d); if(rr.length){ ROWS=rr; setMode("LIVE"); } })
+   .catch(()=>{}).finally(()=>{ setPage("over"); bump(); });
+  return ()=>{dead=true;};
+ },[]);
+
+ useEffect(()=>{                                    // heartbeat
+  clearInterval(pollRef.current);
+  const beat=()=>{
+   if(mode==="LIVE"){
+    fetch("/env-infra/probes/live?env="+encodeURIComponent(cur))
+     .then(r=>r.ok?r.json():[]).then(l=>{tick++;applyLive(l);render();}).catch(()=>{});
+   } else if(PAGE==="over"){ pulse(); }
+  };
+  beat(); pollRef.current=setInterval(beat, mode==="LIVE"?5000:2600);
+  return ()=>clearInterval(pollRef.current);
+ },[mode,rev]);
+
+ const act=async (e)=>{                             // event delegation
+  const g=e.target.closest("[data-act]"); if(!g) return;
+  const [k,v]=g.getAttribute("data-act").split(":");
+  if(k==="lane"){ SEL=(v==="null"||SEL===+v)?null:+v; render(); }
+  else if(k==="page"){ setPage(v); }
+  else if(k==="env"){ cur=v; SEL=null; render(); }
+  else if(k==="mode"){ setMode(m=>m==="LIVE"?"DEMO":"LIVE"); }
+  else if(k==="edit"){ EDITK=+v; render(); }
+  else if(k==="canceledit"){ EDITK=null; render(); }
+  else if(k==="addrow"){ addRow(); if(mode!=="LIVE") return; }
+  else if(k==="del"){ delRow(+v); if(mode==="LIVE") await persistRows().then(d=>{WBDIFF={ok:1,msg:"DELETED · persisted: "+d.changed+" changed · "+d.removed+" removed · probes "+d.probes_armed+" armed"};render();}).catch(()=>{}); }
+  else if(k==="save"){ saveRow(+v); if(mode==="LIVE") await persistRows().then(d=>{WBDIFF={ok:1,msg:"SAVED · persisted · probes: "+d.probes_armed+" ARMED / "+d.probes_waiting+" WAITING"};render();}).catch(()=>{}); }
+  else if(k==="dl"){ if(mode==="LIVE"){window.location.href="/env-infra/export";} else dl(); }
+ };
+ const onUpload=async (ev)=>{
+  const f=ev.target.files[0]; if(!f) return;
+  if(mode==="LIVE"){
+   const fd=new FormData(); fd.append("file",f);
+   const res=await fetch("/env-infra/import",{method:"POST",body:fd});
+   const d=await res.json();
+   if(!res.ok){ WBDIFF={ok:0,msg:"IMPORT REJECTED — "+(d.detail||res.status)}; }
+   else { const rr=await fetch("/env-infra").then(r=>r.json());
+    ROWS=rowsFromApi(rr);
+    WBDIFF={ok:1,msg:"IMPORT ACCEPTED · "+d.added+" added · "+d.changed+" changed · probes "+d.probes_armed+" ARMED / "+d.probes_waiting+" WAITING"}; }
+   render(); ev.target.value="";
+  } else ul(ev);
+ };
+
+ const T=(id,label,live)=>(
+  <span id={"tab"+id} style={{padding:"6px 2px",cursor:live?"pointer":"default",color:"#5c6b7a"}}
+   onClick={live?()=>setPage(id.toLowerCase()):undefined}>{label}</span>);
+
+ return (
+  <div style={{fontFamily:"'Segoe UI',sans-serif",background:"#eef2f6",padding:14,minHeight:"100%"}} onClick={act}>
+   <div style={{display:"flex",gap:22,fontSize:11.5,fontWeight:700,color:"#5c6b7a",borderBottom:"1.5px solid #dfe6ec",marginBottom:10}}>
+    {T("Over","Overview",true)}{T("Cert","Certificates",true)}
+    <span style={{padding:"6px 2px"}} title="existing tabs — Environment360.jsx">Health checks</span>
+    <span style={{padding:"6px 2px"}} title="existing tabs — Environment360.jsx">Pulse check</span>
+    {T("Inv","Inventory",true)}
+    <span style={{marginLeft:"auto",fontSize:9.5,fontWeight:800,color:mode==="LIVE"?"#2fb344":"#c98d1a"}}>
+     {mode==="LIVE"?"● LIVE — real probes":"○ DEMO — simulated"}</span>
+   </div>
+   <div className="bar" id="tabs"></div>
+   <div id="pgOver"></div>
+   <div id="pgCert" style={{display:"none"}}></div>
+   <div id="pgTopo">
+    <div className="kpis" id="kpis" style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:8,marginBottom:9}}></div>
+    <div style={{background:"#fff",border:"1px solid #dfe6ec",borderRadius:12,padding:8,overflowX:"auto"}}>
+     <svg id="g" viewBox="0 0 1560 830" style={{minWidth:1560,display:"block"}}></svg>
+    </div>
+   </div>
+   <div id="pgInv" style={{display:"none"}}>
+    <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",margin:"8px 0"}}>
+     <span data-act="dl" style={{padding:"8px 18px",borderRadius:8,fontSize:11.5,fontWeight:800,cursor:"pointer",background:"#1168bd",color:"#fff"}}>⬇ Download workbook (Excel)</span>
+     <label style={{padding:"8px 18px",borderRadius:8,fontSize:11.5,fontWeight:800,cursor:"pointer",border:"1.5px solid #1168bd",background:"#fff",color:"#1168bd"}}>
+      ⬆ Upload workbook<input type="file" accept=".tsv,.csv,.txt,.xlsx" style={{display:"none"}} onChange={onUpload}/></label>
+     <span data-act="addrow" style={{padding:"8px 18px",borderRadius:8,fontSize:11.5,fontWeight:800,cursor:"pointer",border:"1.5px solid #1168bd",background:"#fff",color:"#1168bd"}}>＋ Add row</span>
+     <span style={{fontSize:9.5,color:"#7d93a8"}}>edit ✎ / delete 🗑 · Save persists via /env-infra/import → probes re-provision</span>
+    </div>
+    <div style={{background:"#fff",border:"1px solid #dfe6ec",borderRadius:12,padding:"11px 13px"}}>
+     <h3 style={{margin:"0 0 8px",fontSize:11,color:"#0f4775",letterSpacing:.6}}>SERVER INVENTORY · <span id="invEnv"></span></h3>
+     <div id="invTbl" style={{overflowX:"auto"}}></div>
+    </div>
+   </div>
+   <div id="feedbox" style={{marginTop:9,background:"#10193b",borderRadius:10,padding:"9px 13px"}}>
+    <b style={{fontSize:9.5,color:"#7cc0ff",letterSpacing:1.5}}>EVENT FEED · probe stream</b><div id="feed"></div>
+   </div>
+  </div>);
+}

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>CP 360 · C4 drill-down — Context → Containers → Components</title>
+<style>
+ :root{--navy:#10193b;--accent:#0f4775;--pop:#31bced;--sub:#5c6b7a;--panel2:#dfe6e9;--bg:#eef2f5}
+ *{box-sizing:border-box;margin:0}
+ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:#233240}
+ .hdr{background:var(--navy);color:#fff;padding:11px 24px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:40}
+ .hdr b{font-size:15px}
+ .crumbs{display:flex;gap:6px;align-items:center;font-size:11px;color:#8fb4dd}
+ .crumb{cursor:pointer;padding:3px 10px;border-radius:999px}
+ .crumb.live{background:var(--pop);color:var(--navy);font-weight:700;cursor:default}
+ .crumb:not(.live):hover{background:#1a2650}
+ .hint{margin-left:auto;font-size:9.5px;color:#8fb4dd}
+ .wrap{max-width:1340px;margin:0 auto;padding:20px 28px 60px}
+ h1{font-size:22px;font-weight:500;color:var(--accent);border-bottom:2px solid var(--accent);padding-bottom:12px;margin-bottom:6px}
+ .c4lvl{font-size:9px;font-weight:800;background:#e8ecf9;color:#4a5fc0;border-radius:999px;padding:2px 10px;margin-left:8px}
+ .sub{font-size:11px;color:var(--sub);margin-bottom:14px}
+ .board{background:#fff;border:1px solid var(--panel2);border-radius:10px;padding:18px}
+ .clk{cursor:pointer}
+ .clk:hover rect:first-of-type, .clk:hover path:first-of-type{filter:brightness(1.12)}
+ .legend{display:flex;gap:18px;margin-top:10px;font-size:9.5px;color:var(--sub);flex-wrap:wrap}
+ .lg{display:flex;align-items:center;gap:6px}
+ .sw2{width:22px;height:12px;border-radius:3px;display:inline-block}
+ .note{background:#fff;border-left:4px solid var(--accent);border-radius:8px;padding:12px 16px;margin-top:14px;font-size:11px;line-height:1.7;color:#31414f}
+ .bk{font-size:11.5px;font-weight:700;padding:7px 16px;border-radius:5px;background:var(--navy);color:#fff;cursor:pointer;display:inline-block;margin-bottom:12px}
+ .tbl{background:#fff;border:1px solid var(--panel2);border-radius:8px;overflow:hidden}
+ .trow{display:grid;grid-template-columns:36px 100px minmax(0,1.2fr) minmax(0,1.6fr) 90px 50px 90px;gap:10px;padding:8px 14px;font-size:11px;border-top:1px solid #eef1f4;align-items:center}
+ .trow.hd{font-size:8.5px;font-weight:800;text-transform:uppercase;color:#93a1ad;background:#f7f9fa;border-top:none}
+ .cid{font-family:Consolas,monospace;font-size:10px;font-weight:700}
+ .cn{font-weight:700;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .dl,.pl{color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .pl{font-size:9.5px}.dl{font-size:10px}
+ .chip{font-size:8.5px;font-weight:800;padding:2px 8px;border-radius:999px;white-space:nowrap;display:inline-block}
+ .chdr{display:flex;align-items:center;gap:12px;background:var(--navy);color:#fff;border-radius:10px;padding:14px 20px;margin-bottom:12px}
+ .chdr .ic{font-size:26px}
+ .chdr small{display:block;font-size:10px;color:#a9c1de;margin-top:2px}
+ .chdr .cnt{margin-left:auto;text-align:center;font-size:10px;color:#a9c1de}
+ .chdr .cnt b{display:block;font-size:20px;color:#fff}
+</style></head><body>
+<div class="hdr"><b>CP 360°</b>
+ <div class="crumbs" id="crumbs"></div>
+ <span class="hint">click boxes to drill · breadcrumb or Esc to go back up</span></div>
+<div class="wrap" id="app"></div>
+<script id="data" type="application/json">{"comps": [{"id": "1", "zone": "1. SEI", "plane": "Source", "component": "SWP Platform", "deliverable": "Interface spec: domains, entities, extract triggers", "technology": "Contract", "priority": "P1", "custom": "None", "status": "Not Started", "container": "CROSS"}, {"id": "2", "zone": "1. SEI", "plane": "Source", "component": "SWP UI", "deliverable": "Access model + SSO handshake spec", "technology": "Contract", "priority": "P3", "custom": "None", "status": "Not Started", "container": "CROSS"}, {"id": "3", "zone": "1. SEI", "plane": "Source", "component": "SWP APIs", "deliverable": "API contract: endpoints, auth, rate limits, SLAs", "technology": "Contract", "priority": "P1", "custom": "None", "status": "Not Started", "container": "GW"}, {"id": "4", "zone": "1. SEI", "plane": "Source", "component": "SWP Loaders", "deliverable": "Loader file format + submission/ack contract", "technology": "Contract", "priority": "P2", "custom": "None", "status": "Not Started", "container": "CROSS"}, {"id": "5", "zone": "1. SEI", "plane": "Source", "component": "Extract Generation", "deliverable": "File spec: layout, naming, manifest, EOD + intraday cadence", "technology": "Contract", "priority": "P1", "custom": "None", "status": "Not Started", "container": "LZ"}, {"id": "6", "zone": "1. SEI", "plane": "PS-Orchestration", "component": "Orchestration API / Data Ingestion / ODM / Workflows / Config", "deliverable": "Outbound orchestration design (SEI-owned, BBH-reviewed)", "technology": "Contract", "priority": "P3", "custom": "None", "status": "Not Started", "container": "ORCH"}, {"id": "7", "zone": "1. SEI", "plane": "PS-Orchestration", "component": "Status Monitoring Dashboard", "deliverable": "Status event contract to Integration360", "technology": "Contract", "priority": "P2", "custom": "Low", "status": "Not Started", "container": "ORCH"}, {"id": "8", "zone": "2. Hub", "plane": "Ingress/Egress", "component": "Landing Zone + Transport", "deliverable": "Transport design: protocol, auth, dirs, retention, completeness signal", "technology": "Infra", "priority": "P1", "custom": "Low", "status": "Not Started", "container": "LZ"}, {"id": "9", "zone": "2. Hub", "plane": "Ingress/Egress", "component": "File Arrival Sensors", "deliverable": "Per-file sensor design; start-on-arrival not batch-complete", "technology": "Airflow", "priority": "P1", "custom": "Medium", "status": "Not Started", "container": "LZ"}, {"id": "10", "zone": "2. Hub", "plane": "Ingress/Egress", "component": "Outbound Producers", "deliverable": "Design for Data Extracts, JSON payloads, Loader File", "technology": "Python", "priority": "P3", "custom": "High", "status": "Not Started", "container": "CROSS"}, {"id": "11", "zone": "2. Hub", "plane": "Ingress/Egress", "component": "Apigee Proxy", "deliverable": "Proxy design: submit path + status-return path", "technology": "Vendor/Infra", "priority": "P3", "custom": "Low", "status": "Not Started", "container": "GW"}, {"id": "12", "zone": "2. Hub", "plane": "Ingress/Egress", "component": "API Gateway / Data Plane", "deliverable": "Real-time route design, independent of batch", "technology": "Vendor/Infra", "priority": "P2", "custom": "Low", "status": "Not Started", "container": "GW"}, {"id": "13", "zone": "2. Hub", "plane": "Processing", "component": "Python Ingestion Framework", "deliverable": "Module design: validation, profiling, metadata capture, RAW load", "technology": "Python", "priority": "P1", "custom": "High", "status": "Not Started", "container": "RAW"}, {"id": "14", "zone": "2. Hub", "plane": "Processing", "component": "Stage 1 RAW", "deliverable": "Physical model: 7 RAW_* tables, 8 audit cols, partitioning, retention", "technology": "Oracle DDL", "priority": "P1", "custom": "None", "status": "Not Started", "container": "RAW"}, {"id": "15", "zone": "2. Hub", "plane": "Processing", "component": "Stage 2 Enriched (dbt)", "deliverable": "5 STG2_* models, 8 processing steps, tests", "technology": "dbt", "priority": "P1", "custom": "Medium", "status": "Not Started", "container": "ENR"}, {"id": "16", "zone": "2. Hub", "plane": "Processing", "component": "Gold (dbt)", "deliverable": "2 SCD2 dims + 3 facts; SCD2 and merge logic", "technology": "dbt", "priority": "P1", "custom": "High", "status": "Not Started", "container": "ENR"}, {"id": "17", "zone": "2. Hub", "plane": "Processing", "component": "Correction Handling", "deliverable": "Bitemporal vs merge design, applied across Stage 2 and Gold", "technology": "dbt", "priority": "P1", "custom": "High", "status": "Not Started", "container": "ENR"}, {"id": "18", "zone": "2. Hub", "plane": "Orchestration", "component": "Airflow DAG + Per-Domain Fan-out", "deliverable": "DAG design: 7 parallel branches, join points, retries", "technology": "Airflow", "priority": "P1", "custom": "High", "status": "Not Started", "container": "ORCH"}, {"id": "19", "zone": "2. Hub", "plane": "Orchestration", "component": "Dim-before-Fact / dbt Threads", "deliverable": "Build-order and concurrency design", "technology": "Airflow + dbt", "priority": "P2", "custom": "Low", "status": "Not Started", "container": "ENR"}, {"id": "20", "zone": "2. Hub", "plane": "Orchestration", "component": "Intraday Cadence Control", "deliverable": "Cadence design and lane assignment", "technology": "Airflow", "priority": "P1", "custom": "Medium", "status": "Not Started", "container": "ORCH"}, {"id": "21", "zone": "2. Hub", "plane": "Orchestration", "component": "Replay / Rerun Engine", "deliverable": "Replay design from LOAD_ID; scope, idempotency, downstream impact", "technology": "Python + Airflow", "priority": "P1", "custom": "High", "status": "Not Started", "container": "ORCH"}, {"id": "22", "zone": "2. Hub", "plane": "Orchestration", "component": "Partial-Batch Policy", "deliverable": "Policy + implementation: halt-all vs per-domain proceed", "technology": "Airflow", "priority": "P1", "custom": "Medium", "status": "Not Started", "container": "ORCH"}, {"id": "23", "zone": "2. Hub", "plane": "Data Quality", "component": "G1 File / Structural Gate", "deliverable": "Check set + quarantine design. BLOCKS RAW insert", "technology": "Python", "priority": "P1", "custom": "High", "status": "Not Started", "container": "RAW"}, {"id": "24", "zone": "2. Hub", "plane": "Data Quality", "component": "G2 RAW Profiling Gate", "deliverable": "Profiling checks. BLOCKS Stage 2", "technology": "Airflow + SQL", "priority": "P2", "custom": "Medium", "status": "Not Started", "container": "RAW"}, {"id": "25", "zone": "2. Hub", "plane": "Data Quality", "component": "G3 dbt Tests + Business Rules", "deliverable": "Test suite + rule design. BLOCKS Gold", "technology": "dbt", "priority": "P1", "custom": "Medium", "status": "Not Started", "container": "ENR"}, {"id": "26", "zone": "2. Hub", "plane": "Data Quality", "component": "G4 Tie-out / Control Totals", "deliverable": "RAW-to-Gold reconciliation. BLOCKS Gold publish. Per-target", "technology": "Airflow + SQL", "priority": "P1", "custom": "High", "status": "Not Started", "container": "RAW"}, {"id": "27", "zone": "2. Hub", "plane": "Data Quality", "component": "G5 Post-Publish Recon", "deliverable": "Advisory recon; triggers replay", "technology": "Airflow + SQL", "priority": "P2", "custom": "Medium", "status": "Not Started", "container": "GOLD"}, {"id": "28", "zone": "2. Hub", "plane": "Data Quality", "component": "DQ Framework", "deliverable": "Rule registry, severity tiers, results store, audited override path", "technology": "Python", "priority": "P1", "custom": "High", "status": "Not Started", "container": "META"}, {"id": "29", "zone": "2. Hub", "plane": "Foundation", "component": "Error Handling & Quarantine", "deliverable": "Error taxonomy, quarantine store, resubmission path", "technology": "Python", "priority": "P1", "custom": "High", "status": "Not Started", "container": "CROSS"}, {"id": "30", "zone": "2. Hub", "plane": "Foundation", "component": "Reconciliation Framework", "deliverable": "Recon model: control totals, exception lifecycle", "technology": "Python", "priority": "P1", "custom": "High", "status": "Not Started", "container": "META"}, {"id": "31", "zone": "2. Hub", "plane": "Foundation", "component": "Audit & Lineage", "deliverable": "End-to-end lineage design, evidence retention", "technology": "Python + dbt", "priority": "P1", "custom": "Medium", "status": "Not Started", "container": "META"}, {"id": "32", "zone": "2. Hub", "plane": "Foundation", "component": "Security & Access Control", "deliverable": "AuthN/AuthZ model, data classification, masking", "technology": "Infra", "priority": "P1", "custom": "Low", "status": "Not Started", "container": "CROSS"}, {"id": "33", "zone": "2. Hub", "plane": "Foundation", "component": "Metadata & Configuration Store", "deliverable": "Config model: rules, thresholds, mappings, schedules", "technology": "Oracle DDL + Python", "priority": "P1", "custom": "High", "status": "Not Started", "container": "ORCH"}, {"id": "34", "zone": "2. Hub", "plane": "Foundation", "component": "Observability", "deliverable": "Logs, metrics, traces; SLIs and alerting", "technology": "Infra", "priority": "P2", "custom": "Low", "status": "Not Started", "container": "CROSS"}, {"id": "35", "zone": "2. Hub", "plane": "Foundation", "component": "Integration360", "deliverable": "Monitoring, exception mgmt, process tracking, recon", "technology": "Vendor/BBH", "priority": "P1", "custom": "Medium", "status": "Not Started", "container": "META"}, {"id": "36", "zone": "2. Hub", "plane": "Foundation", "component": "SSO", "deliverable": "SSO design to SWP UI", "technology": "Infra", "priority": "P3", "custom": "None", "status": "Not Started", "container": "CROSS"}, {"id": "37", "zone": "3. Consumers", "plane": "Consumers", "component": "PBDW", "deliverable": "Publication design + change control", "technology": "Oracle DDL + dbt", "priority": "P1", "custom": "Medium", "status": "Not Started", "container": "CROSS"}, {"id": "38", "zone": "3. Consumers", "plane": "Consumers", "component": "IMDS Stage -> IMDS", "deliverable": "Staging DB + load design from Stage 2", "technology": "Oracle DDL + dbt", "priority": "P2", "custom": "Medium", "status": "Not Started", "container": "ENR"}, {"id": "39", "zone": "3. Consumers", "plane": "Consumers", "component": "Pivotal Database", "deliverable": "Feed design from Stage 2", "technology": "dbt", "priority": "P2", "custom": "Medium", "status": "Not Started", "container": "ENR"}, {"id": "40", "zone": "3. Consumers", "plane": "Consumers", "component": "CP DW Canonical Model", "deliverable": "Forward-compatibility design only (future)", "technology": "Design only", "priority": "P3", "custom": "None", "status": "Not Started", "container": "CROSS"}, {"id": "41", "zone": "3. Consumers", "plane": "Consumers", "component": "BI / Analytics", "deliverable": "Semantic layer + access design", "technology": "BI tooling", "priority": "P2", "custom": "Low", "status": "Not Started", "container": "CROSS"}, {"id": "42", "zone": "3. Consumers", "plane": "Consumers", "component": "Real-time Consumers", "deliverable": "Consumer contract on the API lane", "technology": "Contract", "priority": "P2", "custom": "None", "status": "Not Started", "container": "GW"}, {"id": "43", "zone": "3. Consumers", "plane": "Consumers", "component": "BBH Existing Systems", "deliverable": "Impact assessment: front/back office, trade, custody", "technology": "Analysis", "priority": "P3", "custom": "None", "status": "Not Started", "container": "CROSS"}, {"id": "44", "zone": "4. OpenShift", "plane": "Platform", "component": "Projects / Namespaces", "deliverable": "Environment topology: dev, test, UAT, prod", "technology": "Infra", "priority": "P1", "custom": "None", "status": "Not Started", "container": "PLATFORM"}, {"id": "45", "zone": "4. OpenShift", "plane": "Platform", "component": "Container Images", "deliverable": "Base image standard: Python, dbt, Airflow", "technology": "Infra", "priority": "P1", "custom": "Medium", "status": "Not Started", "container": "PLATFORM"}, {"id": "46", "zone": "4. OpenShift", "plane": "Platform", "component": "Registry, Scanning, Signing", "deliverable": "Image supply-chain design + promotion policy", "technology": "Infra", "priority": "P2", "custom": "None", "status": "Not Started", "container": "PLATFORM"}, {"id": "47", "zone": "4. OpenShift", "plane": "Platform", "component": "Service Accounts, RBAC, SCCs", "deliverable": "Cluster access model", "technology": "Infra", "priority": "P1", "custom": "None", "status": "Not Started", "container": "PLATFORM"}, {"id": "48", "zone": "4. OpenShift", "plane": "Platform", "component": "Secrets Management", "deliverable": "Secrets design: Oracle creds, sFTP keys, API tokens", "technology": "Infra", "priority": "P1", "custom": "Low", "status": "Not Started", "container": "PLATFORM"}, {"id": "49", "zone": "4. OpenShift", "plane": "Platform", "component": "Network Policy & Egress", "deliverable": "Egress to SEI/Apigee/Oracle; ingress rules", "technology": "Infra", "priority": "P1", "custom": "None", "status": "Not Started", "container": "PLATFORM"}, {"id": "50", "zone": "4. OpenShift", "plane": "Platform", "component": "Persistent Storage", "deliverable": "Volume design: landing, quarantine, dbt artifacts, logs", "technology": "Infra", "priority": "P2", "custom": "None", "status": "Not Started", "container": "PLATFORM"}, {"id": "51", "zone": "4. OpenShift", "plane": "Runtime", "component": "Airflow Deployment", "deliverable": "Scheduler HA, KubernetesExecutor, pod operator design", "technology": "Infra + Airflow", "priority": "P1", "custom": "Medium", "status": "Not Started", "container": "PLATFORM"}, {"id": "52", "zone": "4. OpenShift", "plane": "Runtime", "component": "Worker Pod Autoscaling", "deliverable": "Autoscaling design sized to the fan-out", "technology": "Infra", "priority": "P1", "custom": "Low", "status": "Not Started", "container": "PLATFORM"}, {"id": "53", "zone": "4. OpenShift", "plane": "Runtime", "component": "Resource Quotas & Priority", "deliverable": "Requests/limits, quotas, priority classes for EOD", "technology": "Infra", "priority": "P2", "custom": "None", "status": "Not Started", "container": "PLATFORM"}, {"id": "54", "zone": "4. OpenShift", "plane": "Runtime", "component": "Warm-start / Pre-pulled Images", "deliverable": "Cold-start mitigation design", "technology": "Infra", "priority": "P2", "custom": "Low", "status": "Not Started", "container": "PLATFORM"}, {"id": "55", "zone": "4. OpenShift", "plane": "Runtime", "component": "Oracle Connection Pooling", "deliverable": "Pooling design; the real parallelism ceiling", "technology": "Python + Infra", "priority": "P1", "custom": "Medium", "status": "Not Started", "container": "PLATFORM"}, {"id": "56", "zone": "4. OpenShift", "plane": "Runtime", "component": "Node Placement", "deliverable": "Taints/affinity: batch burst vs always-on API", "technology": "Infra", "priority": "P2", "custom": "None", "status": "Not Started", "container": "PLATFORM"}, {"id": "57", "zone": "4. OpenShift", "plane": "Deployment", "component": "CI/CD Pipelines", "deliverable": "Build, test, scan, promote pipeline design", "technology": "CI/CD", "priority": "P1", "custom": "Medium", "status": "Not Started", "container": "PLATFORM"}, {"id": "58", "zone": "4. OpenShift", "plane": "Deployment", "component": "GitOps / ArgoCD", "deliverable": "Manifest promotion and drift control", "technology": "CI/CD", "priority": "P2", "custom": "Low", "status": "Not Started", "container": "PLATFORM"}, {"id": "59", "zone": "4. OpenShift", "plane": "Deployment", "component": "dbt Release & Rollback", "deliverable": "dbt versioning, release cadence, rollback design", "technology": "dbt + CI/CD", "priority": "P1", "custom": "High", "status": "Not Started", "container": "PLATFORM"}, {"id": "60", "zone": "4. OpenShift", "plane": "Deployment", "component": "Database Change Management", "deliverable": "DDL control for RAW/STG2/Gold + PBDW/IMDS", "technology": "Process + DDL", "priority": "P1", "custom": "Low", "status": "Not Started", "container": "PLATFORM"}, {"id": "61", "zone": "4. OpenShift", "plane": "Deployment", "component": "Blue-Green / Canary (API lane)", "deliverable": "Zero-downtime release design for real-time", "technology": "Infra", "priority": "P3", "custom": "None", "status": "Not Started", "container": "PLATFORM"}, {"id": "62", "zone": "4. OpenShift", "plane": "Operations", "component": "HA / DR", "deliverable": "DR topology, RTO/RPO for the batch window", "technology": "Infra", "priority": "P2", "custom": "Low", "status": "Not Started", "container": "PLATFORM"}, {"id": "63", "zone": "4. OpenShift", "plane": "Operations", "component": "Backup & Restore", "deliverable": "Airflow metadata DB, config store, quarantine volumes", "technology": "Infra", "priority": "P2", "custom": "None", "status": "Not Started", "container": "PLATFORM"}, {"id": "64", "zone": "4. OpenShift", "plane": "Operations", "component": "Monitoring Stack", "deliverable": "Prometheus/Grafana/log aggregation wired into item 34", "technology": "Infra", "priority": "P2", "custom": "Low", "status": "Not Started", "container": "PLATFORM"}, {"id": "65", "zone": "4. OpenShift", "plane": "Operations", "component": "Cost & Capacity Monitoring", "deliverable": "Capacity model for a sharply peaked EOD burst", "technology": "Infra", "priority": "P3", "custom": "None", "status": "Not Started", "container": "PLATFORM"}], "counts": {"CROSS": 12, "GW": 4, "LZ": 3, "ORCH": 7, "RAW": 5, "ENR": 7, "GOLD": 1, "META": 4, "PLATFORM": 22}}</script>
+<script>
+var DATA=JSON.parse(document.getElementById('data').textContent);
+var CONTAINERS={
+ LZ:["Landing Zone","📥","sFTP / CIFS · file reception + manifest"],
+ RAW:["Stage 1 RAW","🧱","Oracle · immutable append-only AD-8 · Python AD-7"],
+ ENR:["Stage 2 Enriched","🧪","Oracle · dbt · dedup · conform"],
+ GOLD:["Gold (Exadata)","🏆","SCD2 · facts · tie-out AD-9 · Hub-owned AD-1"],
+ ORCH:["Orchestration","🛠","Airflow on OpenShift · 9-domain fan-out"],
+ GW:["API Gateway","🛡","Envoy / Data Plane · real-time lane"],
+ META:["Metadata & Config","⚙","feed registry · DQ rules · drives everything"],
+ PLATFORM:["OpenShift Platform","🖧","zone 4 — runtime, CI/CD, operations"],
+ CROSS:["Cross-cutting & consumers","🧭","monitoring · recon · consumers · outbound"]};
+var st={lvl:1,cont:null};
+function esc(x){return String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function cnt(k){var n=0;DATA.comps.forEach(function(c){if(c.container===k)n++;});return n;}
+function go(lvl,cont){st={lvl:lvl,cont:cont||null};render();window.scrollTo(0,0);}
+function crumbs(){
+ var h='<span class="crumb'+(st.lvl===1?' live':'')+'" onclick="go(1)">L1 · Context</span>';
+ if(st.lvl>=2)h+='<span>›</span><span class="crumb'+(st.lvl===2?' live':'')+'" onclick="go(2)">L2 · Hub containers</span>';
+ if(st.lvl===3)h+='<span>›</span><span class="crumb live">L3 · '+esc(CONTAINERS[st.cont][0])+'</span>';
+ document.getElementById('crumbs').innerHTML=h;
+}
+function sysBox(x,y,w,label,sub,kind,click){
+ var fill=kind==="in"?"#1168bd":kind==="ext"?"#999":"#fff";
+ var stroke=kind==="fut"?' stroke="#cc3344" stroke-dasharray="6 4" stroke-width="1.6"':'';
+ var tc=kind==="fut"?"#cc3344":"#fff", sc=kind==="fut"?"#c66":(kind==="ext"?"#e8e8e8":"#bcd6ef");
+ var lines=sub.split("|"),h=40+lines.length*11;
+ var t=lines.map(function(l,i){return '<text x="'+(x+w/2)+'" y="'+(y+40+i*11)+'" font-size="8" fill="'+sc+'" text-anchor="middle">'+l+'</text>';}).join("");
+ var g='<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="6" fill="'+fill+'"'+stroke+'/>' 
+  +'<text x="'+(x+w/2)+'" y="'+(y+28)+'" font-size="11" font-weight="700" fill="'+tc+'" text-anchor="middle">'+label+'</text>'+t;
+ return click?'<g class="clk" onclick="'+click+'">'+g+'</g>':'<g>'+g+'</g>';
+}
+function dbBox(x,y,w,label,sub,click,accent){
+ accent=accent||"#1168bd";
+ var lines=sub.split("|"),h=44+lines.length*10;
+ var t=lines.map(function(l,i){return '<text x="'+(x+w/2)+'" y="'+(y+38+i*10)+'" font-size="7.5" fill="#cfe0f2" text-anchor="middle">'+l+'</text>';}).join("");
+ var g='<path d="M '+x+' '+(y+8)+' a '+(w/2)+' 8 0 0 1 '+w+' 0 v '+(h-16)+' a '+(w/2)+' 8 0 0 1 -'+w+' 0 z" fill="'+accent+'"/>' 
+  +'<ellipse cx="'+(x+w/2)+'" cy="'+(y+8)+'" rx="'+(w/2)+'" ry="8" fill="'+accent+'" stroke="#0d5296"/>' 
+  +'<text x="'+(x+w/2)+'" y="'+(y+27)+'" font-size="10" font-weight="700" fill="#fff" text-anchor="middle">'+label+'</text>'+t;
+ return '<g class="clk" onclick="'+click+'">'+g+'</g>';
+}
+function rel(x1,y1,x2,y2,label,dashed,thick){
+ var mx=(x1+x2)/2,my=(y1+y2)/2;
+ var st2=dashed?' stroke-dasharray="6 4"':(thick?' stroke-width="2.4"':' stroke-width="1.3"');
+ var lw=label.length*4.6+10;
+ return '<path d="M '+x1+' '+y1+' C '+mx+' '+y1+', '+mx+' '+y2+', '+x2+' '+y2+'" fill="none" stroke="#555"'+st2+' marker-end="url(#c4a)"/>' 
+  +'<rect x="'+(mx-lw/2)+'" y="'+(my-9)+'" width="'+lw+'" height="14" fill="#fff" opacity=".92" rx="3"/>' 
+  +'<text x="'+mx+'" y="'+(my+2)+'" font-size="8.5" fill="#555" font-style="italic" text-anchor="middle">'+label+'</text>';
+}
+var DEFS='<defs><marker id="c4a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#555"/></marker></defs>';
+function renderL1(){
+ var s='<svg viewBox="0 0 1280 560">'+DEFS
+ +'<g><circle cx="640" cy="42" r="14" fill="#08427b"/><rect x="570" y="58" width="140" height="52" rx="8" fill="#08427b"/>'
+ +'<text x="640" y="78" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">CP Data Ops</text>'
+ +'<text x="640" y="92" font-size="8" fill="#b8c9dd" text-anchor="middle">runs batch · quarantine · overrides</text></g>'
+ +sysBox(60,220,190,"SEI SWP Platform","batch extracts|~30 feeds · 9 domains · EOD","ext")
+ +sysBox(60,400,190,"SEI SWP APIs","real-time source","ext")
+ +sysBox(480,250,320,"CP INTEGRATION HUB","Landing → RAW → Enriched → Gold → publish|real-time lane · ▼ CLICK TO OPEN ('+ (DATA.comps.length) +' components inside)","in","go(2)")
+ +sysBox(1010,130,210,"PBDW","SYSTEM OF RECORD · existing","in")
+ +sysBox(1010,250,210,"Pivotal DB","existing","in")
+ +sysBox(1010,350,210,"IMDS","existing","in")
+ +sysBox(1010,460,210,"CP DW Canonical","not built this phase","fut")
+ +rel(250,265,480,295,"sFTP files + manifest [EOD]")
+ +rel(250,425,480,330,"real-time API [no batch dep]")
+ +rel(640,110,640,250,"operates · approves")
+ +rel(800,285,1010,165,"publish [movement only]")
+ +rel(800,305,1010,280,"publish [movement only]")
+ +rel(800,325,1010,380,"publish [movement only]")
+ +rel(800,345,1010,490,"forward-compatible only",true)
+ +'</svg>';
+ return '<h1>System Context <span class="c4lvl">C4 · LEVEL 1</span></h1>'
+  +'<div class="sub">one box for the whole Hub — click it to drill into the containers.</div>'
+  +'<div class="board">'+s+'<div class="legend">'
+  +'<span class="lg"><span class="sw2" style="background:#1168bd"></span>in scope — the Hub drills</span>'
+  +'<span class="lg"><span class="sw2" style="background:#999"></span>external — SEI-owned, contract only</span>'
+  +'<span class="lg"><span class="sw2" style="background:#fff;border:1.5px dashed #cc3344"></span>future — not this phase</span>'
+  +'</div></div>';
+}
+function ccount(k){return CONTAINERS[k][0]+'|'+CONTAINERS[k][2]+'|▼ '+cnt(k)+' components';}
+function renderL2(){
+ var s='<svg viewBox="0 0 1280 660">'+DEFS
+ +sysBox(30,190,165,"SEI SWP","batch + APIs","ext")
+ +'<rect x="240" y="26" width="770" height="600" rx="10" fill="none" stroke="#1168bd" stroke-dasharray="8 5" stroke-width="1.5"/>'
+ +'<text x="258" y="48" font-size="11" font-weight="800" fill="#1168bd">CP INTEGRATION HUB — click any container for its components</text>'
+ +sysBox(280,86,180,CONTAINERS.LZ[0],CONTAINERS.LZ[2].replace(/ · /g,"|")+'|▼ '+cnt("LZ")+' components',"in","go(3,'LZ')")
+ +dbBox(280,220,180,CONTAINERS.RAW[0],"Oracle · AD-8 · AD-7|▼ "+cnt("RAW")+" components","go(3,'RAW')")
+ +dbBox(280,350,180,CONTAINERS.ENR[0],"Oracle · dbt|▼ "+cnt("ENR")+" components","go(3,'ENR')")
+ +dbBox(560,350,180,CONTAINERS.GOLD[0],"Exadata · AD-9 · AD-1|▼ "+cnt("GOLD")+" components","go(3,'GOLD')")
+ +sysBox(560,86,180,CONTAINERS.ORCH[0],"Airflow on OpenShift|▼ "+cnt("ORCH")+" components","in","go(3,'ORCH')")
+ +sysBox(560,506,180,CONTAINERS.GW[0],"Envoy / Data Plane|▼ "+cnt("GW")+" components","in","go(3,'GW')")
+ +dbBox(800,200,175,CONTAINERS.META[0],"registry · rules|▼ "+cnt("META")+" components","go(3,'META')","#5a6472")
+ +sysBox(800,420,175,CONTAINERS.PLATFORM[0],"runtime · CI/CD|▼ "+cnt("PLATFORM")+" components","in","go(3,'PLATFORM')")
+ +sysBox(1050,250,200,"PBDW · Pivotal · IMDS","consumers — movement only|▼ "+cnt("CROSS")+" cross-cutting","in","go(3,'CROSS')")
+ +rel(195,220,280,120,"feeds")
+ +rel(370,148,370,220,"Python load")
+ +rel(370,300,370,350,"dbt")
+ +rel(460,390,560,390,"DB-link · direct-path · HCC",false,true)
+ +rel(740,390,1050,300,"simple movement")
+ +rel(560,126,460,250,"orchestrates")
+ +rel(800,250,660,140,"drives",true)
+ +rel(195,250,560,536,"real-time")
+ +'</svg>';
+ return '<span class="bk" onclick="go(1)">← up to Context</span>'
+  +'<h1>Containers <span class="c4lvl">C4 · LEVEL 2</span></h1>'
+  +'<div class="sub">every container carries its live component count from the tracker — click to drill to Level 3.</div>'
+  +'<div class="board">'+s+'</div>';
+}
+function renderL3(){
+ var C=CONTAINERS[st.cont];
+ var rows=DATA.comps.filter(function(c){return c.container===st.cont;});
+ var h='<span class="bk" onclick="go(2)">← up to Containers</span>'
+  +'<h1>Components <span class="c4lvl">C4 · LEVEL 3</span></h1>'
+  +'<div class="chdr"><span class="ic">'+C[1]+'</span><div><b>'+esc(C[0])+'</b><small>'+esc(C[2])+'</small></div>'
+  +'<div class="cnt"><b>'+rows.length+'</b>components</div></div>'
+  +'<div class="tbl"><div class="trow hd"><span>ID</span><span>Plane</span><span>Component</span><span>Deliverable</span><span>Tech</span><span>Prio</span><span>Status</span></div>';
+ rows.forEach(function(c){
+  h+='<div class="trow"><span class="cid">'+esc(c.id)+'</span><span class="pl" title="'+esc(c.plane)+'">'+esc(c.plane)+'</span>'
+   +'<span class="cn" title="'+esc(c.component)+'">'+esc(c.component)+'</span>'
+   +'<span class="dl" title="'+esc(c.deliverable)+'">'+esc(c.deliverable)+'</span>'
+   +'<span style="font-size:9.5px;color:#0b5e83">'+esc(c.technology)+'</span>'
+   +'<span><span class="chip" style="background:'+(c.priority==="P1"?"#fde8e8":"#eef1f4")+';color:'+(c.priority==="P1"?"#c0392b":"#8a97a3")+'">'+esc(c.priority||"—")+'</span></span>'
+   +'<span><span class="chip" style="background:#eef1f4;color:#8a97a3">'+esc((c.status||"—").toUpperCase())+'</span></span></div>';
+ });
+ h+='</div><div class="note">This is the same 65-row tracker filtered to <b>'+esc(C[0])+'</b> — in the live Design Pack each row carries its Design chip drilling into the component design document (#13, #15, #23 … natively rendered, diagrams zoomable).</div>';
+ return h;
+}
+function render(){
+ crumbs();
+ document.getElementById('app').innerHTML = st.lvl===1?renderL1():st.lvl===2?renderL2():renderL3();
+}
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&st.lvl>1)go(st.lvl-1,null);});
+render();
+</script></body></html>

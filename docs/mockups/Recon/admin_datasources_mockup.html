@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CP 360 — Admin · Data Sources</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f5f8f8;--panel:#fff;--panel2:#dfe6e9;--border:#b5b6b6;--text:#333;--sub:#666;
+    --navy:#10193b;--accent:#0f4775;--pop:#31bced;--success:#159943;--successbg:#d0ebd9;
+    --danger:#c1113a;--dangerbg:#f3d2d7;--warning:#e67e22;--warningbg:#fae5d3;
+    --info:#0091bf;--infobg:#e0f5fd;--mono:'Roboto Mono',monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Roboto,Arial,sans-serif;
+    font-size:14px;line-height:1.5;min-width:1300px;display:flex}
+  .rail{width:208px;flex-shrink:0;background:var(--navy);color:#b9c6d6;min-height:100vh;padding:6px 0}
+  .rlogo{padding:12px 16px;color:#fff;font-weight:700;font-size:16px}
+  .rlogo small{display:block;color:#8fb4dd;font-weight:400;font-size:10px;letter-spacing:.08em}
+  .glbl{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#6d84a3;padding:9px 16px 2px}
+  .nitem{padding:6px 16px;font-size:12.5px;cursor:pointer;border-left:3px solid transparent}
+  .nitem:hover{background:#1a2547;color:#fff}
+  .nitem.on{background:#1c2a52;color:#fff;border-left-color:var(--pop);font-weight:500}
+  .main{flex:1;min-width:0}
+  .hdr{height:56px;background:var(--navy);color:#fff;display:flex;align-items:center;gap:14px;padding:0 18px}
+  .hdr .live{margin-left:auto;font-size:11px;font-weight:700;background:var(--successbg);
+    color:var(--success);border-radius:999px;padding:2px 10px}
+  .wrap{padding:16px 22px 60px;max-width:1240px}
+  h1{font-size:19px;font-weight:500;margin:0 0 2px}
+  .sub{color:var(--sub);font-size:12.5px;margin-bottom:13px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:3px;
+    box-shadow:0 3px 5px rgba(0,0,0,.08);overflow:hidden;margin-bottom:14px}
+  .ph{display:flex;align-items:center;padding:9px 14px;border-bottom:1px solid var(--panel2);background:#fafcfc}
+  .ph h2{font-size:12px;font-weight:700;text-transform:uppercase;margin:0}
+  .ph .hint{margin-left:auto;font-size:10.5px;color:var(--sub)}
+  .btn{height:30px;background:var(--accent);color:#fff;border:0;border-radius:2px;
+    font-size:12px;font-weight:500;padding:0 14px;cursor:pointer}
+  .btn.sec{background:#fff;color:var(--accent);border:1px solid var(--border)}
+  .btn.ghost{background:transparent;border:0;color:var(--accent);text-decoration:underline;padding:0 4px}
+  .chip{font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:999px;white-space:nowrap}
+  .chip.green{background:var(--successbg);color:var(--success)}
+  .chip.red{background:var(--dangerbg);color:var(--danger)}
+  .chip.grey{background:var(--panel2);color:var(--sub)}
+  .chip.blue{background:var(--infobg);color:var(--info)}
+  .srow{display:grid;grid-template-columns:190px 1fr 150px 170px 120px 130px;gap:11px;align-items:center;
+    padding:10px 14px;border-bottom:1px solid var(--panel2)}
+  .srow:hover{background:#eee}
+  .sname{font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--navy)}
+  .sname small{display:block;font-family:Roboto;font-weight:400;font-size:9.5px;color:var(--sub)}
+  .m{font-family:var(--mono);font-size:10px;color:var(--sub)}
+  .gridhead{display:grid;grid-template-columns:190px 1fr 150px 170px 120px 130px;gap:11px;
+    padding:6px 14px;font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;
+    color:var(--sub);font-weight:700;background:#fafcfc;border-bottom:1px solid var(--panel2)}
+  /* form */
+  .form{display:grid;grid-template-columns:1fr 1fr;gap:0}
+  .fcol{padding:14px 16px}
+  .fcol:first-child{border-right:1px solid var(--panel2)}
+  .fld{margin-bottom:11px}
+  .fld label{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;
+    color:var(--sub);font-weight:700;margin-bottom:3px}
+  .fld input,.fld select{width:100%;height:32px;border:1px solid var(--border);border-radius:2px;
+    font-family:inherit;font-size:12.5px;padding:0 9px;background:#fff}
+  .fld input.mono{font-family:var(--mono);font-size:11.5px}
+  .fld .note{font-size:10px;color:var(--sub);margin-top:3px}
+  .fld .note code{font-family:var(--mono);font-size:9.5px;background:var(--panel2);padding:1px 4px;border-radius:2px}
+  .radio{display:flex;gap:14px;font-size:12px;padding:4px 0}
+  .radio label{display:flex;gap:5px;align-items:center;text-transform:none;font-weight:400;
+    font-size:12px;color:var(--text);letter-spacing:0}
+  .testbox{border:1px solid var(--panel2);border-radius:3px;background:#fafcfc;padding:9px 12px;
+    font-family:var(--mono);font-size:10.5px;line-height:1.7}
+  .testbox .ok{color:var(--success);font-weight:700}
+  .secnote{background:var(--infobg);border:1px solid #b9d0e8;border-radius:3px;
+    padding:8px 13px;font-size:11.5px;color:var(--accent);margin:0 16px 14px}
+</style>
+</head>
+<body>
+
+<nav class="rail">
+  <div class="rlogo">CP 360<small>CAPITAL PARTNERS · BBH</small></div>
+  <div class="nitem">&#8962; Home</div>
+  <div class="glbl">Catalog</div>
+  <div class="nitem">Interface 360</div><div class="nitem">API 360</div>
+  <div class="nitem">Data 360</div><div class="nitem">Datapoint 360</div>
+  <div class="glbl">Lineage</div><div class="nitem">Lineage</div>
+  <div class="glbl">Utilities</div><div class="nitem">Auto Mapper</div>
+  <div class="glbl">Governance</div>
+  <div class="nitem">PII Explorer</div><div class="nitem">Quality Guardrails</div>
+  <div class="nitem">Impact Analysis</div>
+  <div class="nitem">Variance 360</div>
+  <div class="nitem">Recon 360</div>
+  <div class="glbl">Admin</div>
+  <div class="nitem on">Data Sources</div>
+  <div class="nitem">Scan Profiles</div>
+  <div class="nitem">Tolerance Rules</div>
+  <div class="glbl">Architecture</div><div class="nitem">System Design</div>
+</nav>
+
+<div class="main">
+  <div class="hdr"><span style="font-weight:700">Admin · Data Sources</span><span class="live">LIVE</span></div>
+  <div class="wrap">
+    <h1>Data Sources</h1>
+    <div class="sub">Register Oracle connections once — Variance 360, CLOB Inspector and Recon 360 pick them
+      from here · secrets never leave the server, never render in the UI</div>
+
+    <!-- ============ registered sources ============ -->
+    <div class="panel">
+      <div class="ph"><h2>Registered sources · 5</h2>
+        <span class="hint">status = last test · used-by shows which modules reference it</span>
+        <button class="btn" style="margin-left:12px">+ New data source</button></div>
+      <div class="gridhead"><span>Name</span><span>Connection</span><span>Schema(s)</span>
+        <span>Role</span><span>Used by</span><span>Status / actions</span></div>
+
+      <div class="srow">
+        <div class="sname">ADDVANTAGE_PROD<small>system of record · read-only acct</small></div>
+        <span class="m">host · advdb1.bbh.com:1521/ADVP</span>
+        <span class="m">ADDV</span>
+        <span><span class="chip blue">SYSTEM OF RECORD</span></span>
+        <span class="m">Recon 360 (A)</span>
+        <span><span class="chip green">OK · 06:00</span> <button class="btn ghost">test</button> <button class="btn ghost">edit</button></span>
+      </div>
+      <div class="srow">
+        <div class="sname">SWP_ADDV_MIRROR<small>dbt output · under test</small></div>
+        <span class="m">host · qclpbdb1:2483/PBDWHDBQ · NNE thick</span>
+        <span class="m">SWPADV</span>
+        <span><span class="chip blue">UNDER TEST</span></span>
+        <span class="m">Recon 360 (B)</span>
+        <span><span class="chip green">OK · 06:00</span> <button class="btn ghost">test</button> <button class="btn ghost">edit</button></span>
+      </div>
+      <div class="srow">
+        <div class="sname">PBDW_QA<small>warehouse profiling</small></div>
+        <span class="m">LDAP · qcoid.bbh.com:3060/pbdwhdbq → resolved</span>
+        <span class="m">PBDWSTG, PBDWAPP</span>
+        <span><span class="chip grey">PROFILING</span></span>
+        <span class="m">Variance 360 · CLOB Insp.</span>
+        <span><span class="chip green">OK · 12:41</span> <button class="btn ghost">test</button> <button class="btn ghost">edit</button></span>
+      </div>
+      <div class="srow">
+        <div class="sname">CP_CATALOG<small>recon &amp; evidence store</small></div>
+        <span class="m">host · dvlpbdb1:2483/pbdwhdbt</span>
+        <span class="m">SILVER</span>
+        <span><span class="chip grey">CATALOG</span></span>
+        <span class="m">all modules (writes)</span>
+        <span><span class="chip green">OK · 12:41</span> <button class="btn ghost">test</button> <button class="btn ghost">edit</button></span>
+      </div>
+      <div class="srow">
+        <div class="sname">STAR_PROD<small>valuation legacy</small></div>
+        <span class="m">host · stardb2.bbh.com:1521/STARP</span>
+        <span class="m">STAR</span>
+        <span><span class="chip blue">SYSTEM OF RECORD</span></span>
+        <span class="m">— not referenced yet</span>
+        <span><span class="chip red">AUTH FAIL · 07-26</span> <button class="btn ghost">test</button> <button class="btn ghost">edit</button></span>
+      </div>
+    </div>
+
+    <!-- ============ new / edit form ============ -->
+    <div class="panel">
+      <div class="ph"><h2>New data source</h2>
+        <span class="hint">test before save · saving stores the secret server-side only</span></div>
+      <div class="form">
+        <div class="fcol">
+          <div class="fld"><label>Display name</label>
+            <input class="mono" value="SWP_ADDV_MIRROR_UAT" />
+            <div class="note">unique key — referenced by scan profiles and run evidence</div></div>
+          <div class="fld"><label>Role</label>
+            <select><option>System of record (side A)</option><option selected>Under test (side B)</option>
+              <option>Profiling source</option><option>Catalog / evidence store</option></select></div>
+          <div class="fld"><label>Connection method</label>
+            <div class="radio">
+              <label><input type="radio" name="cm" checked/> Host / port / service</label>
+              <label><input type="radio" name="cm"/> LDAP alias</label>
+              <label><input type="radio" name="cm"/> TNS entry</label>
+            </div></div>
+          <div class="fld"><label>Host</label><input class="mono" value="uatpbdb1.testbbh.com"/></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="fld"><label>Port</label><input class="mono" value="2483"/></div>
+            <div class="fld"><label>Service name</label><input class="mono" value="PBDWHDBU"/></div>
+          </div>
+          <div class="fld"><label>Schema(s) — comma separated</label>
+            <input class="mono" value="SWPADV"/>
+            <div class="note">Recon 360 compares like-named tables inside these schemas</div></div>
+        </div>
+        <div class="fcol">
+          <div class="fld"><label>Username</label><input class="mono" value="RECON_RO"/></div>
+          <div class="fld"><label>Password</label>
+            <input type="password" value="············" />
+            <div class="note">write-only: stored AES-encrypted in <code>cp_datasource_secret</code>,
+              or reference a vault/env key instead: <code>env:CP_DS_SWPUAT_PWD</code> ·
+              never returned by any API, never shown again</div></div>
+          <div class="fld"><label>Driver options</label>
+            <div class="radio">
+              <label><input type="checkbox" checked/> Thick mode (NNE)</label>
+              <label><input type="checkbox" checked/> Read-only intent</label>
+            </div>
+            <div class="note">thick uses server's <code>CP_ORACLE_CLIENT_DIR</code></div></div>
+          <div class="fld"><label>Test connection</label>
+            <button class="btn sec" style="margin-bottom:7px">Run test</button>
+            <div class="testbox">
+              <span class="ok">✓ connected</span> in 412 ms · thick · NNE active<br/>
+              ✓ schema SWPADV visible · 178 tables · SELECT granted<br/>
+              ✓ SELECT COUNT(*) FROM SWPADV.ACCT_MASTER → 272,335<br/>
+              ⚠ no SELECT on SWPADV.TRN_ARCHIVE — will be skipped in scans
+            </div></div>
+          <div style="display:flex;gap:9px;margin-top:6px">
+            <button class="btn">Save data source</button>
+            <button class="btn sec">Cancel</button>
+          </div>
+        </div>
+      </div>
+      <div class="secnote"><b>Security model:</b> credentials are write-only — the UI posts them once,
+        the API stores them encrypted (or as a vault/env reference) keyed by source name; every later
+        use (scans, tests, profiling) resolves the secret server-side. Edit shows all fields except the
+        secret; changing the password is the only way to replace it. Every test &amp; use is logged to
+        the evidence trail with the source name, never the credential.</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CP 360 — Variance 360 · AS-BUILT (renders exactly what the shipped code renders)</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f5f8f8;--panel:#fff;--panel2:#dfe6e9;--border:#b5b6b6;--text:#333;--sub:#666;
+    --navy:#10193b;--accent:#0f4775;--pop:#31bced;
+    --success:#159943;--successbg:#d0ebd9;--danger:#c1113a;--dangerbg:#f3d2d7;
+    --warning:#e67e22;--warningbg:#fae5d3;--info:#0091bf;--infobg:#e0f5fd;
+    --c-date:#7c3aed;--mono:'Roboto Mono',monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Roboto,Arial,sans-serif;
+    font-size:14px;line-height:1.5;min-width:1300px}
+  .asbuilt{background:var(--navy);color:#9fd0a8;font-family:var(--mono);font-size:11px;
+    padding:6px 18px}
+  .asbuilt b{color:#fff}
+  .wrap{max-width:1240px;margin:0 auto;padding:16px 22px 60px}
+  h1{font-size:19px;font-weight:500;margin:0 0 2px}
+  .sub{color:var(--sub);font-size:12.5px;margin-bottom:12px}
+  .sub code{font-family:var(--mono);font-size:11px;background:var(--panel2);padding:1px 5px;border-radius:2px}
+  .genbar{background:var(--panel);border:1px solid var(--border);border-radius:3px;
+    box-shadow:0 3px 5px rgba(0,0,0,.08);padding:10px 14px;display:flex;gap:10px;
+    align-items:flex-end;flex-wrap:wrap;margin-bottom:12px}
+  .gf label{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;
+    color:var(--sub);font-weight:700;margin-bottom:2px}
+  .gf select{height:30px;border:1px solid var(--border);border-radius:2px;background:#fff;
+    font-size:12px;padding:0 6px}
+  .btn{height:30px;background:var(--accent);color:#fff;border:0;border-radius:2px;
+    font-size:12px;font-weight:500;padding:0 14px;cursor:pointer}
+  .lastrun{margin-left:auto;align-self:center;font-family:var(--mono);font-size:10px;
+    color:var(--sub);text-align:right;line-height:1.5}
+  .lastrun b{color:var(--success)}
+  .tabs{display:flex;gap:2px;border-bottom:2px solid var(--panel2);margin-bottom:12px}
+  .tab{user-select:none;padding:7px 13px;font-size:12.5px;color:var(--sub);cursor:pointer;
+    border-bottom:2px solid transparent;margin-bottom:-2px}
+  .tab.on{color:var(--text);font-weight:500;border-bottom-color:var(--accent)}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:3px;
+    box-shadow:0 3px 5px rgba(0,0,0,.08);overflow:hidden;margin-bottom:13px}
+  .ph{display:flex;align-items:center;padding:8px 14px;border-bottom:1px solid var(--panel2);background:#fafcfc}
+  .ph h2{font-size:11.5px;font-weight:700;text-transform:uppercase;margin:0}
+  .ph .hint{margin-left:auto;font-size:10.5px;color:var(--sub);display:flex;gap:6px;align-items:center}
+  .ph select{height:24px;font-size:11px}
+  .view{display:none}.view.on{display:block}
+  .chip{font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+  .chip.red{background:var(--dangerbg);color:var(--danger)}
+  .chip.amber{background:var(--warningbg);color:var(--warning)}
+  .chip.green{background:var(--successbg);color:var(--success)}
+  .chip.grey{background:var(--panel2);color:var(--sub)}
+  .chip.blue{background:var(--infobg);color:var(--info)}
+  .hop{font-family:var(--mono);font-size:8.5px;padding:2px 6px;border-radius:999px;white-space:nowrap;margin-right:3px}
+  .hop.ok{border:1.5px solid #9fb6a9;background:var(--successbg);color:#41604f}
+  .hop.brk{border:1.5px solid var(--danger);background:var(--dangerbg);color:var(--danger);font-weight:700}
+  .hop.file{border:1.5px dashed var(--border);background:#f4f6f8;color:var(--sub)}
+  .hop.clob{border:1.5px solid var(--c-date);background:#efe9f8;color:var(--c-date)}
+  .fmt{font-family:var(--mono);font-size:10px;font-weight:700;padding:3px 7px;border-radius:3px;display:inline-block}
+  .fmt small{display:block;font-weight:400;font-size:8.5px;opacity:.85}
+  .fmt.date{background:#efe9f8;color:var(--c-date)}.fmt.num{background:var(--infobg);color:var(--accent)}
+  .fmt.id{background:var(--dangerbg);color:var(--danger)}.fmt.mix{background:var(--warningbg);color:var(--warning)}
+  .fmt.txt{background:#f0f2f4;color:var(--sub)}.fmt.unk{background:#f0f2f4;color:var(--sub)}
+  .cbar{height:14px;border-radius:2px;overflow:hidden;display:flex;border:1px solid var(--panel2)}
+  .cbar i{display:block;height:100%}
+  .mono{font-family:var(--mono)}
+  .empty{padding:26px 14px;text-align:center;color:var(--sub);font-size:12.5px}
+  .gridhead{display:grid;gap:10px;padding:6px 14px;font-size:9.5px;text-transform:uppercase;
+    letter-spacing:.05em;color:var(--sub);font-weight:700;background:#fafcfc;
+    border-bottom:1px solid var(--panel2)}
+  .note{font-size:10px;color:var(--info);background:var(--infobg);border-radius:2px;
+    padding:1px 6px;font-family:var(--mono)}
+.vt{display:none}
+#vt0:checked ~ .view.v0{display:block}
+#vt0:checked ~ .tabs label[for=vt0]{color:var(--text);font-weight:500;border-bottom-color:var(--accent)}
+#vt1:checked ~ .view.v1{display:block}
+#vt1:checked ~ .tabs label[for=vt1]{color:var(--text);font-weight:500;border-bottom-color:var(--accent)}
+#vt2:checked ~ .view.v2{display:block}
+#vt2:checked ~ .tabs label[for=vt2]{color:var(--text);font-weight:500;border-bottom-color:var(--accent)}
+#vt3:checked ~ .view.v3{display:block}
+#vt3:checked ~ .tabs label[for=vt3]{color:var(--text);font-weight:500;border-bottom-color:var(--accent)}
+#vt4:checked ~ .view.v4{display:block}
+#vt4:checked ~ .tabs label[for=vt4]{color:var(--text);font-weight:500;border-bottom-color:var(--accent)}
+</style>
+</head>
+<body>
+
+<div class="asbuilt"><b>AS-BUILT MOCKUP</b> — mirrors ui-src/Variance360.jsx exactly:
+same tabs, grid widths, chips, empty states, and DEMO-mode data from mockData.js ·
+<b>deltas vs spec:</b> record byte-diagram &amp; raw-record view are spec-only (drawer, future) ·
+outlier_cnt / value_census hidden when null (engine defers second pass)</div>
+
+<div class="wrap"><input type="radio" name="vtab" id="vt0" class="vt" checked/><input type="radio" name="vtab" id="vt1" class="vt"/><input type="radio" name="vtab" id="vt2" class="vt"/><input type="radio" name="vtab" id="vt3" class="vt"/><input type="radio" name="vtab" id="vt4" class="vt"/>
+  <h1>Variance 360</h1>
+  <div class="sub">Column composition, format inference, deviation &amp; stage variance ·
+    <code>SRC → STG1 → STG2 → DWH</code> · NYDFS evidence-tagged</div>
+
+  <!-- generator bar exactly as JSX: DS select, optional table, Generate, last-run -->
+  <div class="genbar">
+    <div class="gf"><label>Data source</label>
+      <select style="min-width:210px"><option>PBDW — 3716/6066 mapped</option></select></div>
+    <div class="gf"><label>Table (optional)</label>
+      <select style="min-width:190px"><option>All mapped tables</option>
+        <option selected>DIM_ACCOUNT</option></select></div>
+    <button class="btn">▶&nbsp;Generate</button>
+    <span style="font-size:11px;color:var(--sub);align-self:center">run ING20260723_162245 started — refresh in a few min</span>
+    <div class="lastrun">last run <b>complete</b> ING20260723_162245<br/>272,335 rows · 1,132 cols</div>
+  </div>
+
+  <div class="tabs">
+    <label class="tab" for="vt0">High Variance Tables</label>
+    <label class="tab" for="vt1">Column Composition</label>
+    <label class="tab" for="vt2">CLOB Inspector</label>
+    <label class="tab" for="vt3">Coverage</label>
+    <label class="tab" for="vt4">Runs &amp; Evidence</label>
+  </div>
+
+  <!-- ============ TAB 0 — TablesTab ============ -->
+  <section class="view v0">
+    <div class="panel">
+      <div class="ph"><h2>Tables by variance score · ING20260723_162245</h2>
+        <span class="hint">⛁ file · ×2 multi-feed (combined) · CLOB packed · GRAIN Δ expected</span></div>
+
+      <!-- grid: 22px 210px 1fr 210px 130px 62px, exactly as component -->
+      <div style="display:grid;grid-template-columns:22px 210px 1fr 210px 130px 62px;gap:11px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--panel2);cursor:pointer">
+        <span class="mono" style="font-size:11px;color:var(--sub)">1</span>
+        <div><div class="mono" style="font-size:11.5px;font-weight:700;color:var(--navy)">FACT_TRANSACTIONS</div>
+          <div style="font-size:9.5px;color:var(--sub)">Transactions · 214 fields</div></div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="flex:1;height:13px;background:#eef1f4;border-radius:2px;overflow:hidden">
+            <i style="display:block;height:100%;width:34%;background:var(--danger)"></i></div>
+          <span class="mono" style="font-size:11px;font-weight:700;width:84px;text-align:right">28.3
+            <span style="display:block;font-weight:400;font-size:9px;color:var(--sub)">19/214 variant</span></span></div>
+        <div><span class="hop file">SRC ⛁</span><span class="hop ok">STG1</span><span class="hop brk">STG2</span><span class="hop ok">DWH</span></div>
+        <span class="mono" style="font-size:10px;color:var(--sub)"><b style="color:var(--danger)">SUM</b> · STG1-&gt;STG2</span>
+        <span class="chip red">RED</span>
+      </div>
+
+      <div style="display:grid;grid-template-columns:22px 210px 1fr 210px 130px 62px;gap:11px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--panel2);cursor:pointer">
+        <span class="mono" style="font-size:11px;color:var(--sub)">2</span>
+        <div><div class="mono" style="font-size:11.5px;font-weight:700;color:var(--navy)">DIM_ACCOUNT</div>
+          <div style="font-size:9.5px;color:var(--sub)">Account · 1132 fields</div></div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="flex:1;height:13px;background:#eef1f4;border-radius:2px;overflow:hidden">
+            <i style="display:block;height:100%;width:9%;background:var(--warning)"></i></div>
+          <span class="mono" style="font-size:11px;font-weight:700;width:84px;text-align:right">7.4
+            <span style="display:block;font-weight:400;font-size:9px;color:var(--sub)">21/1132 variant</span></span></div>
+        <div><span class="hop file">SRC ⛁</span><span class="hop brk">STG1</span><span class="hop ok">STG2</span><span class="hop ok">DWH</span></div>
+        <span class="mono" style="font-size:10px;color:var(--sub)"><b style="color:var(--danger)">NULLS</b> · SRC-&gt;STG1</span>
+        <span class="chip amber">AMBER</span>
+      </div>
+
+      <div style="display:grid;grid-template-columns:22px 210px 1fr 210px 130px 62px;gap:11px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--panel2);cursor:pointer">
+        <span class="mono" style="font-size:11px;color:var(--sub)">3</span>
+        <div><div class="mono" style="font-size:11.5px;font-weight:700;color:var(--navy)">DIM_ACCOUNT_FEE_BLOCKS</div>
+          <div style="font-size:9.5px;color:var(--sub)">Account · 28 fields</div></div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="flex:1;height:13px;background:#eef1f4;border-radius:2px;overflow:hidden">
+            <i style="display:block;height:100%;width:4%;background:var(--info)"></i></div>
+          <span class="mono" style="font-size:11px;font-weight:700;width:84px;text-align:right">3.0
+            <span style="display:block;font-weight:400;font-size:9px;color:var(--sub)">1/28 variant</span></span></div>
+        <div><span class="hop file">SRC ⛁</span><span class="hop clob">STG1 CLOB</span><span class="hop ok">STG2</span><span class="hop ok">DWH</span></div>
+        <span class="mono" style="font-size:10px;color:var(--sub)"><b style="color:var(--danger)">CNT</b> · STG1-&gt;STG2</span>
+        <span class="chip green">GREEN</span>
+      </div>
+      <div style="padding:6px 14px;font-size:10px;color:var(--sub)">
+        <span class="note">as-built</span> clicking a *_CLOB / FEE_BLOCKS table routes to CLOB Inspector; others to Composition
+        · GRAIN Δ chip pending lineage flag (WIRING.md known limits)</div>
+    </div>
+  </section>
+
+  <!-- ============ TAB 1 — CompositionTab ============ -->
+  <section class="view v1">
+    <div class="panel">
+      <div class="ph"><h2>DIM_ACCOUNT · content, format &amp; deviation</h2>
+        <span class="hint">table <select><option>DIM_ACCOUNT</option></select>
+          stage <select><option>SRC</option><option>STG1</option><option>STG2</option><option selected>DWH</option></select></span></div>
+      <div class="gridhead" style="grid-template-columns:170px 80px 114px 1fr 104px 235px">
+        <span>Column</span><span>Declared</span><span>Detected format</span>
+        <span>Composition</span><span>Deviation</span><span>Verdict + failing census</span></div>
+
+      <div style="display:grid;grid-template-columns:170px 80px 114px 1fr 104px 235px;gap:10px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--panel2)">
+        <div class="mono" style="font-size:11px;font-weight:700;color:var(--navy)">TRANS_TO_PRIN_DATE</div>
+        <span class="mono" style="font-size:9.5px;color:var(--sub)">VARCHAR2(10)</span>
+        <span class="fmt date">DATE<small>MM/DD/YYYY</small></span>
+        <div>
+          <div class="cbar"><i style="width:56.2%;background:var(--c-date)"></i><i style="width:1%;background:repeating-linear-gradient(45deg,var(--danger),var(--danger) 4px,#a50d31 4px,#a50d31 8px)"></i><i style="width:42.8%;background:#e8ecef"></i></div>
+          <div style="display:flex;justify-content:space-between" class="mono"><span style="font-size:8.5px;color:var(--sub)">99.99% conform</span><span style="font-size:8.5px;color:var(--danger)">11 fail</span><span style="font-size:8.5px;color:var(--sub)">43.75% blank</span></div>
+          <div class="mono" style="font-size:8.5px;color:var(--sub)">n = <b style="color:var(--navy)">153.2K</b> of <b style="color:var(--navy)">272.3K</b></div>
+        </div>
+        <div class="mono" style="font-size:9px;color:var(--sub);line-height:1.5">range<br/><b style="color:var(--navy)">01/01/1987→12/31/2026</b></div>
+        <div style="font-size:10px;line-height:1.35"><b class="mono" style="font-size:9.5px;color:var(--danger)">CAST_UNSAFE</b><br/>cast fails ~11 rows — cleanse before cast
+          <div class="mono" style="margin-top:3px;font-size:8.5px">
+            <span class="fmt date" style="font-size:8.5px;padding:0 4px">MM/DD,YYYY</span> 8&nbsp;
+            <span class="fmt date" style="font-size:8.5px;padding:0 4px">YYYYMMDD</span> 2&nbsp;
+            <span class="fmt unk" style="font-size:8.5px;padding:0 4px">UNCLASSIFIED</span> 1</div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:170px 80px 114px 1fr 104px 235px;gap:10px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--panel2)">
+        <div class="mono" style="font-size:11px;font-weight:700;color:var(--navy)">MARKET_VALUE_AMT</div>
+        <span class="mono" style="font-size:9.5px;color:var(--sub)">VARCHAR2(22)</span>
+        <span class="fmt num">DECIMAL<small>NUMBER(18,2)</small></span>
+        <div>
+          <div class="cbar"><i style="width:88.1%;background:var(--accent)"></i><i style="width:9.7%;background:#5f87a7"></i><i style="width:2.2%;background:#e8ecef"></i></div>
+          <div style="display:flex;justify-content:space-between" class="mono"><span style="font-size:8.5px;color:var(--sub)">100% conform</span><span style="font-size:8.5px;color:var(--sub)">2.2% blank</span></div>
+          <div class="mono" style="font-size:8.5px;color:var(--sub)">n = <b style="color:var(--navy)">266.3K</b> of <b style="color:var(--navy)">272.3K</b></div>
+        </div>
+        <div class="mono" style="font-size:9px;color:var(--sub);line-height:1.5">μ <b style="color:var(--navy)">4.2M</b> σ <b style="color:var(--navy)">18.7M</b><br/>P50 <b style="color:var(--navy)">612.0K</b></div>
+        <div style="font-size:10px"><b class="mono" style="font-size:9.5px;color:var(--success)">CLEAN</b><br/>safe cast to NUMBER(18,2)
+          <div style="font-size:9px;color:var(--sub)"><span class="note">as-built</span> outlier count appears here once second pass lands</div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:170px 80px 114px 1fr 104px 235px;gap:10px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--panel2)">
+        <div class="mono" style="font-size:11px;font-weight:700;color:var(--navy)">ANA_ZIP_CODE</div>
+        <span class="mono" style="font-size:9.5px;color:var(--sub)">VARCHAR2(9)</span>
+        <span class="fmt id">IDENTIFIER<small>4.1K lead-0</small></span>
+        <div>
+          <div class="cbar"><i style="width:6.2%;background:#5f87a7"></i><i style="width:93.8%;background:#e8ecef"></i></div>
+          <div style="display:flex;justify-content:space-between" class="mono"><span style="font-size:8.5px;color:var(--sub)">100% conform</span><span style="font-size:8.5px;color:var(--sub)">93.76% blank</span></div>
+          <div class="mono" style="font-size:8.5px;color:var(--sub)">n = <b style="color:var(--navy)">17.0K</b> of <b style="color:var(--navy)">272.3K</b></div>
+        </div>
+        <div class="mono" style="font-size:9px;color:var(--sub)">—</div>
+        <div style="font-size:10px"><b class="mono" style="font-size:9.5px;color:var(--danger)">IDENTIFIER_LEADING_ZERO</b><br/>NEVER cast to NUMBER — keep VARCHAR2</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:170px 80px 114px 1fr 104px 235px;gap:10px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--panel2)">
+        <div class="mono" style="font-size:11px;font-weight:700;color:var(--navy)">BBH_TRUST_INV_AUTHORITY_CODE</div>
+        <span class="mono" style="font-size:9.5px;color:var(--sub)">VARCHAR2(4)</span>
+        <span class="fmt mix">MIXED<small>&nbsp;</small></span>
+        <div>
+          <div class="cbar"><i style="width:12.1%;background:#9fb0bd"></i><i style="width:11.1%;background:#5f87a7"></i><i style="width:76.8%;background:#e8ecef"></i></div>
+          <div style="display:flex;justify-content:space-between" class="mono"><span style="font-size:8.5px;color:var(--sub)">0% conform</span><span style="font-size:8.5px;color:var(--sub)">76.78% blank</span></div>
+          <div class="mono" style="font-size:8.5px;color:var(--sub)">n = <b style="color:var(--navy)">63.2K</b> of <b style="color:var(--navy)">272.3K</b></div>
+        </div>
+        <div class="mono" style="font-size:9px;color:var(--sub)">—</div>
+        <div style="font-size:10px"><b class="mono" style="font-size:9.5px;color:var(--warning)">REVIEW_MIXED</b><br/>mixed content — multiple type populations; review before mapping</div>
+      </div>
+      <div style="padding:6px 14px;font-size:10px;color:var(--sub)">
+        <span class="note">as-built</span> the v2 fix in action: MIXED renders amber REVIEW_MIXED, never CLEAN
+        · PII columns append “PII — samples hidden” to the n-line</div>
+    </div>
+  </section>
+
+  <!-- ============ TAB 2 — ClobTab ============ -->
+  <section class="view v2">
+    <div class="panel">
+      <div class="ph"><h2>CLOB columns · STG1_FIS_ACCOUNT_FEE_BLOCKS</h2>
+        <span class="hint"><select><option>STG1_FIS_ACCOUNT_FEE_BLOCKS</option></select></span></div>
+      <div style="display:grid;grid-template-columns:190px 1fr 160px 150px 80px;gap:11px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--panel2);background:var(--infobg);cursor:pointer">
+        <div class="mono" style="font-size:11.5px;font-weight:700;color:var(--navy)">BLOCK_CLOB</div>
+        <span class="mono" style="font-size:10px;color:var(--sub)">31,648 blobs · len 380 (99.7% uniform) · FIXED_WIDTH · <span style="color:var(--danger)">94 truncated</span></span>
+        <span class="mono" style="font-size:10px;color:var(--sub)">spec 21/23 fields</span>
+        <span class="mono" style="font-size:10px;color:var(--danger)">unmapped: 91-98</span>
+        <span class="chip blue">INSPECT ▾</span>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="ph"><h2>▾ BLOCK_CLOB · fields parsed inside the CLOB</h2>
+        <span class="hint">parse spec from stg1_to_stg2_transform · census via DBMS_LOB.SUBSTR</span></div>
+      <div class="gridhead" style="grid-template-columns:170px 86px 110px 1fr 110px 250px">
+        <span>Parsed field</span><span>Position</span><span>Format</span>
+        <span>Conformance</span><span>Deviation</span><span>Verdict</span></div>
+
+      <div style="display:grid;grid-template-columns:170px 86px 110px 1fr 110px 250px;gap:10px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--panel2)">
+        <div><div class="mono" style="font-size:11px;font-weight:700;color:var(--navy)">FEE_DT</div>
+          <div style="font-size:9px;color:var(--sub)">→ STG2.FEE_DATE</div></div>
+        <span class="mono" style="font-size:9.5px;color:var(--sub)">17–24</span>
+        <span class="fmt date">DATE<small>YYYYMMDD</small></span>
+        <span class="mono" style="font-size:9.5px;color:var(--sub)">99.6% · n = <b style="color:var(--navy)">30.6K</b> of 31.6K · <span style="color:var(--danger)">121 fail</span></span>
+        <span class="mono" style="font-size:9px;color:var(--sub)">—</span>
+        <div style="font-size:10px"><b class="mono" style="font-size:9.5px;color:var(--danger)">CAST_UNSAFE</b><br/>121 values fail mask (00000000 sentinels)</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:170px 86px 110px 1fr 110px 250px;gap:10px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--panel2)">
+        <div><div class="mono" style="font-size:11px;font-weight:700;color:var(--navy)">FEE_MIN</div>
+          <div style="font-size:9px;color:var(--sub)">→ STG2.FEE_MIN_AMOUNT</div></div>
+        <span class="mono" style="font-size:9.5px;color:var(--sub)">25–38</span>
+        <span class="fmt num">DECIMAL<small>&nbsp;</small></span>
+        <span class="mono" style="font-size:9.5px;color:var(--sub)">99.7% · n = <b style="color:var(--navy)">31.1K</b> of 31.6K · <span style="color:var(--danger)">94 fail</span></span>
+        <span class="mono" style="font-size:9px;color:var(--sub)">μ <b style="color:var(--navy)">1.2K</b> σ 3.9K</span>
+        <div style="font-size:10px"><b class="mono" style="font-size:9.5px;color:var(--danger)">CAST_UNSAFE</b><br/>94 values fail NUMBER</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:170px 86px 110px 1fr 110px 250px;gap:10px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--panel2)">
+        <div><div class="mono" style="font-size:11px;font-weight:700;color:var(--navy)">BYTES_91_98</div></div>
+        <span class="mono" style="font-size:9.5px;color:var(--sub)">91–98</span>
+        <span class="fmt unk">UNKNOWN<small>&nbsp;</small></span>
+        <span class="mono" style="font-size:9.5px;color:var(--sub)">0% · n = <b style="color:var(--navy)">12.8K</b> of 31.6K</span>
+        <span class="mono" style="font-size:9px;color:var(--sub)">—</span>
+        <div style="font-size:10px"><b class="mono" style="font-size:9.5px;color:var(--warning)">UNMAPPED_DATA</b><br/>no transform reads bytes 91-98; non-blank in 12,844 blobs</div>
+      </div>
+      <div style="padding:6px 14px;font-size:10px;color:var(--sub)">
+        <span class="note">as-built</span> the code auto-selects the CLOB when a table has exactly one ·
+        record byte-diagram &amp; highlighted raw record from the spec mockup = future drawer, not in this build</div>
+    </div>
+  </section>
+
+  <!-- ============ TAB 3 — CoverageTab ============ -->
+  <section class="view v3">
+    <div class="panel">
+      <div class="ph"><h2>Lineage &amp; profiling coverage · PBDW</h2>
+        <span class="hint">legacy_lineage status census</span></div>
+      <!-- rows exactly as COV_META mapping in component -->
+      <div style="display:grid;grid-template-columns:225px 1fr 120px 118px;gap:11px;padding:8px 14px;align-items:center;font-size:12px;border-bottom:1px solid var(--panel2)">
+        <span><b>Verified chains</b> <span style="color:var(--sub);font-size:10.5px">(Exists)</span></span>
+        <div style="height:11px;background:#eef1f4;border-radius:2px;overflow:hidden"><i style="display:block;height:100%;width:46%;background:var(--success)"></i></div>
+        <span class="mono" style="font-size:10.5px;color:var(--sub)">2,805 fields</span><span class="chip green">PROFILED</span></div>
+      <div style="display:grid;grid-template-columns:225px 1fr 120px 118px;gap:11px;padding:8px 14px;align-items:center;font-size:12px;border-bottom:1px solid var(--panel2)">
+        <span><b>Unstatused lineage</b> <span style="color:var(--sub);font-size:10.5px">((blank))</span></span>
+        <div style="height:11px;background:#eef1f4;border-radius:2px;overflow:hidden"><i style="display:block;height:100%;width:19%;background:var(--warning)"></i></div>
+        <span class="mono" style="font-size:10.5px;color:var(--sub)">1,136 fields</span><span class="chip amber">TRIAGE</span></div>
+      <div style="display:grid;grid-template-columns:225px 1fr 120px 118px;gap:11px;padding:8px 14px;align-items:center;font-size:12px;border-bottom:1px solid var(--panel2)">
+        <span><b>Verified chains</b> <span style="color:var(--sub);font-size:10.5px">(mapped)</span></span>
+        <div style="height:11px;background:#eef1f4;border-radius:2px;overflow:hidden"><i style="display:block;height:100%;width:15%;background:var(--success)"></i></div>
+        <span class="mono" style="font-size:10.5px;color:var(--sub)">911 fields</span><span class="chip green">PROFILED</span></div>
+      <div style="display:grid;grid-template-columns:225px 1fr 120px 118px;gap:11px;padding:8px 14px;align-items:center;font-size:12px;border-bottom:1px solid var(--pan2)">
+        <span><b>DWH-generated</b> <span style="color:var(--sub);font-size:10.5px">(Not Applicable)</span></span>
+        <div style="height:11px;background:#eef1f4;border-radius:2px;overflow:hidden"><i style="display:block;height:100%;width:14%;background:#9fb0bd"></i></div>
+        <span class="mono" style="font-size:10.5px;color:var(--sub)">867 fields</span><span class="chip grey">JUSTIFIED</span></div>
+      <div style="display:grid;grid-template-columns:225px 1fr 120px 118px;gap:11px;padding:8px 14px;align-items:center;font-size:12px;border-bottom:1px solid var(--panel2)">
+        <span><b>Stale mappings</b> <span style="color:var(--sub);font-size:10.5px">(Does Not Exist)</span></span>
+        <div style="height:11px;background:#eef1f4;border-radius:2px;overflow:hidden"><i style="display:block;height:100%;width:4%;background:var(--danger)"></i></div>
+        <span class="mono" style="font-size:10.5px;color:var(--sub)">223 fields</span><span class="chip red">FIX LINEAGE</span></div>
+      <div style="display:grid;grid-template-columns:225px 1fr 120px 118px;gap:11px;padding:8px 14px;align-items:center;font-size:12px">
+        <span><b>Known gaps</b> <span style="color:var(--sub);font-size:10.5px">(unmapped)</span></span>
+        <div style="height:11px;background:#eef1f4;border-radius:2px;overflow:hidden"><i style="display:block;height:100%;width:2%;background:var(--danger)"></i></div>
+        <span class="mono" style="font-size:10.5px;color:var(--sub)">124 fields</span><span class="chip red">MAP</span></div>
+    </div>
+    <div class="panel">
+      <div class="ph"><h2>Tables with no lineage · 12</h2>
+        <span class="hint">confirm with owners — derived tables may be justified</span></div>
+      <div style="padding:9px 14px" class="mono"><span style="font-size:11px;line-height:1.9;color:var(--navy)">
+        FACT_CASH_SETTLEMENTS · FACT_MBS_FACTOR · FACT_PRICE · FACT_SECURITY_MEASURES ·
+        FACT_HOLDINGS_BATCH · FACT_HOLDINGS_UPDATED · DIM_MASTER_ACCOUNT_BLOCKS ·
+        DIM_MSTR_ACCT_RELATIONSHIP · DIM_CRM_TAR_CONTACTS · DIM_IPS_CONSOLIDATED ·
+        DIM_ACCOUNT_MAP · REF_ACCRUED_INCOME_VARNOTE</span></div>
+    </div>
+  </section>
+
+  <!-- ============ TAB 4 — RunsTab ============ -->
+  <section class="view v4">
+    <div class="panel">
+      <div class="ph"><h2>Runs &amp; evidence trail</h2><span class="hint">immutable · RECON_* · NYDFS</span></div>
+      <div style="display:grid;grid-template-columns:180px 78px 92px 1fr;gap:11px;padding:9px 14px;align-items:center;font-size:11.5px;border-bottom:1px solid var(--panel2)">
+        <span class="mono" style="font-size:10.5px;font-weight:700">ING20260723_162245</span><span>BOTH</span>
+        <span style="font-weight:700;color:var(--success)">COMPLETE</span>
+        <span class="mono" style="font-size:10.5px;color:var(--sub)">DIM_ACCOUNT · 272.3K rows · 1.1K cols</span></div>
+      <div style="display:grid;grid-template-columns:180px 78px 92px 1fr;gap:11px;padding:9px 14px;align-items:center;font-size:11.5px;border-bottom:1px solid var(--panel2)">
+        <span class="mono" style="font-size:10.5px;font-weight:700">CLB20260723_154012</span><span>CLOB</span>
+        <span style="font-weight:700;color:var(--success)">COMPLETE</span>
+        <span class="mono" style="font-size:10.5px;color:var(--sub)">STG1_FIS_ACCOUNT_FEE_BLOCKS · 31.6K rows</span></div>
+      <div style="display:grid;grid-template-columns:180px 78px 92px 1fr;gap:11px;padding:9px 14px;align-items:center;font-size:11.5px">
+        <span class="mono" style="font-size:10.5px;font-weight:700">V20260723_105931</span><span>COMPOSITION</span>
+        <span style="font-weight:700;color:var(--danger)">FAILED</span>
+        <span class="mono" style="font-size:10.5px;color:var(--sub)">DIM_ACCOUNT_FEE_BLOCK · no mapped chains in legacy_lineage for PBDW/DIM_ACCOUNT_FEE_BLOCK</span></div>
+    </div>
+  </section>
+</div>
+
+
+</body>
+</html>

@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CP Catalog — Global Search Mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#10193b; --accent:#0f4775; --pop:#31bced; --hover:#0091bf;
+    --bg:#f5f8f8; --panel:#fff; --border:#dbdae0; --bgsoft:#eef3f3; --infobg:#e0f5fd;
+    --text:#2b2f38; --sub:#5a6472; --muted:#9aa3b0;
+    --api:#159943; --data:#0091bf; --datapoint:#0f4775; --interface:#b8528a;
+    --loader:#7c3aed; --pii:#c1113a; --sei:#0091bf;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Roboto,Arial,sans-serif;font-size:14px}
+  .mono{font-family:'Roboto Mono',monospace}
+  .top{background:var(--navy);color:#fff;display:flex;align-items:center;padding:0 20px;height:54px;gap:12px;position:sticky;top:0;z-index:50}
+  .logo{width:30px;height:30px;background:var(--pop);border-radius:3px;display:grid;place-items:center;color:var(--navy);font-weight:700;font-size:13px}
+  .top b{font-size:14px}.top small{color:#8ea3c4;font-size:10px;display:block}
+  /* search box + dropdown */
+  .searchwrap{margin-left:18px;position:relative;width:380px}
+  .searchbox{background:rgba(255,255,255,.12);border-radius:18px;height:34px;display:flex;align-items:center;padding:0 14px;color:#9fb3cf;font-size:13px}
+  .searchbox input{background:none;border:none;outline:none;color:#fff;font-size:13px;flex:1;margin-left:8px}
+  .dropdown{position:absolute;top:40px;left:0;width:100%;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 28px rgba(16,25,59,.25);overflow:hidden;display:none;z-index:60}
+  .dropdown.show{display:block}
+  .dd-head{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);padding:8px 14px 4px}
+  .dd-row{display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;border-bottom:1px solid var(--bg)}
+  .dd-row:hover{background:var(--infobg)}
+  .dd-foot{padding:9px 14px;font-size:12px;font-weight:600;color:var(--accent);background:var(--bgsoft);cursor:pointer;text-align:center}
+  .badge{font-size:8px;font-weight:700;color:#fff;padding:2px 7px;border-radius:3px;min-width:78px;text-align:center;flex-shrink:0}
+  .b-api{background:var(--api)}.b-data{background:var(--data)}.b-datapoint{background:var(--datapoint)}
+  .b-interface{background:var(--interface)}.b-loader{background:var(--loader)}.b-pii{background:var(--pii)}
+  nav.modnav{margin-left:auto;display:flex;gap:3px}
+  nav.modnav a{color:#bcccdf;font-size:12px;padding:6px 10px;border-radius:3px;cursor:pointer}
+  nav.modnav a.active{background:var(--accent);color:#fff}
+  .wrap{max-width:1180px;margin:0 auto;padding:24px 22px 70px}
+  .screen{display:none}.screen.on{display:block}
+  /* results page */
+  .rhead{font-size:22px;font-weight:500;color:var(--navy);margin:0 0 4px}
+  .rsub{font-size:13px;color:var(--sub);margin:0 0 20px}
+  .rsub b{color:var(--navy)}
+  .filterbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px}
+  .fchip{font-size:12px;font-weight:600;padding:6px 13px;border-radius:16px;cursor:pointer;border:1px solid var(--border);background:var(--panel);color:var(--sub);display:flex;align-items:center;gap:6px}
+  .fchip.on{border-color:var(--accent);background:var(--infobg);color:var(--accent)}
+  .fchip .cnt{font-size:10px;background:var(--bgsoft);border-radius:8px;padding:1px 6px;color:var(--sub)}
+  .modsection{margin-bottom:26px}
+  .modsection h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:10px;margin:0 0 10px;padding-bottom:8px;border-bottom:2px solid var(--border)}
+  .modsection h2 .dot{width:10px;height:10px;border-radius:50%}
+  .modsection h2 .c{margin-left:auto;font-size:11px;color:var(--muted);font-weight:600}
+  .rrow{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:8px;cursor:pointer;transition:.12s}
+  .rrow:hover{border-color:var(--hover);box-shadow:0 2px 10px rgba(16,25,59,.08);transform:translateX(2px)}
+  .rrow .nm{font-size:14px;font-weight:600;color:var(--navy)}
+  .rrow .meta{font-size:12px;color:var(--sub);margin-top:2px}
+  .rrow .hl{background:#fff3b0;padding:0 2px;border-radius:2px}
+  .rrow .proj{font-size:8px;font-weight:700;color:#fff;background:var(--sei);padding:2px 6px;border-radius:3px}
+  .rrow .arrow{margin-left:auto;color:var(--muted);font-size:18px}
+  .rrow .pii{font-size:8px;font-weight:700;color:#fff;background:var(--pii);padding:2px 6px;border-radius:3px}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 22px;border-radius:8px;font-size:13px;box-shadow:0 6px 24px rgba(0,0,0,.3);display:none;z-index:100}
+  .toast.show{display:block;animation:pop .2s ease}
+  @keyframes pop{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1}}
+  .demoland{background:var(--panel);border:1px dashed var(--border);border-radius:10px;padding:40px;text-align:center;color:var(--muted)}
+  .demoland b{color:var(--navy);font-size:16px}
+  .hintbar{background:var(--infobg);border:1px solid var(--pop);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--accent);margin-bottom:20px}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="logo">CP</div>
+  <div><b>CP Catalog</b><small>BBH Capital Partners</small></div>
+  <div class="searchwrap">
+    <div class="searchbox">⚲ <input id="sb" placeholder="Search across all modules…" autocomplete="off"
+       oninput="onType(this.value)" onkeydown="if(event.key==='Enter')showResultsPage()"></div>
+    <div class="dropdown" id="dd"></div>
+  </div>
+  <nav class="modnav">
+    <a onclick="goLand()" id="nav-home">Home</a>
+    <a id="nav-results" class="active">Search</a>
+  </nav>
+</div>
+
+<div class="wrap">
+  <!-- landing hint -->
+  <div class="screen on" id="s-land">
+    <div class="hintbar">▲ Type in the search box above (try <b>account</b>, <b>income</b>, <b>settlement</b>, or <b>exchange</b>).
+      You'll see a quick dropdown preview; press <b>Enter</b> for the full grouped results page.</div>
+    <div class="demoland">
+      <b>Global Search</b><br><br>
+      Searches every module — API 360, Data 360, Datapoint 360, System Interface 360, Loaders, PII —<br>
+      and groups matches by module with a badge showing where each lives.<br>
+      Click any result to open it directly in its module.
+    </div>
+  </div>
+
+  <!-- results page -->
+  <div class="screen" id="s-results">
+    <div class="rhead">Search results</div>
+    <div class="rsub">Showing matches for "<b id="qecho">account</b>" across all modules — <b id="total">0</b> results</div>
+
+    <div class="filterbar" id="filterbar"></div>
+    <div id="sections"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ---- the catalog "index" (representative) -----------------------------
+  // module -> badge label, color class, and how a click would navigate
+  const MODMETA = {
+    api:        { label:"API 360",          cls:"b-api",        color:"#159943", nav:"API 360 → Sources" },
+    data:       { label:"DATA 360",         cls:"b-data",       color:"#0091bf", nav:"Data 360 → Inbound Feeds" },
+    datapoint:  { label:"DATAPOINT 360",    cls:"b-datapoint",  color:"#0f4775", nav:"Datapoint 360" },
+    interface:  { label:"INTERFACE 360",    cls:"b-interface",  color:"#b8528a", nav:"Interface 360" },
+    loader:     { label:"LOADERS",          cls:"b-loader",     color:"#7c3aed", nav:"Data 360 → Loaders" },
+    pii:        { label:"PII",              cls:"b-pii",        color:"#c1113a", nav:"PII Explorer" },
+  };
+  const ORDER = ["api","data","datapoint","interface","loader","pii"];
+
+  const INDEX = [
+    // API 360
+    { module:"api", name:"POST /retrieveAccountDetails", meta:"CoreAccounting · produces accountNumber", target:"endpoint" },
+    { module:"api", name:"GET /accounts/{id}", meta:"AccountService · consumes accountId", target:"endpoint" },
+    { module:"api", name:"POST /income", meta:"IncomeService · adhoc income", target:"endpoint", kw:"income" },
+    { module:"api", name:"POST /settlements", meta:"SettlementService", target:"endpoint", kw:"settlement" },
+    { module:"api", name:"POST /fx/deals", meta:"FXService · exchange rate", target:"endpoint", kw:"exchange" },
+    // Data 360 (feeds + fields)
+    { module:"data", name:"Account", meta:"inbound feed · Client & Account Onboarding · 32 fields", target:"feed", proj:"SEI" },
+    { module:"data", name:"ACCOUNT_NUMBER", meta:"field · Account feed · CHAR(17)", target:"field", proj:"SEI" },
+    { module:"data", name:"ACCOUNT_DISPLAY_NAME", meta:"field · Account feed · CHAR(100)", target:"field", proj:"SEI", pii:true },
+    { module:"data", name:"Adhoc Income", meta:"income event · Income_Event dataset", target:"feed", proj:"SEI", kw:"income" },
+    { module:"data", name:"Settlement Record", meta:"silver model · sei_stg_settlements", target:"model", proj:"SEI", kw:"settlement" },
+    { module:"data", name:"EXCHANGE_RATE", meta:"field · FX deal · Decimal(18,9)", target:"field", proj:"SEI", kw:"exchange" },
+    // Datapoint 360
+    { module:"datapoint", name:"account_number", meta:"datapoint · 42 occurrences · 5 modules · IN+OUT", target:"datapoint" },
+    { module:"datapoint", name:"income_realized", meta:"datapoint · 6 occurrences · outbound", target:"datapoint", kw:"income" },
+    { module:"datapoint", name:"settlement_lag", meta:"datapoint · 9 occurrences", target:"datapoint", kw:"settlement" },
+    { module:"datapoint", name:"exchange_rate", meta:"datapoint · 7 occurrences · outbound", target:"datapoint", kw:"exchange" },
+    // Interface 360
+    { module:"interface", name:"Account Outbound", meta:"SWP → BBH AddVantage · outbound", target:"interface", pii:true },
+    { module:"interface", name:"Settlement Instructions", meta:"SWP → Custody · inbound", target:"interface", kw:"settlement" },
+    // Loaders
+    { module:"loader", name:"Adhoc Income Loader", meta:"outbound · Income · v1.4 · 11 attrs", target:"loader", proj:"SEI", kw:"income" },
+    { module:"loader", name:"ACCOUNT_NUMBER", meta:"loader attribute · Adhoc Income Loader · Mandatory", target:"loader-attr", proj:"SEI" },
+    { module:"loader", name:"Settlement Instructions Loader", meta:"outbound · Settlements · v1.0", target:"loader", proj:"SEI", kw:"settlement" },
+    { module:"loader", name:"EXCHANGE_RATE", meta:"canonical field · Decimal(18,9) · PSI36 FX Loader", target:"loader-canon", proj:"SEI", kw:"exchange" },
+    // PII
+    { module:"pii", name:"Client Name", meta:"Direct Identifier · matches ACCOUNT_DISPLAY_NAME (+23)", target:"pii" },
+  ];
+
+  function matches(q){
+    const ql=q.toLowerCase();
+    return INDEX.filter(r => r.name.toLowerCase().includes(ql)
+      || (r.meta||"").toLowerCase().includes(ql)
+      || (r.kw||"").includes(ql));
+  }
+  function hl(text,q){
+    if(!q) return text;
+    const i=text.toLowerCase().indexOf(q.toLowerCase());
+    if(i<0) return text;
+    return text.slice(0,i)+'<span class="hl">'+text.slice(i,i+q.length)+'</span>'+text.slice(i+q.length);
+  }
+
+  // ---- dropdown preview ----
+  function onType(q){
+    const dd=document.getElementById('dd');
+    if(!q){dd.classList.remove('show');return;}
+    const r=matches(q).slice(0,6);
+    if(!r.length){dd.innerHTML='<div class="dd-row" style="color:var(--muted)">No matches</div>';dd.classList.add('show');return;}
+    dd.innerHTML='<div class="dd-head">Quick preview</div>'+r.map(x=>{
+      const m=MODMETA[x.module];
+      return `<div class="dd-row" onclick="openItem('${x.module}','${x.name.replace(/'/g,"")}')">
+        <span class="badge ${m.cls}">${m.label}</span>
+        <div style="min-width:0"><div style="font-size:13px;font-weight:600;color:var(--navy)">${hl(x.name,q)}</div>
+        <div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${x.meta}</div></div>
+      </div>`;
+    }).join("")+`<div class="dd-foot" onclick="showResultsPage()">See all ${matches(q).length} results →</div>`;
+    dd.classList.add('show');
+  }
+
+  // ---- full results page ----
+  let activeFilter=null;
+  function showResultsPage(){
+    const q=document.getElementById('sb').value || 'account';
+    document.getElementById('dd').classList.remove('show');
+    document.getElementById('qecho').textContent=q;
+    activeFilter=null;
+    renderResults(q);
+    document.getElementById('s-land').classList.remove('on');
+    document.getElementById('s-results').classList.add('on');
+    window.scrollTo(0,0);
+  }
+  function renderResults(q){
+    const all=matches(q);
+    document.getElementById('total').textContent=all.length;
+    // filter chips by module
+    const byMod={};
+    all.forEach(r=>{ (byMod[r.module]=byMod[r.module]||[]).push(r); });
+    const fb=document.getElementById('filterbar');
+    fb.innerHTML=`<div class="fchip ${activeFilter===null?'on':''}" onclick="setFilter(null)">All <span class="cnt">${all.length}</span></div>`+
+      ORDER.filter(m=>byMod[m]).map(m=>{
+        const meta=MODMETA[m];
+        return `<div class="fchip ${activeFilter===m?'on':''}" onclick="setFilter('${m}')">
+          <span class="dot" style="background:${meta.color};width:8px;height:8px;border-radius:50%;display:inline-block"></span>
+          ${meta.label} <span class="cnt">${byMod[m].length}</span></div>`;
+      }).join("");
+    // sections
+    const sec=document.getElementById('sections');
+    const showMods=activeFilter?[activeFilter]:ORDER;
+    sec.innerHTML=showMods.filter(m=>byMod[m]).map(m=>{
+      const meta=MODMETA[m];
+      return `<div class="modsection">
+        <h2><span class="dot" style="background:${meta.color}"></span>${meta.label}
+          <span style="font-size:10px;color:var(--muted);font-weight:500;margin-left:4px">→ ${meta.nav}</span>
+          <span class="c">${byMod[m].length} match${byMod[m].length>1?'es':''}</span></h2>
+        ${byMod[m].map(r=>`
+          <div class="rrow" onclick="openItem('${r.module}','${r.name.replace(/'/g,"")}')">
+            <span class="badge ${meta.cls}">${meta.label}</span>
+            <div style="min-width:0">
+              <div class="nm">${hl(r.name,q)}</div>
+              <div class="meta">${r.meta}</div>
+            </div>
+            ${r.proj?`<span class="proj">${r.proj}</span>`:''}
+            ${r.pii?'<span class="pii">PII</span>':''}
+            <span class="arrow">›</span>
+          </div>`).join("")}
+      </div>`;
+    }).join("");
+  }
+  function setFilter(m){ activeFilter=m; renderResults(document.getElementById('sb').value||'account'); }
+
+  // ---- navigation (click opens item in its module) ----
+  function openItem(module,name){
+    const m=MODMETA[module];
+    toast(`→ Opening "${name}" in ${m.nav}`);
+    document.getElementById('dd').classList.remove('show');
+  }
+  function toast(msg){
+    const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+    clearTimeout(window._tt);window._tt=setTimeout(()=>t.classList.remove('show'),2200);
+  }
+  function goLand(){
+    document.getElementById('s-results').classList.remove('on');
+    document.getElementById('s-land').classList.add('on');
+    document.getElementById('nav-home').classList.remove('active');
+  }
+  document.addEventListener('click',e=>{ if(!e.target.closest('.searchwrap')) document.getElementById('dd').classList.remove('show'); });
+</script>
+</body>
+</html>

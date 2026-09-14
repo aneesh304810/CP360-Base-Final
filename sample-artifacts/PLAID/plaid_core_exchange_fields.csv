@@ -1,0 +1,19 @@
+field_name,type,description,sample
+account_id,STRING(38),Plaid persistent account identifier,ilQ9dOkqW6cnBGpDzR1eSeXWWWWWlKtDsyXlD
+account_number,STRING(17),Depository account number (Core Exchange accountnumber),0004471230
+routing_number,STRING(9),ABA routing transit number,021000021
+account_type,STRING(20),FDX account type (CHECKING SAVINGS INVESTMENT),INVESTMENT
+account_subtype,STRING(30),Plaid subtype (brokerage ira 401k),brokerage
+official_name,STRING(80),Official account name from the institution,SMITH FAMILY TRUST BROKERAGE
+nickname,STRING(50),Customer-set display name,Smith Fam Tr
+mask,STRING(4),Last 2-4 digits of the account number,1230
+iso_currency_code,STRING(3),ISO 4217 currency of balances,USD
+current_balance,"DECIMAL(18,2)",Current balance including pending,1450320.55
+available_balance,"DECIMAL(18,2)",Balance available for withdrawal,1448200.10
+balance_as_of,TIMESTAMP,Balance timestamp (ISO 8601),2026-07-14T21:00:00Z
+transaction_id,STRING(38),Plaid transaction identifier,lPNjeW1nR6CDn5okmGQ6hEpMo4lLNoSrzqDje
+transaction_amount,"DECIMAL(18,2)",Signed transaction amount,-2500.00
+transaction_date,DATE,Posting date of the transaction,2026-07-14
+merchant_name,STRING(100),Clean merchant / counterparty name,FIDELITY INVESTMENTS
+payment_channel,STRING(20),Channel (online in store other),online
+pending,BOOLEAN,Whether the transaction is pending,false

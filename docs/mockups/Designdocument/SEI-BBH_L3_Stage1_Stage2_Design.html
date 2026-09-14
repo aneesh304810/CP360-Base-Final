@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>L3 — Stage 1 RAW &amp; Stage 2 Enriched: detailed design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EDF0F3;--card:#FFFFFF;--ink:#0F151C;--ink-2:#4A5765;--rule:#C9D2DB;
+  --s1:#5C4470;--s2:#2C6E5B;--block:#A82316;--new:#9A5B00;--grid:rgba(15,21,28,.055);
+}
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:28px 28px;color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;
+}
+.sheet{max-width:1120px;margin:0 auto;padding:34px 22px 80px}
+.mast{border-top:3px solid var(--ink);padding-top:14px;margin-bottom:20px}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2)}
+h1{font-family:"Archivo",sans-serif;font-weight:700;font-size:clamp(25px,4vw,38px);line-height:1.05;letter-spacing:-.022em;margin:8px 0 10px;max-width:22ch}
+.sub{max-width:70ch;color:var(--ink-2);font-size:14.5px;margin:0}
+
+nav{position:sticky;top:0;z-index:20;background:rgba(237,240,243,.94);backdrop-filter:blur(6px);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);margin:20px 0 24px}
+nav ul{list-style:none;display:flex;flex-wrap:wrap;margin:0;padding:0}
+nav a{display:block;padding:10px 13px;font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);text-decoration:none;border-right:1px solid var(--rule)}
+nav a:hover,nav a:focus{background:var(--ink);color:#fff;outline:none}
+
+section.blk{background:var(--card);border:1px solid var(--rule);border-top:4px solid var(--c);margin-bottom:22px;scroll-margin-top:58px}
+.hd{padding:16px 18px 14px;border-bottom:1px solid var(--rule)}
+.hd .tag{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.17em;text-transform:uppercase;color:var(--c);font-weight:600}
+.hd h2{font-family:"Archivo",sans-serif;font-size:21px;margin:5px 0 6px;letter-spacing:-.015em}
+.hd p{margin:0;font-size:13.5px;color:var(--ink-2);max-width:82ch}
+.body{padding:16px 18px 20px}
+h4{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-2);margin:22px 0 10px;padding-bottom:5px;border-bottom:1px solid var(--rule)}
+h4:first-child{margin-top:0}
+p.lead{font-size:13.5px;color:var(--ink-2);max-width:82ch}
+
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:4px}
+th{background:var(--c);color:#fff;font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.09em;text-transform:uppercase;font-weight:600;text-align:left;padding:8px 9px}
+td{border:1px solid var(--rule);padding:7px 9px;vertical-align:top}
+tr:nth-child(even) td{background:#FAFBFC}
+code,.mono{font-family:"IBM Plex Mono",monospace;font-size:11.5px;background:#F0F3F6;padding:1px 4px;border-radius:2px}
+pre{font-family:"IBM Plex Mono",monospace;font-size:11.5px;line-height:1.65;background:#0F151C;color:#D6DEE6;padding:14px 16px;overflow-x:auto;border-radius:2px;margin:0 0 6px}
+pre .k{color:#7FB3E8}pre .s{color:#9BD6A8}pre .c{color:#6E7D8C;font-style:italic}pre .h{color:#E8A87C}
+.flow{font-family:"IBM Plex Mono",monospace;font-size:12px;line-height:1.7;background:#F7F9FB;border:1px solid var(--rule);padding:13px 15px;overflow-x:auto;white-space:pre;color:#1B2733;margin-bottom:6px}
+.flow .b{color:var(--block);font-weight:600}.flow .g{color:var(--s2);font-weight:600}.flow .n{color:var(--new);font-weight:600}
+ul.risk{margin:0;padding-left:17px;font-size:13.5px;color:var(--ink-2)}
+ul.risk li{margin-bottom:7px}ul.risk b{color:var(--ink)}
+.ad{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;background:#FFF1DC;border:1px solid #E8CDA1;color:#7A4A00;padding:1px 5px;border-radius:2px}
+.call{border-left:3px solid var(--block);background:#FDF6F5;padding:11px 14px;font-size:13.5px;margin:12px 0 0}
+.call b{display:block;font-family:"Archivo",sans-serif;font-size:13.5px;margin-bottom:3px;color:var(--ink)}
+.cap{font-size:11.5px;color:var(--ink-2);font-family:"IBM Plex Mono",monospace;margin:0 0 14px}
+@media(max-width:760px){table{font-size:11.5px}td,th{padding:6px 7px}}
+@media print{body{background:#fff}nav{position:static}section.blk{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+<header class="mast">
+  <div class="eyebrow">Level 3 · components 13, 14, 15, 17 · detailed design</div>
+  <h1>Stage 1 RAW and Stage 2 Enriched</h1>
+  <p class="sub">The two layers where the pipeline either stays auditable or quietly stops being auditable. Stage 1 is the evidence record; Stage 2 is the only place business meaning is allowed to enter. Everything below is design intent for engineering review, not yet approved.</p>
+</header>
+
+<nav><ul>
+  <li><a href="#contract">Layer contract</a></li>
+  <li><a href="#s1">Stage 1 · RAW</a></li>
+  <li><a href="#loadid">LOAD_ID &amp; idempotency</a></li>
+  <li><a href="#s2">Stage 2 · Enriched</a></li>
+  <li><a href="#corr">Corrections</a></li>
+  <li><a href="#sql">Worked model</a></li>
+  <li><a href="#open">Open items</a></li>
+</ul></nav>
+
+<!-- ================= CONTRACT ================= -->
+<section class="blk" id="contract" style="--c:#16305B">
+  <div class="hd">
+    <div class="tag">Design premise</div>
+    <h2>What each layer is, and what it must never become</h2>
+    <p>Most medallion failures come from a layer taking on a job that belongs to its neighbour. These rules are the ones worth defending in review.</p>
+  </div>
+  <div class="body">
+    <table>
+      <tr><th style="width:15%">Layer</th><th style="width:30%">Is</th><th style="width:30%">Is not</th><th>Test of the rule</th></tr>
+      <tr>
+        <td><b>Stage 1 RAW</b><br><span class="mono">7 tables</span></td>
+        <td>A byte-faithful record of what SEI sent, stamped with when and in what file. Append only.</td>
+        <td>Typed, cleaned, deduplicated, or joined. No rejects removed, no defaults applied.</td>
+        <td>You can reconstruct the original file from the table. If you can't, RAW is doing too much.</td>
+      </tr>
+      <tr>
+        <td><b>Stage 2 Enriched</b><br><span class="mono">5 models</span></td>
+        <td>Typed, standardised, corrected, business-rule-validated, reusable across all consumers.</td>
+        <td>Consumer-shaped. No PBDW-specific column names, no Pivotal-specific filters, no report logic.</td>
+        <td>A second consumer can be added without changing a Stage 2 model.</td>
+      </tr>
+      <tr>
+        <td><b>Gold</b><br><span class="mono">5 objects</span></td>
+        <td>Kimball dims and facts. Surrogate keys, SCD2 history, conformed grain.</td>
+        <td>Where corrections get resolved. That must already have happened.</td>
+        <td>Gold logic is dimensional mechanics only — no source-system knowledge.</td>
+      </tr>
+    </table>
+
+    <h4>Lineage map — 7 → 5 → 5</h4>
+<div class="flow">  file (SEI)              Stage 1 RAW                  Stage 2 (dbt)            Gold
+  ─────────────────────   ─────────────────────────    ────────────────────     ─────────────────────
+  Account Snapshot    ──▶ RAW_ACCOUNT              ──▶ STG2_ACCOUNT         ──▶ DIM_ACCOUNT  <span class="g">SCD2</span>
+  Client Snapshot     ──▶ RAW_CLIENT               ──▶ STG2_INTERESTED_PARTY──▶ DIM_INTERESTED_PARTY <span class="g">SCD2</span>
+  Tax Lot Snapshot    ──▶ RAW_TAXLOT               ──▶ STG2_TAX_LOT         ──▶ FACT_TAX_LOT <span class="g">append</span>
+  Transaction Delta   ──▶ RAW_TRANSACTION          ─┐
+  Corrected Txn       ──▶ RAW_CORRECTED_TRANSACTION─┴▶ STG2_TRANSACTIONS    ──▶ FACT_TRANSACTIONS <span class="g">merge</span>
+  Position Delta      ──▶ RAW_POSITION             ─┐
+  Corrected Position  ──▶ RAW_CORRECTED_POSITION   ─┴▶ STG2_CP_HOLDINGS     ──▶ FACT_CP_HOLDINGS <span class="g">merge</span>
+</div>
+    <p class="cap">Note the naming break: RAW_CLIENT → STG2_INTERESTED_PARTY. The rename happens once, in Stage 2, and the mapping belongs in the config store (33) — not in a model comment.</p>
+  </div>
+</section>
+
+<!-- ================= STAGE 1 ================= -->
+<section class="blk" id="s1" style="--c:#5C4470">
+  <div class="hd">
+    <div class="tag">Component 14 · with 13 loading it</div>
+    <h2>Stage 1 — RAW (SWP)</h2>
+    <p>Python-managed, immutable, append only. Seven tables, one per source file. Its single obligation is that a replay from RAW produces the same result as the original run — which drives every decision below.</p>
+  </div>
+  <div class="body">
+
+    <h4>Table specification</h4>
+    <table>
+      <tr><th style="width:23%">Table</th><th style="width:14%">Feed type</th><th style="width:20%">Natural key (in Stage 2)</th><th style="width:16%">Volume shape</th><th>Partition</th></tr>
+      <tr><td><span class="mono">RAW_ACCOUNT</span></td><td>Full snapshot</td><td>ACCOUNT_ID</td><td>Flat, full daily</td><td>BUSINESS_DATE</td></tr>
+      <tr><td><span class="mono">RAW_CLIENT</span></td><td>Full snapshot</td><td>CLIENT_ID</td><td>Flat, full daily</td><td>BUSINESS_DATE</td></tr>
+      <tr><td><span class="mono">RAW_TAXLOT</span></td><td>Full snapshot</td><td>ACCOUNT_ID + LOT_ID</td><td>Largest feed</td><td>BUSINESS_DATE</td></tr>
+      <tr><td><span class="mono">RAW_TRANSACTION</span></td><td>Delta</td><td>TRANSACTION_ID</td><td>Spiky, event-driven</td><td>BUSINESS_DATE</td></tr>
+      <tr><td><span class="mono">RAW_POSITION</span></td><td>Delta</td><td>ACCOUNT_ID + SECURITY_ID</td><td>Moderate</td><td>BUSINESS_DATE</td></tr>
+      <tr><td><span class="mono">RAW_CORRECTED_TRANSACTION</span></td><td>Correction</td><td>TRANSACTION_ID + effective date</td><td>Small, irregular</td><td>BUSINESS_DATE (file date)</td></tr>
+      <tr><td><span class="mono">RAW_CORRECTED_POSITION</span></td><td>Correction</td><td>ACCOUNT_ID + SECURITY_ID + eff. date</td><td>Small, irregular</td><td>BUSINESS_DATE (file date)</td></tr>
+    </table>
+    <p class="cap">Natural keys are listed for Stage 2's benefit. RAW itself carries no key constraint — see below.</p>
+
+    <div class="call">
+      <b>Design call: every business column in RAW is VARCHAR2.</b>
+      Typing at the RAW boundary means a bad date or a non-numeric amount rejects the row at load, and the evidence of what SEI actually sent is destroyed. Store as text, cast in Stage 2, and let G1 report type violations without blocking storage of them. This is the difference between "we can prove what arrived" and "we can prove what arrived and parsed."
+    </div>
+
+    <h4>Audit columns — all seven tables</h4>
+    <table>
+      <tr><th style="width:22%">Column</th><th style="width:16%">Type</th><th>Semantics and why it exists</th></tr>
+      <tr><td><span class="mono">LOAD_ID</span></td><td>NUMBER(18)</td><td>Unique per file-load attempt. The replay handle and the join key for lineage. See next section.</td></tr>
+      <tr><td><span class="mono">BUSINESS_DATE</span></td><td>DATE</td><td>The date the data is <i>about</i>. Partition key. For corrections this is the file date, not the corrected event's date.</td></tr>
+      <tr><td><span class="mono">FILE_DATE</span></td><td>DATE</td><td>Date asserted by SEI in the filename or manifest. Divergence from BUSINESS_DATE is itself a G1 check.</td></tr>
+      <tr><td><span class="mono">FILE_NAME</span></td><td>VARCHAR2(260)</td><td>Exact delivered filename. Evidence, and the tie back to the landing zone.</td></tr>
+      <tr><td><span class="mono">ROW_NUM</span></td><td>NUMBER(12)</td><td>Ordinal position in the file. Makes a RAW row addressable to a physical line — essential for an audit query.</td></tr>
+      <tr><td><span class="mono">LOAD_TIMESTAMP</span></td><td>TIMESTAMP</td><td>When BBH loaded it. The "knew-at" axis. Do not use for ordering business events.</td></tr>
+      <tr><td><span class="mono">SOURCE_SYSTEM</span></td><td>VARCHAR2(30)</td><td>Constant <span class="mono">'SEI_SWP'</span> today. Present so the second source doesn't require a schema change.</td></tr>
+      <tr><td><span class="mono">INGESTION_STATUS</span></td><td>VARCHAR2(20)</td><td>LOADED / QUARANTINED / SUPERSEDED. Not a DQ verdict — that lives in the DQ results store (28).</td></tr>
+    </table>
+
+    <h4>DDL pattern</h4>
+<pre><span class="c">-- one pattern, seven tables. Generated from the config store (33), not hand-written.</span>
+<span class="k">CREATE TABLE</span> RAW_TRANSACTION (
+  LOAD_ID           <span class="h">NUMBER(18)</span>     <span class="k">NOT NULL</span>,
+  BUSINESS_DATE     <span class="h">DATE</span>           <span class="k">NOT NULL</span>,
+  FILE_DATE         <span class="h">DATE</span>,
+  FILE_NAME         <span class="h">VARCHAR2(260)</span>  <span class="k">NOT NULL</span>,
+  ROW_NUM           <span class="h">NUMBER(12)</span>     <span class="k">NOT NULL</span>,
+  LOAD_TIMESTAMP    <span class="h">TIMESTAMP</span>      <span class="k">DEFAULT</span> SYSTIMESTAMP <span class="k">NOT NULL</span>,
+  SOURCE_SYSTEM     <span class="h">VARCHAR2(30)</span>   <span class="k">DEFAULT</span> <span class="s">'SEI_SWP'</span>   <span class="k">NOT NULL</span>,
+  INGESTION_STATUS  <span class="h">VARCHAR2(20)</span>   <span class="k">DEFAULT</span> <span class="s">'LOADED'</span>    <span class="k">NOT NULL</span>,
+  <span class="c">-- business payload: all VARCHAR2, cast downstream</span>
+  TRANSACTION_ID    <span class="h">VARCHAR2(64)</span>,
+  ACCOUNT_ID        <span class="h">VARCHAR2(64)</span>,
+  TRADE_DATE        <span class="h">VARCHAR2(32)</span>,
+  SETTLE_DATE       <span class="h">VARCHAR2(32)</span>,
+  TRANSACTION_TYPE  <span class="h">VARCHAR2(64)</span>,
+  QUANTITY          <span class="h">VARCHAR2(48)</span>,
+  AMOUNT            <span class="h">VARCHAR2(48)</span>
+)
+<span class="k">PARTITION BY RANGE</span> (BUSINESS_DATE)
+  <span class="k">INTERVAL</span> (NUMTODSINTERVAL(1,<span class="s">'DAY'</span>))
+  (<span class="k">PARTITION</span> P_INIT <span class="k">VALUES LESS THAN</span> (<span class="k">DATE</span> <span class="s">'2026-01-01'</span>));
+
+<span class="c">-- no primary key, no unique constraint, no NOT NULL on business columns.</span>
+<span class="c">-- duplicates are data to be observed, not errors to be prevented.</span>
+<span class="k">CREATE INDEX</span> IX_RAW_TXN_LOAD <span class="k">ON</span> RAW_TRANSACTION (LOAD_ID) <span class="k">LOCAL</span>;</pre>
+
+    <h4>Load mechanism — choose per feed, not once</h4>
+    <table>
+      <tr><th style="width:22%">Mechanism</th><th style="width:26%">Use for</th><th style="width:26%">Strength</th><th>Cost</th></tr>
+      <tr><td>External table</td><td>Tax Lot, Account, Client — the large snapshots</td><td>One pass; G1 checks run as SQL over the file; no row shipping</td><td>File must be on a DB-visible mount; brittle on malformed rows</td></tr>
+      <tr><td>SQL*Loader direct path</td><td>Large deltas where the file can't be DB-mounted</td><td>Fast bulk insert, bad-file capture built in</td><td>External process to orchestrate and parse the log</td></tr>
+      <tr><td>cx_Oracle <span class="mono">executemany</span></td><td>Corrections, small feeds</td><td>Full control, easy quarantine routing</td><td>Slowest per row; fine at correction volumes</td></tr>
+    </table>
+    <p class="lead">Component 13 exposes these behind one loader interface, selected by config per domain. Hardcoding one mechanism is the single most likely way this framework becomes seven scripts.</p>
+
+    <h4>Retention and partitioning</h4>
+    <ul class="risk">
+      <li><b>Interval partitioning by BUSINESS_DATE</b>, daily. Gives partition-wise replay, cheap purge by <span class="mono">DROP PARTITION</span>, and partition pruning for G2 profiling.</li>
+      <li><b>Retention is set by replay depth, not by disk.</b> If the business needs to replay 90 days, RAW holds 90 days minimum. Decide the replay window first, then size storage — the reverse produces a system that cannot honour its own recovery promise.</li>
+      <li><b>Compress partitions older than the active window</b> — <span class="mono">ROW STORE COMPRESS ADVANCED</span> on the snapshot tables, where repeated daily snapshots compress heavily.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ================= LOAD_ID ================= -->
+<section class="blk" id="loadid" style="--c:#5C4470">
+  <div class="hd">
+    <div class="tag">Cross-cutting · underpins replay (21) and tie-out (26)</div>
+    <h2>LOAD_ID and redelivery</h2>
+    <p>The one identifier the whole recovery story hangs on. Get it wrong and replay, lineage and G4 all become approximations.</p>
+  </div>
+  <div class="body">
+    <h4>Definition</h4>
+    <p class="lead">One LOAD_ID per <b>file-load attempt</b> — not per batch, not per business date. A batch of seven files produces seven LOAD_IDs bound by a BATCH_ID in the config store. This is what lets one domain be replayed without touching the other six, which is the whole point of the per-domain fan-out in component 18.</p>
+
+<div class="flow">  BATCH_ID 2026-08-07-EOD
+   ├ LOAD_ID 100411  RAW_ACCOUNT      acct_20260807.csv  1,204,882 rows  LOADED
+   ├ LOAD_ID 100412  RAW_CLIENT       clnt_20260807.csv    318,447 rows  LOADED
+   ├ LOAD_ID 100413  RAW_TAXLOT       txlt_20260807.csv  9,771,203 rows  LOADED
+   ├ LOAD_ID 100414  RAW_TRANSACTION  txn_20260807.csv     442,190 rows  LOADED
+   ├ LOAD_ID 100415  RAW_POSITION     posn_20260807.csv    877,014 rows  LOADED
+   ├ LOAD_ID 100416  RAW_CORRECTED_TRANSACTION            <span class="b">    1,204 rows  LOADED</span>
+   └ LOAD_ID 100417  RAW_CORRECTED_POSITION                     318 rows  LOADED
+
+  redelivery of the same file later:
+   └ LOAD_ID 100455  RAW_TRANSACTION  txn_20260807_v2.csv  442,190 rows  LOADED
+        └─▶ <span class="n">100414 marked INGESTION_STATUS = 'SUPERSEDED'</span>   (rows stay — nothing is deleted)
+</div>
+
+    <div class="call">
+      <b>Redelivery is a supersede, never a delete.</b>
+      SEI resends a file for a date already loaded. The wrong instinct is to delete the old rows and reload. That breaks immutability and makes the audit question "what did we hold on Tuesday morning?" unanswerable. Instead: load again under a new LOAD_ID, flag the prior load SUPERSEDED, and let Stage 2's latest-record selection prefer the current load. The old rows remain as evidence and cost one partition's storage.
+    </div>
+
+    <h4>What LOAD_ID enables downstream</h4>
+    <table>
+      <tr><th style="width:26%">Consumer</th><th>Use</th></tr>
+      <tr><td>Replay engine (21)</td><td>Replay scope is a LOAD_ID set, not a date. Re-run one domain, or one corrected file, without disturbing the rest of the batch.</td></tr>
+      <tr><td>G4 tie-out (26)</td><td>Compare Gold output against the row counts captured at ingest per LOAD_ID — a lookup, not a table rescan. This is what makes G4 affordable inside the window.</td></tr>
+      <tr><td>Audit &amp; lineage (31)</td><td>Row-level lineage is the LOAD_ID + ROW_NUM pair carried forward into Stage 2. A Gold value traces to a physical line in a named file.</td></tr>
+      <tr><td>Quarantine (29)</td><td>Quarantined rows keep the LOAD_ID of the attempt that rejected them, so resubmission is traceable to the original.</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ================= STAGE 2 ================= -->
+<section class="blk" id="s2" style="--c:#2C6E5B">
+  <div class="hd">
+    <div class="tag">Component 15 · with 17 inside it</div>
+    <h2>Stage 2 — Enriched (dbt)</h2>
+    <p>Five models, eight processing steps, one fixed order. The order is not stylistic: applying business rules before corrections validates data you're about to replace, and deduplicating after joins multiplies the work.</p>
+  </div>
+  <div class="body">
+
+    <h4>The eight steps as a fixed CTE order</h4>
+<div class="flow">  <span class="g">1</span> source          read RAW for the target business date(s), LOAD_ID not SUPERSEDED
+  <span class="g">2</span> standardise     trim, case-fold codes, normalise nulls ('', 'NULL', 'N/A' → NULL)
+  <span class="g">3</span> typecast        VARCHAR2 → DATE / NUMBER, safe-cast; failures routed, not raised
+  <span class="g">4</span> deduplicate     natural key + LOAD_ID; keep highest ROW_NUM  <span class="n">← before joins</span>
+  <span class="b">5</span> <span class="b">corrections     union delta + corrected, rank by correction sequence</span>
+  <span class="g">6</span> lookups         reference joins — security master, account hierarchy
+  <span class="g">7</span> rules           business rule validations → flag columns, G3 tests assert on them
+  <span class="g">8</span> derive          computed attributes
+  <span class="g">9</span> latest select   one row per natural key per business date
+
+  ordering constraints that are not negotiable:
+    4 before 6   — dedup on a joined set multiplies rows and cost
+    5 before 7   — never validate a record you are about to supersede
+    5 before 9   — latest-record must see corrections to pick correctly
+</div>
+
+    <h4>Model specification</h4>
+    <table>
+      <tr><th style="width:20%">Model</th><th style="width:20%">Sources</th><th style="width:16%">Grain</th><th style="width:20%">Materialization</th><th>Rationale</th></tr>
+      <tr>
+        <td><span class="mono">STG2_ACCOUNT</span></td><td>RAW_ACCOUNT</td><td>ACCOUNT_ID per business date</td>
+        <td><b>Incremental</b>, insert by business date</td>
+        <td>Full snapshot in, current-state out. Gold builds SCD2 — Stage 2 must <i>not</i>. Keep the day's snapshot so SCD2 can be rebuilt without re-reading RAW.</td>
+      </tr>
+      <tr>
+        <td><span class="mono">STG2_INTERESTED_PARTY</span></td><td>RAW_CLIENT</td><td>CLIENT_ID per business date</td>
+        <td><b>Incremental</b>, insert by business date</td>
+        <td>Same shape as account. Note the rename — mapping lives in config (33).</td>
+      </tr>
+      <tr>
+        <td><span class="mono">STG2_TAX_LOT</span></td><td>RAW_TAXLOT</td><td>ACCOUNT_ID + LOT_ID per business date</td>
+        <td><b>Incremental</b>, insert by business date</td>
+        <td>Largest feed. Full refresh on a full snapshot is the worst combination available and should not ship.</td>
+      </tr>
+      <tr>
+        <td><span class="mono">STG2_TRANSACTIONS</span></td><td>RAW_TRANSACTION + RAW_CORRECTED_TRANSACTION</td><td>TRANSACTION_ID, versioned</td>
+        <td><b>Incremental</b>, merge on key + version</td>
+        <td>Corrections reach back into prior dates. Needs a lookback window, not a single-date filter.</td>
+      </tr>
+      <tr>
+        <td><span class="mono">STG2_CP_HOLDINGS</span></td><td>RAW_POSITION + RAW_CORRECTED_POSITION</td><td>ACCOUNT_ID + SECURITY_ID + date, versioned</td>
+        <td><b>Incremental</b>, merge on key + version</td>
+        <td>Same pattern as transactions.</td>
+      </tr>
+    </table>
+
+    <div class="call">
+      <b>Design call: none of the five should be full refresh.</b>
+      SEI v5 offers "Full Refresh (Daily) / Incremental" as an either-or. On daily full snapshots of Account, Client and Tax Lot, full refresh means rebuilding the entire history every night to add one day. Incremental-by-business-date gives the same result at a fraction of the cost, and makes a single-day replay possible. Full refresh should be reserved for a deliberate rebuild, run by hand.
+    </div>
+
+    <h4>Standard column set added by Stage 2</h4>
+    <table>
+      <tr><th style="width:26%">Column</th><th>Purpose</th></tr>
+      <tr><td><span class="mono">SRC_LOAD_ID</span>, <span class="mono">SRC_ROW_NUM</span></td><td>Carried from RAW. Row-level lineage back to a physical line in a named file.</td></tr>
+      <tr><td><span class="mono">RECORD_VERSION</span></td><td>1 for the original, incrementing per correction applied to the same natural key.</td></tr>
+      <tr><td><span class="mono">IS_CURRENT</span></td><td>Y for the version in force now. Gold consumes only current rows; audit reads all of them.</td></tr>
+      <tr><td><span class="mono">EFFECTIVE_FROM_TS</span> / <span class="mono">EFFECTIVE_TO_TS</span></td><td>The knew-at axis. With BUSINESS_DATE as the happened-at axis, this is what makes as-of restatement possible.</td></tr>
+      <tr><td><span class="mono">DQ_FLAGS</span></td><td>Business rule outcomes as a structured column. G3 tests assert against it; nothing is silently dropped.</td></tr>
+      <tr><td><span class="mono">DBT_UPDATED_AT</span></td><td>Model run timestamp. Operational, not business.</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ================= CORRECTIONS ================= -->
+<section class="blk" id="corr" style="--c:#A82316">
+  <div class="hd">
+    <div class="tag">Component 17 · <span class="ad">AD-2</span> lives here</div>
+    <h2>Correction integration — the hard part</h2>
+    <p>SEI v5 says corrections are "Merge (Update Existing)". That works until someone asks what the position was on Tuesday morning. This section sets out both options honestly and states a recommendation.</p>
+  </div>
+  <div class="body">
+
+    <h4>The two axes</h4>
+<div class="flow">                      happened-at  ──▶  BUSINESS_DATE      (the event's date)
+                      knew-at      ──▶  EFFECTIVE_FROM_TS  (when BBH learned it)
+
+  Aug 5   transaction T-991 booked, amount 10,000   → BUSINESS_DATE 2026-08-05, v1
+  Aug 7   correction file: T-991 amount is 12,000   → BUSINESS_DATE 2026-08-05, v2
+                                                       arrived on 2026-08-07
+
+  question a regulator asks:  "what did your books show for Aug 5, as at Aug 6?"
+  under merge:                unanswerable — v1 no longer exists
+  under versioned append:     v1, WHERE EFFECTIVE_FROM_TS &lt;= Aug 6 &lt; EFFECTIVE_TO_TS
+</div>
+
+    <table>
+      <tr><th style="width:16%">Option</th><th style="width:28%">Mechanism</th><th style="width:28%">Gains</th><th>Costs</th></tr>
+      <tr>
+        <td><b>A · In-place merge</b><br><span class="mono">SEI v5 position</span></td>
+        <td>Correction updates the Stage 2 row; Gold merges through.</td>
+        <td>Smallest tables. Simplest queries. Least build.</td>
+        <td>Prior state destroyed. No as-of restatement. Replay cannot restore what it overwrote. Lineage records that a value changed, not what it was.</td>
+      </tr>
+      <tr>
+        <td><b>B · Versioned append</b><br><span class="mono">recommended</span></td>
+        <td>Correction inserts a new version; prior row closed with EFFECTIVE_TO_TS and IS_CURRENT = N.</td>
+        <td>As-of restatement works. Replay is meaningful. Audit answerable. Corrections become observable — you can report on their volume and lag.</td>
+        <td>Larger tables. Every consumer query needs <span class="mono">IS_CURRENT = 'Y'</span> — mitigated by exposing a view. One custom dbt macro to write and maintain.</td>
+      </tr>
+    </table>
+
+    <div class="call">
+      <b>Recommendation: option B, and the reason is reversibility.</b>
+      Starting with B and later flattening to current-state is a straightforward migration. Starting with A and later needing history is not a migration — the history is gone and cannot be reconstructed. In a financial data pipeline carrying transactions, positions and tax lots, the probability that someone eventually asks an as-of question is not low. Note also that this decision is what makes the replay engine (21) implementable at all: replay under option A can re-run a merge, but it cannot undo one.
+    </div>
+
+    <h4>Correction resolution logic</h4>
+<pre><span class="c">-- macro: resolve_corrections(base_rel, corr_rel, natural_key, business_date_col)</span>
+<span class="c">-- used identically by STG2_TRANSACTIONS and STG2_CP_HOLDINGS</span>
+
+<span class="k">WITH</span> unioned <span class="k">AS</span> (
+  <span class="k">SELECT</span> t.*, <span class="h">0</span> <span class="k">AS</span> correction_seq, <span class="s">'ORIGINAL'</span> <span class="k">AS</span> record_source <span class="k">FROM</span> base t
+  <span class="k">UNION ALL</span>
+  <span class="k">SELECT</span> c.*, <span class="h">1</span> <span class="k">AS</span> correction_seq, <span class="s">'CORRECTION'</span>                  <span class="k">FROM</span> corr c
+),
+versioned <span class="k">AS</span> (
+  <span class="k">SELECT</span> u.*,
+         <span class="k">ROW_NUMBER</span>() <span class="k">OVER</span> (
+           <span class="k">PARTITION BY</span> transaction_id, business_date
+           <span class="k">ORDER BY</span> correction_seq, load_timestamp, src_load_id
+         ) <span class="k">AS</span> record_version,
+         <span class="k">LEAD</span>(load_timestamp) <span class="k">OVER</span> (
+           <span class="k">PARTITION BY</span> transaction_id, business_date
+           <span class="k">ORDER BY</span> correction_seq, load_timestamp, src_load_id
+         ) <span class="k">AS</span> effective_to_ts
+  <span class="k">FROM</span> unioned u
+)
+<span class="k">SELECT</span> v.*,
+       v.load_timestamp <span class="k">AS</span> effective_from_ts,
+       <span class="k">CASE WHEN</span> v.effective_to_ts <span class="k">IS NULL THEN</span> <span class="s">'Y'</span> <span class="k">ELSE</span> <span class="s">'N'</span> <span class="k">END</span> <span class="k">AS</span> is_current
+<span class="k">FROM</span> versioned v</pre>
+
+    <h4>Three cases this must handle</h4>
+    <ul class="risk">
+      <li><b>Correction arrives before its original.</b> Out-of-order delivery. The macro produces a correction with no base — the row must park with <span class="mono">DQ_FLAGS = 'ORPHAN_CORRECTION'</span> and be retried on a lookback window, not silently dropped. G3 asserts the orphan count is zero after the window.</li>
+      <li><b>Two corrections to the same record on the same day.</b> Ordering by <span class="mono">correction_seq</span> alone is insufficient — the tiebreak must be LOAD_TIMESTAMP then SRC_LOAD_ID, and it must be deterministic, or two replays produce two different answers.</li>
+      <li><b>Correction to a record outside the incremental window.</b> A correction landing today for a transaction from six weeks ago falls outside a seven-day lookback. Either the window is configurable per feed from the config store (33), or corrections beyond it route to a manual queue. Silence is the wrong answer.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ================= WORKED MODEL ================= -->
+<section class="blk" id="sql" style="--c:#2C6E5B">
+  <div class="hd">
+    <div class="tag">Component 15 · reference implementation</div>
+    <h2>Worked model — STG2_TRANSACTIONS</h2>
+    <p>The hardest of the five, because it carries corrections. The other four are simplifications of this shape.</p>
+  </div>
+  <div class="body">
+<pre><span class="c">-- models/stage2/stg2_transactions.sql</span>
+{{ config(
+    materialized = <span class="s">'incremental'</span>,
+    unique_key   = [<span class="s">'transaction_id'</span>, <span class="s">'business_date'</span>, <span class="s">'record_version'</span>],
+    incremental_strategy = <span class="s">'merge'</span>,
+    partition_by = <span class="s">'business_date'</span>,
+    on_schema_change = <span class="s">'fail'</span>
+) }}
+
+{% set lookback = var(<span class="s">'correction_lookback_days'</span>, <span class="h">7</span>) %}   <span class="c">-- sourced from config store 33</span>
+
+<span class="k">WITH</span> src_txn <span class="k">AS</span> (
+    <span class="k">SELECT</span> * <span class="k">FROM</span> {{ source(<span class="s">'raw_swp'</span>, <span class="s">'RAW_TRANSACTION'</span>) }}
+    <span class="k">WHERE</span> ingestion_status <span class="k">IN</span> (<span class="s">'LOADED'</span>)          <span class="c">-- SUPERSEDED loads excluded</span>
+    {% if is_incremental() %}
+      <span class="k">AND</span> business_date &gt;= (<span class="k">SELECT</span> <span class="k">MAX</span>(business_date) - {{ lookback }} <span class="k">FROM</span> {{ this }})
+    {% endif %}
+),
+src_corr <span class="k">AS</span> (
+    <span class="k">SELECT</span> * <span class="k">FROM</span> {{ source(<span class="s">'raw_swp'</span>, <span class="s">'RAW_CORRECTED_TRANSACTION'</span>) }}
+    <span class="k">WHERE</span> ingestion_status <span class="k">IN</span> (<span class="s">'LOADED'</span>)
+    {% if is_incremental() %}
+      <span class="k">AND</span> business_date &gt;= (<span class="k">SELECT</span> <span class="k">MAX</span>(business_date) - {{ lookback }} <span class="k">FROM</span> {{ this }})
+    {% endif %}
+),
+
+<span class="c">-- step 2 + 3: standardise then typecast. safe cast: bad values become NULL and are flagged,</span>
+<span class="c">-- never raised — a single malformed amount must not fail the whole model.</span>
+typed <span class="k">AS</span> (
+    <span class="k">SELECT</span>
+        {{ std_code(<span class="s">'transaction_id'</span>) }}      <span class="k">AS</span> transaction_id,
+        {{ std_code(<span class="s">'account_id'</span>) }}          <span class="k">AS</span> account_id,
+        {{ safe_date(<span class="s">'trade_date'</span>) }}         <span class="k">AS</span> trade_date,
+        {{ safe_date(<span class="s">'settle_date'</span>) }}        <span class="k">AS</span> settle_date,
+        {{ std_code(<span class="s">'transaction_type'</span>) }}    <span class="k">AS</span> transaction_type,
+        {{ safe_number(<span class="s">'quantity'</span>) }}         <span class="k">AS</span> quantity,
+        {{ safe_number(<span class="s">'amount'</span>) }}           <span class="k">AS</span> amount,
+        business_date, load_id <span class="k">AS</span> src_load_id, row_num <span class="k">AS</span> src_row_num, load_timestamp
+    <span class="k">FROM</span> src_txn
+),
+
+<span class="c">-- step 4: deduplicate within a load, BEFORE any join</span>
+deduped <span class="k">AS</span> (
+    <span class="k">SELECT</span> * <span class="k">FROM</span> (
+        <span class="k">SELECT</span> t.*, <span class="k">ROW_NUMBER</span>() <span class="k">OVER</span> (
+                 <span class="k">PARTITION BY</span> transaction_id, business_date, src_load_id
+                 <span class="k">ORDER BY</span> src_row_num <span class="k">DESC</span>) <span class="k">AS</span> rn
+        <span class="k">FROM</span> typed t
+    ) <span class="k">WHERE</span> rn = <span class="h">1</span>
+),
+
+<span class="c">-- step 5: corrections. shared macro — identical logic in STG2_CP_HOLDINGS.</span>
+corrected <span class="k">AS</span> (
+    {{ resolve_corrections(<span class="s">'deduped'</span>, <span class="s">'corr_typed'</span>,
+                           natural_key=[<span class="s">'transaction_id'</span>,<span class="s">'business_date'</span>]) }}
+),
+
+<span class="c">-- step 6: reference joins, after dedup and corrections</span>
+enriched <span class="k">AS</span> (
+    <span class="k">SELECT</span> c.*, a.account_type, a.base_currency, s.asset_class
+    <span class="k">FROM</span> corrected c
+    <span class="k">LEFT JOIN</span> {{ ref(<span class="s">'ref_account'</span>) }}  a <span class="k">ON</span> c.account_id = a.account_id
+    <span class="k">LEFT JOIN</span> {{ ref(<span class="s">'ref_security'</span>) }} s <span class="k">ON</span> c.security_id = s.security_id
+),
+
+<span class="c">-- step 7 + 8: business rules as flags, then derived attributes.</span>
+<span class="c">-- rules FLAG, they do not FILTER. G3 asserts on the flags; dropping rows here</span>
+<span class="c">-- would make the G4 tie-out fail for a reason nobody can see.</span>
+flagged <span class="k">AS</span> (
+    <span class="k">SELECT</span> e.*,
+      <span class="k">CASE WHEN</span> account_type <span class="k">IS NULL</span>         <span class="k">THEN</span> <span class="s">'UNKNOWN_ACCOUNT;'</span> <span class="k">END</span> ||
+      <span class="k">CASE WHEN</span> settle_date &lt; trade_date    <span class="k">THEN</span> <span class="s">'SETTLE_BEFORE_TRADE;'</span> <span class="k">END</span> ||
+      <span class="k">CASE WHEN</span> amount <span class="k">IS NULL</span>               <span class="k">THEN</span> <span class="s">'AMOUNT_UNPARSEABLE;'</span> <span class="k">END</span> <span class="k">AS</span> dq_flags,
+      amount * <span class="k">NVL</span>(fx.rate, <span class="h">1</span>)               <span class="k">AS</span> amount_base_ccy
+    <span class="k">FROM</span> enriched e
+    <span class="k">LEFT JOIN</span> {{ ref(<span class="s">'ref_fx_rate'</span>) }} fx
+      <span class="k">ON</span> e.currency = fx.currency <span class="k">AND</span> e.business_date = fx.rate_date
+)
+
+<span class="k">SELECT</span> * <span class="k">FROM</span> flagged</pre>
+
+    <h4>Accompanying schema.yml — G3 assertions</h4>
+<pre>models:
+  - name: stg2_transactions
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [transaction_id, business_date, record_version]
+      - dbt_utils.expression_is_true:
+          expression: <span class="s">"NOT (is_current = 'Y' AND effective_to_ts IS NOT NULL)"</span>
+    columns:
+      - name: transaction_id
+        tests: [not_null]
+      - name: account_id
+        tests:
+          - not_null
+          - relationships: { to: ref('stg2_account'), field: account_id }
+      - name: amount
+        tests:
+          - not_null:
+              config: { severity: <span class="s">"{{ var('sev_amount_null','error') }}" }</span>   <span class="c"># from config 33</span>
+      - name: dq_flags
+        tests:
+          - accepted_values:
+              values: [<span class="s">'ORPHAN_CORRECTION'</span>]
+              config: { severity: warn }</pre>
+    <p class="cap">Severity is parameterised, not literal. A threshold hardcoded in a dbt test cannot be read by Airflow, so the gate cannot branch on it — see plane 4.</p>
+  </div>
+</section>
+
+<!-- ================= OPEN ================= -->
+<section class="blk" id="open" style="--c:#9A5B00">
+  <div class="hd">
+    <div class="tag">To close before build</div>
+    <h2>Open items on these two layers</h2>
+    <p>Ordered by how much rework each one causes if it is answered late.</p>
+  </div>
+  <div class="body">
+    <table>
+      <tr><th style="width:6%">#</th><th style="width:28%">Question</th><th style="width:16%">Owner</th><th>Consequence of deciding late</th></tr>
+      <tr><td>1</td><td><span class="ad">AD-2</span> Corrections: merge or versioned append</td><td>ARB</td><td>Rewrites both correction-carrying models, the Gold merge, replay, and the lineage claim. Decide first.</td></tr>
+      <tr><td>2</td><td>Replay depth — how many days must be replayable</td><td>Business + BBH ops</td><td>Sets RAW retention and partition compression. Cheap now, a storage migration later.</td></tr>
+      <tr><td>3</td><td>Correction lookback window per feed</td><td>SEI + BBH</td><td>Too short and corrections silently miss; too long and every incremental run scans weeks.</td></tr>
+      <tr><td>4</td><td>Does SEI emit a change indicator or row hash on snapshots</td><td>SEI</td><td>The single largest performance lever available. Without it, Tax Lot is processed in full every night.</td></tr>
+      <tr><td>5</td><td>Natural keys confirmed per domain</td><td>SEI</td><td>Dedup, corrections and SCD2 all key off these. Assumed above; must be confirmed, not inferred.</td></tr>
+      <tr><td>6</td><td>Late-arriving dimension policy — reject or inferred member</td><td>ARB</td><td>Changes the join behaviour in all fact-feeding models.</td></tr>
+      <tr><td>7</td><td>PII classification of Client and Account attributes</td><td>BBH security</td><td>Masking changes the RAW model. Retrofitting masking into an immutable layer is unpleasant.</td></tr>
+      <tr><td>8</td><td>Reference data ownership — security master, FX, hierarchy</td><td>BBH</td><td>Stage 2 lookups assume these exist and are current. None appear in either source deck.</td></tr>
+    </table>
+
+    <div class="call">
+      <b>Item 8 is a genuine gap, not a detail.</b>
+      Stage 2's "Reference / Lookup Joins" step appears in SEI v5 with no reference sources named anywhere in either document. Security master, FX rates and account hierarchy are assumed above because the step cannot work without them. Their ownership, refresh cadence and failure behaviour are undesigned — and an FX rate that is one day stale produces silently wrong base-currency amounts that no gate above will catch.
+    </div>
+  </div>
+</section>
+
+</div>
+</body>
+</html>

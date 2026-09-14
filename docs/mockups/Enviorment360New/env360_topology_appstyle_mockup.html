@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Environment 360 · Network Topology — app style</title>
+<style>
+ body{font-family:'Segoe UI',sans-serif;background:#fff;margin:0;padding:16px;color:#233240}
+ .tabs{display:flex;gap:22px;font-size:11.5px;font-weight:700;color:#5c6b7a;border-bottom:1.5px solid #e8edf1;margin-bottom:4px}
+ .tabs span{padding:6px 2px}
+ .tabs .on{color:#1168bd;border-bottom:2.5px solid #1168bd}
+ .bar{display:flex;gap:7px;align-items:center;margin:8px 0}
+ .tab{padding:4px 14px;border-radius:999px;font-size:10px;font-weight:800;cursor:pointer;border:1.5px solid #d5dee6;color:#3d566e;background:#fff}
+ .tab.on{background:#1168bd;border-color:#1168bd;color:#fff}
+ .tab.prod.on{background:#8a1f2d;border-color:#8a1f2d}
+ svg{min-width:1560px;display:block}
+ .cap{font-size:10px;color:#8aa0b4;margin-top:6px}
+ @keyframes bl{50%{opacity:.3}}
+</style></head><body>
+<div class="tabs"><span>Overview</span><span>Certificates</span><span>Health checks</span><span>Topology</span><span>Pulse check</span><span class="on">Network Topology</span><span>Inventory</span></div>
+<div class="bar" id="tabs"></div>
+<div style="overflow-x:auto"><svg id="g" viewBox="0 0 1560 660"></svg></div>
+<div class="cap">badges = TLS certs / firewall rules on that hop · dots = node health · link color = path health · ◌ = port TBD in workbook · all live from the same probe results</div>
+<script>
+var SHEET=`Layer\tSystem\tHosts\tPort\tSSL
+Platform\tCP Integration Hub\tOCPQ RD-DEV\tTBD\t
+Database\tIMDS\tdvlimdsdb\tOracle JDBC port TBD\t
+Database\tPBDW\tdvlpbdb1\tTBD\t
+Consumer\tPivotal\tQCWPIVDEVSEI2/4/5\tTBD\t
+Consumer\tClient Portal\tdvltasap235\tTBD\t2026-08-20
+File System\tLanding\trdwebfs cphub$\tTBD\t
+External SFTP\tSFTP\tqcsecureftp.bbh.com\tSFTP 22\t
+External API\tEgress\t192.200.8/5 · 204.136.26\tHTTPS 443\t
+#SIT
+Platform\tCP Integration Hub\tOCPQ RD-SIT\tTBD\t
+Database\tIMDS\tqblimdsdb\tOracle JDBC port TBD\t
+Database\tPBDW\tQALPBDB3\tTBD\t
+Consumer\tPivotal\tAPMTRSEI·SEIDB6·INTSEI1\tTBD\t
+Consumer\tClient Portal\trdltasap235\tTBD\t
+File System\tLanding\trdwebfs cphub$\tTBD\t
+External SFTP\tSFTP\tqcsecureftp.bbh.com\tSFTP 22\t
+External API\tEgress\tBBH ranges ×3\tHTTPS 443\t
+#TRIAL_UAT
+Platform\tCP Integration Hub\tOCPQ QC\tTBD\t
+Database\tIMDS\trdlimdsdb\tOracle JDBC port TBD\t
+Database\tPBDW\tQCLPBDB3\tTBD\t
+Consumer\tPivotal\tAUPGSEI1/2·SEIDB4/5\tTBD\t
+Consumer\tClient Portal\tqcltasap235\tTBD\t
+File System\tLanding\tqcwebfs cphub$\tTBD\t
+External SFTP\tSFTP\tqcsecureftp.bbh.com\tSFTP 22\t
+External API\tEgress\tBBH ranges ×3\tHTTPS 443\t
+#PROD
+Platform\tCP Integration Hub\tPROD cluster TBD\tTBD\t
+Database\tIMDS\tnjlimdsdb\tOracle JDBC port TBD\t
+Database\tPBDW\tnjlpbdb3\tTBD\t
+Consumer\tPivotal\tNJWPIVCRM ×6\tTBD\t
+Consumer\tClient Portal\tnjtasap12 ×4\tTBD\t
+File System\tLanding\tprod share TBD\tTBD\t
+External SFTP\tSFTP\tsecureftp.bbh.com\tSFTP 22\t
+External API\tEgress\tBBH ranges ×3\tHTTPS 443\t`;
+var ENVO=["DEV","SIT","TRIAL_UAT","PROD"],cur="DEV",tick=0,ST={},SEL=null;
+function wb(){var out=[],env=0;SHEET.split("\n").slice(1).forEach(function(l){
+ if(l[0]==="#"){env++;return;}var c=l.split("\t");
+ out.push({env:ENVO[env],layer:c[0],system:c[1],hosts:c[2],port:c[3]||"TBD",ssl:c[4]||""});});return out;}
+var ROWS=wb();
+function fR(layer,frag){return ROWS.filter(function(r){return r.env===cur&&r.layer===layer&&r.system.indexOf(frag)>=0;})[0]||{hosts:"?",port:"TBD"};}
+function pOf(pp){if(!pp||pp.toUpperCase().indexOf("TBD")>=0)return null;var m=pp.match(/(\d{2,5})/);return m?m[1]:pp;}
+function sslMin(){var r=ROWS.filter(function(x){return x.env===cur&&x.ssl;})[0];
+ if(!r)return null;var d=Math.round((new Date(r.ssl)-new Date("2026-08-14"))/864e5);return {sys:r.system,days:d};}
+var W=176,H=42;
+function nodes(){return [
+ {id:"users",x:48,y:140,ic:"👤",t:"Users · analysts",s:"browser → F5 → route"},
+ {id:"corp.f5",x:48,y:250,ic:"🎯",t:"F5 / LTM VIP",s:"TLS terminate · monitors"},
+ {id:"mgmt",x:48,y:480,ic:"🛰",t:"Splunk · Vault · OIDC",s:"HEC 8088 · vault 8200"},
+ {id:"app.ingress",x:350,y:118,ic:"🚪",t:"OCP ingress",s:fR("Platform","Integration").hosts},
+ {id:"app.hub",x:502,y:212,ic:"⚙️",t:"Hub pods",s:"Airflow · dbt · ingestion"},
+ {id:"app.envoy",x:362,y:330,ic:"🔀",t:"Envoy data plane",s:"consumer APIs · fat JWT"},
+ {id:"app.out",x:502,y:470,ic:"📤",t:"Outbound producers",s:"16 loaders · idem keys"},
+ {id:"data.imds",x:732,y:150,ic:"🛢",t:"IMDS",s:fR("Database","IMDS").hosts+" · 62G/8c"},
+ {id:"data.pbdw",x:732,y:296,ic:"🛢",t:"PBDW",s:fR("Database","PBDW").hosts+" · 62G/8c"},
+ {id:"cons.piv",x:962,y:150,ic:"🏢",t:"Pivotal",s:fR("Consumer","Pivotal").hosts},
+ {id:"cons.portal",x:962,y:262,ic:"🖥",t:"Client Portal",s:fR("Consumer","Client Portal").hosts},
+ {id:"dmz.mft",x:1182,y:118,ic:"📥",t:"MFT · Momentum",s:fR("External SFTP","SFTP").hosts},
+ {id:"dmz.cifs",x:1182,y:230,ic:"🗄",t:"Landing · CIFS",s:fR("File System","Landing").hosts},
+ {id:"dmz.apigee",x:1182,y:470,ic:"🛡",t:"Apigee egress",s:"passthrough · corr-id"},
+ {id:"ext.sei",x:1376,y:118,ic:"🏦",t:"SEI SWP",s:"extracts · loaders · APIs"},
+ {id:"ext.seiapi",x:1376,y:440,ic:"🌐",t:"SEI API targets",s:fR("External API","Egress").hosts},
+ {id:"ext.vendor",x:1376,y:548,ic:"☁️",t:"CRD · Azure | PORT",s:"vendor-managed"}];}
+function L(a,b,chip,tbdSrc){return {a:a,b:b,chip:chip,src:tbdSrc};}
+var LK=[
+ L("ext.sei","dmz.mft","SFTP 22 · Momentum pull",null),
+ L("dmz.mft","dmz.cifs","rename-atomic drop",null),
+ L("dmz.cifs","app.hub",["CIFS 445 · FW-APP","File System","Landing"],1),
+ L("users","corp.f5","",null),
+ L("corp.f5","app.ingress","F5 → route 443",null),
+ L("app.ingress","app.hub","",null),
+ L("corp.f5","app.envoy","API 443",null),
+ L("app.hub","data.imds",["FW-DATA · JDBC","Database","IMDS"],1),
+ L("app.hub","data.pbdw",["FW-DATA · JDBC","Database","PBDW"],1),
+ L("data.pbdw","cons.piv",["FW-CONS · feeds","Consumer","Pivotal"],1),
+ L("data.pbdw","cons.portal",["FW-CONS · feeds","Consumer","Client Portal"],1),
+ L("app.out","dmz.apigee","submit 443 · corr-id",null),
+ L("dmz.apigee","ext.seiapi",["HTTPS 443 · allowlist ✓","External API","Egress"],1),
+ L("dmz.apigee","ext.vendor","vendor 443",null),
+ L("app.hub","mgmt","HEC 8088",null)];
+function esc(t){return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+function stCol(s){return s==="ok"?"#2e9e4f":s==="warn"?"#e08a00":s==="wait"?"#b6c2cc":"#c23a3a";}
+function render(){
+ var NS=nodes(),by={};NS.forEach(function(n){by[n.id]=n;});
+ var s='';
+ // airy zone dividers + labels (his style)
+ var Z=[["USER ZONE",30],["OPENSHIFT · OCPQ — CP INTEGRATION HUB",330],["DATA ZONE",712],["CONSUMERS",942],["DMZ · MFT / EGRESS",1162],["EXTERNAL · SEI / VENDORS",1356]];
+ Z.forEach(function(z,i){
+  if(i)s+='<line x1="'+(z[1]-10)+'" y1="60" x2="'+(z[1]-10)+'" y2="640" stroke="#e3eaf0" stroke-dasharray="3,6"/>';
+  s+='<text x="'+z[1]+'" y="52" font-size="9.6" font-weight="800" fill="#93a7b8" letter-spacing="2">'+z[0]+'</text>';});
+ // links: dashed beziers, chips floating near midpoints
+ LK.forEach(function(k,i){
+  var a=by[k.a],b=by[k.b];
+  var x1=a.x+(b.x>a.x?W:0),y1=a.y+H/2,x2=b.x+(b.x>a.x?0:W),y2=b.y+H/2;
+  var mx=(x1+x2)/2, bend=(y2>y1?-24:24)*((i%3)+1)/2;
+  var st=ST["p"+i]||{ok:1,ms:20+((i*37)%80)};
+  var tbd=false,label="";
+  if(k.chip){
+   if(typeof k.chip==="string")label=k.chip;
+   else{var r=fR(k.chip[1],k.chip[2]);var p=pOf(r.port);tbd=!p&&!!k.src;label=k.chip[0]+" · "+(p?p:"◌ TBD");}
+  }
+  var col=tbd?"#c98d1a":(st.ok?"#5aa87c":"#b8564a");
+  s+='<path d="M '+x1+' '+y1+' C '+mx+' '+(y1+bend)+', '+mx+' '+(y2-bend)+', '+x2+' '+y2+'" fill="none" stroke="'+col+'" stroke-width="1.4" stroke-dasharray="4,4"'+(tbd?' opacity=".8"':'')+'/>';
+  if(label){
+   var lx=mx,ly=(y1+y2)/2+((i%2)?12:-8);
+   s+='<g onclick="SEL=SEL==='+i+'?null:'+i+';render()" style="cursor:pointer"><text x="'+lx+'" y="'+ly+'" font-size="8.8" fill="'+(tbd?"#a3720e":"#6b8296")+'" font-weight="'+(tbd?'800':'600')+'" text-anchor="middle">'+esc(label)+(k.chip&&typeof k.chip==="string"&&st.ok?"  ·  "+st.ms+"ms":"")+'</text></g>';}
+ });
+ // cert chip on route hop (from inventory ssl)
+ var m=sslMin();
+ if(m)s+='<rect x="252" y="120" width="86" height="15" rx="7.5" fill="#fbe9ef"/><text x="295" y="131" font-size="8.6" font-weight="800" fill="#c2185b" text-anchor="middle">expires in '+m.days+'d</text>';
+ // cards, his style: small, dot riding the top-right corner
+ NS.forEach(function(n){
+  var st=(ST[n.id]||{s:"ok"}).s;
+  s+='<g><rect x="'+n.x+'" y="'+n.y+'" width="'+W+'" height="'+H+'" rx="8" fill="#fff" stroke="#e6ecf1" filter="drop-shadow(0 1px 2px rgba(30,50,70,.08))"/>'
+   +'<text x="'+(n.x+9)+'" y="'+(n.y+17)+'" font-size="10" font-weight="800" fill="#1c2d47">'+n.ic+' '+esc(n.t)+'</text>'
+   +'<text x="'+(n.x+9)+'" y="'+(n.y+32)+'" font-size="8.2" fill="#7a8ea0" font-family="Consolas,monospace">'+esc(n.s)+'</text>'
+   +'<circle cx="'+(n.x+W-3)+'" cy="'+(n.y+3)+'" r="4.6" fill="'+stCol(st)+'" stroke="#fff" stroke-width="1.4"'+(st==="warn"||st==="down"?' style="animation:bl 1.4s infinite"':'')+'><title>'+n.id+' · '+st+'</title></circle></g>';});
+ // detail popover (topmost)
+ if(SEL!==null){
+  var k=LK[SEL],a=by[k.a],b=by[k.b];
+  var lbl=typeof k.chip==="string"?k.chip:(function(){var r=fR(k.chip[1],k.chip[2]);var p=pOf(r.port);return k.chip[0]+" · "+(p||"◌ awaiting firewall decision")+"  |  "+r.hosts;})();
+  var px=Math.min((a.x+b.x)/2,1280),py=Math.max(70,(a.y+b.y)/2-30);
+  s+='<g><rect x="'+px+'" y="'+py+'" width="264" height="58" rx="9" fill="#10193b" filter="drop-shadow(0 3px 8px rgba(16,25,59,.3))"/>'
+   +'<text x="'+(px+12)+'" y="'+(py+18)+'" font-size="9" font-weight="800" fill="#7cc0ff">PATH · '+k.a+' → '+k.b+'</text>'
+   +'<text x="'+(px+12)+'" y="'+(py+36)+'" font-size="8.6" fill="#e6eef6" font-family="Consolas,monospace">'+esc(lbl).slice(0,52)+'</text>'
+   +'<text x="'+(px+12)+'" y="'+(py+50)+'" font-size="8.2" fill="#8fa3b5">data-path: '+k.a+'-'+k.b+' · click to close</text>'
+   +'<g onclick="SEL=null;render()" style="cursor:pointer"><text x="'+(px+250)+'" y="'+(py+18)+'" font-size="11" fill="#8fa3b5" text-anchor="middle">✕</text></g></g>';
+ }
+ document.getElementById('g').innerHTML=s;
+ var t='';ENVO.forEach(function(k){t+='<span class="tab '+(k==="PROD"?"prod ":"")+(k===cur?"on":"")+'" onclick="cur=\''+k+'\';SEL=null;render()">'+(k==="TRIAL_UAT"?"TRIAL/UAT":k)+'</span>';});
+ t+='<span style="margin-left:auto;font-size:9.5px;font-weight:800;color:#2e9e4f">● LIVE</span>';
+ document.getElementById('tabs').innerHTML=t;
+}
+function pulse(){tick++;
+ ["dmz.mft","dmz.cifs","dmz.apigee","app.ingress","app.hub","app.envoy","app.out","corp.f5","mgmt","cons.piv","cons.portal","ext.vendor"].forEach(function(id,i){
+  var r=(tick*7+i*13)%97;ST[id]={s:r<88?"ok":(r<95?"warn":"down")};});
+ ["data.imds","data.pbdw"].forEach(function(id){
+  var r=fR("Database",id==="data.imds"?"IMDS":"PBDW");
+  ST[id]=pOf(r.port)?{s:((tick*11)%90<84?"ok":"warn")}:{s:"wait"};});
+ for(var i=0;i<15;i++)ST["p"+i]={ok:((tick*5+i*11)%89)<84,ms:12+((tick*13+i*29)%120)};
+ render();}
+pulse();
+if(typeof setInterval==="function")setInterval(pulse,2600);
+</script></body></html>

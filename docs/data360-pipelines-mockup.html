@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CP Catalog — Data 360 Pipelines Mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#10193b; --accent:#0f4775; --pop:#31bced; --hover:#0091bf;
+    --bg:#f5f8f8; --panel:#fff; --border:#dbdae0; --bgsoft:#eef3f3; --infobg:#e0f5fd;
+    --text:#2b2f38; --sub:#5a6472; --muted:#9aa3b0;
+    --eod:#0091bf; --bod:#7c3aed; --intraday:#e67e22; --reference:#5a6472;
+    --success:#159943; --failed:#c1113a; --running:#e67e22; --unknown:#9aa3b0;
+    --bronze:#a8743a; --silver:#8a9199; --gold:#c8a13a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Roboto,Arial,sans-serif;font-size:14px}
+  .mono{font-family:'Roboto Mono',monospace}
+  .top{background:var(--navy);color:#fff;display:flex;align-items:center;padding:0 24px;height:54px;gap:14px}
+  .logo{width:32px;height:32px;background:var(--pop);border-radius:3px;display:grid;place-items:center;color:var(--navy);font-weight:700}
+  .top b{font-size:15px}.top small{color:#8ea3c4;font-size:11px;display:block}
+  .badge{margin-left:6px;font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;background:rgba(21,153,67,.25);color:#bfe}
+  nav.modnav{margin-left:auto;display:flex;gap:4px}
+  nav.modnav a{color:#bcccdf;font-size:13px;padding:7px 12px;border-radius:3px;text-decoration:none;cursor:pointer}
+  nav.modnav a.active{background:var(--accent);color:#fff}
+  .wrap{max-width:1263px;margin:0 auto;padding:24px 24px 60px}
+  .h1{font-size:24px;font-weight:500;color:var(--accent);border-bottom:2px solid var(--accent);padding-bottom:12px;margin:0 0 16px;display:flex;align-items:center;gap:10px}
+  .switch{display:inline-flex;background:var(--panel);border:1px solid var(--border);border-radius:4px;overflow:hidden;margin-bottom:16px}
+  .switch button{border:none;background:none;padding:8px 16px;font-size:13px;cursor:pointer;font-family:inherit;color:var(--sub);border-right:1px solid var(--border)}
+  .switch button:last-child{border-right:none}.switch button.on{background:var(--accent);color:#fff}
+  .switch .ct{font-size:11px;opacity:.7;margin-left:5px}
+  /* top tabs */
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:20px}
+  .tabs button{background:none;border:none;font-size:13px;font-weight:500;padding:10px 18px;cursor:pointer;color:var(--sub);border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit}
+  .tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
+  /* layout */
+  .layout{display:flex;gap:16px;align-items:flex-start}
+  .plist{width:260px;flex-shrink:0}
+  .plabel{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px}
+  .pitem{display:block;width:100%;text-align:left;padding:10px 12px;margin-bottom:6px;cursor:pointer;font-family:inherit;border:1px solid var(--border);border-radius:6px;background:var(--panel)}
+  .pitem.on{border-color:var(--accent);background:var(--infobg)}
+  .pitem .hd{display:flex;align-items:center;gap:6px}
+  .pitem .dot{width:8px;height:8px;border-radius:8px}
+  .pitem .nm{font-size:13px;font-weight:600;color:var(--navy)}
+  .pitem .sch{margin-left:auto;font-size:9px;font-weight:700;color:#fff;padding:2px 6px;border-radius:3px}
+  .pitem .mt{font-size:11px;color:var(--sub);margin-top:3px}
+  .detail{flex:1}
+  .dtitle{font-size:20px;font-weight:600;color:var(--navy)}
+  .schtag{font-size:10px;font-weight:700;color:#fff;padding:3px 8px;border-radius:3px}
+  .sub{font-size:12px;color:var(--sub);margin-bottom:16px}
+  .seclabel{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin:16px 0 8px}
+  /* dag card */
+  .dag{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-bottom:10px}
+  .dag .dn{font-family:'Roboto Mono',monospace;font-size:13px;font-weight:600;color:var(--navy)}
+  .chips{display:flex;gap:4px;margin-top:8px;flex-wrap:wrap}
+  .chip{font-size:10px;padding:3px 7px;border-radius:3px;color:#fff}
+  /* tables */
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--border);border-radius:4px;overflow:hidden}
+  th{background:var(--bgsoft);text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--accent)}
+  td{padding:8px 10px;font-size:13px;border-bottom:1px solid var(--bg)}
+  tr:last-child td{border-bottom:none}
+  /* model chain */
+  .chain{display:flex;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  .mnode{background:var(--panel);cursor:pointer;border:1px solid var(--border);border-radius:4px;padding:8px 11px;min-width:120px;font-family:inherit;text-align:left}
+  .mnode:hover{background:var(--infobg)}
+  .mnode .ly{font-size:9px;font-weight:700;text-transform:uppercase}
+  .mnode .mn{font-size:12px;font-weight:600;color:var(--navy);margin-top:2px}
+  .mnode .sc{font-size:10px;color:var(--muted)}
+  .ar{color:var(--muted);font-size:16px;padding:0 6px}
+  .hint{font-size:12px;color:var(--sub)}
+  /* model detail */
+  .back{font-size:12px;padding:5px 12px;border:1px solid var(--border);border-radius:4px;background:var(--panel);cursor:pointer;color:var(--sub);margin-bottom:14px}
+  pre{background:#0a0f24;color:#cfe3ff;padding:16px;border-radius:6px;font-size:12px;overflow-x:auto;font-family:'Roboto Mono',monospace;line-height:1.5}
+  .planebtn{height:30px;padding:0 14px;border:1px solid var(--border);border-radius:4px;cursor:pointer;font-family:inherit;font-size:13px;background:var(--panel);color:var(--text)}
+  .planebtn.on{background:var(--navy);color:#fff}
+  .lnode-label{font-size:11px;font-weight:600;fill:var(--navy)}
+  .lnode-sub{font-size:9px;fill:var(--muted)}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="logo">CP</div>
+  <div><b>CP Catalog</b><small>BBH Capital Partners</small></div>
+  <span class="badge">● LIVE</span>
+  <nav class="modnav">
+    <a>Home</a><a>System Design</a><a>Interface 360</a>
+    <a>API 360</a><a class="active">Data 360</a><a>Datapoint 360</a><a>PII Explorer</a>
+  </nav>
+</div>
+
+<div class="wrap">
+  <div class="h1">◆ Data 360</div>
+  <div class="switch">
+    <button class="on">All <span class="ct">196</span></button>
+    <button>SEI <span class="ct">96</span></button>
+    <button>Non-SEI <span class="ct">100</span></button>
+  </div>
+
+  <div class="tabs">
+    <button class="on" id="tabPipe" onclick="showTab('pipe')">Pipelines</button>
+    <button id="tabLin" onclick="showTab('lin')">Lineage Graph</button>
+  </div>
+
+  <!-- PIPELINES TAB -->
+  <div id="tab-pipe">
+  <div class="layout">
+    <div class="plist">
+      <div class="plabel">Pipelines (5)</div>
+      <div id="plist"></div>
+    </div>
+    <div class="detail" id="detail"></div>
+  </div>
+  </div>
+
+  <!-- LINEAGE GRAPH TAB -->
+  <div id="tab-lin" style="display:none">
+    <div style="display:flex;gap:6px;margin-bottom:16px;align-items:center">
+      <button class="planebtn on" onclick="setPlane(this,'Data')">Data</button>
+      <button class="planebtn" onclick="setPlane(this,'Transform')">Transform</button>
+      <button class="planebtn" onclick="setPlane(this,'Orchestration')">Orchestration</button>
+      <span id="planehint" style="font-size:12px;color:var(--sub);margin-left:10px"></span>
+    </div>
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:24px;position:relative;overflow:auto">
+      <svg id="lineagesvg" width="900" height="440"></svg>
+    </div>
+    <div style="font-size:12px;color:var(--sub);margin-top:10px" id="legend"></div>
+  </div>
+</div>
+
+<script>
+  const SCHED={EOD:"var(--eod)",BOD:"var(--bod)",Intraday:"var(--intraday)",Reference:"var(--reference)"};
+  const STATUS={success:"var(--success)",failed:"var(--failed)",running:"var(--running)",unknown:"var(--unknown)"};
+  const LAYER={bronze:"var(--bronze)",silver:"var(--silver)",gold:"var(--gold)"};
+
+  const PIPES=[
+    {id:"positions",name:"Positions",sch:"EOD",status:"success",models:6,feeds:1,dag:"swp_eod_positions",
+     runs:[["sei_brz_positions","success",42],["sei_stg_positions","success",88],["sei_int_positions_enriched","success",65],["sei_gld_positions_summary","success",120]],
+     feedrows:[["SWP Position EOD Feed","sei_stage","standard","US"]]},
+    {id:"nav",name:"Nav",sch:"EOD",status:"running",models:5,feeds:0,dag:"acct_nav_calculation",
+     runs:[["gld_nav_daily","success",95],["snap_nav_history","running",0]],feedrows:[]},
+    {id:"taxlots",name:"Taxlots",sch:"EOD",status:"failed",models:4,feeds:1,dag:"swp_eod_positions",
+     runs:[["sei_brz_taxlots","success",38],["sei_stg_taxlots","success",70],["recon_taxlots","failed",12]],
+     feedrows:[["SWP Taxlot EOD Feed","sei_stage","standard","US"]]},
+    {id:"cash",name:"Cash",sch:"Intraday",status:"success",models:4,feeds:1,dag:"acct_cash_processing",
+     runs:[["brz_cash","success",30],["stg_cash","success",55],["gld_cash_summary","success",80]],
+     feedrows:[["SWP Cash Ledger Feed","pbdw","standard","US"]]},
+    {id:"fees",name:"Fees",sch:"EOD",status:"success",models:4,feeds:0,dag:"acct_fee_calculation",
+     runs:[["brz_fees","success",28],["gld_fees_summary","success",60]],feedrows:[]}
+  ];
+  const SQL=`SELECT account_id,
+       as_of_date,
+       SUM(amount_usd)     AS market_value_usd,
+       COUNT(*)            AS position_count
+FROM pbdw.sei_int_positions_enriched
+GROUP BY account_id, as_of_date`;
+  const COLS=[["amount_usd","market_value_usd","SUM(amount_usd)"],
+              ["*","position_count","COUNT(*)"],
+              ["account_id","account_id","account_id (passthrough)"]];
+
+  function modelsFor(p){
+    return [
+      {m:`sei_brz_${p.id}`,ly:"bronze",sc:"sei_stage"},
+      {m:`sei_stg_${p.id}`,ly:"silver",sc:"pbdw"},
+      {m:`sei_int_${p.id}_enriched`,ly:"silver",sc:"pbdw"},
+      {m:`sei_gld_${p.id}_summary`,ly:"gold",sc:"imdw"}
+    ];
+  }
+
+  function renderList(active){
+    document.getElementById("plist").innerHTML=PIPES.map((p,i)=>`
+      <button class="pitem ${i===active?'on':''}" onclick="pick(${i})">
+        <div class="hd">
+          <span class="dot" style="background:${STATUS[p.status]}"></span>
+          <span class="nm">${p.name}</span>
+          <span class="sch" style="background:${SCHED[p.sch]}">${p.sch}</span>
+        </div>
+        <div class="mt">${p.models} models · ${p.feeds} feeds · 1 DAG</div>
+      </button>`).join("");
+  }
+
+  function renderDetail(p){
+    const feeds = p.feedrows.length ? `
+      <div class="seclabel">② Source — SWP EOD Feeds</div>
+      <table><thead><tr><th>Feed</th><th>Schema</th><th>Class</th><th>Geography</th></tr></thead>
+      <tbody>${p.feedrows.map(f=>`<tr><td><b>${f[0]}</b></td><td>${f[1]}</td><td>${f[2]}</td><td>${f[3]}</td></tr>`).join("")}</tbody></table>` : "";
+    const models=modelsFor(p);
+    const chain=models.map((m,i)=>{
+      const node=`<button class="mnode" onclick="openModel('${p.id}','${m.m}')" style="border-left:3px solid ${LAYER[m.ly]}"><div class="ly" style="color:${LAYER[m.ly]}">${m.ly}</div><div class="mn">${m.m}</div><div class="sc">${m.sc}</div></button>`;
+      return node + (i<models.length-1?`<span class="ar">→</span>`:"");
+    }).join("");
+    const runChips=p.runs.map(r=>`<span class="chip" style="background:${STATUS[r[1]]}" title="${r[1]}, ${r[2]}s">${r[0]}</span>`).join("");
+    document.getElementById("detail").innerHTML=`
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+        <div class="dtitle">${p.name} Pipeline</div>
+        <span class="schtag" style="background:${SCHED[p.sch]}">${p.sch}</span>
+      </div>
+      <div class="sub">${p.feeds} source feeds · ${p.models} dbt models · 1 Airflow DAG</div>
+
+      <div class="seclabel">① Orchestration — Airflow</div>
+      <div class="dag">
+        <div class="dn">${p.dag}</div>
+        <div class="chips">${runChips}</div>
+      </div>
+
+      ${feeds}
+
+      <div class="seclabel">③ Transform — dbt Models (bronze → silver → gold)</div>
+      <div class="chain">${chain}</div>
+      <div class="hint">Click any model to see its transformation SQL and column lineage. The arrows show the end-to-end lineage from raw feed through bronze/silver to the gold mart.</div>`;
+  }
+
+  function pick(i){renderList(i);renderDetail(PIPES[i]);}
+
+  function openModel(pid,model){
+    document.getElementById("detail").innerHTML=`
+      <button class="back" onclick="pick(currentIdx)">← Back to pipeline</button>
+      <div style="font-size:18px;font-weight:600;color:var(--navy);margin-bottom:2px">${model}</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px">dbt_model transformation</div>
+      <div class="seclabel">Transformation SQL</div>
+      <pre>${SQL.replace('positions',pid)}</pre>
+      <div class="seclabel">Column lineage</div>
+      <table><thead><tr><th>Source column</th><th>→</th><th>Target column</th><th>Transform expression</th></tr></thead>
+      <tbody>${COLS.map(c=>`<tr><td class="mono" style="font-size:12px">${c[0]}</td><td style="color:var(--muted)">→</td><td class="mono" style="font-size:12px;color:var(--navy)">${c[1]}</td><td class="mono" style="font-size:12px;color:var(--hover)">${c[2]}</td></tr>`).join("")}</tbody></table>`;
+  }
+
+  let currentIdx=0;
+  const _pick=pick; pick=function(i){currentIdx=i;_pick(i);};
+
+  // ---- tab switching ----
+  function showTab(which){
+    document.getElementById('tab-pipe').style.display = which==='pipe'?'block':'none';
+    document.getElementById('tab-lin').style.display  = which==='lin'?'block':'none';
+    document.getElementById('tabPipe').classList.toggle('on',which==='pipe');
+    document.getElementById('tabLin').classList.toggle('on',which==='lin');
+    if(which==='lin') renderLineage('Data');
+  }
+
+  // ---- lineage graph (Data / Transform / Orchestration planes) ----
+  const PLANE_NODES = {
+    Data: [
+      {id:'feed',label:'SWP Position Feed',sub:'FEED · bronze',col:0,row:1,ly:'bronze'},
+      {id:'brz',label:'sei_brz_positions',sub:'TABLE · sei_stage',col:1,row:1,ly:'bronze'},
+      {id:'stg',label:'sei_stg_positions',sub:'TABLE · pbdw',col:2,row:1,ly:'silver'},
+      {id:'gld',label:'sei_gld_positions_summary',sub:'TABLE · imdw',col:3,row:1,ly:'gold'}
+    ],
+    Transform: [
+      {id:'feed',label:'SWP Position Feed',sub:'source',col:0,row:1,ly:'bronze'},
+      {id:'brz',label:'brz_positions',sub:'dbt · bronze',col:1,row:1,ly:'bronze'},
+      {id:'stg',label:'stg_positions',sub:'dbt · silver',col:2,row:0,ly:'silver'},
+      {id:'int',label:'int_positions_enriched',sub:'dbt · silver',col:2,row:2,ly:'silver'},
+      {id:'gld',label:'gld_positions_summary',sub:'dbt · gold',col:3,row:1,ly:'gold'}
+    ],
+    Orchestration: [
+      {id:'dag',label:'swp_eod_positions',sub:'Airflow DAG',col:0,row:1,ly:'dag'},
+      {id:'brz',label:'brz_positions_run',sub:'task',col:1,row:0,ly:'bronze'},
+      {id:'stg',label:'stg_positions_run',sub:'task',col:1,row:2,ly:'silver'},
+      {id:'gld',label:'gld_positions_summary_run',sub:'task',col:2,row:1,ly:'gold'}
+    ]
+  };
+  const PLANE_EDGES = {
+    Data:[['feed','brz'],['brz','stg'],['stg','gld']],
+    Transform:[['feed','brz'],['brz','stg'],['brz','int'],['stg','gld'],['int','gld']],
+    Orchestration:[['dag','brz'],['dag','stg'],['dag','gld']]
+  };
+  const PLANE_HINT={
+    Data:"Tables, views & feeds — what flows where",
+    Transform:"dbt models — bronze → silver → gold",
+    Orchestration:"Airflow DAG → which tasks/models it runs (dotted)"
+  };
+  const LCOL={bronze:"#a8743a",silver:"#8a9199",gold:"#c8a13a",dag:"#0f4775"};
+
+  function setPlane(btn,plane){
+    document.querySelectorAll('.planebtn').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    renderLineage(plane);
+  }
+  function renderLineage(plane){
+    document.getElementById('planehint').textContent=PLANE_HINT[plane];
+    const nodes=PLANE_NODES[plane], edges=PLANE_EDGES[plane];
+    const NW=170,NH=44,CX=210,CY=130,X0=20,Y0=40;
+    const pos={};
+    nodes.forEach(n=>{pos[n.id]={x:X0+n.col*CX,y:Y0+n.row*CY};});
+    const dotted = plane==='Orchestration';
+    let svg='';
+    svg+='<defs><marker id="lar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="#9aa3b0"/></marker></defs>';
+    edges.forEach(([a,b])=>{
+      const pa=pos[a],pb=pos[b];
+      const x1=pa.x+NW,y1=pa.y+NH/2,x2=pb.x,y2=pb.y+NH/2;
+      const mx=(x1+x2)/2;
+      svg+=`<path d="M${x1} ${y1} C${mx} ${y1} ${mx} ${y2} ${x2} ${y2}" fill="none" stroke="#9aa3b0" stroke-width="1.5" ${dotted?'stroke-dasharray="4 3"':''} marker-end="url(#lar)"/>`;
+    });
+    nodes.forEach(n=>{
+      const p=pos[n.id];
+      svg+=`<g>
+        <rect x="${p.x}" y="${p.y}" width="${NW}" height="${NH}" rx="4" fill="#fff" stroke="#dbdae0"/>
+        <rect x="${p.x}" y="${p.y}" width="4" height="${NH}" rx="2" fill="${LCOL[n.ly]}"/>
+        <text x="${p.x+12}" y="${p.y+19}" class="lnode-label">${n.label}</text>
+        <text x="${p.x+12}" y="${p.y+33}" class="lnode-sub">${n.sub}</text>
+      </g>`;
+    });
+    document.getElementById('lineagesvg').innerHTML=svg;
+    document.getElementById('legend').innerHTML=
+      `<span style="display:inline-flex;gap:12px;flex-wrap:wrap">`+
+      `<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#a8743a"></span> bronze</span>`+
+      `<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#8a9199"></span> silver</span>`+
+      `<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#c8a13a"></span> gold</span>`+
+      (dotted?`<span style="color:var(--muted)">· · · dotted = DAG orchestration</span>`:``)+`</span>`;
+  }
+
+  renderList(0);renderDetail(PIPES[0]);
+</script>
+</body>
+</html>

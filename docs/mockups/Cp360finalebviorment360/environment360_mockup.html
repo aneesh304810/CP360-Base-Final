@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>CP 360 · Environment 360 — SSL certificates + health</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+ :root{--bg:#f5f8f8;--panel2:#dfe6e9;--border:#b5b6b6;--sub:#666;--navy:#10193b;--accent:#0f4775;
+  --pop:#31bced;--success:#159943;--successbg:#d0ebd9;--warn:#e67e22;--warnbg:#fae5d3;
+  --danger:#c1113a;--dangerbg:#f3d2d7;--info:#0091bf;--infobg:#e0f5fd;--mono:'Roboto Mono',Consolas,monospace}
+ *{box-sizing:border-box;margin:0}
+ body{background:var(--bg);color:#333;font-family:Roboto,Arial,sans-serif;font-size:13px;display:flex;min-width:1360px}
+ .rail{width:200px;flex-shrink:0;background:var(--navy);color:#b9c6d6;min-height:100vh;padding:6px 0}
+ .rlogo{padding:12px 16px;color:#fff;font-weight:700;font-size:16px}
+ .rlogo small{display:block;color:#8fb4dd;font-weight:400;font-size:10px;letter-spacing:.08em}
+ .glbl{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#6d84a3;padding:9px 16px 2px}
+ .ni{padding:6px 16px;font-size:12.5px;border-left:3px solid transparent;display:flex;gap:7px;align-items:center}
+ .ni.on{background:#1c2a52;color:#fff;border-left-color:var(--pop);font-weight:500}
+ .wipdot{width:7px;height:7px;border-radius:50%;background:var(--warn);animation:pulse 1.6s infinite}
+ @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+ .wiptag{font-size:8px;font-weight:700;border-radius:999px;padding:1px 6px;background:var(--warn);color:#fff;margin-left:auto}
+ .main{flex:1;min-width:0}
+ .hdr{height:52px;background:var(--navy);color:#fff;display:flex;align-items:center;gap:14px;padding:0 18px}
+ .live{font-size:11px;font-weight:700;background:var(--successbg);color:var(--success);border-radius:999px;padding:2px 10px}
+ .sw{display:inline-flex;background:#1c2a52;border-radius:999px;padding:2px;margin-left:auto}
+ .sw label{padding:4px 15px;font-size:11.5px;border-radius:999px;cursor:pointer;color:#8fb4dd}
+ input[type=radio]{display:none}
+ #r0:checked ~ .main .sw label[for=r0],#r1:checked ~ .main .sw label[for=r1],
+ #r2:checked ~ .main .sw label[for=r2],#r3:checked ~ .main .sw label[for=r3],
+ #r4:checked ~ .main .sw label[for=r4]{background:var(--pop);color:var(--navy);font-weight:700}
+ .pg{display:none} #r0:checked ~ .main #p0,#r1:checked ~ .main #p1,#r2:checked ~ .main #p2,
+ #r3:checked ~ .main #p3,#r4:checked ~ .main #p4{display:block}
+ .wrap{padding:14px 20px 60px;max-width:1280px}
+ h1{font-size:19px;font-weight:500}
+ .sub{color:var(--sub);font-size:12.5px;margin-bottom:12px}
+ .chip{font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+ .green{background:var(--successbg);color:var(--success)} .grey{background:var(--panel2);color:var(--sub)}
+ .amber{background:var(--warnbg);color:var(--warn)} .red{background:var(--dangerbg);color:var(--danger)}
+ .blue{background:var(--infobg);color:var(--info)}
+ .mono{font-family:var(--mono)}
+ .panel{background:#fff;border:1px solid var(--border);border-radius:3px;box-shadow:0 3px 5px rgba(0,0,0,.08);margin-bottom:13px;overflow:hidden}
+ .ph{display:flex;align-items:center;gap:10px;padding:8px 13px;border-bottom:1px solid var(--panel2);background:#fafcfc}
+ .ph h2{font-size:11.5px;text-transform:uppercase}
+ .hint{margin-left:auto;font-size:10.5px;color:var(--sub)}
+ .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:11px;margin-bottom:13px}
+ .kpi{background:#fff;border:1px solid var(--border);border-radius:3px;padding:10px 13px;text-align:center;border-top:3px solid var(--panel2)}
+ .kpi b{display:block;font-size:23px;color:var(--navy)}
+ .kpi span{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--sub)}
+ .kpi.bad{border-top-color:var(--danger)} .kpi.warn2{border-top-color:var(--warn)} .kpi.ok{border-top-color:var(--success)}
+ /* env cards */
+ .envs{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+ .env{background:#fff;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+ .envh{display:flex;gap:9px;align-items:center;padding:9px 13px;color:#fff;font-weight:700;font-size:12.5px}
+ .envrow{display:flex;gap:8px;align-items:center;padding:6px 13px;font-size:11.5px;border-top:1px solid #eef1f4}
+ .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+ .d-ok{background:var(--success)} .d-warn{background:var(--warn)} .d-bad{background:var(--danger);animation:pulse 1.2s infinite}
+ .lat{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--sub)}
+ /* cert table */
+ table.certs{border-collapse:collapse;width:100%;font-size:11.5px}
+ table.certs th{text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--sub);
+  padding:7px 13px;border-bottom:1.5px solid var(--panel2);background:#fafcfc}
+ table.certs td{padding:7px 13px;border-bottom:1px solid #eef1f4;vertical-align:middle}
+ .daysbar{display:inline-block;width:90px;height:7px;background:var(--panel2);border-radius:4px;vertical-align:middle;margin-right:7px}
+ .daysbar i{display:block;height:7px;border-radius:4px}
+ .btn{height:26px;background:#fff;color:var(--accent);border:1px solid var(--border);border-radius:2px;font-size:11px;padding:0 10px;cursor:pointer}
+ .btn.pri{background:var(--accent);color:#fff;border:0}
+ /* health */
+ .spark{display:inline-flex;gap:1.5px;vertical-align:middle}
+ .sp{width:4px;height:14px;border-radius:1px;background:var(--success)}
+ .sp.w{background:var(--warn)} .sp.b{background:var(--danger)} .sp.e{background:var(--panel2)}
+ .banner{display:flex;gap:12px;align-items:center;background:var(--dangerbg);border:1px solid #e8b3c0;
+  border-left:4px solid var(--danger);border-radius:3px;padding:9px 14px;margin-bottom:13px;font-size:12px}
+ /* ---- topology ---- */
+ .topo{position:relative;height:560px;background:#fff;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+ .zone{position:absolute;top:0;bottom:0;border-right:1.5px dashed #d3dce2}
+ .zone .zl{position:absolute;top:8px;left:12px;font-size:9.5px;font-weight:800;text-transform:uppercase;
+  letter-spacing:.08em;color:#8a97a3}
+ .tnode2{position:absolute;width:158px;background:#fff;border:1.5px solid var(--panel2);border-radius:8px;
+  padding:8px 11px;font-size:10.5px;box-shadow:0 3px 8px rgba(20,40,60,.10);z-index:3}
+ .tnode2 b{display:flex;gap:6px;align-items:center;font-size:11px;color:var(--navy)}
+ .tnode2 small{display:block;font-family:var(--mono);font-size:8.5px;color:var(--sub);margin-top:2px}
+ .tnode2 .st{position:absolute;top:-5px;right:-5px;width:11px;height:11px;border-radius:50%;border:2px solid #fff}
+ .st.ok{background:var(--success)} .st.wn{background:var(--warn)} .st.bd{background:var(--danger);animation:pulse 1.2s infinite}
+ .certbdg{position:absolute;font-size:8px;font-weight:800;border-radius:999px;padding:1px 7px;z-index:4;
+  background:#fff;border:1.5px solid}
+ svg.wires{position:absolute;inset:0;width:100%;height:100%;z-index:1}
+ .flow{stroke-dasharray:7 6;animation:dash 1.2s linear infinite}
+ @keyframes dash{to{stroke-dashoffset:-13}}
+ /* ---- pulse ---- */
+ .pulserun{display:flex;gap:14px;align-items:center;margin-bottom:13px}
+ .pulsebtn{position:relative;width:74px;height:74px;border-radius:50%;background:var(--accent);color:#fff;
+  display:grid;place-items:center;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0}
+ .pulsebtn::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:2.5px solid var(--pop);
+  animation:ring 1.8s ease-out infinite}
+ @keyframes ring{0%{transform:scale(.85);opacity:1}100%{transform:scale(1.45);opacity:0}}
+ .plog{font-size:11.5px}
+ .prow{display:flex;gap:10px;align-items:center;padding:6px 13px;border-bottom:1px solid #eef1f4;
+  opacity:0;animation:appear .3s ease forwards}
+ @keyframes appear{to{opacity:1}}
+ .prow .tm{font-family:var(--mono);font-size:10px;color:var(--sub);width:64px}
+ .prow .tgt{font-family:var(--mono);font-size:10.5px;flex:1}
+ .prow .ms{font-family:var(--mono);font-size:10px;color:var(--sub);width:64px;text-align:right}
+</style></head><body>
+<input type="radio" name="pg" id="r0" checked><input type="radio" name="pg" id="r1"><input type="radio" name="pg" id="r2"><input type="radio" name="pg" id="r3"><input type="radio" name="pg" id="r4">
+<nav class="rail"><div class="rlogo">CP 360<small>CAPITAL PARTNERS · BBH</small></div>
+ <div class="ni">⌂ Home</div><div class="glbl">Catalog</div><div class="ni">Interface 360</div>
+ <div class="ni">API 360</div><div class="ni">Data 360</div><div class="ni">Datapoint 360</div>
+ <div class="glbl">Lineage</div><div class="ni">Lineage</div>
+ <div class="glbl">Utilities</div><div class="ni">Auto Mapper</div>
+ <div class="glbl">Governance</div><div class="ni">PII Explorer</div><div class="ni">Quality Guardrails</div>
+ <div class="ni">Variance 360</div><div class="ni">Recon 360</div><div class="ni">API Console</div>
+ <div class="glbl">Admin</div><div class="ni">Data Sources</div><div class="ni">API Catalog Admin</div>
+ <div class="ni on"><span class="wipdot"></span>Environment 360<span class="wiptag">IN BUILD</span></div>
+</nav>
+<div class="main">
+<div class="hdr"><b>Admin · Environment 360</b><span class="live">LIVE</span>
+ <span style="font-size:10.5px;color:#8fb4dd">certificates + health across every CP environment · scanned hourly</span>
+ <div class="sw"><label for="r0">① Overview</label><label for="r1">② Certificates</label><label for="r2">③ Health checks</label><label for="r3">④ Topology</label><label for="r4">⑤ Pulse check</label></div></div>
+<div class="wrap">
+
+<!-- ============ ① OVERVIEW ============ -->
+<div class="pg" id="p0">
+<div class="banner">🔴 <b>SSL expiring in 6 days:</b> cp-catalog-opendatahub.apps.ocpq.testbbh.com — the CP 360 route itself. Renewal owner: OpenShift platform team · ticket OCPQ-4471 open.
+ <span style="margin-left:auto"><button class="btn pri">View certificate →</button></span></div>
+<div class="kpis">
+ <div class="kpi ok"><b>17</b><span>endpoints monitored</span></div>
+ <div class="kpi ok"><b>14</b><span>healthy now</span></div>
+ <div class="kpi warn2"><b>2</b><span>degraded</span></div>
+ <div class="kpi bad"><b>1</b><span>cert ≤ 7 days</span></div>
+ <div class="kpi warn2"><b>3</b><span>certs ≤ 30 days</span></div>
+</div>
+<div class="envs">
+ <div class="env"><div class="envh" style="background:#0f4775">🖥 OpenShift · OCPQ <span class="chip green" style="margin-left:auto">QA</span></div>
+  <div class="envrow"><span class="dot d-bad"></span><span class="mono" style="font-size:10.5px">cp-catalog-opendatahub route</span><span class="chip red">CERT 6d</span><span class="lat">182ms</span></div>
+  <div class="envrow"><span class="dot d-ok"></span><span class="mono" style="font-size:10.5px">cp-airflow webserver</span><span class="lat">240ms</span></div>
+  <div class="envrow"><span class="dot d-warn"></span><span class="mono" style="font-size:10.5px">WebFS · CIFS mount</span><span class="chip amber">SLOW I/O</span><span class="lat">1.9s</span></div>
+  <div class="envrow"><span class="dot d-ok"></span><span class="mono" style="font-size:10.5px">ODH workbenches</span><span class="lat">21/21 up</span></div></div>
+ <div class="env"><div class="envh" style="background:#7c3aed">🗄 Oracle</div>
+  <div class="envrow"><span class="dot d-ok"></span><span class="mono" style="font-size:10.5px">dvlpbdb1 · pbdwhdbt (DEV)</span><span class="lat">9ms</span></div>
+  <div class="envrow"><span class="dot d-ok"></span><span class="mono" style="font-size:10.5px">qclpbdb1 · PBDWHDBQ (QA)</span><span class="lat">11ms</span></div>
+  <div class="envrow"><span class="dot d-ok"></span><span class="mono" style="font-size:10.5px">SILVER sessions</span><span class="lat">64/120 in use</span></div>
+  <div class="envrow"><span class="dot d-ok"></span><span class="mono" style="font-size:10.5px">TCPS wallet cert</span><span class="chip green">241d</span><span class="lat">—</span></div></div>
+ <div class="env"><div class="envh" style="background:#0b7d7d">🔗 Integration</div>
+  <div class="envrow"><span class="dot d-ok"></span><span class="mono" style="font-size:10.5px">api-qa.seic.com (SEI QA)</span><span class="chip amber">CERT 23d</span><span class="lat">310ms</span></div>
+  <div class="envrow"><span class="dot d-ok"></span><span class="mono" style="font-size:10.5px">Apigee outbound gateway</span><span class="lat">96ms</span></div>
+  <div class="envrow"><span class="dot d-warn"></span><span class="mono" style="font-size:10.5px">3scale HA gateway (POC)</span><span class="chip amber">1/2 pods</span><span class="lat">—</span></div>
+  <div class="envrow"><span class="dot d-ok"></span><span class="mono" style="font-size:10.5px">Jenkins · Nexus</span><span class="lat">140ms</span></div></div>
+</div>
+</div>
+
+<!-- ============ ② CERTIFICATES ============ -->
+<div class="pg" id="p1">
+<h1>SSL certificates</h1>
+<div class="sub">every TLS endpoint CP touches — sorted by days left · scanner reads the live chain, not a spreadsheet</div>
+<div class="panel"><div class="ph"><h2>Certificates · 11</h2>
+ <span class="chip red">1 critical ≤7d</span><span class="chip amber">2 warning ≤30d</span>
+ <span class="hint">expiry alerts → #cp-environments + email at 30 · 14 · 7 · 3 · 1 days</span></div>
+<table class="certs">
+<tr><th>endpoint</th><th>issued to (CN)</th><th>issuer</th><th>expires</th><th>days left</th><th>used by</th><th></th></tr>
+<tr style="background:#fff5f7"><td class="mono" style="font-size:10.5px">cp-catalog-opendatahub.apps.ocpq.testbbh.com</td>
+ <td class="mono" style="font-size:10.5px">*.apps.ocpq.testbbh.com</td><td>BBH Internal CA</td>
+ <td class="mono" style="font-size:10.5px">2026-08-10</td>
+ <td><span class="daysbar"><i style="width:7%;background:var(--danger)"></i></span><b style="color:var(--danger)">6</b></td>
+ <td style="font-size:10.5px">CP 360 UI route</td>
+ <td><button class="btn pri">Renewal ticket ↗</button></td></tr>
+<tr style="background:#fffaf4"><td class="mono" style="font-size:10.5px">api-qa.seic.com</td>
+ <td class="mono" style="font-size:10.5px">api-qa.seic.com</td><td>DigiCert TLS RSA</td>
+ <td class="mono" style="font-size:10.5px">2026-08-27</td>
+ <td><span class="daysbar"><i style="width:26%;background:var(--warn)"></i></span><b style="color:var(--warn)">23</b></td>
+ <td style="font-size:10.5px">API Console · SEI QA env</td>
+ <td><button class="btn">Notify SEI</button></td></tr>
+<tr style="background:#fffaf4"><td class="mono" style="font-size:10.5px">jenkins.testbbh.com</td>
+ <td class="mono" style="font-size:10.5px">jenkins.testbbh.com</td><td>BBH Internal CA</td>
+ <td class="mono" style="font-size:10.5px">2026-09-01</td>
+ <td><span class="daysbar"><i style="width:31%;background:var(--warn)"></i></span><b style="color:var(--warn)">28</b></td>
+ <td style="font-size:10.5px">CI pipelines · ImageStreams</td>
+ <td><button class="btn">Renewal ticket ↗</button></td></tr>
+<tr><td class="mono" style="font-size:10.5px">nexus.testbbh.com</td>
+ <td class="mono" style="font-size:10.5px">nexus.testbbh.com</td><td>BBH Internal CA</td>
+ <td class="mono" style="font-size:10.5px">2026-11-14</td>
+ <td><span class="daysbar"><i style="width:78%;background:var(--success)"></i></span><b>102</b></td>
+ <td style="font-size:10.5px">pip/npm air-gap mirror</td><td></td></tr>
+<tr><td class="mono" style="font-size:10.5px">cp-airflow.apps.ocpq.testbbh.com</td>
+ <td class="mono" style="font-size:10.5px">*.apps.ocpq.testbbh.com</td><td>BBH Internal CA</td>
+ <td class="mono" style="font-size:10.5px">2026-08-10</td>
+ <td><span class="daysbar"><i style="width:7%;background:var(--danger)"></i></span><b style="color:var(--danger)">6</b></td>
+ <td style="font-size:10.5px">same wildcard as CP 360 route</td>
+ <td><span class="chip grey">same cert ↑</span></td></tr>
+<tr><td class="mono" style="font-size:10.5px">dvlpbdb1.testbbh.com:2484 (TCPS)</td>
+ <td class="mono" style="font-size:10.5px">dvlpbdb1.testbbh.com</td><td>BBH Internal CA</td>
+ <td class="mono" style="font-size:10.5px">2027-04-02</td>
+ <td><span class="daysbar"><i style="width:100%;background:var(--success)"></i></span><b>241</b></td>
+ <td style="font-size:10.5px">Oracle wallet · thick client</td><td></td></tr>
+<tr><td class="mono" style="font-size:10.5px">apigee-gw.bbh.com</td>
+ <td class="mono" style="font-size:10.5px">apigee-gw.bbh.com</td><td>Entrust OV TLS</td>
+ <td class="mono" style="font-size:10.5px">2026-12-30</td>
+ <td><span class="daysbar"><i style="width:100%;background:var(--success)"></i></span><b>148</b></td>
+ <td style="font-size:10.5px">outbound API facade</td><td></td></tr>
+</table>
+<div style="padding:8px 13px;font-size:10.5px;color:var(--sub)">wildcard grouping: 2 endpoints share *.apps.ocpq — one renewal fixes both · scanner also verifies chain completeness and SAN coverage, not just the date</div>
+</div>
+</div>
+
+<!-- ============ ③ HEALTH CHECKS ============ -->
+<div class="pg" id="p2">
+<h1>Health checks</h1>
+<div class="sub">hourly probes per environment · 30-day strip per check · degraded ≠ down: latency and capacity thresholds catch trouble early</div>
+<div class="panel"><div class="ph"><h2>OpenShift · OCPQ</h2><span class="chip amber">1 degraded</span>
+ <span class="hint">probes run from inside the cluster + from the laptop network — both views matter</span></div>
+ <table class="certs">
+ <tr><th>check</th><th>what it verifies</th><th>now</th><th>latency</th><th>last 30 days</th></tr>
+ <tr><td class="mono" style="font-size:10.5px">GET /healthz · CP 360 UI route</td><td style="font-size:11px">route + pod + FastAPI up</td>
+  <td><span class="chip green">200 OK</span></td><td class="mono" style="font-size:10.5px">182ms</td>
+  <td><span class="spark"><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span></span> 99.8%</td></tr>
+ <tr><td class="mono" style="font-size:10.5px">Airflow scheduler heartbeat</td><td style="font-size:11px">last heartbeat &lt; 60s · DAG import errors = 0</td>
+  <td><span class="chip green">OK</span></td><td class="mono" style="font-size:10.5px">—</td>
+  <td><span class="spark"><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp b"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span></span> 98.9%</td></tr>
+ <tr style="background:#fffaf4"><td class="mono" style="font-size:10.5px">WebFS · CIFS mount write test</td><td style="font-size:11px">write+read a probe file on the share</td>
+  <td><span class="chip amber">SLOW 1.9s</span></td><td class="mono" style="font-size:10.5px">1.9s ▲</td>
+  <td><span class="spark"><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp w"></span><span class="sp w"></span><span class="sp w"></span><span class="sp w"></span><span class="sp w"></span><span class="sp w"></span><span class="sp w"></span><span class="sp w"></span></span> degrading 8d</td></tr>
+ <tr><td class="mono" style="font-size:10.5px">artifacts tree scan freshness</td><td style="font-size:11px">nightly api360 scan ran &lt; 26h ago</td>
+  <td><span class="chip green">7h ago</span></td><td class="mono" style="font-size:10.5px">—</td>
+  <td><span class="spark"><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span><span class="sp"></span></span> 100%</td></tr>
+ </table></div>
+<div class="panel"><div class="ph"><h2>Oracle</h2><span class="chip green">all healthy</span></div>
+ <table class="certs">
+ <tr><th>check</th><th>what it verifies</th><th>now</th><th>latency</th><th>last 30 days</th></tr>
+ <tr><td class="mono" style="font-size:10.5px">SELECT 1 · dvlpbdb1/pbdwhdbt</td><td style="font-size:11px">connect as A041327 · thick mode</td>
+  <td><span class="chip green">OK</span></td><td class="mono" style="font-size:10.5px">9ms</td><td>100%</td></tr>
+ <tr><td class="mono" style="font-size:10.5px">SILVER session headroom</td><td style="font-size:11px">sessions &lt; 80% of cap (Airflow pool guard)</td>
+  <td><span class="chip green">64/120</span></td><td class="mono" style="font-size:10.5px">—</td><td>2 warns · month</td></tr>
+ </table></div>
+<div class="panel"><div class="ph"><h2>Integration</h2><span class="chip amber">1 degraded</span></div>
+ <table class="certs">
+ <tr><th>check</th><th>what it verifies</th><th>now</th><th>latency</th><th>last 30 days</th></tr>
+ <tr><td class="mono" style="font-size:10.5px">SEI QA token mint</td><td style="font-size:11px">OAuth2 client credentials round-trip</td>
+  <td><span class="chip green">OK</span></td><td class="mono" style="font-size:10.5px">310ms</td><td>99.4%</td></tr>
+ <tr style="background:#fffaf4"><td class="mono" style="font-size:10.5px">3scale gateway pods</td><td style="font-size:11px">2/2 replicas ready (HA)</td>
+  <td><span class="chip amber">1/2</span></td><td class="mono" style="font-size:10.5px">—</td><td>HA degraded 2d</td></tr>
+ </table></div>
+</div>
+
+<!-- ============ ④ TOPOLOGY ============ -->
+<div class="pg" id="p3">
+<h1>Network topology · live status overlay</h1>
+<div class="sub">zones left to right: user → OpenShift OCPQ → data · DMZ → vendors — animated links are live traffic paths, badges are TLS certs on that hop, dots are node health</div>
+<div class="topo">
+ <div class="zone" style="left:0;width:15%"><span class="zl">User zone</span></div>
+ <div class="zone" style="left:15%;width:37%"><span class="zl">OpenShift · OCPQ</span></div>
+ <div class="zone" style="left:52%;width:22%"><span class="zl">Data zone</span></div>
+ <div class="zone" style="left:74%;width:12%"><span class="zl">DMZ · egress</span></div>
+ <div class="zone" style="left:86%;width:14%;border-right:none"><span class="zl">Vendors</span></div>
+ <svg class="wires">
+  <path class="flow" d="M 150 120 C 200 120, 200 120, 250 120" stroke="#159943" stroke-width="2.5" fill="none"/>
+  <path class="flow" d="M 408 120 C 450 120, 450 150, 492 150" stroke="#159943" stroke-width="2" fill="none"/>
+  <path class="flow" d="M 650 150 C 700 150, 700 180, 748 180" stroke="#159943" stroke-width="2.5" fill="none"/>
+  <path class="flow" d="M 650 170 C 700 190, 700 300, 748 310" stroke="#e67e22" stroke-width="2.5" fill="none"/>
+  <path class="flow" d="M 408 300 C 450 300, 450 200, 748 195" stroke="#159943" stroke-width="2" fill="none"/>
+  <path class="flow" d="M 408 320 C 560 330, 860 320, 1035 250" stroke="#159943" stroke-width="2" fill="none"/>
+  <path class="flow" d="M 1193 250 C 1230 250, 1230 250, 1262 250" stroke="#e67e22" stroke-width="2.5" fill="none"/>
+  <path class="flow" d="M 408 450 C 480 450, 480 430, 540 430" stroke="#159943" stroke-width="1.6" fill="none"/>
+  <path class="flow" d="M 250 470 C 300 480, 350 480, 408 460" stroke="#159943" stroke-width="1.6" fill="none"/>
+ </svg>
+ <span class="certbdg" style="left:176px;top:96px;border-color:var(--danger);color:var(--danger)">TLS · 6d ⚠</span>
+ <span class="certbdg" style="left:1198px;top:226px;border-color:var(--warn);color:var(--warn)">TLS · 23d</span>
+ <span class="certbdg" style="left:676px;top:156px;border-color:var(--success);color:var(--success)">TCPS · 241d</span>
+ <div class="tnode2" style="left:22px;top:96px"><span class="st ok"></span><b>👤 Users · analysts</b><small>browser → F5 → route</small></div>
+ <div class="tnode2" style="left:250px;top:92px"><span class="st bd"></span><b>🌐 CP 360 route</b><small>cp-catalog-opendatahub…<br>cert expires in 6 days</small></div>
+ <div class="tnode2" style="left:492px;top:126px"><span class="st ok"></span><b>⚙ FastAPI pods</b><small>cp-catalog-api · 2 replicas</small></div>
+ <div class="tnode2" style="left:250px;top:276px"><span class="st ok"></span><b>🌀 Airflow</b><small>KubernetesExecutor<br>scheduler ♥ 12s ago</small></div>
+ <div class="tnode2" style="left:748px;top:156px"><span class="st ok"></span><b>🗄 dvlpbdb1 · DEV</b><small>pbdwhdbt · SILVER · 9ms</small></div>
+ <div class="tnode2" style="left:748px;top:286px"><span class="st wn"></span><b>📁 WebFS · CIFS</b><small>artifacts tree · 1.9s ▲ slow</small></div>
+ <div class="tnode2" style="left:748px;top:400px"><span class="st ok"></span><b>🗄 qclpbdb1 · QA</b><small>PBDWHDBQ · 11ms</small></div>
+ <div class="tnode2" style="left:1035px;top:216px"><span class="st ok"></span><b>🛡 Apigee egress</b><small>facade + KVM credentials</small></div>
+ <div class="tnode2" style="left:1262px;top:216px"><span class="st ok"></span><b>☁ SEI QA</b><small>api-qa.seic.com · 310ms</small></div>
+ <div class="tnode2" style="left:1262px;top:330px"><span class="st ok"></span><b>☁ Plaid sandbox</b><small>via manifest fetch only</small></div>
+ <div class="tnode2" style="left:250px;top:430px"><span class="st ok"></span><b>🔧 Jenkins</b><small>pipelines → ImageStreams</small></div>
+ <div class="tnode2" style="left:540px;top:400px"><span class="st ok"></span><b>📦 Nexus</b><small>air-gap pip/npm mirror</small></div>
+ <div class="tnode2" style="left:1035px;top:330px"><span class="st wn"></span><b>🛡 3scale POC</b><small>HA gateway · 1/2 pods</small></div>
+</div>
+<div style="font-size:10.5px;color:var(--sub);margin-top:8px">the one picture for incident calls: red badge = the expiring route cert everyone enters through · amber path = the slow CIFS hop degrading uploads · amber node = 3scale HA down to one pod · everything else green and moving</div>
+</div>
+
+<!-- ============ ⑤ PULSE CHECK ============ -->
+<div class="pg" id="p4">
+<h1>Pulse check · one button, the whole estate</h1>
+<div class="sub">runs every probe in dependency order and streams results — the morning ritual and the incident-call opener</div>
+<div class="pulserun">
+ <div class="pulsebtn">▶ PULSE</div>
+ <div>
+  <div style="font-size:13px;font-weight:700">Last pulse: today 09:00 · 17 probes · 14 ✓ · 2 ⚠ · 1 ✗-adjacent</div>
+  <div style="font-size:11px;color:var(--sub)">full sweep takes ~40s · also runs automatically at 06:00 before the nightly-run review · results archived 90 days</div>
+ </div>
+ <span style="margin-left:auto" class="chip amber">⚠ 2 findings — same two as yesterday, aging</span>
+</div>
+<div class="panel"><div class="ph"><h2>Pulse · 09:00:12 run</h2><span class="hint">streams in dependency order — network → platform → data → integration</span></div>
+<div class="plog">
+ <div class="prow" style="animation-delay:.1s"><span class="tm">09:00:12</span><span class="chip blue">DNS</span><span class="tgt">*.apps.ocpq.testbbh.com resolves</span><span class="chip green">OK</span><span class="ms">4ms</span></div>
+ <div class="prow" style="animation-delay:.4s"><span class="tm">09:00:12</span><span class="chip blue">TLS</span><span class="tgt">cp-catalog route handshake + chain</span><span class="chip red">EXPIRES 6d</span><span class="ms">61ms</span></div>
+ <div class="prow" style="animation-delay:.7s"><span class="tm">09:00:13</span><span class="chip blue">HTTP</span><span class="tgt">GET /healthz · CP 360 UI + API</span><span class="chip green">200</span><span class="ms">182ms</span></div>
+ <div class="prow" style="animation-delay:1.0s"><span class="tm">09:00:14</span><span class="chip blue">K8S</span><span class="tgt">pods ready · cp-catalog-api 2/2 · airflow 3/3</span><span class="chip green">OK</span><span class="ms">—</span></div>
+ <div class="prow" style="animation-delay:1.3s"><span class="tm">09:00:15</span><span class="chip blue">ORA</span><span class="tgt">SELECT 1 · dvlpbdb1/pbdwhdbt as A041327</span><span class="chip green">OK</span><span class="ms">9ms</span></div>
+ <div class="prow" style="animation-delay:1.6s"><span class="tm">09:00:15</span><span class="chip blue">ORA</span><span class="tgt">SILVER session headroom 64/120</span><span class="chip green">OK</span><span class="ms">—</span></div>
+ <div class="prow" style="animation-delay:1.9s"><span class="tm">09:00:17</span><span class="chip blue">FS</span><span class="tgt">WebFS write+read probe file</span><span class="chip amber">SLOW 1.9s</span><span class="ms">1.9s</span></div>
+ <div class="prow" style="animation-delay:2.2s"><span class="tm">09:00:18</span><span class="chip blue">JOB</span><span class="tgt">nightly api360 scan freshness</span><span class="chip green">7h ago</span><span class="ms">—</span></div>
+ <div class="prow" style="animation-delay:2.5s"><span class="tm">09:00:19</span><span class="chip blue">AIR</span><span class="tgt">scheduler heartbeat + DAG import errors</span><span class="chip green">OK · 0 err</span><span class="ms">—</span></div>
+ <div class="prow" style="animation-delay:2.8s"><span class="tm">09:00:24</span><span class="chip blue">API</span><span class="tgt">SEI QA OAuth token mint round-trip</span><span class="chip green">OK</span><span class="ms">310ms</span></div>
+ <div class="prow" style="animation-delay:3.1s"><span class="tm">09:00:25</span><span class="chip blue">GW</span><span class="tgt">3scale replicas ready</span><span class="chip amber">1/2</span><span class="ms">—</span></div>
+ <div class="prow" style="animation-delay:3.4s"><span class="tm">09:00:26</span><span class="chip blue">CI</span><span class="tgt">Jenkins queue depth · Nexus reachability</span><span class="chip green">OK</span><span class="ms">140ms</span></div>
+ <div class="prow" style="animation-delay:3.8s"><span class="tm">09:00:52</span><b>Pulse complete — 17 probes · 40s · 2 findings routed to #cp-environments</b><span style="margin-left:auto" class="chip green">DONE</span></div>
+</div></div>
+<div style="font-size:10.5px;color:var(--sub)">dependency order matters: DNS before TLS before HTTP before pods — so one root cause reads as ONE red line followed by skips, not seventeen alarms</div>
+</div>
+</div></div>
+</body></html>

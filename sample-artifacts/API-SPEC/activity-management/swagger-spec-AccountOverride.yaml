@@ -1,0 +1,51 @@
+openapi: 3.0.1
+info:
+  title: Account Override Service
+  version: PSI45
+  description: |
+    SEI Wealth Platform - Account Override.
+    Function point Id is 491.
+    * api/v1/swp/activity-management/accountOverride/update
+servers:
+  - url: https://extranettest.api.seic.com/api/v1/swp/activity-management
+paths:
+  /accountOverride/update:
+    post:
+      operationId: updateAccountOverride
+      summary: Apply an account override
+      description: |
+        Updates an account override.
+
+        | S.No | Business Exception | Error Code | Error Details |
+        |------|--------------------|------------|---------------|
+        | 1 | Invalid Account | ERR-AO-001 | Account id not found |
+        | 2 | Unauthorized | ERR-AO-002 | AppKey invalid |
+        | 3 | Validation | ERR-AO-003 | overrideValue out of range |
+      parameters:
+        - name: AppKey
+          in: header
+          required: true
+          schema: { type: string }
+        - name: Authorization
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                accountId: { type: string, maxLength: 20, example: "ACC123456" }
+                clientName: { type: string, example: "Jane Doe" }
+                overrideType: { type: string, example: "FEE_WAIVER" }
+                overrideValue: { type: number, format: double, example: 0.25 }
+                effectiveDate: { type: string, format: date, example: "2024-06-01" }
+                reason: { type: string, example: "client retention" }
+      responses:
+        '200': { description: Override applied }
+        '400': { description: Bad request }
+        '401': { description: Unauthorized }
+        '404': { description: Not found }
+        '422': { description: Validation failed }
+        '500': { description: Server error }

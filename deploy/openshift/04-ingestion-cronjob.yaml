@@ -1,0 +1,30 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cp-catalog-ingestion
+  namespace: cp-catalog
+spec:
+  schedule: "0 6 * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ingestion
+              image: image-registry.openshift-image-registry.svc:5000/cp-catalog/cp-catalog-api:latest
+              command: ["python", "-m", "ingestion.run"]
+              envFrom:
+                - secretRef: { name: cp-catalog-secret }
+                - configMapRef: { name: cp-catalog-config }
+              volumeMounts:
+                - name: webfs
+                  mountPath: /opt/approot/webfs/cp-datacatalog
+                  readOnly: true
+              resources:
+                requests: { cpu: "200m", memory: "512Mi" }
+                limits: { cpu: "1", memory: "1Gi" }
+          volumes:
+            - name: webfs
+              persistentVolumeClaim: { claimName: cp-catalog-webfs }

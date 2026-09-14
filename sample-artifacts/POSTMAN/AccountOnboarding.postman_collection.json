@@ -1,0 +1,17 @@
+{
+  "info": { "name": "Account Onboarding", "description": "Onboard a client account end to end",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json" },
+  "item": [
+    { "name": "Create Client",
+      "request": { "method": "POST", "url": { "raw": "{{base}}/client/create" } },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.collectionVariables.set('clientId', pm.response.json().id)"] } }] },
+    { "name": "Open Account",
+      "request": { "method": "POST", "url": { "raw": "{{base}}/account/open" } },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.collectionVariables.set('accountId', pm.response.json().id)"] } }] },
+    { "name": "Apply Override",
+      "request": { "method": "POST", "url": { "raw": "{{base}}/accountOverride/update" } },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.collectionVariables.set('overrideId', pm.response.json().id)"] } }] },
+    { "name": "Log Activity",
+      "request": { "method": "POST", "url": { "raw": "{{base}}/activity/log" } } }
+  ]
+}

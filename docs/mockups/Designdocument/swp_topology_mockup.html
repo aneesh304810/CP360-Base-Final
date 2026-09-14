@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>SWP Topology · Environment 360 — target architecture, live, per region</title>
+<style>
+ :root{--navy:#10193b;--accent:#0f4775;--pop:#31bced;--sub:#5c6b7a;--panel2:#dfe6e9;
+  --border:#d7dee4;--bg:#eef2f5;--mono:'Consolas','Roboto Mono',monospace;
+  --success:#159943;--warn:#e67e22;--danger:#cc3344;--future:#cc3344;--teal:#0e8f7e}
+ *{box-sizing:border-box;margin:0}
+ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:#233240}
+ @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+ .hdr{background:var(--navy);color:#fff;padding:11px 24px;display:flex;align-items:center;gap:14px;
+  position:sticky;top:0;z-index:40}
+ .hdr b{font-size:15px}
+ .hdr .live{font-size:9px;font-weight:800;background:rgba(21,153,67,.3);color:#bfe;border-radius:999px;padding:3px 10px}
+ .hdr .sub2{font-size:10.5px;color:#8fb4dd}
+ .sw{margin-left:auto;display:flex;background:#0b1230;border-radius:999px;padding:3px}
+ .sw label{font-size:11px;color:#8fb4dd;padding:5px 18px;border-radius:999px;cursor:pointer}
+ input[name=rg]{display:none}
+ #g0:checked ~ .hdr .sw label[for=g0],#g1:checked ~ .hdr .sw label[for=g1],
+ #g2:checked ~ .hdr .sw label[for=g2],#g3:checked ~ .hdr .sw label[for=g3]
+  {background:var(--pop);color:var(--navy);font-weight:700}
+ .pg{display:none;padding:18px 26px 46px;max-width:1460px;margin:0 auto}
+ #g0:checked ~ #q0,#g1:checked ~ #q1,#g2:checked ~ #q2,#g3:checked ~ #q3{display:block}
+ h1{font-size:18px;font-weight:600;color:var(--navy)}
+ .sub{font-size:10.5px;color:var(--sub);margin:3px 0 12px}
+ /* ---- topology board · exact grammar of the Environment 360 mockup ---- */
+ .topo{position:relative;height:560px;background:#fff;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+ .zone{position:absolute;top:0;bottom:0;border-right:1.5px dashed #d3dce2}
+ .zone .zl{position:absolute;top:8px;left:12px;font-size:9.5px;font-weight:800;text-transform:uppercase;
+  letter-spacing:.08em;color:#8a97a3}
+ .tnode2{position:absolute;width:158px;background:#fff;border:1.5px solid var(--panel2);border-radius:8px;
+  padding:8px 11px;font-size:10.5px;box-shadow:0 3px 8px rgba(20,40,60,.10);z-index:3}
+ .tnode2 b{display:flex;gap:6px;align-items:center;font-size:11px;color:var(--navy)}
+ .tnode2 small{display:block;font-family:var(--mono);font-size:8.5px;color:var(--sub);margin-top:2px}
+ .tnode2 .st{position:absolute;top:-5px;right:-5px;width:11px;height:11px;border-radius:50%;border:2px solid #fff}
+ .st.ok{background:var(--success)} .st.wn{background:var(--warn)} .st.bd{background:var(--danger);animation:pulse 1.2s infinite}
+ .st.na{background:#9aa7b2}
+ .tnode2.fut{border:1.6px dashed var(--future)}
+ .tnode2.fut b{color:var(--future)}
+ .tnode2.gone{opacity:.55;border-style:dashed}
+ .certbdg{position:absolute;font-size:8px;font-weight:800;border-radius:999px;padding:1px 7px;z-index:4;
+  background:#fff;border:1.5px solid}
+ svg.wires{position:absolute;inset:0;width:100%;height:100%;z-index:1}
+ .flow{stroke-dasharray:7 6;animation:dash 1.2s linear infinite}
+ .still{stroke-dasharray:5 6}
+ @keyframes dash{to{stroke-dashoffset:-13}}
+ /* ---- health table ---- */
+ .hc{background:#fff;border:1px solid var(--border);border-radius:6px;margin-top:14px;overflow:hidden}
+ .hc .ph{display:flex;align-items:center;gap:10px;padding:9px 15px;background:#f7fafc;border-bottom:1px solid var(--border)}
+ .hc .ph b{font-size:12px;color:var(--navy)}
+ .hc .ph .hint{font-size:9.5px;color:#8a97a3}
+ .row{display:grid;grid-template-columns:52px 220px 1fr 90px 150px;gap:10px;padding:6px 15px;
+  font-size:10px;border-top:1px solid #f0f3f6;align-items:center}
+ .row.hd{font-size:8px;font-weight:800;text-transform:uppercase;color:#8a97a3;background:#fbfcfd;border-top:none}
+ .k{font-family:var(--mono);font-size:9px;color:#6d3ac0}
+ .tgt{font-family:var(--mono);font-size:9px;color:var(--sub);word-break:break-all}
+ .chip{font-size:8px;font-weight:800;border-radius:999px;padding:2px 8px;display:inline-block}
+ .cok{background:#d9f2e3;color:var(--success)}.cwn{background:#fae5d3;color:#a8560f}
+ .cbd{background:#fde8e8;color:var(--danger)}.cna{background:#eef1f4;color:#8a97a3}
+ .foot{font-size:9.5px;color:var(--sub);margin-top:8px}
+</style></head><body>
+<input type="radio" name="rg" id="g0" checked><input type="radio" name="rg" id="g1">
+<input type="radio" name="rg" id="g2"><input type="radio" name="rg" id="g3">
+<div class="hdr"><b>Environment 360 · SWP Topology</b><span class="live">LIVE</span>
+ <span class="sub2">the Target Architecture slide, wired to the provisioning inventory — animated links are live paths, badges are TLS/DNS on that hop, dots are node health</span>
+ <div class="sw"><label for="g0">DEV</label><label for="g1">SIT</label>
+  <label for="g2">UAT</label><label for="g3">PROD</label></div></div>
+
+<!-- ==================== DEV ==================== -->
+<div class="pg" id="q0">
+<h1>DEV — batch lane on repurposed dvlpbdb1 · IMDS pair is the first fully-new SEI environment</h1>
+<div class="sub">zones left to right: SEI · SWP Platform → BBH · PS Integration Hub → BBH · Consumers — dashed red = CP DW canonical, future by design</div>
+<div class="topo">
+ <div class="zone" style="left:0;width:16%"><span class="zl">SEI · SWP Platform</span></div>
+ <div class="zone" style="left:16%;width:42%"><span class="zl">BBH · PS Integration Hub</span></div>
+ <div class="zone" style="left:58%;width:42%;border-right:none"><span class="zl">BBH · Consumers</span></div>
+ <svg class="wires">
+  <path class="flow" d="M 190 120 C 230 120, 230 120, 268 120" stroke="#159943" stroke-width="2.5" fill="none"/>
+  <path class="flow" d="M 426 120 C 450 120, 450 120, 472 120" stroke="#159943" stroke-width="2" fill="none"/>
+  <path class="flow" d="M 630 120 C 655 120, 655 120, 676 120" stroke="#159943" stroke-width="2" fill="none"/>
+  <path class="flow" d="M 834 110 C 890 100, 900 90, 950 85" stroke="#159943" stroke-width="2.5" fill="none"/>
+  <path class="still" d="M 834 125 C 900 140, 910 165, 950 170" stroke="#cc3344" stroke-width="2" fill="none"/>
+  <path class="flow" d="M 834 140 C 900 190, 910 250, 950 255" stroke="#159943" stroke-width="2" fill="none"/>
+  <path class="flow" d="M 834 150 C 900 230, 910 335, 950 340" stroke="#159943" stroke-width="2" fill="none"/>
+  <path class="flow" d="M 268 300 C 400 300, 600 300, 676 150" stroke="#e67e22" stroke-width="1.8" fill="none"/>
+  <path class="flow" d="M 190 450 C 300 450, 380 450, 460 450" stroke="#0e8f7e" stroke-width="2.5" fill="none"/>
+  <path class="flow" d="M 618 450 C 760 450, 850 440, 950 432" stroke="#0e8f7e" stroke-width="2.5" fill="none"/>
+ </svg>
+ <span class="certbdg" style="left:200px;top:96px;border-color:var(--success);color:var(--success)">sFTP · key ok</span>
+ <span class="certbdg" style="left:475px;top:428px;border-color:var(--success);color:var(--success)">TLS · 27d</span>
+ <div class="tnode2" style="left:22px;top:92px"><span class="st ok"></span><b>🏦 SWP Platform</b><small>batch extracts · EOD/intraday<br>SEI-hosted · conn probe</small></div>
+ <div class="tnode2" style="left:22px;top:422px"><span class="st ok"></span><b>🔌 SWP APIs</b><small>real-time · no batch dep<br>SEI-hosted · TLS 1.2+</small></div>
+ <div class="tnode2" style="left:268px;top:92px"><span class="st wn"></span><b>📥 Landing Zone</b><small>dvlpbdb1 · /swp/landing<br>10.4.20.11 · FS 1.9s ▲</small></div>
+ <div class="tnode2" style="left:472px;top:92px"><span class="st ok"></span><b>🧱 Stage 1 · RAW</b><small>dvlpbdb1 · PBDWHDBT<br>SQL · SELECT 1 · 9ms</small></div>
+ <div class="tnode2" style="left:676px;top:92px"><span class="st ok"></span><b>🧪 Stage 2 · Enriched</b><small>tested dbt models<br>Airflow dev DAGs</small></div>
+ <div class="tnode2" style="left:268px;top:272px"><span class="st ok"></span><b>🛠 ODI Studio</b><small>rtlodiapp3t (existing)<br>repurposed per tracker</small></div>
+ <div class="tnode2" style="left:460px;top:422px"><span class="st ok"></span><b>🛡 API Gateway</b><small>Envoy dev · apps.ocpq<br>TLS C1 · 27d</small></div>
+ <div class="tnode2" style="left:950px;top:56px"><span class="st ok"></span><b>🗄 PBDW · SoR</b><small>dvlpbdb1 (repurposed)<br>10.4.20.11 · DNS+SQL ✓</small></div>
+ <div class="tnode2 fut" style="left:950px;top:142px"><b>◌ CP DW · Canonical</b><small>future — data strategy<br>dashed by design</small></div>
+ <div class="tnode2" style="left:950px;top:228px"><span class="st ok"></span><b>🗄 Pivotal DB</b><small>QCWPIVDEVSEI4/5/2<br>Windows · 24GB · done</small></div>
+ <div class="tnode2" style="left:950px;top:314px"><span class="st ok"></span><b>🗄 IMDS</b><small>dvlimdsdb (IMDSDBLA)<br>10.4.31.12 · H26/H27 ✓</small></div>
+ <div class="tnode2" style="left:950px;top:404px"><span class="st ok"></span><b>👥 Real-time consumers</b><small>dvltasap235 (Portal DEV)<br>10.4.44.35 · H30 ✓</small></div>
+</div>
+<div class="hc"><div class="ph"><b>Health checks — DEV</b><span class="hint">region-scoped slice of the hourly pulse</span>
+ <span style="margin-left:auto" class="chip cok">7 OK</span><span class="chip cwn">1 WARN</span></div>
+ <div class="row hd"><span>ID</span><span>Check</span><span>Target</span><span>Kind</span><span>Latest</span></div>
+ <div class="row"><span class="k">H26</span><span>DNS · IMDS DEV DB</span><span class="tgt">dvlimdsdb.testbbh.com</span><span>DNS</span><span><span class="chip cok">OK · 10.4.31.12</span></span></div>
+ <div class="row"><span class="k">H27</span><span>DNS · IMDS DEV app</span><span class="tgt">dvlimdsapp.testbbh.com</span><span>DNS</span><span><span class="chip cok">OK · 10.4.31.13</span></span></div>
+ <div class="row"><span class="k">H30</span><span>DNS · Client Portal DEV</span><span class="tgt">dvltasap235.testbbh.com</span><span>DNS</span><span><span class="chip cok">OK · 10.4.44.35</span></span></div>
+ <div class="row"><span class="k">H05</span><span>SQL · SELECT 1 dev warehouse</span><span class="tgt">dvlpbdb1:2483/pbdwhdbt</span><span>SQL</span><span><span class="chip cok">OK · 9ms</span></span></div>
+ <div class="row"><span class="k">H07</span><span>FS · landing zone write</span><span class="tgt">/swp/landing (CIFS)</span><span>FS</span><span><span class="chip cwn">SLOW · 1.9s</span></span></div>
+</div>
+<div class="foot">IPs on nodes = latest DNS probe result (env_check_results.detail), refreshed every pulse — never hand-entered. SEI-hosted nodes carry connectivity probes only.</div>
+</div>
+
+<!-- ==================== SIT ==================== -->
+<div class="pg" id="q1">
+<h1>SIT — the new SEI trio arrives · one pulsing red dot tells the story</h1>
+<div class="sub">tracker RITM0682588 says In Progress (repo PBODIQA copied, agent installed) — the pulse agrees on 2 of 3 hosts; qalodidb3sei does not resolve</div>
+<div class="topo">
+ <div class="zone" style="left:0;width:16%"><span class="zl">SEI · SWP Platform</span></div>
+ <div class="zone" style="left:16%;width:42%"><span class="zl">BBH · PS Integration Hub</span></div>
+ <div class="zone" style="left:58%;width:42%;border-right:none"><span class="zl">BBH · Consumers</span></div>
+ <svg class="wires">
+  <path class="flow" d="M 190 120 C 230 120, 230 120, 268 120" stroke="#159943" stroke-width="2.5" fill="none"/>
+  <path class="flow" d="M 426 120 C 450 120, 450 120, 472 120" stroke="#159943" stroke-width="2" fill="none"/>
+  <path class="flow" d="M 630 120 C 655 120, 655 120, 676 120" stroke="#159943" stroke-width="2" fill="none"/>
+  <path class="flow" d="M 834 110 C 890 95, 900 80, 950 75" stroke="#159943" stroke-width="2.5" fill="none"/>
+  <path class="still" d="M 834 125 C 900 140, 910 160, 950 160" stroke="#cc3344" stroke-width="2" fill="none"/>
+  <path class="flow" d="M 834 140 C 900 195, 910 245, 950 245" stroke="#159943" stroke-width="2" fill="none"/>
+  <path class="flow" d="M 834 150 C 900 240, 910 330, 950 330" stroke="#159943" stroke-width="2" fill="none"/>
+  <path class="still" d="M 426 300 C 445 300, 450 300, 468 300" stroke="#cc3344" stroke-width="2.2" fill="none"/>
+  <path class="flow" d="M 626 300 C 650 280, 660 180, 676 155" stroke="#e67e22" stroke-width="1.8" fill="none"/>
+  <path class="flow" d="M 190 460 C 290 460, 370 460, 460 460" stroke="#0e8f7e" stroke-width="2.5" fill="none"/>
+  <path class="flow" d="M 618 460 C 760 460, 850 445, 950 428" stroke="#0e8f7e" stroke-width="2.5" fill="none"/>
+ </svg>
+ <span class="certbdg" style="left:452px;top:276px;border-color:var(--danger);color:var(--danger)">DNS ✗ NXDOMAIN</span>
+ <span class="certbdg" style="left:200px;top:96px;border-color:var(--success);color:var(--success)">sFTP · key ok</span>
+ <div class="tnode2" style="left:22px;top:92px"><span class="st ok"></span><b>🏦 SWP Platform</b><small>batch extracts · EOD/intraday<br>SEI-hosted · conn probe</small></div>
+ <div class="tnode2" style="left:22px;top:432px"><span class="st ok"></span><b>🔌 SWP APIs</b><small>real-time · no batch dep</small></div>
+ <div class="tnode2" style="left:268px;top:92px"><span class="st ok"></span><b>📥 Landing Zone</b><small>qalpbdb3 · /swp/landing<br>10.4.22.31 · H20 ✓</small></div>
+ <div class="tnode2" style="left:472px;top:92px"><span class="st ok"></span><b>🧱 Stage 1 · RAW</b><small>qalpbdb3 · QALPBDB3<br>62GB · 4TB · 8 CPU</small></div>
+ <div class="tnode2" style="left:676px;top:92px"><span class="st ok"></span><b>🧪 Stage 2 · Enriched</b><small>tested dbt models<br>dbt SIT target</small></div>
+ <div class="tnode2" style="left:268px;top:272px"><span class="st bd"></span><b>🗃 ODI Repository</b><small>qalodidb3sei · PBODIQA<br>NXDOMAIN · H21 ✗</small></div>
+ <div class="tnode2" style="left:468px;top:272px"><span class="st ok"></span><b>🛠 ODI Agent</b><small>qalodiapp3sei<br>10.4.22.33 · H22 ✓ · installed</small></div>
+ <div class="tnode2" style="left:460px;top:432px"><span class="st ok"></span><b>🛡 API Gateway</b><small>Envoy SIT · apps.ocpq</small></div>
+ <div class="tnode2" style="left:950px;top:48px"><span class="st ok"></span><b>🗄 PBDW · SoR</b><small>qclpbdb1 (existing SIT)<br>10.4.21.10 · SQL ✓</small></div>
+ <div class="tnode2 fut" style="left:950px;top:132px"><b>◌ CP DW · Canonical</b><small>future — data strategy</small></div>
+ <div class="tnode2" style="left:950px;top:218px"><span class="st ok"></span><b>🗄 Pivotal DB</b><small>SEIDB6 · APMTRSEI · INTSEI1<br>16GB · Completed</small></div>
+ <div class="tnode2" style="left:950px;top:302px"><span class="st ok"></span><b>🗄 IMDS</b><small>qblimdsdb (IMDSDBLB)<br>10.4.32.21 · H28/29 ✓</small></div>
+ <div class="tnode2" style="left:950px;top:400px"><span class="st ok"></span><b>👥 Real-time consumers</b><small>rdltasap235 (Portal SIT)<br>10.4.44.36 · H31 ✓</small></div>
+ <div class="tnode2 gone" style="left:1150px;top:218px"><span class="st wn"></span><b>☁ CRD · vendor</b><small>Azure · set up 8/7<br>restore wk 8/10</small></div>
+ <div class="tnode2 gone" style="left:1150px;top:400px"><span class="st wn"></span><b>☁ PORT · Bloomberg</b><small>25 acct / 3000 sec<br>test user pending</small></div>
+</div>
+<div class="hc"><div class="ph"><b>Health checks — SIT</b><span class="hint">the tracker claims; the pulse shows exactly which brick is missing</span>
+ <span style="margin-left:auto" class="chip cok">6 OK</span><span class="chip cbd">1 FAIL</span></div>
+ <div class="row hd"><span>ID</span><span>Check</span><span>Target</span><span>Kind</span><span>Latest</span></div>
+ <div class="row"><span class="k">H20</span><span>DNS · PBDW SIT DB</span><span class="tgt">qalpbdb3.testbbh.com</span><span>DNS</span><span><span class="chip cok">OK · 10.4.22.31</span></span></div>
+ <div class="row"><span class="k">H21</span><span>DNS · ODI SIT repo</span><span class="tgt">qalodidb3sei.testbbh.com</span><span>DNS</span><span><span class="chip cbd">FAIL · NXDOMAIN</span></span></div>
+ <div class="row"><span class="k">H22</span><span>DNS · ODI SIT agent</span><span class="tgt">qalodiapp3sei.testbbh.com</span><span>DNS</span><span><span class="chip cok">OK · 10.4.22.33</span></span></div>
+ <div class="row"><span class="k">H28</span><span>DNS · IMDS SIT DB</span><span class="tgt">qblimdsdb.testbbh.com</span><span>DNS</span><span><span class="chip cok">OK · 10.4.32.21</span></span></div>
+ <div class="row"><span class="k">H31</span><span>DNS · Client Portal SIT</span><span class="tgt">rdltasap235.testbbh.com</span><span>DNS</span><span><span class="chip cok">OK · 10.4.44.36</span></span></div>
+</div>
+<div class="foot">finding routed to #cp-environments: "SIT ODI repository host qalodidb3sei does not resolve — tracker says repo created 05/28; likely DNS registration pending; blocks ODI SIT connectivity test."</div>
+</div>
+
+<!-- ==================== UAT ==================== -->
+<div class="pg" id="q2">
+<h1>UAT — full new trio resolving · IMDS shares SIT new-infra per the tracker</h1>
+<div class="sub">RITM0682589 — PBODIQC copied from PROD · every board dot green; the amber IMDS dot marks the shared-environment quirk, not a fault</div>
+<div class="topo">
+ <div class="zone" style="left:0;width:16%"><span class="zl">SEI · SWP Platform</span></div>
+ <div class="zone" style="left:16%;width:42%"><span class="zl">BBH · PS Integration Hub</span></div>
+ <div class="zone" style="left:58%;width:42%;border-right:none"><span class="zl">BBH · Consumers</span></div>
+ <svg class="wires">
+  <path class="flow" d="M 190 120 C 230 120, 230 120, 268 120" stroke="#159943" stroke-width="2.5" fill="none"/>
+  <path class="flow" d="M 426 120 C 450 120, 450 120, 472 120" stroke="#159943" stroke-width="2" fill="none"/>
+  <path class="flow" d="M 630 120 C 655 120, 655 120, 676 120" stroke="#159943" stroke-width="2" fill="none"/>
+  <path class="flow" d="M 834 110 C 890 95, 900 80, 950 75" stroke="#159943" stroke-width="2.5" fill="none"/>
+  <path class="still" d="M 834 125 C 900 140, 910 160, 950 160" stroke="#cc3344" stroke-width="2" fill="none"/>
+  <path class="flow" d="M 834 140 C 900 195, 910 245, 950 245" stroke="#159943" stroke-width="2" fill="none"/>
+  <path class="flow" d="M 834 150 C 900 240, 910 330, 950 330" stroke="#159943" stroke-width="2" fill="none"/>
+  <path class="flow" d="M 426 300 C 445 300, 450 300, 468 300" stroke="#159943" stroke-width="2" fill="none"/>
+  <path class="flow" d="M 626 300 C 650 280, 660 180, 676 155" stroke="#e67e22" stroke-width="1.8" fill="none"/>
+  <path class="flow" d="M 190 460 C 290 460, 370 460, 460 460" stroke="#0e8f7e" stroke-width="2.5" fill="none"/>
+  <path class="flow" d="M 618 460 C 760 460, 850 445, 950 428" stroke="#0e8f7e" stroke-width="2.5" fill="none"/>
+ </svg>
+ <span class="certbdg" style="left:200px;top:96px;border-color:var(--success);color:var(--success)">sFTP · key ok</span>
+ <div class="tnode2" style="left:22px;top:92px"><span class="st ok"></span><b>🏦 SWP Platform</b><small>batch extracts · SEI-hosted</small></div>
+ <div class="tnode2" style="left:22px;top:432px"><span class="st ok"></span><b>🔌 SWP APIs</b><small>real-time · no batch dep</small></div>
+ <div class="tnode2" style="left:268px;top:92px"><span class="st ok"></span><b>📥 Landing Zone</b><small>qclpbdb3 · /swp/landing<br>10.4.23.31 · H23 ✓</small></div>
+ <div class="tnode2" style="left:472px;top:92px"><span class="st ok"></span><b>🧱 Stage 1 · RAW</b><small>qclpbdb3 · QCLPBDB3<br>62GB · 4TB · 8 CPU</small></div>
+ <div class="tnode2" style="left:676px;top:92px"><span class="st ok"></span><b>🧪 Stage 2 · Enriched</b><small>tested dbt models</small></div>
+ <div class="tnode2" style="left:268px;top:272px"><span class="st ok"></span><b>🗃 ODI Repository</b><small>qclodidb3sei · PBODIQC<br>10.4.23.32 · H24 ✓</small></div>
+ <div class="tnode2" style="left:468px;top:272px"><span class="st ok"></span><b>🛠 ODI Agent</b><small>qclodiapp3sei<br>10.4.23.33 · H25 ✓</small></div>
+ <div class="tnode2" style="left:460px;top:432px"><span class="st ok"></span><b>🛡 API Gateway</b><small>Envoy UAT · apps.ocpq</small></div>
+ <div class="tnode2" style="left:950px;top:48px"><span class="st ok"></span><b>🗄 PBDW · SoR</b><small>qclpbdb1 (existing UAT)<br>10.4.21.10 · SQL ✓</small></div>
+ <div class="tnode2 fut" style="left:950px;top:132px"><b>◌ CP DW · Canonical</b><small>future — data strategy</small></div>
+ <div class="tnode2" style="left:950px;top:218px"><span class="st ok"></span><b>🗄 Pivotal DB</b><small>AUPGSEI1/2 · SEIDB4/5<br>INTSEI2 · Completed</small></div>
+ <div class="tnode2" style="left:950px;top:302px"><span class="st wn"></span><b>🗄 IMDS · Trial/UAT</b><small>= SIT new-infra (qblimdsdb)<br>shared per tracker</small></div>
+ <div class="tnode2" style="left:950px;top:400px"><span class="st ok"></span><b>👥 Real-time consumers</b><small>qcltasap235 (Portal UAT)<br>10.4.44.37 · H32 ✓</small></div>
+</div>
+<div class="hc"><div class="ph"><b>Health checks — UAT</b>
+ <span style="margin-left:auto" class="chip cok">6 OK</span></div>
+ <div class="row hd"><span>ID</span><span>Check</span><span>Target</span><span>Kind</span><span>Latest</span></div>
+ <div class="row"><span class="k">H23</span><span>DNS · PBDW UAT DB</span><span class="tgt">qclpbdb3.testbbh.com</span><span>DNS</span><span><span class="chip cok">OK · 10.4.23.31</span></span></div>
+ <div class="row"><span class="k">H24</span><span>DNS · ODI UAT repo</span><span class="tgt">qclodidb3sei.testbbh.com</span><span>DNS</span><span><span class="chip cok">OK · 10.4.23.32</span></span></div>
+ <div class="row"><span class="k">H25</span><span>DNS · ODI UAT agent</span><span class="tgt">qclodiapp3sei.testbbh.com</span><span>DNS</span><span><span class="chip cok">OK · 10.4.23.33</span></span></div>
+ <div class="row"><span class="k">H32</span><span>DNS · Client Portal UAT</span><span class="tgt">qcltasap235.testbbh.com</span><span>DNS</span><span><span class="chip cok">OK · 10.4.44.37</span></span></div>
+</div>
+</div>
+
+<!-- ==================== PROD ==================== -->
+<div class="pg" id="q3">
+<h1>PROD — existing estate green · hub activates at go-live · canonical stays dashed</h1>
+<div class="sub">per tracker every platform's PROD row says "not required" — production probes are read-only DNS/TLS until cutover sign-off</div>
+<div class="topo">
+ <div class="zone" style="left:0;width:16%"><span class="zl">SEI · SWP Platform</span></div>
+ <div class="zone" style="left:16%;width:42%"><span class="zl">BBH · PS Integration Hub</span></div>
+ <div class="zone" style="left:58%;width:42%;border-right:none"><span class="zl">BBH · Consumers</span></div>
+ <svg class="wires">
+  <path class="still" d="M 190 120 C 230 120, 230 120, 268 120" stroke="#9aa7b2" stroke-width="2" fill="none"/>
+  <path class="still" d="M 426 120 C 450 120, 450 120, 472 120" stroke="#9aa7b2" stroke-width="2" fill="none"/>
+  <path class="still" d="M 630 130 C 700 140, 850 90, 950 80" stroke="#9aa7b2" stroke-width="2" fill="none"/>
+  <path class="still" d="M 630 140 C 720 170, 850 165, 950 165" stroke="#cc3344" stroke-width="2" fill="none"/>
+  <path class="still" d="M 630 150 C 720 220, 850 250, 950 250" stroke="#9aa7b2" stroke-width="2" fill="none"/>
+  <path class="still" d="M 630 160 C 720 280, 850 335, 950 335" stroke="#9aa7b2" stroke-width="2" fill="none"/>
+  <path class="still" d="M 190 460 C 290 460, 370 460, 460 460" stroke="#9aa7b2" stroke-width="2" fill="none"/>
+  <path class="still" d="M 618 460 C 760 460, 850 445, 950 428" stroke="#9aa7b2" stroke-width="2" fill="none"/>
+ </svg>
+ <div class="tnode2" style="left:22px;top:92px"><span class="st na"></span><b>🏦 SWP Platform</b><small>production sFTP · at go-live</small></div>
+ <div class="tnode2" style="left:22px;top:432px"><span class="st na"></span><b>🔌 SWP APIs</b><small>at go-live</small></div>
+ <div class="tnode2 gone" style="left:268px;top:92px"><span class="st na"></span><b>📥 Landing + Stages</b><small>njlpbdb1.bbh.com<br>probes activate at cutover</small></div>
+ <div class="tnode2 gone" style="left:472px;top:92px"><span class="st na"></span><b>🛠 ODI Studio</b><small>njlodiapp3p.bbh.com</small></div>
+ <div class="tnode2 gone" style="left:460px;top:432px"><span class="st na"></span><b>🛡 API Gateway</b><small>production Envoy · at go-live</small></div>
+ <div class="tnode2" style="left:950px;top:48px"><span class="st ok"></span><b>🗄 PBDW · SoR</b><small>njlpbdb1.bbh.com<br>production · existing</small></div>
+ <div class="tnode2 fut" style="left:950px;top:132px"><b>◌ CP DW · Canonical</b><small>future — data strategy</small></div>
+ <div class="tnode2" style="left:950px;top:218px"><span class="st ok"></span><b>🗄 Pivotal DB</b><small>NJWPIVCRM1/2 · CRMDB2<br>CRMINT · CRMMKT · CRMUX1</small></div>
+ <div class="tnode2" style="left:950px;top:302px"><span class="st ok"></span><b>🗄 IMDS</b><small>njlimdsdb (IMDSDBP)<br>njlimdsapp</small></div>
+ <div class="tnode2" style="left:950px;top:400px"><span class="st ok"></span><b>👥 Real-time consumers</b><small>njtasap12 / 2 / 3 / 4</small></div>
+</div>
+<div class="hc"><div class="ph"><b>Health checks — PROD</b><span class="hint">read-only DNS/TLS until go-live sign-off</span>
+ <span style="margin-left:auto" class="chip cok">4 OK</span><span class="chip cna">3 FUTURE</span></div>
+ <div class="row hd"><span>ID</span><span>Check</span><span>Target</span><span>Kind</span><span>Latest</span></div>
+ <div class="row"><span class="k">—</span><span>DNS · PBDW prod</span><span class="tgt">njlpbdb1.bbh.com</span><span>DNS</span><span><span class="chip cok">OK</span></span></div>
+ <div class="row"><span class="k">—</span><span>DNS · IMDS prod</span><span class="tgt">njlimdsdb.bbh.com</span><span>DNS</span><span><span class="chip cok">OK</span></span></div>
+ <div class="row"><span class="k">—</span><span>Landing / Stages / Gateway</span><span class="tgt">activate at production cutover</span><span>—</span><span><span class="chip cna">FUTURE</span></span></div>
+</div>
+</div>
+</body></html>

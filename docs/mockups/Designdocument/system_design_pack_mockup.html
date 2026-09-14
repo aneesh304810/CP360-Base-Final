@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>CP 360 · System Design — SEI-BBH Engineering Design Pack (mockup)</title>
+<style>
+ :root{--navy:#10193b;--accent:#0f4775;--pop:#31bced;--sub:#5c6b7a;--panel2:#dfe6e9;
+  --bg:#eef2f5;--mono:'Consolas','Roboto Mono',monospace}
+ *{box-sizing:border-box;margin:0}
+ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:#233240}
+ .hdr{background:var(--navy);color:#fff;padding:11px 24px;display:flex;align-items:center;gap:14px}
+ .hdr b{font-size:15px}
+ .hdr .crumb{font-size:10.5px;color:#8fb4dd}
+ .wrap{max-width:1380px;margin:0 auto;padding:22px 28px 60px}
+ h1{font-size:24px;font-weight:500;color:var(--accent);border-bottom:2px solid var(--accent);
+  padding-bottom:15px;margin-bottom:22px}
+ .sect{font-size:15.5px;font-weight:700;color:var(--navy)}
+ .line{font-size:11px;color:var(--sub);margin:3px 0 14px}
+ .docs{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+ .doc{background:#fff;border:1.5px solid var(--panel2);border-radius:10px;padding:13px 15px}
+ .doc.sel{border-color:var(--accent)}
+ .dtop{display:flex;align-items:center;gap:8px}
+ .di{font-size:19px}
+ .chip{font-size:8.5px;font-weight:800;padding:2px 8px;border-radius:999px;white-space:nowrap;display:inline-block}
+ .chip.lvl{background:#e8ecf9;color:#4a5fc0}
+ .doc b{display:block;font-size:12.5px;color:var(--navy);margin:7px 0 3px}
+ .doc small{font-size:9.5px;color:var(--sub);line-height:1.5;display:block;min-height:42px}
+ .dact{display:flex;gap:6px;margin-top:9px}
+ .va{flex:1;text-align:center;font-size:10.5px;font-weight:700;padding:6px 0;border-radius:5px;
+  background:#eef3f8;color:var(--accent);cursor:pointer}
+ .va.on{background:var(--accent);color:#fff}
+ .ext{font-size:10.5px;font-weight:700;padding:6px 10px;border-radius:5px;border:1px solid var(--panel2);color:var(--sub)}
+ .iframe{height:340px;border:1.5px solid var(--accent);border-radius:10px;margin-top:12px;background:#fff;
+  display:grid;place-items:center;color:var(--sub);font-size:12px}
+ .iframe .fake{text-align:center;line-height:2}
+ .strip{display:flex;gap:16px;align-items:center;margin:22px 0 10px;flex-wrap:wrap}
+ .strip .kv{font-size:10.5px;color:var(--sub)}
+ .strip .kv b{color:var(--navy);font-size:14px}
+ .decbtn{margin-left:auto;font-size:10.5px;font-weight:700;padding:4px 12px;border-radius:999px;
+  background:#c0392b;color:#fff}
+ .decs{border:1.5px solid #f0c9c9;border-radius:9px;margin-bottom:12px;overflow:hidden}
+ .dec{padding:9px 14px;font-size:11px;background:#fffafa;border-top:1px solid #f6e2e2}
+ .dec:first-child{border-top:none}
+ .did{color:#c0392b}
+ .dsub{font-size:10px;color:var(--sub);margin-top:3px;line-height:1.55}
+ .rec{font-size:10px;margin-top:2px}
+ .filters{display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap;font-size:10.5px}
+ .pill{font-weight:700;padding:4px 12px;border-radius:999px;cursor:pointer}
+ .search{margin-left:auto;height:28px;border:1px solid var(--panel2);border-radius:3px;
+  padding:0 10px;font-size:11.5px;width:220px;background:#fff;color:#93a1ad;display:flex;align-items:center}
+ .tbl{border:1px solid var(--panel2);border-radius:8px;overflow:hidden;background:#fff}
+ .thead,.trow{display:grid;grid-template-columns:34px 100px minmax(0,1.4fr) minmax(0,1.8fr) 90px 54px 104px 92px;
+  gap:10px;padding:7px 14px;align-items:center}
+ .thead{background:#f7f9fa;font-size:8.5px;font-weight:800;text-transform:uppercase;
+  letter-spacing:.4px;color:#93a1ad}
+ .trow{font-size:11px;border-top:1px solid #eef1f4}
+ .trow.open{background:#f6fafc}
+ .cid{font-family:var(--mono);font-size:9.5px;font-weight:700}
+ .pl{font-size:9.5px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .cn{color:var(--navy);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .dl{font-size:10px;color:var(--sub);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .tech{font-size:9.5px;color:#0b5e83}
+ .drill{padding:9px 14px 12px 44px;font-size:10.5px;background:#fbfdfe;
+  border-top:1.5px dashed var(--panel2);line-height:1.7;color:var(--sub)}
+ .drill b{color:var(--navy)}
+ .foot{font-size:9.5px;color:#93a1ad;margin-top:6px}
+</style></head><body>
+<div class="hdr"><b>CP 360°</b><span class="crumb">Architecture · System Design</span></div>
+<div class="wrap">
+<h1>System Design</h1>
+<div class="sect">SEI ↔ BBH — Engineering Design Pack</div>
+<div class="line">65 components across 4 zones. Python (ingestion) + dbt (transformation) + Airflow (orchestration) on OpenShift/Oracle. One design document per component; Custom Build = High means design doc mandatory before code.</div>
+<div class="docs">
+<div class="doc"><div class="dtop"><span class="di">🏛</span><span class="chip lvl">L1</span></div>
+ <b>Component Architecture</b><small>the full SEI ↔ BBH integration picture — every component, both source decks reconciled</small>
+ <div class="dact"><span class="va">view inline</span><span class="ext">⧉</span></div></div>
+<div class="doc sel"><div class="dtop"><span class="di">🔍</span><span class="chip lvl">L2</span></div>
+ <b>L2 Plane Drill-downs</b><small>how each plane is built — ingress, transform, egress, control</small>
+ <div class="dact"><span class="va on">▾ close</span><span class="ext">⧉</span></div></div>
+<div class="doc"><div class="dtop"><span class="di">🧱</span><span class="chip lvl">L3</span></div>
+ <b>Stage 1 RAW &amp; Stage 2 Enriched</b><small>detailed design — landing to tested dbt models on Exadata</small>
+ <div class="dact"><span class="va">view inline</span><span class="ext">⧉</span></div></div>
+<div class="doc"><div class="dtop"><span class="di">🚑</span><span class="chip lvl">L3</span></div>
+ <b>Error Handling, Quarantine &amp; Override</b><small>detailed design — reject lanes, quarantine tables, override workflow</small>
+ <div class="dact"><span class="va">view inline</span><span class="ext">⧉</span></div></div></div>
+<div class="iframe"><div class="fake">🔍 <b>SEI-BBH_L2_Plane_Drilldowns.html</b> — rendered inline in an iframe<br>
+ <span style="font-size:10px">(the real screen embeds the full interactive document here, served from /designs/)</span></div></div>
+<div class="strip"><b style="font-size:13px;color:var(--navy)">Component Design Tracker</b>
+ <span class="kv"><b>65</b> components</span><span class="kv"><b>36</b> P1</span>
+ <span class="kv"><b>13</b> high custom</span><span class="kv"><b>28</b> NEW (no source deck)</span>
+ <span class="decbtn">⚖ 12 open decisions ▾</span></div>
+<div class="decs"><div class="dec"><b class="did">AD-1</b> — <b>Gold write target: Hub-owned schema vs PBDW/IMDS direct</b>
+ <div class="dsub">SEI v5: Gold materialised into existing Oracle DW tables · BBH v4.2: No Gold layer; Stage 2 feeds consumers · blocks components 16, 37, 60</div><div class="rec">→ <b>Hub-owned Gold schema that publishes</b></div></div><div class="dec"><b class="did">AD-2</b> — <b>Corrections: in-place merge vs bitemporal append</b>
+ <div class="dsub">SEI v5: Merge (update existing) on facts · BBH v4.2: Bitemporal handling held in Stage 2 · blocks components 17, 21, 31, 59</div><div class="rec">→ <b>Bitemporal append with as-of resolution</b></div></div><div class="dec"><b class="did">AD-3</b> — <b>Apigee: firm decision or placeholder</b>
+ <div class="dsub">SEI v5: BBH runs an Apigee proxy (two nodes) · BBH v4.2: Vendor-neutral &#x27;API Gateway / Data Plane&#x27; · blocks components 11, 12</div><div class="rec">→ <b>Pin explicitly or correct SEI diagram</b></div></div><div class="dec"><b class="did">AD-4</b> — <b>Intraday: batch pipeline or real-time lane</b>
+ <div class="dsub">SEI v5: In scope, identical flow to EOD · BBH v4.2: Batch lane annotated EOD only · blocks components 12, 20</div><div class="rec">→ <b>Decide one lane; not both</b></div></div><div class="dec"><b class="did">AD-5</b> — <b>Partial batch: halt-all vs per-domain proceed</b>
+ <div class="dsub">SEI v5: Not addressed · BBH v4.2: Not addressed · blocks components 18, 22</div><div class="rec">→ <b>Halt-all until measured, then relax</b></div></div><div class="dec" style="text-align:center;color:#8a97a3">… 7 more decisions in the live table …</div></div>
+<div class="filters">
+ <span class="pill" style="background:var(--navy);color:#fff">all zones</span>
+ <span class="pill" style="border:1.5px solid #6d3ac0;color:#6d3ac0;background:#fff">1. SEI</span>
+ <span class="pill" style="border:1.5px solid #0f4775;color:#0f4775;background:#fff">2. Hub</span>
+ <span class="pill" style="border:1.5px solid #0b7d7d;color:#0b7d7d;background:#fff">3. Consumers</span>
+ <span class="pill" style="border:1.5px solid #b5651d;color:#b5651d;background:#fff">4. OpenShift</span>
+ <span style="color:var(--sub)">☐ high custom only</span>
+ <span class="search">Search component / tech…</span></div>
+<div class="tbl">
+<div class="thead"><span>ID</span><span>Plane</span><span>Component</span><span>Design deliverable</span>
+ <span>Tech</span><span>Prio</span><span>Custom</span><span>Status</span></div>
+<div class="trow">
+ <span class="cid" style="color:#6d3ac0">1</span>
+ <span class="pl" title="Source">Source</span>
+ <b class="cn" title="SWP Platform">SWP Platform</b>
+ <span class="dl" title="Interface spec: domains, entities, extract triggers">Interface spec: domains, entities, extract triggers</span>
+ <span class="tech">Contract</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#6d3ac0">2</span>
+ <span class="pl" title="Source">Source</span>
+ <b class="cn" title="SWP UI">SWP UI</b>
+ <span class="dl" title="Access model + SSO handshake spec">Access model + SSO handshake spec</span>
+ <span class="tech">Contract</span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">P3</span></span>
+ <span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#6d3ac0">3</span>
+ <span class="pl" title="Source">Source</span>
+ <b class="cn" title="SWP APIs">SWP APIs</b>
+ <span class="dl" title="API contract: endpoints, auth, rate limits, SLAs">API contract: endpoints, auth, rate limits, SLAs</span>
+ <span class="tech">Contract</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#6d3ac0">4</span>
+ <span class="pl" title="Source">Source</span>
+ <b class="cn" title="SWP Loaders">SWP Loaders</b>
+ <span class="dl" title="Loader file format + submission/ack contract">Loader file format + submission/ack contract</span>
+ <span class="tech">Contract</span>
+ <span><span class="chip" style="background:#fae5d3;color:#a8560f">P2</span></span>
+ <span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#6d3ac0">5</span>
+ <span class="pl" title="Source">Source</span>
+ <b class="cn" title="Extract Generation">Extract Generation</b>
+ <span class="dl" title="File spec: layout, naming, manifest, EOD + intraday cadence">File spec: layout, naming, manifest, EOD + intraday cadence</span>
+ <span class="tech">Contract</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#6d3ac0">6</span>
+ <span class="pl" title="PS-Orchestration">PS-Orchestration</span>
+ <b class="cn" title="Orchestration API / Data Ingestion / ODM / Workflows / Config">Orchestration API / Data Ingestion / ODM / Workflows / Config</b>
+ <span class="dl" title="Outbound orchestration design (SEI-owned, BBH-reviewed)">Outbound orchestration design (SEI-owned, BBH-reviewed)</span>
+ <span class="tech">Contract</span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">P3</span></span>
+ <span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#6d3ac0">7</span>
+ <span class="pl" title="PS-Orchestration">PS-Orchestration</span>
+ <b class="cn" title="Status Monitoring Dashboard">Status Monitoring Dashboard</b>
+ <span class="dl" title="Status event contract to Integration360">Status event contract to Integration360</span>
+ <span class="tech">Contract</span>
+ <span><span class="chip" style="background:#fae5d3;color:#a8560f">P2</span></span>
+ <span><span class="chip" style="background:#eef6fb;color:#7d97ab">LOW</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">8</span>
+ <span class="pl" title="Ingress/Egress">Ingress/Egress</span>
+ <b class="cn" title="Landing Zone + Transport">Landing Zone + Transport</b>
+ <span class="dl" title="Transport design: protocol, auth, dirs, retention, completeness signal">Transport design: protocol, auth, dirs, retention, completeness signal</span>
+ <span class="tech">Infra</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#eef6fb;color:#7d97ab">LOW</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow open">
+ <span class="cid" style="color:#0f4775">9</span>
+ <span class="pl" title="Ingress/Egress">Ingress/Egress</span>
+ <b class="cn" title="File Arrival Sensors">File Arrival Sensors</b>
+ <span class="dl" title="Per-file sensor design; start-on-arrival not batch-complete">Per-file sensor design; start-on-arrival not batch-complete</span>
+ <span class="tech">Airflow</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#e0f5fd;color:#0b5e83">MEDIUM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="drill"><b>Key design questions:</b> Manifest-driven or filename pattern?<br><b>Custom scope:</b> Custom sensor/deferrable operator per domain. Base sensors do not know your manifest.<br><b>Depends on:</b> 8, 18 <span class="chip" style="background:#eef6fb;color:#7d97ab">NEW</span></div><div class="trow">
+ <span class="cid" style="color:#0f4775">10</span>
+ <span class="pl" title="Ingress/Egress">Ingress/Egress</span>
+ <b class="cn" title="Outbound Producers">Outbound Producers</b>
+ <span class="dl" title="Design for Data Extracts, JSON payloads, Loader File">Design for Data Extracts, JSON payloads, Loader File</span>
+ <span class="tech">Python</span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">P3</span></span>
+ <span><span class="chip" style="background:#efe6fb;color:#6d3ac0">HIGH CUSTOM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">11</span>
+ <span class="pl" title="Ingress/Egress">Ingress/Egress</span>
+ <b class="cn" title="Apigee Proxy">Apigee Proxy</b>
+ <span class="dl" title="Proxy design: submit path + status-return path">Proxy design: submit path + status-return path</span>
+ <span class="tech">Vendor/Infra</span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">P3</span></span>
+ <span><span class="chip" style="background:#eef6fb;color:#7d97ab">LOW</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">12</span>
+ <span class="pl" title="Ingress/Egress">Ingress/Egress</span>
+ <b class="cn" title="API Gateway / Data Plane">API Gateway / Data Plane</b>
+ <span class="dl" title="Real-time route design, independent of batch">Real-time route design, independent of batch</span>
+ <span class="tech">Vendor/Infra</span>
+ <span><span class="chip" style="background:#fae5d3;color:#a8560f">P2</span></span>
+ <span><span class="chip" style="background:#eef6fb;color:#7d97ab">LOW</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">13</span>
+ <span class="pl" title="Processing">Processing</span>
+ <b class="cn" title="Python Ingestion Framework">Python Ingestion Framework</b>
+ <span class="dl" title="Module design: validation, profiling, metadata capture, RAW load">Module design: validation, profiling, metadata capture, RAW load</span>
+ <span class="tech">Python</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#efe6fb;color:#6d3ac0">HIGH CUSTOM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">14</span>
+ <span class="pl" title="Processing">Processing</span>
+ <b class="cn" title="Stage 1 RAW">Stage 1 RAW</b>
+ <span class="dl" title="Physical model: 7 RAW_* tables, 8 audit cols, partitioning, retention">Physical model: 7 RAW_* tables, 8 audit cols, partitioning, retention</span>
+ <span class="tech">Oracle DDL</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">15</span>
+ <span class="pl" title="Processing">Processing</span>
+ <b class="cn" title="Stage 2 Enriched (dbt)">Stage 2 Enriched (dbt)</b>
+ <span class="dl" title="5 STG2_* models, 8 processing steps, tests">5 STG2_* models, 8 processing steps, tests</span>
+ <span class="tech">dbt</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#e0f5fd;color:#0b5e83">MEDIUM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">16</span>
+ <span class="pl" title="Processing">Processing</span>
+ <b class="cn" title="Gold (dbt)">Gold (dbt)</b>
+ <span class="dl" title="2 SCD2 dims + 3 facts; SCD2 and merge logic">2 SCD2 dims + 3 facts; SCD2 and merge logic</span>
+ <span class="tech">dbt</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#efe6fb;color:#6d3ac0">HIGH CUSTOM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">17</span>
+ <span class="pl" title="Processing">Processing</span>
+ <b class="cn" title="Correction Handling">Correction Handling</b>
+ <span class="dl" title="Bitemporal vs merge design, applied across Stage 2 and Gold">Bitemporal vs merge design, applied across Stage 2 and Gold</span>
+ <span class="tech">dbt</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#efe6fb;color:#6d3ac0">HIGH CUSTOM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">18</span>
+ <span class="pl" title="Orchestration">Orchestration</span>
+ <b class="cn" title="Airflow DAG + Per-Domain Fan-out">Airflow DAG + Per-Domain Fan-out</b>
+ <span class="dl" title="DAG design: 7 parallel branches, join points, retries">DAG design: 7 parallel branches, join points, retries</span>
+ <span class="tech">Airflow</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#efe6fb;color:#6d3ac0">HIGH CUSTOM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">19</span>
+ <span class="pl" title="Orchestration">Orchestration</span>
+ <b class="cn" title="Dim-before-Fact / dbt Threads">Dim-before-Fact / dbt Threads</b>
+ <span class="dl" title="Build-order and concurrency design">Build-order and concurrency design</span>
+ <span class="tech">Airflow + dbt</span>
+ <span><span class="chip" style="background:#fae5d3;color:#a8560f">P2</span></span>
+ <span><span class="chip" style="background:#eef6fb;color:#7d97ab">LOW</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">20</span>
+ <span class="pl" title="Orchestration">Orchestration</span>
+ <b class="cn" title="Intraday Cadence Control">Intraday Cadence Control</b>
+ <span class="dl" title="Cadence design and lane assignment">Cadence design and lane assignment</span>
+ <span class="tech">Airflow</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#e0f5fd;color:#0b5e83">MEDIUM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">21</span>
+ <span class="pl" title="Orchestration">Orchestration</span>
+ <b class="cn" title="Replay / Rerun Engine">Replay / Rerun Engine</b>
+ <span class="dl" title="Replay design from LOAD_ID; scope, idempotency, downstream impact">Replay design from LOAD_ID; scope, idempotency, downstream impact</span>
+ <span class="tech">Python + Airflow</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#efe6fb;color:#6d3ac0">HIGH CUSTOM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">22</span>
+ <span class="pl" title="Orchestration">Orchestration</span>
+ <b class="cn" title="Partial-Batch Policy">Partial-Batch Policy</b>
+ <span class="dl" title="Policy + implementation: halt-all vs per-domain proceed">Policy + implementation: halt-all vs per-domain proceed</span>
+ <span class="tech">Airflow</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#e0f5fd;color:#0b5e83">MEDIUM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">23</span>
+ <span class="pl" title="Data Quality">Data Quality</span>
+ <b class="cn" title="G1 File / Structural Gate">G1 File / Structural Gate</b>
+ <span class="dl" title="Check set + quarantine design. BLOCKS RAW insert">Check set + quarantine design. BLOCKS RAW insert</span>
+ <span class="tech">Python</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#efe6fb;color:#6d3ac0">HIGH CUSTOM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">24</span>
+ <span class="pl" title="Data Quality">Data Quality</span>
+ <b class="cn" title="G2 RAW Profiling Gate">G2 RAW Profiling Gate</b>
+ <span class="dl" title="Profiling checks. BLOCKS Stage 2">Profiling checks. BLOCKS Stage 2</span>
+ <span class="tech">Airflow + SQL</span>
+ <span><span class="chip" style="background:#fae5d3;color:#a8560f">P2</span></span>
+ <span><span class="chip" style="background:#e0f5fd;color:#0b5e83">MEDIUM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">25</span>
+ <span class="pl" title="Data Quality">Data Quality</span>
+ <b class="cn" title="G3 dbt Tests + Business Rules">G3 dbt Tests + Business Rules</b>
+ <span class="dl" title="Test suite + rule design. BLOCKS Gold">Test suite + rule design. BLOCKS Gold</span>
+ <span class="tech">dbt</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#e0f5fd;color:#0b5e83">MEDIUM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">26</span>
+ <span class="pl" title="Data Quality">Data Quality</span>
+ <b class="cn" title="G4 Tie-out / Control Totals">G4 Tie-out / Control Totals</b>
+ <span class="dl" title="RAW-to-Gold reconciliation. BLOCKS Gold publish. Per-target">RAW-to-Gold reconciliation. BLOCKS Gold publish. Per-target</span>
+ <span class="tech">Airflow + SQL</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#efe6fb;color:#6d3ac0">HIGH CUSTOM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">27</span>
+ <span class="pl" title="Data Quality">Data Quality</span>
+ <b class="cn" title="G5 Post-Publish Recon">G5 Post-Publish Recon</b>
+ <span class="dl" title="Advisory recon; triggers replay">Advisory recon; triggers replay</span>
+ <span class="tech">Airflow + SQL</span>
+ <span><span class="chip" style="background:#fae5d3;color:#a8560f">P2</span></span>
+ <span><span class="chip" style="background:#e0f5fd;color:#0b5e83">MEDIUM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">28</span>
+ <span class="pl" title="Data Quality">Data Quality</span>
+ <b class="cn" title="DQ Framework">DQ Framework</b>
+ <span class="dl" title="Rule registry, severity tiers, results store, audited override path">Rule registry, severity tiers, results store, audited override path</span>
+ <span class="tech">Python</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#efe6fb;color:#6d3ac0">HIGH CUSTOM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">29</span>
+ <span class="pl" title="Foundation">Foundation</span>
+ <b class="cn" title="Error Handling &amp; Quarantine">Error Handling &amp; Quarantine</b>
+ <span class="dl" title="Error taxonomy, quarantine store, resubmission path">Error taxonomy, quarantine store, resubmission path</span>
+ <span class="tech">Python</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#efe6fb;color:#6d3ac0">HIGH CUSTOM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">30</span>
+ <span class="pl" title="Foundation">Foundation</span>
+ <b class="cn" title="Reconciliation Framework">Reconciliation Framework</b>
+ <span class="dl" title="Recon model: control totals, exception lifecycle">Recon model: control totals, exception lifecycle</span>
+ <span class="tech">Python</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#efe6fb;color:#6d3ac0">HIGH CUSTOM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">31</span>
+ <span class="pl" title="Foundation">Foundation</span>
+ <b class="cn" title="Audit &amp; Lineage">Audit &amp; Lineage</b>
+ <span class="dl" title="End-to-end lineage design, evidence retention">End-to-end lineage design, evidence retention</span>
+ <span class="tech">Python + dbt</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#e0f5fd;color:#0b5e83">MEDIUM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">32</span>
+ <span class="pl" title="Foundation">Foundation</span>
+ <b class="cn" title="Security &amp; Access Control">Security &amp; Access Control</b>
+ <span class="dl" title="AuthN/AuthZ model, data classification, masking">AuthN/AuthZ model, data classification, masking</span>
+ <span class="tech">Infra</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#eef6fb;color:#7d97ab">LOW</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">33</span>
+ <span class="pl" title="Foundation">Foundation</span>
+ <b class="cn" title="Metadata &amp; Configuration Store">Metadata &amp; Configuration Store</b>
+ <span class="dl" title="Config model: rules, thresholds, mappings, schedules">Config model: rules, thresholds, mappings, schedules</span>
+ <span class="tech">Oracle DDL + Python</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#efe6fb;color:#6d3ac0">HIGH CUSTOM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0f4775">34</span>
+ <span class="pl" title="Foundation">Foundation</span>
+ <b class="cn" title="Observability">Observability</b>
+ <span class="dl" title="Logs, metrics, traces; SLIs and alerting">Logs, metrics, traces; SLIs and alerting</span>
+ <span class="tech">Infra</span>
+ <span><span class="chip" style="background:#fae5d3;color:#a8560f">P2</span></span>
+ <span><span class="chip" style="background:#eef6fb;color:#7d97ab">LOW</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow open">
+ <span class="cid" style="color:#0f4775">35</span>
+ <span class="pl" title="Foundation">Foundation</span>
+ <b class="cn" title="Integration360">Integration360</b>
+ <span class="dl" title="Monitoring, exception mgmt, process tracking, recon">Monitoring, exception mgmt, process tracking, recon</span>
+ <span class="tech">Vendor/BBH</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#e0f5fd;color:#0b5e83">MEDIUM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="drill"><b>Key design questions:</b> Does it become the system of record? (AD-6)<br><b>Custom scope:</b> Existing BBH platform. Custom feed/adapter from the Hub.<br><b>Depends on:</b> 7, 30 <span class="chip" style="background:#eef6fb;color:#7d97ab">Both</span></div><div class="trow">
+ <span class="cid" style="color:#0f4775">36</span>
+ <span class="pl" title="Foundation">Foundation</span>
+ <b class="cn" title="SSO">SSO</b>
+ <span class="dl" title="SSO design to SWP UI">SSO design to SWP UI</span>
+ <span class="tech">Infra</span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">P3</span></span>
+ <span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0b7d7d">37</span>
+ <span class="pl" title="Consumers">Consumers</span>
+ <b class="cn" title="PBDW">PBDW</b>
+ <span class="dl" title="Publication design + change control">Publication design + change control</span>
+ <span class="tech">Oracle DDL + dbt</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#e0f5fd;color:#0b5e83">MEDIUM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0b7d7d">38</span>
+ <span class="pl" title="Consumers">Consumers</span>
+ <b class="cn" title="IMDS Stage -&gt; IMDS">IMDS Stage -&gt; IMDS</b>
+ <span class="dl" title="Staging DB + load design from Stage 2">Staging DB + load design from Stage 2</span>
+ <span class="tech">Oracle DDL + dbt</span>
+ <span><span class="chip" style="background:#fae5d3;color:#a8560f">P2</span></span>
+ <span><span class="chip" style="background:#e0f5fd;color:#0b5e83">MEDIUM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0b7d7d">39</span>
+ <span class="pl" title="Consumers">Consumers</span>
+ <b class="cn" title="Pivotal Database">Pivotal Database</b>
+ <span class="dl" title="Feed design from Stage 2">Feed design from Stage 2</span>
+ <span class="tech">dbt</span>
+ <span><span class="chip" style="background:#fae5d3;color:#a8560f">P2</span></span>
+ <span><span class="chip" style="background:#e0f5fd;color:#0b5e83">MEDIUM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0b7d7d">40</span>
+ <span class="pl" title="Consumers">Consumers</span>
+ <b class="cn" title="CP DW Canonical Model">CP DW Canonical Model</b>
+ <span class="dl" title="Forward-compatibility design only (future)">Forward-compatibility design only (future)</span>
+ <span class="tech">Design only</span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">P3</span></span>
+ <span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0b7d7d">41</span>
+ <span class="pl" title="Consumers">Consumers</span>
+ <b class="cn" title="BI / Analytics">BI / Analytics</b>
+ <span class="dl" title="Semantic layer + access design">Semantic layer + access design</span>
+ <span class="tech">BI tooling</span>
+ <span><span class="chip" style="background:#fae5d3;color:#a8560f">P2</span></span>
+ <span><span class="chip" style="background:#eef6fb;color:#7d97ab">LOW</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0b7d7d">42</span>
+ <span class="pl" title="Consumers">Consumers</span>
+ <b class="cn" title="Real-time Consumers">Real-time Consumers</b>
+ <span class="dl" title="Consumer contract on the API lane">Consumer contract on the API lane</span>
+ <span class="tech">Contract</span>
+ <span><span class="chip" style="background:#fae5d3;color:#a8560f">P2</span></span>
+ <span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#0b7d7d">43</span>
+ <span class="pl" title="Consumers">Consumers</span>
+ <b class="cn" title="BBH Existing Systems">BBH Existing Systems</b>
+ <span class="dl" title="Impact assessment: front/back office, trade, custody">Impact assessment: front/back office, trade, custody</span>
+ <span class="tech">Analysis</span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">P3</span></span>
+ <span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#b5651d">44</span>
+ <span class="pl" title="Platform">Platform</span>
+ <b class="cn" title="Projects / Namespaces">Projects / Namespaces</b>
+ <span class="dl" title="Environment topology: dev, test, UAT, prod">Environment topology: dev, test, UAT, prod</span>
+ <span class="tech">Infra</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#b5651d">45</span>
+ <span class="pl" title="Platform">Platform</span>
+ <b class="cn" title="Container Images">Container Images</b>
+ <span class="dl" title="Base image standard: Python, dbt, Airflow">Base image standard: Python, dbt, Airflow</span>
+ <span class="tech">Infra</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#e0f5fd;color:#0b5e83">MEDIUM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#b5651d">46</span>
+ <span class="pl" title="Platform">Platform</span>
+ <b class="cn" title="Registry, Scanning, Signing">Registry, Scanning, Signing</b>
+ <span class="dl" title="Image supply-chain design + promotion policy">Image supply-chain design + promotion policy</span>
+ <span class="tech">Infra</span>
+ <span><span class="chip" style="background:#fae5d3;color:#a8560f">P2</span></span>
+ <span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#b5651d">47</span>
+ <span class="pl" title="Platform">Platform</span>
+ <b class="cn" title="Service Accounts, RBAC, SCCs">Service Accounts, RBAC, SCCs</b>
+ <span class="dl" title="Cluster access model">Cluster access model</span>
+ <span class="tech">Infra</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#b5651d">48</span>
+ <span class="pl" title="Platform">Platform</span>
+ <b class="cn" title="Secrets Management">Secrets Management</b>
+ <span class="dl" title="Secrets design: Oracle creds, sFTP keys, API tokens">Secrets design: Oracle creds, sFTP keys, API tokens</span>
+ <span class="tech">Infra</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#eef6fb;color:#7d97ab">LOW</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#b5651d">49</span>
+ <span class="pl" title="Platform">Platform</span>
+ <b class="cn" title="Network Policy &amp; Egress">Network Policy &amp; Egress</b>
+ <span class="dl" title="Egress to SEI/Apigee/Oracle; ingress rules">Egress to SEI/Apigee/Oracle; ingress rules</span>
+ <span class="tech">Infra</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#b5651d">50</span>
+ <span class="pl" title="Platform">Platform</span>
+ <b class="cn" title="Persistent Storage">Persistent Storage</b>
+ <span class="dl" title="Volume design: landing, quarantine, dbt artifacts, logs">Volume design: landing, quarantine, dbt artifacts, logs</span>
+ <span class="tech">Infra</span>
+ <span><span class="chip" style="background:#fae5d3;color:#a8560f">P2</span></span>
+ <span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#b5651d">51</span>
+ <span class="pl" title="Runtime">Runtime</span>
+ <b class="cn" title="Airflow Deployment">Airflow Deployment</b>
+ <span class="dl" title="Scheduler HA, KubernetesExecutor, pod operator design">Scheduler HA, KubernetesExecutor, pod operator design</span>
+ <span class="tech">Infra + Airflow</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#e0f5fd;color:#0b5e83">MEDIUM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#b5651d">52</span>
+ <span class="pl" title="Runtime">Runtime</span>
+ <b class="cn" title="Worker Pod Autoscaling">Worker Pod Autoscaling</b>
+ <span class="dl" title="Autoscaling design sized to the fan-out">Autoscaling design sized to the fan-out</span>
+ <span class="tech">Infra</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#eef6fb;color:#7d97ab">LOW</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#b5651d">53</span>
+ <span class="pl" title="Runtime">Runtime</span>
+ <b class="cn" title="Resource Quotas &amp; Priority">Resource Quotas &amp; Priority</b>
+ <span class="dl" title="Requests/limits, quotas, priority classes for EOD">Requests/limits, quotas, priority classes for EOD</span>
+ <span class="tech">Infra</span>
+ <span><span class="chip" style="background:#fae5d3;color:#a8560f">P2</span></span>
+ <span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#b5651d">54</span>
+ <span class="pl" title="Runtime">Runtime</span>
+ <b class="cn" title="Warm-start / Pre-pulled Images">Warm-start / Pre-pulled Images</b>
+ <span class="dl" title="Cold-start mitigation design">Cold-start mitigation design</span>
+ <span class="tech">Infra</span>
+ <span><span class="chip" style="background:#fae5d3;color:#a8560f">P2</span></span>
+ <span><span class="chip" style="background:#eef6fb;color:#7d97ab">LOW</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#b5651d">55</span>
+ <span class="pl" title="Runtime">Runtime</span>
+ <b class="cn" title="Oracle Connection Pooling">Oracle Connection Pooling</b>
+ <span class="dl" title="Pooling design; the real parallelism ceiling">Pooling design; the real parallelism ceiling</span>
+ <span class="tech">Python + Infra</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#e0f5fd;color:#0b5e83">MEDIUM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#b5651d">56</span>
+ <span class="pl" title="Runtime">Runtime</span>
+ <b class="cn" title="Node Placement">Node Placement</b>
+ <span class="dl" title="Taints/affinity: batch burst vs always-on API">Taints/affinity: batch burst vs always-on API</span>
+ <span class="tech">Infra</span>
+ <span><span class="chip" style="background:#fae5d3;color:#a8560f">P2</span></span>
+ <span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#b5651d">57</span>
+ <span class="pl" title="Deployment">Deployment</span>
+ <b class="cn" title="CI/CD Pipelines">CI/CD Pipelines</b>
+ <span class="dl" title="Build, test, scan, promote pipeline design">Build, test, scan, promote pipeline design</span>
+ <span class="tech">CI/CD</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#e0f5fd;color:#0b5e83">MEDIUM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#b5651d">58</span>
+ <span class="pl" title="Deployment">Deployment</span>
+ <b class="cn" title="GitOps / ArgoCD">GitOps / ArgoCD</b>
+ <span class="dl" title="Manifest promotion and drift control">Manifest promotion and drift control</span>
+ <span class="tech">CI/CD</span>
+ <span><span class="chip" style="background:#fae5d3;color:#a8560f">P2</span></span>
+ <span><span class="chip" style="background:#eef6fb;color:#7d97ab">LOW</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#b5651d">59</span>
+ <span class="pl" title="Deployment">Deployment</span>
+ <b class="cn" title="dbt Release &amp; Rollback">dbt Release &amp; Rollback</b>
+ <span class="dl" title="dbt versioning, release cadence, rollback design">dbt versioning, release cadence, rollback design</span>
+ <span class="tech">dbt + CI/CD</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#efe6fb;color:#6d3ac0">HIGH CUSTOM</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#b5651d">60</span>
+ <span class="pl" title="Deployment">Deployment</span>
+ <b class="cn" title="Database Change Management">Database Change Management</b>
+ <span class="dl" title="DDL control for RAW/STG2/Gold + PBDW/IMDS">DDL control for RAW/STG2/Gold + PBDW/IMDS</span>
+ <span class="tech">Process + DDL</span>
+ <span><span class="chip" style="background:#fde8e8;color:#c0392b">P1</span></span>
+ <span><span class="chip" style="background:#eef6fb;color:#7d97ab">LOW</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#b5651d">61</span>
+ <span class="pl" title="Deployment">Deployment</span>
+ <b class="cn" title="Blue-Green / Canary (API lane)">Blue-Green / Canary (API lane)</b>
+ <span class="dl" title="Zero-downtime release design for real-time">Zero-downtime release design for real-time</span>
+ <span class="tech">Infra</span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">P3</span></span>
+ <span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#b5651d">62</span>
+ <span class="pl" title="Operations">Operations</span>
+ <b class="cn" title="HA / DR">HA / DR</b>
+ <span class="dl" title="DR topology, RTO/RPO for the batch window">DR topology, RTO/RPO for the batch window</span>
+ <span class="tech">Infra</span>
+ <span><span class="chip" style="background:#fae5d3;color:#a8560f">P2</span></span>
+ <span><span class="chip" style="background:#eef6fb;color:#7d97ab">LOW</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#b5651d">63</span>
+ <span class="pl" title="Operations">Operations</span>
+ <b class="cn" title="Backup &amp; Restore">Backup &amp; Restore</b>
+ <span class="dl" title="Airflow metadata DB, config store, quarantine volumes">Airflow metadata DB, config store, quarantine volumes</span>
+ <span class="tech">Infra</span>
+ <span><span class="chip" style="background:#fae5d3;color:#a8560f">P2</span></span>
+ <span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#b5651d">64</span>
+ <span class="pl" title="Operations">Operations</span>
+ <b class="cn" title="Monitoring Stack">Monitoring Stack</b>
+ <span class="dl" title="Prometheus/Grafana/log aggregation wired into item 34">Prometheus/Grafana/log aggregation wired into item 34</span>
+ <span class="tech">Infra</span>
+ <span><span class="chip" style="background:#fae5d3;color:#a8560f">P2</span></span>
+ <span><span class="chip" style="background:#eef6fb;color:#7d97ab">LOW</span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div><div class="trow">
+ <span class="cid" style="color:#b5651d">65</span>
+ <span class="pl" title="Operations">Operations</span>
+ <b class="cn" title="Cost &amp; Capacity Monitoring">Cost &amp; Capacity Monitoring</b>
+ <span class="dl" title="Capacity model for a sharply peaked EOD burst">Capacity model for a sharply peaked EOD burst</span>
+ <span class="tech">Infra</span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">P3</span></span>
+ <span></span>
+ <span><span class="chip" style="background:#eef1f4;color:#8a97a3">NOT STARTED</span></span>
+</div>
+</div>
+<div class="foot">All 65 rows above are the real tracker contents (generated from SEI-BBH_Component_Design_Tracker.xlsx). Rows 9 and 35 shown expanded — in the live screen any row click opens its design questions, custom scope, and dependencies. Zone color = the ID.</div>
+</div></body></html>

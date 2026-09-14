@@ -1,0 +1,3261 @@
+{
+ "metadata": {
+  "dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v12.json",
+  "dbt_version": "1.8.0",
+  "project_name": "cp_accounting",
+  "adapter_type": "oracle"
+ },
+ "nodes": {
+  "model.cp.sei_brz_positions": {
+   "resource_type": "model",
+   "name": "sei_brz_positions",
+   "schema": "sei_stage",
+   "path": "bronze/sei_brz_positions.sql",
+   "description": "Bronze sei brz positions",
+   "config": {
+    "meta": {
+     "project": "sei",
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT * FROM swp_feeds.position_feed",
+   "raw_code": "SELECT * FROM swp_feeds.position_feed",
+   "depends_on": {
+    "nodes": [
+     "source.cp.swp_feeds.position_feed"
+    ]
+   },
+   "columns": {
+    "positions_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    },
+    "client_name": {
+     "type": "VARCHAR2(120)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.sei_stg_positions": {
+   "resource_type": "model",
+   "name": "sei_stg_positions",
+   "schema": "pbdw",
+   "path": "silver/sei_stg_positions.sql",
+   "description": "Silver sei stg positions",
+   "config": {
+    "meta": {
+     "project": "sei",
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT positions_id,\n       account_id,\n       as_of_date,\n       ABS(amount) AS amount,\n       quantity,\n       UPPER(currency) AS currency,\n       TRIM(client_name) AS client_name\nFROM sei_stage.sei_brz_positions\nWHERE amount IS NOT NULL",
+   "raw_code": "SELECT positions_id,\n       account_id,\n       as_of_date,\n       ABS(amount) AS amount,\n       quantity,\n       UPPER(currency) AS currency,\n       TRIM(client_name) AS client_name\nFROM sei_stage.sei_brz_positions\nWHERE amount IS NOT NULL",
+   "depends_on": {
+    "nodes": [
+     "model.cp.sei_brz_positions"
+    ]
+   },
+   "columns": {
+    "positions_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    },
+    "client_name": {
+     "type": "VARCHAR2(120)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.sei_int_positions_enriched": {
+   "resource_type": "model",
+   "name": "sei_int_positions_enriched",
+   "schema": "pbdw",
+   "path": "silver/sei_int_positions_enriched.sql",
+   "description": "Silver sei int positions enriched",
+   "config": {
+    "meta": {
+     "project": "sei",
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT s.positions_id,\n       s.account_id,\n       s.as_of_date,\n       s.amount,\n       s.amount * fx.rate AS amount_usd,\n       s.quantity,\n       s.currency\nFROM pbdw.sei_stg_positions s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "raw_code": "SELECT s.positions_id,\n       s.account_id,\n       s.as_of_date,\n       s.amount,\n       s.amount * fx.rate AS amount_usd,\n       s.quantity,\n       s.currency\nFROM pbdw.sei_stg_positions s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.sei_stg_positions",
+     "model.cp.int_fx_rates"
+    ]
+   },
+   "columns": {
+    "positions_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "amount_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.sei_brz_taxlots": {
+   "resource_type": "model",
+   "name": "sei_brz_taxlots",
+   "schema": "sei_stage",
+   "path": "bronze/sei_brz_taxlots.sql",
+   "description": "Bronze sei brz taxlots",
+   "config": {
+    "meta": {
+     "project": "sei",
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT * FROM swp_feeds.taxlot_feed",
+   "raw_code": "SELECT * FROM swp_feeds.taxlot_feed",
+   "depends_on": {
+    "nodes": [
+     "source.cp.swp_feeds.taxlot_feed"
+    ]
+   },
+   "columns": {
+    "taxlots_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    },
+    "client_name": {
+     "type": "VARCHAR2(120)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.sei_stg_taxlots": {
+   "resource_type": "model",
+   "name": "sei_stg_taxlots",
+   "schema": "pbdw",
+   "path": "silver/sei_stg_taxlots.sql",
+   "description": "Silver sei stg taxlots",
+   "config": {
+    "meta": {
+     "project": "sei",
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT taxlots_id,\n       account_id,\n       as_of_date,\n       ABS(amount) AS amount,\n       quantity,\n       UPPER(currency) AS currency,\n       TRIM(client_name) AS client_name\nFROM sei_stage.sei_brz_taxlots\nWHERE amount IS NOT NULL",
+   "raw_code": "SELECT taxlots_id,\n       account_id,\n       as_of_date,\n       ABS(amount) AS amount,\n       quantity,\n       UPPER(currency) AS currency,\n       TRIM(client_name) AS client_name\nFROM sei_stage.sei_brz_taxlots\nWHERE amount IS NOT NULL",
+   "depends_on": {
+    "nodes": [
+     "model.cp.sei_brz_taxlots"
+    ]
+   },
+   "columns": {
+    "taxlots_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    },
+    "client_name": {
+     "type": "VARCHAR2(120)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.sei_int_taxlots_enriched": {
+   "resource_type": "model",
+   "name": "sei_int_taxlots_enriched",
+   "schema": "pbdw",
+   "path": "silver/sei_int_taxlots_enriched.sql",
+   "description": "Silver sei int taxlots enriched",
+   "config": {
+    "meta": {
+     "project": "sei",
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT s.taxlots_id,\n       s.account_id,\n       s.as_of_date,\n       s.amount,\n       s.amount * fx.rate AS amount_usd,\n       s.quantity,\n       s.currency\nFROM pbdw.sei_stg_taxlots s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "raw_code": "SELECT s.taxlots_id,\n       s.account_id,\n       s.as_of_date,\n       s.amount,\n       s.amount * fx.rate AS amount_usd,\n       s.quantity,\n       s.currency\nFROM pbdw.sei_stg_taxlots s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.sei_stg_taxlots",
+     "model.cp.int_fx_rates"
+    ]
+   },
+   "columns": {
+    "taxlots_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "amount_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.sei_brz_transactions": {
+   "resource_type": "model",
+   "name": "sei_brz_transactions",
+   "schema": "sei_stage",
+   "path": "bronze/sei_brz_transactions.sql",
+   "description": "Bronze sei brz transactions",
+   "config": {
+    "meta": {
+     "project": "sei",
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT * FROM swp_feeds.transaction_feed",
+   "raw_code": "SELECT * FROM swp_feeds.transaction_feed",
+   "depends_on": {
+    "nodes": [
+     "source.cp.swp_feeds.transaction_feed"
+    ]
+   },
+   "columns": {
+    "transactions_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    },
+    "client_name": {
+     "type": "VARCHAR2(120)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.sei_stg_transactions": {
+   "resource_type": "model",
+   "name": "sei_stg_transactions",
+   "schema": "pbdw",
+   "path": "silver/sei_stg_transactions.sql",
+   "description": "Silver sei stg transactions",
+   "config": {
+    "meta": {
+     "project": "sei",
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT transactions_id,\n       account_id,\n       as_of_date,\n       ABS(amount) AS amount,\n       quantity,\n       UPPER(currency) AS currency,\n       TRIM(client_name) AS client_name\nFROM sei_stage.sei_brz_transactions\nWHERE amount IS NOT NULL",
+   "raw_code": "SELECT transactions_id,\n       account_id,\n       as_of_date,\n       ABS(amount) AS amount,\n       quantity,\n       UPPER(currency) AS currency,\n       TRIM(client_name) AS client_name\nFROM sei_stage.sei_brz_transactions\nWHERE amount IS NOT NULL",
+   "depends_on": {
+    "nodes": [
+     "model.cp.sei_brz_transactions"
+    ]
+   },
+   "columns": {
+    "transactions_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    },
+    "client_name": {
+     "type": "VARCHAR2(120)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.sei_int_transactions_enriched": {
+   "resource_type": "model",
+   "name": "sei_int_transactions_enriched",
+   "schema": "pbdw",
+   "path": "silver/sei_int_transactions_enriched.sql",
+   "description": "Silver sei int transactions enriched",
+   "config": {
+    "meta": {
+     "project": "sei",
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT s.transactions_id,\n       s.account_id,\n       s.as_of_date,\n       s.amount,\n       s.amount * fx.rate AS amount_usd,\n       s.quantity,\n       s.currency\nFROM pbdw.sei_stg_transactions s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "raw_code": "SELECT s.transactions_id,\n       s.account_id,\n       s.as_of_date,\n       s.amount,\n       s.amount * fx.rate AS amount_usd,\n       s.quantity,\n       s.currency\nFROM pbdw.sei_stg_transactions s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.sei_stg_transactions",
+     "model.cp.int_fx_rates"
+    ]
+   },
+   "columns": {
+    "transactions_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "amount_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.brz_cash": {
+   "resource_type": "model",
+   "name": "brz_cash",
+   "schema": "pbdw",
+   "path": "bronze/brz_cash.sql",
+   "description": "Bronze brz cash",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT * FROM addvantage.cash_ledger",
+   "raw_code": "SELECT * FROM addvantage.cash_ledger",
+   "depends_on": {
+    "nodes": [
+     "source.cp.addvantage.cash_ledger"
+    ]
+   },
+   "columns": {
+    "cash_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    },
+    "client_name": {
+     "type": "VARCHAR2(120)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.stg_cash": {
+   "resource_type": "model",
+   "name": "stg_cash",
+   "schema": "pbdw",
+   "path": "silver/stg_cash.sql",
+   "description": "Silver stg cash",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT cash_id,\n       account_id,\n       as_of_date,\n       ABS(amount) AS amount,\n       quantity,\n       UPPER(currency) AS currency,\n       TRIM(client_name) AS client_name\nFROM pbdw.brz_cash\nWHERE amount IS NOT NULL",
+   "raw_code": "SELECT cash_id,\n       account_id,\n       as_of_date,\n       ABS(amount) AS amount,\n       quantity,\n       UPPER(currency) AS currency,\n       TRIM(client_name) AS client_name\nFROM pbdw.brz_cash\nWHERE amount IS NOT NULL",
+   "depends_on": {
+    "nodes": [
+     "model.cp.brz_cash"
+    ]
+   },
+   "columns": {
+    "cash_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    },
+    "client_name": {
+     "type": "VARCHAR2(120)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.int_cash_enriched": {
+   "resource_type": "model",
+   "name": "int_cash_enriched",
+   "schema": "pbdw",
+   "path": "silver/int_cash_enriched.sql",
+   "description": "Silver int cash enriched",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT s.cash_id,\n       s.account_id,\n       s.as_of_date,\n       s.amount,\n       s.amount * fx.rate AS amount_usd,\n       s.quantity,\n       s.currency\nFROM pbdw.stg_cash s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "raw_code": "SELECT s.cash_id,\n       s.account_id,\n       s.as_of_date,\n       s.amount,\n       s.amount * fx.rate AS amount_usd,\n       s.quantity,\n       s.currency\nFROM pbdw.stg_cash s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.stg_cash",
+     "model.cp.int_fx_rates"
+    ]
+   },
+   "columns": {
+    "cash_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "amount_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.brz_fees": {
+   "resource_type": "model",
+   "name": "brz_fees",
+   "schema": "pbdw",
+   "path": "bronze/brz_fees.sql",
+   "description": "Bronze brz fees",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT * FROM pivotal.fee_schedule",
+   "raw_code": "SELECT * FROM pivotal.fee_schedule",
+   "depends_on": {
+    "nodes": [
+     "source.cp.pivotal.fee_schedule"
+    ]
+   },
+   "columns": {
+    "fees_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    },
+    "client_name": {
+     "type": "VARCHAR2(120)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.stg_fees": {
+   "resource_type": "model",
+   "name": "stg_fees",
+   "schema": "pbdw",
+   "path": "silver/stg_fees.sql",
+   "description": "Silver stg fees",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT fees_id,\n       account_id,\n       as_of_date,\n       ABS(amount) AS amount,\n       quantity,\n       UPPER(currency) AS currency,\n       TRIM(client_name) AS client_name\nFROM pbdw.brz_fees\nWHERE amount IS NOT NULL",
+   "raw_code": "SELECT fees_id,\n       account_id,\n       as_of_date,\n       ABS(amount) AS amount,\n       quantity,\n       UPPER(currency) AS currency,\n       TRIM(client_name) AS client_name\nFROM pbdw.brz_fees\nWHERE amount IS NOT NULL",
+   "depends_on": {
+    "nodes": [
+     "model.cp.brz_fees"
+    ]
+   },
+   "columns": {
+    "fees_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    },
+    "client_name": {
+     "type": "VARCHAR2(120)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.int_fees_enriched": {
+   "resource_type": "model",
+   "name": "int_fees_enriched",
+   "schema": "pbdw",
+   "path": "silver/int_fees_enriched.sql",
+   "description": "Silver int fees enriched",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT s.fees_id,\n       s.account_id,\n       s.as_of_date,\n       s.amount,\n       s.amount * fx.rate AS amount_usd,\n       s.quantity,\n       s.currency\nFROM pbdw.stg_fees s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "raw_code": "SELECT s.fees_id,\n       s.account_id,\n       s.as_of_date,\n       s.amount,\n       s.amount * fx.rate AS amount_usd,\n       s.quantity,\n       s.currency\nFROM pbdw.stg_fees s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.stg_fees",
+     "model.cp.int_fx_rates"
+    ]
+   },
+   "columns": {
+    "fees_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "amount_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.brz_nav": {
+   "resource_type": "model",
+   "name": "brz_nav",
+   "schema": "pbdw",
+   "path": "bronze/brz_nav.sql",
+   "description": "Bronze brz nav",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT * FROM pbdw.nav_components",
+   "raw_code": "SELECT * FROM pbdw.nav_components",
+   "depends_on": {
+    "nodes": [
+     "source.cp.pbdw.nav_components"
+    ]
+   },
+   "columns": {
+    "nav_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    },
+    "client_name": {
+     "type": "VARCHAR2(120)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.stg_nav": {
+   "resource_type": "model",
+   "name": "stg_nav",
+   "schema": "pbdw",
+   "path": "silver/stg_nav.sql",
+   "description": "Silver stg nav",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT nav_id,\n       account_id,\n       as_of_date,\n       ABS(amount) AS amount,\n       quantity,\n       UPPER(currency) AS currency,\n       TRIM(client_name) AS client_name\nFROM pbdw.brz_nav\nWHERE amount IS NOT NULL",
+   "raw_code": "SELECT nav_id,\n       account_id,\n       as_of_date,\n       ABS(amount) AS amount,\n       quantity,\n       UPPER(currency) AS currency,\n       TRIM(client_name) AS client_name\nFROM pbdw.brz_nav\nWHERE amount IS NOT NULL",
+   "depends_on": {
+    "nodes": [
+     "model.cp.brz_nav"
+    ]
+   },
+   "columns": {
+    "nav_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    },
+    "client_name": {
+     "type": "VARCHAR2(120)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.int_nav_enriched": {
+   "resource_type": "model",
+   "name": "int_nav_enriched",
+   "schema": "pbdw",
+   "path": "silver/int_nav_enriched.sql",
+   "description": "Silver int nav enriched",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT s.nav_id,\n       s.account_id,\n       s.as_of_date,\n       s.amount,\n       s.amount * fx.rate AS amount_usd,\n       s.quantity,\n       s.currency\nFROM pbdw.stg_nav s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "raw_code": "SELECT s.nav_id,\n       s.account_id,\n       s.as_of_date,\n       s.amount,\n       s.amount * fx.rate AS amount_usd,\n       s.quantity,\n       s.currency\nFROM pbdw.stg_nav s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.stg_nav",
+     "model.cp.int_fx_rates"
+    ]
+   },
+   "columns": {
+    "nav_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "amount_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.brz_gl": {
+   "resource_type": "model",
+   "name": "brz_gl",
+   "schema": "pbdw",
+   "path": "bronze/brz_gl.sql",
+   "description": "Bronze brz gl",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT * FROM pbdw.gl_entries",
+   "raw_code": "SELECT * FROM pbdw.gl_entries",
+   "depends_on": {
+    "nodes": [
+     "source.cp.pbdw.gl_entries"
+    ]
+   },
+   "columns": {
+    "gl_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    },
+    "client_name": {
+     "type": "VARCHAR2(120)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.stg_gl": {
+   "resource_type": "model",
+   "name": "stg_gl",
+   "schema": "pbdw",
+   "path": "silver/stg_gl.sql",
+   "description": "Silver stg gl",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT gl_id,\n       account_id,\n       as_of_date,\n       ABS(amount) AS amount,\n       quantity,\n       UPPER(currency) AS currency,\n       TRIM(client_name) AS client_name\nFROM pbdw.brz_gl\nWHERE amount IS NOT NULL",
+   "raw_code": "SELECT gl_id,\n       account_id,\n       as_of_date,\n       ABS(amount) AS amount,\n       quantity,\n       UPPER(currency) AS currency,\n       TRIM(client_name) AS client_name\nFROM pbdw.brz_gl\nWHERE amount IS NOT NULL",
+   "depends_on": {
+    "nodes": [
+     "model.cp.brz_gl"
+    ]
+   },
+   "columns": {
+    "gl_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    },
+    "client_name": {
+     "type": "VARCHAR2(120)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.int_gl_enriched": {
+   "resource_type": "model",
+   "name": "int_gl_enriched",
+   "schema": "pbdw",
+   "path": "silver/int_gl_enriched.sql",
+   "description": "Silver int gl enriched",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT s.gl_id,\n       s.account_id,\n       s.as_of_date,\n       s.amount,\n       s.amount * fx.rate AS amount_usd,\n       s.quantity,\n       s.currency\nFROM pbdw.stg_gl s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "raw_code": "SELECT s.gl_id,\n       s.account_id,\n       s.as_of_date,\n       s.amount,\n       s.amount * fx.rate AS amount_usd,\n       s.quantity,\n       s.currency\nFROM pbdw.stg_gl s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.stg_gl",
+     "model.cp.int_fx_rates"
+    ]
+   },
+   "columns": {
+    "gl_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "amount_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.brz_accruals": {
+   "resource_type": "model",
+   "name": "brz_accruals",
+   "schema": "pbdw",
+   "path": "bronze/brz_accruals.sql",
+   "description": "Bronze brz accruals",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT * FROM pbdw.accrual_basis",
+   "raw_code": "SELECT * FROM pbdw.accrual_basis",
+   "depends_on": {
+    "nodes": [
+     "source.cp.pbdw.accrual_basis"
+    ]
+   },
+   "columns": {
+    "accruals_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    },
+    "client_name": {
+     "type": "VARCHAR2(120)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.stg_accruals": {
+   "resource_type": "model",
+   "name": "stg_accruals",
+   "schema": "pbdw",
+   "path": "silver/stg_accruals.sql",
+   "description": "Silver stg accruals",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT accruals_id,\n       account_id,\n       as_of_date,\n       ABS(amount) AS amount,\n       quantity,\n       UPPER(currency) AS currency,\n       TRIM(client_name) AS client_name\nFROM pbdw.brz_accruals\nWHERE amount IS NOT NULL",
+   "raw_code": "SELECT accruals_id,\n       account_id,\n       as_of_date,\n       ABS(amount) AS amount,\n       quantity,\n       UPPER(currency) AS currency,\n       TRIM(client_name) AS client_name\nFROM pbdw.brz_accruals\nWHERE amount IS NOT NULL",
+   "depends_on": {
+    "nodes": [
+     "model.cp.brz_accruals"
+    ]
+   },
+   "columns": {
+    "accruals_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    },
+    "client_name": {
+     "type": "VARCHAR2(120)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.int_accruals_enriched": {
+   "resource_type": "model",
+   "name": "int_accruals_enriched",
+   "schema": "pbdw",
+   "path": "silver/int_accruals_enriched.sql",
+   "description": "Silver int accruals enriched",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT s.accruals_id,\n       s.account_id,\n       s.as_of_date,\n       s.amount,\n       s.amount * fx.rate AS amount_usd,\n       s.quantity,\n       s.currency\nFROM pbdw.stg_accruals s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "raw_code": "SELECT s.accruals_id,\n       s.account_id,\n       s.as_of_date,\n       s.amount,\n       s.amount * fx.rate AS amount_usd,\n       s.quantity,\n       s.currency\nFROM pbdw.stg_accruals s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.stg_accruals",
+     "model.cp.int_fx_rates"
+    ]
+   },
+   "columns": {
+    "accruals_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "amount_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "quantity": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.brz_fx_rates": {
+   "resource_type": "model",
+   "name": "brz_fx_rates",
+   "schema": "pbdw",
+   "path": "bronze/brz_fx_rates.sql",
+   "description": "Bronze brz fx rates",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT * FROM bloomberg.fx_feed",
+   "raw_code": "SELECT * FROM bloomberg.fx_feed",
+   "depends_on": {
+    "nodes": [
+     "source.cp.bloomberg.fx_feed"
+    ]
+   },
+   "columns": {
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "rate": {
+     "type": "NUMBER(12,6)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.int_fx_rates": {
+   "resource_type": "model",
+   "name": "int_fx_rates",
+   "schema": "pbdw",
+   "path": "silver/int_fx_rates.sql",
+   "description": "Silver int fx rates",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT currency, as_of_date, rate FROM pbdw.brz_fx_rates WHERE rate > 0",
+   "raw_code": "SELECT currency, as_of_date, rate FROM pbdw.brz_fx_rates WHERE rate > 0",
+   "depends_on": {
+    "nodes": [
+     "model.cp.brz_fx_rates"
+    ]
+   },
+   "columns": {
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "rate": {
+     "type": "NUMBER(12,6)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.sei_gld_positions_summary": {
+   "resource_type": "model",
+   "name": "sei_gld_positions_summary",
+   "schema": "imdw",
+   "path": "gold/sei_gld_positions_summary.sql",
+   "description": "Gold sei gld positions summary",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng",
+     "project": "sei"
+    }
+   },
+   "compiled_code": "SELECT account_id,\n       as_of_date,\n       SUM(amount_usd) AS market_value_usd,\n       COUNT(*) AS position_count\nFROM pbdw.sei_int_positions_enriched\nGROUP BY account_id, as_of_date",
+   "raw_code": "SELECT account_id,\n       as_of_date,\n       SUM(amount_usd) AS market_value_usd,\n       COUNT(*) AS position_count\nFROM pbdw.sei_int_positions_enriched\nGROUP BY account_id, as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.sei_int_positions_enriched"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "market_value_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "position_count": {
+     "type": "NUMBER",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.sei_gld_taxlots_summary": {
+   "resource_type": "model",
+   "name": "sei_gld_taxlots_summary",
+   "schema": "imdw",
+   "path": "gold/sei_gld_taxlots_summary.sql",
+   "description": "Gold sei gld taxlots summary",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng",
+     "project": "sei"
+    }
+   },
+   "compiled_code": "SELECT account_id,\n       as_of_date,\n       SUM(amount_usd) AS cost_basis_usd,\n       SUM(quantity) AS total_quantity\nFROM pbdw.sei_int_taxlots_enriched\nGROUP BY account_id, as_of_date",
+   "raw_code": "SELECT account_id,\n       as_of_date,\n       SUM(amount_usd) AS cost_basis_usd,\n       SUM(quantity) AS total_quantity\nFROM pbdw.sei_int_taxlots_enriched\nGROUP BY account_id, as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.sei_int_taxlots_enriched"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "cost_basis_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "total_quantity": {
+     "type": "NUMBER",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.sei_gld_transactions_summary": {
+   "resource_type": "model",
+   "name": "sei_gld_transactions_summary",
+   "schema": "imdw",
+   "path": "gold/sei_gld_transactions_summary.sql",
+   "description": "Gold sei gld transactions summary",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng",
+     "project": "sei"
+    }
+   },
+   "compiled_code": "SELECT account_id,\n       as_of_date,\n       SUM(amount_usd) AS traded_value_usd,\n       COUNT(*) AS trade_count\nFROM pbdw.sei_int_transactions_enriched\nGROUP BY account_id, as_of_date",
+   "raw_code": "SELECT account_id,\n       as_of_date,\n       SUM(amount_usd) AS traded_value_usd,\n       COUNT(*) AS trade_count\nFROM pbdw.sei_int_transactions_enriched\nGROUP BY account_id, as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.sei_int_transactions_enriched"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "traded_value_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "trade_count": {
+     "type": "NUMBER",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.gld_cash_summary": {
+   "resource_type": "model",
+   "name": "gld_cash_summary",
+   "schema": "imdw",
+   "path": "gold/gld_cash_summary.sql",
+   "description": "Gold gld cash summary",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT account_id,\n       as_of_date,\n       SUM(amount_usd) AS cash_balance_usd,\n       COUNT(DISTINCT account_id) AS account_count\nFROM pbdw.int_cash_enriched\nGROUP BY account_id, as_of_date",
+   "raw_code": "SELECT account_id,\n       as_of_date,\n       SUM(amount_usd) AS cash_balance_usd,\n       COUNT(DISTINCT account_id) AS account_count\nFROM pbdw.int_cash_enriched\nGROUP BY account_id, as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.int_cash_enriched"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "cash_balance_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "account_count": {
+     "type": "NUMBER",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.gld_fees_summary": {
+   "resource_type": "model",
+   "name": "gld_fees_summary",
+   "schema": "imdw",
+   "path": "gold/gld_fees_summary.sql",
+   "description": "Gold gld fees summary",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT account_id,\n       as_of_date,\n       SUM(amount_usd) AS fee_total_usd,\n       AVG(amount_usd) AS avg_fee_usd\nFROM pbdw.int_fees_enriched\nGROUP BY account_id, as_of_date",
+   "raw_code": "SELECT account_id,\n       as_of_date,\n       SUM(amount_usd) AS fee_total_usd,\n       AVG(amount_usd) AS avg_fee_usd\nFROM pbdw.int_fees_enriched\nGROUP BY account_id, as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.int_fees_enriched"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "fee_total_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "avg_fee_usd": {
+     "type": "NUMBER",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.gld_nav_daily": {
+   "resource_type": "model",
+   "name": "gld_nav_daily",
+   "schema": "imdw",
+   "path": "gold/gld_nav_daily.sql",
+   "description": "Gold gld nav daily",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT p.account_id,\n       p.as_of_date,\n       p.market_value_usd,\n       c.cash_balance_usd,\n       p.market_value_usd + c.cash_balance_usd - f.fee_total_usd AS nav_usd\nFROM imdw.sei_gld_positions_summary p\nJOIN imdw.gld_cash_summary c ON c.account_id = p.account_id AND c.as_of_date = p.as_of_date\nLEFT JOIN imdw.gld_fees_summary f ON f.account_id = p.account_id AND f.as_of_date = p.as_of_date",
+   "raw_code": "SELECT p.account_id,\n       p.as_of_date,\n       p.market_value_usd,\n       c.cash_balance_usd,\n       p.market_value_usd + c.cash_balance_usd - f.fee_total_usd AS nav_usd\nFROM imdw.sei_gld_positions_summary p\nJOIN imdw.gld_cash_summary c ON c.account_id = p.account_id AND c.as_of_date = p.as_of_date\nLEFT JOIN imdw.gld_fees_summary f ON f.account_id = p.account_id AND f.as_of_date = p.as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.sei_gld_positions_summary",
+     "model.cp.gld_cash_summary",
+     "model.cp.gld_fees_summary"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "market_value_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "cash_balance_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "nav_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.gld_gl_consolidated": {
+   "resource_type": "model",
+   "name": "gld_gl_consolidated",
+   "schema": "imdw",
+   "path": "gold/gld_gl_consolidated.sql",
+   "description": "Gold gld gl consolidated",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT t.account_id,\n       t.as_of_date,\n       t.traded_value_usd,\n       a.amount_usd AS accrual_usd,\n       t.traded_value_usd + NVL(a.amount_usd,0) AS gl_total_usd\nFROM imdw.sei_gld_transactions_summary t\nLEFT JOIN pbdw.int_accruals_enriched a ON a.account_id = t.account_id",
+   "raw_code": "SELECT t.account_id,\n       t.as_of_date,\n       t.traded_value_usd,\n       a.amount_usd AS accrual_usd,\n       t.traded_value_usd + NVL(a.amount_usd,0) AS gl_total_usd\nFROM imdw.sei_gld_transactions_summary t\nLEFT JOIN pbdw.int_accruals_enriched a ON a.account_id = t.account_id",
+   "depends_on": {
+    "nodes": [
+     "model.cp.sei_gld_transactions_summary",
+     "model.cp.int_accruals_enriched"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "traded_value_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "accrual_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "gl_total_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.gld_client_reporting": {
+   "resource_type": "model",
+   "name": "gld_client_reporting",
+   "schema": "imdw",
+   "path": "gold/gld_client_reporting.sql",
+   "description": "Gold gld client reporting",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT n.account_id,\n       n.as_of_date,\n       n.nav_usd,\n       g.gl_total_usd,\n       RANK() OVER (PARTITION BY n.as_of_date ORDER BY n.nav_usd DESC) AS nav_rank\nFROM imdw.gld_nav_daily n\nLEFT JOIN imdw.gld_gl_consolidated g ON g.account_id = n.account_id AND g.as_of_date = n.as_of_date",
+   "raw_code": "SELECT n.account_id,\n       n.as_of_date,\n       n.nav_usd,\n       g.gl_total_usd,\n       RANK() OVER (PARTITION BY n.as_of_date ORDER BY n.nav_usd DESC) AS nav_rank\nFROM imdw.gld_nav_daily n\nLEFT JOIN imdw.gld_gl_consolidated g ON g.account_id = n.account_id AND g.as_of_date = n.as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.gld_nav_daily",
+     "model.cp.gld_gl_consolidated"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "nav_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "gl_total_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "nav_rank": {
+     "type": "NUMBER",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.brz_account_dim": {
+   "resource_type": "model",
+   "name": "brz_account_dim",
+   "schema": "pbdw",
+   "path": "bronze/brz_account_dim.sql",
+   "description": "Bronze brz account dim",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng",
+     "project": "pivotal"
+    }
+   },
+   "compiled_code": "SELECT * FROM pivotal.account_master",
+   "raw_code": "SELECT * FROM pivotal.account_master",
+   "depends_on": {
+    "nodes": [
+     "source.cp.pivotal.account_master"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_name": {
+     "type": "VARCHAR2(120)",
+     "description": ""
+    },
+    "client_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.dim_account": {
+   "resource_type": "model",
+   "name": "dim_account",
+   "schema": "pbdw",
+   "path": "silver/dim_account.sql",
+   "description": "Silver dim account",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng",
+     "project": "pivotal"
+    }
+   },
+   "compiled_code": "SELECT account_id, INITCAP(account_name) AS account_name, client_id FROM pbdw.brz_account_dim",
+   "raw_code": "SELECT account_id, INITCAP(account_name) AS account_name, client_id FROM pbdw.brz_account_dim",
+   "depends_on": {
+    "nodes": [
+     "model.cp.brz_account_dim"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_name": {
+     "type": "VARCHAR2(120)",
+     "description": ""
+    },
+    "client_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.brz_client_dim": {
+   "resource_type": "model",
+   "name": "brz_client_dim",
+   "schema": "pbdw",
+   "path": "bronze/brz_client_dim.sql",
+   "description": "Bronze brz client dim",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng",
+     "project": "pivotal"
+    }
+   },
+   "compiled_code": "SELECT * FROM pivotal.client_master",
+   "raw_code": "SELECT * FROM pivotal.client_master",
+   "depends_on": {
+    "nodes": [
+     "source.cp.pivotal.client_master"
+    ]
+   },
+   "columns": {
+    "client_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "client_name": {
+     "type": "VARCHAR2(120)",
+     "description": ""
+    },
+    "domicile": {
+     "type": "VARCHAR2(2)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.dim_client": {
+   "resource_type": "model",
+   "name": "dim_client",
+   "schema": "pbdw",
+   "path": "silver/dim_client.sql",
+   "description": "Silver dim client",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng",
+     "project": "pivotal"
+    }
+   },
+   "compiled_code": "SELECT client_id, TRIM(client_name) AS client_name, domicile FROM pbdw.brz_client_dim",
+   "raw_code": "SELECT client_id, TRIM(client_name) AS client_name, domicile FROM pbdw.brz_client_dim",
+   "depends_on": {
+    "nodes": [
+     "model.cp.brz_client_dim"
+    ]
+   },
+   "columns": {
+    "client_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "client_name": {
+     "type": "VARCHAR2(120)",
+     "description": ""
+    },
+    "domicile": {
+     "type": "VARCHAR2(2)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.recon_positions": {
+   "resource_type": "model",
+   "name": "recon_positions",
+   "schema": "pbdw",
+   "path": "silver/recon_positions.sql",
+   "description": "Silver recon positions",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng",
+     "project": "sei"
+    }
+   },
+   "compiled_code": "SELECT b.account_id,\n       b.as_of_date,\n       COUNT(b.positions_id) AS bronze_count,\n       COUNT(s.positions_id) AS silver_count,\n       COUNT(b.positions_id) - COUNT(s.positions_id) AS variance\nFROM sei_stage.sei_brz_positions b\nLEFT JOIN pbdw.sei_stg_positions s ON s.positions_id = b.positions_id\nGROUP BY b.account_id, b.as_of_date",
+   "raw_code": "SELECT b.account_id,\n       b.as_of_date,\n       COUNT(b.positions_id) AS bronze_count,\n       COUNT(s.positions_id) AS silver_count,\n       COUNT(b.positions_id) - COUNT(s.positions_id) AS variance\nFROM sei_stage.sei_brz_positions b\nLEFT JOIN pbdw.sei_stg_positions s ON s.positions_id = b.positions_id\nGROUP BY b.account_id, b.as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.sei_brz_positions",
+     "model.cp.sei_stg_positions"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "bronze_count": {
+     "type": "NUMBER",
+     "description": ""
+    },
+    "silver_count": {
+     "type": "NUMBER",
+     "description": ""
+    },
+    "variance": {
+     "type": "NUMBER",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.recon_taxlots": {
+   "resource_type": "model",
+   "name": "recon_taxlots",
+   "schema": "pbdw",
+   "path": "silver/recon_taxlots.sql",
+   "description": "Silver recon taxlots",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng",
+     "project": "sei"
+    }
+   },
+   "compiled_code": "SELECT b.account_id,\n       b.as_of_date,\n       COUNT(b.taxlots_id) AS bronze_count,\n       COUNT(s.taxlots_id) AS silver_count,\n       COUNT(b.taxlots_id) - COUNT(s.taxlots_id) AS variance\nFROM sei_stage.sei_brz_taxlots b\nLEFT JOIN pbdw.sei_stg_taxlots s ON s.taxlots_id = b.taxlots_id\nGROUP BY b.account_id, b.as_of_date",
+   "raw_code": "SELECT b.account_id,\n       b.as_of_date,\n       COUNT(b.taxlots_id) AS bronze_count,\n       COUNT(s.taxlots_id) AS silver_count,\n       COUNT(b.taxlots_id) - COUNT(s.taxlots_id) AS variance\nFROM sei_stage.sei_brz_taxlots b\nLEFT JOIN pbdw.sei_stg_taxlots s ON s.taxlots_id = b.taxlots_id\nGROUP BY b.account_id, b.as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.sei_brz_taxlots",
+     "model.cp.sei_stg_taxlots"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "bronze_count": {
+     "type": "NUMBER",
+     "description": ""
+    },
+    "silver_count": {
+     "type": "NUMBER",
+     "description": ""
+    },
+    "variance": {
+     "type": "NUMBER",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.recon_transactions": {
+   "resource_type": "model",
+   "name": "recon_transactions",
+   "schema": "pbdw",
+   "path": "silver/recon_transactions.sql",
+   "description": "Silver recon transactions",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng",
+     "project": "sei"
+    }
+   },
+   "compiled_code": "SELECT b.account_id,\n       b.as_of_date,\n       COUNT(b.transactions_id) AS bronze_count,\n       COUNT(s.transactions_id) AS silver_count,\n       COUNT(b.transactions_id) - COUNT(s.transactions_id) AS variance\nFROM sei_stage.sei_brz_transactions b\nLEFT JOIN pbdw.sei_stg_transactions s ON s.transactions_id = b.transactions_id\nGROUP BY b.account_id, b.as_of_date",
+   "raw_code": "SELECT b.account_id,\n       b.as_of_date,\n       COUNT(b.transactions_id) AS bronze_count,\n       COUNT(s.transactions_id) AS silver_count,\n       COUNT(b.transactions_id) - COUNT(s.transactions_id) AS variance\nFROM sei_stage.sei_brz_transactions b\nLEFT JOIN pbdw.sei_stg_transactions s ON s.transactions_id = b.transactions_id\nGROUP BY b.account_id, b.as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.sei_brz_transactions",
+     "model.cp.sei_stg_transactions"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "bronze_count": {
+     "type": "NUMBER",
+     "description": ""
+    },
+    "silver_count": {
+     "type": "NUMBER",
+     "description": ""
+    },
+    "variance": {
+     "type": "NUMBER",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.dq_positions": {
+   "resource_type": "model",
+   "name": "dq_positions",
+   "schema": "pbdw",
+   "path": "silver/dq_positions.sql",
+   "description": "Silver dq positions",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng",
+     "project": "sei"
+    }
+   },
+   "compiled_code": "SELECT account_id,\n       COUNT(*) AS row_count,\n       SUM(CASE WHEN amount_usd < 0 THEN 1 ELSE 0 END) AS negative_count\nFROM pbdw.sei_int_positions_enriched\nGROUP BY account_id",
+   "raw_code": "SELECT account_id,\n       COUNT(*) AS row_count,\n       SUM(CASE WHEN amount_usd < 0 THEN 1 ELSE 0 END) AS negative_count\nFROM pbdw.sei_int_positions_enriched\nGROUP BY account_id",
+   "depends_on": {
+    "nodes": [
+     "model.cp.sei_int_positions_enriched"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "row_count": {
+     "type": "NUMBER",
+     "description": ""
+    },
+    "negative_count": {
+     "type": "NUMBER",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.dq_cash": {
+   "resource_type": "model",
+   "name": "dq_cash",
+   "schema": "pbdw",
+   "path": "silver/dq_cash.sql",
+   "description": "Silver dq cash",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT account_id,\n       COUNT(*) AS row_count,\n       SUM(CASE WHEN amount_usd < 0 THEN 1 ELSE 0 END) AS negative_count\nFROM pbdw.int_cash_enriched\nGROUP BY account_id",
+   "raw_code": "SELECT account_id,\n       COUNT(*) AS row_count,\n       SUM(CASE WHEN amount_usd < 0 THEN 1 ELSE 0 END) AS negative_count\nFROM pbdw.int_cash_enriched\nGROUP BY account_id",
+   "depends_on": {
+    "nodes": [
+     "model.cp.int_cash_enriched"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "row_count": {
+     "type": "NUMBER",
+     "description": ""
+    },
+    "negative_count": {
+     "type": "NUMBER",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.dq_fees": {
+   "resource_type": "model",
+   "name": "dq_fees",
+   "schema": "pbdw",
+   "path": "silver/dq_fees.sql",
+   "description": "Silver dq fees",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT account_id,\n       COUNT(*) AS row_count,\n       SUM(CASE WHEN amount_usd < 0 THEN 1 ELSE 0 END) AS negative_count\nFROM pbdw.int_fees_enriched\nGROUP BY account_id",
+   "raw_code": "SELECT account_id,\n       COUNT(*) AS row_count,\n       SUM(CASE WHEN amount_usd < 0 THEN 1 ELSE 0 END) AS negative_count\nFROM pbdw.int_fees_enriched\nGROUP BY account_id",
+   "depends_on": {
+    "nodes": [
+     "model.cp.int_fees_enriched"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "row_count": {
+     "type": "NUMBER",
+     "description": ""
+    },
+    "negative_count": {
+     "type": "NUMBER",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.dq_nav": {
+   "resource_type": "model",
+   "name": "dq_nav",
+   "schema": "pbdw",
+   "path": "silver/dq_nav.sql",
+   "description": "Silver dq nav",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT account_id, COUNT(*) AS row_count FROM imdw.gld_nav_daily GROUP BY account_id",
+   "raw_code": "SELECT account_id, COUNT(*) AS row_count FROM imdw.gld_nav_daily GROUP BY account_id",
+   "depends_on": {
+    "nodes": [
+     "model.cp.gld_nav_daily"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "row_count": {
+     "type": "NUMBER",
+     "description": ""
+    },
+    "negative_count": {
+     "type": "NUMBER",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.dq_gl": {
+   "resource_type": "model",
+   "name": "dq_gl",
+   "schema": "pbdw",
+   "path": "silver/dq_gl.sql",
+   "description": "Silver dq gl",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT account_id, COUNT(*) AS row_count FROM imdw.gld_gl_consolidated GROUP BY account_id",
+   "raw_code": "SELECT account_id, COUNT(*) AS row_count FROM imdw.gld_gl_consolidated GROUP BY account_id",
+   "depends_on": {
+    "nodes": [
+     "model.cp.gld_gl_consolidated"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "row_count": {
+     "type": "NUMBER",
+     "description": ""
+    },
+    "negative_count": {
+     "type": "NUMBER",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.snap_nav_history": {
+   "resource_type": "model",
+   "name": "snap_nav_history",
+   "schema": "imdw",
+   "path": "gold/snap_nav_history.sql",
+   "description": "Gold snap nav history",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT account_id, as_of_date, nav_usd,\n       LAG(nav_usd) OVER (PARTITION BY account_id ORDER BY as_of_date) AS prev_nav_usd,\n       nav_usd - LAG(nav_usd) OVER (PARTITION BY account_id ORDER BY as_of_date) AS nav_change\nFROM imdw.gld_nav_daily",
+   "raw_code": "SELECT account_id, as_of_date, nav_usd,\n       LAG(nav_usd) OVER (PARTITION BY account_id ORDER BY as_of_date) AS prev_nav_usd,\n       nav_usd - LAG(nav_usd) OVER (PARTITION BY account_id ORDER BY as_of_date) AS nav_change\nFROM imdw.gld_nav_daily",
+   "depends_on": {
+    "nodes": [
+     "model.cp.gld_nav_daily"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "nav_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "prev_nav_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "nav_change": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.snap_client_history": {
+   "resource_type": "model",
+   "name": "snap_client_history",
+   "schema": "imdw",
+   "path": "gold/snap_client_history.sql",
+   "description": "Gold snap client history",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT account_id, as_of_date, nav_usd,\n       LAG(nav_usd) OVER (PARTITION BY account_id ORDER BY as_of_date) AS prev_nav_usd,\n       nav_usd - LAG(nav_usd) OVER (PARTITION BY account_id ORDER BY as_of_date) AS nav_change\nFROM imdw.gld_client_reporting",
+   "raw_code": "SELECT account_id, as_of_date, nav_usd,\n       LAG(nav_usd) OVER (PARTITION BY account_id ORDER BY as_of_date) AS prev_nav_usd,\n       nav_usd - LAG(nav_usd) OVER (PARTITION BY account_id ORDER BY as_of_date) AS nav_change\nFROM imdw.gld_client_reporting",
+   "depends_on": {
+    "nodes": [
+     "model.cp.gld_client_reporting"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "nav_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "prev_nav_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "nav_change": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.fct_positions_by_client": {
+   "resource_type": "model",
+   "name": "fct_positions_by_client",
+   "schema": "imdw",
+   "path": "gold/fct_positions_by_client.sql",
+   "description": "Gold fct positions by client",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng",
+     "project": "sei"
+    }
+   },
+   "compiled_code": "SELECT c.client_name,\n       c.domicile,\n       g.as_of_date,\n       SUM(g.market_value_usd) AS total_usd\nFROM imdw.sei_gld_positions_summary g\nJOIN pbdw.dim_account a ON a.account_id = g.account_id\nJOIN pbdw.dim_client c ON c.client_id = a.client_id\nGROUP BY c.client_name, c.domicile, g.as_of_date",
+   "raw_code": "SELECT c.client_name,\n       c.domicile,\n       g.as_of_date,\n       SUM(g.market_value_usd) AS total_usd\nFROM imdw.sei_gld_positions_summary g\nJOIN pbdw.dim_account a ON a.account_id = g.account_id\nJOIN pbdw.dim_client c ON c.client_id = a.client_id\nGROUP BY c.client_name, c.domicile, g.as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.sei_gld_positions_summary",
+     "model.cp.dim_account",
+     "model.cp.dim_client"
+    ]
+   },
+   "columns": {
+    "client_name": {
+     "type": "VARCHAR2(120)",
+     "description": ""
+    },
+    "domicile": {
+     "type": "VARCHAR2(2)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "total_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.fct_cash_by_client": {
+   "resource_type": "model",
+   "name": "fct_cash_by_client",
+   "schema": "imdw",
+   "path": "gold/fct_cash_by_client.sql",
+   "description": "Gold fct cash by client",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT c.client_name,\n       c.domicile,\n       g.as_of_date,\n       SUM(g.cash_balance_usd) AS total_usd\nFROM imdw.gld_cash_summary g\nJOIN pbdw.dim_account a ON a.account_id = g.account_id\nJOIN pbdw.dim_client c ON c.client_id = a.client_id\nGROUP BY c.client_name, c.domicile, g.as_of_date",
+   "raw_code": "SELECT c.client_name,\n       c.domicile,\n       g.as_of_date,\n       SUM(g.cash_balance_usd) AS total_usd\nFROM imdw.gld_cash_summary g\nJOIN pbdw.dim_account a ON a.account_id = g.account_id\nJOIN pbdw.dim_client c ON c.client_id = a.client_id\nGROUP BY c.client_name, c.domicile, g.as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.gld_cash_summary",
+     "model.cp.dim_account",
+     "model.cp.dim_client"
+    ]
+   },
+   "columns": {
+    "client_name": {
+     "type": "VARCHAR2(120)",
+     "description": ""
+    },
+    "domicile": {
+     "type": "VARCHAR2(2)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "total_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.brz_interest": {
+   "resource_type": "model",
+   "name": "brz_interest",
+   "schema": "pbdw",
+   "path": "bronze/brz_interest.sql",
+   "description": "Bronze brz interest",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT * FROM addvantage.interest_accrual",
+   "raw_code": "SELECT * FROM addvantage.interest_accrual",
+   "depends_on": {
+    "nodes": [
+     "source.cp.addvantage.interest_accrual"
+    ]
+   },
+   "columns": {
+    "interest_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.stg_interest": {
+   "resource_type": "model",
+   "name": "stg_interest",
+   "schema": "pbdw",
+   "path": "silver/stg_interest.sql",
+   "description": "Silver stg interest",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT interest_id, account_id, as_of_date, ABS(amount) AS amount, UPPER(currency) AS currency\nFROM pbdw.brz_interest\nWHERE amount IS NOT NULL",
+   "raw_code": "SELECT interest_id, account_id, as_of_date, ABS(amount) AS amount, UPPER(currency) AS currency\nFROM pbdw.brz_interest\nWHERE amount IS NOT NULL",
+   "depends_on": {
+    "nodes": [
+     "model.cp.brz_interest"
+    ]
+   },
+   "columns": {
+    "interest_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.int_interest_enriched": {
+   "resource_type": "model",
+   "name": "int_interest_enriched",
+   "schema": "pbdw",
+   "path": "silver/int_interest_enriched.sql",
+   "description": "Silver int interest enriched",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT s.interest_id, s.account_id, s.as_of_date, s.amount * fx.rate AS amount_usd\nFROM pbdw.stg_interest s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "raw_code": "SELECT s.interest_id, s.account_id, s.as_of_date, s.amount * fx.rate AS amount_usd\nFROM pbdw.stg_interest s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.stg_interest",
+     "model.cp.int_fx_rates"
+    ]
+   },
+   "columns": {
+    "interest_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.gld_interest_summary": {
+   "resource_type": "model",
+   "name": "gld_interest_summary",
+   "schema": "imdw",
+   "path": "gold/gld_interest_summary.sql",
+   "description": "Gold gld interest summary",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT account_id, as_of_date, SUM(amount_usd) AS interest_total_usd, COUNT(*) AS interest_count\nFROM pbdw.int_interest_enriched\nGROUP BY account_id, as_of_date",
+   "raw_code": "SELECT account_id, as_of_date, SUM(amount_usd) AS interest_total_usd, COUNT(*) AS interest_count\nFROM pbdw.int_interest_enriched\nGROUP BY account_id, as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.int_interest_enriched"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "interest_total_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "interest_count": {
+     "type": "NUMBER",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.sei_brz_dividends": {
+   "resource_type": "model",
+   "name": "sei_brz_dividends",
+   "schema": "sei_stage",
+   "path": "bronze/sei_brz_dividends.sql",
+   "description": "Bronze sei brz dividends",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng",
+     "project": "sei"
+    }
+   },
+   "compiled_code": "SELECT * FROM swp_feeds.dividend_feed",
+   "raw_code": "SELECT * FROM swp_feeds.dividend_feed",
+   "depends_on": {
+    "nodes": [
+     "source.cp.swp_feeds.dividend_feed"
+    ]
+   },
+   "columns": {
+    "dividends_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.sei_stg_dividends": {
+   "resource_type": "model",
+   "name": "sei_stg_dividends",
+   "schema": "pbdw",
+   "path": "silver/sei_stg_dividends.sql",
+   "description": "Silver sei stg dividends",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng",
+     "project": "sei"
+    }
+   },
+   "compiled_code": "SELECT dividends_id, account_id, as_of_date, ABS(amount) AS amount, UPPER(currency) AS currency\nFROM sei_stage.sei_brz_dividends\nWHERE amount IS NOT NULL",
+   "raw_code": "SELECT dividends_id, account_id, as_of_date, ABS(amount) AS amount, UPPER(currency) AS currency\nFROM sei_stage.sei_brz_dividends\nWHERE amount IS NOT NULL",
+   "depends_on": {
+    "nodes": [
+     "model.cp.sei_brz_dividends"
+    ]
+   },
+   "columns": {
+    "dividends_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.sei_int_dividends_enriched": {
+   "resource_type": "model",
+   "name": "sei_int_dividends_enriched",
+   "schema": "pbdw",
+   "path": "silver/sei_int_dividends_enriched.sql",
+   "description": "Silver sei int dividends enriched",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng",
+     "project": "sei"
+    }
+   },
+   "compiled_code": "SELECT s.dividends_id, s.account_id, s.as_of_date, s.amount * fx.rate AS amount_usd\nFROM pbdw.sei_stg_dividends s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "raw_code": "SELECT s.dividends_id, s.account_id, s.as_of_date, s.amount * fx.rate AS amount_usd\nFROM pbdw.sei_stg_dividends s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.sei_stg_dividends",
+     "model.cp.int_fx_rates"
+    ]
+   },
+   "columns": {
+    "dividends_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.sei_gld_dividends_summary": {
+   "resource_type": "model",
+   "name": "sei_gld_dividends_summary",
+   "schema": "imdw",
+   "path": "gold/sei_gld_dividends_summary.sql",
+   "description": "Gold sei gld dividends summary",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng",
+     "project": "sei"
+    }
+   },
+   "compiled_code": "SELECT account_id, as_of_date, SUM(amount_usd) AS dividends_total_usd, COUNT(*) AS dividends_count\nFROM pbdw.sei_int_dividends_enriched\nGROUP BY account_id, as_of_date",
+   "raw_code": "SELECT account_id, as_of_date, SUM(amount_usd) AS dividends_total_usd, COUNT(*) AS dividends_count\nFROM pbdw.sei_int_dividends_enriched\nGROUP BY account_id, as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.sei_int_dividends_enriched"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "dividends_total_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "dividends_count": {
+     "type": "NUMBER",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.sei_brz_corporate_actions": {
+   "resource_type": "model",
+   "name": "sei_brz_corporate_actions",
+   "schema": "sei_stage",
+   "path": "bronze/sei_brz_corporate_actions.sql",
+   "description": "Bronze sei brz corporate actions",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng",
+     "project": "sei"
+    }
+   },
+   "compiled_code": "SELECT * FROM swp_feeds.corp_action_feed",
+   "raw_code": "SELECT * FROM swp_feeds.corp_action_feed",
+   "depends_on": {
+    "nodes": [
+     "source.cp.swp_feeds.corp_action_feed"
+    ]
+   },
+   "columns": {
+    "corporate_actions_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.sei_stg_corporate_actions": {
+   "resource_type": "model",
+   "name": "sei_stg_corporate_actions",
+   "schema": "pbdw",
+   "path": "silver/sei_stg_corporate_actions.sql",
+   "description": "Silver sei stg corporate actions",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng",
+     "project": "sei"
+    }
+   },
+   "compiled_code": "SELECT corporate_actions_id, account_id, as_of_date, ABS(amount) AS amount, UPPER(currency) AS currency\nFROM sei_stage.sei_brz_corporate_actions\nWHERE amount IS NOT NULL",
+   "raw_code": "SELECT corporate_actions_id, account_id, as_of_date, ABS(amount) AS amount, UPPER(currency) AS currency\nFROM sei_stage.sei_brz_corporate_actions\nWHERE amount IS NOT NULL",
+   "depends_on": {
+    "nodes": [
+     "model.cp.sei_brz_corporate_actions"
+    ]
+   },
+   "columns": {
+    "corporate_actions_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.sei_int_corporate_actions_enriched": {
+   "resource_type": "model",
+   "name": "sei_int_corporate_actions_enriched",
+   "schema": "pbdw",
+   "path": "silver/sei_int_corporate_actions_enriched.sql",
+   "description": "Silver sei int corporate actions enriched",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng",
+     "project": "sei"
+    }
+   },
+   "compiled_code": "SELECT s.corporate_actions_id, s.account_id, s.as_of_date, s.amount * fx.rate AS amount_usd\nFROM pbdw.sei_stg_corporate_actions s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "raw_code": "SELECT s.corporate_actions_id, s.account_id, s.as_of_date, s.amount * fx.rate AS amount_usd\nFROM pbdw.sei_stg_corporate_actions s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.sei_stg_corporate_actions",
+     "model.cp.int_fx_rates"
+    ]
+   },
+   "columns": {
+    "corporate_actions_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.sei_gld_corporate_actions_summary": {
+   "resource_type": "model",
+   "name": "sei_gld_corporate_actions_summary",
+   "schema": "imdw",
+   "path": "gold/sei_gld_corporate_actions_summary.sql",
+   "description": "Gold sei gld corporate actions summary",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng",
+     "project": "sei"
+    }
+   },
+   "compiled_code": "SELECT account_id, as_of_date, SUM(amount_usd) AS corporate_actions_total_usd, COUNT(*) AS corporate_actions_count\nFROM pbdw.sei_int_corporate_actions_enriched\nGROUP BY account_id, as_of_date",
+   "raw_code": "SELECT account_id, as_of_date, SUM(amount_usd) AS corporate_actions_total_usd, COUNT(*) AS corporate_actions_count\nFROM pbdw.sei_int_corporate_actions_enriched\nGROUP BY account_id, as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.sei_int_corporate_actions_enriched"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "corporate_actions_total_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "corporate_actions_count": {
+     "type": "NUMBER",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.brz_settlements": {
+   "resource_type": "model",
+   "name": "brz_settlements",
+   "schema": "pbdw",
+   "path": "bronze/brz_settlements.sql",
+   "description": "Bronze brz settlements",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT * FROM charles_river.settlement_feed",
+   "raw_code": "SELECT * FROM charles_river.settlement_feed",
+   "depends_on": {
+    "nodes": [
+     "source.cp.charles_river.settlement_feed"
+    ]
+   },
+   "columns": {
+    "settlements_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.stg_settlements": {
+   "resource_type": "model",
+   "name": "stg_settlements",
+   "schema": "pbdw",
+   "path": "silver/stg_settlements.sql",
+   "description": "Silver stg settlements",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT settlements_id, account_id, as_of_date, ABS(amount) AS amount, UPPER(currency) AS currency\nFROM pbdw.brz_settlements\nWHERE amount IS NOT NULL",
+   "raw_code": "SELECT settlements_id, account_id, as_of_date, ABS(amount) AS amount, UPPER(currency) AS currency\nFROM pbdw.brz_settlements\nWHERE amount IS NOT NULL",
+   "depends_on": {
+    "nodes": [
+     "model.cp.brz_settlements"
+    ]
+   },
+   "columns": {
+    "settlements_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.int_settlements_enriched": {
+   "resource_type": "model",
+   "name": "int_settlements_enriched",
+   "schema": "pbdw",
+   "path": "silver/int_settlements_enriched.sql",
+   "description": "Silver int settlements enriched",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT s.settlements_id, s.account_id, s.as_of_date, s.amount * fx.rate AS amount_usd\nFROM pbdw.stg_settlements s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "raw_code": "SELECT s.settlements_id, s.account_id, s.as_of_date, s.amount * fx.rate AS amount_usd\nFROM pbdw.stg_settlements s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.stg_settlements",
+     "model.cp.int_fx_rates"
+    ]
+   },
+   "columns": {
+    "settlements_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.gld_settlements_summary": {
+   "resource_type": "model",
+   "name": "gld_settlements_summary",
+   "schema": "imdw",
+   "path": "gold/gld_settlements_summary.sql",
+   "description": "Gold gld settlements summary",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT account_id, as_of_date, SUM(amount_usd) AS settlements_total_usd, COUNT(*) AS settlements_count\nFROM pbdw.int_settlements_enriched\nGROUP BY account_id, as_of_date",
+   "raw_code": "SELECT account_id, as_of_date, SUM(amount_usd) AS settlements_total_usd, COUNT(*) AS settlements_count\nFROM pbdw.int_settlements_enriched\nGROUP BY account_id, as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.int_settlements_enriched"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "settlements_total_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "settlements_count": {
+     "type": "NUMBER",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.brz_custody": {
+   "resource_type": "model",
+   "name": "brz_custody",
+   "schema": "pbdw",
+   "path": "bronze/brz_custody.sql",
+   "description": "Bronze brz custody",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT * FROM addvantage.custody_positions",
+   "raw_code": "SELECT * FROM addvantage.custody_positions",
+   "depends_on": {
+    "nodes": [
+     "source.cp.addvantage.custody_positions"
+    ]
+   },
+   "columns": {
+    "custody_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.stg_custody": {
+   "resource_type": "model",
+   "name": "stg_custody",
+   "schema": "pbdw",
+   "path": "silver/stg_custody.sql",
+   "description": "Silver stg custody",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT custody_id, account_id, as_of_date, ABS(amount) AS amount, UPPER(currency) AS currency\nFROM pbdw.brz_custody\nWHERE amount IS NOT NULL",
+   "raw_code": "SELECT custody_id, account_id, as_of_date, ABS(amount) AS amount, UPPER(currency) AS currency\nFROM pbdw.brz_custody\nWHERE amount IS NOT NULL",
+   "depends_on": {
+    "nodes": [
+     "model.cp.brz_custody"
+    ]
+   },
+   "columns": {
+    "custody_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.int_custody_enriched": {
+   "resource_type": "model",
+   "name": "int_custody_enriched",
+   "schema": "pbdw",
+   "path": "silver/int_custody_enriched.sql",
+   "description": "Silver int custody enriched",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT s.custody_id, s.account_id, s.as_of_date, s.amount * fx.rate AS amount_usd\nFROM pbdw.stg_custody s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "raw_code": "SELECT s.custody_id, s.account_id, s.as_of_date, s.amount * fx.rate AS amount_usd\nFROM pbdw.stg_custody s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.stg_custody",
+     "model.cp.int_fx_rates"
+    ]
+   },
+   "columns": {
+    "custody_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.gld_custody_summary": {
+   "resource_type": "model",
+   "name": "gld_custody_summary",
+   "schema": "imdw",
+   "path": "gold/gld_custody_summary.sql",
+   "description": "Gold gld custody summary",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT account_id, as_of_date, SUM(amount_usd) AS custody_total_usd, COUNT(*) AS custody_count\nFROM pbdw.int_custody_enriched\nGROUP BY account_id, as_of_date",
+   "raw_code": "SELECT account_id, as_of_date, SUM(amount_usd) AS custody_total_usd, COUNT(*) AS custody_count\nFROM pbdw.int_custody_enriched\nGROUP BY account_id, as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.int_custody_enriched"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "custody_total_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "custody_count": {
+     "type": "NUMBER",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.brz_performance": {
+   "resource_type": "model",
+   "name": "brz_performance",
+   "schema": "pbdw",
+   "path": "bronze/brz_performance.sql",
+   "description": "Bronze brz performance",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT * FROM pbdw.performance_returns",
+   "raw_code": "SELECT * FROM pbdw.performance_returns",
+   "depends_on": {
+    "nodes": [
+     "source.cp.pbdw.performance_returns"
+    ]
+   },
+   "columns": {
+    "performance_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.stg_performance": {
+   "resource_type": "model",
+   "name": "stg_performance",
+   "schema": "pbdw",
+   "path": "silver/stg_performance.sql",
+   "description": "Silver stg performance",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT performance_id, account_id, as_of_date, ABS(amount) AS amount, UPPER(currency) AS currency\nFROM pbdw.brz_performance\nWHERE amount IS NOT NULL",
+   "raw_code": "SELECT performance_id, account_id, as_of_date, ABS(amount) AS amount, UPPER(currency) AS currency\nFROM pbdw.brz_performance\nWHERE amount IS NOT NULL",
+   "depends_on": {
+    "nodes": [
+     "model.cp.brz_performance"
+    ]
+   },
+   "columns": {
+    "performance_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "currency": {
+     "type": "VARCHAR2(3)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.int_performance_enriched": {
+   "resource_type": "model",
+   "name": "int_performance_enriched",
+   "schema": "pbdw",
+   "path": "silver/int_performance_enriched.sql",
+   "description": "Silver int performance enriched",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT s.performance_id, s.account_id, s.as_of_date, s.amount * fx.rate AS amount_usd\nFROM pbdw.stg_performance s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "raw_code": "SELECT s.performance_id, s.account_id, s.as_of_date, s.amount * fx.rate AS amount_usd\nFROM pbdw.stg_performance s\nLEFT JOIN pbdw.int_fx_rates fx ON fx.currency = s.currency AND fx.as_of_date = s.as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.stg_performance",
+     "model.cp.int_fx_rates"
+    ]
+   },
+   "columns": {
+    "performance_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "amount_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.gld_performance_summary": {
+   "resource_type": "model",
+   "name": "gld_performance_summary",
+   "schema": "imdw",
+   "path": "gold/gld_performance_summary.sql",
+   "description": "Gold gld performance summary",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT account_id, as_of_date, SUM(amount_usd) AS performance_total_usd, COUNT(*) AS performance_count\nFROM pbdw.int_performance_enriched\nGROUP BY account_id, as_of_date",
+   "raw_code": "SELECT account_id, as_of_date, SUM(amount_usd) AS performance_total_usd, COUNT(*) AS performance_count\nFROM pbdw.int_performance_enriched\nGROUP BY account_id, as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.int_performance_enriched"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "performance_total_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "performance_count": {
+     "type": "NUMBER",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.gld_income_statement": {
+   "resource_type": "model",
+   "name": "gld_income_statement",
+   "schema": "imdw",
+   "path": "gold/gld_income_statement.sql",
+   "description": "Gold gld income statement",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT i.account_id,\n       i.as_of_date,\n       i.interest_total_usd,\n       d.dividends_total_usd,\n       i.interest_total_usd + d.dividends_total_usd AS gross_income_usd\nFROM imdw.gld_interest_summary i\nLEFT JOIN imdw.sei_gld_dividends_summary d ON d.account_id = i.account_id AND d.as_of_date = i.as_of_date",
+   "raw_code": "SELECT i.account_id,\n       i.as_of_date,\n       i.interest_total_usd,\n       d.dividends_total_usd,\n       i.interest_total_usd + d.dividends_total_usd AS gross_income_usd\nFROM imdw.gld_interest_summary i\nLEFT JOIN imdw.sei_gld_dividends_summary d ON d.account_id = i.account_id AND d.as_of_date = i.as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.gld_interest_summary",
+     "model.cp.sei_gld_dividends_summary"
+    ]
+   },
+   "columns": {
+    "account_id": {
+     "type": "NUMBER(18)",
+     "description": ""
+    },
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "interest_total_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "dividends_total_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "gross_income_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    }
+   }
+  },
+  "model.cp.gld_exec_dashboard": {
+   "resource_type": "model",
+   "name": "gld_exec_dashboard",
+   "schema": "imdw",
+   "path": "gold/gld_exec_dashboard.sql",
+   "description": "Gold gld exec dashboard",
+   "config": {
+    "meta": {
+     "owner": "accounting.data.eng"
+    }
+   },
+   "compiled_code": "SELECT n.as_of_date,\n       SUM(n.nav_usd) AS total_aum_usd,\n       SUM(inc.gross_income_usd) AS total_income_usd,\n       COUNT(DISTINCT n.account_id) AS account_count\nFROM imdw.gld_nav_daily n\nLEFT JOIN imdw.gld_income_statement inc ON inc.account_id = n.account_id AND inc.as_of_date = n.as_of_date\nGROUP BY n.as_of_date",
+   "raw_code": "SELECT n.as_of_date,\n       SUM(n.nav_usd) AS total_aum_usd,\n       SUM(inc.gross_income_usd) AS total_income_usd,\n       COUNT(DISTINCT n.account_id) AS account_count\nFROM imdw.gld_nav_daily n\nLEFT JOIN imdw.gld_income_statement inc ON inc.account_id = n.account_id AND inc.as_of_date = n.as_of_date\nGROUP BY n.as_of_date",
+   "depends_on": {
+    "nodes": [
+     "model.cp.gld_nav_daily",
+     "model.cp.gld_income_statement"
+    ]
+   },
+   "columns": {
+    "as_of_date": {
+     "type": "DATE",
+     "description": ""
+    },
+    "total_aum_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "total_income_usd": {
+     "type": "NUMBER(17,4)",
+     "description": ""
+    },
+    "account_count": {
+     "type": "NUMBER",
+     "description": ""
+    }
+   }
+  }
+ },
+ "sources": {
+  "source.cp.swp_feeds.position_feed": {
+   "name": "position_feed",
+   "schema": "swp_feeds",
+   "source_name": "swp_feeds"
+  },
+  "source.cp.swp_feeds.taxlot_feed": {
+   "name": "taxlot_feed",
+   "schema": "swp_feeds",
+   "source_name": "swp_feeds"
+  },
+  "source.cp.swp_feeds.transaction_feed": {
+   "name": "transaction_feed",
+   "schema": "swp_feeds",
+   "source_name": "swp_feeds"
+  },
+  "source.cp.addvantage.cash_ledger": {
+   "name": "cash_ledger",
+   "schema": "addvantage",
+   "source_name": "addvantage"
+  },
+  "source.cp.pivotal.fee_schedule": {
+   "name": "fee_schedule",
+   "schema": "pivotal",
+   "source_name": "pivotal"
+  },
+  "source.cp.pbdw.nav_components": {
+   "name": "nav_components",
+   "schema": "pbdw",
+   "source_name": "pbdw"
+  },
+  "source.cp.pbdw.gl_entries": {
+   "name": "gl_entries",
+   "schema": "pbdw",
+   "source_name": "pbdw"
+  },
+  "source.cp.pbdw.accrual_basis": {
+   "name": "accrual_basis",
+   "schema": "pbdw",
+   "source_name": "pbdw"
+  },
+  "source.cp.bloomberg.fx_feed": {
+   "name": "fx_feed",
+   "schema": "bloomberg",
+   "source_name": "bloomberg"
+  },
+  "source.cp.pivotal.account_master": {
+   "name": "account_master",
+   "schema": "pivotal",
+   "source_name": "pivotal"
+  },
+  "source.cp.pivotal.client_master": {
+   "name": "client_master",
+   "schema": "pivotal",
+   "source_name": "pivotal"
+  },
+  "source.cp.addvantage.interest_accrual": {
+   "name": "interest_accrual",
+   "schema": "addvantage",
+   "source_name": "addvantage"
+  },
+  "source.cp.swp_feeds.dividend_feed": {
+   "name": "dividend_feed",
+   "schema": "swp_feeds",
+   "source_name": "swp_feeds"
+  },
+  "source.cp.swp_feeds.corp_action_feed": {
+   "name": "corp_action_feed",
+   "schema": "swp_feeds",
+   "source_name": "swp_feeds"
+  },
+  "source.cp.charles_river.settlement_feed": {
+   "name": "settlement_feed",
+   "schema": "charles_river",
+   "source_name": "charles_river"
+  },
+  "source.cp.addvantage.custody_positions": {
+   "name": "custody_positions",
+   "schema": "addvantage",
+   "source_name": "addvantage"
+  },
+  "source.cp.pbdw.performance_returns": {
+   "name": "performance_returns",
+   "schema": "pbdw",
+   "source_name": "pbdw"
+  }
+ }
+}

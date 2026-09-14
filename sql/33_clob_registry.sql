@@ -1,0 +1,76 @@
+-- ============================================================================
+-- 33_clob_registry.sql — CLOB structure registry: the curated taxonomy of
+-- every CLOB in the estate drives the inspector's parser dispatch and PII
+-- suppression. Idempotent: drops & reloads the registry rows.
+-- ============================================================================
+BEGIN
+  EXECUTE IMMEDIATE '
+CREATE TABLE recon_clob_registry (
+      structure_id      NUMBER,
+      structure_name    VARCHAR2(60),
+      parser_family     VARCHAR2(40),
+      table_name        VARCHAR2(200) NOT NULL,
+      column_name       VARCHAR2(200) NOT NULL,
+      child_entity      VARCHAR2(3),
+      sensitivity_hint  VARCHAR2(60),
+      delimiter_pattern VARCHAR2(40),
+      CONSTRAINT pk_recon_clob_reg PRIMARY KEY (table_name, column_name)
+)';
+EXCEPTION WHEN OTHERS THEN
+  IF SQLCODE != -955 THEN RAISE; END IF;
+END;
+/
+DELETE FROM recon_clob_registry;
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (1, 'JSON_OBJECT_UD_ATTRIBUTES', 'json_parser', 'DIM_ACCOUNT_UD', 'USER_DEFINED_ATTRIBUTE_CLOB', 'YES', 'ATTRIBUTE_PAYLOAD_REVIEW', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (1, 'JSON_OBJECT_UD_ATTRIBUTES', 'json_parser', 'DIM_ACCOUNT_UD_HIST', 'USER_DEFINED_ATTRIBUTE_CLOB', 'YES', 'ATTRIBUTE_PAYLOAD_REVIEW', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (1, 'JSON_OBJECT_UD_ATTRIBUTES', 'json_parser', 'DIM_INTERESTED_PARTY_UD', 'USER_DEFINED_ATTRIBUTE_CLOB', 'YES', 'ATTRIBUTE_PAYLOAD_REVIEW', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (1, 'JSON_OBJECT_UD_ATTRIBUTES', 'json_parser', 'DIM_INTERESTED_PARTY_UD_HIST', 'USER_DEFINED_ATTRIBUTE_CLOB', 'YES', 'ATTRIBUTE_PAYLOAD_REVIEW', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (1, 'JSON_OBJECT_UD_ATTRIBUTES', 'json_parser', 'DIM_IP_RELATIONSHIP_UD', 'USER_DEFINED_ATTRIBUTE_CLOB', 'YES', 'ATTRIBUTE_PAYLOAD_REVIEW', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (1, 'JSON_OBJECT_UD_ATTRIBUTES', 'json_parser', 'DIM_IP_RELATIONSHIP_UD_HIST', 'USER_DEFINED_ATTRIBUTE_CLOB', 'YES', 'ATTRIBUTE_PAYLOAD_REVIEW', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (1, 'JSON_OBJECT_UD_ATTRIBUTES', 'json_parser', 'DIM_MASTER_ACCOUNT_UD', 'USER_DEFINED_ATTRIBUTE_CLOB', 'YES', 'ATTRIBUTE_PAYLOAD_REVIEW', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (1, 'JSON_OBJECT_UD_ATTRIBUTES', 'json_parser', 'DIM_MASTER_ACCOUNT_UD_HIST', 'USER_DEFINED_ATTRIBUTE_CLOB', 'YES', 'ATTRIBUTE_PAYLOAD_REVIEW', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (1, 'JSON_OBJECT_UD_ATTRIBUTES', 'json_parser', 'DIM_SECURITY_UD', 'USER_DEFINED_ATTRIBUTE_CLOB', 'YES', 'ATTRIBUTE_PAYLOAD_REVIEW', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (1, 'JSON_OBJECT_UD_ATTRIBUTES', 'json_parser', 'DIM_SECURITY_UD_HIST', 'USER_DEFINED_ATTRIBUTE_CLOB', 'YES', 'ATTRIBUTE_PAYLOAD_REVIEW', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (2, 'JSON_OBJECT_WITH_NESTED_ARRAYS', 'json_parser', 'DIM_MASTER_ACCOUNT_BLOCKS', 'BLOCKS_CLOB', 'YES', 'ATTRIBUTE_PAYLOAD_REVIEW', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (3, 'RULE_EXPRESSION', 'rule_expression_parser', 'CRD_COMPL_RULES', 'EXPRESSION', 'NO', 'BUSINESS_RULE', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (4, 'LEGAL_REGULATORY_TEXT', 'text_parser', 'CRD_COMPL_RULES', 'LEGAL_TEXT', 'NO', 'REGULATORY_DOCUMENT', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (5, 'FREE_FORM_NARRATIVE', 'text_parser', 'DIM_BBH_IPS', 'NOTES', 'NO', 'PII_REVIEW_RECOMMENDED', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (5, 'FREE_FORM_NARRATIVE', 'text_parser', 'DIM_BBH_IPS', 'CLIENT_INVESTMENT_RESTRICTIONS', 'NO', 'PII_REVIEW_RECOMMENDED', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (5, 'FREE_FORM_NARRATIVE', 'text_parser', 'DIM_BBH_IPS', 'DISTRIBUTION_NEEDS', 'NO', 'PII_REVIEW_RECOMMENDED', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (5, 'FREE_FORM_NARRATIVE', 'text_parser', 'DIM_BBH_IPS', 'ADDITIONAL_IMPORTANT_INFO', 'NO', 'PII_REVIEW_RECOMMENDED', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (5, 'FREE_FORM_NARRATIVE', 'text_parser', 'DIM_BBH_IPS', 'DESCRIPTION', 'NO', 'PII_REVIEW_RECOMMENDED', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (5, 'FREE_FORM_NARRATIVE', 'text_parser', 'DIM_BBH_IPS', 'SPECIAL_COMMENTS', 'NO', 'PII_REVIEW_RECOMMENDED', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (5, 'FREE_FORM_NARRATIVE', 'text_parser', 'DIM_BBH_IPS', 'SPECIAL_CONSIDERATIONS', 'NO', 'PII_REVIEW_RECOMMENDED', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (5, 'FREE_FORM_NARRATIVE', 'text_parser', 'DIM_BBH_IPS', 'ASSET_ELIGIBILITY_DESCRIPTION', 'NO', 'PII_REVIEW_RECOMMENDED', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (5, 'FREE_FORM_NARRATIVE', 'text_parser', 'DIM_BBH_IPS', 'INACTIVE_REASON', 'NO', 'PII_REVIEW_RECOMMENDED', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (5, 'FREE_FORM_NARRATIVE', 'text_parser', 'DIM_COMPANY', 'COMMENTS', 'NO', 'PII_REVIEW_RECOMMENDED', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (5, 'FREE_FORM_NARRATIVE', 'text_parser', 'DIM_CONTACT', 'COMMENTS', 'NO', 'PII_REVIEW_RECOMMENDED', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (5, 'FREE_FORM_NARRATIVE', 'text_parser', 'DIM_CONTACT', 'BBH_SOURCE_OF_WEALTH', 'NO', 'PII_REVIEW_RECOMMENDED', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (5, 'FREE_FORM_NARRATIVE', 'text_parser', 'DIM_CONTACT', 'BBH_REFERRAL_COMMENTS', 'NO', 'PII_REVIEW_RECOMMENDED', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (5, 'FREE_FORM_NARRATIVE', 'text_parser', 'DIM_EMPLOYEE', 'COMMENTS', 'NO', 'PII_REVIEW_RECOMMENDED', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (5, 'FREE_FORM_NARRATIVE', 'text_parser', 'DIM_IPS_SPL_CONSIDERATIONS', 'SPECIAL_CONSIDERATIONS', 'NO', 'PII_REVIEW_RECOMMENDED', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (6, 'PIPE_CODE_LIST', 'delimited_parser', 'DIM_BBH_IPS', 'OPTOUTS_LIST', 'YES', 'BUSINESS_RULE', '||');
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (7, 'PIPE_CODE_VALUE_LIST', 'delimited_parser', 'DIM_BBH_IPS', 'WS_OPTOUTS_LIST', 'YES', 'BUSINESS_RULE', '||,|');
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (7, 'PIPE_CODE_VALUE_LIST', 'delimited_parser', 'DIM_BBH_IPS', 'WS_CLIENT_GUIDELINES_LIST', 'YES', 'BUSINESS_RULE', '||,|');
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (8, 'PIPE_ID_LIST', 'delimited_parser', 'DIM_COMPANY', 'BBH_TEAM_MEMBERS', 'YES', 'REFERENCE_DATA', '||,|');
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (8, 'PIPE_ID_LIST', 'delimited_parser', 'DIM_CONTACT', 'BBH_TEAM_MEMBERS', 'YES', 'REFERENCE_DATA', '||,|');
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (8, 'PIPE_ID_LIST', 'delimited_parser', 'DIM_OFFICE', 'BBH_TEAM_MEMBERS', 'YES', 'REFERENCE_DATA', '||,|');
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (9, 'COMPOSITE_HIERARCHICAL', 'complex_parser', 'DIM_BBH_IPS', 'UIMP_LIST', 'YES', 'BUSINESS_RULE', '||,*,~,,');
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (10, 'CHANGE_HISTORY', 'history_parser', 'DIM_BBH_IPS_HISTORY', 'OLD_VALUE', 'NO', 'AUDIT_TRAIL', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (10, 'CHANGE_HISTORY', 'history_parser', 'DIM_BBH_IPS_HISTORY', 'NEW_VALUE', 'NO', 'AUDIT_TRAIL', '|');
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (11, 'HTML_CONTENT', 'html_parser', 'DIM_EMPLOYEE', 'BBH_HTML_EMAIL_SIGNATURE', 'NO', 'INTERNAL_ONLY', 'HTML');
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (12, 'PLAIN_EMAIL_SIGNATURE', 'text_parser', 'DIM_EMPLOYEE', 'BBH_EMAIL_SIGNATURE', 'NO', 'INTERNAL_ONLY', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (13, 'SQL_CONFIGURATION', 'sql_parser', 'PBDW_REPORT_CONFIGURATION', 'REPORT_SQL', 'NO', 'LINEAGE_CONFIG', 'SQL');
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (14, 'ERROR_LOG', 'log_parser', 'PBDW_ETL_AUDIT_LOG', 'ERROR_MESSAGE', 'NO', 'TECHNICAL_LOG_REVIEW', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (15, 'EMPTY', 'empty_handler', 'DIM_BBH_IPS_APPROVAL', 'COMMENTS', 'NO', 'NONE', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (15, 'EMPTY', 'empty_handler', 'DIM_COMPANY', 'STRENGTHS', 'NO', 'NONE', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (15, 'EMPTY', 'empty_handler', 'DIM_COMPANY', 'WEAKNESSES', 'NO', 'NONE', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (15, 'EMPTY', 'empty_handler', 'DIM_COMPANY', 'STRATEGIC_ALLIANCES', 'NO', 'NONE', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (15, 'EMPTY', 'empty_handler', 'DIM_COMPANY', 'MAJOR_COMPETITORS', 'NO', 'NONE', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (15, 'EMPTY', 'empty_handler', 'DIM_COMPANY', 'MARKET_PERCEPTION', 'NO', 'NONE', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (15, 'EMPTY', 'empty_handler', 'DIM_COMPANY', 'MARKETING_STRATEGY', 'NO', 'NONE', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (15, 'EMPTY', 'empty_handler', 'DIM_COMPANY', 'TARGET_MARKETS', 'NO', 'NONE', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (15, 'EMPTY', 'empty_handler', 'DIM_COMPANY', 'SALES_STRATEGY', 'NO', 'NONE', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (15, 'EMPTY', 'empty_handler', 'DIM_CONTACT', 'CHILDRENS_NAMES', 'NO', 'NONE', NULL);
+INSERT INTO recon_clob_registry (structure_id, structure_name, parser_family, table_name, column_name, child_entity, sensitivity_hint, delimiter_pattern) VALUES (15, 'EMPTY', 'empty_handler', 'DIM_OFFICE', 'COMMENTS', 'NO', 'NONE', NULL);
+COMMIT;

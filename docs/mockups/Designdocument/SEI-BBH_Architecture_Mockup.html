@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SEI ↔ BBH Integration — Component Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EDF0F3;
+  --card:#FFFFFF;
+  --ink:#0F151C;
+  --ink-2:#4A5765;
+  --rule:#C9D2DB;
+  --sei:#3F6288;
+  --hub:#16305B;
+  --cons:#3D6459;
+  --ocp:#5E4F72;
+  --new:#9A5B00;
+  --block:#A82316;
+  --grid:rgba(15,21,28,.055);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  background-image:
+    linear-gradient(var(--grid) 1px,transparent 1px),
+    linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:28px 28px;
+  color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,sans-serif;
+  font-size:15px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.sheet{max-width:1360px;margin:0 auto;padding:34px 22px 70px}
+
+/* ---------- masthead ---------- */
+.mast{border-top:3px solid var(--ink);padding-top:14px;margin-bottom:26px}
+.eyebrow{
+  font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--ink-2);
+}
+h1{
+  font-family:"Archivo",sans-serif;font-weight:700;
+  font-size:clamp(26px,4.4vw,42px);line-height:1.04;letter-spacing:-.022em;
+  margin:8px 0 10px;max-width:19ch;
+}
+.sub{max-width:64ch;color:var(--ink-2);font-size:14.5px;margin:0 0 18px}
+.meta{display:flex;flex-wrap:wrap;gap:0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.meta div{
+  flex:1 1 150px;padding:11px 14px 12px;border-right:1px solid var(--rule);
+}
+.meta div:last-child{border-right:0}
+.meta b{display:block;font-family:"Archivo",sans-serif;font-size:23px;line-height:1;letter-spacing:-.02em}
+.meta span{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2)}
+
+/* ---------- zone grid ---------- */
+.flow{display:grid;grid-template-columns:1fr 2.15fr 1fr;gap:16px;align-items:start}
+.zone{background:var(--card);border:1px solid var(--rule);border-top:4px solid var(--z);border-radius:2px}
+.zone-hd{padding:12px 14px 11px;border-bottom:1px solid var(--rule)}
+.zone-hd .tag{
+  font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--z);font-weight:600;
+}
+.zone-hd h2{font-family:"Archivo",sans-serif;font-size:16px;margin:4px 0 0;letter-spacing:-.01em}
+.zone-hd p{margin:5px 0 0;font-size:12.5px;color:var(--ink-2)}
+.plane{padding:12px 14px 14px;border-bottom:1px dashed var(--rule)}
+.plane:last-child{border-bottom:0}
+.plane h3{
+  font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:10.5px;
+  letter-spacing:.13em;text-transform:uppercase;color:var(--ink-2);margin:0 0 9px;
+}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{
+  display:flex;align-items:center;gap:6px;
+  border:1px solid var(--rule);border-left:3px solid var(--z);
+  background:#FBFCFD;border-radius:2px;padding:5px 8px 5px 7px;
+  font-size:12.5px;line-height:1.25;max-width:100%;
+}
+.chip .n{
+  font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--ink-2);
+  min-width:15px;text-align:right;font-weight:500;
+}
+.chip .t{
+  font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:600;
+  color:#fff;background:var(--ink-2);border-radius:2px;padding:1px 4px;letter-spacing:.04em;
+}
+.chip.new{background:#FFF8EE;border-color:#E8CDA1}
+.chip.hi{box-shadow:inset 0 -2px 0 rgba(168,35,22,.5)}
+.chip.hi .name{font-weight:600}
+.t.P{background:#1B4D8F}.t.D{background:#2C6E5B}.t.A{background:#7A4B12}
+.t.O{background:#5C4470}.t.I{background:#546070}.t.C{background:#8A8F96}
+
+/* ---------- gate rail : signature ---------- */
+.rail{margin:26px 0 0;background:var(--card);border:1px solid var(--rule);border-top:4px solid var(--block);border-radius:2px;padding:16px 16px 6px}
+.rail h3{font-family:"Archivo",sans-serif;font-size:15px;margin:0 0 3px}
+.rail p.k{margin:0 0 16px;font-size:12.5px;color:var(--ink-2);max-width:78ch}
+.pipe{display:grid;grid-template-columns:repeat(5,1fr);gap:0;position:relative}
+.stage{padding:0 8px}
+.stage .box{
+  border:1px solid var(--rule);border-radius:2px;background:#F7F9FB;
+  padding:9px 10px;text-align:center;
+}
+.stage .box b{display:block;font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.stage .box em{font-style:normal;font-size:11px;color:var(--ink-2)}
+.gate{margin:0 0 9px;text-align:center}
+.gate .bar{
+  display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;
+  letter-spacing:.09em;color:#fff;background:var(--block);padding:3px 9px;border-radius:2px;
+}
+.gate .bar.adv{background:var(--ink-2)}
+.gate small{display:block;font-size:10.5px;color:var(--ink-2);margin-top:5px;line-height:1.35}
+.arrows{display:grid;grid-template-columns:repeat(5,1fr);margin:7px 0 12px}
+.arrows span{
+  height:1px;background:var(--ink);position:relative;margin:0 8px;
+}
+.arrows span::after{
+  content:"";position:absolute;right:-1px;top:-3px;
+  border-left:6px solid var(--ink);border-top:3.5px solid transparent;border-bottom:3.5px solid transparent;
+}
+.arrows span:last-child::after{display:none}
+.arrows span:last-child{background:transparent}
+
+/* ---------- foundation band ---------- */
+.band{margin-top:16px;background:var(--card);border:1px solid var(--rule);border-top:4px solid var(--ocp);border-radius:2px;padding:14px 16px 16px}
+.band .cols{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:10px}
+
+/* ---------- legend + decisions ---------- */
+.foot{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;margin-top:16px}
+.card{background:var(--card);border:1px solid var(--rule);border-radius:2px;padding:14px 16px 16px}
+.card h3{font-family:"Archivo",sans-serif;font-size:14px;margin:0 0 10px}
+.lg{display:flex;flex-wrap:wrap;gap:7px 16px;font-size:12.5px;color:var(--ink-2)}
+.lg i{font-style:normal;display:inline-flex;align-items:center;gap:6px}
+.sw{width:13px;height:13px;border:1px solid var(--rule);border-radius:2px;display:inline-block}
+ol.ad{margin:0;padding-left:17px;font-size:12.5px;color:var(--ink-2)}
+ol.ad li{margin-bottom:5px}
+ol.ad b{color:var(--ink);font-weight:600}
+.note{margin-top:14px;font-size:12px;color:var(--ink-2);border-top:1px solid var(--rule);padding-top:10px}
+
+@media(max-width:960px){
+  .flow{grid-template-columns:1fr}
+  .foot{grid-template-columns:1fr}
+  .band .cols{grid-template-columns:1fr 1fr}
+  .pipe,.arrows{grid-template-columns:1fr}
+  .arrows{display:none}
+  .stage{padding:0 0 10px}
+}
+@media print{
+  body{background:#fff}
+  .sheet{max-width:none;padding:0}
+}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <header class="mast">
+    <div class="eyebrow">Architecture mockup · v5 reconciliation · draft for ARB</div>
+    <h1>SEI ↔ BBH Integration</h1>
+    <p class="sub">Sixty-five components across four zones. Python ingests, dbt transforms, Airflow orchestrates, OpenShift runs it. Numbers match the engineering design tracker.</p>
+    <div class="meta">
+      <div><b>65</b><span>Components</span></div>
+      <div><b>36</b><span>Priority 1</span></div>
+      <div><b>13</b><span>High custom build</span></div>
+      <div><b>28</b><span>In neither source deck</span></div>
+      <div><b>12</b><span>Open decisions</span></div>
+    </div>
+  </header>
+
+  <section class="flow">
+
+    <!-- ZONE 1 -->
+    <div class="zone" style="--z:var(--sei)">
+      <div class="zone-hd">
+        <div class="tag">Zone 1</div>
+        <h2>SEI</h2>
+        <p>Source of record and outbound orchestration. SEI-owned; BBH consumes to contract.</p>
+      </div>
+      <div class="plane">
+        <h3>Source</h3>
+        <div class="chips">
+          <span class="chip"><span class="n">1</span><span class="name">SWP Platform</span><span class="t C">CON</span></span>
+          <span class="chip"><span class="n">2</span><span class="name">SWP UI</span><span class="t C">CON</span></span>
+          <span class="chip"><span class="n">3</span><span class="name">SWP APIs</span><span class="t C">CON</span></span>
+          <span class="chip"><span class="n">4</span><span class="name">Loaders</span><span class="t C">CON</span></span>
+          <span class="chip"><span class="n">5</span><span class="name">Extract generation</span><span class="t C">CON</span></span>
+        </div>
+      </div>
+      <div class="plane">
+        <h3>PS-Orchestration</h3>
+        <div class="chips">
+          <span class="chip"><span class="n">6</span><span class="name">Orchestration API · ODM · Workflows · Config</span><span class="t C">CON</span></span>
+          <span class="chip"><span class="n">7</span><span class="name">Status Monitoring Dashboard</span><span class="t C">CON</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ZONE 2 -->
+    <div class="zone" style="--z:var(--hub)">
+      <div class="zone-hd">
+        <div class="tag">Zone 2 · the seam</div>
+        <h2>BBH PS-Integration Hub</h2>
+        <p>Every cross-party flow passes through here, both directions, batch and real-time. Twenty-nine components, twelve of them high-custom.</p>
+      </div>
+
+      <div class="plane">
+        <h3>Ingress / Egress</h3>
+        <div class="chips">
+          <span class="chip"><span class="n">8</span><span class="name">Landing Zone + transport</span><span class="t I">INF</span></span>
+          <span class="chip new"><span class="n">9</span><span class="name">File arrival sensors</span><span class="t A">AIR</span></span>
+          <span class="chip hi"><span class="n">10</span><span class="name">Outbound producers</span><span class="t P">PY</span></span>
+          <span class="chip"><span class="n">11</span><span class="name">Apigee proxy</span><span class="t I">VEN</span></span>
+          <span class="chip"><span class="n">12</span><span class="name">API Gateway / Data Plane</span><span class="t I">VEN</span></span>
+        </div>
+      </div>
+
+      <div class="plane">
+        <h3>Processing</h3>
+        <div class="chips">
+          <span class="chip hi"><span class="n">13</span><span class="name">Python ingestion framework</span><span class="t P">PY</span></span>
+          <span class="chip"><span class="n">14</span><span class="name">Stage 1 RAW · 7 tables</span><span class="t O">DDL</span></span>
+          <span class="chip"><span class="n">15</span><span class="name">Stage 2 Enriched · 5 models</span><span class="t D">DBT</span></span>
+          <span class="chip hi"><span class="n">16</span><span class="name">Gold · 2 dims, 3 facts</span><span class="t D">DBT</span></span>
+          <span class="chip hi"><span class="n">17</span><span class="name">Correction handling</span><span class="t D">DBT</span></span>
+        </div>
+      </div>
+
+      <div class="plane">
+        <h3>Orchestration</h3>
+        <div class="chips">
+          <span class="chip hi"><span class="n">18</span><span class="name">DAG + per-domain fan-out</span><span class="t A">AIR</span></span>
+          <span class="chip new"><span class="n">19</span><span class="name">Dim-before-fact / threads</span><span class="t A">AIR</span></span>
+          <span class="chip"><span class="n">20</span><span class="name">Intraday cadence control</span><span class="t A">AIR</span></span>
+          <span class="chip new hi"><span class="n">21</span><span class="name">Replay / rerun engine</span><span class="t P">PY</span></span>
+          <span class="chip new"><span class="n">22</span><span class="name">Partial-batch policy</span><span class="t A">AIR</span></span>
+        </div>
+      </div>
+
+      <div class="plane">
+        <h3>Data quality · blocking</h3>
+        <div class="chips">
+          <span class="chip hi"><span class="n">23</span><span class="name">G1 file / structural</span><span class="t P">PY</span></span>
+          <span class="chip"><span class="n">24</span><span class="name">G2 RAW profiling</span><span class="t A">AIR</span></span>
+          <span class="chip"><span class="n">25</span><span class="name">G3 dbt tests + rules</span><span class="t D">DBT</span></span>
+          <span class="chip new hi"><span class="n">26</span><span class="name">G4 tie-out / control totals</span><span class="t A">AIR</span></span>
+          <span class="chip"><span class="n">27</span><span class="name">G5 post-publish recon</span><span class="t A">AIR</span></span>
+          <span class="chip new hi"><span class="n">28</span><span class="name">DQ framework · registry, severity, override</span><span class="t P">PY</span></span>
+        </div>
+      </div>
+
+      <div class="plane">
+        <h3>Foundation</h3>
+        <div class="chips">
+          <span class="chip hi"><span class="n">29</span><span class="name">Error handling &amp; quarantine</span><span class="t P">PY</span></span>
+          <span class="chip hi"><span class="n">30</span><span class="name">Reconciliation framework</span><span class="t P">PY</span></span>
+          <span class="chip"><span class="n">31</span><span class="name">Audit &amp; lineage</span><span class="t P">PY</span></span>
+          <span class="chip"><span class="n">32</span><span class="name">Security &amp; access</span><span class="t I">INF</span></span>
+          <span class="chip hi"><span class="n">33</span><span class="name">Metadata &amp; config store</span><span class="t O">DDL</span></span>
+          <span class="chip"><span class="n">34</span><span class="name">Observability</span><span class="t I">INF</span></span>
+          <span class="chip"><span class="n">35</span><span class="name">Integration360</span><span class="t I">VEN</span></span>
+          <span class="chip"><span class="n">36</span><span class="name">SSO</span><span class="t I">INF</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ZONE 3 -->
+    <div class="zone" style="--z:var(--cons)">
+      <div class="zone-hd">
+        <div class="tag">Zone 3</div>
+        <h2>BBH Consumers</h2>
+        <p>Where the Hub publishes. Roughly a thousand downstream consumers, unallocated.</p>
+      </div>
+      <div class="plane">
+        <h3>Data stores</h3>
+        <div class="chips">
+          <span class="chip"><span class="n">37</span><span class="name">PBDW — system of record</span><span class="t O">DDL</span></span>
+          <span class="chip"><span class="n">38</span><span class="name">IMDS Stage → IMDS</span><span class="t O">DDL</span></span>
+          <span class="chip"><span class="n">39</span><span class="name">Pivotal Database</span><span class="t D">DBT</span></span>
+          <span class="chip"><span class="n">40</span><span class="name">CP DW canonical — future</span><span class="t C">DSN</span></span>
+        </div>
+      </div>
+      <div class="plane">
+        <h3>Consumption</h3>
+        <div class="chips">
+          <span class="chip"><span class="n">41</span><span class="name">BI / analytics</span><span class="t C">BI</span></span>
+          <span class="chip"><span class="n">42</span><span class="name">Real-time consumers</span><span class="t C">CON</span></span>
+          <span class="chip"><span class="n">43</span><span class="name">BBH existing systems</span><span class="t C">ANL</span></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SIGNATURE: gate interlock -->
+  <section class="rail">
+    <h3>Gate interlock — where a failure stops the line</h3>
+    <p class="k">Blocking, not advisory. G4 is the addition: it sits <em>before</em> the Gold publish, so a tie-out failure leaves production on yesterday's state instead of reconciling damage after the fact.</p>
+
+    <div class="pipe">
+      <div class="stage">
+        <div class="gate"><span class="bar">G1 blocks</span><small>File &amp; structural.<br>Nothing enters RAW.</small></div>
+        <div class="box"><b>Ingest</b><em>Python · item 13</em></div>
+      </div>
+      <div class="stage">
+        <div class="gate"><span class="bar">G2 blocks</span><small>RAW profiling.<br>Stage 2 does not run.</small></div>
+        <div class="box"><b>Stage 1 RAW</b><em>immutable · append only</em></div>
+      </div>
+      <div class="stage">
+        <div class="gate"><span class="bar">G3 blocks</span><small>dbt tests + business rules.<br>Gold untouched.</small></div>
+        <div class="box"><b>Stage 2</b><em>dbt · 5 models</em></div>
+      </div>
+      <div class="stage">
+        <div class="gate"><span class="bar">G4 blocks</span><small>RAW→Gold tie-out, per target.<br>Publish is withheld.</small></div>
+        <div class="box"><b>Gold</b><em>dbt · SCD2 + merge</em></div>
+      </div>
+      <div class="stage">
+        <div class="gate"><span class="bar adv">G5 advisory</span><small>Post-publish recon.<br>Triggers replay.</small></div>
+        <div class="box"><b>Publish</b><em>PBDW · IMDS · Pivotal</em></div>
+      </div>
+    </div>
+    <div class="arrows"><span></span><span></span><span></span><span></span><span></span></div>
+  </section>
+
+  <!-- ZONE 4 -->
+  <section class="band" style="--z:var(--ocp)">
+    <div class="zone-hd" style="padding:0 0 10px;border-bottom:1px solid var(--rule)">
+      <div class="tag" style="color:var(--ocp)">Zone 4 · runs everything above</div>
+      <h2>OpenShift infrastructure &amp; deployment</h2>
+      <p>Twenty-two components, none of them in either source deck. Pod parallelism is cheap; Oracle sessions are not — item 55 sets the real ceiling on the fan-out in item 18.</p>
+    </div>
+    <div class="cols">
+      <div class="plane" style="padding:12px 0 0;border:0">
+        <h3>Platform</h3>
+        <div class="chips" style="--z:var(--ocp)">
+          <span class="chip new"><span class="n">44</span><span class="name">Namespaces</span></span>
+          <span class="chip new"><span class="n">45</span><span class="name">Container images</span></span>
+          <span class="chip new"><span class="n">46</span><span class="name">Registry &amp; scanning</span></span>
+          <span class="chip new"><span class="n">47</span><span class="name">RBAC / SCC</span></span>
+          <span class="chip new"><span class="n">48</span><span class="name">Secrets</span></span>
+          <span class="chip new"><span class="n">49</span><span class="name">Network &amp; egress</span></span>
+          <span class="chip new"><span class="n">50</span><span class="name">Storage</span></span>
+        </div>
+      </div>
+      <div class="plane" style="padding:12px 0 0;border:0">
+        <h3>Runtime</h3>
+        <div class="chips" style="--z:var(--ocp)">
+          <span class="chip new"><span class="n">51</span><span class="name">Airflow deployment</span></span>
+          <span class="chip new"><span class="n">52</span><span class="name">Worker autoscaling</span></span>
+          <span class="chip new"><span class="n">53</span><span class="name">Quotas &amp; priority</span></span>
+          <span class="chip new"><span class="n">54</span><span class="name">Warm start</span></span>
+          <span class="chip new"><span class="n">55</span><span class="name">Oracle pooling</span></span>
+          <span class="chip new"><span class="n">56</span><span class="name">Node placement</span></span>
+        </div>
+      </div>
+      <div class="plane" style="padding:12px 0 0;border:0">
+        <h3>Deployment</h3>
+        <div class="chips" style="--z:var(--ocp)">
+          <span class="chip new"><span class="n">57</span><span class="name">CI/CD pipelines</span></span>
+          <span class="chip new"><span class="n">58</span><span class="name">GitOps</span></span>
+          <span class="chip new hi"><span class="n">59</span><span class="name">dbt release &amp; rollback</span></span>
+          <span class="chip new"><span class="n">60</span><span class="name">DB change management</span></span>
+          <span class="chip new"><span class="n">61</span><span class="name">Blue-green (API lane)</span></span>
+        </div>
+      </div>
+      <div class="plane" style="padding:12px 0 0;border:0">
+        <h3>Operations</h3>
+        <div class="chips" style="--z:var(--ocp)">
+          <span class="chip new"><span class="n">62</span><span class="name">HA / DR</span></span>
+          <span class="chip new"><span class="n">63</span><span class="name">Backup &amp; restore</span></span>
+          <span class="chip new"><span class="n">64</span><span class="name">Monitoring stack</span></span>
+          <span class="chip new"><span class="n">65</span><span class="name">Cost &amp; capacity</span></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="foot">
+    <div class="card">
+      <h3>Reading the diagram</h3>
+      <div class="lg">
+        <i><span class="t P">PY</span> Python</i>
+        <i><span class="t D">DBT</span> dbt</i>
+        <i><span class="t A">AIR</span> Airflow</i>
+        <i><span class="t O">DDL</span> Oracle DDL</i>
+        <i><span class="t I">INF</span> Infra / vendor</i>
+        <i><span class="t C">CON</span> Contract / analysis</i>
+      </div>
+      <div class="lg" style="margin-top:12px">
+        <i><span class="sw" style="background:#FFF8EE;border-color:#E8CDA1"></span> In neither source deck — scope addition</i>
+        <i><span class="sw" style="background:#fff;box-shadow:inset 0 -2px 0 rgba(168,35,22,.5)"></span> High custom build — design doc before code</i>
+        <i><span class="sw" style="background:var(--block);border-color:var(--block)"></span> Blocking gate</i>
+      </div>
+      <p class="note">Numbers are the component IDs in the design tracker. The eight Python items carrying a high-custom mark are the real build: validation, DQ, replay, recon, config. dbt is comparatively thin — five Stage 2 models, five Gold, two hard macros.</p>
+    </div>
+
+    <div class="card">
+      <h3>Blocked on a decision</h3>
+      <ol class="ad">
+        <li><b>AD-1</b> Gold writes a Hub schema or PBDW/IMDS direct — blocks 16, 37, 60</li>
+        <li><b>AD-2</b> Corrections bitemporal or in-place merge — blocks 17, 21, 31, 59</li>
+        <li><b>AD-3</b> Apigee: decision or placeholder — blocks 11, 12</li>
+        <li><b>AD-4</b> Intraday on batch or API lane — blocks 12, 20</li>
+        <li><b>AD-5</b> Partial batch: halt-all or per-domain — blocks 18, 22</li>
+        <li><b>AD-6</b> Reconciliation system of record — blocks 7, 30, 35</li>
+      </ol>
+      <p class="note">Build order follows from this: item 33, the config store, comes first — items 13, 18, 23 and 28 are all meant to be config-driven and will be hardcoded if it isn't there.</p>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

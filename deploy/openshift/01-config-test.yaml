@@ -1,0 +1,11 @@
+## TEST config — security disabled, core features only (no LDAP/Entra)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cp-catalog-config
+  namespace: cp-catalog
+data:
+  ENVIRONMENT: "dev"
+  CATALOG_DISABLE_SECURITY: "true"
+  CORS_ORIGINS: "*"
+  SEI_ORACLE_SCHEMAS: "SEI_RAW,SEI_STAGE"

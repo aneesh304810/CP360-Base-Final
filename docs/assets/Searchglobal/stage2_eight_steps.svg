@@ -1,0 +1,177 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1220" width="1600" height="1220" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif">
+
+  <defs>
+    <style>
+      .serif { font-family: Georgia, 'Iowan Old Style', 'Times New Roman', serif; }
+      .m     { font-family: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace; }
+      .ink   { fill: #10161D; }
+      .slate { fill: #5A6672; }
+      .mute  { fill: #8D98A3; }
+      .sn    { font-family: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace; font-size: 12px; fill: #10161D; letter-spacing: 0.4px; }
+      .cte   { font-family: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace; font-size: 10px; fill: #8D98A3; letter-spacing: 0.8px; }
+      .wh    { font-size: 11.5px; fill: #5A6672; }
+      .st    { font-family: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace; font-size: 10px; fill: #33506B; }
+      .tr    { font-size: 11px; fill: #8A5560; }
+      .hdr   { font-family: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace; font-size: 9.5px; fill: #8D98A3; letter-spacing: 1.8px; }
+      .band  { font-family: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace; font-size: 10.5px; letter-spacing: 2px; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1220" fill="#EEF0F3"/>
+
+  <!-- ══ HEADER ══ -->
+  <text class="m" x="60" y="42" font-size="11.5" fill="#A6192E" letter-spacing="2.4">STAGE 2 · INSIDE ONE MODEL</text>
+  <text class="serif ink" x="60" y="82" font-size="32">Eight steps. One CTE each. The order is not negotiable.</text>
+  <text class="slate" x="60" y="110" font-size="14.5">Keys before attributes, attributes before derivation, derivation before versioning. Reorder any of these and the model is wrong in a way tests will not catch.</text>
+  <line x1="60" y1="140" x2="1540" y2="140" stroke="#D2D8DE"/>
+
+  <text class="hdr" x="132" y="186">STEP · CTE</text>
+  <text class="hdr" x="420" y="186">WHAT HAPPENS</text>
+  <text class="hdr" x="860" y="186">COLUMNS STAMPED</text>
+  <text class="hdr" x="1180" y="186">THE TRAP</text>
+
+  <!-- ══ SPINE ══ -->
+  <line x1="78" y1="240" x2="78" y2="842" stroke="#C9CFD6" stroke-width="1.4" stroke-dasharray="4 5"/>
+
+  <!-- ══ ROW 1 ══ -->
+  <text class="serif" x="78" y="248" font-size="24" fill="#A6192E" text-anchor="middle">1</text>
+  <rect x="110" y="200" width="1430" height="78" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+  <text class="sn" x="132" y="230">Base and filter</text><text class="cte" x="132" y="252">base</text>
+  <text class="wh" x="420" y="230">Read stg_*, restricted to rows changed since the last run.</text>
+  <text class="wh" x="420" y="249">On a full refresh the filter falls away entirely.</text>
+  <text class="st" x="860" y="230">(pass-through — nothing added)</text>
+  <text class="tr" x="1180" y="230">Filtering on AS_OF_DT instead of LOAD_TS</text>
+  <text class="tr" x="1180" y="249">silently misses late corrections to prior dates.</text>
+
+  <!-- ══ ROW 2 ══ -->
+  <text class="serif" x="78" y="334" font-size="24" fill="#A6192E" text-anchor="middle">2</text>
+  <rect x="110" y="286" width="1430" height="78" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+  <text class="sn" x="132" y="316">Resolve keys</text><text class="cte" x="132" y="338">keys_resolved</text>
+  <text class="wh" x="420" y="316">Every natural key mapped to its surrogate by left join.</text>
+  <text class="wh" x="420" y="335">A key that will not resolve does not remove the row.</text>
+  <text class="st" x="860" y="316">ACCOUNT_SK, PARTY_SK, SECURITY_SK,</text>
+  <text class="st" x="860" y="335">UNRESOLVED_KEY_FLG</text>
+  <text class="tr" x="1180" y="316">An inner join here deletes data — the one thing</text>
+  <text class="tr" x="1180" y="335">this layer must never do. Left join, always.</text>
+
+  <!-- ══ ROW 3 ══ -->
+  <text class="serif" x="78" y="420" font-size="24" fill="#A6192E" text-anchor="middle">3</text>
+  <rect x="110" y="372" width="1430" height="78" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+  <text class="sn" x="132" y="402">Marry the sources</text><text class="cte" x="132" y="424">survived · conform models only</text>
+  <text class="wh" x="420" y="402">Where two feeds describe one entity, survivorship picks</text>
+  <text class="wh" x="420" y="421">the winning value field by field. SWP wins during cutover.</text>
+  <text class="st" x="860" y="402">SURVIVING_SRC_SYSTEM,</text>
+  <text class="st" x="860" y="421">SURVIVORSHIP_RULE_ID</text>
+  <text class="tr" x="1180" y="402">Deciding survivorship inside a fact model means</text>
+  <text class="tr" x="1180" y="421">re-deciding it in every other fact model.</text>
+
+  <!-- ══ ROW 4 ══ -->
+  <text class="serif" x="78" y="506" font-size="24" fill="#A6192E" text-anchor="middle">4</text>
+  <rect x="110" y="458" width="1430" height="78" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+  <text class="sn" x="132" y="488">Attach attributes</text><text class="cte" x="132" y="510">attributed</text>
+  <text class="wh" x="420" y="488">Descriptive context attached by lookup — what this thing is.</text>
+  <text class="wh" x="420" y="507">Pure joins. No arithmetic occurs at this step.</text>
+  <text class="st" x="860" y="488">ASSET_CLASS_CD, GICS_SECTOR_CD,</text>
+  <text class="st" x="860" y="507">BASE_CCY, ACCOUNT_TYPE_CD, KYC_STATUS_CD</text>
+  <text class="tr" x="1180" y="488">Lookups against an SCD2 dimension need an</text>
+  <text class="tr" x="1180" y="507">as-of predicate, not just the key. Or you fan out.</text>
+
+  <!-- ══ ROW 5 ══ -->
+  <text class="serif" x="78" y="592" font-size="24" fill="#A6192E" text-anchor="middle">5</text>
+  <rect x="110" y="544" width="1430" height="78" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+  <rect x="110" y="544" width="4" height="78" rx="2" fill="#A6192E"/>
+  <text class="sn" x="132" y="574">Derive the measures</text><text class="cte" x="132" y="596">derived</text>
+  <text class="wh" x="420" y="574">Market value, cost basis, accrued income, FX conversion,</text>
+  <text class="wh" x="420" y="593">realised and unrealised gain and loss. One convention.</text>
+  <text class="st" x="860" y="574">FX_RATE, MARKET_VALUE_BASE,</text>
+  <text class="st" x="860" y="593">COST_BASIS_BASE, UNREALIZED_GL_BASE</text>
+  <text class="tr" x="1180" y="574">The step that justifies the whole layer. Anything</text>
+  <text class="tr" x="1180" y="593">computed in two places is computed wrong.</text>
+
+  <!-- ══ ROW 6 ══ -->
+  <text class="serif" x="78" y="678" font-size="24" fill="#A6192E" text-anchor="middle">6</text>
+  <rect x="110" y="630" width="1430" height="78" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+  <text class="sn" x="132" y="660">Version in two clocks</text><text class="cte" x="132" y="682">versioned</text>
+  <text class="wh" x="420" y="660">ROW_HASH compared against the current version. Unchanged</text>
+  <text class="wh" x="420" y="679">is a no-op; changed closes the old row and opens a new one.</text>
+  <text class="st" x="860" y="660">EFFECTIVE_FROM_TS, EFFECTIVE_TO_TS,</text>
+  <text class="st" x="860" y="679">VALID_FROM_TS, VALID_TO_TS, IS_CURRENT_FLG</text>
+  <text class="tr" x="1180" y="660">Hashing the audit columns into ROW_HASH makes</text>
+  <text class="tr" x="1180" y="679">every row look changed, every single night.</text>
+
+  <!-- ══ ROW 7 ══ -->
+  <text class="serif" x="78" y="764" font-size="24" fill="#A6192E" text-anchor="middle">7</text>
+  <rect x="110" y="716" width="1430" height="78" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+  <text class="sn" x="132" y="746">Score, do not reject</text><text class="cte" x="132" y="768">scored</text>
+  <text class="wh" x="420" y="746">Registry rules evaluate to PASS, WARN or FAIL. The row lands</text>
+  <text class="wh" x="420" y="765">either way, carrying its own verdict with it.</text>
+  <text class="st" x="860" y="746">DQ_SCORE, DQ_SEVERITY,</text>
+  <text class="st" x="860" y="765">DQ_RULE_FAILED</text>
+  <text class="tr" x="1180" y="746">A rule that rejects rather than flags turns Stage 2</text>
+  <text class="tr" x="1180" y="765">into a filter. It is not one. Gold is.</text>
+
+  <!-- ══ ROW 8 ══ -->
+  <text class="serif" x="78" y="850" font-size="24" fill="#A6192E" text-anchor="middle">8</text>
+  <rect x="110" y="802" width="1430" height="78" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+  <text class="sn" x="132" y="832">Project explicitly</text><text class="cte" x="132" y="854">final select</text>
+  <text class="wh" x="420" y="832">An explicit column list matching the declared contract.</text>
+  <text class="wh" x="420" y="851">Audit columns stamped last so they never enter the hash.</text>
+  <text class="st" x="860" y="832">BATCH_ID, LOAD_TS, ROW_HASH,</text>
+  <text class="st" x="860" y="851">SRC_SYSTEM</text>
+  <text class="tr" x="1180" y="832">select * makes schema drift invisible to</text>
+  <text class="tr" x="1180" y="851">on_schema_change. Ban it in review.</text>
+
+  <!-- ══ DOES NOT HAPPEN ══ -->
+  <line x1="60" y1="912" x2="1540" y2="912" stroke="#D2D8DE"/>
+  <text class="band" x="60" y="946" fill="#7A6A4F">WHAT DELIBERATELY DOES NOT HAPPEN HERE — ALL OF IT BELONGS TO GOLD</text>
+  <g>
+    <rect x="60" y="960" width="292" height="72" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+    <text class="ink" x="82" y="990" font-size="13.5" font-weight="600">Target formatting</text>
+    <text class="mute" x="82" y="1012" font-size="11">Column names, order, widths</text>
+
+    <rect x="372" y="960" width="292" height="72" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+    <text class="ink" x="394" y="990" font-size="13.5" font-weight="600">Code translation</text>
+    <text class="mute" x="394" y="1012" font-size="11">SWP codes to AddVantage codes</text>
+
+    <rect x="684" y="960" width="292" height="72" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+    <text class="ink" x="706" y="990" font-size="13.5" font-weight="600">Presentation rounding</text>
+    <text class="mute" x="706" y="1012" font-size="11">Six decimals stay six here</text>
+
+    <rect x="996" y="960" width="292" height="72" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+    <text class="ink" x="1018" y="990" font-size="13.5" font-weight="600">Filtering FAIL rows</text>
+    <text class="mute" x="1018" y="1012" font-size="11">They land, visibly, with a reason</text>
+
+    <rect x="1308" y="960" width="232" height="72" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+    <text class="ink" x="1330" y="990" font-size="13.5" font-weight="600">Aggregation</text>
+    <text class="mute" x="1330" y="1012" font-size="11">Grain does not change</text>
+  </g>
+
+  <!-- ══ INVARIANTS ══ -->
+  <text class="band" x="60" y="1076" fill="#A6192E">FOUR INVARIANTS — IF ONE BREAKS, SOMETHING HAS LEAKED IN FROM ANOTHER LAYER</text>
+  <g>
+    <rect x="60" y="1090" width="370" height="96" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+    <rect x="60" y="1090" width="4" height="96" rx="2" fill="#A6192E"/>
+    <text class="ink" x="88" y="1122" font-size="14.5" font-weight="600">Rows out ≥ rows in</text>
+    <text class="slate" x="88" y="1148" font-size="12">Enrichment adds context. It never</text>
+    <text class="slate" x="88" y="1167" font-size="12">reduces the row count.</text>
+
+    <rect x="450" y="1090" width="370" height="96" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+    <rect x="450" y="1090" width="4" height="96" rx="2" fill="#A6192E"/>
+    <text class="ink" x="478" y="1122" font-size="14.5" font-weight="600">Each number computed once</text>
+    <text class="slate" x="478" y="1148" font-size="12">One definition, one place in the</text>
+    <text class="slate" x="478" y="1167" font-size="12">codebase, no exceptions.</text>
+
+    <rect x="840" y="1090" width="370" height="96" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+    <rect x="840" y="1090" width="4" height="96" rx="2" fill="#A6192E"/>
+    <text class="ink" x="868" y="1122" font-size="14.5" font-weight="600">Dated twice, scored once</text>
+    <text class="slate" x="868" y="1148" font-size="12">Two clocks and a quality verdict</text>
+    <text class="slate" x="868" y="1167" font-size="12">on every single row.</text>
+
+    <rect x="1230" y="1090" width="310" height="96" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+    <rect x="1230" y="1090" width="4" height="96" rx="2" fill="#A6192E"/>
+    <text class="ink" x="1258" y="1122" font-size="14.5" font-weight="600">Rebuildable from stg_*</text>
+    <text class="slate" x="1258" y="1148" font-size="12">No external state, no manual</text>
+    <text class="slate" x="1258" y="1167" font-size="12">fixes, no hand-patched rows.</text>
+  </g>
+
+</svg>

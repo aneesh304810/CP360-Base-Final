@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1020" width="1600" height="1020" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif">
+
+  <defs>
+    <style>
+      .serif { font-family: Georgia, 'Iowan Old Style', 'Times New Roman', serif; }
+      .m     { font-family: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace; }
+      .ink   { fill: #10161D; }
+      .slate { fill: #5A6672; }
+      .mute  { fill: #8D98A3; }
+      .bn    { font-family: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace; font-size: 11px; fill: #10161D; letter-spacing: 0.4px; }
+      .lbl   { font-family: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace; font-size: 9.5px; fill: #8D98A3; letter-spacing: 1.4px; }
+      .val   { font-size: 11.5px; fill: #33414F; }
+      .band  { font-family: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace; font-size: 10.5px; letter-spacing: 2px; }
+      .sql   { font-family: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace; font-size: 11px; fill: #1B2530; }
+    </style>
+    <marker id="ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#33506B"/></marker>
+    <marker id="no" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#C08A94"/></marker>
+  </defs>
+
+  <rect width="1600" height="1020" fill="#EEF0F3"/>
+
+  <!-- ══ HEADER ══ -->
+  <text class="m" x="60" y="42" font-size="11.5" fill="#A6192E" letter-spacing="2.4">REFERENCE MAPPING · WHERE IT LIVES, WHERE IT IS USED</text>
+  <text class="serif ink" x="60" y="82" font-size="32">Two mappings. Two owners. Two different layers.</text>
+  <text class="slate" x="60" y="110" font-size="14.5">Identity is resolved once in Stage 2. Code translation happens only at the Gold edge. Collapsing them into one layer is how legacy semantics get permanently baked in.</text>
+  <line x1="60" y1="140" x2="1540" y2="140" stroke="#D2D8DE"/>
+
+  <!-- ══ REF SCHEMA CARD ══ -->
+  <rect x="60" y="210" width="460" height="510" rx="7" fill="#FFFFFF" stroke="#DCE1E6"/>
+  <path d="M66 210 H514 a6 6 0 0 1 6 6 V250 H60 V216 a6 6 0 0 1 6 -6 z" fill="#10161D"/>
+  <rect x="60" y="210" width="460" height="4" rx="2" fill="#7A6A4F"/>
+  <text class="m" x="82" y="236" font-size="12" fill="#FFFFFF" letter-spacing="0.8">REF SCHEMA</text>
+  <text class="m" x="498" y="236" font-size="10" fill="#8D98A3" text-anchor="end">declared as dbt sources, never built</text>
+
+  <!-- sub A -->
+  <rect x="80" y="264" width="420" height="200" rx="6" fill="#F7F8F9" stroke="#DCE1E6"/>
+  <rect x="80" y="264" width="4" height="200" rx="2" fill="#33506B"/>
+  <text class="ink" x="104" y="294" font-size="16" font-weight="600">Identity crosswalk</text>
+  <text class="bn" x="104" y="318">XWALK_ACCOUNT_ID · XWALK_PARTY_ID</text>
+  <text class="lbl" x="104" y="348">GRAIN</text><text class="val" x="230" y="348">one row per entity instance</text>
+  <text class="lbl" x="104" y="372">VOLUME</text><text class="val" x="230" y="372">millions</text>
+  <text class="lbl" x="104" y="396">OWNER</text><text class="val" x="230" y="396">migration and operations</text>
+  <text class="lbl" x="104" y="420">EXAMPLE</text><text class="val" x="230" y="420">SWP 0012345-001 ↔ ADV 12345-001</text>
+  <text class="lbl" x="104" y="448" fill="#33506B">CONSUMED IN</text><text class="val" x="230" y="448" fill="#33506B" font-weight="600">Stage 2 — conform, step 2</text>
+
+  <!-- sub B -->
+  <rect x="80" y="478" width="420" height="200" rx="6" fill="#F7F8F9" stroke="#DCE1E6"/>
+  <rect x="80" y="478" width="4" height="200" rx="2" fill="#7A6A4F"/>
+  <text class="ink" x="104" y="508" font-size="16" font-weight="600">Value and code mapping</text>
+  <text class="bn" x="104" y="532">MAP_TXN_TYPE · MAP_SEC_TYPE · MAP_CASH_TYPE</text>
+  <text class="lbl" x="104" y="562">GRAIN</text><text class="val" x="230" y="562">one row per code, per domain</text>
+  <text class="lbl" x="104" y="586">VOLUME</text><text class="val" x="230" y="586">hundreds</text>
+  <text class="lbl" x="104" y="610">OWNER</text><text class="val" x="230" y="610">business SME, ARB approved</text>
+  <text class="lbl" x="104" y="634">EXAMPLE</text><text class="val" x="230" y="634">SWP PURCHASE ↔ ADV BUY</text>
+  <text class="lbl" x="104" y="662" fill="#7A6A4F">CONSUMED IN</text><text class="val" x="230" y="662" fill="#7A6A4F" font-weight="600">Gold — facade only</text>
+
+  <text class="mute" x="82" y="702" font-size="11">Both carry EFFECTIVE_FROM_DT, EFFECTIVE_TO_DT, APPROVED_BY, CHANGE_TICKET.</text>
+
+  <!-- ══ ARROWS ══ -->
+  <path d="M 520 375 H 694" stroke="#33506B" stroke-width="1.8" fill="none" marker-end="url(#ok)"/>
+  <path d="M 520 620 H 694" stroke="#7A6A4F" stroke-width="1.8" fill="none" marker-end="url(#ok)"/>
+
+  <path d="M 520 497 H 694" stroke="#C08A94" stroke-width="1.6" fill="none" stroke-dasharray="6 4" marker-end="url(#no)"/>
+  <g stroke="#A6192E" stroke-width="2.2">
+    <path d="M 598 487 L 618 507"/><path d="M 618 487 L 598 507"/>
+  </g>
+  <text x="608" y="470" font-size="11" fill="#A6192E" text-anchor="middle" font-weight="600">never here</text>
+
+  <!-- ══ PIPELINE ══ -->
+  <text class="band mute" x="700" y="196">PIPELINE</text>
+  <g>
+    <rect x="700" y="210" width="400" height="90" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/><rect x="700" y="210" width="400" height="4" rx="2" fill="#5A6672"/>
+    <text class="bn" x="722" y="240">stg_swp__client · account · transaction</text>
+    <text class="val" x="722" y="264">Cleansed, cast, deduped. No mapping tables</text>
+    <text class="val" x="722" y="284">are touched at this layer at all.</text>
+
+    <rect x="700" y="320" width="400" height="110" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/><rect x="700" y="320" width="400" height="4" rx="2" fill="#33506B"/>
+    <text class="bn" x="722" y="350">STAGE 2 — CONFORM</text>
+    <text class="val" x="722" y="374">Crosswalk joined once. ACCOUNT_SK minted,</text>
+    <text class="val" x="722" y="394">and ADV_ACCOUNT_NBR retained as a column</text>
+    <text class="val" x="722" y="414">so nothing downstream re-joins it.</text>
+
+    <rect x="700" y="450" width="400" height="90" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/><rect x="700" y="450" width="400" height="4" rx="2" fill="#A6192E"/>
+    <text class="bn" x="722" y="480">STAGE 2 — ENRICH</text>
+    <text class="val" x="722" y="504">Speaks SWP only. No mapping table appears</text>
+    <text class="val" x="722" y="524">in any int_ model, by rule.</text>
+
+    <rect x="700" y="560" width="400" height="130" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/><rect x="700" y="560" width="400" height="4" rx="2" fill="#7A6A4F"/>
+    <text class="bn" x="722" y="590">GOLD — ADV_ FACADE</text>
+    <text class="val" x="722" y="614">Code translation happens here and only here.</text>
+    <text class="val" x="722" y="634">Legacy identifiers are projected from the</text>
+    <text class="val" x="722" y="654">conform layer, not re-derived.</text>
+    <text class="val" x="722" y="674" fill="#7A6A4F">Projection, never logic.</text>
+  </g>
+
+  <!-- ══ RIGHT NOTES ══ -->
+  <text class="band mute" x="1150" y="196">WHY THE SPLIT</text>
+  <rect x="1150" y="210" width="390" height="140" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+  <rect x="1150" y="210" width="4" height="140" rx="2" fill="#33506B"/>
+  <text class="ink" x="1178" y="242" font-size="15" font-weight="600">Identity, resolved once</text>
+  <text class="slate" x="1178" y="268" font-size="12">Millions of rows. Joining it once, in conform,</text>
+  <text class="slate" x="1178" y="287" font-size="12">costs one pass. Joining it again in each Gold</text>
+  <text class="slate" x="1178" y="306" font-size="12">file costs one pass per file, and gives four</text>
+  <text class="slate" x="1178" y="325" font-size="12">chances for the answer to differ.</text>
+
+  <rect x="1150" y="380" width="390" height="140" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+  <rect x="1150" y="380" width="4" height="140" rx="2" fill="#A6192E"/>
+  <text class="ink" x="1178" y="412" font-size="15" font-weight="600">The leak this prevents</text>
+  <text class="slate" x="1178" y="438" font-size="12">If MAP_TXN_TYPE appears in an int_ model,</text>
+  <text class="slate" x="1178" y="457" font-size="12">AddVantage semantics are now inside your</text>
+  <text class="slate" x="1178" y="476" font-size="12">enrichment layer. The facade can never be</text>
+  <text class="slate" x="1178" y="495" font-size="12">retired, and the migration bought nothing.</text>
+
+  <rect x="1150" y="550" width="390" height="140" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+  <rect x="1150" y="550" width="4" height="140" rx="2" fill="#7A6A4F"/>
+  <text class="ink" x="1178" y="582" font-size="15" font-weight="600">Different owners, rightly</text>
+  <text class="slate" x="1178" y="608" font-size="12">The crosswalk is an operational artefact of</text>
+  <text class="slate" x="1178" y="627" font-size="12">migration. Code mapping encodes business</text>
+  <text class="slate" x="1178" y="646" font-size="12">meaning and needs SME sign-off — which is</text>
+  <text class="slate" x="1178" y="665" font-size="12">why neither belongs in a dbt seed file.</text>
+
+  <!-- ══ BOTTOM ══ -->
+  <line x1="60" y1="748" x2="1540" y2="748" stroke="#D2D8DE"/>
+
+  <rect x="60" y="776" width="740" height="212" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+  <rect x="60" y="776" width="4" height="212" rx="2" fill="#A6192E"/>
+  <text class="ink" x="88" y="808" font-size="16" font-weight="600">Both are effective-dated. Every join is as-of.</text>
+  <text class="sql" x="88" y="842">left join {{ source('ref','map_txn_type') }} m</text>
+  <text class="sql" x="88" y="862">  on  m.src_txn_type_cd = t.txn_type_cd</text>
+  <text class="sql" x="88" y="882">  and t.trade_dt between m.effective_from_dt</text>
+  <text class="sql" x="88" y="902">                     and nvl(m.effective_to_dt, date '9999-12-31')</text>
+  <text class="slate" x="88" y="936" font-size="12">Without the as-of predicate, correcting a mapping silently restates every prior period's</text>
+  <text class="slate" x="88" y="956" font-size="12">output — and you will not be able to explain why last March's file changed.</text>
+
+  <rect x="830" y="776" width="710" height="212" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+  <rect x="830" y="776" width="4" height="212" rx="2" fill="#A6192E"/>
+  <text class="ink" x="858" y="808" font-size="16" font-weight="600">When a source value has no mapping</text>
+  <text class="slate" x="858" y="838" font-size="12.5">Apply the domain default, set MAPPING_MISSING_FLG = 'Y', raise an</text>
+  <text class="slate" x="858" y="858" font-size="12.5">exception row for the stewardship queue. Never null silently. Never fail the batch.</text>
+  <text class="slate" x="858" y="890" font-size="12.5">Populate the queue by discovery, on a schedule:</text>
+  <text class="sql" x="858" y="920" font-size="10.5">select distinct txn_type_cd from int_transaction_enriched t</text>
+  <text class="sql" x="858" y="938" font-size="10.5">where not exists (select 1 from map_txn_type m where m.src_txn_type_cd = t.txn_type_cd)</text>
+  <text class="slate" x="858" y="968" font-size="12">That is how a new SEI code is found in week one, not by a consumer complaint in month three.</text>
+
+</svg>

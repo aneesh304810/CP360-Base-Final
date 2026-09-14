@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>CP 360 · Lineage — FINAL implementation mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+ :root{--bg:#fafbfc;--line:#c9d4dc;--ink:#233240;--sub:#7b8894;--accent:#0f4775;--pop:#31bced;
+  --ok:#159943;--okbg:#e7f6ec;--warn:#e67e22;--warnbg:#fdf1e3;--gap:#c1113a;--gapbg:#fbe9ed;
+  --ud:#7c3aed;--udbg:#f1eafd;--mono:'Roboto Mono',Consolas,monospace}
+ *{box-sizing:border-box;margin:0}
+ body{background:var(--bg);color:var(--ink);font-family:Roboto,Arial,sans-serif;font-size:14px;min-width:1100px}
+ .hdr{height:52px;background:#10193b;color:#fff;display:flex;align-items:center;gap:14px;padding:0 22px;
+  position:sticky;top:0;z-index:50}
+ .hdr small{color:#8fb4dd;font-size:11px}
+ .hdr .esc{margin-left:auto;font-size:10.5px;color:#8fb4dd}
+ .wrap{max-width:1040px;margin:0 auto;padding:22px 24px 60px}
+ #crumb{font-size:12.5px;color:var(--sub);margin-bottom:20px;min-height:18px}
+ #crumb a{color:var(--pop);cursor:pointer;text-decoration:none}
+ #crumb a:hover{text-decoration:underline}
+ #crumb .sep{margin:0 7px;color:#c2ccd4}
+ #crumb b{color:var(--ink);font-weight:500}
+ h1{font-size:19px;font-weight:400;text-align:center;margin-bottom:4px}
+ .subt{font-size:12.5px;color:var(--sub);text-align:center;margin-bottom:24px}
+ #stage{animation:fade .18s ease}
+ @keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+ /* spine */
+ .spine{display:flex;align-items:flex-start;justify-content:center;margin:6px 0 30px}
+ .node{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:150px;max-width:210px}
+ .circ{width:54px;height:54px;border-radius:50%;background:#fff;border:2.5px solid var(--accent);
+  display:grid;place-items:center;font-size:22px;box-shadow:0 2px 6px rgba(20,40,60,.08)}
+ .node b{font-size:13px;font-weight:500;text-align:center}
+ .node small{font-size:10.5px;color:var(--sub);text-align:center}
+ .link2{flex:1;max-width:160px;height:2.5px;background:var(--line);position:relative;margin-top:26px}
+ .link2 .lbl{position:absolute;top:-24px;left:50%;transform:translateX(-50%);font-size:10px;
+  background:var(--warnbg);color:var(--warn);font-weight:700;border-radius:999px;padding:2px 10px;white-space:nowrap}
+ .link2::after{content:"";position:absolute;right:-1px;top:-4.5px;border-left:9px solid var(--line);
+  border-top:6px solid transparent;border-bottom:6px solid transparent}
+ .value{margin-top:8px;font-family:var(--mono);font-size:10.5px;background:#f4f7f9;border:1px solid var(--line);
+  border-radius:6px;padding:6px 9px;max-width:200px;text-align:center;word-break:break-all}
+ .value.ok{border-color:#bfe3cb;background:var(--okbg)}
+ .value .sp{background:var(--gapbg);color:var(--gap);border-radius:3px;padding:0 2px}
+ /* cards */
+ .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+ .card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:17px;cursor:pointer;
+  transition:box-shadow .15s,transform .15s;display:flex;gap:15px;align-items:center}
+ .card:hover{box-shadow:0 8px 20px rgba(20,40,60,.12);transform:translateY(-2px)}
+ .ring{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;flex-shrink:0}
+ .ring span{background:#fff;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;
+  font-size:12.5px;font-weight:700}
+ .card h3{font-size:13.5px;font-weight:500;margin-bottom:2px}
+ .card small{font-size:11px;color:var(--sub)}
+ /* table rows */
+ .trow{display:flex;align-items:center;background:#fff;border:1px solid var(--line);
+  border-radius:10px;padding:13px 18px;margin-bottom:11px;cursor:pointer;transition:box-shadow .15s}
+ .trow:hover{box-shadow:0 6px 16px rgba(20,40,60,.12)}
+ .mini{width:32px;height:32px;border-radius:50%;border:2px solid var(--accent);display:grid;place-items:center;
+  font-size:13px;background:#fff;flex-shrink:0}
+ .mini.q{border-style:dashed;border-color:var(--gap);color:var(--gap);font-weight:700}
+ .mline{width:46px;height:2px;background:var(--line)}
+ .trow .nm{margin-left:16px;flex:1}
+ .trow .nm b{font-size:14px;font-weight:500;font-family:var(--mono)}
+ .trow .nm small{display:block;font-size:11px;color:var(--sub);margin-top:1px}
+ .bar{width:140px;height:7px;border-radius:5px;background:#edf1f4;overflow:hidden}
+ .bar i{display:block;height:7px;background:var(--ok)}
+ .pct{width:64px;text-align:right;font-size:13px;font-weight:500}
+ /* column rows */
+ .tools{display:flex;gap:10px;align-items:center;margin-bottom:14px}
+ .tools input{flex:1;max-width:340px;height:32px;border:1px solid var(--line);border-radius:7px;
+  padding:0 12px;font-size:12.5px;background:#fff}
+ .fpill{font-size:10.5px;font-weight:700;border-radius:999px;padding:4px 12px;cursor:pointer;border:1.5px solid transparent;user-select:none}
+ .fpill.on{border-color:var(--ink)}
+ .legend{display:flex;gap:18px;justify-content:center;font-size:11px;color:var(--sub);margin-bottom:16px;align-items:center}
+ .crow{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--line);
+  border-radius:8px;padding:10px 16px;margin-bottom:8px;cursor:pointer}
+ .crow:hover{box-shadow:0 5px 14px rgba(20,40,60,.10)}
+ .crow .cn{font-family:var(--mono);font-size:12.5px;flex:1}
+ .dots{display:flex;align-items:center}
+ .d{width:12px;height:12px;border-radius:50%;background:var(--accent)}
+ .d.t{background:var(--warn)}
+ .d.u{background:var(--ud)}
+ .d.e{width:9px;height:9px;background:#fff;border:2px dashed var(--gap)}
+ .seg{width:24px;height:2px;background:var(--line)}
+ .seg.e{background:repeating-linear-gradient(90deg,var(--line) 0 4px,transparent 4px 8px)}
+ .tag2{font-size:10px;font-weight:700;border-radius:999px;padding:2px 10px;min-width:96px;text-align:center}
+ .more{text-align:center;font-size:11px;color:var(--sub);margin-top:12px}
+ /* level 4 */
+ .defbox{max-width:660px;margin:6px auto 0;background:#fff;border:1px solid var(--line);border-radius:10px;
+  padding:16px 22px;text-align:center}
+ .defbox p{font-size:13.5px;line-height:1.6;color:#3c4a57}
+ .defbox .src2{font-size:10.5px;color:var(--sub);margin-top:7px}
+ .verify{display:inline-flex;gap:8px;align-items:center;margin-top:14px;background:var(--okbg);
+  color:#0d6b31;font-size:12px;font-weight:500;border-radius:999px;padding:6px 16px}
+ .verify.warn{background:var(--warnbg);color:#8a5a1e}
+ .devlink{display:block;text-align:center;margin-top:14px;font-size:11.5px;color:var(--pop);cursor:pointer}
+ .navrow{display:flex;justify-content:center;gap:14px;margin-top:16px;font-size:11.5px}
+ .navrow span{color:var(--pop);cursor:pointer;user-select:none}
+ /* landing */
+ .dscards{display:grid;grid-template-columns:1fr 1fr;gap:22px;max-width:760px;margin:26px auto 0}
+ .dscard{background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:26px 24px;cursor:pointer;
+  text-align:center;transition:box-shadow .15s,transform .15s,border-color .15s}
+ .dscard:hover{box-shadow:0 12px 28px rgba(20,40,60,.14);transform:translateY(-3px);border-color:var(--pop)}
+ .dscard .big{font-size:40px;margin-bottom:8px}
+ .dscard h2{font-size:17px;font-weight:500;margin-bottom:3px}
+ .dscard small{font-size:11.5px;color:var(--sub);display:block;line-height:1.6}
+ .dsstat{display:flex;justify-content:center;gap:18px;margin-top:14px;font-size:11px;color:var(--sub)}
+ .dsstat b{display:block;font-size:16px;color:var(--ink);font-weight:500;text-align:center}
+ .viewsw{display:inline-flex;background:#1c2a52;border-radius:999px;padding:2px;margin-left:14px}
+ .viewsw span{padding:4px 14px;font-size:11px;border-radius:999px;cursor:pointer;color:#8fb4dd;user-select:none}
+ .viewsw span.on{background:var(--pop);color:#10193b;font-weight:700}
+ .dschip{font-size:10px;font-weight:700;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);
+  border-radius:999px;padding:3px 11px;cursor:pointer;user-select:none}
+ /* full dictionary + transformation (level 4 business) */
+ .fullbox{max-width:760px;margin:14px auto 0;background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+ .fullbox .fh{background:#f4f7f9;border-bottom:1px solid var(--line);padding:8px 18px;font-size:11px;
+  font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--sub);display:flex;gap:10px;align-items:center}
+ .fullbox .fb{padding:14px 20px;font-size:13px;line-height:1.7;color:#3c4a57;text-align:left}
+ .fullbox .fb .kvline{display:grid;grid-template-columns:170px 1fr;gap:3px 14px;font-size:12.5px;margin-top:10px}
+ .fullbox .fb .kvline b{color:var(--sub);font-size:10px;text-transform:uppercase;letter-spacing:.04em;padding-top:2px}
+ .hop{display:flex;gap:14px;padding:11px 20px;border-bottom:1px solid #eef1f4;align-items:flex-start}
+ .hop:last-child{border-bottom:none}
+ .hop .hstage{min-width:150px;font-size:11px;font-weight:700}
+ .hop .hex{font-family:var(--mono);font-size:11px;background:#f4f7f9;border:1px solid var(--line);
+  border-radius:5px;padding:5px 9px;color:#233240}
+ .hop .hwhy{font-size:11.5px;color:var(--sub);flex:1;line-height:1.5}
+ /* technical view frame */
+ .techframe{border:1.5px dashed var(--line);border-radius:12px;background:#fff;padding:34px;text-align:center;max-width:860px;margin:10px auto}
+ .techframe h2{font-size:16px;font-weight:500;margin:8px 0 6px}
+ .techframe p{font-size:12.5px;color:var(--sub);line-height:1.7;max-width:640px;margin:0 auto}
+ /* ==== technical view · faithful LegacyLineage recreation ==== */
+ .tv{max-width:1180px;margin:0 auto;font-size:13px}
+ .tvtabs{display:flex;gap:22px;border-bottom:1px solid var(--line);margin-bottom:10px}
+ .tvtab{padding:7px 2px;font-size:13px;color:var(--sub);cursor:default}
+ .tvtab.on{color:#111;font-weight:500;border-bottom:2.5px solid #1668b0}
+ .tvmodes{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-bottom:12px}
+ .tvm{padding:5px 16px;font-size:11.5px;color:var(--sub);background:#fff;cursor:default}
+ .tvm.on{background:#0f4775;color:#fff}
+ .fgshell{background:#fff;border:1px solid var(--line);border-radius:8px;margin-bottom:12px;overflow:hidden}
+ .fghead{display:flex;align-items:center;gap:11px;padding:12px 17px;
+  background:linear-gradient(to right,#eef3f8,#f7fafc);font-size:14.5px;font-weight:700;color:#10193b}
+ .fghead .meta{margin-left:auto;font-size:10.5px;color:#999;font-weight:400}
+ .fgbar{height:5px;width:100px;background:#e8edf2;border-radius:3px;overflow:hidden}
+ .fgbar i{display:block;height:100%;background:#159943}
+ .tblhead{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#fbfcfe;
+  border:1px solid var(--line);border-radius:6px;margin:14px 17px 0;font-size:13px}
+ .tblhead .mono2{font-family:var(--mono);font-weight:700;color:#10193b}
+ .pill{font-size:9px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+ .gridhdr,.gridrow{display:grid;grid-template-columns:16px 1fr 100px 56px 56px 46px 108px;gap:10px;
+  padding:7px 14px;align-items:center}
+ .gridhdr{background:#f7f9fa;font-size:8.5px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.4px;color:#999;margin:0 17px;border:1px solid var(--line);border-bottom:0}
+ .gridwrap{margin:0 17px 14px;border:1px solid var(--line);border-radius:0 0 6px 6px;overflow:hidden;background:#fff}
+ .gridrow{font-size:12px;border-top:1px solid #eef1f4}
+ .gridrow .fld{font-family:var(--mono);font-weight:600;color:#0f4775;text-decoration:underline dotted;text-underline-offset:3px;cursor:default}
+ .gridrow .dim{font-family:var(--mono);color:#666;font-size:11px}
+ .chainzone{padding:8px 14px 14px 40px;background:#fbfdfe;border-top:1px dashed var(--line)}
+ .chainlbl{font-size:9px;font-weight:700;text-transform:uppercase;color:#666;margin:6px 0}
+ .chainrow{display:flex;align-items:stretch;gap:6px;flex-wrap:wrap}
+ .cnode{border:1.5px solid var(--line);border-radius:8px;padding:7px 10px;min-width:140px;background:#fff;position:relative}
+ .cnode.def{border-color:#6d3ac0}
+ .cnode .stg3{font-size:8px;font-weight:800;text-transform:uppercase;padding:2px 6px;border-radius:3px;color:#fff;display:inline-block}
+ .cnode .cc{font-family:var(--mono);font-size:11.5px;color:#10193b;font-weight:600;margin-top:3px}
+ .cnode .ct{font-size:9px;color:#666;max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .cnode .defbdg{position:absolute;top:5px;right:7px;font-size:7.5px;font-weight:800;color:#6d3ac0;background:#efe6fb;border-radius:999px;padding:1px 5px}
+ .xfa{font-size:9px;color:#e67e22;font-family:var(--mono);text-align:center;max-width:84px;align-self:center}
+ /* InlineDef */
+ .idf{border:1.5px solid var(--line);border-left:5px solid #b5651d;border-radius:9px;background:#fbfcfe;margin:10px 14px 4px 40px;overflow:hidden}
+ .idfgrid{display:grid;grid-template-columns:1fr 1.25fr}
+ .idfdict{border-right:1px solid var(--line)}
+ .idfhead{font-size:11px;font-weight:800;color:#fff;padding:7px 14px;background:#b5651d}
+ .idfhead .rt{float:right;font-weight:400;opacity:.85}
+ .idfterm{font-size:14px;font-weight:700;color:#10193b;padding:10px 14px 4px}
+ .idfkv{display:grid;grid-template-columns:130px 1fr;gap:8px;padding:6px 14px;font-size:11px;border-top:1px solid #f0f3f6}
+ .idfkv .k{font-size:8.5px;font-weight:700;text-transform:uppercase;color:#999;padding-top:2px}
+ .jrow{display:flex;align-items:stretch;flex-wrap:wrap;row-gap:16px;padding:18px 2px 2px}
+ .jcard{flex:1 1 118px;min-width:108px;max-width:220px;position:relative;padding:0 5px}
+ .jbdg{position:absolute;top:0;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:7.5px;
+  font-weight:800;padding:2px 8px;border-radius:999px;z-index:1}
+ .jbox{border:1.5px solid var(--line);border-radius:9px;background:#fff;padding:8px 11px;height:100%}
+ .jarrow{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:30px;color:#999;font-size:13px}
+ .jxf{font-size:8.5px;color:#e67e22;font-family:var(--mono);max-width:92px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .prooft{border-collapse:collapse;font-size:11px}
+ .prooft th{text-align:left;padding:2px 16px 2px 0;font-size:8px;text-transform:uppercase}
+ .prooft td{padding:2px 16px 2px 0;font-family:var(--mono);color:#10193b}
+ .landchip{font-family:var(--mono);font-size:9.5px;margin:2px 4px 0 0;display:inline-block;padding:2px 8px;
+  border-radius:3px;background:#eef6fb;color:#0b5e83;border:1px solid #cfe6f2}
+ .whchip{font-size:10px;font-weight:700;padding:3px 11px;border-radius:12px;border:1.5px solid #0b7d9e;color:#0b7d9e;background:#fff}
+ .modalback{background:rgba(16,25,59,.45);border-radius:12px;padding:26px;margin:12px 17px}
+ .modalcard{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.38);max-width:1000px;margin:0 auto}
+ .modalhead{display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid var(--line);background:#fafcfc;font-size:12.5px}
+ .modalhead .x{margin-left:auto;font-size:14px;color:#666;cursor:pointer}
+ /* roomy text inside the popup only */
+ .modalcard .idfhead{font-size:12.5px;padding:10px 20px}
+ .modalcard .idfterm{font-size:18px;padding:16px 20px 6px}
+ .modalcard .idfkv{grid-template-columns:160px 1fr;gap:12px;padding:10px 20px;font-size:12.5px;line-height:1.7}
+ .modalcard .idfkv .k{font-size:9.5px}
+ .modalcard .prooft{font-size:12.5px}
+ .modalcard .prooft td{padding:4px 20px 4px 0}
+ .modalcard .chainlbl{font-size:10px}
+ .modalcard .jbox .cc{font-size:12.5px}
+ .modalcard .jbox .ct{font-size:10px}
+ .modalcard .landchip{font-size:10.5px;padding:3px 10px}
+ /* smart widths: identifiers are 10-20ch mono — names one line, cards hug content */
+ .jcard{flex:0 1 auto;min-width:15ch;max-width:26ch}
+ .jbox .cc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .cnode{min-width:16ch;max-width:28ch}
+ .cnode .cc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ /* popup reads top-to-bottom: lineage first, description below */
+ .modalcard .idfgrid{display:flex;flex-direction:column}
+ .modalcard .idfdict{order:2;border-right:none;border-top:1px solid var(--line)}
+ .storyband{border-top:1px solid var(--line);padding:12px 20px 14px}
+ .storyband h5{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#666;margin:0 0 9px}
+ .stflex{display:flex;align-items:stretch}
+ .starr{align-self:center;padding:0 10px;color:#999;font-size:15px;font-weight:700}
+ .stseg{flex:1;border-radius:9px;padding:10px 13px;text-align:center;background:#f4f7f9;border:1.5px solid var(--line)}
+ .stseg.hot{background:#fae5d3;border-color:#f0cba8}
+ .stseg .ic{font-size:19px}
+ .stseg .hd{font-size:12.5px;font-weight:700;margin-top:3px;color:#10193b}
+ .stseg.hot .hd{color:#8a5a1e}
+ .stseg .ex{font-family:var(--mono);font-size:10px;margin-top:4px;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .stseg .nt{font-size:10.5px;color:#666;margin-top:3px}
+</style></head><body>
+<div class="hdr"><b>Lineage</b><small>final implementation mockup — matches LineageHome + BizLineage as shipped</small>
+ <span id="hdrds"></span><span id="hdrview"></span>
+ <span class="esc">Esc / ← go up a level</span></div>
+<div class="wrap"><div id="crumb"></div><div id="stage"></div></div>
+<script>
+/* ================= data (shape = exactly what legacy_lineage/proof/dictionary provide) ================= */
+const GROUPS=[
+ {id:'am',name:'Account Master & Reference',tables:4,tablesMapped:3,fields:497,pct:67},
+ {id:'hist',name:'History',tables:5,tablesMapped:4,fields:102,pct:66},
+ {id:'other',name:'Other',tables:3,fields:57,pct:44},
+ {id:'audit',name:'Audit Trail & Change History',tables:9,fields:179,pct:0},
+ {id:'intra',name:'Intraday / API Keys',tables:4,fields:220,pct:0},
+ {id:'pos',name:'Positions',tables:6,tablesMapped:6,fields:88,pct:92}];
+const TABLES_BY_DS={PBDW:{am:[
+ {id:'DIM_ACCOUNT',desc:'account master',fields:251,pct:96,src:true},
+ {id:'DIM_INTERESTED_PARTY',desc:'related parties',fields:118,pct:71,src:true},
+ {id:'DIM_SECURITY',desc:'security master',fields:96,pct:88,src:true},
+ {id:'REF_ACCOUNT_TYPE',desc:'reference codes — source not yet mapped',fields:32,pct:0,src:false}]},
+ IMDS:{am:[{id:'DIM_PORTFOLIO',desc:'portfolio master',fields:142,pct:52,src:true},
+  {id:'FACT_PERFORMANCE',desc:'performance returns',fields:96,pct:31,src:true}]}};
+const TABLES={get am(){return (TABLES_BY_DS[st.ds]||TABLES_BY_DS.PBDW).am;}};
+/* kind: pass | xf | gap | ud   (xfAt: which hop 0/1/2) */
+const FIELDS={DIM_ACCOUNT:[
+ {c:'ACCOUNT_LONG_NAME_1',kind:'xf',xfAt:2,tag:'spaces trimmed',v:'clean'},
+ {c:'ACCOUNT_LONG_NAME_2',kind:'xf',xfAt:2,tag:'spaces trimmed',v:'clean'},
+ {c:'ACCOUNT_LONG_NAME_3',kind:'gap',tag:'no source'},
+ {c:'ACCOUNT_LONG_NAME_4',kind:'gap',tag:'no source'},
+ {c:'ACCOUNT_NUMBER',kind:'xf',xfAt:2,tag:'standardized',v:'clean'},
+ {c:'ACCOUNT_SHORT_NAME',kind:'pass',tag:'as-is',v:'clean'},
+ {c:'ACCOUNT_MAIL_ADDRESS_1',kind:'pass',tag:'as-is',v:'clean'},
+ {c:'ACCOUNT_MAIL_ADDRESS_2',kind:'pass',tag:'as-is',v:'clean'},
+ {c:'ACCOUNT_STATUS_CD',kind:'pass',tag:'as-is',v:'clean'},
+ {c:'TRANS_TO_PRIN_DATE',kind:'xf',xfAt:2,tag:'text → date',v:'changed'},
+ {c:'USER_DEFINED_ATTRIBUTE_CLOB',kind:'ud',tag:'12 UD keys',v:'none'},
+ {c:'↳ UD_7 · GST EXEMPT FLAG',kind:'ud',tag:'key UD_7',v:'clean'},
+ {c:'ACCOUNT_OPEN_DATE',kind:'pass',tag:'as-is',v:'clean'},
+ {c:'OFFICE_CODE',kind:'pass',tag:'as-is',v:'clean'}]};
+const DETAIL={
+ 'ACCOUNT_LONG_NAME_1':{title:'Account Long Name — line 1',
+  vals:['GST EXEMPT TCB FBO BFP U/A DTD<span class=sp>···</span>','GST EXEMPT TCB FBO BFP U/A DTD<span class=sp>···</span>','GST EXEMPT TCB FBO BFP U/A DTD','GST EXEMPT TCB FBO BFP U/A DTD'],
+  okFrom:2,xfLabel:'✂ extra spaces removed',
+  what:'The full name of the account, as entered in AddVantage — up to 32 characters, required. Used on customer statements and administrative reports. The same name also feeds interested-party and security screens.',
+  src:'AddVantage dictionary · Master Account Master · BI/2-1 · the only change on the journey: trailing spaces removed',
+  verify:{ok:true,txt:'✓ value verified stage-to-stage · Variance 360'}},
+ 'ACCOUNT_NUMBER':{title:'Account Number',
+  vals:['08427107','08427107','8427107','8427107'],okFrom:2,xfLabel:'⚙ standardized — leading zero removed',
+  what:'The primary account identifier as carried on statements and client communications.',
+  src:'AddVantage dictionary · Master Account Master · BI/7-1 · standardization applies the house numbering convention',
+  verify:{ok:true,txt:'✓ value verified stage-to-stage · Variance 360'}},
+ 'TRANS_TO_PRIN_DATE':{title:'Transfer To Principal Date',
+  vals:['20240630','20240630','2024-06-30','2024-06-30'],okFrom:2,xfLabel:'📅 text turned into a real date',
+  what:'The date a transfer to principal takes effect. Arrives as plain text from AddVantage and becomes a true date in staging.',
+  src:'AddVantage dictionary · date format YYYYMMDD in a text field',
+  verify:{ok:false,txt:'⚠ value changes flagged — 11 of 272,406 rows fail the date mask'}},
+ 'ACCOUNT_LONG_NAME_3':{title:'Account Long Name — line 3',gap:true,
+  what:'This warehouse column has no mapped source — it exists in DIM_ACCOUNT but nothing feeds it today. It may be legacy headroom or an unmapped feed; the census keeps it visible instead of hiding it.',
+  src:'lineage status: NO SOURCE — candidate for the migration decision list',
+  verify:{ok:false,txt:'◌ nothing to verify — no source mapped'}},
+ 'USER_DEFINED_ATTRIBUTE_CLOB':{title:'User-Defined Attributes (the envelope)',ud:true,
+  vals:['{"UD_1":"NY27","UD_7":"Y"…}','{"UD_1":"NY27","UD_7":"Y"…}','kept as-is + opened','12 separate UD fields'],okFrom:2,xfLabel:'📦 envelope opened — 12 fields inside',
+  what:'A packet of client-specific extension attributes carried as one JSON envelope. We keep the envelope AND open it: each UD key becomes its own traceable field with its own definition.',
+  src:'UD explosion: is_ud = Y rows · flat CLOB also kept · each UD key individually in the census',
+  verify:{ok:true,txt:'✓ value verified stage-to-stage · Variance 360'}}};
+DETAIL['ACCOUNT_LONG_NAME_2']=Object.assign({},DETAIL['ACCOUNT_LONG_NAME_1'],{title:'Account Long Name — line 2'});
+DETAIL['↳ UD_7 · GST EXEMPT FLAG']={title:'UD_7 — GST Exempt Flag',
+ vals:['inside UD envelope','inside UD envelope','"Y"','"Y"'],okFrom:2,xfLabel:'📦 taken out of the envelope',
+ what:'A yes/no flag marking the account GST-exempt. It travels inside the user-defined envelope and becomes its own field when the envelope is opened.',
+ src:'exploded from USER_DEFINED_ATTRIBUTE_CLOB · key UD_7 · synthesized lineage row',
+ verify:{ok:true,txt:'✓ value verified stage-to-stage · Variance 360'}};
+const SOURCES=[
+ {id:'PBDW',icon:'🏪',name:'PB Data Warehouse',sub:'private banking · statements, billing, client reporting',
+  groups:6,tables:42,fields:1143,pct:61},
+ {id:'IMDS',icon:'📈',name:'IM Data Warehouse',sub:'investment management · portfolios, performance, holdings',
+  groups:4,tables:28,fields:864,pct:38}];
+const STAGES=[['🏦','AddVantage','nightly file'],['📥','Landed','staging 1'],['🧼','Cleaned','staging 2'],['🏪','Warehouse','']];
+/* full dictionary + complete transformation chain per column (business view · level 4) */
+const FULLDICT={
+ 'ACCOUNT_LONG_NAME_1':{
+  longDesc:'Stores the full legal name of the account as entered at account opening in AddVantage, line 1 of up to 5 name lines. This is the primary display name used on most customer-facing and administrative output: periodic statements, confirmations, account-opening letters, fee invoices and internal administrative reports. For trust and fiduciary accounts the line typically carries the trust registration wording (e.g. trustee designations, U/A and DTD clauses); continuation of long registrations flows into Long Name lines 2 through 5. The field is REQUIRED at entry, alphanumeric, one line of up to 32 characters in AddVantage. Because the same field code (BI/2-1) exists on other masters, the identical position on the Interested Party Master holds the interested party full name and on the Security Issue Master the security name — field identity is always master + code, resolved from the source file.',
+  attrs:[['Field code','BI/2-1 (canonical BI_2_1)'],['Master','Master Account Master'],['Group','Basic Information (BI)'],
+   ['AddVantage type','A · 1 line / 32 · Required'],['Warehouse type','VARCHAR2(42)'],
+   ['Privacy class','Client-identifying · masked in lower environments'],
+   ['Same code, other masters','Interested Party Full Name Line 1 · Security Name Line 1']],
+  hops:[
+   {st:'AddVantage → Landed',ex:'direct move · BI_2_L1 → BI_2_1',why:'The nightly file field is physicalized into the staging-1 table exactly as delivered — fixed-width padding included. Name normalizes L1 → 1.'},
+   {st:'Landed → Cleaned',ex:'RTRIM(BI_2_1)  →  ACCOUNT_LONG_NAME_1',why:'The single transformation on this field: AddVantage pads fixed-width records, so trailing spaces are trimmed. The column is also renamed to its business name.'},
+   {st:'Cleaned → Warehouse',ex:'direct move',why:'Loaded into DIM_ACCOUNT with no further change — what you see in the warehouse is the cleaned value, byte for byte.'}]},
+ 'ACCOUNT_NUMBER':{
+  longDesc:'The primary account identifier as printed on statements and used in all client communications. Assigned in AddVantage at account opening; the source file carries it with a leading zero as part of the fixed-width numeric convention, which is removed on the way to the warehouse so that the number matches the house numbering convention used across downstream reporting and billing.',
+  attrs:[['Field code','BI/7-1'],['Master','Master Account Master'],['AddVantage type','N · 8 · Required'],
+   ['Warehouse type','VARCHAR2(20)'],['Uniqueness','Unique per account']],
+  hops:[
+   {st:'AddVantage → Landed',ex:'direct move',why:'Delivered as fixed-width numeric text, leading zero intact.'},
+   {st:'Landed → Cleaned',ex:'canon(BI_7_1) → ACCOUNT_NUMBER',why:'The house standardization: leading zeros stripped and the identifier validated against the numbering convention.'},
+   {st:'Cleaned → Warehouse',ex:'direct move',why:'Loaded into DIM_ACCOUNT unchanged.'}]},
+ 'TRANS_TO_PRIN_DATE':{
+  longDesc:'The effective date of a transfer to principal on the account. AddVantage stores this as plain text in YYYYMMDD form inside a character field; the warehouse holds a true DATE so that date arithmetic and reporting filters work correctly. The conversion is where the 11 known bad rows surface — values in the source that do not parse as valid dates.',
+  attrs:[['Field code','TA/14-2'],['Master','Master Account Master'],['AddVantage type','A · 8 · date-as-text'],
+   ['Warehouse type','DATE'],['Known issues','11 of 272,406 rows fail the YYYYMMDD mask — under review']],
+  hops:[
+   {st:'AddVantage → Landed',ex:'direct move',why:'Text arrives exactly as keyed.'},
+   {st:'Landed → Cleaned',ex:"TO_DATE(TA_14_2,'YYYYMMDD')",why:'Text becomes a real date. Rows that fail the mask are quarantined and surfaced in Variance 360.'},
+   {st:'Cleaned → Warehouse',ex:'direct move',why:'True DATE loaded into DIM_ACCOUNT.'}]},
+ 'USER_DEFINED_ATTRIBUTE_CLOB':{
+  longDesc:'A packet of client-specific extension attributes carried as one JSON envelope on the account record. Business areas use UD keys for attributes the core system has no field for — exemption flags, servicing markers, office-specific codes. The warehouse keeps the envelope exactly as delivered AND opens it: every UD key becomes its own individually traceable field with its own definition, so nothing inside the envelope is invisible to lineage, impact analysis, or governance.',
+  attrs:[['Field','USER_DEFINED_ATTRIBUTE_CLOB'],['Contents','12 UD keys currently in use'],
+   ['Warehouse handling','flat CLOB kept + exploded UD_n views (is_ud = Y)'],
+   ['Governance','each UD key carries its own definition and PII class']],
+  hops:[
+   {st:'AddVantage → Landed',ex:'direct move (JSON text)',why:'The envelope travels intact.'},
+   {st:'Landed → Cleaned',ex:'kept as-is + JSON keys parsed',why:'The envelope is preserved and simultaneously opened: each UD_n key is parsed out.'},
+   {st:'Cleaned → Warehouse',ex:'CLOB + 12 exploded UD fields',why:'Both views land: the flat envelope and twelve first-class UD fields, each with synthesized lineage.'}]}};
+FULLDICT['ACCOUNT_LONG_NAME_2']=FULLDICT['ACCOUNT_LONG_NAME_1'];
+FULLDICT['UD_7 · GST EXEMPT FLAG']={
+ longDesc:'A yes/no flag marking the account exempt from GST. It travels inside the user-defined envelope (key UD_7) and becomes its own field when the envelope is opened, with its own definition and trace — governance treats it exactly like a native field.',
+ attrs:[['Origin','USER_DEFINED_ATTRIBUTE_CLOB · key UD_7'],['Values','Y / N'],
+  ['Lineage','synthesized row · lineage_status = UD Attribute']],
+ hops:[{st:'Envelope → Field',ex:"JSON key 'UD_7' → UD_7",why:'Taken out of the envelope during the staging parse.'},
+  {st:'Field → Warehouse',ex:'direct move',why:'Lands as an individually queryable UD field.'}]};
+
+/* ================= state + navigation ================= */
+let st={level:-1,ds:null,view:'business',group:null,table:null,col:null,filter:'',
+ pills:{pass:true,xf:true,gap:true,ud:true}};
+function pickDs(d,v){st.ds=d;if(v)st.view=v;st.level=0;render();}
+function setView(v){st.view=v;render();}
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+function go(l,g,t,c){st.level=l;if(g!==undefined)st.group=g;if(t!==undefined)st.table=t;
+ if(c!==undefined)st.col=c;if(l<3){st.filter='';}render();}
+function up(){if(st.level>-1)go(st.level-1);}
+document.addEventListener('keydown',(e)=>{
+ if(e.key==='Escape'||(e.key==='ArrowLeft'&&document.activeElement.tagName!=='INPUT'))up();});
+
+/* ================= renderers ================= */
+function crumb(){
+ if(st.level===-1){$('crumb').innerHTML='';return;}
+ const parts=[`<a onclick="go(-1)">Sources</a>`,
+  st.level===0?`<b>${st.ds}</b>`:`<a onclick="go(0)">${st.ds}</a>`];
+ if(st.level>=1&&st.group)parts.push(st.level===1?`<b>${esc(gName())}</b>`:`<a onclick="go(1)">${esc(gName())}</a>`);
+ if(st.level>=2&&st.table)parts.push(st.level===2?`<b>${esc(st.table)}</b>`:`<a onclick="go(2)">${esc(st.table)}</a>`);
+ if(st.level===3&&st.col)parts.push(`<b>${esc(st.col)}</b>`);
+ $('crumb').innerHTML=parts.join('<span class="sep">›</span>');
+}
+const gName=()=>(GROUPS.find(g=>g.id===st.group)||{}).name||'';
+function ring(p){const col=p===0?'#c2ccd4':p<60?'var(--warn)':'var(--ok)';
+ return `<div class="ring" style="background:conic-gradient(${col} 0 ${p}%,#edf1f4 ${p}% 100%)"><span>${p}%</span></div>`;}
+function spine(extra){
+ return `<div class="spine">`+STAGES.map((s,i)=>{
+  const link=i<3?`<div class="link2">${extra&&extra.xfAt===i+1&&extra.lbl?`<span class="lbl">${extra.lbl}</span>`:''}</div>`:'';
+  const v=extra&&extra.vals?`<div class="value ${extra.okFrom!=null&&i>=extra.okFrom?'ok':''}">${extra.vals[i]}</div>`:'';
+  return `<div class="node"><div class="circ" style="border-color:${['#7c3aed','#0091bf','#e67e22','#0f4775'][i]}">${s[0]}</div><b>${s[1]}</b><small>${i===3?st.ds||'':s[2]}</small>${v}</div>${link}`;
+ }).join('')+`</div>`;}
+
+function hdrbits(){
+ $('hdrds').innerHTML=st.ds?`<span class="dschip" onclick="go(-1)">${st.ds} ▾${st.ds==='IMDS'?' <span style="font-size:8px;font-weight:700;border-radius:999px;padding:1px 6px;background:#e67e22;color:#fff">IN BUILD</span>':''}</span>`:'';
+ $('hdrview').innerHTML=st.ds?`<span class="viewsw">
+  <span class="${st.view==='business'?'on':''}" onclick="setView('business')">Business view</span>
+  <span class="${st.view==='technical'?'on':''}" onclick="setView('technical')">Technical view</span></span>`:'';}
+function render(){crumb();hdrbits();const el=$('stage');el.style.animation='none';void el.offsetWidth;el.style.animation='';
+ if(st.level===-1)return renderLanding(el);
+ if(st.view==='technical')return renderTechnical(el);
+ if(st.level===0)renderEstate(el);else if(st.level===1)renderGroup(el);
+ else if(st.level===2)renderTable(el);else renderColumn(el);}
+
+function renderLanding(el){
+ el.innerHTML=`<h1 style="margin-top:26px">Data lineage</h1>
+ <div class="subt">pick a warehouse — then choose how you want to read it</div>
+ <div class="dscards">`+SOURCES.map(d=>
+  `<div class="dscard" style="cursor:default"><div class="big">${d.icon}</div>
+   <h2>${d.id}${d.id==='IMDS'?' <span style="font-size:8.5px;font-weight:700;letter-spacing:.05em;border-radius:999px;padding:2px 8px;background:#e67e22;color:#fff;vertical-align:3px">IN BUILD</span>':''}</h2><small>${esc(d.name)}<br>${esc(d.sub)}</small>
+   <div style="display:flex;gap:10px;margin-top:16px">
+    <div onclick="pickDs('${d.id}','business')" style="flex:1;padding:11px 8px;border-radius:9px;cursor:pointer;background:#0f4775;color:#fff">
+     <div style="font-size:16px">📖</div><b style="font-size:12px">Business view</b>
+     <div style="font-size:9.5px;opacity:.85">pictorial drill · anyone can read it</div></div>
+    <div onclick="pickDs('${d.id}','technical')" style="flex:1;padding:11px 8px;border-radius:9px;cursor:pointer;background:#fff;color:#0f4775;border:1.5px solid #0f4775">
+     <div style="font-size:16px">🛠</div><b style="font-size:12px">Technical view</b>
+     <div style="font-size:9.5px;opacity:.8">full developer screen · chains · proof</div></div>
+   </div>
+   <div class="dsstat"><span><b>${d.groups}</b>groups</span><span><b>${d.tables}</b>tables</span>
+   <span><b>${d.fields.toLocaleString()}</b>fields</span><span><b>${d.pct}%</b>mapped</span></div></div>`).join('')+
+ `</div>
+ <div class="more" style="margin-top:22px">choose your door per warehouse — the header switch stays for flipping mid-flight · deep-links from search land straight in Technical:
+  <b>Business view</b> — the pictorial drill you can hand to anyone ·
+  <b>Technical view</b> — the full developer screen (your existing Lineage, unchanged)</div>`;}
+
+function renderTechnical(el){
+ const foc = st.col || 'ACCOUNT_LONG_NAME_1';
+ el.innerHTML=`<div class="tv">
+ <div style="font-size:11px;color:var(--sub);margin-bottom:8px">Technical view · your LegacyLineage, unchanged — rendered here exactly as it looks today${st.col?` · deep-linked from Business view on <b class=\"mono\">${esc(foc)}</b>`:''}</div>
+ <div class="tvtabs"><div class="tvtab on">Lineage by Functional Group</div><div class="tvtab">Dependency View</div></div>
+ <div style="display:flex;gap:12px;align-items:center">
+  <div class="tvmodes"><div class="tvm on">table</div><div class="tvm">map</div><div class="tvm">biz</div></div>
+  <input placeholder="Search table…" style="height:29px;border:1px solid var(--line);border-radius:3px;padding:0 10px;font-size:12px;width:200px;background:#fff">
+ </div>
+ <div class="fgshell">
+  <div class="fghead"><span style="font-size:10;color:#999">▾</span> Account Master &amp; Reference Data
+   <span class="meta">15 tables · 497 fields · 67% mapped · ${st.ds}</span>
+   <span class="fgbar"><i style="width:67%"></i></span></div>
+  <div class="tblhead"><span style="color:#999;font-size:10px">▾</span>
+   <span class="mono2">DIM_ACCOUNT</span>
+   <span class="pill" style="background:#e0f5fd;color:#0091bf">DIMENSION</span>
+   <span style="margin-left:auto;font-size:10.5px;color:#999">251 fields · 240 mapped · 12 UD</span></div>
+  <div class="gridhdr" style="margin-top:0"><span></span><span>Field (click for definition + lineage)</span><span>Type</span><span>Len</span><span>Prec</span><span>UD</span><span>Variance</span></div>
+  <div class="gridwrap">
+   <div class="gridrow"><span style="color:#999;font-size:10px">▶</span><span class="fld">ACCOUNT_KEY</span>
+    <span class="dim">NUMBER</span><span class="dim">—</span><span class="dim">—</span><span></span>
+    <span><span class="pill" style="background:#f0f0f2;color:#888">N/A</span></span></div>
+   <div class="gridrow" style="background:#f6fafc"><span style="color:#999;font-size:10px">▾</span>
+    <span><span class="fld">▾ ${esc(foc)}</span></span>
+    <span class="dim">VARCHAR2</span><span class="dim">42</span><span class="dim">—</span><span></span>
+    <span><span class="pill" style="background:#d0ebd9;color:#159943">CLEAN</span></span></div>
+   <div class="chainzone">
+    <div class="chainlbl">Backward lineage — primary chain</div>
+    <div class="chainrow">
+     <div class="cnode def"><span class="defbdg">ⓘ def</span><span class="stg3" style="background:#7c3aed">SRC</span>
+      <div class="cc">BI_2_L1</div><div class="ct">Addv-MSTR-ACC-SB_BBU-TRP.dat</div></div>
+     <div class="xfa">→<br>N/A</div>
+     <div class="cnode"><span class="stg3" style="background:#00a3a3">STG1</span>
+      <div class="cc">BI_2_1</div><div class="ct">STG1_MASTER_ACCOUNT_INTRADAY · VARCHAR2/42</div></div>
+     <div class="xfa">→<br>RTRIM</div>
+     <div class="cnode"><span class="stg3" style="background:#0091bf">STG2</span>
+      <div class="cc">ACCOUNT_LONG_NAME_1</div><div class="ct">STG2_MASTER_ACCOUNT · VARCHAR2/42</div></div>
+     <div class="xfa">→<br>N/A</div>
+     <div class="cnode"><span class="stg3" style="background:#0f4775">DWH</span>
+      <div class="cc">ACCOUNT_LONG_NAME_1</div><div class="ct">DIM_ACCOUNT · VARCHAR2/42</div></div>
+    </div>
+    <div class="chainlbl" style="margin-top:10px">Stage-by-stage proof (sample)</div>
+    <table class="prooft"><tr><th style="color:#7c3aed">SRC</th><th style="color:#00a3a3">STG1</th>
+     <th style="color:#0091bf">STG2</th><th style="color:#0f4775">DWH</th></tr>
+     <tr><td>GST EXEMPT TCB FBO BFP U/A DTD&nbsp;&nbsp;</td><td>GST EXEMPT TCB FBO BFP U/A DTD&nbsp;&nbsp;</td>
+     <td>GST EXEMPT TCB FBO BFP U/A DTD</td><td>GST EXEMPT TCB FBO BFP U/A DTD</td></tr></table>
+   </div>
+   <div style="font-size:10.5px;color:var(--sub);margin:10px 17px 0">clicking the field (or a map/rail card) now opens the definition as a centered popup — full width, dimmed backdrop, Esc closes; no more bottom-of-rail squeeze:</div>
+   <div class="modalback"><div class="modalcard">
+   <div class="modalhead"><b>DIM_ACCOUNT.ACCOUNT_LONG_NAME_1 · Master Account Master</b>
+    <span style="margin-left:auto;font-size:10.5px;color:#999">Esc or click outside to close</span><span class="x">✕</span></div>
+   <div class="idf" style="margin:10px 14px 14px;border-left-width:5px"><div class="idfgrid">
+    <div class="idfdict">
+     <div class="idfhead">Master Account Master · BI/2-1<span class="rt">ADDVANTAGE dictionary</span></div>
+     <div class="idfterm">Account Long Name Line 1</div>
+     <div class="idfkv"><span class="k">DB field code</span><b class="mono" style="font-size:11px">BI_2_1 <i style="color:#999">(from BI/2-1)</i></b></div>
+     <div class="idfkv"><span class="k">Group</span><span>Basic Information (BI)</span></div>
+     <div class="idfkv"><span class="k">Data type</span><b class="mono" style="font-size:11px">A · 1 line/32 · Required</b></div>
+     <div class="idfkv"><span class="k">Description</span><span style="line-height:1.55">Stores full name of account. Used on most customer and administrative reports.</span></div>
+     <div class="idfkv"><span class="k">Same code, other masters</span><span>Interested Party Master — Interested Party Full Name Line 1 · Security Issue Master — Security Name Line 1
+      <i style="display:block;font-size:9px;color:#999;margin-top:2px">Shown: Master Account Master — resolved from the source file / staging table (field identity is master + code).</i></span></div>
+    </div>
+    <div style="padding:10px 14px">
+     <div class="chainlbl">Lineage — full chain · ${st.ds}</div>
+     <div class="jrow">
+      <div class="jcard"><div class="jbox"><span class="stg3" style="background:#7c3aed">SRC</span>
+       <div class="cc">BI_2_L1</div><div class="ct" style="white-space:normal">SRC_MASTER_ACCOUNT_INTRADAY</div></div></div>
+      <div class="jarrow">→</div>
+      <div class="jcard"><span class="jbdg" style="background:#efe6fb;color:#6d3ac0">PHYSICALIZED ▾</span>
+       <div class="jbox"><span class="stg3" style="background:#00a3a3">STG1</span>
+       <div class="cc">BI_2_1</div><div class="ct" style="white-space:normal">STG1_MASTER_ACCOUNT_INTRADAY · VARCHAR2(42)</div></div></div>
+      <div class="jarrow">→<span class="jxf">RTRIM</span></div>
+      <div class="jcard"><span class="jbdg" style="background:#fae5d3;color:#a8560f">RENAMED ▾</span>
+       <div class="jbox"><span class="stg3" style="background:#0091bf">STG2</span>
+       <div class="cc">ACCOUNT_LONG_NAME_1</div><div class="ct" style="white-space:normal">STG2_MASTER_ACCOUNT · VARCHAR2(42)</div></div></div>
+      <div class="jarrow">→</div>
+      <div class="jcard"><div class="jbox"><span class="stg3" style="background:${st.ds==='IMDS'?'#0b7d9e':'#0f4775'}">DWH · ${st.ds}</span>
+       <div class="cc">ACCOUNT_LONG_NAME_1</div><div class="ct" style="white-space:normal">DIM_ACCOUNT · VARCHAR2(42)</div></div></div>
+     </div>
+     <div style="margin-top:10px"><span class="chainlbl" style="display:inline">Also lands in (${st.ds}): </span>
+      <span class="landchip">DIM_INTERESTED_PARTY.FULL_NAME_1</span>
+      <span class="landchip">DIM_SECURITY.PRINT_NAME_1</span></div>
+     <div style="margin-top:10px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <span class="chainlbl" style="display:inline;margin:0">Same field, other warehouse:</span>
+      <span class="whchip">${st.ds==='PBDW'?'IMDS':'PBDW'} — DIM_PORTFOLIO.PORTFOLIO_LONG_NAME ↗</span></div>
+    </div>
+    <div class="storyband"><h5>What happens to this column — in plain terms</h5>
+     <div class="stflex">
+      <div class="stseg"><div class="ic">📥</div><div class="hd">arrives as delivered</div>
+       <div class="ex">BI_2_L1 → BI_2_1</div><div class="nt">same field · database-legal name</div></div>
+      <div class="starr">→</div>
+      <div class="stseg hot"><div class="ic">🧼</div><div class="hd">extra spaces removed</div>
+       <div class="ex">RTRIM(BI_2_1)</div><div class="nt">takes its business name: ACCOUNT_LONG_NAME_1</div></div>
+      <div class="starr">→</div>
+      <div class="stseg"><div class="ic">🏪</div><div class="hd">stored in the warehouse</div>
+       <div class="ex">direct move</div><div class="nt">what you query in DIM_ACCOUNT</div></div>
+     </div></div>
+   </div></div>
+   </div></div>
+   <div class="gridrow"><span style="color:#999;font-size:10px">▶</span><span class="fld">ACCOUNT_LONG_NAME_2</span>
+    <span class="dim">VARCHAR2</span><span class="dim">42</span><span class="dim">—</span><span></span>
+    <span><span class="pill" style="background:#d0ebd9;color:#159943">CLEAN</span></span></div>
+   <div class="gridrow"><span style="color:#999;font-size:10px">▶</span>
+    <span><span class="fld" style="color:#999;text-decoration:none">↳ UD_7</span></span>
+    <span class="dim">VARCHAR2</span><span class="dim">1</span><span class="dim">—</span>
+    <span><span class="pill" style="background:#efe6fb;color:#7c3aed">UD</span></span>
+    <span><span class="pill" style="background:#d0ebd9;color:#159943">CLEAN</span></span></div>
+  </div>
+ </div>
+ <div style="text-align:center;font-size:10.5px;color:var(--sub);padding-bottom:8px">
+  map · biz modes, alt source chains, and the Dependency View swimlanes all live here too — with the Linkage Map spacing fix applied (cards size to content, panels float above the wires)</div>
+ </div>`;}
+function renderEstate(el){
+ el.innerHTML=`<h1>Where our data comes from</h1>
+ <div class="subt">one journey, every field — click an area to zoom in</div>${spine()}
+ <div class="cards">`+GROUPS.map(g=>
+  `<div class="card" onclick="go(1,'${g.id}')">${ring(g.pct)}<div><h3>${esc(g.name)}</h3>
+   <small>${g.tablesMapped!=null?g.tablesMapped+' of ':''}${g.tables} tables mapped · ${g.fields} fields${g.pct===0?' · not started':''}</small></div></div>`).join('')+`</div>`;}
+
+function renderGroup(el){
+ const tabs=TABLES[st.group]||[];
+ el.innerHTML=`<h1>${esc(gName())}</h1>
+ <div class="subt">${tabs.filter(t=>t.src).length} of ${tabs.length} tables mapped · one row per table — click a table</div>`+
+ (tabs.length?tabs.map(t=>
+  `<div class="trow" onclick="${t.src?`go(2,undefined,'${t.id}')`:''}" ${t.src?'':'style="opacity:.75;cursor:default"'}>
+   <div class="mini ${t.src?'':'q'}">${t.src?'🏦':'?'}</div><div class="mline"></div>
+   <div class="mini">⚙</div><div class="mline"></div>
+   <div class="mini" style="background:#eef5fb">🏪</div>
+   <div class="nm"><b>${t.id}</b><small>${esc(t.desc)} · ${t.fields} fields</small></div>
+   <div class="bar"><i style="width:${t.pct}%"></i></div>
+   <div class="pct" ${t.pct===0?'style="color:var(--gap)"':''}>${t.pct}%</div></div>`).join('')
+ :`<div class="more">mapping for this group hasn\u2019t started — tables appear here when the first workbook lands</div>`);}
+
+function dotRow(f){
+ const D=(cls)=>`<span class="d ${cls}"></span>`,S=(e)=>`<span class="seg ${e?'e':''}"></span>`;
+ if(f.kind==='gap')return D('e')+S(1)+D('e')+S(1)+D('e')+S(1)+D('');
+ if(f.kind==='ud')return D('u')+S()+D('u')+S()+D('u')+S()+D('u');
+ const dots=[0,1,2,3].map(i=>D(f.kind==='xf'&&i===f.xfAt?'t':''));
+ return dots[0]+S()+dots[1]+S()+dots[2]+S()+dots[3];}
+function tagStyle(f){return f.kind==='pass'?'background:var(--okbg);color:#0d6b31'
+ :f.kind==='xf'?'background:var(--warnbg);color:var(--warn)'
+ :f.kind==='ud'?'background:var(--udbg);color:var(--ud)':'background:var(--gapbg);color:var(--gap)';}
+function setPill(k){st.pills[k]=!st.pills[k];render();}
+function setFilter(v){st.filter=v;renderTable($('stage'),true);crumb();}
+
+function renderTable(el,keepFocus){
+ const all=FIELDS[st.table]||[];
+ const rows=all.filter(f=>st.pills[f.kind]&&f.c.toLowerCase().includes(st.filter.toLowerCase()));
+ const counts={pass:0,xf:0,gap:0,ud:0};all.forEach(f=>counts[f.kind]++);
+ const vc={clean:0,changed:0,none:0};all.forEach(f=>vc[(f.v==='clean'||f.v==='changed')?f.v:'none']++);
+ el.innerHTML=`<h1>${esc(st.table)}</h1>
+ <div class="subt">every field\u2019s journey in four dots — the whole story at a glance</div>
+ <div class="tools">
+  <input id="flt" placeholder="type to filter ${all.length} fields…" value="${esc(st.filter)}" oninput="setFilter(this.value)">
+  <span class="fpill ${st.pills.pass?'on':''}" style="background:var(--okbg);color:#0d6b31" onclick="setPill('pass')">as-is · ${counts.pass}</span>
+  <span class="fpill ${st.pills.xf?'on':''}" style="background:var(--warnbg);color:var(--warn)" onclick="setPill('xf')">changed · ${counts.xf}</span>
+  <span class="fpill ${st.pills.ud?'on':''}" style="background:var(--udbg);color:var(--ud)" onclick="setPill('ud')">UD · ${counts.ud}</span>
+  <span class="fpill ${st.pills.gap?'on':''}" style="background:var(--gapbg);color:var(--gap)" onclick="setPill('gap')">no source · ${counts.gap}</span></div>
+ <div class="tools" style="margin-top:-4px;margin-bottom:12px">
+  <b style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--sub)">Proof variance · Variance 360</b>
+  <span class="fpill" style="background:var(--okbg);color:#0d6b31">✓ ${vc.clean} verified clean</span>
+  <span class="fpill" style="background:var(--warnbg);color:#a8560f">⚠ ${vc.changed} value changes flagged</span>
+  <span class="fpill" style="background:#edf1f4;color:#666">◌ ${vc.none} no sample yet</span></div>
+ <div class="legend">
+  <span style="display:flex;gap:6px;align-items:center"><span class="d"></span> flows as-is</span>
+  <span style="display:flex;gap:6px;align-items:center"><span class="d t"></span> changed on that hop</span>
+  <span style="display:flex;gap:6px;align-items:center"><span class="d u"></span> user-defined envelope</span>
+  <span style="display:flex;gap:6px;align-items:center"><span class="d e"></span> missing — no source</span></div>`+
+ rows.map(f=>`<div class="crow" onclick="go(3,undefined,undefined,'${f.c}')">
+   <span class="cn">${esc(f.c)}</span><div class="dots">${dotRow(f)}</div>
+   <span title="${f.v==='clean'?'proof verified clean':f.v==='changed'?'value changes flagged':'no sample captured'}"
+    style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:${f.v==='clean'?'#159943':f.v==='changed'?'#e67e22':'#c2ccd4'}"></span>
+   <span class="tag2" style="${tagStyle(f)}">${esc(f.tag)}</span></div>`).join('')+
+ `<div class="more">${rows.length} of ${all.length} shown · in the real screen the rest of the 251 stream in on scroll</div>`;
+ if(keepFocus){const i=$('flt');i.focus();i.setSelectionRange(i.value.length,i.value.length);}}
+
+function renderColumn(el){
+ const d=DETAIL[st.col];
+ const flist=FIELDS[st.table]||[];const idx=flist.findIndex(f=>f.c===st.col);
+ const nav=`<div class="navrow">
+  ${idx>0?`<span onclick="go(3,undefined,undefined,'${flist[idx-1].c}')">← ${esc(flist[idx-1].c)}</span>`:''}
+  ${idx<flist.length-1?`<span onclick="go(3,undefined,undefined,'${flist[idx+1].c}')">${esc(flist[idx+1].c)} →</span>`:''}</div>`;
+ if(!d){el.innerHTML=`<h1>${esc(st.col)}</h1><div class="subt">journey detail</div>${spine()}
+  <div class="defbox"><p>This field flows unchanged from AddVantage to the warehouse.</p>
+  <div class="verify" style="background:#edf1f4;color:#666">◌ no sample captured for this field yet</div></div>${nav}`;return;}
+ if(d.gap){el.innerHTML=`<h1>${esc(d.title)}</h1><div class="subt">the honest picture — a gap is still a picture</div>
+  <div class="spine">
+   <div class="node"><div class="circ" style="border:2.5px dashed var(--gap);color:var(--gap)">?</div><b>No source</b><small>nothing feeds this</small></div>
+   <div class="link2" style="background:repeating-linear-gradient(90deg,var(--line) 0 5px,transparent 5px 10px)"></div>
+   <div class="node"><div class="circ" style="border-color:var(--accent);background:#eef5fb">🏪</div><b>Warehouse</b><small>DIM_ACCOUNT</small>
+    <div class="value">exists · always empty</div></div></div>
+  <div class="defbox"><p>${esc(d.what)}</p><div class="src2">${esc(d.src)}</div>
+  <div class="verify warn">${esc(d.verify.txt)}</div></div>${nav}`;return;}
+ const fd=FULLDICT[st.col];
+ const dictHtml=fd?`<div class="fullbox"><div class="fh">📖 Full dictionary entry
+   <span style="margin-left:auto;font-weight:400;text-transform:none;letter-spacing:0">AddVantage dictionary · complete text</span></div>
+  <div class="fb">${esc(fd.longDesc)}
+   <div class="kvline">${fd.attrs.map(a=>`<b>${esc(a[0])}</b><span>${esc(a[1])}</span>`).join('')}</div></div></div>`:'';
+ const hopsHtml=fd?`<div class="fullbox"><div class="fh">⚙ The whole transformation — every hop, nothing hidden</div>
+  ${fd.hops.map(h=>`<div class="hop"><div class="hstage">${esc(h.st)}</div>
+   <div class="hex">${esc(h.ex)}</div><div class="hwhy">${esc(h.why)}</div></div>`).join('')}</div>`:'';
+ el.innerHTML=`<h1>${esc(d.title)}</h1>
+ <div class="subt">the full journey of one field, with a real value riding along</div>
+ ${spine({vals:d.vals,okFrom:d.okFrom,xfAt:3,lbl:d.xfLabel})}
+ <div class="defbox"><p><b>What it is:</b> ${esc(d.what)}</p>
+  <div class="src2">${esc(d.src)}</div>
+  <div class="verify ${d.verify.ok?'':'warn'}">${esc(d.verify.txt)}</div></div>
+ ${dictHtml}${hopsHtml}
+ <span class="devlink" onclick="setView('technical')">open Technical view — full chain, alt sources, all proof stages →</span>${nav}`;}
+
+render();
+</script>
+</body></html>

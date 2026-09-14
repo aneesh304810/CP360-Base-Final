@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CP Catalog — API 360 Mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#10193b; --accent:#0f4775; --pop:#31bced; --hover:#0091bf;
+    --bg:#f5f8f8; --panel:#fff; --border:#dbdae0; --bgsoft:#eef3f3;
+    --text:#2b2f38; --sub:#5a6472; --muted:#9aa3b0;
+    --sei:#0091bf; --pivotal:#7c3aed; --bloomberg:#000; --internal:#0f4775;
+    --get:#159943; --post:#0091bf; --put:#e67e22; --delete:#c1113a;
+    --danger:#c1113a; --dangerbg:#fbe9ec; --infobg:#e0f5fd; --success:#159943;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:Roboto,'Helvetica Neue',Arial,sans-serif;font-size:14px}
+  code,.mono{font-family:'Roboto Mono',monospace}
+  /* header */
+  .top{background:var(--navy);color:#fff;display:flex;align-items:center;
+    padding:0 24px;height:54px;gap:14px}
+  .top .logo{width:32px;height:32px;background:var(--pop);border-radius:3px;
+    display:grid;place-items:center;color:var(--navy);font-weight:700}
+  .top b{font-size:15px}.top small{color:#8ea3c4;font-size:11px;display:block}
+  .badge{margin-left:6px;font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;
+    background:rgba(21,153,67,.25);color:#bfe}
+  .search{margin-left:18px;background:rgba(255,255,255,.12);border-radius:16px;
+    height:32px;display:flex;align-items:center;padding:0 12px;width:280px;color:#9fb3cf}
+  .search input{background:none;border:none;outline:none;color:#fff;font-size:13px;flex:1;margin-left:6px}
+  nav.modnav{margin-left:auto;display:flex;gap:4px}
+  nav.modnav a{color:#bcccdf;font-size:13px;padding:7px 12px;border-radius:3px;text-decoration:none}
+  nav.modnav a.active{background:var(--accent);color:#fff}
+  /* layout */
+  .wrap{max-width:1263px;margin:0 auto;padding:28px 24px 60px}
+  .h1{font-size:24px;font-weight:500;color:var(--accent);border-bottom:2px solid var(--accent);
+    padding-bottom:12px;margin:0 0 18px;display:flex;align-items:center;gap:10px}
+  /* project switcher */
+  .switch{display:inline-flex;background:var(--panel);border:1px solid var(--border);
+    border-radius:4px;overflow:hidden;margin-bottom:18px}
+  .switch button{border:none;background:none;padding:8px 16px;font-size:13px;cursor:pointer;
+    font-family:inherit;color:var(--sub);border-right:1px solid var(--border)}
+  .switch button:last-child{border-right:none}
+  .switch button.on{background:var(--accent);color:#fff}
+  .switch .ct{font-size:11px;opacity:.7;margin-left:5px}
+  /* subview tabs */
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:22px}
+  .tabs button{background:none;border:none;font-size:13px;font-weight:500;padding:10px 18px;
+    cursor:pointer;color:var(--sub);border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit}
+  .tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
+  .view{display:none}.view.on{display:block}
+  /* table */
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--border);
+    border-radius:4px;overflow:hidden}
+  th{background:var(--bgsoft);text-align:left;padding:10px 14px;font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.4px;color:var(--accent);border-bottom:1px solid var(--border)}
+  td{padding:10px 14px;font-size:13px;border-bottom:1px solid var(--bg)}
+  tr:last-child td{border-bottom:none}
+  tr.click{cursor:pointer}tr.click:hover td{background:var(--infobg)}
+  /* badges */
+  .pb{font-size:10px;font-weight:700;text-transform:uppercase;padding:2px 7px;border-radius:3px;color:#fff}
+  .pb.sei{background:var(--sei)}.pb.pivotal{background:var(--pivotal)}
+  .pb.bloomberg{background:var(--bloomberg)}.pb.internal{background:var(--internal)}
+  .mb{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;color:#fff;min-width:42px;text-align:center;display:inline-block}
+  .mb.GET{background:var(--get)}.mb.POST{background:var(--post)}.mb.PUT{background:var(--put)}.mb.DELETE{background:var(--delete)}
+  .pii{font-size:9px;font-weight:700;color:#fff;background:var(--danger);padding:2px 6px;border-radius:3px}
+  .kpis{display:flex;gap:14px;margin-bottom:22px;flex-wrap:wrap}
+  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:14px 20px;min-width:120px}
+  .kpi .n{font-size:24px;font-weight:700;color:var(--navy)}
+  .kpi .n.d{color:var(--danger)}
+  .kpi .l{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-top:3px}
+  /* drawer */
+  .layout{display:flex;gap:0}
+  .drawer{width:400px;background:var(--panel);border:1px solid var(--border);border-left:none;
+    padding:20px;align-self:flex-start}
+  .drawer h3{margin:8px 0 2px;font-size:18px;font-weight:500}
+  .kv{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bg);font-size:13px}
+  .kv span{color:var(--sub)}.kv b{color:var(--navy)}
+  .sec{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:18px 0 8px}
+  .errtable td{font-size:12px;padding:7px 10px}
+  /* dependency graph */
+  .depwrap{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:24px;position:relative;overflow:auto}
+  .note{font-size:12px;color:var(--sub);margin-bottom:16px}
+  .epnode{position:absolute;width:230px;height:42px;background:var(--panel);border:1px solid var(--border);
+    border-radius:4px;display:flex;align-items:center;padding:0 10px;font-size:12px;
+    box-shadow:0 1px 3px rgba(16,25,59,.08)}
+  /* flow */
+  .flowbtns{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+  .flowbtns button{height:30px;padding:0 14px;border:1px solid var(--border);border-radius:15px;
+    cursor:pointer;font-size:13px;font-family:inherit;background:var(--panel);color:var(--text)}
+  .flowbtns button.on{background:var(--hover);color:#fff;border-color:var(--hover)}
+  .flowcanvas{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:26px;
+    display:flex;align-items:center;flex-wrap:wrap;gap:0}
+  .step{background:#f3effd;border:1px solid var(--pivotal);border-radius:4px;padding:12px 16px;min-width:160px}
+  .step .si{font-size:10px;font-weight:700;color:var(--pivotal);text-transform:uppercase}
+  .step .sl{font-size:13px;font-weight:600;margin:3px 0}
+  .step .se{font-size:11px;color:var(--sub)}
+  .step .sv{font-size:10px;color:var(--hover);margin-top:5px;font-weight:600}
+  .arrow{color:var(--muted);font-size:18px;padding:0 8px}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="logo">CP</div>
+  <div><b>CP Catalog</b><small>BBH Capital Partners</small></div>
+  <span class="badge">● LIVE</span>
+  <div class="search"><span>⚲</span><input placeholder="Search datasets, feeds, models…"></div>
+  <nav class="modnav">
+    <a href="#">Home</a><a href="#">System Design</a><a href="#">Interface 360</a>
+    <a href="#" class="active">API 360</a><a href="#">Data 360</a>
+    <a href="#">Datapoint 360</a><a href="#">PII Explorer</a>
+  </nav>
+</div>
+
+<div class="wrap">
+  <div class="h1">◆ API 360</div>
+
+  <!-- project switcher -->
+  <div class="switch">
+    <button class="on" onclick="proj(this,'all')">All <span class="ct">4</span></button>
+    <button onclick="proj(this,'sei')">SEI <span class="ct">3</span></button>
+    <button onclick="proj(this,'non-sei')">Non-SEI <span class="ct">1</span></button>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpis">
+    <div class="kpi"><div class="n">4</div><div class="l">API Sources</div></div>
+    <div class="kpi"><div class="n">23</div><div class="l">Endpoints</div></div>
+    <div class="kpi"><div class="n d">6</div><div class="l">PII Fields</div></div>
+    <div class="kpi"><div class="n">2</div><div class="l">Business Flows</div></div>
+  </div>
+
+  <!-- subview tabs -->
+  <div class="tabs">
+    <button class="on" onclick="tab(this,'sources')">Sources</button>
+    <button onclick="tab(this,'dep')">API Dependency</button>
+    <button onclick="tab(this,'flow')">Business Flow</button>
+  </div>
+
+  <!-- SOURCES -->
+  <div class="view on" id="sources">
+    <div class="layout">
+      <div style="flex:1">
+        <table>
+          <thead><tr><th>Source</th><th>Project</th><th>Feature Group</th><th>Release</th><th>Kind</th><th>Endpoints</th></tr></thead>
+          <tbody>
+            <tr class="click" onclick="document.getElementById('drawer').style.display='block'">
+              <td><b>AccountOverride</b></td><td><span class="pb sei">SEI</span></td>
+              <td>activity-management</td><td>PSI45</td><td>OpenAPI</td><td>3</td></tr>
+            <tr class="click"><td><b>AssetMaster</b></td><td><span class="pb sei">SEI</span></td>
+              <td>asset</td><td>PSI45</td><td>OpenAPI</td><td>7</td></tr>
+            <tr class="click"><td><b>OrderEntry</b></td><td><span class="pb sei">SEI</span></td>
+              <td>order-management</td><td>PSI45</td><td>OpenAPI</td><td>9</td></tr>
+            <tr class="click"><td><b>BloombergRef</b></td><td><span class="pb bloomberg">BLOOMBERG</span></td>
+              <td>market-data</td><td>v2</td><td>OpenAPI</td><td>4</td></tr>
+          </tbody>
+        </table>
+        <div class="note" style="margin-top:12px">Click a source to drill into its endpoints, request fields, and documented errors.</div>
+      </div>
+
+      <!-- endpoint drawer -->
+      <div class="drawer" id="drawer">
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="pb sei">SEI</span><span class="pii">CLIENT PII</span>
+        </div>
+        <h3>POST /accountOverride/update</h3>
+        <div style="font-size:12px;color:var(--muted)">Activity Management · PSI45</div>
+        <div class="kv"><span>Function Point Id</span><b>491</b></div>
+        <div class="kv"><span>Operation</span><b>updateAccountOverride</b></div>
+        <div class="kv"><span>Request fields</span><b>6</b></div>
+        <div class="kv"><span>Documented errors</span><b>29</b></div>
+        <div class="kv"><span>Auth</span><b>OAuth2 + AppKey</b></div>
+        <div class="kv"><span>Server</span><b style="font-size:11px" class="mono">extranettest.api.seic.com</b></div>
+
+        <div class="sec">Request fields</div>
+        <table style="border:none">
+          <thead><tr><th>Field</th><th>Type</th><th>Req</th><th></th></tr></thead>
+          <tbody>
+            <tr><td class="mono">accountId</td><td>string</td><td>Y</td><td></td></tr>
+            <tr><td class="mono">clientName</td><td>string</td><td>Y</td><td><span class="pii">PII</span></td></tr>
+            <tr><td class="mono">overrideType</td><td>string</td><td>Y</td><td></td></tr>
+            <tr><td class="mono">overrideValue</td><td>number</td><td>Y</td><td></td></tr>
+            <tr><td class="mono">effectiveDate</td><td>date</td><td>N</td><td></td></tr>
+            <tr><td class="mono">reason</td><td>string</td><td>N</td><td></td></tr>
+          </tbody>
+        </table>
+
+        <div class="sec">Documented errors</div>
+        <table class="errtable" style="border:none">
+          <thead><tr><th>Status</th><th>Code</th><th>Exception</th></tr></thead>
+          <tbody>
+            <tr><td>400</td><td class="mono">ERR-AO-001</td><td>Invalid Account</td></tr>
+            <tr><td>401</td><td class="mono">ERR-AO-002</td><td>Unauthorized</td></tr>
+            <tr><td>422</td><td class="mono">ERR-AO-003</td><td>Validation</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- DEPENDENCY GRAPH -->
+  <div class="view" id="dep">
+    <div class="depwrap">
+      <div class="note">Endpoint dependency graph — method color on the left border, arrow shows call direction. Solid = calls, dashed = reads.</div>
+      <div style="position:relative;height:260px;min-width:640px">
+        <svg width="640" height="260" style="position:absolute;top:0;left:0">
+          <defs><marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0 0 L6 3 L0 6 Z" fill="#9aa3b0"/></marker></defs>
+          <path d="M250 41 C330 41 330 41 410 41" fill="none" stroke="#9aa3b0" stroke-width="1.5" marker-end="url(#ar)"/>
+          <path d="M250 41 C330 41 330 101 410 101" fill="none" stroke="#9aa3b0" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ar)"/>
+          <path d="M250 161 C330 161 330 161 410 161" fill="none" stroke="#9aa3b0" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ar)"/>
+          <path d="M250 161 C330 161 330 221 410 221" fill="none" stroke="#9aa3b0" stroke-width="1.5" marker-end="url(#ar)"/>
+        </svg>
+        <div class="epnode" style="left:20px;top:20px;border-left:3px solid var(--post)"><span class="mb POST">POST</span>&nbsp;/accountOverride/update</div>
+        <div class="epnode" style="left:20px;top:140px;border-left:3px solid var(--post)"><span class="mb POST">POST</span>&nbsp;/order/entry</div>
+        <div class="epnode" style="left:410px;top:20px;border-left:3px solid var(--get)"><span class="mb GET">GET</span>&nbsp;/account/{id}</div>
+        <div class="epnode" style="left:410px;top:80px;border-left:3px solid var(--post)"><span class="mb POST">POST</span>&nbsp;/activity/log</div>
+        <div class="epnode" style="left:410px;top:140px;border-left:3px solid var(--get)"><span class="mb GET">GET</span>&nbsp;/asset/{id}</div>
+        <div class="epnode" style="left:410px;top:200px;border-left:3px solid var(--post)"><span class="mb POST">POST</span>&nbsp;/cash/reserve</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BUSINESS FLOW -->
+  <div class="view" id="flow">
+    <div class="flowbtns">
+      <button class="on" onclick="flow(this,0)">Onboard Account</button>
+      <button onclick="flow(this,1)">Place Order</button>
+    </div>
+    <div class="flowcanvas" id="flowcanvas"></div>
+    <div class="note" style="margin-top:14px">Variables passed between steps are shown under each call — the chain shows how one API's output feeds the next. Sourced from Postman collections.</div>
+  </div>
+</div>
+
+<script>
+  function proj(b,p){document.querySelectorAll('.switch button').forEach(x=>x.classList.remove('on'));b.classList.add('on');}
+  function tab(b,id){
+    document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
+    document.getElementById(id).classList.add('on');
+  }
+  const FLOWS=[
+    {name:'Onboard Account',steps:[
+      {l:'Create client',e:'POST /client/create',v:'clientId'},
+      {l:'Open account',e:'POST /account/open',v:'accountId'},
+      {l:'Apply override',e:'POST /accountOverride/update',v:'overrideId'},
+      {l:'Log activity',e:'POST /activity/log',v:null}]},
+    {name:'Place Order',steps:[
+      {l:'Lookup asset',e:'GET /asset/{id}',v:'assetId'},
+      {l:'Reserve cash',e:'POST /cash/reserve',v:'reservationId'},
+      {l:'Submit order',e:'POST /order/entry',v:'orderId'}]}
+  ];
+  function flow(b,i){
+    if(b){document.querySelectorAll('.flowbtns button').forEach(x=>x.classList.remove('on'));b.classList.add('on');}
+    const f=FLOWS[i];const c=document.getElementById('flowcanvas');c.innerHTML='';
+    f.steps.forEach((s,idx)=>{
+      const d=document.createElement('div');d.className='step';
+      d.innerHTML=`<div class="si">Step ${idx+1}</div><div class="sl">${s.l}</div>`+
+        `<div class="se">${s.e}</div>`+(s.v?`<div class="sv">→ ${s.v}</div>`:'');
+      c.appendChild(d);
+      if(idx<f.steps.length-1){const a=document.createElement('div');a.className='arrow';a.textContent='▶';c.appendChild(a);}
+    });
+  }
+  flow(null,0);
+</script>
+</body>
+</html>

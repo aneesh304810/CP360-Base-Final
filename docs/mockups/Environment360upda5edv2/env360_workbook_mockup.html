@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Environment 360 · Infrastructure Workbook — ingest &amp; reflect</title>
+<style>
+ body{font-family:'Segoe UI',sans-serif;background:#f2f5f8;margin:0;padding:16px;color:#233240}
+ h1{font-size:17px;margin:0 0 2px;color:#10193b}
+ .sub{font-size:10px;color:#5c6b7a;margin-bottom:10px}
+ .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+ .btn{padding:7px 16px;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;border:1.5px solid #1168bd;background:#1168bd;color:#fff}
+ .btn.sec{background:#fff;color:#1168bd}
+ .tab{padding:5px 14px;border-radius:999px;font-size:10.5px;font-weight:800;cursor:pointer;border:1.5px solid #c3d0dc;color:#3d566e;background:#fff}
+ .tab.on{background:#10193b;border-color:#10193b;color:#fff}
+ .hint{margin-left:auto;font-size:9.5px;color:#7d93a8}
+ .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px}
+ .kpi{background:#fff;border:1px solid #dfe6ec;border-radius:10px;padding:7px 12px}
+ .kpi .v{font-size:17px;font-weight:800;color:#10193b}.kpi .l{font-size:8.4px;color:#7d93a8;font-weight:800;letter-spacing:1px}
+ .kpi.a .v{color:#c98d1a}.kpi.g .v{color:#2fb344}
+ .diff{display:none;background:#eef7ff;border:1.5px solid #1168bd;border-radius:10px;padding:9px 13px;margin-bottom:10px;font-size:10.5px}
+ .diff b{color:#0f4775}
+ .diff .chg{font-family:Consolas,monospace;font-size:10px;margin-top:3px;color:#345}
+ .grid{display:grid;grid-template-columns:1.5fr 1fr;gap:10px}
+ .card{background:#fff;border:1px solid #dfe6ec;border-radius:12px;padding:11px 13px}
+ .card h3{margin:0 0 8px;font-size:11px;color:#0f4775;letter-spacing:.6px}
+ table{border-collapse:collapse;width:100%;font-size:10px}
+ th{text-align:left;color:#7d93a8;font-size:8.6px;letter-spacing:1px;border-bottom:1.5px solid #e2e9ee;padding:4px 6px}
+ td{padding:5px 6px;border-bottom:1px solid #eef2f6;vertical-align:top}
+ td.mono{font-family:Consolas,monospace;font-size:9.4px;color:#42556a}
+ .tbd{display:inline-block;border:1.5px dashed #c98d1a;color:#a3720e;border-radius:7px;padding:0 7px;font-weight:800;font-size:9px}
+ .okp{display:inline-block;background:#eef9f0;border:1px solid #2fb344;color:#1e7a30;border-radius:7px;padding:0 7px;font-weight:800;font-size:9px}
+ .lane{display:flex;justify-content:space-between;align-items:center;padding:5px 2px;border-bottom:1px solid #eef2f6;font-size:10px}
+ .lane .p{font-family:Consolas,monospace;font-size:8.8px;color:#7d93a8}
+ .ask{font-size:9.8px;color:#5a4a1a;background:#fffaf0;border:1px solid #f0d9a0;border-radius:8px;padding:5px 9px;margin-top:5px;font-family:Consolas,monospace}
+ .foot{margin-top:10px;font-size:9.4px;color:#7d93a8}
+ input[type=file]{display:none}
+</style></head><body>
+<h1>Infrastructure Workbook <span style="font-size:8.5px;font-weight:800;background:#10193b;color:#7cc0ff;border-radius:999px;padding:2px 9px;margin-left:7px">ENVIRONMENT 360</span> <span style="font-size:8.5px;font-weight:800;color:#2fb344;margin-left:6px">● LIVE</span></h1>
+<div class="sub">the spreadsheet is the source of truth — download, edit in Excel, upload; topology, probes and firewall asks regenerate from it</div>
+<div class="bar">
+ <span class="btn" onclick="dl()">⬇ Download workbook</span>
+ <label class="btn sec">⬆ Upload workbook<input type="file" id="up" accept=".tsv,.csv,.txt" onchange="ul(event)"></label>
+ <span id="tabs"></span>
+ <span class="hint">try it: download → change a TBD port to "Oracle JDBC 1521" → upload → watch the lane flip</span>
+</div>
+<div class="kpis" id="kpis"></div>
+<div class="diff" id="diff"></div>
+<div class="grid">
+ <div class="card"><h3>INVENTORY · <span id="envlbl"></span></h3><div id="tbl"></div></div>
+ <div>
+  <div class="card"><h3>GENERATED LANES · probe manifest</h3><div id="lanes"></div></div>
+  <div class="card" style="margin-top:10px"><h3 style="color:#8a6a10">FIREWALL / NETWORK ASKS</h3><div id="asks"></div></div>
+ </div>
+</div>
+<div class="foot">wired to: GET /env-infra/export · POST /env-infra/import (diff + hist) · GET /env-infra/topology?env= — same JSON this page renders</div>
+<script>
+var SHEET=`Layer\tSystem\tNew_SEI_Hosts_or_Endpoint\tSizing_RAM\tSizing_CPU\tSizing_Storage_or_Capacity\tGrowth\tHosting\tDirection\tProtocol_Port\tStatus_or_Notes
+Platform\tCP Integration Hub\tOCPQ shared OpenShift cluster - RD DEV namespace\t4 GB\t2\t10GB\tTBD\tBBH OpenShift\tBidirectional\tTBD\tnamespace + pod sizing TBD
+File System\tCPHUB Landing Share\t\\\\rdwebfs.testbbh.com\\cphub$\tNA\tNA\t20GB\tTBD\tBBH\tInternal\tTBD\tregional landing share
+Database\tIMDS\tdvlimdsdb.testbbh.com; dvlimdsapp.testbbh.com\t62 GB\t8\t6 TB\tMinimal\tBBH\tInternal\tOracle JDBC port TBD\tNew SEI DEV
+Database\tPBDW\tdvlpbdb1.testbbh.com; rtlodiapp3t.testbbh.com\t62 GB\t8\t4 TB\tMinimal\tBBH\tInternal\tTBD\tNew SEI DEV
+Consumer\tPivotal\tQCWPIVDEVSEI2; QCWPIVDEVSEI4; QCWPIVDEVSEI5\t16 GB\t4\tC:100 D:250\tMinimal\tBBH\tOutbound\tTBD\tsizing as supplied
+Consumer\tCRD\tAzure-hosted vendor application\tVM\tVM\tVM\tTBD\tVendor Azure\tOutbound\tTBD\tCRD sizing TBD
+Consumer\tClient Portal\tdvltasap235.testbbh.com\t12 GB\t2\t350 GB\tTBD\tBBH RHEL\tOutbound\tTBD\tNew SEI DEV host
+Consumer\tPORT\tNew PORT test instance\tVM\tVM\t25 accts; 3000 sec\tTBD\tBloomberg\tOutbound\tTBD\ttest-account care
+Platform\tCP Integration Hub\tOCPQ shared OpenShift cluster - RD SIT namespace\t4 GB\t2\t10GB\tTBD\tBBH OpenShift\tBidirectional\tTBD\tSIT mapped to RD
+File System\tCPHUB Landing Share\t\\\\rdwebfs.testbbh.com\\cphub$\tNA\tNA\t20GB\tTBD\tBBH\tInternal\tTBD\tfolder split TBD
+Database\tIMDS\tqblimdsdb.testbbh.com; qblimdsapp.testbbh.com\t62 GB\t8\t6 TB\tMinimal\tBBH\tInternal\tOracle JDBC port TBD\tNew SEI SIT
+Database\tPBDW\tQALPBDB3; qalodiapp3sei; qalodidb3sei\t62 GB\t8\t4 TB\tMinimal\tBBH\tInternal\tTBD\tNew SEI SIT
+Consumer\tPivotal\tQCWPIVAPMTRSEI; QCWPIVSEIDB6; QCWPIVINTSEI1\t16 GB\t4\tC:100 D:250\tMinimal\tBBH\tOutbound\tTBD\tsizing as supplied
+Consumer\tCRD\tAzure-hosted vendor application\tVM\tVM\tVM\tTBD\tVendor Azure\tOutbound\tTBD\tCRD sizing TBD
+Consumer\tClient Portal\trdltasap235.testbbh.com\t12 GB\t2\t350 GB\tTBD\tBBH RHEL\tOutbound\tTBD\tNew SEI SIT host
+Consumer\tPORT\tNew PORT test instance\tVM\tVM\t25 accts; 3000 sec\tTBD\tBloomberg\tOutbound\tTBD\ttest-account care
+Platform\tCP Integration Hub\tOCPQ shared OpenShift cluster - QC namespace\t4 GB\t2\t10GB\tTBD\tBBH OpenShift\tBidirectional\tTBD\tTrial/UAT on QC
+File System\tCPHUB Landing Share\t\\\\qcwebfs.testbbh.com\\cphub$\tNA\tNA\t20GB\tTBD\tBBH\tInternal\tTBD\tQC landing share
+Database\tIMDS\trdlimdsdb.testbbh.com; rdlimdsapp.testbbh.com\t62 GB\t8\t6 TB\tMinimal\tBBH\tInternal\tOracle JDBC port TBD\tNew SEI UAT
+Database\tPBDW\tQCLPBDB3; qclodiapp3sei; qclodidb3sei\t62 GB\t8\t4 TB\tMinimal\tBBH\tInternal\tTBD\tNew SEI UAT
+Consumer\tPivotal\tAUPGSEI1/2; SEIDB4/5; INTSEI2\t16 GB\t4\tC:100 D:250\tMinimal\tBBH\tOutbound\tTBD\tsizing as supplied
+Consumer\tCRD\tAzure-hosted vendor application\tVM\tVM\tTBD\tTBD\tVendor Azure\tOutbound\tTBD\tCRD sizing TBD
+Consumer\tClient Portal\tqcltasap235.testbbh.com\t12 GB\t2\t350 GB\tTBD\tBBH RHEL\tOutbound\tTBD\tNew SEI UAT host
+Consumer\tPORT\tNew PORT test instance\tVM\tVM\t25 accts; 3000 sec\tTBD\tBloomberg\tOutbound\tTBD\ttest-account care
+Platform\tCP Integration Hub\tProduction OpenShift cluster and namespace TBD\t16GB\t16\t25GB\tTBD\tBBH OpenShift\tBidirectional\tTBD\tPROD platform TBD
+File System\tCPHUB Landing Share\tProduction cphub share TBD\tNA\tNA\t20GB\tTBD\tBBH\tInternal\tTBD\tPROD share TBD
+Database\tIMDS\tnjlimdsdb.bbh.com; njlimdsapp.bbh.com\t62GB\t8\t6TB\tTBD\tBBH\tInternal\tOracle JDBC port TBD\tPROD sizing TBD
+Database\tPBDW\tnjlpbdb3; njlodiapp3sei; njlodidb3sei\t62GB\t8\t6TB\tTBD\tBBH\tInternal\tTBD\tPROD sizing TBD
+Consumer\tPivotal\tNJWPIVCRM ×6\t16GB\t4\t100GB\tTBD\tBBH\tOutbound\tTBD\tPROD sizing TBD
+Consumer\tCRD\tCRD production vendor environment\tVM\tVM\tVM\tTBD\tVendor Azure\tOutbound\tTBD\tPROD CRD TBD
+Consumer\tClient Portal\tnjtasap12 ×4\t12GB\t2\t350GB\tTBD\tBBH RHEL\tOutbound\tTBD\tPROD sizing TBD
+Consumer\tPORT\tBloomberg PORT production\tVM\tVM\t25 accts; 3000 sec\tTBD\tBloomberg\tOutbound\tTBD\tPROD capacity TBD
+External API\tSEI API Proxy Egress\t192.200.8.0/24; 192.200.5.0/24; 204.136.26.0/24\tNA\tNA\tNA\tTBD\tBBH to SEI\tOutbound\tHTTPS 443\tIP ranges whitelisted by SEI
+External SFTP\tSEI to BBH SFTP\tqcsecureftp.bbh.com\tNA\tNA\tNA\tTBD\tBBH MFT\tInbound\tSFTP 22\tSEI source IPs whitelisted by BBH
+External SFTP\tSEI to BBH SFTP\tsecureftp.bbh.com\tNA\tNA\tNA\tTBD\tBBH MFT\tInbound\tSFTP 22\tPROD account seiswp_sftp`;
+var ENVO=["DEV","SIT","TRIAL_UAT","PROD"], cur="DEV", ROWS=[], LAST=null;
+function hash(s){var h=0;for(var i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))|0;}return (h>>>0).toString(16);}
+function parse(text){
+ var lines=text.replace(/\r/g,"").split("\n").filter(function(l){return l.trim();});
+ var hdr=lines[0].split("\t"), out=[], idx=-1;
+ if(hdr[0]!=="Layer") throw "missing Layer column — sheet rejected";
+ for(var li=1;li<lines.length;li++){
+  var c=lines[li].split("\t"), r={};
+  hdr.forEach(function(h,k){r[h]=(c[k]||"").trim();});
+  if(!r.Layer) continue;
+  var envs;
+  if(r.Layer==="Platform"&&r.System.indexOf("Integration Hub")>=0){idx++;if(idx>3)throw "too many Platform blocks";}
+  if(r.Layer.indexOf("External")===0){
+   envs=r.New_SEI_Hosts_or_Endpoint.indexOf("qcsecureftp")>=0?["DEV","SIT","TRIAL_UAT"]:
+        (r.New_SEI_Hosts_or_Endpoint.indexOf("secureftp")>=0?["PROD"]:ENVO.slice());
+  }else{
+   if(idx<0)throw "data row before first Platform block — sheet rejected";
+   envs=[ENVO[idx]];
+  }
+  envs.forEach(function(env){
+   var row={env:env,layer:r.Layer,system:r.System,hosts:r.New_SEI_Hosts_or_Endpoint,
+    ram:r.Sizing_RAM,cpu:r.Sizing_CPU,sto:r.Sizing_Storage_or_Capacity,
+    port:r.Protocol_Port,notes:r.Status_or_Notes};
+   row.h=hash(JSON.stringify(row));out.push(row);});
+ }
+ if(idx!==3)throw "expected 4 environment blocks, found "+(idx+1);
+ return out;
+}
+var LMAP=[["Database","IMDS","hub-imds","Hub → IMDS"],["Database","PBDW","hub-pbdw","Hub → PBDW"],
+ ["File System","Landing","cifs-hub","Landing → Hub"],["External SFTP","SFTP","sei-mft","SEI → MFT"],
+ ["Consumer","Pivotal","pbdw-piv","PBDW → Pivotal"],["Consumer","Client Portal","pbdw-portal","PBDW → Portal"],
+ ["External API","Egress","apigee-sei","Apigee → SEI"],["Consumer","CRD","apigee-vendor","Apigee → vendors"]];
+function portOf(pp){if(!pp||pp.toUpperCase().indexOf("TBD")>=0)return null;var m=pp.match(/(\d{2,5})/);return m?m[1]:pp;}
+function render(){
+ var ers=ROWS.filter(function(r){return r.env===cur;});
+ var tbd=ROWS.filter(function(r){return (r.port||"TBD").toUpperCase().indexOf("TBD")>=0;}).length;
+ document.getElementById('tabs').innerHTML=ENVO.map(function(e){return '<span class="tab '+(e===cur?"on":"")+'" onclick="cur=\''+e+'\';render()">'+e+'</span>';}).join(' ');
+ document.getElementById('envlbl').textContent=cur;
+ document.getElementById('kpis').innerHTML=
+  '<div class="kpi"><div class="v">'+ROWS.length+'</div><div class="l">ROWS LOADED</div></div>'
+ +'<div class="kpi"><div class="v">4</div><div class="l">ENVIRONMENTS</div></div>'
+ +'<div class="kpi a"><div class="v">'+tbd+'</div><div class="l">PORTS TBD</div></div>'
+ +'<div class="kpi g"><div class="v">'+(LAST?LAST.changed:0)+'</div><div class="l">CHANGED · LAST IMPORT</div></div>'
+ +'<div class="kpi"><div class="v">'+(LAST?LAST.added:0)+'/'+(LAST?LAST.removed:0)+'</div><div class="l">ADDED / REMOVED</div></div>';
+ var t='<table><tr><th>LAYER</th><th>SYSTEM</th><th>HOSTS</th><th>SIZING</th><th>PORT</th></tr>';
+ ers.forEach(function(r){
+  var isTbd=(r.port||"TBD").toUpperCase().indexOf("TBD")>=0;
+  t+='<tr><td>'+r.layer+'</td><td><b>'+r.system+'</b><br><span style="font-size:8.6px;color:#8aa0b4">'+r.notes+'</span></td>'
+   +'<td class="mono">'+r.hosts.split(";").join("<br>")+'</td>'
+   +'<td class="mono">'+[r.ram,r.cpu,r.sto].filter(function(x){return x&&x!=="NA";}).join(" · ")+'</td>'
+   +'<td>'+(isTbd?'<span class="tbd">◌ TBD</span>':'<span class="okp">'+r.port+'</span>')+'</td></tr>';});
+ document.getElementById('tbl').innerHTML=t+'</table>';
+ var ls='';
+ LMAP.forEach(function(m){
+  var src=ers.filter(function(r){return r.layer===m[0]&&r.system.indexOf(m[1])>=0;})[0];
+  var p=src?portOf(src.port):null;
+  ls+='<div class="lane"><span>'+m[3]+' <span class="p">path.'+m[2]+'</span></span>'
+   +(p?'<span class="okp">'+p+' · probe armed</span>':'<span class="tbd">◌ TBD — probe waiting</span>')+'</div>';});
+ document.getElementById('lanes').innerHTML=ls;
+ var asks=ers.filter(function(r){return (r.port||"TBD").toUpperCase().indexOf("TBD")>=0;});
+ document.getElementById('asks').innerHTML=asks.map(function(r){return '<div class="ask">'+r.layer+' · '+r.system+' — port?</div>';}).join('')||'<div style="font-size:10px;color:#2fb344;font-weight:800">✓ no open asks in '+cur+'</div>';
+}
+function dl(){
+ var blob=new Blob([SHEET],{type:"text/tab-separated-values"});
+ var a=document.createElement("a");a.href=URL.createObjectURL(blob);
+ a.download="cp_env_infrastructure.tsv";a.click();
+}
+function ul(ev){
+ var f=ev.target.files[0];if(!f)return;
+ var rd=new FileReader();
+ rd.onload=function(){
+  try{
+   var nw=parse(rd.result);
+   var curm={},d={added:0,changed:0,removed:0,list:[]};
+   ROWS.forEach(function(r){curm[r.env+"|"+r.layer+"|"+r.system]=r.h;});
+   var nwm={};
+   nw.forEach(function(r){var k=r.env+"|"+r.layer+"|"+r.system;nwm[k]=1;
+    if(!(k in curm)){d.added++;d.list.push("+ "+k);}
+    else if(curm[k]!==r.h){d.changed++;d.list.push("Δ "+k);}});
+   ROWS.forEach(function(r){var k=r.env+"|"+r.layer+"|"+r.system;if(!(k in nwm)){d.removed++;d.list.push("− "+k);}});
+   ROWS=nw;SHEET=rd.result;LAST=d;
+   var el=document.getElementById('diff');el.style.display="block";
+   el.innerHTML='<b>IMPORT ACCEPTED</b> — '+d.added+' added · '+d.changed+' changed · '+d.removed+' removed · versioned to env_infra_hist'
+    +(d.list.length?'<div class="chg">'+d.list.slice(0,6).join('<br>')+(d.list.length>6?'<br>…':'')+'</div>':'')
+    +'<div class="chg" style="color:#1e7a30">topology + probe manifest regenerated ↓</div>';
+   render();
+  }catch(e){
+   var el=document.getElementById('diff');el.style.display="block";
+   el.style.borderColor="#d43a3a";el.innerHTML='<b style="color:#a33">IMPORT REJECTED</b> — '+e+' (nothing changed; fix the sheet and retry)';
+  }
+  ev.target.value="";
+ };
+ rd.readAsText(f);
+}
+ROWS=parse(SHEET);render();
+</script></body></html>

@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CP Catalog — Lineage Canvas</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#10193b;--accent:#0f4775;--pop:#31bced;--hover:#0091bf;
+    --bg:#f5f8f8;--panel:#fff;--border:#dbdae0;--soft:#eef3f3;--info:#e0f5fd;
+    --text:#2b2f38;--sub:#5a6472;--muted:#9aa3b0;
+    --bronze:#a8743a;--silver:#8a9199;--gold:#c8932a;--feed:#0091bf;--dag:#7c3aed;
+    --pass:#5a6472;--fn:#e67e22;--der:#0f4775;--lit:#9aa3b0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Roboto,Arial,sans-serif;font-size:14px}
+  .mono{font-family:'Roboto Mono',monospace}
+  .top{background:var(--navy);color:#fff;display:flex;align-items:center;padding:0 18px;height:50px;gap:10px}
+  .logo{width:28px;height:28px;background:var(--pop);border-radius:3px;display:grid;place-items:center;color:var(--navy);font-weight:700;font-size:12px}
+  .top b{font-size:14px}
+  .toolbar{display:flex;align-items:center;gap:8px;padding:10px 18px;background:var(--panel);border-bottom:1px solid var(--border)}
+  .toolbar .back{font-size:13px;color:var(--sub);cursor:pointer;display:flex;align-items:center;gap:5px}
+  .seg{display:flex;gap:2px;background:var(--soft);border-radius:7px;padding:3px}
+  .seg button{background:none;border:none;font-size:12px;font-weight:600;padding:6px 13px;border-radius:5px;cursor:pointer;color:var(--sub);font-family:inherit}
+  .seg button.on{background:var(--navy);color:#fff}
+  .viewseg button.on{background:var(--accent)}
+  .spacer{flex:1}
+  .zoombtn{width:30px;height:30px;border:1px solid var(--border);background:var(--panel);border-radius:6px;cursor:pointer;font-size:15px;color:var(--sub)}
+  .stage{position:relative;height:calc(100vh - 92px);overflow:hidden;background:
+    radial-gradient(circle, #d7dee2 1px, transparent 1px);background-size:22px 22px;background-color:#f7fafa}
+  .canvas{position:absolute;top:0;left:0;width:3000px;height:2000px;transform-origin:0 0}
+  .node{position:absolute;background:var(--panel);border:1px solid var(--border);border-radius:8px;min-width:150px;box-shadow:0 1px 4px rgba(16,25,59,.1);cursor:grab;user-select:none}
+  .node .nh{padding:9px 12px;border-radius:8px 8px 0 0;display:flex;align-items:center;gap:7px}
+  .node .nh .ico{width:8px;height:8px;border-radius:2px}
+  .node .nt{font-size:13px;font-weight:600;color:var(--navy)}
+  .node .ns{font-size:10px;color:var(--muted);padding:0 12px 8px}
+  .node.feed .nh{border-bottom:2px solid var(--feed)}
+  .node.bronze .nh{border-bottom:2px solid var(--bronze)}
+  .node.silver .nh{border-bottom:2px solid var(--silver)}
+  .node.gold .nh{border-bottom:2px solid var(--gold)}
+  .node.dag .nh{border-bottom:2px solid var(--dag)}
+  .node .cols{border-top:1px solid var(--soft);padding:4px 0;display:none}
+  .node.expanded .cols{display:block}
+  .col{padding:4px 12px;font-family:'Roboto Mono',monospace;font-size:11px;color:var(--sub);display:flex;align-items:center;gap:6px;position:relative}
+  .col .port{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0}
+  .col.key{color:var(--navy);font-weight:600}.col.key .port{background:var(--accent)}
+  .col.pii .port{background:#c1113a}
+  .col:hover{background:var(--info)}
+  svg.edges{position:absolute;top:0;left:0;width:3000px;height:2000px;pointer-events:none;z-index:0}
+  .node{z-index:1}
+  .legend{position:absolute;left:14px;bottom:14px;background:rgba(255,255,255,.95);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:11px;z-index:5}
+  .legend div{display:flex;align-items:center;gap:6px;padding:2px 0;color:var(--sub)}
+  .legend .ln{width:20px;height:0;border-top:2px solid}
+  .hint{position:absolute;right:14px;top:14px;background:rgba(255,255,255,.95);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--muted);z-index:5}
+  /* side detail */
+  .side{position:absolute;right:0;top:0;width:330px;height:100%;background:var(--panel);border-left:1px solid var(--border);box-shadow:-2px 0 12px rgba(16,25,59,.08);z-index:10;transform:translateX(100%);transition:transform .2s;overflow-y:auto}
+  .side.open{transform:translateX(0)}
+  .side .sh{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center}
+  .side .sh b{font-size:14px;color:var(--navy)}
+  .side .sx{margin-left:auto;cursor:pointer;color:var(--muted);font-size:18px}
+  .side .sb{padding:14px 16px}
+  .side .sec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin:14px 0 7px}
+  .side .sec:first-child{margin-top:0}
+  .xrow{border:1px solid var(--border);border-radius:7px;padding:9px 11px;margin-bottom:8px}
+  .xrow .xt{font-size:12px;font-weight:600;color:var(--navy);font-family:'Roboto Mono',monospace}
+  .xrow .xe{font-size:11px;font-family:'Roboto Mono',monospace;color:var(--accent);background:var(--soft);padding:5px 8px;border-radius:4px;margin-top:5px;word-break:break-all}
+  .xrow .xs{font-size:10px;color:var(--muted);margin-top:5px}
+  .tag{font-size:8px;font-weight:700;color:#fff;padding:2px 6px;border-radius:3px}
+</style>
+</head>
+<body>
+<div class="top"><div class="logo">CP</div><b>Catalog Platform</b><span style="font-size:11px;color:#8ea3c4;margin-left:6px">Data 360 · Lineage</span></div>
+
+<div class="toolbar">
+  <span class="back">‹ Back</span>
+  <span style="font-size:13px;font-weight:600;color:var(--navy);margin-right:8px">◆ Positions Pipeline</span>
+  <div class="seg viewseg">
+    <button class="on" onclick="setView(this,'dataset')">Dataset graph</button>
+    <button onclick="setView(this,'column')">Columns</button>
+  </div>
+  <div class="seg" id="planeseg" style="display:flex">
+    <button class="on" onclick="setPlane(this,'data')">Data</button>
+    <button onclick="setPlane(this,'transform')">Transforms</button>
+    <button onclick="setPlane(this,'orch')">Orchestration</button>
+  </div>
+  <span style="font-size:11px;color:var(--muted)" id="colhint">Columns view: click a node to expand its columns</span>
+  <div class="spacer"></div>
+  <button class="zoombtn" onclick="zoom(0.1)">+</button>
+  <button class="zoombtn" onclick="zoom(-0.1)">−</button>
+  <button class="zoombtn" onclick="resetZoom()">⤢</button>
+</div>
+
+<div class="stage" id="stage">
+  <div class="canvas" id="canvas">
+    <svg class="edges" id="edges"></svg>
+    <!-- nodes injected -->
+  </div>
+  <div class="legend">
+    <div><span class="ln" style="border-color:var(--feed)"></span> data flow</div>
+    <div><span class="ln" style="border-color:var(--der)"></span> transform</div>
+    <div><span class="ln" style="border-color:var(--dag);border-top-style:dashed"></span> orchestration</div>
+    <div id="collegend" style="display:none;margin-top:4px;border-top:1px solid var(--border);padding-top:4px">
+      <div><span class="ln" style="border-color:var(--pass)"></span> passthrough</div>
+      <div><span class="ln" style="border-color:var(--fn)"></span> function</div>
+      <div><span class="ln" style="border-color:var(--der)"></span> derived</div>
+    </div>
+  </div>
+  <div class="hint" id="hint">Drag nodes · scroll to pan · +/− to zoom</div>
+
+  <!-- side detail -->
+  <div class="side" id="side">
+    <div class="sh"><b id="side-title">Column transform</b><span class="sx" onclick="closeSide()">×</span></div>
+    <div class="sb" id="side-body"></div>
+  </div>
+</div>
+
+<script>
+  // ---- model ----
+  const NODES = {
+    position: {x:60, y:120, cls:'feed', t:'positions', s:'feed · SWP EOD',
+      cols:['account_number','asset_id','market_value_local','fx_rate','as_of_date']},
+    trades:   {x:60, y:360, cls:'feed', t:'TRADES', s:'feed · SWP',
+      cols:['account_number','trade_id','quantity','fx_rate']},
+    brz:      {x:320, y:120, cls:'bronze', t:'BRZ_POSITIONS', s:'bronze · dbt',
+      cols:['account_number','asset_id','market_value_local','fx_rate','as_of_date']},
+    slv:      {x:580, y:120, cls:'silver', t:'SLV_POSITIONS', s:'silver · dbt',
+      cols:['account_number','asset_id','market_value_local','fx_rate','as_of_date']},
+    gld:      {x:840, y:90,  cls:'gold', t:'GLD_POSITION_SUM', s:'gold · dbt',
+      cols:['account_number','market_value_usd','position_count','as_of_date']},
+    dag:      {x:840, y:330, cls:'dag', t:'swp_medallion_dag', s:'airflow · 02:00 TU-SAT', cols:[]},
+  };
+  // dataset-level edges: [from, to, kind]
+  const DS_EDGES = [
+    ['position','brz','data'], ['trades','brz','data'],
+    ['brz','slv','transform'], ['slv','gld','transform'],
+    ['dag','brz','orch'], ['dag','slv','orch'], ['dag','gld','orch'],
+  ];
+  // column-level edges: from node.col -> to node.col, with transform
+  const COL_EDGES = [
+    ['slv','account_number','gld','account_number','1:1','pass','passthrough (key)'],
+    ['slv','market_value_local','gld','market_value_usd','market_value_local * fx_rate','der','derived · 2 source cols'],
+    ['slv','fx_rate','gld','market_value_usd','market_value_local * fx_rate','der','derived · 2 source cols'],
+    ['slv','asset_id','gld','position_count','COUNT(asset_id)','der','aggregate'],
+    ['slv','as_of_date','gld','as_of_date','1:1','pass','passthrough'],
+    ['brz','account_number','slv','account_number','1:1','pass','passthrough (key)'],
+    ['brz','market_value_local','slv','market_value_local','ROUND(market_value_local,2)','fn','function'],
+  ];
+
+  let view='dataset', plane='data', scale=1, expanded=new Set();
+
+  function renderNodes(){
+    const c=document.getElementById('canvas');
+    [...c.querySelectorAll('.node')].forEach(n=>n.remove());
+    Object.entries(NODES).forEach(([id,n])=>{
+      if(view==='dataset' && plane!=='orch' && n.cls==='dag') return; // dag only in orch plane (data/transform hide it)
+      const el=document.createElement('div');
+      el.className='node '+n.cls+(expanded.has(id)?' expanded':'');
+      el.style.left=n.x+'px'; el.style.top=n.y+'px'; el.id='n-'+id;
+      const colsHtml = (view==='column' && n.cols.length)
+        ? '<div class="cols">'+n.cols.map(col=>{
+            const key=col==='account_number'?' key':''; 
+            return `<div class="col${key}" id="col-${id}-${col}"><span class="port"></span>${col}</div>`;
+          }).join('')+'</div>' : '';
+      el.innerHTML=`<div class="nh"><span class="ico" style="background:var(--${n.cls==='feed'?'feed':n.cls==='bronze'?'bronze':n.cls==='silver'?'silver':n.cls==='gold'?'gold':'dag'})"></span><span class="nt">${n.t}</span></div><div class="ns">${n.s}</div>${colsHtml}`;
+      if(view==='column' && n.cols.length){
+        el.querySelector('.nh').style.cursor='pointer';
+        el.querySelector('.nh').onclick=(e)=>{e.stopPropagation();toggleExpand(id);};
+      }
+      makeDraggable(el,id);
+      c.appendChild(el);
+    });
+    drawEdges();
+  }
+
+  function toggleExpand(id){
+    // one at a time
+    if(expanded.has(id)) expanded.delete(id);
+    else { expanded.clear(); expanded.add(id); }
+    renderNodes();
+  }
+
+  function drawEdges(){
+    const svg=document.getElementById('edges'); svg.innerHTML='';
+    const C=document.getElementById('canvas');
+    const rel=(el)=>{const r=el.getBoundingClientRect();const cr=C.getBoundingClientRect();return {x:(r.left-cr.left)/scale,y:(r.top-cr.top)/scale,w:r.width/scale,h:r.height/scale};};
+    if(view==='dataset'){
+      DS_EDGES.forEach(([f,t,kind])=>{
+        if(plane==='data' && kind!=='data') return;
+        if(plane==='transform' && kind==='orch') return;
+        // orch plane shows all
+        const fe=document.getElementById('n-'+f), te=document.getElementById('n-'+t);
+        if(!fe||!te) return;
+        const a=rel(fe), b=rel(te);
+        const x1=a.x+a.w, y1=a.y+a.h/2, x2=b.x, y2=b.y+b.h/2;
+        const col=kind==='data'?'#0091bf':kind==='transform'?'#0f4775':'#7c3aed';
+        const dash=kind==='orch'?'stroke-dasharray="5"':'';
+        svg.innerHTML+=`<path d="M${x1},${y1} C${x1+50},${y1} ${x2-50},${y2} ${x2},${y2}" stroke="${col}" stroke-width="2" fill="none" ${dash}/>`;
+      });
+    } else {
+      // column edges: draw an edge if EITHER endpoint node is expanded.
+      // If a node is collapsed, anchor to its header (so you still see the link).
+      COL_EDGES.forEach((edge,idx)=>{
+        const [fn,fc,tn,tc,expr,type,desc]=edge;
+        const fExp=expanded.has(fn), tExp=expanded.has(tn);
+        if(!fExp && !tExp) return; // at least one end must be expanded
+        const fCol=document.getElementById('col-'+fn+'-'+fc);
+        const tCol=document.getElementById('col-'+tn+'-'+tc);
+        const fNode=document.getElementById('n-'+fn);
+        const tNode=document.getElementById('n-'+tn);
+        if(!fNode||!tNode) return;
+        const fe = (fExp && fCol) ? fCol : fNode;
+        const te = (tExp && tCol) ? tCol : tNode;
+        const a=rel(fe), b=rel(te);
+        const x1=a.x+a.w, y1=a.y+a.h/2, x2=b.x, y2=b.y+b.h/2;
+        const col=type==='pass'?'#5a6472':type==='fn'?'#e67e22':'#0f4775';
+        const faded = (!fExp||!tExp) ? 'stroke-opacity="0.4"' : '';
+        svg.innerHTML+=`<path d="M${x1},${y1} C${x1+40},${y1} ${x2-40},${y2} ${x2},${y2}" stroke="${col}" stroke-width="2" fill="none" ${faded} style="cursor:pointer" onclick="showXformIdx(${idx})"/>`;
+      });
+    }
+  }
+
+  function showXformIdx(idx){
+    const [fn,fc,tn,tc,expr,type,desc]=COL_EDGES[idx];
+    const tnode=NODES[tn]?NODES[tn].t:tn;
+    document.getElementById('side-title').textContent=tc;
+    document.getElementById('side-body').innerHTML=`
+      <div class="sec">Target column</div><div class="xrow"><div class="xt">${tc}</div><div class="xs">in ${tnode}</div></div>
+      <div class="sec">Transform rule (transform_expr)</div>
+      <div class="xrow"><div class="xe">${expr}</div><div class="xs">${desc}</div></div>
+      <div class="sec">Source column(s)</div><div class="xrow"><div class="xt">${fc}</div><div class="xs">from ${NODES[fn]?NODES[fn].t:fn}</div></div>
+      <div class="sec">Provenance</div><div class="xrow"><div class="xs">Extracted by sqlglot · one column_lineage edge · click other edges to inspect</div></div>`;
+    document.getElementById('side').classList.add('open');
+  }
+  function closeSide(){document.getElementById('side').classList.remove('open');}
+
+  // view + plane toggles
+  function setView(btn,v){btn.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('on'));btn.classList.add('on');view=v;
+    document.getElementById('planeseg').style.display=v==='dataset'?'flex':'none';
+    document.getElementById('colhint').style.display=v==='column'?'inline':'none';
+    document.getElementById('collegend').style.display=v==='column'?'block':'none';
+    expanded.clear(); if(v==='column'){expanded.add('slv');expanded.add('gld');} renderNodes();}
+  function setPlane(btn,p){btn.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('on'));btn.classList.add('on');plane=p;renderNodes();}
+
+  // zoom + drag
+  function applyScale(){document.getElementById('canvas').style.transform=`scale(${scale})`;}
+  function zoom(d){scale=Math.max(0.4,Math.min(2,scale+d));applyScale();}
+  function resetZoom(){scale=1;applyScale();}
+  function makeDraggable(el,id){
+    let sx,sy,ox,oy,drag=false;
+    el.addEventListener('mousedown',e=>{if(e.target.closest('.col'))return;drag=true;el.style.cursor='grabbing';sx=e.clientX;sy=e.clientY;ox=NODES[id].x;oy=NODES[id].y;e.preventDefault();});
+    window.addEventListener('mousemove',e=>{if(!drag)return;NODES[id].x=ox+(e.clientX-sx)/scale;NODES[id].y=oy+(e.clientY-sy)/scale;el.style.left=NODES[id].x+'px';el.style.top=NODES[id].y+'px';drawEdges();});
+    window.addEventListener('mouseup',()=>{if(drag){drag=false;el.style.cursor='grab';}});
+  }
+  // pan
+  let panx=0,pany=0,panning=false,psx,psy;
+  document.getElementById('stage').addEventListener('mousedown',e=>{if(e.target.id==='stage'||e.target.id==='canvas'){panning=true;psx=e.clientX-panx;psy=e.clientY-pany;}});
+  window.addEventListener('mousemove',e=>{if(!panning)return;panx=e.clientX-psx;pany=e.clientY-psy;document.getElementById('canvas').style.transform=`translate(${panx}px,${pany}px) scale(${scale})`;});
+  window.addEventListener('mouseup',()=>panning=false);
+
+  renderNodes();
+</script>
+</body>
+</html>

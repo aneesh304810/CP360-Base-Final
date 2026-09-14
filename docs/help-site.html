@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CP Catalog — Architecture & Ingestion Help</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f5f8f8;--panel:#fff;--border:#dbdae0;--text:#333;--sub:#666;--muted:#999;
+    --navy:#10193b;--accent:#0f4775;--pop:#31bced;--hover:#0091bf;--tint:#cae3ee;
+    --sei:#0091bf;--internal:#0f4775;--success:#159943;--danger:#c1113a;--warning:#e67e22;
+    --bronze:#b45309;--silver:#64748b;--gold:#ca8a04;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:Roboto,'Helvetica Neue',Arial,sans-serif;font-size:14px;line-height:1.6}
+  code{background:#eef2f8;padding:2px 6px;border-radius:3px;font-size:13px;color:var(--accent)}
+  pre{background:#0b1f3a;color:#e6edf6;padding:14px 16px;border-radius:4px;overflow:auto;
+    font-size:12.5px;line-height:1.5}
+  pre code{background:none;color:inherit;padding:0}
+  a{color:var(--hover);text-decoration:none}
+  .wrap{display:flex;min-height:100vh}
+  aside{width:270px;flex-shrink:0;background:var(--navy);color:#cdd9ea;position:sticky;top:0;
+    height:100vh;overflow-y:auto}
+  .brand{display:flex;align-items:center;gap:11px;padding:20px 22px;border-bottom:1px solid rgba(255,255,255,.08)}
+  .brand .lg{width:34px;height:34px;border-radius:3px;background:var(--pop);display:grid;
+    place-items:center;color:var(--navy);font-weight:700}
+  .brand b{color:#fff;font-size:15px}.brand small{display:block;color:#7e93b3;font-size:11px}
+  nav{padding:10px 12px 40px}
+  nav .grp{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:#6f86a8;
+    font-weight:700;padding:14px 10px 5px}
+  nav a{display:block;color:#bcccdf;padding:7px 10px;border-radius:3px;font-size:13.5px;cursor:pointer}
+  nav a:hover{background:rgba(255,255,255,.06);color:#fff}
+  nav a.active{background:var(--accent);color:#fff}
+  main{flex:1;min-width:0}
+  .top{position:sticky;top:0;z-index:5;background:rgba(245,248,248,.9);backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--border);padding:12px 32px;font-size:13px;color:var(--sub)}
+  .content{max-width:850px;margin:0 auto;padding:32px}
+  section{display:none}section.active{display:block}
+  h1{font-size:26px;color:var(--accent);border-bottom:2px solid var(--accent);padding-bottom:14px;
+    margin:0 0 8px}
+  .lede{font-size:16px;color:var(--sub);margin:0 0 24px}
+  h2{font-size:19px;color:var(--navy);margin:28px 0 10px}
+  h3{font-size:15px;margin:20px 0 6px}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)}
+  th{background:#f0f4fa;color:var(--accent);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:18px 20px;margin:14px 0}
+  .callout{border-left:3px solid var(--hover);background:#e0f5fd;padding:12px 16px;border-radius:0 4px 4px 0;margin:14px 0}
+  .callout.warn{border-color:var(--warning);background:#fae5d3}
+  .pill{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;padding:2px 7px;
+    border-radius:3px;color:#fff}
+  .pill.sei{background:var(--sei)}.pill.int{background:var(--internal)}
+  .pill.bronze{background:var(--bronze)}.pill.silver{background:var(--silver)}.pill.gold{background:var(--gold)}
+  .flow{display:flex;align-items:center;flex-wrap:wrap;gap:0;margin:16px 0}
+  .flow .stp{background:var(--tint);border:1px solid #5f87a7;border-radius:3px;padding:6px 10px;
+    font-size:12px;font-weight:600;color:var(--navy);white-space:nowrap}
+  .flow .stp.last{background:#f3d2d7;border-color:var(--danger)}
+  .flow .ar{color:var(--muted);padding:0 5px}
+  .steps{counter-reset:s;list-style:none;padding:0}
+  .steps>li{counter-increment:s;position:relative;padding:0 0 4px 42px;margin:16px 0}
+  .steps>li::before{content:counter(s);position:absolute;left:0;top:-2px;width:28px;height:28px;
+    border-radius:50%;background:var(--navy);color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px}
+  .steps>li b{display:block;color:var(--navy)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside>
+    <div class="brand"><div class="lg">CP</div>
+      <div><b>CP Catalog Help</b><small>Architecture &amp; Ingestion</small></div></div>
+    <nav id="nav">
+      <div class="grp">Understand</div>
+      <a data-s="overview" class="active">What is CP Catalog</a>
+      <a data-s="architecture">Architecture</a>
+      <a data-s="projects">SEI vs Non-SEI</a>
+      <div class="grp">Ingestion</div>
+      <a data-s="flow">How ingestion works</a>
+      <a data-s="artifacts">The artifacts</a>
+      <a data-s="sharedrive">Share drive layout</a>
+      <a data-s="run">Run ingestion</a>
+      <div class="grp">Reference</div>
+      <a data-s="formats">Artifact formats</a>
+      <a data-s="samples">Sample artifacts</a>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="top" id="crumb">Understand · What is CP Catalog</div>
+    <div class="content">
+
+      <section id="overview" class="active">
+        <h1>What is CP Catalog</h1>
+        <p class="lede">A self-hosted metadata catalog for BBH Capital Partners — four 360&deg;
+          lenses plus PII classification, organized by Project (SEI vs Non-SEI).</p>
+        <p>CP Catalog <b>harvests</b> metadata from your existing artifacts and systems, stores it
+          in a dedicated Oracle schema, and presents it as a searchable, navigable map of the data
+          estate. It is <b>read-only</b> — it never writes back to source systems and never runs
+          pipelines. The catalog is a <b>byproduct of the pipeline</b>: ingestion runs idempotently
+          after each dbt build.</p>
+        <div class="card">
+          <b>The five inputs</b>
+          <ul>
+            <li>Interface inventory (interfaces.xlsx) &rarr; Interface 360</li>
+            <li>SEI feed dictionary (SWP_EOD_Data_Feeds.xlsx) &rarr; Data 360</li>
+            <li>SEI Swagger specs (API-SPEC/) &rarr; API 360</li>
+            <li>PII attributes list (PII_Attributes_List.xlsx) &rarr; PII classification</li>
+            <li>Live: dbt manifest, Airflow metadata DB, Oracle/SQL Server schemas</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="architecture">
+        <h1>Architecture</h1>
+        <p class="lede">Harvest &rarr; store &rarr; serve &rarr; present, on OpenShift.</p>
+        <pre>  Sources              Ingestion (Python)         Store        Serve         Present
+  interfaces.xlsx  ┐                              ┌────────┐   ┌────────┐   ┌──────────┐
+  SWP feeds.xlsx   ├─▶ connectors ──▶ loader._merge ▶ Oracle │──▶ FastAPI │──▶ React UI │
+  Swagger YAML     │   ProjectResolver  (idempotent │CATALOG │   read API │   6 screens │
+  PII xlsx         │   (one source of   MERGE)      │ schema │   /api/... │   DEMO|LIVE │
+  dbt manifest     │    truth)                      └────────┘   └────────┘   └──────────┘
+  Airflow PG DB    │                                 ▲
+  Oracle schemas  ─┘   run.py orchestrator           │ OpenShift: api + ui + ingestion CronJob</pre>
+        <h2>Three principles</h2>
+        <table>
+          <tr><th>Principle</th><th>Meaning</th></tr>
+          <tr><td>Catalog is a byproduct</td><td>ingestion runs after each dbt build, idempotently</td></tr>
+          <tr><td>Read-only API</td><td>the API only SELECTs; all writes happen in ingestion</td></tr>
+          <tr><td>DEMO &rarr; LIVE fallback</td><td>the UI renders fully with embedded mock data, no backend needed</td></tr>
+        </table>
+        <h2>The loader contract</h2>
+        <p>Every connector writes <b>only</b> through one method — an idempotent Oracle MERGE.
+          The <code>protect</code> list shields overlay/PII columns from being overwritten on a
+          re-harvest, so business edits and PII tags survive every run.</p>
+        <pre><code>loader._merge(table, pk, values, protect=('business_desc','is_pii',...))</code></pre>
+      </section>
+
+      <section id="projects">
+        <h1>SEI vs Non-SEI</h1>
+        <p class="lede"><code>project_id</code> is a first-class dimension on every entity, resolved
+          by one <code>ProjectResolver</code> so assignment is deterministic and auditable.</p>
+        <table>
+          <tr><th>Source</th><th>Rule</th></tr>
+          <tr><td>dbt model</td><td><code>meta.project</code>, else name <code>^sei_</code>/<code>^swp_</code> &rarr; <span class="pill sei">SEI</span></td></tr>
+          <tr><td>Airflow DAG</td><td><code>sei</code> tag, else <code>^swp_</code>/<code>^sei_</code> &rarr; <span class="pill sei">SEI</span></td></tr>
+          <tr><td>Oracle schema</td><td>in <code>SEI_ORACLE_SCHEMAS</code> &rarr; <span class="pill sei">SEI</span></td></tr>
+          <tr><td>API spec</td><td>under <code>API-SPEC/</code> &rarr; <span class="pill sei">SEI</span></td></tr>
+          <tr><td>Interface system</td><td>fuzzy map: AddVantage&rarr;addvantage, Pivotal&rarr;pivotal&hellip;</td></tr>
+        </table>
+        <div class="callout">To add a Non-SEI project: insert a row in the <code>projects</code> table
+          (or the override CSV) and, if it needs auto-detection, add a rule in <code>ProjectResolver</code>.
+          Nothing else changes.</div>
+      </section>
+
+      <section id="flow">
+        <h1>How ingestion works</h1>
+        <p class="lede">One orchestrator (<code>run.py</code>) runs the steps in order, each guarded
+          (one failure won't abort the rest), ending with the PII matcher.</p>
+        <div class="flow">
+          <span class="stp">projects</span><span class="ar">&#9654;</span>
+          <span class="stp">oracle</span><span class="ar">&#9654;</span>
+          <span class="stp">feed_dictionary</span><span class="ar">&#9654;</span>
+          <span class="stp">dbt</span><span class="ar">&#9654;</span>
+          <span class="stp">airflow</span><span class="ar">&#9654;</span>
+          <span class="stp">interface360</span><span class="ar">&#9654;</span>
+          <span class="stp">pii_classification</span><span class="ar">&#9654;</span>
+          <span class="stp last">pii_match</span>
+        </div>
+        <h2>What each step does</h2>
+        <ol class="steps">
+          <li><b>projects</b> Seed/refresh the project registry (SEI + Non-SEI).</li>
+          <li><b>oracle</b> Harvest tables/views/columns from configured schemas; project per schema.</li>
+          <li><b>feed_dictionary</b> Parse the SWP feed workbook into FEED datasets + columns + enumerations (all SEI).</li>
+          <li><b>dbt</b> Read manifest.json: models, table lineage, compiled SQL, then column-level lineage with transform expressions.</li>
+          <li><b>airflow</b> Read the Airflow Postgres metadata DB: DAGs, runs, and DAG&rarr;model orchestration edges.</li>
+          <li><b>interface360</b> Parse interfaces.xlsx; resolve source/target project; derive systems and routing hops.</li>
+          <li><b>pii_classification</b> Load the PII attribute dictionary.</li>
+          <li><b>pii_match (last)</b> Scan every harvested field, tag PII, write matches with the source entity's project.</li>
+        </ol>
+        <div class="callout">Every step is <b>idempotent</b> — re-running is always safe. The PII matcher
+          runs <b>last</b> because it must see every field every other step produced.</div>
+      </section>
+
+      <section id="artifacts">
+        <h1>The artifacts</h1>
+        <p class="lede">What each ingestion step reads, and what it populates.</p>
+        <table>
+          <tr><th>Artifact</th><th>Step</th><th>Populates</th></tr>
+          <tr><td>interfaces.xlsx</td><td>interface360</td><td>interface360_interfaces, _systems, _routing_hops</td></tr>
+          <tr><td>SWP_EOD_Data_Feeds.xlsx</td><td>feed_dictionary</td><td>datasets(FEED), columns, column_enumerations</td></tr>
+          <tr><td>swagger-spec-*.yaml</td><td>api360</td><td>api_sources, api_endpoints, api_fields, api_endpoint_errors</td></tr>
+          <tr><td>PII_Attributes_List.xlsx</td><td>pii_classification</td><td>pii_classifications</td></tr>
+          <tr><td>manifest.json / catalog.json</td><td>dbt</td><td>datasets(MODEL), transformations, transform_lineage, column_lineage</td></tr>
+          <tr><td>Airflow Postgres DB</td><td>airflow</td><td>datasets(DAG), runs, transform_lineage (DAG&rarr;model)</td></tr>
+          <tr><td>Oracle schemas</td><td>oracle</td><td>datasets(TABLE/VIEW), columns</td></tr>
+        </table>
+      </section>
+
+      <section id="sharedrive">
+        <h1>Share drive layout</h1>
+        <p class="lede">Ingestion reads from the CIFS share, mounted read-only via the SMB CSI driver.</p>
+        <pre>\\qcwebfs.testbbh.com\fixed_income_quant_jupyter$\CP-CATALOG\
+  &#9500;&#9472; API-SPEC\            &#8592; Swagger specs (16 SEI domain folders)
+  &#9500;&#9472; DATA-FEEDS\          &#8592; SWP_EOD_Data_Feeds.xlsx
+  &#9500;&#9472; INTERFACE-SYSTEM\    &#8592; interfaces.xlsx
+  &#9500;&#9472; POSTMAN\             &#8592; optional Postman collections
+  &#9492;&#9472; OVERLAY\
+       &#9500;&#9472; PII_Attributes_List.xlsx
+       &#9500;&#9472; projects.csv         (optional registry overrides)
+       &#9492;&#9472; business_glossary.xlsx (optional)
+
+dbt artifacts: /opt/approot/dbt-artifacts/ (PVC)
+Airflow:       AIRFLOW_DSN (Postgres connection)
+Oracle:        ORACLE_PROD_DSN</pre>
+        <div class="callout">Use the <b>System Design</b> screen in the app to see each source, its
+          path, and stage an artifact for the next run.</div>
+      </section>
+
+      <section id="run">
+        <h1>Run ingestion</h1>
+        <h3>Locally</h3>
+        <pre><code>cd ingestion
+pip install -r requirements.txt
+export CP_CATALOG_DB_DSN="oracle://catalog_user:pwd@localhost:1521/FREEPDB1"
+export CP_CATALOG_ROOT="/path/to/CP-CATALOG"
+export SEI_ORACLE_SCHEMAS="SEI_RAW,SEI_STAGE"
+python -m ingestion.run</code></pre>
+        <h3>On OpenShift</h3>
+        <pre><code>oc create job --from=cronjob/cp-catalog-ingestion seed-now -n cp-catalog
+oc logs -f job/seed-now -n cp-catalog</code></pre>
+        <p>The scheduled CronJob runs daily; trigger a manual run any time. Each run refreshes the
+          whole catalog safely.</p>
+      </section>
+
+      <section id="formats">
+        <h1>Artifact formats</h1>
+
+        <h2>interfaces.xlsx</h2>
+        <p>24 columns, row 1 = headers (exact). Key columns: Source System, Target System, Type
+          (feed type), Feed Routing (multi-hop, <code>--&gt;</code> separated), and a migration flag.</p>
+
+        <h2>SWP_EOD_Data_Feeds.xlsx</h2>
+        <p>Multi-tab: a <code>Contents</code> index plus one tab per feed. Each feed tab has:
+          <code>Position | Field Name | Field Description | Data Type/Format | Max Length | Nullable</code>.
+          Data types parse as <code>NUMBER(p,s)</code>, <code>VARCHAR2(n)</code>, <code>DATE fmt</code>.
+          Coded fields like <code>0 (Null) 1 (Active)</code> become enumerations. PK = position 1 +
+          name ends <code>_ID</code> + not null.</p>
+
+        <h2>swagger-spec-*.yaml</h2>
+        <p>OpenAPI 3.0. The <code>info.description</code> carries <code>Function point Id is 491.</code>
+          and the endpoint URL; error tables are Markdown (<code>S.No | Business Exception | Error
+          Code | Error Details</code>). Everything under <code>API-SPEC/</code> is SEI.</p>
+
+        <h2>PII_Attributes_List.xlsx</h2>
+        <p>One tab, three columns: <code>PII Attribute | PII Components | PII Sensitivity Category</code>.
+          One attribute can group many components. Sensitivity drives the severity ordinal
+          (<span class="pill" style="background:var(--danger)">Client</span>
+          <span class="pill" style="background:var(--warning)">Account</span>
+          <span class="pill" style="background:var(--sei)">Asset</span>).</p>
+
+        <h2>manifest.json</h2>
+        <p>Standard dbt manifest. Per model: <code>name</code>, <code>schema</code>,
+          <code>compiled_code</code>, <code>depends_on.nodes</code> (lineage), and
+          <code>config.meta.project</code> (project hint). The compiled SQL is parsed into
+          column-level lineage with transform expressions.</p>
+      </section>
+
+      <section id="samples">
+        <h1>Sample artifacts</h1>
+        <p class="lede">The <code>sample-artifacts/</code> folder ships realistic files matching every
+          format, validated against the actual connectors. Use them to see the UI populated.</p>
+        <table>
+          <tr><th>File</th><th>Shows</th></tr>
+          <tr><td>INTERFACE-SYSTEM/interfaces.xlsx</td><td>5 interfaces: AddVantage&rarr;Pivotal (Non-SEI) + SEI&rarr;PBDW cross-project</td></tr>
+          <tr><td>DATA-FEEDS/SWP_EOD_Data_Feeds.xlsx</td><td>Taxlot (7 cols, 4 enumerations) + Account feeds, all SEI</td></tr>
+          <tr><td>API-SPEC/.../swagger-spec-AccountOverride.yaml</td><td>FPID 491, 6 fields, 3-row error table, PSI45</td></tr>
+          <tr><td>OVERLAY/PII_Attributes_List.xlsx</td><td>16 classifications across all 4 sensitivity levels</td></tr>
+          <tr><td>dbt-artifacts/manifest.json</td><td>4 models: SEI bronze + internal medallion, full lineage chain</td></tr>
+        </table>
+        <h3>Use them locally</h3>
+        <pre><code>export CP_CATALOG_ROOT="$(pwd)/sample-artifacts"
+export DBT_MANIFEST_PATH="$(pwd)/sample-artifacts/dbt-artifacts/manifest.json"
+python -m ingestion.run</code></pre>
+        <p>Or just run the UI in DEMO mode (<code>cd ui &amp;&amp; npm run dev</code>) — it renders the
+          same shape of data with no backend at all.</p>
+        <div class="callout">These samples are <b>verified</b>: each one parses cleanly through its
+          connector (5 interfaces, Taxlot with 4 enumerations, 16 PII rows, 4 dbt models with correct
+          SEI/internal project resolution and the full lineage chain).</div>
+      </section>
+
+    </div>
+  </main>
+</div>
+<script>
+  const links=document.querySelectorAll('#nav a');
+  const secs=document.querySelectorAll('section');
+  const crumb=document.getElementById('crumb');
+  links.forEach(a=>a.addEventListener('click',()=>{
+    const s=a.dataset.s;
+    secs.forEach(x=>x.classList.toggle('active',x.id===s));
+    links.forEach(x=>x.classList.toggle('active',x===a));
+    let el=a,g='';while(el=el.previousElementSibling){if(el.classList&&el.classList.contains('grp')){g=el.textContent;break}}
+    crumb.textContent=(g?g+' · ':'')+a.textContent;
+    window.scrollTo(0,0);
+  }));
+</script>
+</body>
+</html>

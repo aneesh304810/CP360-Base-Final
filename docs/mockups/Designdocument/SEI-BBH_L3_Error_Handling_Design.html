@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>L3 — Error handling, quarantine &amp; override: detailed design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EDF0F3;--card:#FFFFFF;--ink:#0F151C;--ink-2:#4A5765;--rule:#C9D2DB;
+  --err:#A82316;--qua:#9A5B00;--ovr:#5C4470;--ok:#2C6E5B;--nav:#16305B;--grid:rgba(15,21,28,.055);
+}
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:28px 28px;color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;
+}
+.sheet{max-width:1120px;margin:0 auto;padding:34px 22px 80px}
+.mast{border-top:3px solid var(--ink);padding-top:14px;margin-bottom:20px}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2)}
+h1{font-family:"Archivo",sans-serif;font-weight:700;font-size:clamp(25px,4vw,38px);line-height:1.05;letter-spacing:-.022em;margin:8px 0 10px;max-width:22ch}
+.sub{max-width:70ch;color:var(--ink-2);font-size:14.5px;margin:0}
+nav{position:sticky;top:0;z-index:20;background:rgba(237,240,243,.94);backdrop-filter:blur(6px);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);margin:20px 0 24px}
+nav ul{list-style:none;display:flex;flex-wrap:wrap;margin:0;padding:0}
+nav a{display:block;padding:10px 13px;font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);text-decoration:none;border-right:1px solid var(--rule)}
+nav a:hover,nav a:focus{background:var(--ink);color:#fff;outline:none}
+section.blk{background:var(--card);border:1px solid var(--rule);border-top:4px solid var(--c);margin-bottom:22px;scroll-margin-top:58px}
+.hd{padding:16px 18px 14px;border-bottom:1px solid var(--rule)}
+.hd .tag{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.17em;text-transform:uppercase;color:var(--c);font-weight:600}
+.hd h2{font-family:"Archivo",sans-serif;font-size:21px;margin:5px 0 6px;letter-spacing:-.015em}
+.hd p{margin:0;font-size:13.5px;color:var(--ink-2);max-width:82ch}
+.body{padding:16px 18px 20px}
+h4{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-2);margin:22px 0 10px;padding-bottom:5px;border-bottom:1px solid var(--rule)}
+h4:first-child{margin-top:0}
+p.lead{font-size:13.5px;color:var(--ink-2);max-width:82ch}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:4px}
+th{background:var(--c);color:#fff;font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.09em;text-transform:uppercase;font-weight:600;text-align:left;padding:8px 9px}
+td{border:1px solid var(--rule);padding:7px 9px;vertical-align:top}
+tr:nth-child(even) td{background:#FAFBFC}
+code,.mono{font-family:"IBM Plex Mono",monospace;font-size:11.5px;background:#F0F3F6;padding:1px 4px;border-radius:2px}
+pre{font-family:"IBM Plex Mono",monospace;font-size:11.5px;line-height:1.65;background:#0F151C;color:#D6DEE6;padding:14px 16px;overflow-x:auto;border-radius:2px;margin:0 0 6px}
+pre .k{color:#7FB3E8}pre .s{color:#9BD6A8}pre .c{color:#6E7D8C;font-style:italic}pre .h{color:#E8A87C}
+.flow{font-family:"IBM Plex Mono",monospace;font-size:12px;line-height:1.7;background:#F7F9FB;border:1px solid var(--rule);padding:13px 15px;overflow-x:auto;white-space:pre;color:#1B2733;margin-bottom:6px}
+.flow .b{color:var(--err);font-weight:600}.flow .g{color:var(--ok);font-weight:600}.flow .n{color:var(--qua);font-weight:600}
+ul.risk{margin:0;padding-left:17px;font-size:13.5px;color:var(--ink-2)}
+ul.risk li{margin-bottom:7px}ul.risk b{color:var(--ink)}
+.ad{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;background:#FFF1DC;border:1px solid #E8CDA1;color:#7A4A00;padding:1px 5px;border-radius:2px}
+.call{border-left:3px solid var(--err);background:#FDF6F5;padding:11px 14px;font-size:13.5px;margin:12px 0 0}
+.call b{display:block;font-family:"Archivo",sans-serif;font-size:13.5px;margin-bottom:3px;color:var(--ink)}
+.cap{font-size:11.5px;color:var(--ink-2);font-family:"IBM Plex Mono",monospace;margin:0 0 14px}
+.pill{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;color:#fff;padding:1px 6px;border-radius:2px;white-space:nowrap}
+.p-blk{background:#A82316}.p-flg{background:#7A4B12}.p-rty{background:#546070}.p-pag{background:#5C4470}
+@media(max-width:760px){table{font-size:11.5px}td,th{padding:6px 7px}}
+@media print{body{background:#fff}nav{position:static}section.blk{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+<header class="mast">
+  <div class="eyebrow">Level 3 · component 29 · with 28 and 30 · detailed design</div>
+  <h1>Error handling, quarantine and override</h1>
+  <p class="sub">What happens when something fails, and who is allowed to decide it should proceed anyway. Both source decks name this capability in a single line; nothing below it exists yet.</p>
+</header>
+
+<nav><ul>
+  <li><a href="#scope">Scope</a></li>
+  <li><a href="#tax">Taxonomy</a></li>
+  <li><a href="#model">Data model</a></li>
+  <li><a href="#quar">Quarantine</a></li>
+  <li><a href="#life">Lifecycle</a></li>
+  <li><a href="#ovr">Override</a></li>
+  <li><a href="#seq">Worked failure</a></li>
+  <li><a href="#api">Interface</a></li>
+  <li><a href="#open">Open items</a></li>
+</ul></nav>
+
+<!-- SCOPE -->
+<section class="blk" id="scope" style="--c:#16305B">
+  <div class="hd">
+    <div class="tag">Boundary</div>
+    <h2>What component 29 owns</h2>
+    <p>Error handling sits between four neighbours and is easy to over-scope. These lines keep it coherent.</p>
+  </div>
+  <div class="body">
+    <table>
+      <tr><th style="width:22%">Component</th><th style="width:38%">Owns</th><th>Does not own</th></tr>
+      <tr><td><b>29 Error handling</b></td><td>Taxonomy, error record, quarantine store, resubmission path, routing to alerts.</td><td>Deciding whether a rule failure is fatal — that is severity, owned by 28.</td></tr>
+      <tr><td>28 DQ framework</td><td>Rule registry, severity tiers, thresholds, DQ results store, override authorisation.</td><td>Physical handling of the failed file or row.</td></tr>
+      <tr><td>30 Reconciliation</td><td>Exception lifecycle for <i>reconciliation</i> breaks, control totals, the operator's queue.</td><td>Ingest-time failures. Those are 29's.</td></tr>
+      <tr><td>21 Replay</td><td>Re-running a business date once the underlying problem is fixed.</td><td>Deciding that a replay is warranted.</td></tr>
+    </table>
+
+    <div class="call">
+      <b>Design premise: quarantine is pre-RAW only.</b>
+      Once a row is in RAW it is immutable and stays there — bad rows are evidence, not waste. So quarantine applies to files and rows that never made it into RAW. Everything after RAW is <i>flagged</i> and <i>blocked</i>, never removed. This one rule resolves most of the ambiguity in the sections below: if you find yourself designing a way to pull rows out of Stage 2, the design has gone wrong.
+    </div>
+  </div>
+</section>
+
+<!-- TAXONOMY -->
+<section class="blk" id="tax" style="--c:#A82316">
+  <div class="hd">
+    <div class="tag">Classification</div>
+    <h2>Error taxonomy</h2>
+    <p>Errors are classified on capture, and the class determines the route. Without this, everything becomes a generic pipeline failure and the operator has to read logs to find out what happened.</p>
+  </div>
+  <div class="body">
+    <table>
+      <tr><th style="width:9%">Class</th><th style="width:18%">Name</th><th style="width:26%">Examples</th><th style="width:16%">Default route</th><th>Detected at</th></tr>
+      <tr><td><span class="mono">E1</span></td><td>Transport</td><td>File missing, late beyond window, truncated, unreadable, auth failure</td><td><span class="pill p-blk">BLOCK FILE</span></td><td>Sensors (9), landing zone (8)</td></tr>
+      <tr><td><span class="mono">E2</span></td><td>Structural</td><td>Encoding, delimiter, column count, header mismatch, manifest count mismatch, checksum</td><td><span class="pill p-blk">BLOCK FILE</span></td><td>G1 (23)</td></tr>
+      <tr><td><span class="mono">E3</span></td><td>Type / parse</td><td>Unparseable date, non-numeric amount, oversized value</td><td><span class="pill p-flg">FLAG ROW</span></td><td>Stage 2 safe-cast (15)</td></tr>
+      <tr><td><span class="mono">E4</span></td><td>Business rule</td><td>Unknown account, settle before trade, negative quantity where disallowed</td><td><span class="pill p-flg">FLAG ROW</span> then G3 asserts</td><td>Stage 2 (15) / G3 (25)</td></tr>
+      <tr><td><span class="mono">E5</span></td><td>Reconciliation</td><td>RAW→Gold count mismatch, control total break, orphan correction past window</td><td><span class="pill p-blk">BLOCK PUBLISH</span></td><td>G4 (26) / G5 (27)</td></tr>
+      <tr><td><span class="mono">E6</span></td><td>Infrastructure</td><td>DB unavailable, session limit, pod evicted, timeout, disk full</td><td><span class="pill p-rty">RETRY</span></td><td>Any task</td></tr>
+      <tr><td><span class="mono">E7</span></td><td>Orchestration</td><td>Upstream dependency failed, window breach, concurrent-run conflict</td><td><span class="pill p-pag">PAGE</span></td><td>Airflow (18, 20)</td></tr>
+    </table>
+    <p class="cap">Default route is what the class does absent a config override. Severity from the registry (28) can escalate FLAG to BLOCK, but never de-escalates E1, E2 or E5.</p>
+
+    <h4>Retry versus recover</h4>
+    <table>
+      <tr><th style="width:14%">Class</th><th style="width:16%">Airflow retry</th><th>Why</th></tr>
+      <tr><td>E6 only</td><td>Yes, bounded exponential backoff</td><td>Transient infrastructure. The same input will succeed on the next attempt.</td></tr>
+      <tr><td>E1–E5, E7</td><td><b>Never</b></td><td>The input is unchanged, so the outcome is unchanged. Retrying a DQ failure burns the window and produces a misleading run history where a real data problem looks like flakiness.</td></tr>
+    </table>
+    <div class="call">
+      <b>Implementation note.</b>
+      Set <span class="mono">retries=0</span> on all gate tasks and raise a non-retryable exception type from the framework. The default Airflow behaviour — retry everything three times — will otherwise quietly convert every blocking gate into a four-times-slower blocking gate.
+    </div>
+  </div>
+</section>
+
+<!-- DATA MODEL -->
+<section class="blk" id="model" style="--c:#A82316">
+  <div class="hd">
+    <div class="tag">Persistence</div>
+    <h2>Error record data model</h2>
+    <p>One error event table for the whole Hub, written by Python and by Airflow. Integration360 (35) reads it; nothing else writes it.</p>
+  </div>
+  <div class="body">
+<pre><span class="k">CREATE TABLE</span> HUB_ERROR_EVENT (
+  ERROR_ID          <span class="h">NUMBER(18)</span>    <span class="k">GENERATED ALWAYS AS IDENTITY</span>,
+  ERROR_CLASS       <span class="h">VARCHAR2(4)</span>   <span class="k">NOT NULL</span>,   <span class="c">-- E1..E7</span>
+  ERROR_CODE        <span class="h">VARCHAR2(40)</span>  <span class="k">NOT NULL</span>,   <span class="c">-- E2_COLUMN_COUNT_MISMATCH</span>
+  SEVERITY          <span class="h">VARCHAR2(10)</span>  <span class="k">NOT NULL</span>,   <span class="c">-- ERROR | WARN  (resolved from registry 28)</span>
+  ROUTE             <span class="h">VARCHAR2(20)</span>  <span class="k">NOT NULL</span>,   <span class="c">-- BLOCK_FILE | BLOCK_PUBLISH | FLAG_ROW | RETRY | PAGE</span>
+
+  <span class="c">-- context: what was being processed</span>
+  BATCH_ID          <span class="h">VARCHAR2(40)</span>,
+  LOAD_ID           <span class="h">NUMBER(18)</span>,               <span class="c">-- null for pre-load failures (E1)</span>
+  DOMAIN            <span class="h">VARCHAR2(30)</span>,             <span class="c">-- ACCOUNT | TRANSACTION | ...</span>
+  BUSINESS_DATE     <span class="h">DATE</span>,
+  FILE_NAME         <span class="h">VARCHAR2(260)</span>,
+  ROW_NUM           <span class="h">NUMBER(12)</span>,               <span class="c">-- null for file-level errors</span>
+  GATE              <span class="h">VARCHAR2(4)</span>,              <span class="c">-- G1..G5, null if not gate-raised</span>
+  RULE_ID           <span class="h">VARCHAR2(40)</span>,             <span class="c">-- FK to the rule registry (28)</span>
+  DAG_RUN_ID        <span class="h">VARCHAR2(120)</span>,
+  TASK_ID           <span class="h">VARCHAR2(120)</span>,
+
+  <span class="c">-- payload</span>
+  MESSAGE           <span class="h">VARCHAR2(2000)</span> <span class="k">NOT NULL</span>,
+  DETAIL            <span class="h">CLOB</span>,                     <span class="c">-- JSON: expected vs actual, sample values</span>
+
+  <span class="c">-- lifecycle</span>
+  STATUS            <span class="h">VARCHAR2(20)</span>  <span class="k">DEFAULT</span> <span class="s">'NEW'</span> <span class="k">NOT NULL</span>,
+  ASSIGNED_TO       <span class="h">VARCHAR2(120)</span>,
+  RESOLUTION        <span class="h">VARCHAR2(30)</span>,             <span class="c">-- RESUBMITTED | OVERRIDDEN | WAIVED | FIXED_UPSTREAM</span>
+  RESOLVED_BY       <span class="h">VARCHAR2(120)</span>,
+  RESOLVED_TS       <span class="h">TIMESTAMP</span>,
+  RESOLUTION_NOTE   <span class="h">VARCHAR2(2000)</span>,
+
+  CREATED_TS        <span class="h">TIMESTAMP</span>     <span class="k">DEFAULT</span> SYSTIMESTAMP <span class="k">NOT NULL</span>,
+  <span class="k">CONSTRAINT</span> PK_HUB_ERROR_EVENT <span class="k">PRIMARY KEY</span> (ERROR_ID)
+)
+<span class="k">PARTITION BY RANGE</span> (CREATED_TS) <span class="k">INTERVAL</span> (NUMTOYMINTERVAL(1,<span class="s">'MONTH'</span>))
+  (<span class="k">PARTITION</span> P_INIT <span class="k">VALUES LESS THAN</span> (<span class="k">TIMESTAMP</span> <span class="s">'2026-01-01 00:00:00'</span>));
+
+<span class="k">CREATE INDEX</span> IX_ERR_OPEN   <span class="k">ON</span> HUB_ERROR_EVENT (STATUS, SEVERITY, CREATED_TS);
+<span class="k">CREATE INDEX</span> IX_ERR_LOAD   <span class="k">ON</span> HUB_ERROR_EVENT (LOAD_ID);
+<span class="k">CREATE INDEX</span> IX_ERR_BATCH  <span class="k">ON</span> HUB_ERROR_EVENT (BATCH_ID, DOMAIN);</pre>
+
+    <div class="call">
+      <b>Every error carries LOAD_ID where one exists.</b>
+      This is what makes the error record joinable to RAW, to the DQ results store, to lineage, and to a replay scope. An error table keyed only by DAG run ID tells you a task failed; it does not tell you which rows in which file, and it cannot drive a targeted replay.
+    </div>
+
+    <h4>Error code convention</h4>
+    <p class="lead"><span class="mono">{CLASS}_{SUBJECT}_{CONDITION}</span> — for example <span class="mono">E2_MANIFEST_COUNT_MISMATCH</span>, <span class="mono">E4_ACCOUNT_UNKNOWN</span>, <span class="mono">E5_TIEOUT_ROWCOUNT</span>. Codes are registered in the config store (33), not invented at the call site. An unregistered code is itself an error — it fails CI, so the catalogue cannot silently drift.</p>
+  </div>
+</section>
+
+<!-- QUARANTINE -->
+<section class="blk" id="quar" style="--c:#9A5B00">
+  <div class="hd">
+    <div class="tag">Pre-RAW only</div>
+    <h2>Quarantine store</h2>
+    <p>Two levels — whole files that failed G1, and individual rows that could not be parsed into columns at all. Both retain the original bytes.</p>
+  </div>
+  <div class="body">
+
+    <h4>File-level quarantine</h4>
+<div class="flow">  /landing/{domain}/{business_date}/          ← delivered
+  /quarantine/{domain}/{business_date}/
+        {load_id}/
+          original/     txn_20260807.csv        ← byte-identical copy, never edited
+          manifest/     txn_20260807.manifest
+          report/       g1_failures.json        ← what failed, expected vs actual
+          meta.json                             ← load_id, batch_id, error_ids, ts
+</div>
+    <p class="lead">The file is <b>copied</b>, not moved. The landing zone retains its own copy under its own retention — an operator answering "what did SEI actually send" should never depend on the quarantine process having worked correctly.</p>
+
+    <h4>Row-level quarantine</h4>
+    <p class="lead">Applies only where a row cannot be split into columns — ragged delimiter, embedded newline, encoding break. A row that parses but holds a bad value is <i>not</i> quarantined; it loads into RAW as text and is flagged in Stage 2. That distinction keeps RAW faithful.</p>
+<pre><span class="k">CREATE TABLE</span> HUB_QUARANTINE_ROW (
+  QUARANTINE_ID   <span class="h">NUMBER(18)</span>    <span class="k">GENERATED ALWAYS AS IDENTITY</span>,
+  LOAD_ID         <span class="h">NUMBER(18)</span>    <span class="k">NOT NULL</span>,
+  DOMAIN          <span class="h">VARCHAR2(30)</span>  <span class="k">NOT NULL</span>,
+  BUSINESS_DATE   <span class="h">DATE</span>          <span class="k">NOT NULL</span>,
+  FILE_NAME       <span class="h">VARCHAR2(260)</span> <span class="k">NOT NULL</span>,
+  ROW_NUM         <span class="h">NUMBER(12)</span>    <span class="k">NOT NULL</span>,
+  RAW_LINE        <span class="h">CLOB</span>          <span class="k">NOT NULL</span>,   <span class="c">-- the original line, unmodified</span>
+  ERROR_ID        <span class="h">NUMBER(18)</span>    <span class="k">NOT NULL</span>,   <span class="c">-- FK HUB_ERROR_EVENT</span>
+  STATUS          <span class="h">VARCHAR2(20)</span>  <span class="k">DEFAULT</span> <span class="s">'QUARANTINED'</span>,
+  RESUBMIT_LOAD_ID <span class="h">NUMBER(18)</span>,               <span class="c">-- the load that later accepted it</span>
+  CREATED_TS      <span class="h">TIMESTAMP</span>     <span class="k">DEFAULT</span> SYSTIMESTAMP
+);</pre>
+
+    <h4>Retention</h4>
+    <table>
+      <tr><th style="width:30%">Store</th><th style="width:20%">Retention</th><th>Driver</th></tr>
+      <tr><td>Quarantined files</td><td>Match RAW retention</td><td>A replay of day N must be able to see what was rejected on day N. Shorter retention creates a gap in the audit story.</td></tr>
+      <tr><td>Quarantined rows</td><td>Match RAW retention</td><td>Same reasoning.</td></tr>
+      <tr><td>Error events</td><td>Longer — 24 months minimum</td><td>Small table, and the operational history is what evidences control effectiveness to an auditor.</td></tr>
+    </table>
+    <p class="cap">RAW retention is itself unset — it depends on the replay-depth decision, still open.</p>
+  </div>
+</section>
+
+<!-- LIFECYCLE -->
+<section class="blk" id="life" style="--c:#9A5B00">
+  <div class="hd">
+    <div class="tag">State machine</div>
+    <h2>Exception lifecycle</h2>
+    <p>An error is not an alert. It has states, an owner and a resolution — otherwise the same failure recurs nightly and nobody can say whether it was ever addressed.</p>
+  </div>
+  <div class="body">
+<div class="flow">                    ┌──────────┐
+   error raised ───▶│   NEW    │  unassigned, alert fired
+                    └────┬─────┘
+                         │ operator picks up
+                    ┌────▼─────┐
+                    │ TRIAGED  │  owner set, cause identified
+                    └────┬─────┘
+        ┌────────────────┼────────────────┬──────────────────┐
+        ▼                ▼                ▼                  ▼
+  ┌───────────┐   ┌────────────┐   ┌────────────┐   ┌────────────────┐
+  │RESUBMITTED│   │ OVERRIDDEN │   │  WAIVED    │   │ FIXED_UPSTREAM │
+  │ new file  │   │ <span class="b">proceed</span>    │   │ accepted as│   │ SEI corrects   │
+  │ from SEI  │   │ this run   │   │ known/OK   │   │ and resends    │
+  └─────┬─────┘   └─────┬──────┘   └─────┬──────┘   └───────┬────────┘
+        └───────────────┴────────────────┴──────────────────┘
+                         ▼
+                    ┌──────────┐
+                    │  CLOSED  │  resolution + note + who + when
+                    └──────────┘
+
+  aged NEW &gt; SLA ──▶ escalation (severity-driven, from registry 28)
+</div>
+
+    <table>
+      <tr><th style="width:22%">Resolution</th><th style="width:34%">Means</th><th>Triggers</th></tr>
+      <tr><td><span class="mono">RESUBMITTED</span></td><td>SEI sent a replacement file; it loaded under a new LOAD_ID.</td><td>Normal ingest. Prior load marked SUPERSEDED.</td></tr>
+      <tr><td><span class="mono">OVERRIDDEN</span></td><td>A human authorised the blocked run to proceed with the data as-is.</td><td>Override record written; run resumes. See next section.</td></tr>
+      <tr><td><span class="mono">WAIVED</span></td><td>The condition is known and acceptable; the rule needs adjusting.</td><td>No pipeline action. Raises a change to the rule registry.</td></tr>
+      <tr><td><span class="mono">FIXED_UPSTREAM</span></td><td>SEI corrected the source; a correction file follows.</td><td>May trigger a replay of affected dates.</td></tr>
+    </table>
+
+    <div class="call">
+      <b>Repeat-offender detection is where the value is.</b>
+      A single error is an incident. The same <span class="mono">ERROR_CODE</span> on the same <span class="mono">DOMAIN</span> for five consecutive business dates is a design problem — an unstated SEI behaviour, or a rule calibrated wrong. Build the recurrence query into the operator's view from day one; it is trivial with this data model and near-impossible to retrofit onto log-based alerting.
+    </div>
+  </div>
+</section>
+
+<!-- OVERRIDE -->
+<section class="blk" id="ovr" style="--c:#5C4470">
+  <div class="hd">
+    <div class="tag">The hardest control</div>
+    <h2>Override path</h2>
+    <p>Blocking gates without an override mean a 2am failure waits until morning. An override that is not tightly constrained means the gates are decorative. Both failure modes are real; the design below is the narrow path between them.</p>
+  </div>
+  <div class="body">
+
+    <h4>Constraints</h4>
+    <ul class="risk">
+      <li><b>Single-run scope, always.</b> An override authorises one gate, on one LOAD_ID or batch, for one run. It never persists, never applies to a future date, and cannot be set as a standing exemption. A standing exemption is a rule change and goes through the registry.</li>
+      <li><b>Never available for E5 at G4.</b> A tie-out break means Gold does not reconcile to RAW. Overriding it publishes knowingly-wrong data to PBDW and IMDS. If the business genuinely needs to publish, that is a business decision recorded outside the pipeline — not a button in it.</li>
+      <li><b>Two-person rule above a threshold.</b> Overrides on ERROR-severity failures affecting more than a configured row count or value require a second authoriser. Threshold in the config store.</li>
+      <li><b>Expires.</b> An override token is valid for a bounded window — 60 minutes by default. A stale approval cannot be replayed into a later run.</li>
+      <li><b>Written to lineage, not just to a log.</b> The override is part of the audit trail for the affected business date. An auditor asking why day N published despite a failure must find the answer in the same place as the rest of the evidence.</li>
+    </ul>
+
+    <h4>Override record</h4>
+<pre><span class="k">CREATE TABLE</span> HUB_OVERRIDE (
+  OVERRIDE_ID     <span class="h">NUMBER(18)</span>    <span class="k">GENERATED ALWAYS AS IDENTITY</span>,
+  ERROR_ID        <span class="h">NUMBER(18)</span>    <span class="k">NOT NULL</span>,   <span class="c">-- what is being overridden</span>
+  GATE            <span class="h">VARCHAR2(4)</span>   <span class="k">NOT NULL</span>,
+  SCOPE_TYPE      <span class="h">VARCHAR2(20)</span>  <span class="k">NOT NULL</span>,   <span class="c">-- LOAD | BATCH   (never DOMAIN, never STANDING)</span>
+  SCOPE_ID        <span class="h">VARCHAR2(40)</span>  <span class="k">NOT NULL</span>,
+  BUSINESS_DATE   <span class="h">DATE</span>          <span class="k">NOT NULL</span>,
+  JUSTIFICATION   <span class="h">VARCHAR2(2000)</span> <span class="k">NOT NULL</span>,  <span class="c">-- free text, mandatory, min length enforced</span>
+  APPROVER_1      <span class="h">VARCHAR2(120)</span> <span class="k">NOT NULL</span>,
+  APPROVER_2      <span class="h">VARCHAR2(120)</span>,               <span class="c">-- required above threshold</span>
+  GRANTED_TS      <span class="h">TIMESTAMP</span>     <span class="k">DEFAULT</span> SYSTIMESTAMP <span class="k">NOT NULL</span>,
+  EXPIRES_TS      <span class="h">TIMESTAMP</span>     <span class="k">NOT NULL</span>,
+  CONSUMED_TS     <span class="h">TIMESTAMP</span>,                   <span class="c">-- set when the gate actually uses it</span>
+  <span class="k">CONSTRAINT</span> CK_OVR_SCOPE <span class="k">CHECK</span> (SCOPE_TYPE <span class="k">IN</span> (<span class="s">'LOAD'</span>,<span class="s">'BATCH'</span>))
+);</pre>
+
+    <h4>Gate behaviour with an override present</h4>
+<div class="flow">  gate evaluates ──▶ FAIL
+        │
+        ├─ look for a valid override:  ERROR_ID match
+        │                              AND CONSUMED_TS IS NULL
+        │                              AND SYSTIMESTAMP &lt; EXPIRES_TS
+        │                              AND gate is override-eligible
+        │
+        ├─ none found  ──▶ <span class="b">BLOCK</span>. task fails non-retryably. alert.
+        │
+        └─ found       ──▶ stamp CONSUMED_TS
+                           write ERROR_EVENT.RESOLUTION = 'OVERRIDDEN'
+                           tag the affected rows: DQ_FLAGS += 'OVERRIDDEN'
+                           <span class="n">proceed</span>
+</div>
+    <p class="lead">The row-level tag matters: downstream consumers and any later investigation can identify exactly which records were published under an override, without reading the override table.</p>
+  </div>
+</section>
+
+<!-- WORKED FAILURE -->
+<section class="blk" id="seq" style="--c:#A82316">
+  <div class="hd">
+    <div class="tag">End to end</div>
+    <h2>Worked failure — G1 column-count mismatch</h2>
+    <p>One concrete path through every component above, at 01:14 on a business date.</p>
+  </div>
+  <div class="body">
+<div class="flow">  01:12  sensor (9)     txn_20260807.csv lands. manifest says 442,190 rows / 24 cols.
+  01:13  ingest (13)    LOAD_ID 100414 allocated. streaming read begins.
+  01:14  <span class="b">G1 (23)</span>       row 1 header has 25 columns. expected 24.
+                        ──▶ raise E2_COLUMN_COUNT_MISMATCH, severity ERROR (registry 28)
+
+  01:14  error (29)     HUB_ERROR_EVENT row written:
+                          class E2 · route BLOCK_FILE · gate G1 · LOAD_ID 100414
+                          detail {"expected":24,"actual":25,"header":"...,SETTLE_CCY"}
+                        file copied to /quarantine/transaction/2026-08-07/100414/
+                        RAW_TRANSACTION receives <span class="b">zero rows</span>.
+
+  01:14  airflow (18)   transaction branch fails. <span class="b">retries = 0</span>, no reattempt.
+                        <span class="n">22 partial-batch policy</span> decides: halt-all, or let the
+                        other six domains proceed to Stage 2.
+
+  01:15  alert (34)     ERROR severity ──▶ on-call page + Integration360 (35) queue entry.
+
+  01:40  operator       TRIAGED. cause: SEI added SETTLE_CCY without notice.
+                        two paths available —
+                          a) SEI resends without the column      ──▶ RESUBMITTED
+                          b) accept the new column               ──▶ config change to
+                             the domain spec in 33, then replay  ──▶ FIXED_UPSTREAM
+
+                        override is <span class="b">not</span> appropriate here: the file cannot be parsed,
+                        so there is nothing to proceed with. override applies to
+                        gates that fail on <span class="g">content</span>, not on <span class="g">structure</span>.
+
+  02:05  replay (21)    scope = LOAD_ID set for domain TRANSACTION, business date
+                        2026-08-07. the other six domains are untouched.
+  02:20  <span class="g">G4 (26)</span>       tie-out passes. publish proceeds. error CLOSED.
+</div>
+
+    <div class="call">
+      <b>Note what the taxonomy bought here.</b>
+      Because the error was classified E2 at capture, three things followed automatically: no retry, file quarantined rather than partially loaded, and the operator's queue entry already named the domain, the load and the expected-versus-actual. None of that is available from a stack trace in a task log — which is what "Recon &amp; Error Handling" as a single box on a slide will produce if it is built without this layer.
+    </div>
+  </div>
+</section>
+
+<!-- API -->
+<section class="blk" id="api" style="--c:#16305B">
+  <div class="hd">
+    <div class="tag">Interface</div>
+    <h2>Framework surface</h2>
+    <p>One import for Python components, one operator for Airflow. Both write to the same store — an error raised in dbt-land and an error raised in ingest must be indistinguishable to Integration360.</p>
+  </div>
+  <div class="body">
+<pre><span class="c"># hub_framework/errors.py — used by 13, 23, 26, 29, 30</span>
+
+<span class="k">from</span> hub_framework.errors <span class="k">import</span> HubError, ErrorClass, raise_blocking
+
+raise_blocking(
+    code       = <span class="s">"E2_COLUMN_COUNT_MISMATCH"</span>,     <span class="c"># must exist in registry (33)</span>
+    context    = ctx,                              <span class="c"># batch, load, domain, file, date</span>
+    message    = <span class="s">"header column count 25, expected 24"</span>,
+    detail     = {<span class="s">"expected"</span>: <span class="h">24</span>, <span class="s">"actual"</span>: <span class="h">25</span>, <span class="s">"header"</span>: header_line},
+    quarantine = QuarantineFile(path=src_path),    <span class="c"># optional</span>
+)
+<span class="c"># → writes HUB_ERROR_EVENT, copies to quarantine, checks for a valid override,</span>
+<span class="c">#   raises NonRetryableHubError if none. severity resolved from the registry,</span>
+<span class="c">#   never passed by the caller.</span>
+
+<span class="c"># flagging, not blocking — used inside Stage 2 post-processing and G2</span>
+flag_row(code=<span class="s">"E4_ACCOUNT_UNKNOWN"</span>, context=ctx, row_num=n)
+
+<span class="c"># Airflow side</span>
+<span class="k">from</span> hub_framework.operators <span class="k">import</span> GateOperator
+
+GateOperator(
+    task_id   = <span class="s">"g4_tieout_fact_transactions"</span>,
+    gate      = <span class="s">"G4"</span>,
+    rule_set  = <span class="s">"tieout.fact_transactions"</span>,   <span class="c"># resolved from registry</span>
+    scope     = <span class="s">"{{ ti.xcom_pull('ingest_transaction')['load_id'] }}"</span>,
+    retries   = <span class="h">0</span>,                            <span class="c"># enforced by the operator regardless</span>
+)</pre>
+
+    <ul class="risk" style="margin-top:14px">
+      <li><b>Severity is never a caller argument.</b> If a developer can pass <span class="mono">severity="warn"</span> at the call site, severity has left the registry and the config-driven design is decorative.</li>
+      <li><b>Codes are validated at import time</b> against the registry snapshot, and in CI against the live registry. An unregistered code fails the build.</li>
+      <li><b>The same context object</b> flows from the ingest framework through every gate, so LOAD_ID, batch and domain are never reconstructed or guessed.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- OPEN -->
+<section class="blk" id="open" style="--c:#9A5B00">
+  <div class="hd">
+    <div class="tag">To close before build</div>
+    <h2>Open items</h2>
+    <p>None of these are technical unknowns. They are decisions about who is accountable when the pipeline stops.</p>
+  </div>
+  <div class="body">
+    <table>
+      <tr><th style="width:6%">#</th><th style="width:32%">Question</th><th style="width:18%">Owner</th><th>Why it matters</th></tr>
+      <tr><td>1</td><td>Who holds override authority, and what is the two-person threshold</td><td>BBH ops + risk</td><td>Without a named role, the override is either unusable at 2am or effectively unrestricted. Both defeat the gates.</td></tr>
+      <tr><td>2</td><td>Is G4 override-eligible at all</td><td>ARB</td><td>Recommendation above is no. If the business disagrees, that needs stating explicitly, not discovering during an incident.</td></tr>
+      <tr><td>3</td><td>Escalation SLA per severity</td><td>BBH ops</td><td>Drives the aged-NEW escalation path and the on-call rota.</td></tr>
+      <tr><td>4</td><td>Quarantine retention — inherits RAW retention, which is unset</td><td>Business + ops</td><td>Depends on the replay-depth decision. Blocked on the same answer.</td></tr>
+      <tr><td>5</td><td>Does SEI receive error notifications automatically</td><td>SEI + BBH</td><td>Most E1/E2 failures are SEI-side. A manual email loop adds hours to every recurrence.</td></tr>
+      <tr><td>6</td><td>Error queue ownership: Integration360 or SEI dashboard <span class="ad">AD-6</span></td><td>ARB</td><td>Two queues means two owners and neither closing the exception.</td></tr>
+      <tr><td>7</td><td>Partial-batch interaction <span class="ad">AD-5</span></td><td>ARB</td><td>Determines whether one domain's E2 failure stops the other six. The taxonomy is ready for either answer.</td></tr>
+    </table>
+  </div>
+</section>
+
+</div>
+</body>
+</html>

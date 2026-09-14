@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CP 360 — Recon 360 · Parallel-Run Reconciliation</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f5f8f8;--panel:#fff;--panel2:#dfe6e9;--border:#b5b6b6;--text:#333;--sub:#666;
+    --navy:#10193b;--accent:#0f4775;--success:#159943;--successbg:#d0ebd9;
+    --danger:#c1113a;--dangerbg:#f3d2d7;--warning:#e67e22;--warningbg:#fae5d3;
+    --info:#0091bf;--infobg:#e0f5fd;--mono:'Roboto Mono',monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Roboto,Arial,sans-serif;
+    font-size:14px;line-height:1.5;min-width:1300px}
+  .hdr{height:56px;background:var(--navy);color:#fff;display:flex;align-items:center;gap:14px;padding:0 16px}
+  .hdr .logo{font-weight:700}.hdr .logo small{color:#9db3c9;font-weight:400;margin-left:8px;font-size:11px}
+  .hdr .live{margin-left:auto;font-size:11px;font-weight:700;background:var(--successbg);
+    color:var(--success);border-radius:999px;padding:2px 10px}
+  .wrap{max-width:1240px;margin:0 auto;padding:18px 24px 60px}
+  h1{font-size:19px;font-weight:500;margin:0 0 2px}
+  .sub{color:var(--sub);font-size:12.5px;margin-bottom:13px}
+  .sub code{font-family:var(--mono);font-size:11px;background:var(--panel2);padding:1px 5px;border-radius:2px}
+  .sides{display:grid;grid-template-columns:1fr 60px 1fr;gap:0;margin-bottom:13px;align-items:center}
+  .side{background:var(--panel);border:1px solid var(--border);border-radius:3px;padding:10px 14px}
+  .side .t{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--sub);font-weight:700}
+  .side .n{font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--navy)}
+  .side .d{font-family:var(--mono);font-size:10px;color:var(--sub)}
+  .vs{text-align:center;font-family:var(--mono);font-weight:700;color:var(--accent)}
+  .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:13px}
+  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:3px;padding:9px 13px}
+  .kpi .n{font-family:var(--mono);font-size:18px;font-weight:700}
+  .kpi .l{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--sub)}
+  .g{color:var(--success)}.r{color:var(--danger)}.a{color:var(--warning)}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:3px;
+    box-shadow:0 3px 5px rgba(0,0,0,.08);overflow:hidden;margin-bottom:14px}
+  .ph{display:flex;align-items:center;padding:9px 14px;border-bottom:1px solid var(--panel2);background:#fafcfc}
+  .ph h2{font-size:12px;font-weight:700;text-transform:uppercase;margin:0}
+  .ph .hint{margin-left:auto;font-size:10.5px;color:var(--sub)}
+  .chip{font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:999px;white-space:nowrap}
+  .chip.red{background:var(--dangerbg);color:var(--danger)}
+  .chip.amber{background:var(--warningbg);color:var(--warning)}
+  .chip.green{background:var(--successbg);color:var(--success)}
+  .chip.grey{background:var(--panel2);color:var(--sub)}
+  .trow{display:grid;grid-template-columns:210px 120px 1fr 1fr 130px 64px;gap:11px;align-items:center;
+    padding:9px 14px;border-bottom:1px solid var(--panel2);cursor:pointer}
+  .trow:hover{background:#eee}
+  .tname{font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--navy)}
+  .tname small{display:block;font-family:Roboto;font-weight:400;font-size:9.5px;color:var(--sub)}
+  .m{font-family:var(--mono);font-size:10px;color:var(--sub)}
+  .m b{color:var(--navy)}
+  .m .bad{color:var(--danger);font-weight:700}
+  .ab{display:flex;gap:6px;align-items:baseline}
+  .ab .a1,.ab .b1{font-family:var(--mono);font-size:10.5px}
+  .ab .a1{color:var(--accent)} .ab .b1{color:#7c3aed}
+  .drill{background:#fbfcfd;border-top:2px solid var(--accent);padding:13px 16px}
+  .drill h3{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--sub);margin:12px 0 7px}
+  .drill h3:first-child{margin-top:0}
+  .breakrow{display:grid;grid-template-columns:170px 1fr 1fr 130px;gap:10px;padding:6px 10px;
+    font-family:var(--mono);font-size:10.5px;border-bottom:1px solid var(--panel2);align-items:center}
+  .breakrow.h{font-weight:700;font-size:9.5px;text-transform:uppercase;color:var(--sub);
+    font-family:Roboto;background:#fafcfc}
+  .va{color:var(--accent)} .vb{color:#7c3aed}
+  .diff{background:var(--dangerbg);border-radius:2px;padding:0 4px}
+  .tolrow{display:flex;gap:8px;align-items:center;padding:5px 10px;font-size:11px;
+    border-bottom:1px solid var(--panel2)}
+  .tolrow code{font-family:var(--mono);font-size:10px;background:var(--panel2);padding:1px 5px;border-radius:2px}
+  .aging{display:flex;gap:3px;align-items:flex-end;height:34px}
+  .aging i{display:block;width:14px;background:var(--danger);border-radius:2px 2px 0 0}
+  .aging i.ok{background:var(--success)}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <span class="logo">CP 360<small>RECON 360 · PARALLEL RUN · AddVantage ⇄ SWP-transformed · run PR20260728_0600</small></span>
+  <span class="live">LIVE</span>
+</div>
+
+<div class="wrap">
+  <h1>Recon 360 — Prod Parallel Reconciliation</h1>
+  <div class="sub">Same-schema comparison · AddVantage (system of record) vs SWP reverse-transformed via
+    <code>Airflow + dbt</code> · schema ⇄ aggregates ⇄ row hashes ⇄ column diffs · daily · NYDFS evidence-tagged</div>
+
+
+  <!-- scan setup: pick the pair, scope, run -->
+  <div class="panel" style="margin-bottom:13px">
+    <div class="ph"><h2>Reconciliation scan</h2>
+      <span class="hint">profiles remember pair + scope + tolerances · scheduled daily 06:00 or on-demand</span></div>
+    <div style="padding:10px 14px;display:flex;gap:11px;align-items:flex-end;flex-wrap:wrap">
+      <div><label style="display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--sub);font-weight:700;margin-bottom:2px">Side A · system of record</label>
+        <select style="height:30px;min-width:230px;font-size:12px"><option selected>AddVantage PROD (ADDV @ advdb1)</option><option>AddVantage UAT</option><option>STAR PROD</option></select></div>
+      <div><label style="display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--sub);font-weight:700;margin-bottom:2px">Side B · under test</label>
+        <select style="height:30px;min-width:230px;font-size:12px"><option selected>SWP→ADDV mirror (SWPADV @ qclpbdb1)</option><option>SWP→ADDV mirror UAT</option></select></div>
+      <div><label style="display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--sub);font-weight:700;margin-bottom:2px">Scope</label>
+        <select style="height:30px;min-width:170px;font-size:12px"><option selected>All 180 common tables</option><option>Functional group…</option><option>Only yesterday's breaks (12)</option><option>Pick tables…</option></select></div>
+      <div><label style="display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--sub);font-weight:700;margin-bottom:2px">Depth</label>
+        <select style="height:30px;min-width:160px;font-size:12px"><option>Schema only (fast)</option><option selected>Schema + aggregates</option><option>+ row hash (PK tables)</option></select></div>
+      <button style="height:30px;background:var(--accent);color:#fff;border:0;border-radius:2px;font-size:12px;font-weight:500;padding:0 16px;cursor:pointer">▶ Run scan</button>
+      <div style="flex:1;min-width:220px">
+        <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:9.5px;color:var(--sub)"><span>scanning… 142/180 tables</span><span>ETA 4 min</span></div>
+        <div style="height:8px;background:#eef1f4;border-radius:2px;overflow:hidden"><i style="display:block;height:100%;width:79%;background:var(--info)"></i></div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--sub);margin-top:2px">now: POS_TAX_LOT (row hash, 6.1M rows) · results stream in below as each table lands</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- sides -->
+  <div class="sides">
+    <div class="side">
+      <div class="t">Side A — System of Record</div>
+      <div class="n">AddVantage PROD</div>
+      <div class="d">ADVPROD@advdb1:1521/ADVP · schema ADDV · as-of 2026-07-28 EOD</div>
+    </div>
+    <div class="vs">⇄</div>
+    <div class="side">
+      <div class="t">Side B — Under Test</div>
+      <div class="n">SWP → AddVantage format</div>
+      <div class="d">SWPMIRROR@qclpbdb1:2483/PBDWHDBQ · schema SWPADV · dbt build 2026-07-28 05:40</div>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpis">
+    <div class="kpi"><div class="n">180</div><div class="l">Tables compared</div></div>
+    <div class="kpi"><div class="n g">164</div><div class="l">Fully reconciled</div></div>
+    <div class="kpi"><div class="n a">4</div><div class="l">Schema drift</div></div>
+    <div class="kpi"><div class="n r">12</div><div class="l">Data breaks</div></div>
+    <div class="kpi"><div class="n r">18,414</div><div class="l">Rows in break</div></div>
+    <div class="kpi"><div class="n">96.2%</div><div class="l">Match rate · +0.8 vs yday</div></div>
+  </div>
+
+
+  <!-- triage rail: filter to what needs a human -->
+  <div style="display:flex;gap:7px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+    <span class="chip red" style="cursor:pointer">RED 12</span>
+    <span class="chip amber" style="cursor:pointer">DRIFT 4</span>
+    <span class="chip amber" style="cursor:pointer;background:#fae5d3">NEW TODAY 3</span>
+    <span class="chip grey" style="cursor:pointer">AGING &gt;5 RUNS 2</span>
+    <span class="chip green" style="cursor:pointer">GREEN 296 (hidden)</span>
+    <span style="font-size:11px;color:var(--sub);margin-left:6px">group:</span>
+    <select style="height:24px;font-size:11px"><option selected>By severity</option><option>By functional area</option><option>By fix owner</option></select>
+    <input placeholder="find table…" style="height:24px;font-size:11px;border:1px solid var(--border);border-radius:2px;padding:0 8px;margin-left:auto;width:180px"/>
+  </div>
+
+  <!-- estate heatmap: all 180 tables in one glance -->
+  <div class="panel">
+    <div class="ph"><h2>Estate at a glance · 180 tables</h2><span class="hint">one cell per table · click a cell to jump · hover for name</span></div>
+    <div style="padding:10px 14px;display:flex;flex-wrap:wrap;gap:3px">
+<i title="TABLE_000" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_001" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_002" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_003" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_004" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_005" style="width:16px;height:16px;border-radius:2px;background:var(--danger);opacity:1;cursor:pointer"></i><i title="TABLE_006" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_007" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_008" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_009" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_010" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_011" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_012" style="width:16px;height:16px;border-radius:2px;background:var(--warning);opacity:1;cursor:pointer"></i><i title="TABLE_013" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_014" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_015" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_016" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_017" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_018" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_019" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_020" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_021" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_022" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_023" style="width:16px;height:16px;border-radius:2px;background:var(--danger);opacity:1;cursor:pointer"></i><i title="TABLE_024" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_025" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_026" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_027" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_028" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_029" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_030" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_031" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_032" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_033" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_034" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_035" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_036" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_037" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_038" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_039" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_040" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_041" style="width:16px;height:16px;border-radius:2px;background:var(--danger);opacity:1;cursor:pointer"></i><i title="TABLE_042" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_043" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_044" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_045" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_046" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_047" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_048" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_049" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_050" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_051" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_052" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_053" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_054" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_055" style="width:16px;height:16px;border-radius:2px;background:var(--warning);opacity:1;cursor:pointer"></i><i title="TABLE_056" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_057" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_058" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_059" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_060" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_061" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_062" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_063" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_064" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_065" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_066" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_067" style="width:16px;height:16px;border-radius:2px;background:var(--danger);opacity:1;cursor:pointer"></i><i title="TABLE_068" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_069" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_070" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_071" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_072" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_073" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_074" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_075" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_076" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_077" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_078" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_079" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_080" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_081" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_082" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_083" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_084" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_085" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_086" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_087" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_088" style="width:16px;height:16px;border-radius:2px;background:var(--danger);opacity:1;cursor:pointer"></i><i title="TABLE_089" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_090" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_091" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_092" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_093" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_094" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_095" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_096" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_097" style="width:16px;height:16px;border-radius:2px;background:var(--warning);opacity:1;cursor:pointer"></i><i title="TABLE_098" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_099" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_100" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_101" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_102" style="width:16px;height:16px;border-radius:2px;background:var(--danger);opacity:1;cursor:pointer"></i><i title="TABLE_103" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_104" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_105" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_106" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_107" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_108" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_109" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_110" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_111" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_112" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_113" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_114" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_115" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_116" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_117" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_118" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_119" style="width:16px;height:16px;border-radius:2px;background:var(--danger);opacity:1;cursor:pointer"></i><i title="TABLE_120" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_121" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_122" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_123" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_124" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_125" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_126" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_127" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_128" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_129" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_130" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_131" style="width:16px;height:16px;border-radius:2px;background:var(--danger);opacity:1;cursor:pointer"></i><i title="TABLE_132" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_133" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_134" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_135" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_136" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_137" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_138" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_139" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_140" style="width:16px;height:16px;border-radius:2px;background:var(--danger);opacity:1;cursor:pointer"></i><i title="TABLE_141" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_142" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_143" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_144" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_145" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_146" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_147" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_148" style="width:16px;height:16px;border-radius:2px;background:var(--warning);opacity:1;cursor:pointer"></i><i title="TABLE_149" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_150" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_151" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_152" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_153" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_154" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_155" style="width:16px;height:16px;border-radius:2px;background:var(--danger);opacity:1;cursor:pointer"></i><i title="TABLE_156" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_157" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_158" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_159" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_160" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_161" style="width:16px;height:16px;border-radius:2px;background:var(--danger);opacity:1;cursor:pointer"></i><i title="TABLE_162" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_163" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_164" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_165" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_166" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_167" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_168" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_169" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_170" style="width:16px;height:16px;border-radius:2px;background:var(--danger);opacity:1;cursor:pointer"></i><i title="TABLE_171" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_172" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_173" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_174" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_175" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_176" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_177" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_178" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i><i title="TABLE_179" style="width:16px;height:16px;border-radius:2px;background:var(--success);opacity:.35;cursor:pointer"></i>
+    </div>
+  </div>
+
+  <!-- schema drift -->
+  <div class="panel">
+    <div class="ph"><h2>Schema reconciliation · 4 drifts</h2>
+      <span class="hint">caught before data pass — fix the dbt model, not the data</span></div>
+    <div class="trow" style="cursor:default">
+      <div class="tname">ACCT_FEE_SCHEDULE<small>column missing in B</small></div>
+      <span class="chip amber">B MISSING COL</span>
+      <div class="m">A: <b>FEE_OVERRIDE_PCT NUMBER(7,4)</b></div>
+      <div class="m">B: <span class="bad">column absent — dbt model drops it</span></div>
+      <div class="m">since 07-26 · 3 runs</div>
+      <span class="chip amber">DRIFT</span>
+    </div>
+    <div class="trow" style="cursor:default">
+      <div class="tname">POS_TAX_LOT<small>datatype narrowed in B</small></div>
+      <span class="chip amber">TYPE DRIFT</span>
+      <div class="m">A: <b>ORIG_FACE NUMBER(18,6)</b></div>
+      <div class="m">B: <span class="bad">NUMBER(15,2) — precision loss on MBS</span></div>
+      <div class="m">since 07-28 · new</div>
+      <span class="chip red">FIX FIRST</span>
+    </div>
+  </div>
+
+  <!-- data breaks -->
+  <div class="panel">
+    <div class="ph"><h2>Data reconciliation · tables by break severity</h2>
+      <span class="hint">aggregates per column · row-hash on PK · click for column-level diff</span></div>
+
+    <div class="trow">
+      <div class="tname">TRN_TRANSACTION<small>PK: ACCT_NO + TRN_SEQ · 4.2M rows</small></div>
+      <div class="ab"><span class="a1">A 4,214,882</span><span class="b1">B 4,214,882</span></div>
+      <div class="m">CNT ✓ · SUM(AMOUNT) <span class="bad">Δ $12,844.16</span> · HASH <span class="bad">8,412 rows differ</span></div>
+      <div class="m">missing in B: <b>0</b> · extra in B: <b>0</b> · value mismatch: <span class="bad">8,412</span></div>
+      <div class="aging"><i style="height:30px"></i><i style="height:28px"></i><i style="height:26px"></i><i style="height:22px"></i><i style="height:20px"></i><i style="height:18px" title="today"></i></div>
+      <span class="chip red">RED</span>
+    </div>
+
+    <!-- expanded drill for TRN_TRANSACTION -->
+    <div class="drill">
+      <h3>Column-level diff · sample of 8,412 hash-mismatched rows (PII-suppressed per dictionary)</h3>
+      <div class="breakrow h"><span>PK</span><span>Side A (AddVantage)</span><span>Side B (SWP-transformed)</span><span>Columns differing</span></div>
+      <div class="breakrow">
+        <span>0084271-004412</span>
+        <span class="va">TRN_AMT = <b>1,250.00</b> · SETTLE_DT = 07/25</span>
+        <span class="vb">TRN_AMT = <span class="diff">1,250.03</span> · SETTLE_DT = 07/25</span>
+        <span>TRN_AMT</span>
+      </div>
+      <div class="breakrow">
+        <span>0091730-001208</span>
+        <span class="va">TRN_CODE = <b>DIV</b> · TRN_AMT = 84.12</span>
+        <span class="vb">TRN_CODE = <span class="diff">DVI</span> · TRN_AMT = 84.12</span>
+        <span>TRN_CODE</span>
+      </div>
+      <div class="breakrow">
+        <span>0088412-009914</span>
+        <span class="va">SETTLE_DT = <b>2026-07-25</b></span>
+        <span class="vb">SETTLE_DT = <span class="diff">2026-07-25 14:22:08</span></span>
+        <span>SETTLE_DT (time part)</span>
+      </div>
+      <h3>Break signature analysis — 8,412 mismatches decompose into</h3>
+      <div class="tolrow"><span class="chip red">6,204</span> TRN_AMT off by ≤ $0.05 —
+        <b>&nbsp;rounding rule differs&nbsp;</b> · dbt model rounds HALF_UP, AddVantage banker's rounding
+        · fix <code>models/trn/trn_transaction.sql</code></div>
+      <div class="tolrow"><span class="chip red">1,890</span> TRN_CODE = 'DVI' vs 'DIV' —
+        <b>&nbsp;code-map transposition&nbsp;</b> in seed <code>ref_trn_code_map.csv</code></div>
+      <div class="tolrow"><span class="chip amber">318</span> SETTLE_DT carries time in B —
+        <b>&nbsp;add tolerance rule&nbsp;</b> DATE-only compare, or TRUNC() in model</div>
+    </div>
+
+    <div class="trow">
+      <div class="tname">POS_HOLDING<small>PK: ACCT_NO + ASSET_ID · 1.8M rows</small></div>
+      <div class="ab"><span class="a1">A 1,844,206</span><span class="b1">B 1,843,988</span></div>
+      <div class="m">CNT <span class="bad">Δ 218</span> · SUM(MKT_VAL) <span class="bad">Δ $2.4M</span></div>
+      <div class="m">missing in B: <span class="bad">218</span> · all 218 = pending-trade positions · timing?</div>
+      <div class="aging"><i style="height:12px"></i><i style="height:14px"></i><i style="height:12px"></i><i style="height:16px"></i><i style="height:14px"></i><i style="height:13px" title="today"></i></div>
+      <span class="chip red">RED</span>
+    </div>
+
+    <div style="padding:9px 14px;border-bottom:1px solid var(--panel2);display:flex;gap:10px;align-items:center;background:#f6faf7;cursor:pointer">
+      <span class="chip green">164 GREEN</span>
+      <span style="font-size:12px;color:var(--sub)">fully reconciled — counts, sums and row hashes match with tolerances applied · click to expand · newest first below</span>
+    </div>
+    <div class="trow">
+      <div class="tname">ACCT_MASTER<small>PK: ACCT_NO · 272K rows</small></div>
+      <div class="ab"><span class="a1">A 272,335</span><span class="b1">B 272,335</span></div>
+      <div class="m">CNT ✓ · all SUMs ✓ · HASH ✓ (with 3 tolerance rules applied)</div>
+      <div class="m">0 breaks · 14 runs clean</div>
+      <div class="aging"><i class="ok" style="height:8px"></i><i class="ok" style="height:8px"></i><i class="ok" style="height:8px"></i><i class="ok" style="height:8px"></i><i class="ok" style="height:8px"></i><i class="ok" style="height:8px"></i></div>
+      <span class="chip green">GREEN</span>
+    </div>
+  </div>
+
+  <!-- tolerance config -->
+  <div class="panel">
+    <div class="ph"><h2>Tolerance rules · governed config, not code</h2>
+      <span class="hint">recon_pr_config · every rule is itself evidence — auditors see what you chose to ignore and why</span></div>
+    <div class="tolrow"><code>GLOBAL</code> ignore columns: <code>LOAD_DATE, BATCH_ID, CREATED_TSP, UPDATED_TSP</code> — warehouse metadata, legitimately differs</div>
+    <div class="tolrow"><code>TRN_TRANSACTION</code> numeric tolerance <code>TRN_AMT ± 0.00</code> — money must match to the penny (no tolerance granted)</div>
+    <div class="tolrow"><code>POS_HOLDING</code> compare <code>PRICE_DT</code> as DATE (ignore time)</div>
+    <div class="tolrow"><code>ACCT_MASTER</code> ignore <code>LAST_MAINT_USER</code> — differs by design (system users)</div>
+  </div>
+</div>
+
+</body>
+</html>

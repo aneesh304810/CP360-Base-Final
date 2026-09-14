@@ -1,0 +1,537 @@
+<title>CP360 Final Codebase</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+<style>
+:root{
+  --ground:#f6f7f6;
+  --surface:#ffffff;
+  --sunk:#eceeed;
+  --ink:#15201e;
+  --ink-2:#33423f;
+  --muted:#5c6b68;
+  --faint:#8b9996;
+  --rule:#d7dedc;
+  --rule-2:#c2cdca;
+  --teal:#1e5f56;
+  --teal-2:#2d7d70;
+  --teal-3:#4b9e8e;
+  --teal-4:#7fc0b1;
+  --teal-wash:#e4efec;
+  --clay:#a8402a;
+  --clay-wash:#f6e6e1;
+  --shadow:0 1px 2px rgba(21,32,30,.06),0 8px 24px -12px rgba(21,32,30,.18);
+  --display:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --body:'Source Serif 4',Georgia,'Times New Roman',serif;
+  --mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0e1513;
+    --surface:#151e1c;
+    --sunk:#1b2523;
+    --ink:#e7ecea;
+    --ink-2:#c3cfcc;
+    --muted:#93a4a0;
+    --faint:#6d7d79;
+    --rule:#2a3936;
+    --rule-2:#3a4a47;
+    --teal:#63c3b1;
+    --teal-2:#4faa99;
+    --teal-3:#3d8878;
+    --teal-4:#2c6459;
+    --teal-wash:#16302b;
+    --clay:#e08265;
+    --clay-wash:#331d17;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0e1513;
+  --surface:#151e1c;
+  --sunk:#1b2523;
+  --ink:#e7ecea;
+  --ink-2:#c3cfcc;
+  --muted:#93a4a0;
+  --faint:#6d7d79;
+  --rule:#2a3936;
+  --rule-2:#3a4a47;
+  --teal:#63c3b1;
+  --teal-2:#4faa99;
+  --teal-3:#3d8878;
+  --teal-4:#2c6459;
+  --teal-wash:#16302b;
+  --clay:#e08265;
+  --clay-wash:#331d17;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.6);
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--ground);
+  color:var(--ink);
+  font-family:var(--body);
+  font-size:17px;
+  line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1080px;margin:0 auto;padding-inline:24px;padding-block:0}
+.col{max-width:64ch}
+
+/* ---------- masthead ---------- */
+header.mast{border-bottom:1px solid var(--rule);padding-block:56px 34px;margin-bottom:44px}
+.eyebrow{
+  font-family:var(--display);font-size:11.5px;font-weight:600;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--teal);margin:0 0 20px
+}
+h1{
+  font-family:var(--display);font-weight:700;font-size:clamp(38px,6.4vw,62px);
+  line-height:1.02;letter-spacing:-.025em;margin:0 0 20px;text-wrap:balance;color:var(--ink)
+}
+.standfirst{font-size:20px;line-height:1.5;color:var(--ink-2);margin:0;max-width:56ch}
+.standfirst b{font-weight:600;color:var(--ink)}
+.metarow{
+  display:flex;flex-wrap:wrap;gap:10px 28px;margin-top:28px;
+  font-family:var(--mono);font-size:11.5px;color:var(--faint);letter-spacing:.02em
+}
+.metarow span b{color:var(--muted);font-weight:500}
+
+/* ---------- verdict ---------- */
+.verdict{
+  background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--teal);
+  border-radius:3px;box-shadow:var(--shadow);padding:30px 32px;margin-bottom:52px
+}
+.verdict .lbl{
+  font-family:var(--display);font-size:11px;font-weight:600;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted);margin:0 0 12px
+}
+.verdict .name{
+  font-family:var(--mono);font-size:clamp(26px,4.4vw,38px);font-weight:700;
+  color:var(--teal);margin:0 0 14px;letter-spacing:-.02em;word-break:break-word
+}
+.verdict p{margin:0;color:var(--ink-2);max-width:60ch}
+.vstats{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:22px;
+  margin-top:26px;padding-top:24px;border-top:1px solid var(--rule)
+}
+.vstats div{display:flex;flex-direction:column;gap:3px}
+.vstats .n{font-family:var(--mono);font-size:23px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.1}
+.vstats .k{font-family:var(--display);font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+
+/* ---------- sections ---------- */
+section{margin-bottom:56px}
+h2{
+  font-family:var(--display);font-weight:700;font-size:27px;letter-spacing:-.017em;
+  margin:0 0 6px;color:var(--ink);text-wrap:balance
+}
+.dek{color:var(--muted);font-size:16px;margin:0 0 26px;max-width:62ch}
+h3{
+  font-family:var(--display);font-weight:600;font-size:12px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--muted);margin:34px 0 14px
+}
+p{margin:0 0 16px}
+.col p:last-child{margin-bottom:0}
+code{
+  font-family:var(--mono);font-size:.855em;background:var(--sunk);
+  padding:1.5px 5px;border-radius:2px;color:var(--ink);word-break:break-word
+}
+a{color:var(--teal);text-decoration-thickness:1px;text-underline-offset:2px}
+
+blockquote{
+  margin:0 0 22px;padding:18px 24px;background:var(--teal-wash);
+  border-left:3px solid var(--teal-3);border-radius:0 3px 3px 0
+}
+blockquote p{margin:0;font-size:18px;font-style:italic;color:var(--ink)}
+blockquote cite{
+  display:block;margin-top:10px;font-style:normal;font-family:var(--mono);
+  font-size:11.5px;color:var(--muted)
+}
+
+/* ---------- migration spine ---------- */
+.spine{background:var(--surface);border:1px solid var(--rule);border-radius:3px;padding:30px 26px;box-shadow:var(--shadow)}
+.spinescroll{overflow-x:auto;padding-bottom:4px}
+.cells{display:grid;grid-template-columns:repeat(24,minmax(34px,1fr));gap:4px;min-width:840px}
+.cell{
+  aspect-ratio:1;border-radius:2px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:11.5px;font-weight:500;font-variant-numeric:tabular-nums;
+  color:#fff;position:relative
+}
+:root[data-theme="dark"] .cell,
+:root:not([data-theme="light"]) .cell{color:#0e1513}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]) .cell{color:#fff}}
+.c-base{background:var(--teal)}
+.c-a{background:var(--teal-2)}
+.c-b{background:var(--teal-3)}
+.c-c{background:var(--teal-4)}
+.c-void{
+  background:repeating-linear-gradient(45deg,var(--sunk),var(--sunk) 3px,var(--rule) 3px,var(--rule) 6px);
+  color:var(--faint)
+}
+.c-bad{background:var(--clay);color:#fff}
+:root[data-theme="dark"] .c-bad,:root:not([data-theme="light"]) .c-bad{color:#1a0e0a}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]) .c-bad{color:#fff}}
+.c-bad.hatch{
+  background:repeating-linear-gradient(45deg,var(--clay),var(--clay) 4px,var(--clay-wash) 4px,var(--clay-wash) 8px)
+}
+
+.legend{
+  display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:24px;padding-top:20px;
+  border-top:1px solid var(--rule)
+}
+.lg{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.sw{width:12px;height:12px;border-radius:2px;flex:none}
+
+.defects{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:2px;margin-top:26px;background:var(--rule);border:1px solid var(--rule);border-radius:3px;overflow:hidden}
+.defect{background:var(--surface);padding:18px 20px}
+.defect .no{font-family:var(--mono);font-size:19px;font-weight:700;color:var(--clay);display:block;margin-bottom:5px}
+.defect .t{font-family:var(--display);font-size:13px;font-weight:600;color:var(--ink);display:block;margin-bottom:6px}
+.defect .d{font-size:14.5px;line-height:1.48;color:var(--muted)}
+
+/* ---------- tables ---------- */
+.tscroll{overflow-x:auto;border:1px solid var(--rule);border-radius:3px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:15px}
+th{
+  font-family:var(--display);font-size:10.5px;font-weight:600;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--muted);text-align:left;padding:13px 18px;
+  border-bottom:1px solid var(--rule-2);white-space:nowrap;background:var(--sunk)
+}
+td{padding:12px 18px;border-bottom:1px solid var(--rule);color:var(--ink-2);vertical-align:top}
+tr:last-child td{border-bottom:none}
+td.sql{font-family:var(--mono);font-size:13px;color:var(--teal);white-space:nowrap;font-weight:500;font-variant-numeric:tabular-nums}
+td.repo{font-family:var(--mono);font-size:12.5px;color:var(--ink);word-break:break-word}
+td.num{font-family:var(--mono);font-size:13.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.win td{background:var(--teal-wash)}
+tr.win td.repo{font-weight:700;color:var(--teal)}
+.tag{
+  font-family:var(--display);font-size:9.5px;font-weight:600;letter-spacing:.09em;
+  text-transform:uppercase;padding:3px 7px;border-radius:2px;white-space:nowrap;
+  background:var(--teal);color:var(--surface)
+}
+:root[data-theme="dark"] .tag,:root:not([data-theme="light"]) .tag{color:#0e1513}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]) .tag{color:#fff}}
+.tag.warn{background:var(--clay);color:#fff}
+
+/* ---------- chains ---------- */
+.chain{
+  font-family:var(--mono);font-size:13px;line-height:2.1;color:var(--muted);
+  padding:16px 20px;background:var(--surface);border:1px solid var(--rule);
+  border-radius:3px;margin-bottom:8px;overflow-x:auto;white-space:nowrap
+}
+.chain b{color:var(--teal);font-weight:700}
+.chain i{font-style:normal;color:var(--faint)}
+
+/* ---------- issues ---------- */
+.issue{
+  display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:start;
+  padding:18px 0;border-bottom:1px solid var(--rule)
+}
+.issue:last-child{border-bottom:none}
+.chip{
+  font-family:var(--display);font-size:9.5px;font-weight:700;letter-spacing:.09em;
+  text-transform:uppercase;padding:4px 9px;border-radius:2px;white-space:nowrap;margin-top:3px
+}
+.chip.block{background:var(--clay);color:#fff}
+.chip.fix{background:var(--teal-wash);color:var(--teal);border:1px solid var(--teal-3)}
+.chip.note{background:var(--sunk);color:var(--muted);border:1px solid var(--rule-2)}
+.issue .h{font-family:var(--display);font-weight:600;font-size:16.5px;color:var(--ink);margin:0 0 5px}
+.issue .b{margin:0;font-size:15.5px;color:var(--muted);line-height:1.55}
+
+/* ---------- exclusions ---------- */
+.excl{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px}
+.ex{border:1px dashed var(--rule-2);border-radius:3px;padding:18px 20px;background:transparent}
+.ex .n{font-family:var(--mono);font-size:13.5px;font-weight:700;color:var(--ink);display:block;margin-bottom:7px;word-break:break-word}
+.ex .d{font-size:14.5px;color:var(--muted);line-height:1.5}
+
+/* ---------- footer ---------- */
+footer{border-top:1px solid var(--rule);padding-block:34px 60px;margin-top:8px}
+.note{
+  font-size:14.5px;color:var(--muted);background:var(--sunk);border-radius:3px;
+  padding:16px 20px;max-width:64ch;margin:0 0 26px
+}
+.fmeta{font-family:var(--mono);font-size:11px;color:var(--faint);line-height:1.8}
+
+@media (max-width:640px){
+  body{font-size:16px}
+  header.mast{padding-block:40px 28px;margin-bottom:34px}
+  .verdict{padding:24px 22px}
+  .spine{padding:22px 16px}
+  .issue{grid-template-columns:1fr;gap:9px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+
+<header class="mast">
+  <p class="eyebrow">Codebase consolidation · 105 repositories</p>
+  <h1>CP360 Final Codebase</h1>
+  <p class="standfirst">Ten months of work sits in 105 repositories. Only <b>ten</b> of them matter, and the SQL migration numbers stitch those ten back into a single ordered chain.</p>
+  <div class="metarow">
+    <span><b>Analysed</b> 14 Sep 2026</span>
+    <span><b>Repos cloned</b> 50</span>
+    <span><b>Method</b> migration census + tree diff</span>
+  </div>
+</header>
+
+<section>
+  <div class="verdict">
+    <p class="lbl">Recommended base</p>
+    <p class="name">Cp360final</p>
+    <p>The largest complete application in the account, and a strict superset of every rival snapshot. Start the enterprise build here, then layer twenty-four feature increments in migration order.</p>
+    <div class="vstats">
+      <div><span class="n">172</span><span class="k">Files</span></div>
+      <div><span class="n">6,897</span><span class="k">Python LOC</span></div>
+      <div><span class="n">5,412</span><span class="k">JSX LOC</span></div>
+      <div><span class="n">01–24</span><span class="k">Migrations</span></div>
+      <div><span class="n">34</span><span class="k">Connectors</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="col">
+  <h2>The finding that changes the answer</h2>
+  <p class="dek">The repositories whose names promise a finished build are the ones that contain the least.</p>
+  <p>Every repo in the <code>Env360</code> line — including <code>Env360finalupdatedv8</code>, the newest thing in the account — is a <b>patch bundle</b>, not a codebase. Each holds 14–19 files under a single <em>"Add files via upload"</em> commit. Your own manifest says so on line two:</p>
+  <blockquote>
+    <p>11 impacted files + SQL. Everything else in your repo untouched.</p>
+    <cite>Env360finalupdatedv8 / IMPACTED.md</cite>
+  </blockquote>
+  <p>Those eleven files land in <code>ui/src/</code>, <code>api/app/</code>, <code>ingestion/</code> and <code>sql/</code> — directories that live somewhere else. Begin the enterprise version from <code>v8</code> and you inherit eleven files and no application.</p>
+  <p>The real shape of the work is <b>one base application plus roughly twenty-four feature patches</b> scattered across separate repositories. The migration numbers are what put them back in order.</p>
+</section>
+
+<section>
+  <h2>The migration spine</h2>
+  <p class="dek">Forty-eight numbered migrations, reconstructed across ten repositories. Colour follows chronology — deep teal is the base, lightening as the increments were written. Three defects are punched into the chain.</p>
+
+  <div class="spine">
+    <div class="spinescroll">
+      <div class="cells">
+        <div class="cell c-base" title="01_schema.sql — Cp360final">01</div>
+        <div class="cell c-base" title="02_schema_additions.sql — Cp360final">02</div>
+        <div class="cell c-base" title="03_quality_gate_observability.sql — Cp360final">03</div>
+        <div class="cell c-base" title="04_security_governance_versioning.sql — Cp360final">04</div>
+        <div class="cell c-void" title="05 — never existed; numbering skip, consistent across all repos">05</div>
+        <div class="cell c-base" title="06_oracle_text_search.sql — Cp360final">06</div>
+        <div class="cell c-base" title="07_api360.sql — Cp360final">07</div>
+        <div class="cell c-base" title="08_interface360.sql — Cp360final">08</div>
+        <div class="cell c-base" title="09_datapoint360.sql — Cp360final">09</div>
+        <div class="cell c-base" title="10_feed_dictionary.sql — Cp360final">10</div>
+        <div class="cell c-base" title="11_pii_classification.sql — Cp360final">11</div>
+        <div class="cell c-base" title="12_projects.sql — Cp360final">12</div>
+        <div class="cell c-base" title="13_widen_api_columns.sql — Cp360final">13</div>
+        <div class="cell c-base" title="14_business_flows.sql — Cp360final">14</div>
+        <div class="cell c-base" title="15_business_glossary.sql — Cp360final">15</div>
+        <div class="cell c-base" title="16_pipeline_builder.sql — Cp360final">16</div>
+        <div class="cell c-base" title="17_datapoint_direction.sql — Cp360final">17</div>
+        <div class="cell c-base" title="18_loader_workbook.sql — Cp360final">18</div>
+        <div class="cell c-base" title="19_project_sources.sql — Cp360final">19</div>
+        <div class="cell c-base" title="20_search_index.sql — Cp360final">20</div>
+        <div class="cell c-base" title="21_business_flow_workbook.sql — Cp360final">21</div>
+        <div class="cell c-base" title="22_reference_data.sql — Cp360final">22</div>
+        <div class="cell c-base" title="23_column_fixes.sql — Cp360final">23</div>
+        <div class="cell c-base" title="24_quality_guardrails.sql — Cp360final">24</div>
+        <div class="cell c-a" title="25_impact_analysis.sql — Cp360Impact">25</div>
+        <div class="cell c-a" title="26_legacy_lineage.sql — E2elimeage">26</div>
+        <div class="cell c-bad hatch" title="COLLISION — 27_legacy_dictionary.sql (Dictvlv910) vs 27_legacy_lineage_update.sql (Lineage360)">27</div>
+        <div class="cell c-a" title="28_legacy_dictionary_v2_upgrade.sql — Dictvlv910">28</div>
+        <div class="cell c-a" title="29_legacy_lineage_data_source.sql — V5latest">29</div>
+        <div class="cell c-bad" title="MISSING — no 30_*.sql exists in any repository">30</div>
+        <div class="cell c-b" title="31_variance360.sql — Recon">31</div>
+        <div class="cell c-b" title="32_variance360_v2.sql — Recon">32</div>
+        <div class="cell c-b" title="33_clob_registry.sql — Recon">33</div>
+        <div class="cell c-b" title="34_datasources.sql — Recon">34</div>
+        <div class="cell c-b" title="35_recon360.sql — Recon">35</div>
+        <div class="cell c-b" title="36_api360_console.sql — Api360postmon">36</div>
+        <div class="cell c-b" title="37_api360_consolidation.sql — Finalapi360deploymen5-">37</div>
+        <div class="cell c-b" title="38_api360_admin_ux.sql — Finalapi360deploymen5-">38</div>
+        <div class="cell c-c" title="39_environment360.sql — Designdocument">39</div>
+        <div class="cell c-c" title="40_env_inventory.sql — Designdocument">40</div>
+        <div class="cell c-c" title="41_design_docs.sql — Sys2desugn">41</div>
+        <div class="cell c-c" title="42_component_status.sql — Hubmodel">42</div>
+        <div class="cell c-c" title="43_env_infra.sql — Env360v3">43</div>
+        <div class="cell c-c" title="44_env_probe.sql — Env360v3">44</div>
+        <div class="cell c-c" title="45_env_ssl.sql — Env360v3">45</div>
+        <div class="cell c-c" title="46_env_network.sql — Env360finalupdatedv8">46</div>
+        <div class="cell c-bad" title="SUPERSEDED — skip; 48 drops its table (your own note)">47</div>
+        <div class="cell c-c" title="48_env_workload.sql — Env360finalupdatedv8">48</div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span class="lg"><span class="sw" style="background:var(--teal)"></span>Base · Cp360final</span>
+      <span class="lg"><span class="sw" style="background:var(--teal-2)"></span>Lineage &amp; dictionary</span>
+      <span class="lg"><span class="sw" style="background:var(--teal-3)"></span>Variance, Recon &amp; API360</span>
+      <span class="lg"><span class="sw" style="background:var(--teal-4)"></span>Environment360 &amp; design</span>
+      <span class="lg"><span class="sw" style="background:var(--clay)"></span>Defect</span>
+      <span class="lg"><span class="sw c-void" style="border:1px solid var(--rule-2)"></span>Never existed</span>
+    </div>
+
+    <div class="defects">
+      <div class="defect">
+        <span class="no">30</span>
+        <span class="t">Genuinely missing</span>
+        <span class="d">The chain runs 29 → gap → 31. No <code>30_*.sql</code> exists in any repository. It is on your local machine, or it was never written.</span>
+      </div>
+      <div class="defect">
+        <span class="no">27</span>
+        <span class="t">Number used twice</span>
+        <span class="d"><code>27_legacy_dictionary.sql</code> and <code>27_legacy_lineage_update.sql</code> are different schema changes sharing one number. Renumber one to 30 and the chain closes.</span>
+      </div>
+      <div class="defect">
+        <span class="no">47</span>
+        <span class="t">Superseded — skip it</span>
+        <span class="d">Your own manifest: <em>"47 superseded — skip; 48 drops its table."</em> Applying it then dropping it wastes a deploy step.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Why Cp360final wins</h2>
+  <p class="dek">Every other full application is an earlier cut of the same tree. Sizes are files · Python LOC · highest migration.</p>
+  <div class="tscroll">
+    <table>
+      <thead>
+        <tr><th>Repository</th><th>Files</th><th>Py LOC</th><th>SQL to</th><th>Verdict</th></tr>
+      </thead>
+      <tbody>
+        <tr class="win"><td class="repo">Cp360final</td><td class="num">172</td><td class="num">6,897</td><td class="num">24</td><td><span class="tag">Base</span></td></tr>
+        <tr><td class="repo">Aneeshv4datacatalog</td><td class="num">167</td><td class="num">6,406</td><td class="num">24</td><td>Subset — lacks guardrails router, Interface360, run.py</td></tr>
+        <tr><td class="repo">Final360catalog</td><td class="num">149</td><td class="num">5,657</td><td class="num">23</td><td>Earlier cut</td></tr>
+        <tr><td class="repo">Fullcp360</td><td class="num">146</td><td class="num">5,550</td><td class="num">22</td><td>Earlier cut</td></tr>
+        <tr><td class="repo">Fullcp360datacatalog</td><td class="num">140</td><td class="num">4,997</td><td class="num">20</td><td>Earlier cut</td></tr>
+        <tr><td class="repo">Cp360</td><td class="num">129</td><td class="num">4,799</td><td class="num">19</td><td>Earlier cut</td></tr>
+        <tr><td class="repo">Finalbulid</td><td class="num">94</td><td class="num">2,469</td><td class="num">12</td><td>Earlier cut</td></tr>
+        <tr><td class="repo">Catalog</td><td class="num">67</td><td class="num">3,815</td><td class="num">06</td><td>Early prototype</td></tr>
+        <tr><td class="repo">Cpfinalcatalog</td><td class="num">0</td><td class="num">0</td><td class="num">—</td><td><span class="tag warn">Empty</span></td></tr>
+        <tr><td class="repo">Apiii360im</td><td class="num">0</td><td class="num">0</td><td class="num">—</td><td><span class="tag warn">Empty</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="col" style="margin-top:22px">
+    <p>Beyond raw size, <code>Cp360final</code> is the only repository carrying the full operational surface: <code>deploy/openshift</code>, <code>nginx.conf</code>, PowerShell <em>and</em> bash scripts in <code>local/</code>, eighteen documents in <code>docs/</code>, and thirty-four ingestion connectors. Its <code>api/app/main.py</code> mounts routers in a guarded loop, so a single failed import is logged and skipped rather than taking the API down — a genuinely sound foundation to build an enterprise version on.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Assembly order</h2>
+  <p class="dek">Nine repositories layer onto the base, applied in migration order.</p>
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>SQL</th><th>Feature</th><th>Source repository</th></tr></thead>
+      <tbody>
+        <tr class="win"><td class="sql">01–24</td><td>Core catalog</td><td class="repo">Cp360final <span class="tag">Base</span></td></tr>
+        <tr><td class="sql">25</td><td>Impact analysis + AutoMapper</td><td class="repo">Cp360Impact</td></tr>
+        <tr><td class="sql">26</td><td>Legacy lineage</td><td class="repo">E2elimeage</td></tr>
+        <tr><td class="sql">27</td><td>Legacy dictionary</td><td class="repo">Dictvlv910</td></tr>
+        <tr><td class="sql">27 ⚠</td><td>Legacy lineage update</td><td class="repo">Lineage360 <span class="tag warn">Renumber</span></td></tr>
+        <tr><td class="sql">28</td><td>Legacy dictionary v2</td><td class="repo">Dictvlv910</td></tr>
+        <tr><td class="sql">29</td><td>Legacy lineage data source</td><td class="repo">V5latest</td></tr>
+        <tr><td class="sql">31–35</td><td>Variance360, Recon360, datasources</td><td class="repo">Recon</td></tr>
+        <tr><td class="sql">36</td><td>API360 console</td><td class="repo">Api360postmon</td></tr>
+        <tr><td class="sql">37–38</td><td>API360 consolidation + admin UX</td><td class="repo">Finalapi360deploymen5-</td></tr>
+        <tr><td class="sql">39–40</td><td>Environment360 + env inventory</td><td class="repo">Designdocument</td></tr>
+        <tr><td class="sql">41</td><td>Design docs</td><td class="repo">Sys2desugn</td></tr>
+        <tr><td class="sql">42</td><td>Component status</td><td class="repo">Hubmodel</td></tr>
+        <tr><td class="sql">43–45</td><td>Env infra · probe · SSL</td><td class="repo">Env360v3</td></tr>
+        <tr><td class="sql">46, 48</td><td>Env network · workload</td><td class="repo">Env360finalupdatedv8</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>What you can safely ignore</h2>
+  <p class="dek">Verified by tree diff — in each chain the winner strictly contains everything to its right.</p>
+
+  <div class="chain"><b>Recon</b> <i>⊃</i> Variancefile350 <i>⊃</i> Variance360 <i>⊃</i> Varians360</div>
+  <div class="chain"><b>Finalapi360deploymen5-</b> <i>⊃</i> Api360</div>
+  <div class="chain"><b>Designdocument</b> <i>⊃</i> Finalenv360 <i>⊃</i> Cp360finalebviorment360 <i>⊃</i> Enviorment360</div>
+  <div class="chain"><b>Env360v3</b> <i>⊃</i> Environment360upda5edv2 <i>⊃</i> Enviorment360New</div>
+  <div class="chain"><b>Env360finalupdatedv8</b> <i>⊃</i> v7 <i>⊃</i> v6final <i>⊃</i> v5final <i>⊃</i> impactedfilesv4</div>
+  <div class="chain"><b>Sys2desugn</b> <i>+</i> <b>DesignBatchnew</b> <i>— complementary; together they cover designs-md 08–34 with no gaps</i></div>
+
+  <div class="col" style="margin-top:24px">
+    <p>In the Environment360 chain, <code>39_environment360.sql</code> is <b>byte-identical</b> across all four repositories — md5 <code>5fdb2bd6500f00770714cb7d707858d8</code>. <code>Designdocument</code> wins it because it alone also carries migration 40.</p>
+    <p>That leaves <b>ten repositories that matter out of 105</b>. The remaining ninety-five are snapshots, supersets already captured above, or unrelated work.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Resolve before you build</h2>
+  <p class="dek">Six items stand between the assembled repository and an enterprise foundation.</p>
+
+  <div class="issue">
+    <span class="chip block">Blocker</span>
+    <div>
+      <p class="h">No tests, no CI, no git history</p>
+      <p class="b">Every one of the 105 repositories is a single upload commit. There is not one test file or pipeline anywhere in the account. For an enterprise version this is a larger gap than any missing migration — and the first thing to fix once the base is assembled.</p>
+    </div>
+  </div>
+  <div class="issue">
+    <span class="chip block">Blocker</span>
+    <div>
+      <p class="h">Migration 30 is absent</p>
+      <p class="b">The chain jumps 29 → 31. Confirm whether it exists locally or was never written; until then the schema cannot be rebuilt from scratch on a clean database.</p>
+    </div>
+  </div>
+  <div class="issue">
+    <span class="chip fix">Fix</span>
+    <div>
+      <p class="h">Renumber the duplicate 27</p>
+      <p class="b">Two distinct schema changes share the number. Moving <code>27_legacy_lineage_update.sql</code> to <code>30</code> resolves the collision and the gap in one edit.</p>
+    </div>
+  </div>
+  <div class="issue">
+    <span class="chip fix">Fix</span>
+    <div>
+      <p class="h">routers_environment360 is not mounted</p>
+      <p class="b">Absent from the router tuple in <code>main.py</code>, so <code>/env/overview</code> returns 404 and the panels silently fall back to demo data. Already documented in your own IMPACTED.md as a known open item.</p>
+    </div>
+  </div>
+  <div class="issue">
+    <span class="chip fix">Fix</span>
+    <div>
+      <p class="h">Duplicated files inside patch bundles</p>
+      <p class="b">Several bundles ship the same file at the root <em>and</em> under <code>ui-src/</code> or <code>api-app/</code> — <code>v8</code> carries <code>env_infra_ingest.py</code> twice. Keep the path-qualified copy; the root copies are drop artifacts.</p>
+    </div>
+  </div>
+  <div class="issue">
+    <span class="chip note">Benign</span>
+    <div>
+      <p class="b" style="margin-top:4px">Migration <code>05</code> never existed. The skip from 04 to 06 is consistent across all 105 repositories, so it is intentional numbering, not a loss.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Keep these out</h2>
+  <p class="dek">Separate products. Folding them in would dilute the base rather than extend it.</p>
+  <div class="excl">
+    <div class="ex">
+      <span class="n">Final-Sei-Account</span>
+      <span class="d">Airflow + dbt SEI accounting demo. 67 files, its own medallion pipeline and seed data. Unrelated to the catalog.</span>
+    </div>
+    <div class="ex">
+      <span class="n">Cpguardrails</span>
+      <span class="d">Jenkins and OPA policy framework for CI. Useful <em>alongside</em> CP360 as a pipeline, never inside it.</span>
+    </div>
+    <div class="ex">
+      <span class="n">Pocsize</span>
+      <span class="d">Sizing proof-of-concept — dbt models, k8s manifests, sizing reports. Research, not product.</span>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p class="note"><b>On sources.</b> This analysis was reconstructed entirely from the repositories themselves — chat history was not available. It did not need to be: the <code>IMPACTED.md</code>, <code>WIRING.md</code> and <code>INSTALL.md</code> notes you wrote alongside each patch document the intent precisely, and the migration numbers carry the order.</p>
+  <p class="fmeta">
+    Assembled result — migrations 01–48 · ~15 API routers · ~25 UI screens<br>
+    Data360 · Api360 · Interface360 · Datapoint360 · Lineage · Impact · Variance &amp; Recon · Environment360 · System Design<br>
+    50 repositories cloned and diffed · 14 September 2026
+  </p>
+</footer>
+
+</div>

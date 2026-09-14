@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cp-catalog-secret
+  namespace: cp-catalog
+type: Opaque
+stringData:
+  CP_CATALOG_DB_DSN: "oracle://catalog_user:CHANGE_ME@catalog-db:1521/CATALOG"
+  ORACLE_PROD_DSN: "oracle://reader:CHANGE_ME@oracle-prod:1521/PROD"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cp-catalog-config
+  namespace: cp-catalog
+data:
+  CP_CATALOG_ROOT: "/opt/approot/webfs/cp-datacatalog"
+  ORACLE_PROD_SCHEMAS: "PBDW,IMDW,RISK,SEI_RAW,SEI_STAGE"
+  SEI_ORACLE_SCHEMAS: "SEI_RAW,SEI_STAGE"
+  DBT_MANIFEST_PATH: "/opt/approot/dbt-artifacts/manifest.json"
+  DBT_CATALOG_PATH: "/opt/approot/dbt-artifacts/catalog.json"
+  DBT_RUN_RESULTS_PATH: "/opt/approot/dbt-artifacts/run_results.json"

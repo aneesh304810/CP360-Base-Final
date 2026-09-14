@@ -1,0 +1,241 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1220" width="1920" height="1220" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif">
+
+  <defs>
+    <style>
+      .serif { font-family: Georgia, 'Iowan Old Style', 'Times New Roman', serif; }
+      .m     { font-family: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace; }
+      .ink   { fill: #10161D; }
+      .slate { fill: #5A6672; }
+      .mute  { fill: #8D98A3; }
+      .bn    { font-family: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace; font-size: 11px; fill: #10161D; letter-spacing: 0.4px; }
+      .bd    { font-size: 11px; fill: #5A6672; }
+      .band  { font-family: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace; font-size: 10.5px; letter-spacing: 2px; }
+      .lane  { font-family: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace; font-size: 11px; letter-spacing: 1.6px; fill: #10161D; }
+    </style>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#A8B2BC"/></marker>
+    <marker id="ad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#33506B"/></marker>
+  </defs>
+
+  <rect width="1920" height="1220" fill="#EEF0F3"/>
+
+  <!-- ══ HEADER ══ -->
+  <text class="m" x="60" y="42" font-size="11.5" fill="#A6192E" letter-spacing="2.4">SWP MIGRATION PROGRAMME · TARGET DATA FLOW · CLIENT · ACCOUNT · TRANSACTION</text>
+  <text class="serif ink" x="60" y="84" font-size="34">SEI sends us new data. Downstream sees the file it always saw.</text>
+  <text class="slate" x="60" y="114" font-size="15">Stage 2 is where records from separate feeds are married to one identity, every derived number is computed once, and every change is dated. It is not a canonical model — that is deferred, deliberately.</text>
+  <line x1="60" y1="140" x2="1860" y2="140" stroke="#D2D8DE"/>
+
+  <!-- ══ EXEC STRIP ══ -->
+  <text class="band mute" x="60" y="172">IN PLAIN TERMS</text>
+  <g>
+    <rect x="220" y="186" width="300" height="80" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+    <text class="ink" x="242" y="214" font-size="15" font-weight="600">What SEI sends us</text>
+    <text class="bd" x="242" y="238">Landed untouched, so the original</text>
+    <text class="bd" x="242" y="255">file can always be reproduced.</text>
+
+    <rect x="550" y="186" width="300" height="80" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+    <text class="ink" x="572" y="214" font-size="15" font-weight="600">Made legible</text>
+    <text class="bd" x="572" y="238">Typed, cleaned, de-duplicated.</text>
+    <text class="bd" x="572" y="255">Bad records flagged, never dropped.</text>
+
+    <rect x="880" y="186" width="630" height="80" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+    <rect x="880" y="186" width="630" height="4" rx="2" fill="#A6192E"/>
+    <text class="ink" x="902" y="216" font-size="15" font-weight="600">Married and versioned</text>
+    <text class="bd" x="902" y="240">Client, account and transaction records resolved to one identity. Every value a report shows —</text>
+    <text class="bd" x="902" y="257">market value, gain and loss — computed here once, and dated, so history can be replayed.</text>
+
+    <rect x="1540" y="186" width="320" height="80" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+    <text class="ink" x="1562" y="214" font-size="15" font-weight="600">Delivered unchanged</text>
+    <text class="bd" x="1562" y="238">The same file shape ~1,000 systems</text>
+    <text class="bd" x="1562" y="255">consume today. They do not change.</text>
+  </g>
+
+  <!-- ══ STAGE 2 BRACKET ══ -->
+  <rect x="866" y="292" width="658" height="468" rx="8" fill="none" stroke="#A6192E" stroke-width="1.4" stroke-dasharray="7 5"/>
+
+  <!-- ══ COLUMN HEADERS ══ -->
+  <text class="band mute" x="220" y="284">SOURCE</text>
+  <text class="band mute" x="550" y="284">STAGE 1 — CLEANSE</text>
+  <text class="band" x="880" y="284" fill="#33506B">STAGE 2 — CONFORM</text>
+  <text class="band" x="1210" y="284" fill="#A6192E">STAGE 2 — ENRICH</text>
+  <text class="band" x="1540" y="284" fill="#7A6A4F">GOLD — ADDVANTAGE SHAPE</text>
+
+  <!-- ══ FLOW ARROWS ══ -->
+  <g stroke="#A8B2BC" stroke-width="1.6" fill="none">
+    <path d="M 520 385 H 546" marker-end="url(#a)"/>
+    <path d="M 850 385 H 876" marker-end="url(#a)"/>
+    <path d="M 1180 385 H 1536" marker-end="url(#a)"/>
+
+    <path d="M 520 535 H 546" marker-end="url(#a)"/>
+    <path d="M 850 535 H 876" marker-end="url(#a)"/>
+    <path d="M 1180 535 H 1536" marker-end="url(#a)"/>
+
+    <path d="M 520 685 H 546" marker-end="url(#a)"/>
+    <path d="M 850 685 H 1206" marker-end="url(#a)"/>
+    <path d="M 1510 685 H 1536" marker-end="url(#a)"/>
+  </g>
+
+  <!-- conformed keys feeding enrich -->
+  <g stroke="#33506B" stroke-width="1.4" fill="none" stroke-dasharray="5 4">
+    <path d="M 1180 410 H 1195 V 612 H 1360 V 626" marker-end="url(#ad)"/>
+    <path d="M 1180 560 H 1195 V 612"/>
+  </g>
+  <text class="m" x="1204" y="606" font-size="10" fill="#33506B">conformed keys — ACCOUNT_SK, PARTY_SK, SECURITY_SK</text>
+
+  <!-- ══ LANE LABELS ══ -->
+  <text class="lane" x="60" y="390">CLIENT</text>
+  <text class="lane" x="60" y="540">ACCOUNT</text>
+  <text class="lane" x="60" y="690">TRANSACTION</text>
+  <line x1="60" y1="460" x2="1860" y2="460" stroke="#E2E6EA"/>
+  <line x1="60" y1="610" x2="866" y2="610" stroke="#E2E6EA"/>
+  <line x1="1524" y1="610" x2="1860" y2="610" stroke="#E2E6EA"/>
+
+  <!-- ══ CLIENT LANE ══ -->
+  <g>
+    <rect x="220" y="330" width="300" height="110" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/><rect x="220" y="330" width="300" height="4" rx="2" fill="#8D98A3"/>
+    <text class="bn" x="242" y="360">SWP · CLIENT FEED</text>
+    <text class="bd" x="242" y="384">Daily full extract, relational</text>
+    <text class="bd" x="242" y="402">Landed verbatim, never edited</text>
+    <text class="bd" x="242" y="420">File, timestamp, row number kept</text>
+
+    <rect x="550" y="330" width="300" height="110" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/><rect x="550" y="330" width="300" height="4" rx="2" fill="#5A6672"/>
+    <text class="bn" x="572" y="360">stg_swp__client</text>
+    <text class="bd" x="572" y="384">Trimmed, cast, deduped on client id</text>
+    <text class="bd" x="572" y="402">One row per source row, no joins</text>
+    <text class="bd" x="572" y="420">DQ flags raised, nothing dropped</text>
+
+    <rect x="880" y="330" width="300" height="110" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/><rect x="880" y="330" width="300" height="4" rx="2" fill="#33506B"/>
+    <text class="bn" x="902" y="360">int_party_resolved</text>
+    <text class="bd" x="902" y="384">PARTY_SK minted, crosswalk applied</text>
+    <text class="bd" x="902" y="402">KYC status, PII classification</text>
+    <text class="bd" x="902" y="420">Bitemporal history maintained</text>
+
+    <rect x="1540" y="330" width="320" height="110" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/><rect x="1540" y="330" width="320" height="4" rx="2" fill="#7A6A4F"/>
+    <text class="bn" x="1562" y="360">ADV_CLIENT_MASTER</text>
+    <text class="bd" x="1562" y="384">Legacy client id emitted via crosswalk</text>
+    <text class="bd" x="1562" y="402">Legacy column names and order</text>
+    <text class="bd" x="1562" y="420">Projection only — no logic here</text>
+  </g>
+
+  <!-- ══ ACCOUNT LANE ══ -->
+  <g>
+    <rect x="220" y="480" width="300" height="110" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/><rect x="220" y="480" width="300" height="4" rx="2" fill="#8D98A3"/>
+    <text class="bn" x="242" y="510">SWP · ACCOUNT FEED</text>
+    <text class="bd" x="242" y="534">Daily full extract, relational</text>
+    <text class="bd" x="242" y="552">Includes UDF payload as a CLOB</text>
+    <text class="bd" x="242" y="570">Landed verbatim, never edited</text>
+
+    <rect x="550" y="480" width="300" height="110" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/><rect x="550" y="480" width="300" height="4" rx="2" fill="#5A6672"/>
+    <text class="bn" x="572" y="510">stg_swp__account</text>
+    <text class="bd" x="572" y="534">Trimmed, cast, deduped on account id</text>
+    <text class="bd" x="572" y="552">UDF CLOB kept intact, validated JSON</text>
+    <text class="bd" x="572" y="570">DQ flags raised, nothing dropped</text>
+
+    <rect x="880" y="480" width="300" height="110" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/><rect x="880" y="480" width="300" height="4" rx="2" fill="#33506B"/>
+    <text class="bn" x="902" y="510">int_account_conformed</text>
+    <text class="bd" x="902" y="534">ACCOUNT_SK minted, PARTY_SK joined</text>
+    <text class="bd" x="902" y="552">Legacy account number retained</text>
+    <text class="bd" x="902" y="570">UDF shredded to key/value by registry</text>
+
+    <rect x="1540" y="480" width="320" height="110" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/><rect x="1540" y="480" width="320" height="4" rx="2" fill="#7A6A4F"/>
+    <text class="bn" x="1562" y="510">ADV_ACCOUNT_MASTER</text>
+    <text class="bd" x="1562" y="534">Legacy account number and status codes</text>
+    <text class="bd" x="1562" y="552">Fixed positions, rounded to 2dp</text>
+    <text class="bd" x="1562" y="570">UDF payload re-serialised from registry</text>
+  </g>
+
+  <!-- ══ TRANSACTION LANE ══ -->
+  <g>
+    <rect x="220" y="630" width="300" height="110" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/><rect x="220" y="630" width="300" height="4" rx="2" fill="#8D98A3"/>
+    <text class="bn" x="242" y="660">SWP · TRANSACTION FEED</text>
+    <text class="bd" x="242" y="684">Intraday deltas, relational</text>
+    <text class="bd" x="242" y="702">Landed verbatim, never edited</text>
+    <text class="bd" x="242" y="720">Late arrivals accepted, not rejected</text>
+
+    <rect x="550" y="630" width="300" height="110" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/><rect x="550" y="630" width="300" height="4" rx="2" fill="#5A6672"/>
+    <text class="bn" x="572" y="660">stg_swp__transaction</text>
+    <text class="bd" x="572" y="684">Trimmed, cast, deduped on txn id</text>
+    <text class="bd" x="572" y="702">One row per source row, no joins</text>
+    <text class="bd" x="572" y="720">DQ flags raised, nothing dropped</text>
+
+    <rect x="1210" y="630" width="300" height="110" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/><rect x="1210" y="630" width="300" height="4" rx="2" fill="#A6192E"/>
+    <text class="bn" x="1232" y="660">int_transaction_enriched</text>
+    <text class="bd" x="1232" y="684">Joined to ACCOUNT_SK, SECURITY_SK</text>
+    <text class="bd" x="1232" y="702">Net amounts in base ccy, FX as-of date</text>
+    <text class="bd" x="1232" y="720">Event sequence, reversals, bitemporal</text>
+
+    <rect x="1540" y="630" width="320" height="110" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/><rect x="1540" y="630" width="320" height="4" rx="2" fill="#7A6A4F"/>
+    <text class="bn" x="1562" y="660">ADV_TRANSACTION_FILE</text>
+    <text class="bd" x="1562" y="684">SWP codes collapsed via MAP_TXN_TYPE</text>
+    <text class="bd" x="1562" y="702">Legacy sign convention restored</text>
+    <text class="bd" x="1562" y="720">Projection only — no logic here</text>
+  </g>
+
+  <text class="mute" x="880" y="782" font-size="12">int_security_conformed and REF_FX_RATE also sit in the conform column. Positions and cash follow the transaction pattern exactly.</text>
+
+  <!-- ══ WHAT STAGE 2 IS ══ -->
+  <text class="band" x="60" y="822" fill="#A6192E">WHAT STAGE 2 IS — AND WHAT IT DELIBERATELY IS NOT</text>
+  <g>
+    <rect x="60" y="836" width="435" height="150" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+    <rect x="60" y="836" width="4" height="150" rx="2" fill="#A6192E"/>
+    <text class="ink" x="88" y="868" font-size="16" font-weight="600">Not a canonical model</text>
+    <text class="bd" x="88" y="896" font-size="12">Its shape comes from the SWP source and the</text>
+    <text class="bd" x="88" y="915" font-size="12">AddVantage target — not from a vendor-neutral</text>
+    <text class="bd" x="88" y="934" font-size="12">business definition. Canonical modelling is</text>
+    <text class="bd" x="88" y="953" font-size="12">deferred, not omitted. Trigger to revisit: the</text>
+    <text class="bd" x="88" y="972" font-size="12">first non-SWP source of record.</text>
+
+    <rect x="515" y="836" width="435" height="150" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+    <rect x="515" y="836" width="4" height="150" rx="2" fill="#A6192E"/>
+    <text class="ink" x="543" y="868" font-size="16" font-weight="600">Where the data is married</text>
+    <text class="bd" x="543" y="896" font-size="12">Client, account and transaction records are</text>
+    <text class="bd" x="543" y="915" font-size="12">resolved to one identity through the crosswalk.</text>
+    <text class="bd" x="543" y="934" font-size="12">SWP is the declared survivor during cutover, and</text>
+    <text class="bd" x="543" y="953" font-size="12">SURVIVING_SRC_SYSTEM is stored on the row so</text>
+    <text class="bd" x="543" y="972" font-size="12">the decision stays auditable.</text>
+
+    <rect x="970" y="836" width="435" height="150" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+    <rect x="970" y="836" width="4" height="150" rx="2" fill="#A6192E"/>
+    <text class="ink" x="998" y="868" font-size="16" font-weight="600">Where time is kept</text>
+    <text class="bd" x="998" y="896" font-size="12">Two clocks on every row: EFFECTIVE_* for the</text>
+    <text class="bd" x="998" y="915" font-size="12">business date a fact applies to, VALID_* for the</text>
+    <text class="bd" x="998" y="934" font-size="12">moment we learned it. This is the only layer that</text>
+    <text class="bd" x="998" y="953" font-size="12">can answer "what did we know on 15 April" —</text>
+    <text class="bd" x="998" y="972" font-size="12">AddVantage format is flat and current-state.</text>
+
+    <rect x="1425" y="836" width="435" height="150" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+    <rect x="1425" y="836" width="4" height="150" rx="2" fill="#A6192E"/>
+    <text class="ink" x="1453" y="868" font-size="16" font-weight="600">Where every number is computed</text>
+    <text class="bd" x="1453" y="896" font-size="12">Market value, gain and loss, FX conversion —</text>
+    <text class="bd" x="1453" y="915" font-size="12">derived once, here. Gold reads finished columns</text>
+    <text class="bd" x="1453" y="934" font-size="12">and reshapes them. The moment two consumers</text>
+    <text class="bd" x="1453" y="953" font-size="12">derive the same figure themselves, you are back</text>
+    <text class="bd" x="1453" y="972" font-size="12">to reconciling the estate against itself.</text>
+  </g>
+
+  <!-- ══ STANDARDS ══ -->
+  <text class="band mute" x="60" y="1030">ENGINEERING STANDARDS APPLIED THROUGHOUT — dbt-core · dbt-oracle · Airflow + Cosmos on OpenShift</text>
+  <g>
+    <rect x="60" y="1044" width="586" height="140" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+    <text class="ink" x="88" y="1076" font-size="15" font-weight="600">Naming and materialisation</text>
+    <text class="m" x="88" y="1104" font-size="11" fill="#33414F">stg_&lt;source&gt;__&lt;entity&gt; · int_&lt;entity&gt;_&lt;verb&gt; · ADV_&lt;file&gt;</text>
+    <text class="bd" x="88" y="1128" font-size="12">Three verbs only: _resolved, _conformed, _enriched.</text>
+    <text class="bd" x="88" y="1150" font-size="12">Conform materialises as table, enrich as incremental</text>
+    <text class="bd" x="88" y="1168" font-size="12">merge, Gold as table. Dependencies via ref() only.</text>
+
+    <rect x="667" y="1044" width="586" height="140" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+    <text class="ink" x="695" y="1076" font-size="15" font-weight="600">Surrogate keys and two clocks</text>
+    <text class="m" x="695" y="1104" font-size="11" fill="#33414F">SK = standard_hash(SRC_SYSTEM||'|'||natural_key)</text>
+    <text class="bd" x="695" y="1128" font-size="12">Deterministic, rebuild-safe, RAW(16). Never hashed on</text>
+    <text class="bd" x="695" y="1150" font-size="12">an attribute that can change. EFFECTIVE_* is business</text>
+    <text class="bd" x="695" y="1168" font-size="12">time, VALID_* is system time, IS_CURRENT_FLG is current.</text>
+
+    <rect x="1274" y="1044" width="586" height="140" rx="6" fill="#FFFFFF" stroke="#DCE1E6"/>
+    <text class="ink" x="1302" y="1076" font-size="15" font-weight="600">Proof, not assertion</text>
+    <text class="bd" x="1302" y="1100" font-size="12">unique, not_null and relationships tests on every Stage 2</text>
+    <text class="bd" x="1302" y="1122" font-size="12">model. DQ_SEVERITY on every row — FAIL rows land and</text>
+    <text class="bd" x="1302" y="1144" font-size="12">stay visible; only Gold excludes them. During dual run,</text>
+    <text class="bd" x="1302" y="1166" font-size="12">every ADV_ file is compared field-by-field to the live</text>
+    <text class="bd" x="1302" y="1188" font-size="12">AddVantage output until the variance report is empty.</text>
+  </g>
+
+</svg>

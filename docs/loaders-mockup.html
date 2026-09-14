@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CP Catalog — Loaders (Outbound) Mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#10193b; --accent:#0f4775; --pop:#31bced; --hover:#0091bf;
+    --bg:#f5f8f8; --panel:#fff; --border:#dbdae0; --bgsoft:#eef3f3; --infobg:#e0f5fd;
+    --text:#2b2f38; --sub:#5a6472; --muted:#9aa3b0;
+    --outbound:#7c3aed; --mandatory:#c1113a; --conditional:#e67e22; --optional:#5a6472;
+    --success:#159943;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Roboto,Arial,sans-serif;font-size:14px}
+  .mono{font-family:'Roboto Mono',monospace}
+  .top{background:var(--navy);color:#fff;display:flex;align-items:center;padding:0 24px;height:54px;gap:14px}
+  .logo{width:32px;height:32px;background:var(--pop);border-radius:3px;display:grid;place-items:center;color:var(--navy);font-weight:700}
+  .top b{font-size:15px}.top small{color:#8ea3c4;font-size:11px;display:block}
+  .badge{margin-left:6px;font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;background:rgba(21,153,67,.25);color:#bfe}
+  nav.modnav{margin-left:auto;display:flex;gap:4px}
+  nav.modnav a{color:#bcccdf;font-size:13px;padding:7px 12px;border-radius:3px;text-decoration:none;cursor:pointer}
+  nav.modnav a.active{background:var(--accent);color:#fff}
+  .wrap{max-width:1263px;margin:0 auto;padding:24px 24px 60px}
+  .h1{font-size:24px;font-weight:500;color:var(--accent);border-bottom:2px solid var(--accent);padding-bottom:12px;margin:0 0 8px;display:flex;align-items:center;gap:10px}
+  .lead{font-size:13px;color:var(--sub);margin:0 0 18px;line-height:1.6;max-width:820px}
+  .layout{display:flex;gap:18px;align-items:flex-start}
+  .list{width:280px;flex-shrink:0}
+  .label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px}
+  .litem{display:block;width:100%;text-align:left;padding:10px 12px;margin-bottom:6px;cursor:pointer;font-family:inherit;border:1px solid var(--border);border-radius:6px;background:var(--panel)}
+  .litem.on{border-color:var(--outbound);background:#f3edfd}
+  .litem .nm{font-size:13px;font-weight:600;color:var(--navy)}
+  .litem .mt{font-size:11px;color:var(--sub);margin-top:2px}
+  .detail{flex:1;min-width:0}
+  .dtitle{font-size:20px;font-weight:600;color:var(--navy)}
+  .outtag{font-size:10px;font-weight:700;color:#fff;background:var(--outbound);padding:3px 9px;border-radius:4px}
+  .meta{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--sub);margin:6px 0 16px}
+  .meta b{color:var(--navy)}
+  /* sub-tabs */
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:16px;flex-wrap:wrap}
+  .tabs button{background:none;border:none;font-size:12px;font-weight:500;padding:8px 12px;cursor:pointer;color:var(--sub);border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit}
+  .tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
+  .pane{display:none}.pane.on{display:block}
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--border);border-radius:4px;overflow:hidden}
+  th{background:var(--bgsoft);text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--accent)}
+  td{padding:8px 10px;font-size:13px;border-bottom:1px solid var(--bg);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  .opt{font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;color:#fff}
+  .opt.Mandatory{background:var(--mandatory)}.opt.Conditional{background:var(--conditional)}.opt.Optional{background:var(--optional)}
+  .src{font-size:9px;font-weight:600;color:var(--muted);padding:1px 5px;border:1px solid var(--border);border-radius:3px}
+  .mapgrid{display:grid;grid-template-columns:140px 1fr;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+  .mapgrid .k{background:var(--bgsoft);padding:9px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--accent);border-bottom:1px solid var(--border)}
+  .mapgrid .v{padding:9px 12px;font-size:13px;border-bottom:1px solid var(--border)}
+  .mapgrid .v .mono{color:var(--hover)}
+  .modchip{display:inline-block;font-size:11px;font-family:'Roboto Mono',monospace;background:var(--infobg);color:var(--accent);padding:2px 8px;border-radius:3px;margin:2px}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="logo">CP</div>
+  <div><b>CP Catalog</b><small>BBH Capital Partners</small></div>
+  <span class="badge">● LIVE</span>
+  <nav class="modnav">
+    <a>Home</a><a>System Design</a><a>Interface 360</a>
+    <a>API 360</a><a class="active">Data 360</a><a>Datapoint 360</a><a>PII Explorer</a>
+  </nav>
+</div>
+
+<div class="wrap">
+  <div class="h1">◆ Data 360 — Loaders</div>
+  <p class="lead">Outbound loaders (BBH → SWP) ingested from CP_Catalog_SEI_Loaders.xlsx (all 10 sheets).
+    Each loader shows its file structure, attributes, validations, exceptions, the CP Catalog module mapping,
+    and the canonical → physical field mapping. These feed the Datapoint 360 <b>Outbound</b> group.</p>
+
+  <div class="layout">
+    <div class="list">
+      <div class="label">Loaders (outbound)</div>
+      <div id="llist"></div>
+    </div>
+    <div class="detail" id="detail"></div>
+  </div>
+</div>
+
+<script>
+  const LOADERS = [
+    {
+      id:"Adhoc_Income_Loader", name:"Adhoc Income Loader", group:"Group 2", version:"1.4",
+      domain:"Income", fmt:"xlsx/xls/csv", purpose:"Adhoc income with backup tax",
+      ui:"Yes", sys:"Yes (FTP/NDM)", fp:"Separate FP", approval:"Yes",
+      format:[
+        ["File Header","No (UI adds)","Yes (1)","Loader Type, PO, Firm, Date, User, Source"],
+        ["Attribute Header","Yes (1)","Yes (1)","Column names — case-sensitive"],
+        ["Data Rows","Yes (≥1)","Yes (≥1)","Independent record processing"],
+        ["File Footer","No (UI adds)","Yes (1)",""]
+      ],
+      attrs:[
+        ["FIRM_ID","Firm","ID","","Mandatory","","",""],
+        ["ACCOUNT_NUMBER","Account","Character","17","Mandatory","","","Adhoc_Income_Attributes"],
+        ["PORTFOLIO_ID","Portfolio ID","Number","9","Conditional","","ID or Name",""],
+        ["ASSET_IDENTIFIER_TYPE","Asset id type","Character","65","Mandatory","CUSIP/ISIN/SEDOL/Ticker/SOR ID","",""],
+        ["INCOME_TYPE","Income type","Character","","Mandatory","Cash Dividend; Interest; Capital Gain Distribution","","Adhoc_Income_Attributes"],
+        ["PAYMENT_DATE","Payment date","Date","","Mandatory","DD-MON-YYYY","",""],
+        ["GROSS_AMOUNT","Gross amount","Amount","17,3","Mandatory","","Positive",""],
+        ["NET_AMOUNT","Net amount","Amount","17,3","Conditional","","Derived if not provided",""],
+        ["PAYMENT_CURRENCY","Payment currency","ISO","3","Mandatory","ISO","",""],
+        ["BACKUP_WITHHOLDING_TAX","Backup WH tax","Amount","17,3","Optional","","Overrides system computed",""],
+        ["CUSTODIAN_ID","Custodian ID","Number","","Conditional","","PSI49; required when POSK_ID specified",""]
+      ],
+      validations:[
+        ["WITHHOLDING_TAX_RATE","0-100, 6 decimals","Invalid withholding tax rate"],
+        ["INCOME_TYPE","Cash Dividend / Interest / Capital Gain only","Invalid income type"],
+        ["PAYMENT_CURRENCY","Must match account base","Currency mismatch"]
+      ],
+      exceptions:[
+        ["File","Format/header/footer/delimiter failure","Fix file structure and reload (no Activity created)"],
+        ["Business (Reload-able)","Invalid date format / missing mandatory","Exception Extract → fix → Exception Reload"],
+        ["Business (Non-reload)","Invalid account status, AML check, IC failures","Fix underlying then reload or Force Resolve"]
+      ],
+      map:{si:"Yes - file ingest", api:"POST /income", data:"Income_Event", dp:"Income_Realized", notes:"PSI46/49 custodian fields"},
+      canonical:[
+        ["PAYMENT_DATE","Date","Date","PAYMENT_DATE",""],
+        ["GROSS_AMOUNT","Amount","Decimal(18,6)","GROSS_AMOUNT","Type depends on AMOUNT_TYPE"],
+        ["NET_AMOUNT","Amount","Decimal(18,6)","NET_AMOUNT",""]
+      ]
+    },
+    {
+      id:"Custody_Transfer_Loader", name:"Custody Transfer Loader (v2)", group:"Group 2", version:"2.0",
+      domain:"Custody", fmt:"xlsx/xls/csv", purpose:"Bulk custody transfers",
+      ui:"Yes", sys:"Yes (FTP/NDM)", fp:"6360", approval:"Yes",
+      format:[
+        ["File Header","No (UI adds)","Yes (1)","Loader Type, PO, Firm, Date, User, Source"],
+        ["Attribute Header","Yes (1)","Yes (1)","Column names — case-sensitive"],
+        ["Data Rows","Yes (≥1)","Yes (≥1)","v2 adds POSK Type/BIC"]
+      ],
+      attrs:[
+        ["POSK_TYPE","From POSK type","Character","35","Optional","Name; ID; BIC","Default ID","Custody_Transfer_V2_Attributes"],
+        ["TO_PLACE_OF_SETTLEMENT_TYPE","TO POS type","Character","35","Optional","Name; ID; BIC","Default ID","Custody_Transfer_V2_Attributes"],
+        ["TO_PLACE_OF_SETTLEMENT","TO POS value","Character/ID","35","Conditional","","ID/Name/BIC depending on type","Custody_Transfer_V2_Attributes"],
+        ["TO_POSK_TYPE","TO POSK type","Character","35","Optional","Name; ID; BIC","Default ID","Custody_Transfer_V2_Attributes"],
+        ["TO_POSK_ID","TO POSK value","Character/ID","35","Conditional","","ID/Name/BIC depending on type","Custody_Transfer_V2_Attributes"]
+      ],
+      validations:[
+        ["QUANTITY","Decimal(18,6); positive","Invalid quantity"]
+      ],
+      exceptions:[
+        ["File","Format/header/footer/delimiter failure","Fix file structure and reload"],
+        ["Approval","File-level and record-level routing","Approve via queue per role"]
+      ],
+      map:{si:"Yes - file ingest", api:"POST /custody-transfers", data:"Custody_Transfer", dp:"Position_Movement", notes:"v2 adds POSK Name/ID/BIC"},
+      canonical:[
+        ["QUANTITY","Amount","Decimal(18,6)","INSTRUCTED_AMOUNT_QUANTITY_ORIGINAL_FACE",""]
+      ]
+    },
+    {
+      id:"PSI36_Executed_Trade_Loader_FX", name:"PSI36 Executed Trade Loader (FX)", group:"Group 5", version:"PSOK",
+      domain:"FX", fmt:"xlsx/xls/csv", purpose:"Executed FX Spot/Forward",
+      ui:"Yes", sys:"Yes (FTP/NDM)", fp:"Separate FP", approval:"Yes",
+      format:[["Data Rows","Yes (≥1)","Yes (≥1)","SBBD + record FPs"]],
+      attrs:[
+        ["EXCHANGE_RATE","FX rate","Amount","18,9","Mandatory","","",""],
+        ["SECURITY_DEAL_IDENTIFIER","Deal id","Character","","Mandatory","Unique per cluster","Duplicate deal identifier",""]
+      ],
+      validations:[
+        ["SECURITY_DEAL_IDENTIFIER","Unique per cluster","Duplicate deal identifier"],
+        ["AMOUNT","Max 9999999999999.99; no negatives","Invalid amount"]
+      ],
+      exceptions:[
+        ["Overdraft","Cumulative overdraft across deals","Adjust deals or use BYPASS_OVERDRAFT"],
+        ["Funding Nostro","Cannot derive for buy/sell currency","Setup Funding Nostro / Cash Agent"]
+      ],
+      map:{si:"Yes - file ingest", api:"POST /fx/deals", data:"FX_Deal", dp:"FX_Open_Position", notes:"FX Spot/Forward"},
+      canonical:[
+        ["EXCHANGE_RATE","Amount","Decimal(18,9)","EXCHANGE_RATE",""]
+      ]
+    }
+  ];
+
+  function renderList(active){
+    document.getElementById("llist").innerHTML = LOADERS.map((l,i)=>`
+      <button class="litem ${i===active?'on':''}" onclick="pick(${i})">
+        <div class="nm">${l.name}</div>
+        <div class="mt">${l.group} · ${l.domain} · v${l.version} · ${l.attrs.length} attrs</div>
+      </button>`).join("");
+  }
+
+  let tab = "Attributes";
+  function renderDetail(l){
+    const TABS = ["Attributes","Format","Validations","Exceptions","Module Mapping","Canonical"];
+    const attrRows = l.attrs.map(a=>`<tr>
+      <td class="mono" style="font-size:12px">${a[0]}</td><td>${a[1]}</td>
+      <td>${a[2]||''}${a[3]?` (${a[3]})`:''}</td>
+      <td><span class="opt ${a[4]}">${a[4]}</span></td>
+      <td style="font-size:12px;color:var(--sub)">${a[5]||''}</td>
+      <td style="font-size:11px;color:var(--muted)">${a[7]?`<span class="src">${a[7]}</span>`:'<span class="src">Attributes</span>'}</td></tr>`).join("");
+    const fmtRows = l.format.map(f=>`<tr><td><b>${f[0]}</b></td><td>${f[1]}</td><td>${f[2]}</td><td style="font-size:12px;color:var(--sub)">${f[3]}</td></tr>`).join("");
+    const valRows = l.validations.map(v=>`<tr><td class="mono" style="font-size:12px">${v[0]}</td><td>${v[1]}</td><td style="color:var(--mandatory)">${v[2]}</td></tr>`).join("");
+    const excRows = l.exceptions.map(e=>`<tr><td><b>${e[0]}</b></td><td style="font-size:12px">${e[1]}</td><td style="font-size:12px;color:var(--hover)">${e[2]}</td></tr>`).join("");
+    const canonRows = l.canonical.map(c=>`<tr><td class="mono" style="font-size:12px;color:var(--accent)">${c[0]}</td><td>${c[1]}</td><td class="mono" style="font-size:11px">${c[2]}</td><td class="mono" style="font-size:12px">${c[3]}</td><td style="font-size:12px;color:var(--sub)">${c[4]||''}</td></tr>`).join("");
+
+    document.getElementById("detail").innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:2px">
+        <div class="dtitle">${l.name}</div><span class="outtag">OUTBOUND · BBH → SWP</span>
+      </div>
+      <div class="meta">
+        <span>Group: <b>${l.group}</b></span><span>Domain: <b>${l.domain}</b></span>
+        <span>Format: <b>${l.fmt}</b></span><span>Version: <b>${l.version}</b></span>
+        <span>UI: <b>${l.ui}</b></span><span>System: <b>${l.sys}</b></span><span>FP: <b>${l.fp}</b></span>
+      </div>
+      <div style="font-size:13px;color:var(--sub);margin-bottom:14px">${l.purpose}</div>
+
+      <div class="tabs">
+        ${TABS.map(tb=>`<button class="${tb===tab?'on':''}" onclick="setTab('${tb}')">${tb}</button>`).join("")}
+      </div>
+
+      <div class="pane ${tab==='Attributes'?'on':''}">
+        <table><thead><tr><th>Attribute</th><th>Description</th><th>Type</th><th>Optionality</th><th>Valid Values / Notes</th><th>Source</th></tr></thead>
+        <tbody>${attrRows}</tbody></table></div>
+
+      <div class="pane ${tab==='Format'?'on':''}">
+        <table><thead><tr><th>Component</th><th>Required (UI)</th><th>Required (System)</th><th>Notes</th></tr></thead>
+        <tbody>${fmtRows}</tbody></table></div>
+
+      <div class="pane ${tab==='Validations'?'on':''}">
+        <table><thead><tr><th>Attribute</th><th>Validation Rule</th><th>Error Message</th></tr></thead>
+        <tbody>${valRows}</tbody></table></div>
+
+      <div class="pane ${tab==='Exceptions'?'on':''}">
+        <table><thead><tr><th>Exception Type</th><th>Description</th><th>Resolution Path</th></tr></thead>
+        <tbody>${excRows}</tbody></table></div>
+
+      <div class="pane ${tab==='Module Mapping'?'on':''}">
+        <div style="font-size:12px;color:var(--sub);margin-bottom:10px">How this loader maps into the rest of CP Catalog (from CP_Catalog_Mapping):</div>
+        <div class="mapgrid">
+          <div class="k">Interface 360</div><div class="v">${l.map.si}</div>
+          <div class="k">API 360</div><div class="v"><span class="modchip">${l.map.api}</span></div>
+          <div class="k">Data 360</div><div class="v"><span class="modchip">${l.map.data}</span></div>
+          <div class="k">Datapoint 360</div><div class="v"><span class="modchip">${l.map.dp}</span></div>
+          <div class="k">Notes</div><div class="v" style="border-bottom:none;color:var(--sub)">${l.map.notes}</div>
+        </div></div>
+
+      <div class="pane ${tab==='Canonical'?'on':''}">
+        <div style="font-size:12px;color:var(--sub);margin-bottom:10px">CIFS canonical → physical loader field mapping (the semantic layer for loaders):</div>
+        <table><thead><tr><th>Canonical Field</th><th>Category</th><th>Canonical Type</th><th>Physical Field</th><th>Notes</th></tr></thead>
+        <tbody>${canonRows}</tbody></table></div>`;
+  }
+
+  let cur = 0;
+  function pick(i){ cur=i; tab="Attributes"; renderList(i); renderDetail(LOADERS[i]); }
+  function setTab(tb){ tab=tb; renderDetail(LOADERS[cur]); }
+  renderList(0); renderDetail(LOADERS[0]);
+</script>
+</body>
+</html>

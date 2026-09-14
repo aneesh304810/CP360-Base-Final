@@ -1,0 +1,36 @@
+Layer,System,New_SEI_Hosts_or_Endpoint,Sizing_RAM,Sizing_CPU,Sizing_Storage_or_Capacity,Growth,Hosting,Direction,Protocol_Port,Status_or_Notes
+Platform,CP Integration Hub,OCPQ shared OpenShift cluster - RD DEV namespace,4 GB,2,10GB,TBD,BBH OpenShift,Bidirectional,TBD,Exact namespace and pod sizing TBD
+File System,CPHUB Landing Share,\\rdwebfs.testbbh.com\cphub$,Not Applicable,Not Applicable,20GB,TBD,BBH,Internal,TBD,Regional landing share
+Database,IMDS,dvlimdsdb.testbbh.com; dvlimdsapp.testbbh.com,62 GB,8,6 TB,Minimal Growth,BBH,Internal,Oracle JDBC port TBD,New SEI DEV environment
+Database,PBDW,dvlpbdb1.testbbh.com; rtlodiapp3t.testbbh.com,62 GB,8,4 TB,Minimal Growth,BBH,Internal,TBD,New SEI DEV sizing populated as supplied
+Consumer,Pivotal,QCWPIVDEVSEI2.testbbh.com; QCWPIVDEVSEI4.testbbh.com; QCWPIVDEVSEI5.testbbh.com,16 GB,4,C: 100 GB; D: 250 GB,Minimal Growth,BBH,Outbound,TBD,Sizing populated as supplied
+Consumer,CRD,Azure-hosted vendor application,Vendor Managed,Vendor Managed,Vendor Managed,TBD,Vendor Azure,Outbound,TBD,CRD sizing TBD
+Consumer,Client Portal,dvltasap235.testbbh.com,12 GB,2,350 GB,TBD,BBH RHEL,Outbound,TBD,New SEI DEV host
+Consumer,PORT,New PORT test instance,Vendor Managed,Vendor Managed,25 accounts; 3000 securities,TBD,Bloomberg vendor,Outbound,TBD,Smaller than production limits
+Platform,CP Integration Hub,OCPQ shared OpenShift cluster - RD SIT namespace,4 GB,2,10GB,TBD,BBH OpenShift,Bidirectional,TBD,SIT mapped to RD
+File System,CPHUB Landing Share,\\rdwebfs.testbbh.com\cphub$,Not Applicable,Not Applicable,20GB,TBD,BBH,Internal,TBD,DEV and SIT folder separation TBD
+Database,IMDS,qblimdsdb.testbbh.com; qblimdsapp.testbbh.com,62 GB,8,6 TB,Minimal Growth,BBH,Internal,Oracle JDBC port TBD,New SEI SIT environment
+Database,PBDW,QALPBDB3.testbbh.com; qalodiapp3sei.testbbh.com; qalodidb3sei.testbbh.com,62 GB,8,4 TB,Minimal Growth,BBH,Internal,TBD,New SEI SIT environment
+Consumer,Pivotal,QCWPIVAPMTRSEI.testbbh.com; QCWPIVSEIDB6.testbbh.com; QCWPIVINTSEI1.testbbh.com,16 GB,4,C: 100 GB; D: 250 GB,Minimal Growth,BBH,Outbound,TBD,Sizing populated as supplied
+Consumer,CRD,Azure-hosted vendor application,Vendor Managed,Vendor Managed,Vendor Managed,TBD,Vendor Azure,Outbound,TBD,CRD sizing TBD
+Consumer,Client Portal,rdltasap235.testbbh.com,12 GB,2,350 GB,TBD,BBH RHEL,Outbound,TBD,New SEI SIT host
+Consumer,PORT,New PORT test instance,Vendor Managed,Vendor Managed,25 accounts; 3000 securities,TBD,Bloomberg vendor,Outbound,TBD,Smaller than production limits
+Platform,CP Integration Hub,OCPQ shared OpenShift cluster - QC namespace,4 GB,2,10GB,TBD,BBH OpenShift,Bidirectional,TBD,Trial/UAT mapped to QC
+File System,CPHUB Landing Share,\\qcwebfs.testbbh.com\cphub$,Not Applicable,Not Applicable,20GB,TBD,BBH,Internal,TBD,QC regional landing share
+Database,IMDS,rdlimdsdb.testbbh.com; rdlimdsapp.testbbh.com,62 GB,8,6 TB,Minimal Growth,BBH,Internal,Oracle JDBC port TBD,New SEI Trial/UAT environment
+Database,PBDW,QCLPBDB3.testbbh.com; qclodiapp3sei.testbbh.com; qclodidb3sei.testbbh.com,62 GB,8,4 TB,Minimal Growth,BBH,Internal,TBD,New SEI Trial/UAT environment
+Consumer,Pivotal,QCWPIVAUPGSEI1.testbbh.com; QCWPIVAUPGSEI2.testbbh.com; QCWPIVSEIDB4.testbbh.com; QCWPIVSEIDB5.testbbh.com; QCWPIVINTSEI2.testbbh.com,16 GB,4,C: 100 GB; D: 250 GB,Minimal Growth,BBH,Outbound,TBD,Sizing populated as supplied
+Consumer,CRD,Azure-hosted vendor application,Vendor Managed,Vendor Managed,TBD,TBD,Vendor Azure,Outbound,TBD,CRD sizing TBD
+Consumer,Client Portal,qcltasap235.testbbh.com,12 GB,2,350 GB,TBD,BBH RHEL,Outbound,TBD,New SEI Trial/UAT host
+Consumer,PORT,New PORT test instance,Vendor Managed,Vendor Managed,25 accounts; 3000 securities,TBD,Bloomberg vendor,Outbound,TBD,Smaller than production limits
+Platform,CP Integration Hub,Production OpenShift cluster and namespace TBD,16GB,16,25GB,TBD,BBH OpenShift,Bidirectional,TBD,Production platform details TBD
+File System,CPHUB Landing Share,Production cphub share TBD,Not Applicable,Not Applicable,20GB,TBD,BBH,Internal,TBD,Production share TBD
+Database,IMDS,njlimdsdb.bbh.com; njlimdsapp.bbh.com,62GB,8,6TB,TBD,BBH,Internal,Oracle JDBC port TBD,Production sizing TBD
+Database,PBDW,njlpbdb3.bbh.com; njlodiapp3sei.bbh.com; njlodidb3sei.bbh.com,62GB,8,6TB,TBD,BBH,Internal,TBD,Production sizing TBD
+Consumer,Pivotal,NJWPIVCRMINT.bbh.com; NJWPIVCRMMKT.bbh.com; NJWPIVCRM1.bbh.com; NJWPIVCRM2.bbh.com; NJWPIVCRMUX1.bbh.com; NJWPIVCRMDB2.bbh.com,16GB,4,100GB,TBD,BBH,Outbound,TBD,Production sizing TBD
+Consumer,CRD,CRD production vendor environment,Vendor Managed,Vendor Managed,Vendor Managed,TBD,Vendor Azure,Outbound,TBD,Production CRD sizing TBD
+Consumer,Client Portal,njtasap12.bbh.com; njtas2ap12.bbh.com; njtas3ap12.bbh.com; njtas4ap12.bbh.com,12GB,2,350GB,TBD,BBH RHEL,Outbound,TBD,Production sizing TBD
+Consumer,PORT,Bloomberg PORT production,Vendor Managed,Vendor Managed,25 accounts; 3000 securities,TBD,Bloomberg vendor,Outbound,TBD,Production PORT capacity TBD
+External API,SEI API Proxy Egress,192.200.8.0/24; 192.200.5.0/24; 204.136.26.0/24,Not Applicable,Not Applicable,Not Applicable,TBD,BBH to SEI,Outbound,HTTPS 443,IP ranges to be whitelisted by SEI
+External SFTP,SEI to BBH SFTP,qcsecureftp.bbh.com,Not Applicable,Not Applicable,Not Applicable,TBD,BBH MFT,Inbound,SFTP 22,SEI source IPs whitelisted by BBH
+External SFTP,SEI to BBH SFTP,secureftp.bbh.com,Not Applicable,Not Applicable,Not Applicable,TBD,BBH MFT,Inbound,SFTP 22,Production SFTP account seiswp_sftp

@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CP Catalog — Full-Text Search Design</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#10193b; --accent:#0f4775; --pop:#31bced; --hover:#0091bf;
+    --bg:#eef2f4; --panel:#fff; --border:#d4d9e0; --soft:#f5f8f8;
+    --text:#222831; --sub:#5a6472; --muted:#9aa3b0;
+    --data:#0091bf; --api:#159943; --datapoint:#0f4775; --interface:#b8528a;
+    --loader:#7c3aed; --pii:#c1113a; --index:#a8743a; --gold:#c8932a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Roboto,Arial,sans-serif;font-size:14px;line-height:1.5}
+  .mono{font-family:'Roboto Mono',monospace}
+  .top{background:var(--navy);color:#fff;padding:18px 28px}
+  .top h1{margin:0;font-size:20px;font-weight:500}
+  .top p{margin:4px 0 0;color:#8ea3c4;font-size:13px}
+  .wrap{max-width:1180px;margin:0 auto;padding:26px 22px 70px}
+  .section{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:22px 26px;margin-bottom:22px;box-shadow:0 1px 3px rgba(16,25,59,.05)}
+  .section h2{margin:0 0 4px;font-size:16px;color:var(--accent);display:flex;align-items:center;gap:9px}
+  .section h2 .num{width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;display:grid;place-items:center;font-weight:700}
+  .section .desc{font-size:13px;color:var(--sub);margin:0 0 18px}
+  /* document card */
+  .doccard{border:2px solid var(--index);border-radius:10px;overflow:hidden;max-width:680px;margin:0 auto}
+  .doccard .dh{background:var(--index);color:#fff;padding:9px 16px;font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px}
+  .doccard .dh .tag{margin-left:auto;font-size:10px;background:rgba(255,255,255,.22);padding:2px 8px;border-radius:10px}
+  .field{display:grid;grid-template-columns:150px 1fr;border-bottom:1px solid var(--soft)}
+  .field:last-child{border-bottom:none}
+  .field .k{background:var(--soft);padding:9px 14px;font-size:11px;font-weight:700;color:var(--accent);font-family:'Roboto Mono',monospace;display:flex;align-items:center;gap:6px}
+  .field .v{padding:9px 14px;font-size:13px;font-family:'Roboto Mono',monospace;word-break:break-word}
+  .field.indexed .k{background:#fbf2e6}
+  .field.indexed{background:#fffdf8}
+  .ix-flag{font-size:8px;font-weight:700;color:#fff;background:var(--index);padding:1px 5px;border-radius:3px}
+  .nav-flag{font-size:8px;font-weight:700;color:#fff;background:var(--hover);padding:1px 5px;border-radius:3px}
+  .hl{background:#fff3b0;border-radius:2px;padding:0 2px}
+  /* flow */
+  .flow{display:flex;flex-direction:column;gap:0;align-items:center}
+  .sources{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:6px}
+  .src{font-size:11px;font-weight:600;color:#fff;padding:6px 11px;border-radius:6px}
+  .arrowdown{font-size:22px;color:var(--muted);line-height:1;margin:3px 0}
+  .stage{border-radius:10px;padding:13px 20px;text-align:center;color:#fff;min-width:340px}
+  .stage .t{font-weight:700;font-size:14px}.stage .s{font-size:11px;opacity:.9;margin-top:2px}
+  .stage.flatten{background:var(--index)}
+  .stage.index{background:var(--gold)}
+  .stage.query{background:var(--accent)}
+  .stage.ui{background:var(--data)}
+  .stage.nav{background:var(--navy)}
+  /* retrieval steps */
+  .steps{counter-reset:s;display:flex;flex-direction:column;gap:10px}
+  .step{display:flex;gap:14px;align-items:flex-start;background:var(--soft);border-radius:8px;padding:12px 16px;border-left:4px solid var(--accent)}
+  .step .n{counter-increment:s;flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;font-size:13px;display:grid;place-items:center}
+  .step .n::before{content:counter(s)}
+  .step .body{font-size:13px}.step .body b{color:var(--navy)}
+  .step .body code{background:#e7edf2;padding:1px 6px;border-radius:3px;font-family:'Roboto Mono',monospace;font-size:12px}
+  /* result row demo */
+  .resrow{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:11px 15px;max-width:680px}
+  .badge{font-size:8px;font-weight:700;color:#fff;padding:3px 8px;border-radius:3px;min-width:84px;text-align:center}
+  .b-data{background:var(--data)}
+  .arrow-link{margin-left:auto;color:var(--muted);font-size:18px}
+  /* mapping table */
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{background:var(--soft);text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--accent)}
+  td{padding:7px 10px;border-bottom:1px solid var(--soft);vertical-align:top}
+  td.mono{font-family:'Roboto Mono',monospace;font-size:11.5px}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px}
+  .note{background:#fffbea;border:1px solid #e0c060;border-radius:8px;padding:12px 16px;font-size:12.5px;color:#6b5200;margin-top:14px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--sub);margin-top:14px}
+  .legend span{display:flex;align-items:center;gap:5px}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>CP Catalog — Full-Text Search: Document Design &amp; Flow</h1>
+  <p>How every artifact becomes a searchable "document", and how a result links back to the real page</p>
+</div>
+
+<div class="wrap">
+
+  <!-- 1. THE DOCUMENT -->
+  <div class="section">
+    <h2><span class="num">1</span> The Document — one row per artifact in <span class="mono">search_index</span></h2>
+    <p class="desc">Each feed, field, loader, API, datapoint, or PII attribute is flattened into one "document".
+      Only <b>body_text</b> is read by the Oracle Text index; the rest is metadata carried alongside, including
+      the <b>nav target</b> that links the result back to its real module page.</p>
+
+    <div class="doccard">
+      <div class="dh">📄 search_index document <span class="tag">kind = field</span></div>
+      <div class="field"><div class="k">artifact_key</div><div class="v">field:swp.sei.account.account_number</div></div>
+      <div class="field"><div class="k">module</div><div class="v">data</div></div>
+      <div class="field"><div class="k">kind</div><div class="v">field</div></div>
+      <div class="field"><div class="k">name</div><div class="v">ACCOUNT_NUMBER</div></div>
+      <div class="field indexed"><div class="k"><span class="ix-flag">INDEXED</span> body_text</div>
+        <div class="v"><span class="hl">ACCOUNT_NUMBER ACCOUNT_NUMBER</span> Client Account Number CHAR account</div></div>
+      <div class="field"><div class="k">subtitle</div><div class="v">field · swp.sei.account · CHAR(17)</div></div>
+      <div class="field"><div class="k">project_id</div><div class="v">sei</div></div>
+      <div class="field"><div class="k">is_pii</div><div class="v">N</div></div>
+      <div class="field"><div class="k"><span class="nav-flag">NAV</span> nav_module</div><div class="v">data</div></div>
+      <div class="field"><div class="k"><span class="nav-flag">NAV</span> nav_tab</div><div class="v">Inbound Feeds</div></div>
+      <div class="field"><div class="k"><span class="nav-flag">NAV</span> nav_id</div><div class="v">swp.sei.account</div></div>
+      <div class="field"><div class="k"><span class="nav-flag">NAV</span> nav_extra</div><div class="v">ACCOUNT_NUMBER</div></div>
+    </div>
+
+    <div class="legend">
+      <span><span class="ix-flag">INDEXED</span> only this column is full-text searchable</span>
+      <span><span class="nav-flag">NAV</span> these fields link the result back to the live page</span>
+      <span><span class="hl">highlight</span> name is doubled in body_text → exact-name matches rank highest</span>
+    </div>
+
+    <div class="note"><b>Why body_text repeats the name:</b> Oracle Text SCORE() counts term frequency.
+      Putting the name in twice plus the description means a search for "account_number" scores the exact field
+      higher than a feed that merely mentions account numbers in its description.</div>
+  </div>
+
+  <!-- 2. HOW EACH ARTIFACT MAPS TO A DOCUMENT -->
+  <div class="section">
+    <h2><span class="num">2</span> Source → Document mapping (the flattening at ingest)</h2>
+    <p class="desc">The <span class="mono">search_index_builder</span> step walks every source table and projects each
+      row into a document. body_text and the nav target are built per artifact type.</p>
+    <table>
+      <thead><tr><th>Source table</th><th>Module</th><th>body_text =</th><th>nav target →</th></tr></thead>
+      <tbody>
+        <tr><td class="mono"><span class="dot" style="background:var(--data)"></span>datasets (FEED)</td><td>data</td><td class="mono">name×2 + desc + layer</td><td class="mono">data / Inbound Feeds / object_name</td></tr>
+        <tr><td class="mono"><span class="dot" style="background:var(--data)"></span>columns</td><td>data</td><td class="mono">name×2 + desc + data_type</td><td class="mono">data / Inbound Feeds / dataset_key</td></tr>
+        <tr><td class="mono"><span class="dot" style="background:var(--data)"></span>feed_catalog (in)</td><td>data</td><td class="mono">feed_name×2 + domain</td><td class="mono">data / Inbound Feeds / feed_name</td></tr>
+        <tr><td class="mono"><span class="dot" style="background:var(--loader)"></span>feed_catalog (out)</td><td>loader</td><td class="mono">feed_name×2 + domain</td><td class="mono">data / Loaders / feed_id</td></tr>
+        <tr><td class="mono"><span class="dot" style="background:var(--loader)"></span>ldr_catalog</td><td>loader</td><td class="mono">loader_name×2 + purpose</td><td class="mono">data / Loaders / loader_id</td></tr>
+        <tr><td class="mono"><span class="dot" style="background:var(--loader)"></span>ldr_attributes</td><td>loader</td><td class="mono">attr×2 + desc + type</td><td class="mono">data / Loaders / loader_id</td></tr>
+        <tr><td class="mono"><span class="dot" style="background:var(--loader)"></span>ldr_canonical_map</td><td>loader</td><td class="mono">canonical×2 + physical</td><td class="mono">data / Loaders / loader_id</td></tr>
+        <tr><td class="mono"><span class="dot" style="background:var(--api)"></span>api_endpoints</td><td>api</td><td class="mono">method+path×2 + summary</td><td class="mono">api / Sources / source_id</td></tr>
+        <tr><td class="mono"><span class="dot" style="background:var(--datapoint)"></span>dp_registry</td><td>datapoint</td><td class="mono">display×2 + normalized</td><td class="mono">datapoint / – / dp_name</td></tr>
+        <tr><td class="mono"><span class="dot" style="background:var(--pii)"></span>pii_classifications</td><td>pii</td><td class="mono">attr×2 + components</td><td class="mono">pii / – / pii_attribute</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 3. BUILD FLOW -->
+  <div class="section">
+    <h2><span class="num">3</span> Build flow — how documents get indexed (at ingest time)</h2>
+    <p class="desc">Runs LAST in the pipeline, after all artifacts are loaded.</p>
+    <div class="flow">
+      <div class="sources">
+        <span class="src" style="background:var(--data)">datasets</span>
+        <span class="src" style="background:var(--data)">columns</span>
+        <span class="src" style="background:var(--data)">feed_catalog</span>
+        <span class="src" style="background:var(--loader)">ldr_catalog</span>
+        <span class="src" style="background:var(--loader)">ldr_attributes</span>
+        <span class="src" style="background:var(--loader)">ldr_canonical</span>
+        <span class="src" style="background:var(--api)">api_endpoints</span>
+        <span class="src" style="background:var(--datapoint)">dp_registry</span>
+        <span class="src" style="background:var(--pii)">pii_classifications</span>
+      </div>
+      <div class="arrowdown">↓</div>
+      <div class="stage flatten"><div class="t">search_index_builder.load()</div><div class="s">flatten each row → document (body_text + nav) · MERGE on artifact_key</div></div>
+      <div class="arrowdown">↓</div>
+      <div class="stage index"><div class="t">search_index table</div><div class="s">one document per artifact · denormalized read-model</div></div>
+      <div class="arrowdown">↓</div>
+      <div class="stage" style="background:var(--index)"><div class="t">CTX_DDL.SYNC_INDEX + OPTIMIZE_INDEX</div><div class="s">refresh the Oracle Text index after load (pipeline sync)</div></div>
+      <div class="arrowdown">↓</div>
+      <div class="stage index" style="background:var(--gold)"><div class="t">ix_search_body (CTXSYS.CONTEXT)</div><div class="s">inverted full-text index over body_text · SYNC (ON COMMIT)</div></div>
+    </div>
+  </div>
+
+  <!-- 4. QUERY + RETRIEVAL FLOW -->
+  <div class="section">
+    <h2><span class="num">4</span> Query &amp; retrieval flow — how a result links back</h2>
+    <div class="steps">
+      <div class="step"><div class="n"></div><div class="body">User types <b>"account"</b> in the header search → <code>GET /search?q=account</code></div></div>
+      <div class="step"><div class="n"></div><div class="body">Build Oracle Text expression with stemming: <code>(stem(account) | account)</code></div></div>
+      <div class="step"><div class="n"></div><div class="body">One query: <code>CONTAINS(body_text, :ctx, 1) &gt; 0 ORDER BY SCORE(1) DESC</code> — matches across ALL artifacts at once</div></div>
+      <div class="step"><div class="n"></div><div class="body">Each matching <b>document</b> returns: module, kind, name, subtitle, <b>nav target</b>, SCORE</div></div>
+      <div class="step"><div class="n"></div><div class="body">UI groups by module, renders each row with a <b>module badge</b> + name + subtitle</div></div>
+      <div class="step"><div class="n"></div><div class="body">User clicks → <code>onOpen(nav)</code> → App routes to <code>nav.module</code>, passes <code>selection={tab, id}</code></div></div>
+      <div class="step"><div class="n"></div><div class="body">The module opens the <b>actual artifact</b> using nav.id (the real key) — live page, not the index copy</div></div>
+    </div>
+
+    <div style="margin-top:18px">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">The result row the user sees + clicks</div>
+      <div class="resrow">
+        <span class="badge b-data">DATA 360</span>
+        <div><div style="font-size:14px;font-weight:600;color:var(--navy)"><span class="hl">ACCOUNT</span>_NUMBER</div>
+          <div style="font-size:12px;color:var(--sub)">field · swp.sei.account · CHAR(17)</div></div>
+        <span style="font-size:8px;font-weight:700;color:#fff;background:var(--data);padding:2px 6px;border-radius:3px">SEI</span>
+        <span class="arrow-link">›</span>
+      </div>
+      <div class="arrowdown" style="margin-left:40px">↓ click</div>
+      <div class="stage nav" style="min-width:340px;margin-left:0"><div class="t">Data 360 → Inbound Feeds → Account feed</div><div class="s">opens the live feed detail, ACCOUNT_NUMBER in view (via nav_id = swp.sei.account)</div></div>
+    </div>
+  </div>
+
+  <!-- 5. ARCHITECTURE: read-model -->
+  <div class="section">
+    <h2><span class="num">5</span> Architecture — search_index is a derived read-model</h2>
+    <p class="desc">The source tables stay the system of record. search_index is a flattened <b>copy</b> built at ingest,
+      carrying enough to (a) match text and (b) navigate back. That's why it needs the sync step — and why a result
+      links via a stored nav target, not a live foreign-key join.</p>
+    <div class="flow">
+      <div class="stage" style="background:#48506a;min-width:520px"><div class="t">Source tables — system of record</div><div class="s">datasets · columns · feed_catalog · ldr_* · api_* · dp_registry · pii_*</div></div>
+      <div class="arrowdown">↓ flatten at ingest (denormalize)</div>
+      <div class="stage index" style="background:var(--gold);min-width:520px"><div class="t">search_index + ix_search_body — derived read-model</div><div class="s">one document per artifact · one full-text index · rebuilt/synced each load</div></div>
+      <div class="arrowdown">↓ CONTAINS + SCORE (one query)</div>
+      <div class="stage query" style="min-width:520px"><div class="t">/search → ranked results</div><div class="s">each result carries a nav target back to the live source page</div></div>
+    </div>
+    <div class="note"><b>Tradeoff:</b> a derived copy can go stale, so the ingestion step re-syncs it every run.
+      A live-join search wouldn't go stale but couldn't be full-text indexed or ranked. This is the standard
+      search-index pattern (same reason Elasticsearch/Solr sit alongside a database).</div>
+  </div>
+
+</div>
+</body>
+</html>

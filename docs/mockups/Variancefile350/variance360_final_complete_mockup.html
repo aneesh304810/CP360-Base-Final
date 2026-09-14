@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CP 360 — Variance 360 · Final</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f5f8f8;--panel:#fff;--panel2:#dfe6e9;--border:#b5b6b6;--text:#333;--sub:#666;
+    --navy:#10193b;--accent:#0f4775;--pop:#31bced;--hoverbg:#eee;
+    --success:#159943;--successbg:#d0ebd9;--danger:#c1113a;--dangerbg:#f3d2d7;
+    --warning:#e67e22;--warningbg:#fae5d3;--info:#0091bf;--infobg:#e0f5fd;
+    --c-date:#7c3aed;--c-dec:#0f4775;--c-int:#5f87a7;--c-bool:#159943;
+    --c-str:#9fb0bd;--c-blank:#e8ecef;--c-bad:#c1113a;--mono:'Roboto Mono',monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Roboto,Arial,sans-serif;
+    font-size:14px;line-height:1.5;min-width:1340px;display:flex}
+  .rail{width:208px;flex-shrink:0;background:var(--navy);color:#b9c6d6;min-height:100vh;padding:6px 0}
+  .rlogo{padding:12px 16px;color:#fff;font-weight:700;font-size:16px}
+  .rlogo small{display:block;color:#8fb4dd;font-weight:400;font-size:10px;letter-spacing:.08em}
+  .glbl{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#6d84a3;padding:9px 16px 2px}
+  .nitem{padding:6px 16px;font-size:12.5px;cursor:pointer;border-left:3px solid transparent}
+  .nitem:hover{background:#1a2547;color:#fff}
+  .nitem.on{background:#1c2a52;color:#fff;border-left-color:var(--pop);font-weight:500}
+  .nitem .badge{float:right;font-family:var(--mono);font-size:10px;background:var(--danger);
+    color:#fff;border-radius:999px;padding:0 6px;line-height:16px;margin-top:2px}
+  .main{flex:1;min-width:0}
+  .hdr{height:56px;background:var(--navy);color:#fff;display:flex;align-items:center;gap:14px;padding:0 18px}
+  .hdr input{background:#1c2a52;border:1px solid #2c3d6b;border-radius:2px;color:#cdd8e4;
+    padding:6px 12px;font-size:13px;width:320px}
+  .hdr .conn{font-family:var(--mono);font-size:10px;color:#9db3c9;margin-left:auto}
+  .hdr .live{font-size:11px;font-weight:700;background:var(--successbg);color:var(--success);
+    border-radius:999px;padding:2px 10px}
+  .wrap{padding:16px 22px 60px;max-width:1260px}
+  h1{font-size:19px;font-weight:500;margin:0 0 2px}
+  .sub{color:var(--sub);font-size:12.5px;margin-bottom:12px}
+  .sub code{font-family:var(--mono);font-size:11px;background:var(--panel2);padding:1px 5px;border-radius:2px}
+  .genbar{background:var(--panel);border:1px solid var(--border);border-radius:3px;
+    box-shadow:0 3px 5px rgba(0,0,0,.08);padding:10px 14px;display:flex;gap:10px;
+    align-items:flex-end;flex-wrap:wrap;margin-bottom:12px}
+  .gf label{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;
+    color:var(--sub);font-weight:700;margin-bottom:2px}
+  .gf select{height:30px;border:1px solid var(--border);border-radius:2px;background:#fff;
+    font-family:inherit;font-size:12px;padding:0 6px;min-width:128px}
+  .btn{height:30px;background:var(--accent);color:#fff;border:0;border-radius:2px;
+    font-size:12px;font-weight:500;padding:0 14px;cursor:pointer}
+  .btn.sec{background:#fff;color:var(--accent);border:1px solid var(--border)}
+  .lastrun{margin-left:auto;align-self:center;font-family:var(--mono);font-size:10px;
+    color:var(--sub);text-align:right;line-height:1.5}
+  .lastrun b{color:var(--success)}
+  .tabs{display:flex;gap:2px;border-bottom:2px solid var(--panel2);margin-bottom:12px}
+  .tab{padding:7px 13px;font-size:12.5px;color:var(--sub);cursor:pointer;
+    border-bottom:2px solid transparent;margin-bottom:-2px}
+  .tab.on{color:var(--text);font-weight:500;border-bottom-color:var(--accent)}
+  .tab .cnt{font-family:var(--mono);font-size:9.5px;border-radius:999px;padding:1px 6px;margin-left:4px}
+  .cnt.red{background:var(--dangerbg);color:var(--danger)}
+  .cnt.amber{background:var(--warningbg);color:var(--warning)}
+  .cnt.blue{background:var(--infobg);color:var(--info)}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:3px;
+    box-shadow:0 3px 5px rgba(0,0,0,.08);overflow:hidden;margin-bottom:13px}
+  .ph{display:flex;align-items:center;padding:8px 14px;border-bottom:1px solid var(--panel2);background:#fafcfc}
+  .ph h2{font-size:11.5px;font-weight:700;text-transform:uppercase;margin:0}
+  .ph .hint{margin-left:auto;font-size:10.5px;color:var(--sub)}
+  .view{display:none}.view.on{display:block}
+  .hops{display:inline-flex;align-items:center;font-family:var(--mono);font-size:8.5px}
+  .hop{padding:2px 6px;border:1.5px solid #9fb6a9;border-radius:999px;background:var(--successbg);color:#41604f;white-space:nowrap}
+  .hop.brk{border-color:var(--danger);color:var(--danger);background:var(--dangerbg);font-weight:700}
+  .hop.file{border-style:dashed;border-color:var(--border);background:#f4f6f8;color:var(--sub)}
+  .hop.multi{border-color:var(--info);color:var(--info);background:var(--infobg)}
+  .hop.clob{border-color:var(--c-date);color:var(--c-date);background:#efe9f8}
+  .lnk{width:9px;height:2px;background:#9fb6a9}
+  .lnk.cut{background:transparent;border-top:2px dashed var(--danger)}
+  .lnk.na{background:transparent;border-top:2px dotted var(--border)}
+  .tcard{display:grid;grid-template-columns:22px 200px 1fr 205px 122px 60px;gap:11px;
+    align-items:center;padding:10px 14px;border-bottom:1px solid var(--panel2);cursor:pointer}
+  .tcard:hover{background:var(--hoverbg)}
+  .tname{font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--navy)}
+  .tname small{display:block;font-family:Roboto;font-weight:400;color:var(--sub);font-size:9.5px}
+  .rank{font-family:var(--mono);font-size:11px;color:var(--sub)}
+  .sbar{display:flex;align-items:center;gap:8px}
+  .sbar .bar{flex:1;height:13px;background:#eef1f4;border-radius:2px;overflow:hidden}
+  .sbar .bar i{display:block;height:100%}
+  .snum{font-family:var(--mono);font-size:11px;font-weight:700;width:84px;text-align:right}
+  .snum small{display:block;font-weight:400;font-size:9px;color:var(--sub)}
+  .dom{font-family:var(--mono);font-size:10px;color:var(--sub)} .dom b{color:var(--danger)}
+  .chip{font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:999px}
+  .chip.red{background:var(--dangerbg);color:var(--danger)}
+  .chip.amber{background:var(--warningbg);color:var(--warning)}
+  .chip.green{background:var(--successbg);color:var(--success)}
+  .chip.grey{background:var(--panel2);color:var(--sub)}
+  .grid-head,.crow{display:grid;grid-template-columns:168px 78px 112px 1fr 100px 240px;gap:10px;
+    align-items:center;padding:8px 14px;border-bottom:1px solid var(--panel2)}
+  .grid-head{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--sub);
+    font-weight:700;background:#fafcfc;padding:6px 14px}
+  .crow:hover{background:var(--hoverbg);cursor:pointer}
+  .cname{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--navy)}
+  .cname small{display:block;font-family:Roboto;font-weight:400;color:var(--sub);font-size:9px}
+  .decl{font-family:var(--mono);font-size:9.5px;color:var(--sub)}
+  .fmt{font-family:var(--mono);font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:3px;display:inline-block}
+  .fmt small{display:block;font-weight:400;font-size:8px;opacity:.85}
+  .fmt.date{background:#efe9f8;color:var(--c-date)}.fmt.num{background:var(--infobg);color:var(--c-dec)}
+  .fmt.flag{background:var(--successbg);color:var(--c-bool)}.fmt.id{background:var(--dangerbg);color:var(--danger)}
+  .fmt.txt{background:#f0f2f4;color:var(--sub)}.fmt.mix{background:var(--warningbg);color:var(--warning)}
+  .cbar{height:14px;border-radius:2px;overflow:hidden;display:flex;border:1px solid var(--panel2)}
+  .cbar i{display:block;height:100%}
+  .s-dec{background:var(--c-dec)}.s-int{background:var(--c-int)}.s-date{background:var(--c-date)}
+  .s-bool{background:var(--c-bool)}.s-str{background:var(--c-str)}.s-blank{background:var(--c-blank)}
+  .s-bad{background:repeating-linear-gradient(45deg,var(--c-bad),var(--c-bad) 4px,#a50d31 4px,#a50d31 8px)}
+  .clbl{display:flex;justify-content:space-between;font-family:var(--mono);font-size:8.5px;color:var(--sub);margin-top:2px}
+  .rows{font-family:var(--mono);font-size:8.5px;color:var(--sub)}.rows b{color:var(--navy)}
+  .stats{font-family:var(--mono);font-size:9px;color:var(--sub);line-height:1.45}
+  .stats b{color:var(--navy)}.stats .out{color:var(--danger);font-weight:700}
+  .verdict{font-size:10px;line-height:1.35}
+  .verdict b{font-family:var(--mono);font-size:9.5px}
+  .v-ok b{color:var(--success)}.v-warn b{color:var(--warning)}.v-bad b{color:var(--danger)}
+  .failmini{margin-top:3px;font-family:var(--mono);font-size:8.5px;line-height:1.6}
+  .failmini .tag{font-weight:700;padding:0 4px;border-radius:2px;margin-right:3px}
+  .tag.d2{background:#efe9f8;color:var(--c-date)}.tag.num{background:var(--infobg);color:var(--c-dec)}
+  .tag.unc{background:var(--panel2);color:var(--sub)}
+  /* clob */
+  .meta{display:grid;grid-template-columns:repeat(6,1fr);border-bottom:1px solid var(--panel2)}
+  .mcard{padding:8px 13px;border-right:1px solid var(--panel2)}
+  .mcard:last-child{border-right:0}
+  .mcard .n{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--navy)}
+  .mcard .l{font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:var(--sub)}
+  .layout{padding:12px 14px}
+  .rec{display:flex;height:40px;border:1px solid var(--panel2);border-radius:3px;overflow:hidden;margin-bottom:6px}
+  .seg{display:flex;flex-direction:column;justify-content:center;padding:0 3px;border-right:1px solid #fff;
+    font-family:var(--mono);font-size:8px;color:#fff;overflow:hidden;white-space:nowrap}
+  .seg b{font-size:8.5px}.seg small{opacity:.85;font-size:7.5px}
+  .seg.num{background:var(--c-dec)}.seg.int{background:var(--c-int)}.seg.date{background:var(--c-date)}
+  .seg.flag{background:var(--c-bool)}.seg.str{background:var(--c-str)}
+  .seg.fill{background:var(--c-blank);color:var(--sub)}
+  .seg.bad{background:repeating-linear-gradient(45deg,var(--c-bad),var(--c-bad) 5px,#a50d31 5px,#a50d31 10px)}
+  .rawline{font-family:var(--mono);font-size:10px;background:#0f1c33;color:#9fd0a8;border-radius:3px;
+    padding:7px 10px;overflow-x:auto;white-space:pre}
+  .rawline .h1{color:#7fb5e8}.rawline .h2{color:#c9a7f5}.rawline .h3{color:#7fe0c0}
+  .rawline .hb{color:#ff7d7d;text-decoration:underline wavy}
+  .srcnote{font-size:10.5px;color:var(--sub);margin-top:7px}
+  .srcnote code{font-family:var(--mono);font-size:10px;background:var(--panel2);padding:1px 4px;border-radius:2px}
+  .banner{background:var(--infobg);border:1px solid #b9d0e8;border-radius:3px;
+    padding:7px 13px;font-size:11.5px;color:var(--accent);margin-bottom:12px}
+  .banner b{font-family:var(--mono);font-size:10.5px}
+  .covrow{display:grid;grid-template-columns:225px 1fr 125px 118px;gap:11px;padding:8px 14px;
+    border-bottom:1px solid var(--panel2);align-items:center;font-size:11.5px}
+  .covbar{height:11px;background:#eef1f4;border-radius:2px;overflow:hidden;display:flex}
+  .covbar i{display:block;height:100%}
+  .runrow{display:grid;grid-template-columns:175px 74px 90px 1fr 140px;gap:11px;padding:9px 14px;
+    border-bottom:1px solid var(--panel2);font-size:11.5px;align-items:center}
+  .runrow .m{font-family:var(--mono);font-size:10.5px}
+.vt{display:none}
+#vt0:checked ~ .view.v0{display:block}
+#vt0:checked ~ .tabs label[for=vt0]{color:var(--text);font-weight:500;border-bottom-color:var(--accent)}
+#vt1:checked ~ .view.v1{display:block}
+#vt1:checked ~ .tabs label[for=vt1]{color:var(--text);font-weight:500;border-bottom-color:var(--accent)}
+#vt2:checked ~ .view.v2{display:block}
+#vt2:checked ~ .tabs label[for=vt2]{color:var(--text);font-weight:500;border-bottom-color:var(--accent)}
+#vt3:checked ~ .view.v3{display:block}
+#vt3:checked ~ .tabs label[for=vt3]{color:var(--text);font-weight:500;border-bottom-color:var(--accent)}
+#vt4:checked ~ .view.v4{display:block}
+#vt4:checked ~ .tabs label[for=vt4]{color:var(--text);font-weight:500;border-bottom-color:var(--accent)}
+</style>
+</head>
+<body>
+
+<nav class="rail">
+  <div class="rlogo">CP 360<small>CAPITAL PARTNERS · BBH</small></div>
+  <div class="nitem">&#8962; Home</div>
+  <div class="glbl">Catalog</div>
+  <div class="nitem">Interface 360</div><div class="nitem">API 360</div>
+  <div class="nitem">Data 360</div><div class="nitem">Datapoint 360</div>
+  <div class="glbl">Lineage</div><div class="nitem">Lineage</div>
+  <div class="glbl">Utilities</div><div class="nitem">Auto Mapper</div>
+  <div class="glbl">Governance</div>
+  <div class="nitem">PII Explorer</div><div class="nitem">Quality Guardrails</div>
+  <div class="nitem">Impact Analysis</div>
+  <div class="nitem on">Variance 360<span class="badge">14</span></div>
+  <div class="glbl">Architecture</div><div class="nitem">System Design</div>
+</nav>
+
+<div class="main">
+  <div class="hdr">
+    <input placeholder="CP 360 Search — terms, field codes (BI/2-1), tables…"/>
+    <span class="conn">qclpbdb1:2483/pbdwhdbq · thick · NNE · catalog: dvlpbdb1 SILVER</span>
+    <span class="live">LIVE</span>
+  </div>
+
+  <div class="wrap"><input type="radio" name="vtab" id="vt0" class="vt" checked/><input type="radio" name="vtab" id="vt1" class="vt"/><input type="radio" name="vtab" id="vt2" class="vt"/><input type="radio" name="vtab" id="vt3" class="vt"/><input type="radio" name="vtab" id="vt4" class="vt"/>
+    <h1>Variance 360</h1>
+    <div class="sub">Column composition, format inference, deviation &amp; stage variance during ingestion ·
+      <code>SRC → STG1 → STG2 → DWH</code> · mapping from legacy lineage · NYDFS evidence-tagged</div>
+
+    <div class="genbar">
+      <div class="gf"><label>Data source</label><select><option>PBDW — 3716/6066 mapped</option><option>IMDS</option></select></div>
+      <div class="gf"><label>Table</label><select><option>All mapped tables</option><option selected>DIM_ACCOUNT</option></select></div>
+      <div class="gf"><label>Scope</label><select><option selected>Full scan</option><option>Sample 500K</option></select></div>
+      <div class="gf"><label>Analysis</label><select><option selected>Composition + Stage Variance</option><option>CLOB Inspect</option></select></div>
+      <button class="btn">&#9654;&nbsp;Generate</button>
+      <button class="btn sec">Schedule with ingestion</button>
+      <div class="lastrun">last run <b>&#10003; complete</b> 16:26 · 272,335 rows (FULL) · 1,132 cols · 3m41s<br/>evidence ING20260723_162245 · sql 4be2…91f0</div>
+    </div>
+
+    <div class="tabs">
+      <label class="tab" for="vt0">High Variance Tables<span class="cnt red">6</span></label>
+      <label class="tab" for="vt1">Column Composition</label>
+      <label class="tab" for="vt2">CLOB Inspector<span class="cnt blue">3</span></label>
+      <label class="tab" for="vt3">Coverage<span class="cnt amber">12</span></label>
+      <label class="tab" for="vt4">Runs &amp; Evidence</label>
+    </div>
+
+    <!-- ============ TAB 0: TABLES ============ -->
+    <section class="view v0">
+      <div class="panel">
+        <div class="ph"><h2>Tables by variance score</h2>
+          <span class="hint">⛁ file feed · ×2 multi-feed (combined) · CLOB = packed record · GRAIN Δ = expected</span></div>
+        <label class="tcard" for="vt1" style="display:grid">
+          <span class="rank">1</span>
+          <div class="tname">FACT_TRANSACTIONS<small>Transactions · 214 fields · 2 feeds</small></div>
+          <div class="sbar"><div class="bar"><i style="width:34%;background:var(--danger)"></i></div>
+            <span class="snum">28.3<small>19/214 variant</small></span></div>
+          <div class="hops"><span class="hop file">SRC ⛁</span><span class="lnk na"></span>
+            <span class="hop multi">STG1 ×2</span><span class="lnk cut"></span>
+            <span class="hop brk">STG2</span><span class="lnk"></span><span class="hop">DWH</span></div>
+          <div class="dom"><b>SUM</b> ×11 · HASHSUM ×5</div><span class="chip red">RED</span>
+        </label>
+        <div class="tcard">
+          <span class="rank">2</span>
+          <div class="tname">FACT_TAX_LOT<small>Holdings · FIS + API feeds</small></div>
+          <div class="sbar"><div class="bar"><i style="width:21%;background:var(--danger)"></i></div>
+            <span class="snum">17.9<small>9/156 variant</small></span></div>
+          <div class="hops"><span class="hop file">SRC ⛁</span><span class="lnk na"></span>
+            <span class="hop multi">STG1 ×2</span><span class="lnk"></span>
+            <span class="hop">STG2</span><span class="lnk cut"></span><span class="hop brk">DWH</span></div>
+          <div class="dom"><b>CNT</b> ×2 · SUM ×4</div><span class="chip red">RED</span>
+        </div>
+        <div class="tcard">
+          <span class="rank">3</span>
+          <div class="tname">DIM_ACCOUNT<small>Account · 1,132 fields · EOD + intraday</small></div>
+          <div class="sbar"><div class="bar"><i style="width:9%;background:var(--warning)"></i></div>
+            <span class="snum">7.4<small>21/1132 variant</small></span></div>
+          <div class="hops"><span class="hop file">SRC ⛁</span><span class="lnk na"></span>
+            <span class="hop multi">STG1 ×2</span><span class="lnk cut"></span>
+            <span class="hop brk">STG2</span><span class="lnk"></span><span class="hop">DWH</span></div>
+          <div class="dom"><b>NULLS</b> ×12 · MAXLEN ×6</div><span class="chip amber">AMBER</span>
+        </div>
+        <label class="tcard" for="vt2" style="display:grid">
+          <span class="rank">4</span>
+          <div class="tname">DIM_ACCOUNT_FEE_BLOCKS<small>Account · CLOB parsed · STG1 unlocked</small></div>
+          <div class="sbar"><div class="bar"><i style="width:5%;background:var(--info)"></i></div>
+            <span class="snum">3.0<small>1/28 variant</small></span></div>
+          <div class="hops"><span class="hop file">SRC ⛁</span><span class="lnk na"></span>
+            <span class="hop clob">STG1 CLOB</span><span class="lnk"></span>
+            <span class="hop">STG2</span><span class="lnk"></span><span class="hop">DWH</span></div>
+          <div class="dom">parse verified · SUM Δ 0.00 ✓</div><span class="chip grey">GRAIN Δ</span>
+        </label>
+        <div class="tcard">
+          <span class="rank">5</span>
+          <div class="tname">DIM_SECURITY<small>Security Master · EOD + intraday</small></div>
+          <div class="sbar"><div class="bar"></div><span class="snum">0<small>0/214</small></span></div>
+          <div class="hops"><span class="hop file">SRC ⛁</span><span class="lnk na"></span>
+            <span class="hop multi">STG1 ×2</span><span class="lnk"></span>
+            <span class="hop">STG2</span><span class="lnk"></span><span class="hop">DWH</span></div>
+          <div class="dom">60K+140K = 200K &#10003;</div><span class="chip green">GREEN</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ TAB 1: COMPOSITION ============ -->
+    <section class="view v1">
+      <div class="panel">
+        <div class="ph"><h2>DIM_ACCOUNT · content, format, deviation &amp; failing census</h2>
+          <span class="hint">stage: <b>DWH ▾</b> · click column for metadata drawer</span></div>
+        <div class="grid-head"><span>Column</span><span>Declared</span><span>Detected format</span>
+          <span>Composition</span><span>Deviation</span><span>Verdict + failing census</span></div>
+
+        <div class="crow">
+          <div class="cname">TRANS_TO_PRIN_DATE<small>transfer to principal</small></div>
+          <span class="decl">VARCHAR2(10)</span>
+          <span class="fmt date">DATE<small>MM/DD/YYYY</small></span>
+          <div>
+            <div class="cbar"><i class="s-date" style="width:56.2%"></i><i class="s-bad" style="width:.4%;min-width:3px"></i><i class="s-blank" style="width:43.4%"></i></div>
+            <div class="clbl"><span>99.99% conform</span><span style="color:var(--danger)">11 fail</span></div>
+            <div class="rows">n = <b>153,188</b> of <b>272,335</b></div>
+          </div>
+          <div class="stats">range <b>1987→2026</b><br/>mode <b>2019</b></div>
+          <div class="verdict v-bad"><b>CAST_UNSAFE ×11</b>
+            <div class="failmini">
+              <span class="tag d2">MM/DD,YYYY</span>8 · 2nd format<br/>
+              <span class="tag d2">YYYYMMDD</span>2 · 3rd format ·
+              <span class="tag unc">?</span>1 defect</div>
+          </div>
+        </div>
+
+        <div class="crow">
+          <div class="cname">MARKET_VALUE_AMT<small>market value</small></div>
+          <span class="decl">VARCHAR2(22)</span>
+          <span class="fmt num">DECIMAL<small>NUMBER(18,2)</small></span>
+          <div>
+            <div class="cbar"><i class="s-dec" style="width:88.1%"></i><i class="s-int" style="width:9.7%"></i><i class="s-blank" style="width:2.2%"></i></div>
+            <div class="clbl"><span>100% conform</span><span>2.2% blank</span></div>
+            <div class="rows">n = <b>266,344</b> of <b>272,335</b> · μ/σ on n</div>
+          </div>
+          <div class="stats">μ <b>4.21M</b> σ <b>18.7M</b><br/>P50 <b>612K</b> · <span class="out">214 &gt;3σ</span></div>
+          <div class="verdict v-warn"><b>SAFE CAST · OUTLIERS</b><br/>214 &gt;$60M — review before SUM recon</div>
+        </div>
+
+        <div class="crow">
+          <div class="cname">ANA_ZIP_CODE<small>address zip</small></div>
+          <span class="decl">VARCHAR2(9)</span>
+          <span class="fmt id">IDENTIFIER<small>digits · lead-0</small></span>
+          <div>
+            <div class="cbar"><i class="s-int" style="width:6.2%"></i><i class="s-blank" style="width:93.8%"></i></div>
+            <div class="clbl"><span>100% digits · 4,102 lead-zero</span><span>93.76% blank</span></div>
+            <div class="rows">n = <b>16,993</b> of <b>272,335</b></div>
+          </div>
+          <div class="stats">len 5 (98.9%)<br/>len 9 (1.1%)</div>
+          <div class="verdict v-bad"><b>NEVER CAST</b><br/>02138 → 2138 · keep VARCHAR2</div>
+        </div>
+
+        <div class="crow">
+          <div class="cname">BBH_TRUST_INV_AUTHORITY_CODE<small>trust authority</small></div>
+          <span class="decl">VARCHAR2(4)</span>
+          <span class="fmt mix">MIXED<small>alpha + numeric</small></span>
+          <div>
+            <div class="cbar"><i class="s-str" style="width:12.1%"></i><i class="s-int" style="width:11.1%"></i><i class="s-blank" style="width:76.8%"></i></div>
+            <div class="clbl"><span>48% alpha · 44% numeric</span></div>
+            <div class="rows">n = <b>63,242</b> of <b>272,335</b></div>
+          </div>
+          <div class="stats">7 distinct<br/>A,B,1,2,3,X,∅</div>
+          <div class="verdict v-warn"><b>REVIEW · MIXED</b><br/>two code eras — map both</div>
+        </div>
+
+        <div class="crow">
+          <div class="cname">FATCA_FOREIGN_TAX_ID<small>foreign tax id</small></div>
+          <span class="decl">VARCHAR2(30)</span>
+          <span class="fmt txt">TEXT<small>maxlen 24</small></span>
+          <div>
+            <div class="cbar"><i class="s-str" style="width:4.8%"></i><i class="s-blank" style="width:95.2%"></i></div>
+            <div class="clbl"><span>alphanumeric</span><span>95.16% blank</span></div>
+            <div class="rows">n = <b>13,181</b> of <b>272,335</b> · PII — samples hidden</div>
+          </div>
+          <div class="stats">len 9–24</div>
+          <div class="verdict v-ok"><b>CLEAN · SPARSE</b><br/>95% blank — retire in SWP?</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ TAB 2: CLOB INSPECTOR ============ -->
+    <section class="view v2">
+      <div class="panel">
+        <div class="ph"><h2>CLOB columns · STG1_FIS_ACCOUNT_FEE_BLOCKS</h2>
+          <span class="hint">from ALL_TAB_COLUMNS · click a CLOB to inspect its record structure</span></div>
+        <div class="tcard" style="grid-template-columns:200px 1fr 150px 150px 120px 70px;background:var(--infobg)">
+          <div class="tname">BLOCK_CLOB<small>fee block packed record · SELECTED</small></div>
+          <div class="dom">31,648 blobs · len 380 (99.7% uniform) · fixed-width</div>
+          <div class="dom">21/23 fields parseable</div>
+          <div class="dom"><b style="color:var(--danger)">1 unmapped region</b></div>
+          <div class="dom">parse SUM Δ 0.00 ✓</div>
+          <span class="chip amber">INSPECT ▾</span>
+        </div>
+        <div class="tcard" style="grid-template-columns:200px 1fr 150px 150px 120px 70px">
+          <div class="tname">OVERRIDE_NOTES_CLOB<small>fee override annotations</small></div>
+          <div class="dom">2,114 blobs · len 40–8,200 (variable) · free text</div>
+          <div class="dom">no parse spec in lineage</div>
+          <div class="dom">93.3% empty</div>
+          <div class="dom">text census only</div>
+          <span class="chip grey">TEXT</span>
+        </div>
+        <div class="tcard" style="grid-template-columns:200px 1fr 150px 150px 120px 70px">
+          <div class="tname">FIS_RAW_MSG_CLOB<small>original FIS message</small></div>
+          <div class="dom">31,648 blobs · len 380–420 · fixed-width + header</div>
+          <div class="dom">not referenced by any transform</div>
+          <div class="dom">structure detected</div>
+          <div class="dom">candidate: audit copy</div>
+          <span class="chip grey">NOT PARSED</span>
+        </div>
+      </div>
+      <div class="banner"><b>STG1 unlocked:</b> parse spec lifted from
+        <b>stg1_to_stg2_transform</b> · fields profiled inside the CLOB ·
+        parsed FEE_MIN vs STG2.FEE_MIN_AMOUNT: SUM Δ 0.00 ✓ · grain change annotated</div>
+      <div class="panel">
+        <div class="ph"><h2>▾ BLOCK_CLOB · record structure &amp; parse spec · 31,648 blobs</h2>
+          <span class="hint">fixed-width detected · 21/23 fields SUBSTR-resolvable</span></div>
+        <div class="meta">
+          <div class="mcard"><div class="n">31,648</div><div class="l">Blobs</div></div>
+          <div class="mcard"><div class="n">380</div><div class="l">Len · 99.7% uniform</div></div>
+          <div class="mcard"><div class="n">94</div><div class="l">Truncated (≠380)</div></div>
+          <div class="mcard"><div class="n">FIXED-W</div><div class="l">Format</div></div>
+          <div class="mcard"><div class="n">23</div><div class="l">Fields in spec</div></div>
+          <div class="mcard"><div class="n">21/23</div><div class="l">Spec coverage</div></div>
+        </div>
+        <div class="layout">
+          <div class="rec">
+            <div class="seg int" style="width:58px"><b>ACCT_NO</b><small>1–12</small></div>
+            <div class="seg int" style="width:40px"><b>BLK#</b><small>13–16</small></div>
+            <div class="seg date" style="width:44px"><b>FEE_DT</b><small>17–24</small></div>
+            <div class="seg num" style="width:66px"><b>FEE_MIN</b><small>25–38 S9(11)V99</small></div>
+            <div class="seg num" style="width:66px"><b>FEE_MAX</b><small>39–52</small></div>
+            <div class="seg num" style="width:52px"><b>PRIN_PCT</b><small>53–60</small></div>
+            <div class="seg int" style="width:46px"><b>SCHED#</b><small>61–66</small></div>
+            <div class="seg flag" style="width:24px"><b>MIN</b><small>67</small></div>
+            <div class="seg flag" style="width:24px"><b>1ST</b><small>68</small></div>
+            <div class="seg str" style="width:58px"><b>TAX_CD</b><small>69–72</small></div>
+            <div class="seg str" style="width:72px"><b>DISB_CD</b><small>73–76</small></div>
+            <div class="seg num" style="width:72px"><b>BILLED</b><small>77–90</small></div>
+            <div class="seg bad" style="width:52px"><b>??</b><small>91–98</small></div>
+            <div class="seg str" style="width:100px"><b>CTRL_ACCT</b><small>99–110</small></div>
+            <div class="seg fill" style="flex:1"><b>FILLER</b><small>111–380</small></div>
+          </div>
+          <div class="rawline">00084271070001<span class="h2">20260630</span><span class="h1">00000012500{</span><span class="h1">00000999999{</span><span class="h1">0250</span>004217<span class="h3">Y</span><span class="h3">N</span>T1  D4  <span class="h1">00000084521C</span><span class="hb">±X3@9Z01</span>000842710884…</div>
+          <div class="srcnote">Overpunch decoded (<code>{</code>=+0, <code>C</code>=+3) ·
+            <b style="color:var(--danger)">bytes 91–98 unmapped, non-blank in 12,844 blobs — ask FIS</b> ·
+            2 PL/SQL-parsed fields profiled at STG2 only</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph"><h2>Parsed fields · composition &amp; deviation at STG1</h2></div>
+        <div class="grid-head"><span>Parsed field</span><span>Position</span><span>Format</span>
+          <span>Composition</span><span>Deviation</span><span>Verdict</span></div>
+        <div class="crow">
+          <div class="cname">FEE_MIN<small>→ STG2.FEE_MIN_AMOUNT</small></div>
+          <span class="decl">25–38<br/>S9(11)V99</span>
+          <span class="fmt num">DECIMAL<small>overpunch</small></span>
+          <div>
+            <div class="cbar"><i class="s-dec" style="width:97.9%"></i><i class="s-bad" style="width:.3%;min-width:3px"></i><i class="s-blank" style="width:1.8%"></i></div>
+            <div class="clbl"><span>99.7% conform</span><span style="color:var(--danger)">94 fail</span></div>
+            <div class="rows">n = <b>31,082</b> of <b>31,648</b> blobs</div>
+          </div>
+          <div class="stats">μ <b>1,240</b> σ <b>3,890</b><br/><span class="out">18 &gt;3σ</span></div>
+          <div class="verdict v-bad"><b>CAST_UNSAFE ×94</b><br/>all in the 94 truncated blobs</div>
+        </div>
+        <div class="crow">
+          <div class="cname">BYTES_91_98<small>unmapped region</small></div>
+          <span class="decl">91–98</span>
+          <span class="fmt txt">UNKNOWN<small>mixed</small></span>
+          <div>
+            <div class="cbar"><i class="s-str" style="width:40.6%"></i><i class="s-blank" style="width:59.4%"></i></div>
+            <div class="clbl"><span>40.6% non-blank</span></div>
+            <div class="rows">n = <b>12,844</b> of <b>31,648</b></div>
+          </div>
+          <div class="stats">312 distinct</div>
+          <div class="verdict v-warn"><b>UNMAPPED DATA</b><br/>no transform reads this — ask FIS</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ TAB 3: COVERAGE ============ -->
+    <section class="view v3">
+      <div class="panel">
+        <div class="ph"><h2>Lineage &amp; profiling coverage · PBDW</h2>
+          <span class="hint">status census + physical dictionary cross-check</span></div>
+        <div class="covrow" style="font-weight:700;background:#fafcfc;font-size:10px;text-transform:uppercase;color:var(--sub)">
+          <span>Category</span><span>Share of 6,066 lineage fields</span><span>Count</span><span>Action</span></div>
+        <div class="covrow"><span><b>Verified chains</b> (Exists + mapped)</span>
+          <div class="covbar"><i style="width:61%;background:var(--success)"></i></div>
+          <span class="decl">3,716 · 96 tables</span><span class="chip green">PROFILED</span></div>
+        <div class="covrow"><span><b>Unstatused</b> (blank)</span>
+          <div class="covbar"><i style="width:19%;background:var(--warning)"></i></div>
+          <span class="decl">1,136</span><span class="chip amber">TRIAGE</span></div>
+        <div class="covrow"><span><b>Not Applicable</b> (DWH-generated)</span>
+          <div class="covbar"><i style="width:14%;background:var(--c-str)"></i></div>
+          <span class="decl">867</span><span class="chip grey">JUSTIFIED</span></div>
+        <div class="covrow"><span><b>Does Not Exist</b> (stale)</span>
+          <div class="covbar"><i style="width:4%;background:var(--danger)"></i></div>
+          <span class="decl">223</span><span class="chip red">FIX LINEAGE</span></div>
+        <div class="covrow"><span><b>Tables with no lineage</b></span>
+          <div class="covbar"><i style="width:8%;background:var(--danger)"></i></div>
+          <span class="decl">12 data tables</span><span class="chip red">MAP</span></div>
+      </div>
+      <div class="panel">
+        <div class="ph"><h2>Suspected gaps · confirm with owners</h2></div>
+        <div style="padding:9px 14px;font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--navy)">
+          FACT_CASH_SETTLEMENTS · FACT_MBS_FACTOR · FACT_PRICE · FACT_SECURITY_MEASURES ·
+          FACT_HOLDINGS_BATCH · FACT_HOLDINGS_UPDATED · DIM_MASTER_ACCOUNT_BLOCKS ·
+          DIM_MSTR_ACCT_RELATIONSHIP · DIM_CRM_TAR_CONTACTS · DIM_IPS_CONSOLIDATED ·
+          DIM_ACCOUNT_MAP · REF_ACCRUED_INCOME_VARNOTE</div>
+      </div>
+    </section>
+
+    <!-- ============ TAB 4: RUNS ============ -->
+    <section class="view v4">
+      <div class="panel">
+        <div class="ph"><h2>Runs &amp; evidence trail</h2><span class="hint">immutable · RECON_* @ SILVER · NYDFS</span></div>
+        <div class="runrow" style="font-weight:700;background:#fafcfc;font-size:10px;text-transform:uppercase;color:var(--sub)">
+          <span>Run</span><span>Type</span><span>Status</span><span>Detail</span><span>Evidence</span></div>
+        <div class="runrow"><span class="m"><b>ING20260723_162245</b></span><span>BOTH</span>
+          <span style="color:var(--success);font-weight:700">COMPLETE</span>
+          <span class="m" style="color:var(--sub)">16:22→16:26 · 272,335 rows · 1,132 cols · 8 masks verified · 1 file skipped · 2 masks translated</span>
+          <span class="m" style="color:var(--sub)">sql 4be2…91f0</span></div>
+        <div class="runrow"><span class="m"><b>CLB20260723_154012</b></span><span>CLOB</span>
+          <span style="color:var(--success);font-weight:700">COMPLETE</span>
+          <span class="m" style="color:var(--sub)">BLOCK_CLOB · 31,648 blobs · 21 fields parsed · parse SUM Δ 0.00 · 1 unmapped region flagged</span>
+          <span class="m" style="color:var(--sub)">sql 77aa…04e3</span></div>
+        <div class="runrow"><span class="m"><b>V20260723_112425</b></span><span>BOTH</span>
+          <span style="color:var(--success);font-weight:700">COMPLETE</span>
+          <span class="m" style="color:var(--sub)">scoped: DIM_ACCOUNT_FEE_BLOCKS · 31,648 rows · 3 cols</span>
+          <span class="m" style="color:var(--sub)">sql 9f31…c2ab</span></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+
+</body>
+</html>
