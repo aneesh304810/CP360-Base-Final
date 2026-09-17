@@ -133,6 +133,19 @@ It changes `LINEAGE_ID` to the format `sql/29` specified
 deletes, a reload writes the new rows and **leaves the old ones**, so every
 field is counted twice until you clean up.
 
+**Measure it before deciding.** The database cannot tell you how much is
+being lost: the collapse happens at load, so `LEGACY_LINEAGE` afterwards holds
+one row per target column and looks perfectly consistent. It cannot show you
+what it never received. The workbook is the only witness:
+
+```bash
+python tools/check_lineage_fanin.py /path/to/legacy_lineage.xlsx
+```
+
+It reads the workbook, writes nothing, needs no code change, and prints how
+many rows the old key discards and which source files disappear entirely. If
+it reports 0, skip step 4 with confidence.
+
 Only if you want it:
 
 1. take the connector change
