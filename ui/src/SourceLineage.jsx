@@ -37,30 +37,14 @@ import LineageGraph from "./LineageGraph.jsx";
 
 const STAGE_C = { SRC: "#7c3aed", STG1: "#00a3a3", STG2: "#0091bf", DWH: "#0f4775" };
 
-const MASTER_C = {
-  "Account Master": "#0f4775", "Master Account Master": "#b5651d",
-  "Interested Party Master": "#0b7d7d", "Security Issue Master": "#6d3ac0",
-  "Beneficiary Submaster": "#4a7c2f", "Co-fiduciary Submaster": "#8a6d1a",
-};
-// L0 no longer buckets by master alone — the spine is whichever of
-// functional_group / master the data actually populates. The six named masters
-// keep their agreed colours; any other bucket name gets a deterministic slot,
-// so a functional group keeps one colour across renders and between screens.
-const PALETTE = ["#0f4775", "#b5651d", "#0b7d7d", "#6d3ac0", "#4a7c2f",
-                 "#8a6d1a", "#a8560f", "#00577d", "#7c3aed", "#1f7a5a"];
-const bucketColor = (name) => {
-  if (MASTER_C[name]) return MASTER_C[name];
-  const str = String(name || "");
-  let h = 0;
-  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
-  return PALETTE[h % PALETTE.length];
-};
-const masterColor = bucketColor;      // old name, same function
-
+// The old L0 bucketed by master and gave each bucket an identity colour. L0
+// is ringed cards in the Business grammar now, so the eight-colour palette
+// and its hash went with it; the one place that still wanted a colour is a
+// pipeline marker, and takes the warehouse stage colour instead.
 // The organising principle at L2: what HAPPENS to a field, not where it sits.
 // A business reader learns the pipeline by reading which bucket is biggest.
 const CLS = {
-  pass:     { t: "Pass-through", c: "#7b8794", d: "Arrives and lands unchanged." },
+  pass:     { t: "Pass-through", c: "#7b8894", d: "Arrives and lands unchanged." },
   phys:     { t: "Physicalised", c: "#6d3ac0", d: "Same field, column-safe name." },
   ren:      { t: "Renamed",      c: "#a8560f", d: "Given a business name on the way." },
   trim:     { t: "Trimmed",      c: "#00a3a3", d: "Padding removed at STG1→STG2." },
@@ -184,14 +168,26 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
   }, [file, ds, target, level, system]);
 
   // ---------------------------------------------------------------- chrome
-  const panel = t.panel || "#fff", line = t.panel2 || "#dfe6e9";
-  const sub = t.sub || "#666", muted = t.textMuted || "#999";
-  const navy = t.navy || "#10193b", accent = t.accent || "#0f4775";
+  // Source sits beside Business as the other pictorial door, so it takes
+  // Business's palette rather than the theme tokens Technical uses. These
+  // were t.panel/t.panel2/t.sub/t.textMuted/t.navy/t.accent, which resolve
+  // to a different grey (#dfe6e9 vs #c9d4dc), a different ink (#10193b vs
+  // #233240) and a different link (#0f4775 vs #31bced) — close enough to
+  // look like a mistake rather than a choice. Changed here so every card,
+  // rule and label downstream follows without being touched individually.
+  const panel = "#fff", line = "#c9d4dc";
+  const sub = "#7b8894", muted = "#7b8894";
+  const navy = "#233240", accent = "#31bced";
+  // The status colours Business uses, named rather than repeated inline. The
+  // "t.danger || #c1113a" form that stood here read as themed while always
+  // falling through to the literal, which is how the two pages drifted.
+  const danger = "#c1113a", warning = "#e67e22", success = "#159943";
+  const tint = "#cae3ee";
   const mono = "Roboto Mono, monospace";
 
-  const card = { background: panel, border: `1px solid ${line}`, borderRadius: 8,
+  const card = { background: panel, border: `1px solid ${line}`, borderRadius: 10,
                  overflow: "hidden", marginBottom: 14 };
-  const h2 = { fontSize: 9.5, fontWeight: 800, textTransform: "uppercase",
+  const h2 = { fontSize: 10.5, fontWeight: 800, textTransform: "uppercase",
                letterSpacing: 0.5, color: muted, margin: "18px 0 9px" };
   const rowCss = { display: "grid", alignItems: "center", gap: 14, width: "100%",
                    padding: "11px 15px", borderTop: `1px solid ${line}`,
@@ -200,11 +196,11 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
 
   const meter = (m, f) => {
     const p = pct(m, f);
-    const c = p < 75 ? (t.danger || "#c1113a")
-            : p < 85 ? (t.warning || "#e67e22") : (t.success || "#159943");
+    const c = p < 75 ? danger
+            : p < 85 ? warning : success;
     return (
       <span>
-        <span style={{ display: "block", height: 6, background: "#eef2f4",
+        <span style={{ display: "block", height: 6, background: "#edf1f4",
                        borderRadius: 999, overflow: "hidden" }}>
           <i style={{ display: "block", height: "100%", width: `${p}%`,
                       background: c, borderRadius: 999 }} />
@@ -217,56 +213,43 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
 
   const gapCell = (n) => (
     <span style={{ textAlign: "right", fontFamily: mono, fontSize: 13,
-                   fontWeight: 700, color: n ? (t.danger || "#c1113a") : muted }}>
+                   fontWeight: 700, color: n ? danger : muted }}>
       {n}
-      <span style={{ display: "block", fontFamily: "inherit", fontSize: 9.5,
+      <span style={{ display: "block", fontFamily: "inherit", fontSize: 10.5,
                      fontWeight: 400, color: muted }}>to map</span>
     </span>);
 
   // ---- breadcrumb: the lineage path, not a UI path -----------------------
+  // Business's trail — plain text, "›" separators, current step in ink and
+  // the rest as links. It used to be monospace pills on tinted chips, which
+  // is a different component doing the same job two clicks away.
+  const crumbA = { color: "#31bced", cursor: "pointer" };
   const crumb = () => {
-    const step = (label, lv, key) => (
-      <React.Fragment key={key}>
-        <span style={{ color: muted }}>›</span>
-        {lv === level
-          ? <span style={{ fontFamily: mono, fontSize: 11.5, padding: "3px 8px",
-                           borderRadius: 4, background: t.tint || "#cae3ee",
-                           color: navy }}>{label}</span>
-          : <button onClick={() => { setLevel(lv); if (lv < 2) setTarget(null); }}
-              style={{ fontFamily: mono, fontSize: 11.5, padding: "3px 8px",
-                       borderRadius: 4, background: "#f2f5f7", color: accent,
-                       border: "none", cursor: "pointer" }}>{label}</button>}
-      </React.Fragment>);
+    const step = (label, onClick, current) => (
+      <span key={label}>
+        <span style={{ margin: "0 7px", color: "#c2ccd4" }}>›</span>
+        {current ? <span style={{ color: "#233240" }}>{label}</span>
+                 : <span style={crumbA} onClick={onClick}>{label}</span>}
+      </span>);
+    const atRoot = level === 0 && !group;
     return (
-      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap",
-                    marginBottom: 12, fontSize: 12 }}>
-        {level === 0
-          ? <span style={{ fontFamily: mono, fontSize: 11.5, padding: "3px 8px",
-                           borderRadius: 4, background: t.tint || "#cae3ee",
-                           color: navy }}>All sources</span>
-          : <button onClick={() => { setLevel(0); setFile(null); setTarget(null);
-                                     setGroup(null); setQ(""); }}
-              style={{ fontFamily: mono, fontSize: 11.5, padding: "3px 8px",
-                       borderRadius: 4, background: "#f2f5f7", color: accent,
-                       border: "none", cursor: "pointer" }}>All sources</button>}
-        {/* the functional group sits between "all sources" and a file */}
-        {group && (
-          <React.Fragment key="g">
-            <span style={{ color: muted }}>›</span>
-            {level === 0 && !file
-              ? <span style={{ fontSize: 11.5, padding: "3px 8px", borderRadius: 4,
-                               background: t.tint || "#cae3ee", color: navy }}>
-                  {group}</span>
-              : <button onClick={() => { setLevel(0); setFile(null);
-                                         setTarget(null); setQ(""); }}
-                  style={{ fontSize: 11.5, padding: "3px 8px", borderRadius: 4,
-                           background: "#f2f5f7", color: accent, border: "none",
-                           cursor: "pointer" }}>{group}</button>}
-          </React.Fragment>)}
-        {file && step(file, 1, "f")}
-        {level >= 2 && step(target || "All fields", 2, "t")}
+      <div style={{ fontSize: 12.5, color: "#7b8894", marginBottom: 18 }}>
+        {atRoot
+          ? <b style={{ color: "#233240", fontWeight: 500 }}>{ds}</b>
+          : <span style={crumbA}
+              onClick={() => { setLevel(0); setFile(null); setTarget(null);
+                               setGroup(null); setQ(""); }}>
+              <b style={{ color: "#31bced", fontWeight: 500 }}>{ds}</b></span>}
+        {group && step(group,
+          () => { setLevel(0); setFile(null); setTarget(null); setQ(""); },
+          level === 0 && !file)}
+        {file && step(file,
+          () => { setLevel(1); setTarget(null); }, level === 1)}
+        {level >= 2 && step(target || "All fields",
+          () => { setLevel(2); }, level === 2)}
         {level >= 3 && member && step(
-          tech ? member.code_norm : (member.business_term || member.code_norm), 3, "m")}
+          tech ? member.code_norm : (member.business_term || member.code_norm),
+          () => {}, true)}
       </div>);
   };
 
@@ -291,7 +274,7 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
                                 position: "relative",
                                 borderLeft: i ? `1px solid ${line}` : "none",
                                 opacity: file || k === "SRC" ? 1 : 0.5 }}>
-            <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: 0.6,
+            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.6,
                           textTransform: "uppercase", color: STAGE_C[k] }}>{label}</div>
             <div title={val} style={{ fontFamily: mono, fontSize: 12, color: navy,
                                       marginTop: 2, overflow: "hidden",
@@ -425,33 +408,28 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
     const st = flow.stages || {};
     const unmapped = (st.field_count || 0) - (st.mapped || 0);
     return (
-      <>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: navy, margin: "0 0 4px" }}>
+      <div style={{ maxWidth: 1000, margin: "0 auto" }}>
+        <h1 style={{ fontSize: 19, fontWeight: 400, textAlign: "center",
+                     margin: "0 0 4px" }}>
           {tech ? flow.src_table
                 : (flow.master || flow.functional_group || flow.src_table)}</h1>
-        <p style={{ fontSize: 13, color: sub, margin: "0 0 14px", maxWidth: "74ch" }}>
+        <p style={{ fontSize: 12.5, color: "#7b8894", textAlign: "center",
+                    margin: "0 auto 22px", maxWidth: "74ch" }}>
           {tech
             ? <>Lands in <span style={{ fontFamily: mono }}>{st.stg1_source_table}</span>,
                 conforms to <span style={{ fontFamily: mono }}>{st.stg2_source_table}</span>,
                 then {flow.target_count} warehouse table{flow.target_count === 1 ? "" : "s"}.</>
-            : <>This extract carries {st.field_count} fields. {st.mapped} of them reach
-                the {ds} warehouse; {unmapped} still have no agreed target.</>}
+            : <>This extract carries {st.field_count} fields. {st.reach_stg2 || 0}{" "}
+                reach the conformed stage and {st.mapped} land in the {ds}
+                warehouse, across {flow.target_count} table
+                {flow.target_count === 1 ? "" : "s"}; {unmapped} still have no
+                agreed target.</>}
         </p>
 
-        <div style={{ display: "grid", gap: 1, background: line, border: `1px solid ${line}`,
-                      borderRadius: 8, overflow: "hidden", marginBottom: 6,
-                      gridTemplateColumns: "repeat(auto-fit, minmax(108px, 1fr))" }}>
-          {[[st.field_count || 0, "Fields in file", navy],
-            [st.reach_stg2 || 0, "Reach conformed", navy],
-            [st.mapped || 0, "Reach warehouse", t.success || "#159943"],
-            [unmapped, "Still to map", t.danger || "#c1113a"],
-            [flow.target_count, "Target tables", navy]].map(([n, l, c]) => (
-            <div key={l} style={{ background: panel, padding: "12px 14px" }}>
-              <div style={{ fontSize: 19, fontWeight: 700, color: c }}>{n}</div>
-              <div style={{ fontSize: 10.5, color: sub }}>{l}</div>
-            </div>))}
-        </div>
-
+        {/* The five big-number tiles that stood here said, in a component
+            Business has nowhere, exactly what the line above already says in
+            words. The one number they added — how many fields reach the
+            conformed stage — joins that sentence instead. */}
         <div style={h2}>Where it lands</div>
         <div style={card}>
           {flow.targets.map((tg) => (
@@ -479,7 +457,7 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
                    fontFamily: "inherit", color: accent }}>
           See all {st.field_count} fields in this file →
         </button>
-      </>);
+      </div>);
   };
 
   // ================================================================== L2
@@ -496,10 +474,12 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
                m.lands.some((l) => l.column.toLowerCase().includes(s)));
     });
     return (
-      <>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: navy, margin: "0 0 4px" }}>
+      <div style={{ maxWidth: 1000, margin: "0 auto" }}>
+        <h1 style={{ fontSize: 19, fontWeight: 400, textAlign: "center",
+                     margin: "0 0 4px" }}>
           {target || "All fields"}</h1>
-        <p style={{ fontSize: 13, color: sub, margin: "0 0 14px", maxWidth: "74ch" }}>
+        <p style={{ fontSize: 12.5, color: "#7b8894", textAlign: "center",
+                    margin: "0 auto 22px", maxWidth: "74ch" }}>
           {fields.totals.codes} source fields in {fields.totals.families} famil
           {fields.totals.families === 1 ? "y" : "ies"}
           {target ? <> landing in <span style={{ fontFamily: mono }}>{target}</span></> : null}.
@@ -512,10 +492,10 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
             <button key={k} onClick={() => setBucket(bucket === k ? null : k)}
               style={{ border: `1px solid ${bucket === k ? CLS[k].c : line}`,
                        borderLeft: `3px solid ${CLS[k].c}`, borderRadius: 7,
-                       background: bucket === k ? (t.tint || "#cae3ee") : panel,
+                       background: bucket === k ? tint : panel,
                        padding: "10px 13px", cursor: "pointer", textAlign: "left",
                        minWidth: 150, fontFamily: "inherit" }}>
-              <div style={{ fontSize: 18, fontWeight: 700, color: CLS[k].c }}>
+              <div style={{ fontSize: 19, fontWeight: 700, color: CLS[k].c }}>
                 {counts[k]}</div>
               <div style={{ fontSize: 12.5, color: navy }}>{CLS[k].t}</div>
               <div style={{ fontSize: 11, color: sub }}>{CLS[k].d}</div>
@@ -559,15 +539,14 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
                                  border: `1px solid ${line}`, color: c.c }}>{c.t}</span>
                   <span style={{ fontFamily: mono, fontSize: 10, fontWeight: 700,
                                  padding: "2px 7px", borderRadius: 3, color: "#fff",
-                                 background: f.unmapped ? (t.danger || "#c1113a")
-                                   : bucketColor(flow && (flow.master
-                                                 || flow.functional_group)) }}>
+                                 background: f.unmapped ? danger
+                                   : STAGE_C.DWH }}>
                     {f.family}</span>
                 </button>
                 {multi && famKey === f.family && f.members.map((m) => (
                   <button key={m.code_norm}
                     onClick={() => { setMember(m); setLevel(3); }}
-                    style={{ ...rowCss, background: "#f8fafb",
+                    style={{ ...rowCss, background: "#f4f7f9",
                              gridTemplateColumns: "14px minmax(0,1fr) auto auto" }}>
                     <span />
                     <span style={{ paddingLeft: 12, minWidth: 0 }}>
@@ -582,11 +561,11 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
                           ? ` · lands in ${m.lands.length}` : ""}</span>
                     </span>
                     <span />
-                    <span style={{ fontSize: 9.5, fontWeight: 700, padding: "2px 7px",
+                    <span style={{ fontSize: 10.5, fontWeight: 700, padding: "2px 7px",
                                    borderRadius: 999,
                                    background: m.cls === "unmapped" ? "#f3d2d7" : "#d0ebd9",
-                                   color: m.cls === "unmapped" ? (t.danger || "#c1113a")
-                                                               : (t.success || "#159943") }}>
+                                   color: m.cls === "unmapped" ? danger
+                                                               : success }}>
                       {m.cls === "unmapped" ? "UNMAPPED" : "● VERIFIED"}</span>
                   </button>))}
               </div>);
@@ -595,7 +574,7 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
             <div style={{ padding: 18, color: muted, fontSize: 12.5 }}>
               Nothing matches that filter.</div>)}
         </div>
-      </>);
+      </div>);
   };
 
   // ================================================================== L3
@@ -603,11 +582,13 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
     if (!member) return null;
     const land = member.lands[0];
     return (
-      <>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: navy, margin: "0 0 4px" }}>
+      <div style={{ maxWidth: 1000, margin: "0 auto" }}>
+        <h1 style={{ fontSize: 19, fontWeight: 400, textAlign: "center",
+                     margin: "0 0 4px" }}>
           {tech ? (land ? land.column : member.code_norm)
                 : (member.business_term || member.code_norm)}</h1>
-        <p style={{ fontSize: 13, color: sub, margin: "0 0 14px", maxWidth: "74ch" }}>
+        <p style={{ fontSize: 12.5, color: "#7b8894", textAlign: "center",
+                    margin: "0 auto 22px", maxWidth: "74ch" }}>
           {member.short_desc || (tech ? "No dictionary entry for this code."
                                       : "No business definition recorded yet.")}
         </p>
@@ -620,8 +601,8 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
            ].filter(Boolean).map(([k, v], i) => (
             <span key={i} style={{ fontSize: 11.5, border: `1px solid ${line}`,
                                    borderRadius: 4, padding: "4px 9px",
-                                   color: k === "Governance" ? (t.danger || "#c1113a") : sub }}>
-              {k && <b style={{ color: muted, fontWeight: 700, fontSize: 9.5,
+                                   color: k === "Governance" ? danger : sub }}>
+              {k && <b style={{ color: muted, fontWeight: 700, fontSize: 10.5,
                                 textTransform: "uppercase", marginRight: 6 }}>{k}</b>}
               <span style={{ fontFamily: k === "Group" ? "inherit" : mono }}>{v}</span>
             </span>))}
@@ -660,7 +641,7 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
             onOpenColumn={onOpenTechnical
               ? (tb, col) => onOpenTechnical({ table: tb, column: col })
               : undefined} />)}
-      </>);
+      </div>);
   };
 
   return (
