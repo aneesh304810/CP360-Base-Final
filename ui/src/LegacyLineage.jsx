@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from "react";
 import { api } from "./api.js";
+import LineageGraph from "./LineageGraph.jsx";
 
 // =====================================================================
 // LegacyLineage v5 — the Non-SEI lineage engine.
@@ -291,6 +292,9 @@ function InlineDef({ t, system, dataSource, code, ctx, row, tableName, onDataSou
  const [used, setUsed] = useState([]);
  const [proof, setProof] = useState([]);
  const [loading, setLoading] = useState(true);
+ // chain = the 4-card strip (default). graph = the column-level graph:
+ // fan-in, fan-out and the same code running through other masters.
+ const [lview, setLview] = useState("chain");
 
  useEffect(() => {
  let dead = false;
@@ -394,10 +398,33 @@ function InlineDef({ t, system, dataSource, code, ctx, row, tableName, onDataSou
  padding: roomy ? "16px 22px" : "10px 14px" }}>
  {row ? (
  <>
+ <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
  <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase",
  letterSpacing: 0.4, color: t.sub || "#666" }}>
- Lineage — full chain · {curDs}</div>
+ Lineage — {lview === "chain" ? "full chain" : "column graph"} · {curDs}</div>
+ <span style={{ marginLeft: "auto", display: "flex" }}>
+ {[["chain", "Chain"], ["graph", "Column graph"]].map(([k, label], i) => (
+ <button key={k} onClick={() => setLview(k)}
+ style={{ fontSize: 10, fontWeight: 700, padding: "3px 10px", cursor: "pointer",
+ fontFamily: "inherit", borderStyle: "solid",
+ borderColor: lview === k ? (t.accent || "#0f4775") : (t.panel2 || "#dfe6e9"),
+ borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 1,
+ borderLeftWidth: i ? 0 : 1,
+ borderRadius: i ? "0 3px 3px 0" : "3px 0 0 3px",
+ background: lview === k ? (t.accent || "#0f4775") : "#fff",
+ color: lview === k ? "#fff" : (t.sub || "#666") }}>{label}</button>))}
+ </span>
+ </div>
+ {lview === "chain" ? (
  <Journey t={t} row={row} derived={derived} dataSource={curDs} />
+ ) : (
+ <LineageGraph t={t} dataSource={curDs}
+ table={row.dwh_target_table || tableName}
+ column={row.dwh_target_column}
+ onOpenColumn={onJump
+ ? (tb, col) => onJump({ dwh_target_table: tb, dwh_target_column: col })
+ : undefined} />
+ )}
  {proof.length > 0 && (
  <>
  <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase",
