@@ -213,4 +213,21 @@ def _run_step(step, conn, loader, resolver) -> None:
 
 
 if __name__ == "__main__":
-    run()
+    # `python -m ingestion.run legacy_source_file` — run named steps only.
+    #
+    # README_FINAL.md and LOCAL_SETUP.md have documented this since before I
+    # touched anything ("python -m ingestion.run feed_catalog loader_catalog
+    # datapoint_index"), but run() ignored sys.argv and always ran every step,
+    # so the documented command silently did something much larger.
+    #
+    # It matters for more than tidiness: loading one new source should not
+    # require re-running every connector, and re-running them is not free —
+    # the legacy_lineage step rewrites lineage rows.
+    import sys
+    _args = [a for a in sys.argv[1:] if not a.startswith("-")]
+    _bad = [a for a in _args if a not in STEPS]
+    if _bad:
+        log.error("unknown step(s): %s", ", ".join(_bad))
+        log.error("known steps: %s", ", ".join(STEPS))
+        raise SystemExit(2)
+    run(_args or None)
