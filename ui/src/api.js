@@ -4,7 +4,7 @@ import * as MOCK from './mockData.js';
 import { envInfraApi } from './env360_infra_api_additions.js';
 
 const BASE = import.meta.env.VITE_API_BASE || '/api';
-let LIVE = null; // null=unknown, true/false after probe
+let LIVE = null;   // null=unknown, true/false after probe
 
 export async function probeApi() {
   try {
@@ -62,18 +62,56 @@ export const api = {
   // envProbesLive, envInfraTbd, envInfraSaveRow, envInfraDeleteRow,
   // envInfraImport, envInfraExportUrl — with their own DEMO fallback.
   ...envInfraApi,
-  search: (q, project_id) => {
-    const params = new URLSearchParams();
-    if (q) params.set('q', q);
-    if (project_id && project_id !== 'all') params.set('project_id', project_id);
+
+  search: (q, project_id, limit) => {
+    const params = new URLSearchParams({ q });
+    if (project_id) params.set('project_id', project_id);
+    if (limit) params.set('limit', String(limit));
     return get(`/search?${params.toString()}`, () => MOCK.search(q, project_id));
   },
+  searchSuggest: (q) => get(`/search/suggest?q=${encodeURIComponent(q)}`, () => ({ suggestions: [] })),
+
+  legacyLineageTables: (ds) =>
+    get(`/legacy-lineage/tables${ds ? `?data_source=${encodeURIComponent(ds)}` : ''}`,
+      () => ({ tables: [] })),
+  legacyDataSources: () => get('/legacy-lineage/data-sources', () => ({ data_sources: [] })),
+  legacyWhereUsed: (code) =>
+    get(`/legacy-lineage/where-used?code=${encodeURIComponent(code)}`,
+      () => ({ locations: [] })),
+  legacyLineageGroups: (ds) =>
+    get(`/legacy-lineage/groups${ds ? `?data_source=${encodeURIComponent(ds)}` : ''}`,
+      () => ({ groups: [] })),
+  legacyDependencyNetwork: (o) =>
+    get(`/legacy-lineage/dependency-network?include_excluded=${o && o.include_excluded ? 'true' : 'false'}`
+      + (o && o.data_source ? `&data_source=${encodeURIComponent(o.data_source)}` : ''),
+      () => ({ edges: [], nodes: [] })),
+  legacyLineageFields: (table, ds) =>
+    get(`/legacy-lineage/fields?table=${encodeURIComponent(table)}`
+      + (ds ? `&data_source=${encodeURIComponent(ds)}` : ''), () => ({ fields: [] })),
+  legacyLineageProof: (table, field) =>
+    get(`/legacy-lineage/proof?table=${encodeURIComponent(table)}&field=${encodeURIComponent(field)}`,
+      () => ({ stages: [] })),
+  legacySystems: () => get('/legacy-lineage/systems', () => ({ systems: [] })),
+  legacyBusinessDef: (code, system, ctx) =>
+    get(`/legacy-lineage/business-def?code=${encodeURIComponent(code)}`
+      + (system ? `&system=${encodeURIComponent(system)}` : '')
+      + (ctx && ctx.srcTable ? `&src_table=${encodeURIComponent(ctx.srcTable)}` : '')
+      + (ctx && ctx.dwhTable ? `&dwh_table=${encodeURIComponent(ctx.dwhTable)}` : ''),
+      () => ({ definition: null })),
+  legacyDictionary: (system, q) =>
+    get(`/legacy-lineage/dictionary?system=${encodeURIComponent(system)}${q ? `&q=${encodeURIComponent(q)}` : ''}`,
+      () => ({ definitions: [] })),
+  legacyDictionaryTree: (system, q) =>
+    get(`/legacy-lineage/dictionary-tree?system=${encodeURIComponent(system)}${q ? `&q=${encodeURIComponent(q)}` : ''}`,
+      () => ({ masters: [] })),
+
   projects: () => get('/projects', () => MOCK.projects()),
   projectCategories: () => get('/projects/categories', () => MOCK.projectCategories()),
 
   interfaceStats: () => get('/interface360/stats', () => MOCK.interfaceStats()),
   interfaces: (opts = {}) => {
     const q = new URLSearchParams();
+    q.set('limit', String(opts.limit || 5000));   // full estate; server default was capping at 100
     if (opts.source_project_id) q.set('source_project_id', opts.source_project_id);
     if (opts.target_project_id) q.set('target_project_id', opts.target_project_id);
     if (opts.feed_type) q.set('feed_type', opts.feed_type);
@@ -143,10 +181,7 @@ export const api = {
   apiFlows: (project_id) => get(
     `/api360/flows${project_id ? '?project_id=' + project_id : ''}`,
     () => MOCK.apiFlows(project_id)),
-  search: (q, project_id) => {
-    const qs = new URLSearchParams({ q, ...(project_id ? { project_id } : {}) }).toString();
-    return get(`/search?${qs}`, () => MOCK.search(q));
-  },
+
   projectLanding: () => get('/projects/landing', () => MOCK.projectLanding()),
   projectSources: (pid) => get(`/projects/${encodeURIComponent(pid)}/sources`, () => MOCK.projectSources(pid)),
   inboundFeeds: (opts = {}) => {
@@ -259,25 +294,57 @@ export const api = {
     () => ({ metrics: [], chain: null })),
   varGenerate: (body) => post('/variance/generate', body,
     () => ({ run_id: 'V-DEMO', status: 'RUNNING' })),
+
+  // ---- Impact Analysis (schema drift + blast radius) -----------------------
+  impactStats: () => get('/impact/stats', () => MOCK.impactStats()),
+  impactFindings: (status) => get(
+    `/impact/findings${status ? `?status=${encodeURIComponent(status)}` : ''}`,
+    () => MOCK.impactFindings(status)),
+  impactSetStatus: (finding_id, status) => post(
+    `/impact/findings/${encodeURIComponent(finding_id)}/status`, { status },
+    () => ({ ok: true, finding_id, status })),
+  impactScan: () => post('/impact/scan', {},
+    () => ({ ok: true, findings: 3 })),
+  impactScanSources: () => get('/impact/scan/sources', () => MOCK.impactScanSources()),
+  impactBlast: (column) => get(
+    `/impact/blast?column=${encodeURIComponent(column)}`, () => MOCK.impactBlast(column)),
+  impactBlastColumns: (q) => get(
+    `/impact/blast/columns${q ? `?q=${encodeURIComponent(q)}` : ''}`,
+    () => MOCK.impactBlastColumns()),
+
+  // ---- Auto Mapper ----------------------------------------------------------
+  mapperTargets: () => get('/mapper/targets', () => MOCK.mapperTargets()),
+  mapperParse: (name, content, format) => post('/mapper/parse',
+    { name, content, format }, () => MOCK.mapperParse(name, content, format)),
+  mapperScore: (target_schema, fields) => post('/mapper/score',
+    { target_schema, fields }, () => MOCK.mapperScore(target_schema, fields)),
+  mapperCommit: (source_name, target_schema, mappings) => post('/mapper/commit',
+    { source_name, target_schema, mappings },
+    () => ({ ok: true, run_id: 'demo',
+             committed: mappings.filter((m) => m.verdict === 'ACC').length })),
+  mapperRuns: () => get('/mapper/runs', () => ({ runs: [] })),
+
   varCoverage: (ds) =>
     get(`/variance/coverage?data_source=${ds}`, () => MOCK.varCoverage()),
   varClobTables: (ds) =>
     get(`/variance/clob/tables?data_source=${ds}`, () => MOCK.varClobTables()),
   varClobColumns: (table, ds) =>
     get(`/variance/clob/columns?table=${encodeURIComponent(table)}&data_source=${ds}`,
-        () => MOCK.varClobColumns()),
+      () => MOCK.varClobColumns()),
   varClobProfile: (table, clob, ds) =>
     get(`/variance/clob/profile?table=${encodeURIComponent(table)}&clob=${encodeURIComponent(clob)}&data_source=${ds}`,
-        () => MOCK.varClobProfile()),
+      () => MOCK.varClobProfile()),
   varClobRecord: (table, clob, ds) =>
     get(`/variance/clob/record?table=${encodeURIComponent(table)}&clob=${encodeURIComponent(clob)}&data_source=${ds}`,
-        () => MOCK.varClobRecord()),
+      () => MOCK.varClobRecord()),
+
   dsList: () => get('/admin/datasources', () => MOCK.dsList()),
   dsSave: (body) => post('/admin/datasources', body, () => ({ ok: true })),
   dsDelete: (name) => post(`/admin/datasources/${name}/delete`, {},
     () => ({ ok: true })),
   dsTest: (name) => post(`/admin/datasources/${name}/test`, {},
     () => MOCK.dsTest()),
+
   reconSources: () => get('/recon/sources', () => MOCK.reconSources()),
   reconScan: (body) => post('/recon/scan', body,
     () => ({ run_id: 'PR-DEMO', status: 'RUNNING' })),
@@ -290,9 +357,13 @@ export const api = {
     get(`/recon/breaks?table=${encodeURIComponent(table)}${
       id ? `&run_id=${id}` : ''}`, () => MOCK.reconBreaks()),
   reconConfig: () => get('/recon/config', () => MOCK.reconConfig()),
+
   aconEnvironments: () => get('/apicon/environments',
     () => MOCK.aconEnvironments()),
   aconSaveEnv: (body) => post('/apicon/environments', body,
+    () => ({ ok: true })),
+  aconContracts: () => get('/apicon/contracts', () => MOCK.aconContracts()),
+  aconIngestContract: (body) => post('/apicon/contracts', body,
     () => ({ ok: true })),
   aconCollections: () => get('/apicon/collections',
     () => MOCK.aconCollections()),
@@ -300,6 +371,8 @@ export const api = {
     () => MOCK.aconCollRequests()),
   aconBuildCollection: (body) => post('/apicon/collections/build', body,
     () => ({ ok: true, coll_id: 'C-DEMO' })),
+  aconGenerate: (cid) => post(`/apicon/collections/generate/${cid}`, {},
+    () => ({ ok: true })),
   aconExportPostman: (id) => get(`/apicon/collections/${id}/export-postman`,
     () => ({ info: { name: 'demo' }, item: [] })),
   aconRunCollection: (id, envId) =>
@@ -309,6 +382,8 @@ export const api = {
     () => MOCK.aconExecute()),
   aconHistory: () => get('/apicon/history', () => MOCK.aconHistory()),
   aconFlows: () => get('/apicon/flows', () => MOCK.aconFlows()),
+  aconSaveFlow: (body) => post('/apicon/flows', body,
+    () => ({ ok: true, flow_id: 'FL-DEMO' })),
   aconFlowRun: (id, body) => post(`/apicon/flows/${id}/run`, body,
     () => MOCK.aconFlowRun()),
   aconGuidedTiles: () => get('/apicon/guided/tiles',
@@ -318,11 +393,12 @@ export const api = {
     () => ({ ok: true, flow_id: 'BFC_DEMO', runnable: true })),
   aconSaveBindings: (id, body) => post(`/apicon/flows/${id}/bindings`,
     body, () => ({ ok: true, runnable: true })),
+
   acatSystems: () => get('/apicon/catalog/systems',
     () => MOCK.acatSystems()),
   acatUpload: (body) => post('/apicon/catalog/upload', body,
     () => ({ ok: true, placed: 'API-SPEC/Demo/swagger-spec-demo.yaml',
-      drift_status: 'CURRENT' })),
+             drift_status: 'CURRENT' })),
   acatSaveSystemMeta: (body) =>
     post('/apicon/catalog/system-meta', body, () => ({ ok: true })),
   acatManifest: () => get('/apicon/catalog/manifest',
@@ -347,21 +423,27 @@ export const api = {
     () => ({ unread: 1 })),
   acatEndpoints: (system, q) => get('/apicon/catalog/endpoints?'
     + new URLSearchParams({ ...(system ? { system } : {}),
-      ...(q ? { q } : {}) }), () => MOCK.acatEndpoints()),
+                            ...(q ? { q } : {}) }), () => MOCK.acatEndpoints()),
   acatSuggest: (q, system) => get('/apicon/catalog/suggest?'
     + new URLSearchParams({ q, ...(system ? { system } : {}) }),
     () => MOCK.acatSuggest(q)),
   acatSuggestNext: (endpointKey, have) =>
     get('/apicon/catalog/suggest/next?' + new URLSearchParams(
       { endpoint_key: endpointKey, have: have || '' }),
-    () => MOCK.acatSuggestNext()),
+      () => MOCK.acatSuggestNext()),
   acatPublishFlow: (flowId, pub) =>
     post(`/api360/business-flow/${flowId}`,
       { is_published: pub ? 'Y' : 'N' }, () => ({ ok: true }), 'PATCH'),
+
   aconSaveRequest: (body) => post('/apicon/requests/save', body,
     () => ({ ok: true })),
   aconAdminSystem: (code) => get(`/apicon/admin/system/${code}`,
     () => MOCK.aconAdminSystem()),
+  aconAckDrift: (cid) => post(`/apicon/contracts/${cid}/ack-drift`, {},
+    () => ({ ok: true })),
+  aconDriftUnread: () => get('/apicon/drift/unread', () => ({ unread: 1 })),
+  aconRetireContract: (cid) => post(`/apicon/contracts/${cid}/retire`, {},
+    () => ({ ok: true })),
   aconDeleteCollection: (id) => post(`/apicon/collections/${id}`,
     undefined, () => ({ ok: true }), 'DELETE'),
   aconSetSchedule: (id, tag) =>
@@ -370,6 +452,9 @@ export const api = {
   aconSetEnvEnabled: (id, en) =>
     post(`/apicon/environments/${id}/enabled?enabled=${en}`, {},
       () => ({ ok: true })),
+  aconSetSourceEnabled: (id, en) =>
+    post(`/apicon/ingest-sources/${id}/enabled?enabled=${en}`, {},
+      () => ({ ok: true })),
   aconDecodes: (set) =>
     get(`/apicon/decodes${set ? `?decode_set=${set}` : ''}`,
       () => ({ decodes: [] })),
@@ -377,11 +462,19 @@ export const api = {
     () => ({ ok: true })),
   aconEnvTest: (id) => post(`/apicon/environments/${id}/test`, {},
     () => ({ ok: true, status: 200, elapsed_ms: 41 })),
+  aconSystems: () => get('/apicon/systems', () => MOCK.aconSystems()),
+  aconSaveSystem: (body) => post('/apicon/systems', body,
+    () => ({ ok: true })),
+  aconContractFromUrl: (body) => post('/apicon/contracts/from-url', body,
+    () => ({ ok: true })),
+  aconContractFromPostman: (body) =>
+    post('/apicon/contracts/from-postman', body, () => ({ ok: true })),
+  aconContractManual: (body) => post('/apicon/contracts/manual', body,
+    () => ({ ok: true })),
   aconExportPostmanEnv: (id) =>
     get(`/apicon/environments/${id}/export-postman-env`,
       () => ({ values: [] })),
 
-  // ---- Environment 360 ----
   envOverview: () => get('/env/overview', () => MOCK.envOverview()),
   envCerts: () => get('/env/certs', () => MOCK.envCerts()),
   envScanCerts: () => post('/env/certs/scan', {}, () => ({ ok: true })),
@@ -389,5 +482,4 @@ export const api = {
   envTopology: () => get('/env/topology', () => MOCK.envTopology()),
   envPulse: () => get('/env/pulse', () => MOCK.envPulse()),
   envRunPulse: () => post('/env/pulse/run', {}, () => ({ ok: true })),
-  envInventory: () => get('/env/inventory', () => MOCK.envInventory()),
 };
