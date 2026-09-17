@@ -390,4 +390,20 @@ export const api = {
   envPulse: () => get('/env/pulse', () => MOCK.envPulse()),
   envRunPulse: () => post('/env/pulse/run', {}, () => ({ ok: true })),
   envInventory: () => get('/env/inventory', () => MOCK.envInventory()),
+
+  // ---- Legacy lineage: column-level graph (Technical view) ----
+  // Address by DWH column or by field code. include_parallel=false drops the
+  // same-code chains through other masters. Falls back to an empty graph so
+  // the panel renders its own "no lineage rows" state rather than throwing.
+  legacyLineageGraph: ({ table, column, code, data_source, include_parallel = true } = {}) => {
+    const q = new URLSearchParams();
+    if (table) q.set('table', table);
+    if (column) q.set('column', column);
+    if (code) q.set('code', code);
+    if (data_source) q.set('data_source', data_source);
+    if (!include_parallel) q.set('include_parallel', 'false');
+    return get(`/legacy-lineage/graph?${q.toString()}`,
+      () => ({ focus: null, code: code || null, nodes: [], edges: [],
+               stats: {}, truncated: false }));
+  },
 };

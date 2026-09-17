@@ -23,7 +23,8 @@ for _mod in ("routers_projects", "routers_data360",
              "routers_api360_console", "routers_interface360", "routers_pii",
              "routers_interdependency", "routers_guardrails",
              "routers_impact", "routers_mapper", "routers_legacy_lineage",
-             "routers_reference_legacy", "routers_variance360",
+             "routers_legacy_graph", "routers_reference_legacy",
+             "routers_variance360",
              "routers_recon360", "routers_admin_datasources",
              "routers_environment360", "routers_env_infra"):
     try:
