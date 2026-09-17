@@ -34,6 +34,7 @@ STEPS = [
     "guardrails",        # synthetic quality guardrail events (failed jobs + bad data)
     "legacy_lineage",    # legacy DWH end-to-end lineage (SRC->STG1->STG2->DWH) + proof
     "legacy_dictionary", # legacy business definitions (AddVantage/CRD/STAR) keyed by field code
+    "legacy_source_file",# CP_SOURCE_FILE: the business name of each AddVantage EOD feed
     "search_index",      # MUST be last - indexes everything for full-text search
 ]
 
@@ -187,6 +188,12 @@ def _run_step(step, conn, loader, resolver) -> None:
         from .legacy_lineage_conn import LegacyLineageConnector
         c = LegacyLineageConnector.from_env()
         c.load(loader, c.parse())
+        return
+    if step == "legacy_source_file":
+        from .legacy_source_file_conn import LegacySourceFileConnector
+        c = LegacySourceFileConnector.from_env()
+        n = c.load(loader, c.parse())
+        log.info("legacy_source_file: merged %s feeds", n)
         return
     if step == "legacy_dictionary":
         from .legacy_dictionary_conn import LegacyDictionaryConnector

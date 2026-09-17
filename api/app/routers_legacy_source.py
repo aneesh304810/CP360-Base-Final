@@ -70,6 +70,27 @@ _CANON_SRC = r"""REGEXP_REPLACE(
 # LETTERS_DIGITS _ DIGITS -> (family, line). Anything else is its own family.
 _FAMILY_RE = _re.compile(r"^([A-Z]+_\d+)_(\d+)$")
 
+# canon() for a FEED name, matching ingestion/legacy_source_file_conn.file_key.
+# Drops the extension, the YYYYMMDDHHMMSS / <SEQ NO.> placeholders, collapses
+# separators and uppercases, so src_source_table meets legacy_source_file
+# however the lineage sheet happened to spell the transmission name.
+#
+# Note it does NOT strip BBH/TRP: Oracle has no cheap "trailing token only"
+# form, and stripping them anywhere would turn BBH_REQUEST_AUTHORIZER into
+# REQUEST_AUTHORIZER and mis-join a real source table. The loader writes the
+# trailing-stripped key, so the few feeds that differ only by a trailing tag
+# fall back to the LIKE below instead of matching wrongly.
+_FEED_KEY_SQL = """UPPER(TRIM('_' FROM REGEXP_REPLACE(
+        REGEXP_REPLACE({col},
+            '(\.dat|\.txt|\.csv|\.psv|\.tsv)$|<[^>]*>|' ||
+            '[Yy]{4}[Mm]{2}[Dd]{2}([Hh]{2}[Mm]{2}[Ss]{2})?', ''),
+        '[^A-Za-z0-9]+', '_')))"""
+
+
+def _feed_key(col: str) -> str:
+    return _FEED_KEY_SQL.replace("{col}", col)
+
+
 # The placeholder NVL(functional_group, ...) writes, and the label the master
 # spine uses when the hints do not match. Neither is a real bucket.
 _NO_GROUP = "Unassigned"
@@ -117,6 +138,7 @@ def sources(data_source: str | None = None, spine: str | None = None,
     # --- per file: the authoritative field counts (no double counting) ------
     files = _ds_scoped(f"""
         SELECT src_source_table,
+               {_feed_key('src_source_table')} AS src_file_key,
                MIN(stg1_source_table) AS stg1_source_table,
                MIN(stg2_source_table) AS stg2_source_table,
                COUNT(DISTINCT src_source_column) AS field_count,
@@ -130,11 +152,38 @@ def sources(data_source: str | None = None, spine: str | None = None,
         GROUP BY src_source_table
         ORDER BY COUNT(DISTINCT src_source_column) DESC""", {}, data_source)
 
+    # CP_SOURCE_FILE: the physical feed name -> what it actually is.
+    # _safe, not _ds_scoped: the table is new, so a checkout that has not run
+    # sql/50 returns [] and every file simply keeps its filename. Nothing on
+    # the screen depends on this join succeeding.
+    feeds = _safe("""SELECT src_file, src_file_key, dataset
+                     FROM legacy_source_file WHERE dataset IS NOT NULL""", {})
+    by_key, by_name = {}, {}
+    for r in feeds:
+        if r.get("src_file_key"):
+            by_key.setdefault(r["src_file_key"], r["dataset"])
+        if r.get("src_file"):
+            by_name.setdefault(str(r["src_file"]).strip().upper(), r["dataset"])
+
     names = [f.get("src_source_table") for f in files]
     res = resolve_groups(names, data_source=data_source, system=system,
                          only=spine)
 
     for f in files:
+        # three chances to name the feed, cheapest first: the exact filename,
+        # the canonical key, then the key with a trailing BBH/TRP removed —
+        # which SQL cannot express safely, so it happens here
+        raw = str(f.get("src_source_table") or "").strip().upper()
+        k = f.get("src_file_key") or ""
+        # peel repeatedly, not tag-by-tag: a real key ends "_BBH_TRP", so a
+        # single pass for "_BBH" never fires and leaves "..._BBH" behind
+        k2, peeled = k, True
+        while peeled:
+            peeled = False
+            for tag in ("_TRP", "_BBH"):
+                if k2.endswith(tag):
+                    k2, peeled = k2[: -len(tag)], True
+        f["dataset"] = (by_name.get(raw) or by_key.get(k) or by_key.get(k2))
         f["unmapped"] = (f.get("field_count") or 0) - (f.get("mapped") or 0)
         f["master"] = _master_from_context(f.get("src_source_table"),
                                            f.get("stg1_source_table"))
@@ -294,7 +343,16 @@ def source_flow(src_table: str, data_source: str | None = None):
         r = resolve_groups([src_table], data_source=data_source, system="ADDVANTAGE")
         hit = r["by_file"].get(src_table) or {}
         grp, gsrc = hit.get("group"), hit.get("source")
+    # the same three-chance lookup as /sources, for one file
+    feed = _safe(f"""
+        SELECT dataset FROM legacy_source_file
+        WHERE UPPER(TRIM(src_file)) = UPPER(TRIM(:s))
+           OR src_file_key = {_feed_key(':s')}
+           OR src_file_key = REGEXP_REPLACE({_feed_key(':s')},
+                                            '(_TRP|_BBH)+$', '')""",
+        {"s": src_table})
     return {"src_table": src_table,
+            "dataset": (feed[0].get("dataset") if feed else None),
             "master": _master_from_context(src_table,
                                            st.get("stg1_source_table")),
             "functional_group": grp,

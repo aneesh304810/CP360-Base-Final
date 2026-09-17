@@ -1,5 +1,5 @@
 -- ============================================================================
--- 31_legacy_lineage_reload_cleanup.sql
+-- 49_legacy_lineage_reload_cleanup.sql
 --
 -- DESTRUCTIVE. Read this before running it. It deletes rows.
 --

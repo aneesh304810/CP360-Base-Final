@@ -95,8 +95,8 @@ export const lineageApi = {
 
   lineageSourceFlow: (src_table, data_source) =>
     _get(`/legacy-lineage/source-flow?${_qs({ src_table, data_source })}`,
-      () => ({ src_table, master: null, stages: {}, targets: [],
-               target_count: 0 })),
+      () => ({ src_table, dataset: null, master: null, stages: {},
+               targets: [], target_count: 0 })),
 
   lineageSourceFields: (src_table, data_source, target, system) =>
     _get(`/legacy-lineage/source-fields?${_qs({ src_table, data_source,
