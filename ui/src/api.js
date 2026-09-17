@@ -406,4 +406,28 @@ export const api = {
       () => ({ focus: null, code: code || null, nodes: [], edges: [],
                stats: {}, truncated: false }));
   },
+
+  // ---- Legacy lineage: source-first drill ----
+  // Entry at the AddVantage extract rather than the warehouse table.
+  legacyLineageSources: (data_source) =>
+    get(`/legacy-lineage/sources${data_source ? `?data_source=${encodeURIComponent(data_source)}` : ''}`,
+      () => ({ masters: [], sources: [],
+               totals: { files: 0, masters: 0, field_count: 0, mapped: 0, unmapped: 0 } })),
+
+  legacyLineageSourceFlow: (src_table, data_source) => {
+    const q = new URLSearchParams({ src_table });
+    if (data_source) q.set('data_source', data_source);
+    return get(`/legacy-lineage/source-flow?${q.toString()}`,
+      () => ({ src_table, master: null, stages: {}, targets: [], target_count: 0 }));
+  },
+
+  legacyLineageSourceFields: (src_table, data_source, target, system) => {
+    const q = new URLSearchParams({ src_table });
+    if (data_source) q.set('data_source', data_source);
+    if (target) q.set('target', target);
+    if (system) q.set('system', system);
+    return get(`/legacy-lineage/source-fields?${q.toString()}`,
+      () => ({ src_table, families: [],
+               totals: { codes: 0, families: 0, by_class: {} } }));
+  },
 };

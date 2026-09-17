@@ -3,6 +3,7 @@ import { SectionHeader } from "./AppShell.jsx";
 import { api } from "./api.js";
 import BizLineage from "./BizLineage.jsx";
 import LegacyLineage from "./LegacyLineage.jsx";
+import SourceLineage from "./SourceLineage.jsx";
 
 // =====================================================================
 // LineageHome — the Lineage shell, superseding the old Lineage.jsx
@@ -217,6 +218,8 @@ export default function LineageHome({ t, focus }) {
       onClick={() => setView("business")}>Business view</span>
      <span style={swBtn(view === "technical")}
       onClick={() => setView("technical")}>Technical view</span>
+     <span style={swBtn(view === "source")}
+      onClick={() => setView("source")}>Source view</span>
     </div>
     <span>{scopeBtn("sei", "SEI", true)}{scopeBtn("nonsei", "Non-SEI", false)}</span>
     {scope === "nonsei" && (
@@ -257,6 +260,9 @@ export default function LineageHome({ t, focus }) {
      🧬 SEI lineage — arriving with the SWP program.<br />
      <span style={{ fontSize: 11 }}>Non-SEI (AddVantage) is available now.</span>
     </div>
+   ) : view === "source" ? (
+    <SourceLineage t={t} system={curSys} dataSource={ds} tech={false}
+     onOpenTechnical={openTechnical} />
    ) : view === "business" ? (
     <BizLineage t={t} system={curSys} dataSource={ds}
      onTechnical={openTechnical} onDataSource={switchWarehouse} />
