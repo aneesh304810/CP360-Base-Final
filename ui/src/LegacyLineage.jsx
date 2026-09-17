@@ -53,6 +53,41 @@ const masterColor = (m) => MASTER_C[m] || "#6d3ac0";
 const dsColor = (d) => DS_C[(d || "PBDW").toUpperCase()] || "#0f4775";
 const isNA = (v) => /not applicable|^n\/a$/i.test(String(v || "").trim());
 
+// The sheet spells an absent stage as the literal text "N/A" or "Not
+// Applicable" rather than leaving the cell empty, and nothing treated those
+// as empty. So a column that is not staged at STG2 rendered a STG2 card whose
+// value was the string "N/A" — AND, because canon("ACCOUNT_NUMBER") differs
+// from canon("N/A"), a RENAMED badge above it, and "takes its business name:
+// N/A" in the plain-terms band. Three pieces of furniture asserting a
+// transformation that never happened. nz() is isNA applied where it was
+// missing: to the stage columns and tables, not just the transforms.
+const nz = (v) => (v && !isNA(v) ? v : null);
+
+// A transform expression in plain words. Was private to XformStory, the band
+// that used to sit under the chain repeating it; now the chain itself says
+// this on the arrow, which is where a transformation belongs.
+const friendlyXf = (xf) => {
+  if (!xf || isNA(xf)) return null;
+  const u = String(xf).toUpperCase();
+  if (u.includes("RTRIM") || u.includes("TRIM")) return "extra spaces removed";
+  if (u.includes("TO_DATE")) return "text turned into a real date";
+  if (u.includes("TO_NUMBER")) return "text turned into a number";
+  if (u.includes("DECODE") || u.includes("CASE")) return "code translated to a value";
+  if (u.includes("SUBSTR")) return "cut to size";
+  if (u.includes("UPPER") || u.includes("LOWER")) return "letter case normalized";
+  return String(xf).split("(")[0].toLowerCase() + " applied";
+};
+
+// A source feed is named for transmission, not for reading:
+//   Addv-MSTR-ACC-BID1_TRP_YYYYMMDDHHMMSS_<SEQ NO.>.dat
+// Everything after the date placeholder is delivery mechanics. Trim it for
+// display; the full string stays in the title attribute.
+const shortFeed = (name) => {
+  const s = String(name || "");
+  const m = s.match(/^(.*?)[_-]?(?:Y{4}M{2}D{2}(?:H{2}M{2}S{2})?).*$/i);
+  return (m && m[1]) ? m[1] : s;
+};
+
 // A type is one fact, written the way a developer writes it. The table used
 // to spend three columns on  VARCHAR2 | 42.0 | —  , which is three saccades
 // to read one declaration and two columns of em-dashes on every field that
@@ -114,20 +149,22 @@ function buildStages(row, derived) {
  if (derived)
  st.push({ stage: "ORIGIN", c: STAGE_C.SRC, col: "derived", tbl: "inside AddVantage",
  derived: true });
- st.push({ stage: "SRC", c: STAGE_C.SRC, col: row.src_source_column || "N/A",
- tbl: row.src_source_table || "—", xfNext: row.src_to_stg1_transform });
- st.push({ stage: "STG1", c: STAGE_C.STG1, col: row.stg1_source_column || "N/A",
- tbl: row.stg1_source_table || "—",
+ st.push({ stage: "SRC", c: STAGE_C.SRC, col: nz(row.src_source_column),
+ tbl: nz(row.src_source_table), feed: true,
+ xfNext: row.src_to_stg1_transform });
+ st.push({ stage: "STG1", c: STAGE_C.STG1, col: nz(row.stg1_source_column),
+ tbl: nz(row.stg1_source_table),
  ty: row.stg1_type ? `${row.stg1_type}${row.stg1_length ? "(" + row.stg1_length + ")" : ""}` : null,
- boundary: row.src_source_column && row.stg1_source_column &&
+ boundary: nz(row.src_source_column) && nz(row.stg1_source_column) &&
  row.src_source_column !== row.stg1_source_column &&
  canon(row.src_source_column) === canon(row.stg1_source_column)
  ? ["#efe6fb", "#6d3ac0", "PHYSICALIZED"] : null,
  xfNext: row.stg1_to_stg2_transform });
- st.push({ stage: "STG2", c: STAGE_C.STG2, col: row.stg2_source_column || "N/A",
- tbl: row.stg2_source_table || "—",
+ st.push({ stage: "STG2", c: STAGE_C.STG2, col: nz(row.stg2_source_column),
+ tbl: nz(row.stg2_source_table),
  ty: row.stg2_type ? `${row.stg2_type}${row.stg2_length ? "(" + row.stg2_length + ")" : ""}` : null,
- boundary: row.stg1_source_column && row.stg2_source_column &&
+ // both sides must EXIST before a rename can be claimed
+ boundary: nz(row.stg1_source_column) && nz(row.stg2_source_column) &&
  canon(row.stg1_source_column) !== canon(row.stg2_source_column)
  ? ["#fae5d3", "#a8560f", "RENAMED"] : null,
  xfNext: row.stg2_to_dwh_transform });
@@ -148,24 +185,33 @@ function Journey({ t, row, derived, dataSource }) {
  // above; the bottom margin keeps the last row off the next heading.
  return (
  <div style={{ display: "flex", alignItems: "stretch", flexWrap: "wrap",
- rowGap: 22, padding: "18px 2px 2px", marginBottom: 6 }}>
+ rowGap: 22, padding: "18px 2px 2px", marginBottom: 20 }}>
  {stages.map((s, i) => (
  <div key={s.stage + i}
  style={{ display: "flex", alignItems: "stretch", flex: "0 1 auto",
  minWidth: 0 }}>
- {i > 0 && (
+ {/* The hop, in plain words, ON the arrow. A separate "what happens
+ to this column — in plain terms" band used to repeat all three
+ hops as big icon cards under the chain: two rows of furniture
+ for one fact each, and the fact was already above. Amber means
+ the value changes here; silence means it does not. */}
+ {i > 0 && (() => {
+ const xf = nz(stages[i - 1].xfNext);
+ const words = friendlyXf(xf);
+ return (
  <div style={{ display: "flex", flexDirection: "column", alignItems: "center",
- justifyContent: "center", minWidth: 30, color: t.muted || "#999",
- fontSize: 13, flex: "none" }}>
- →
- {stages[i - 1].xfNext && !isNA(stages[i - 1].xfNext) && (
- <span title={stages[i - 1].xfNext}
- style={{ fontSize: 8.5, color: t.warning || "#e67e22",
- fontFamily: "Roboto Mono, monospace", maxWidth: 92, textAlign: "center",
- overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
- {String(stages[i - 1].xfNext).split("(")[0]}
- </span>)}
- </div>)}
+ justifyContent: "center", minWidth: words ? 86 : 34,
+ maxWidth: 120, padding: "0 4px",
+ color: t.muted || "#999", fontSize: 13, flex: "none" }}>
+ <span style={{ color: words ? (t.warning || "#e67e22")
+ : (t.muted || "#999") }}>→</span>
+ {words && (
+ <span title={xf}
+ style={{ fontSize: 9, lineHeight: 1.25, marginTop: 2,
+ color: t.warning || "#e67e22", textAlign: "center" }}>
+ {words}</span>)}
+ </div>);
+ })()}
  <div style={{ flex: "0 1 auto", minWidth: "15ch", maxWidth: "26ch",
  position: "relative", padding: "0 5px" }}>
  {s.boundary && (
@@ -184,12 +230,24 @@ function Journey({ t, row, derived, dataSource }) {
  background: s.stage === "DWH" ? dsColor(dataSource) : s.c }}>
  {s.stage === "DWH" ? `DWH · ${(dataSource || "PBDW").toUpperCase()}` : s.stage}
  </span>
- <div title={s.col}
- style={{ fontFamily: "Roboto Mono, monospace", fontSize: 11, fontWeight: 700,
- color: t.navy || "#10193b", marginTop: 5, overflow: "hidden",
- textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.col}</div>
- <div style={{ fontSize: 8.5, color: t.sub || "#666", marginTop: 2, wordBreak: "break-all" }}>
- {s.tbl}{s.ty ? ` · ${s.ty}` : ""}</div>
+ {/* An absent stage says so, in words, instead of printing the
+ sheet's literal "N/A" where a column name goes. */}
+ <div title={s.col || "not staged here"}
+ style={{ fontFamily: s.col ? "Roboto Mono, monospace" : "inherit",
+ fontSize: 11, fontWeight: s.col ? 700 : 400,
+ fontStyle: s.col ? "normal" : "italic",
+ color: s.col ? (t.navy || "#10193b") : (t.muted || "#999"),
+ marginTop: 5, overflow: "hidden",
+ textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+ {s.col || "not staged here"}</div>
+ {(s.tbl || s.ty) && (
+ // break-word, not break-all: break-all split the feed name mid-token
+ // into "..._<SE / Q NO.>.dat". A feed shows its readable stem, with
+ // the transmission tail in the tooltip.
+ <div title={s.tbl || ""}
+ style={{ fontSize: 8.5, color: t.sub || "#666", marginTop: 2,
+ wordBreak: "break-word" }}>
+ {s.feed ? shortFeed(s.tbl) : s.tbl}{s.ty ? ` · ${s.ty}` : ""}</div>)}
  {s.derived && (
  <div style={{ fontSize: 8.5, color: "#7c3aed", marginTop: 4, lineHeight: 1.4 }}>
  the sheet records transport from SRC onward — this derivation lives only in the
@@ -235,75 +293,6 @@ function DefModal({ t, title, onClose, children }) {
  color: t.sub || "#666", padding: "0 4px" }}>✕</span>
  </div>
  <div style={{ overflowY: "auto", padding: "10px 14px" }}>{children}</div>
- </div>
- </div>);
-}
-
-/* ------------------------------------------------------------------ */
-/* XformStory — "what is happening" band: one segment per hop, icon + */
-/* plain words + the real expression. Amber = the value changes there. */
-/* ------------------------------------------------------------------ */
-
-function XformStory({ t, row }) {
- const friendly = (xf) => {
- if (!xf || isNA(xf)) return null;
- const u = String(xf).toUpperCase();
- if (u.includes("RTRIM") || u.includes("TRIM")) return "extra spaces removed";
- if (u.includes("TO_DATE")) return "text turned into a real date";
- if (u.includes("TO_NUMBER")) return "text turned into a number";
- if (u.includes("DECODE") || u.includes("CASE")) return "code translated to a value";
- if (u.includes("SUBSTR")) return "cut to size";
- if (u.includes("UPPER") || u.includes("LOWER")) return "letter case normalized";
- return String(xf).split("(")[0].toLowerCase() + " applied";
- };
- const physicalized = row.src_source_column && row.stg1_source_column &&
- row.src_source_column !== row.stg1_source_column &&
- canon(row.src_source_column) === canon(row.stg1_source_column);
- const renamed = row.stg1_source_column && row.stg2_source_column &&
- canon(row.stg1_source_column) !== canon(row.stg2_source_column);
- const ex = (xf, alt) => (xf && !isNA(xf)) ? String(xf) : alt;
- const segs = [
- { icon: "📥", head: friendly(row.src_to_stg1_transform) || "arrives as delivered",
- ex: ex(row.src_to_stg1_transform,
- `${row.src_source_column || "—"} → ${row.stg1_source_column || "—"}`),
- note: physicalized ? "same field · database-legal name" : "no change to the value",
- hot: !!friendly(row.src_to_stg1_transform) },
- { icon: "🧼", head: friendly(row.stg1_to_stg2_transform) || "carried through",
- ex: ex(row.stg1_to_stg2_transform, "direct move"),
- note: renamed ? `takes its business name: ${row.stg2_source_column}` : "value unchanged",
- hot: !!friendly(row.stg1_to_stg2_transform) },
- { icon: "🏪", head: friendly(row.stg2_to_dwh_transform) || "stored in the warehouse",
- ex: ex(row.stg2_to_dwh_transform, "direct move"),
- note: `what you query in ${row.dwh_target_table}`,
- hot: !!friendly(row.stg2_to_dwh_transform) },
- ];
- return (
- <div style={{ borderTop: `1px solid ${t.panel2 || "#dfe6e9"}`,
- padding: "12px 20px 14px" }}>
- <div style={{ fontSize: 9.5, fontWeight: 800, textTransform: "uppercase",
- letterSpacing: 0.4, color: t.sub || "#666", marginBottom: 9 }}>
- What happens to this column — in plain terms</div>
- <div style={{ display: "flex", alignItems: "stretch", gap: 0 }}>
- {segs.map((sg, i) => (
- <React.Fragment key={i}>
- {i > 0 && <div style={{ alignSelf: "center", padding: "0 10px",
- color: t.muted || "#999", fontSize: 15, fontWeight: 700 }}>→</div>}
- <div style={{ flex: 1, minWidth: 0, borderRadius: 9, padding: "10px 13px",
- textAlign: "center",
- background: sg.hot ? (t.warningBg || "#fae5d3") : "#f4f7f9",
- border: `1.5px solid ${sg.hot ? "#f0cba8" : (t.panel2 || "#dfe6e9")}` }}>
- <div style={{ fontSize: 19 }}>{sg.icon}</div>
- <div style={{ fontSize: 12.5, fontWeight: 700, marginTop: 3,
- color: sg.hot ? "#8a5a1e" : (t.navy || "#10193b") }}>{sg.head}</div>
- <div title={sg.ex}
- style={{ fontFamily: "Roboto Mono, monospace", fontSize: 10,
- marginTop: 4, color: t.sub || "#666",
- overflow: "hidden", textOverflow: "ellipsis",
- whiteSpace: "nowrap" }}>{sg.ex}</div>
- <div style={{ fontSize: 10.5, color: t.sub || "#666",
- marginTop: 3 }}>{sg.note}</div>
- </div>
- </React.Fragment>))}
  </div>
  </div>);
 }
@@ -374,7 +363,6 @@ function InlineDef({ t, system, dataSource, code, ctx, row, tableName, onDataSou
  <div style={{ order: roomy ? 2 : 0, minWidth: 0,
  borderRight: (compact || roomy) ? "none" : `1px solid ${t.panel2 || "#dfe6e9"}`,
  borderTop: roomy ? `1px solid ${t.panel2 || "#dfe6e9"}` : "none" }}>
- {roomy && row && <XformStory t={t} row={row} />}
  {!def ? (
  <div style={{ padding: "12px 14px" }}>
  <div style={{ fontSize: 12.5, fontWeight: 700, color: t.navy || "#10193b" }}>
@@ -463,7 +451,8 @@ function InlineDef({ t, system, dataSource, code, ctx, row, tableName, onDataSou
  {proof.length > 0 && (
  <>
  <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase",
- letterSpacing: 0.4, color: t.sub || "#666", margin: "10px 0 4px" }}>
+ letterSpacing: 0.4, color: t.sub || "#666", margin: "4px 0 6px",
+ paddingTop: 12, borderTop: `1px solid ${t.panel2 || "#dfe6e9"}` }}>
  Stage-by-stage proof (sample)</div>
  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
  {proof.map((p) => (
