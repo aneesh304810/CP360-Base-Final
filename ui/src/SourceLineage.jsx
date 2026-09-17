@@ -69,6 +69,74 @@ const CLS = {
 
 const pct = (n, d) => (d ? Math.round((n / d) * 100) : 0);
 
+// ---------------------------------------------------------------------
+// The Business view's grammar, copied rather than approximated, so the two
+// doors of the same page do not read as two products. Values are taken from
+// BizLineage.jsx verbatim — the 54px emoji circles, the 56px conic-gradient
+// ring, the 3-column card grid, the 19/13.5/12.5/11 type scale, and the
+// palette it hardcodes (#7b8894 text, #c9d4dc rule). If BizLineage's
+// grammar changes, these move with it.
+// ---------------------------------------------------------------------
+const STG_META = [
+  ["🏦", "AddVantage", "nightly file", "#7c3aed"],
+  ["📥", "Landed", "staging 1", "#00a3a3"],
+  ["🧼", "Cleaned", "staging 2", "#0091bf"],
+  ["🏪", "Warehouse", "", "#0f4775"],
+];
+
+function Circ({ i, big }) {
+  const m = STG_META[i];
+  return (
+    <div style={{ width: big ? 54 : 32, height: big ? 54 : 32, borderRadius: "50%",
+      background: "#fff", display: "grid", placeItems: "center",
+      fontSize: big ? 22 : 13, flexShrink: 0,
+      border: `2.5px solid ${m[3]}`,
+      boxShadow: "0 2px 6px rgba(20,40,60,.08)" }}>{m[0]}</div>);
+}
+
+function Spine({ ds }) {
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start",
+      justifyContent: "center", margin: "6px 0 26px" }}>
+      {STG_META.map((m, i) => (
+        <React.Fragment key={m[1]}>
+          {i > 0 && (
+            <div style={{ flex: 1, maxWidth: 150, height: 2.5, background: "#c9d4dc",
+              marginTop: 26, position: "relative" }}>
+              <span style={{ position: "absolute", right: -1, top: -4.5,
+                borderLeft: "9px solid #c9d4dc", borderTop: "6px solid transparent",
+                borderBottom: "6px solid transparent" }} />
+            </div>)}
+          <div style={{ display: "flex", flexDirection: "column",
+            alignItems: "center", gap: 7, minWidth: 150, maxWidth: 210 }}>
+            <Circ i={i} big />
+            <b style={{ fontSize: 13, fontWeight: 500 }}>{m[1]}</b>
+            <small style={{ fontSize: 10.5, color: "#7b8894" }}>
+              {i === 3 ? ds : m[2]}</small>
+          </div>
+        </React.Fragment>))}
+    </div>);
+}
+
+function Ring({ pct: p }) {
+  const col = p === 0 ? "#c2ccd4" : p < 60 ? "#e67e22" : "#159943";
+  return (
+    <div style={{ width: 56, height: 56, borderRadius: "50%", flexShrink: 0,
+      background: `conic-gradient(${col} 0 ${p}%, #edf1f4 ${p}% 100%)`,
+      display: "grid", placeItems: "center" }}>
+      <span style={{ background: "#fff", width: 42, height: 42, borderRadius: "50%",
+        display: "grid", placeItems: "center", fontSize: 12.5, fontWeight: 700 }}>
+        {p}%</span>
+    </div>);
+}
+
+const H1 = ({ children }) => (
+  <h1 style={{ fontSize: 19, fontWeight: 400, textAlign: "center",
+    margin: "0 0 4px" }}>{children}</h1>);
+const Sub = ({ children }) => (
+  <div style={{ fontSize: 12.5, color: "#7b8894", textAlign: "center",
+    marginBottom: 22 }}>{children}</div>);
+
 export default function SourceLineage({ t, system = "ADDVANTAGE",
                                         dataSource = "PBDW", tech = false,
                                         onOpenTechnical }) {
@@ -84,12 +152,16 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
   const [flow, setFlow] = useState(null);
   const [fields, setFields] = useState(null);
   const [bucket, setBucket] = useState(null);
+  // L0 is now two steps: the functional groups, then the files inside one.
+  // 137 files in a flat list is a scroll; 15 cards is a screen.
+  const [group, setGroup] = useState(null);
   const [q, setQ] = useState("");
 
   // ---- fetches, one per level -------------------------------------------
   useEffect(() => {
     let dead = false;
     setSrcs(null); setLevel(0); setFile(null); setTarget(null);
+    setGroup(null); setQ("");
     lineageApi.lineageSources(ds).then((d) => { if (!dead) setSrcs(d); });
     return () => { dead = true; };
   }, [ds]);
@@ -172,10 +244,25 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
           ? <span style={{ fontFamily: mono, fontSize: 11.5, padding: "3px 8px",
                            borderRadius: 4, background: t.tint || "#cae3ee",
                            color: navy }}>All sources</span>
-          : <button onClick={() => { setLevel(0); setFile(null); setTarget(null); }}
+          : <button onClick={() => { setLevel(0); setFile(null); setTarget(null);
+                                     setGroup(null); setQ(""); }}
               style={{ fontFamily: mono, fontSize: 11.5, padding: "3px 8px",
                        borderRadius: 4, background: "#f2f5f7", color: accent,
                        border: "none", cursor: "pointer" }}>All sources</button>}
+        {/* the functional group sits between "all sources" and a file */}
+        {group && (
+          <React.Fragment key="g">
+            <span style={{ color: muted }}>›</span>
+            {level === 0 && !file
+              ? <span style={{ fontSize: 11.5, padding: "3px 8px", borderRadius: 4,
+                               background: t.tint || "#cae3ee", color: navy }}>
+                  {group}</span>
+              : <button onClick={() => { setLevel(0); setFile(null);
+                                         setTarget(null); setQ(""); }}
+                  style={{ fontSize: 11.5, padding: "3px 8px", borderRadius: 4,
+                           background: "#f2f5f7", color: accent, border: "none",
+                           cursor: "pointer" }}>{group}</button>}
+          </React.Fragment>)}
         {file && step(file, 1, "f")}
         {level >= 2 && step(target || "All fields", 2, "t")}
         {level >= 3 && member && step(
@@ -216,111 +303,120 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
   };
 
   // ================================================================== L0
+  // Two steps, in the Business view's grammar: the functional groups as a
+  // grid of ringed cards — 15 of them, one screen, no scrolling — then the
+  // files inside the one you pick. The old screen listed all 137 files under
+  // their group headings, which is the scroll this replaces.
   const renderSources = () => {
     if (!srcs) return <div style={{ padding: 20, color: muted }}>Loading sources…</div>;
-    // `groups` is the current shape; `masters` is the alias /sources still
-    // returns for a client written before the spine became configurable.
     const buckets = srcs.groups || srcs.masters || [];
     if (!buckets.length)
       return <div style={{ padding: 20, color: muted }}>
         No source files in {ds} — check ingestion for this warehouse.</div>;
-    const T = srcs.totals;
-    // The spine is whatever the data supports, so label the tile from the
-    // payload. Hard-coding "Masters" is how L0 came to read one bucket of
-    // "Unresolved · 177 tables" on an extract whose tables are named
-    // Company / Instrument / Portfolio — names no master hint matches.
-    // /sources resolves the grouping through several columns in turn and
-    // reports which one answered. Read the label from the payload: three
-    // rounds were lost to a screen that printed the NVL placeholder
-    // "Unassigned" as though it were a bucket anyone had chosen.
-    const R = srcs.resolution || {};
-    const spineTile = srcs.spine_label || "Groups";
-    const ran = (R.resolvers || []).filter((x) => x.ran);
-    const nothingResolved = ran.length > 0 && !R.files_resolved;
+    const T = srcs.totals || {};
+
+    // ---- L0a · the groups ------------------------------------------------
+    if (!group) {
+      const R = srcs.resolution || {};
+      const ran = (R.resolvers || []).filter((x) => x.ran);
+      const nothingResolved = ran.length > 0 && !R.files_resolved;
+      return (
+        <div style={{ maxWidth: 1000, margin: "0 auto" }}>
+          <H1>Where {ds} data comes from</H1>
+          <Sub>{T.files} extract files · {T.field_count} fields ·
+            {" "}{T.mapped} mapped — click an area to zoom in</Sub>
+          <Spine ds={ds} />
+
+          {nothingResolved && (
+            <div style={{ border: "1px solid #e67e22", borderRadius: 10,
+                          padding: "13px 16px", marginBottom: 16 }}>
+              <b style={{ fontSize: 13 }}>No grouping in the data yet</b>
+              <p style={{ fontSize: 12, color: "#7b8894", margin: "6px 0 9px",
+                          maxWidth: "76ch" }}>
+                Every column that could say which business area an extract file
+                belongs to came back empty, so the files below are one flat
+                list. This is a load question, not a screen bug.</p>
+              {ran.map((x) => (
+                <div key={x.source} style={{ display: "flex", gap: 10,
+                          alignItems: "baseline", padding: "3px 0",
+                          borderTop: "1px solid #edf1f4" }}>
+                  <span style={{ fontFamily: mono, fontSize: 11.5, minWidth: 210 }}>
+                    {x.origin}</span>
+                  <span style={{ fontSize: 11, color: "#7b8894" }}>
+                    {x.files_covered} of {R.files_requested} files</span>
+                </div>))}
+            </div>)}
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)",
+                        gap: 16 }}>
+            {buckets.map((b) => {
+              const p = pct(b.mapped, b.field_count);
+              return (
+                <div key={b.key || b.master}
+                  onClick={() => { setGroup(b.key || b.master); setQ(""); }}
+                  style={{ background: "#fff", border: "1px solid #c9d4dc",
+                    borderRadius: 10, padding: 17, cursor: "pointer",
+                    display: "flex", gap: 15, alignItems: "center" }}>
+                  <Ring pct={p} />
+                  <div style={{ minWidth: 0 }}>
+                    <h3 style={{ fontSize: 13.5, fontWeight: 500,
+                      margin: "0 0 2px" }}>{b.label || b.master}</h3>
+                    <small style={{ fontSize: 11, color: "#7b8894" }}>
+                      {b.files.length} file{b.files.length === 1 ? "" : "s"} ·
+                      {" "}{b.field_count} fields
+                      {p === 0 ? " · not started" : ""}</small>
+                  </div>
+                </div>);
+            })}
+          </div>
+        </div>);
+    }
+
+    // ---- L0b · the files in one group ------------------------------------
+    const b = buckets.find((x) => (x.key || x.master) === group) || { files: [] };
+    const files = q
+      ? b.files.filter((f) => (f.src_source_table || "")
+          .toLowerCase().includes(q.toLowerCase()))
+      : b.files;
     return (
-      <>
-        <div style={{ display: "grid", gap: 1, background: line, border: `1px solid ${line}`,
-                      borderRadius: 8, overflow: "hidden", marginBottom: 16,
-                      gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))" }}>
-          {[[T.files, "Extract files"], [T.groups ?? T.masters, spineTile],
-            [T.field_count, "Fields in"], [T.mapped, "Mapped"],
-            [T.unmapped, "Still to map"]].map(([n, l], i) => (
-            <div key={l} style={{ background: panel, padding: "12px 14px" }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: i === 4
-                            ? (t.danger || "#c1113a") : navy }}>{n}</div>
-              <div style={{ fontSize: 10.5, color: sub }}>{l}</div>
-            </div>))}
-        </div>
-
-        {nothingResolved && (
-          <div style={{ ...card, borderColor: t.warning || "#e67e22",
-                        padding: "13px 15px" }}>
-            <b style={{ fontSize: 13, color: navy }}>
-              No grouping in the data yet</b>
-            <p style={{ fontSize: 12, color: sub, margin: "6px 0 9px",
-                        maxWidth: "76ch" }}>
-              Every column that could say which business area an extract file
-              belongs to came back empty, so the files below are one flat list.
-              This is a load question, not a screen bug — filling any one of
-              these gives the drill its top level:
-            </p>
-            {ran.map((x) => (
-              <div key={x.source} style={{ display: "flex", gap: 10,
-                        alignItems: "baseline", padding: "3px 0",
-                        borderTop: `1px solid ${line}` }}>
-                <span style={{ fontFamily: mono, fontSize: 11.5, color: navy,
-                               minWidth: 210 }}>{x.origin}</span>
-                <span style={{ fontSize: 11, color: muted }}>
-                  {x.files_covered} of {R.files_requested} files
-                  {x.buckets ? ` · ${x.buckets} groups` : ""}</span>
-              </div>))}
-          </div>)}
-
-        {buckets.map((m) => (
-          <div key={m.key || m.master} style={card}>
-            <div style={{ padding: "11px 15px", borderBottom: `1px solid ${line}`,
-                          display: "flex", gap: 10, alignItems: "center",
-                          flexWrap: "wrap" }}>
-              <span style={{ width: 9, height: 9, borderRadius: 999,
-                             background: bucketColor(m.label || m.master) }} />
-              <b style={{ fontSize: 13.5, color: navy }}>{m.label || m.master}</b>
-              {(m.sources || []).length > 0 && (
-                <span title={`grouped by ${(m.sources || []).join(", ")}`}
-                      style={{ fontSize: 9.5, fontFamily: mono, color: muted,
-                               border: `1px solid ${line}`, borderRadius: 3,
-                               padding: "1px 5px" }}>
-                  {m.sources.join(" + ")}</span>)}
-              <span style={{ fontSize: 11, color: muted }}>
-                {m.files.length} file{m.files.length === 1 ? "" : "s"} ·
-                {" "}{m.field_count} fields
+      <div style={{ maxWidth: 1000, margin: "0 auto" }}>
+        <H1>{b.label || b.master}</H1>
+        <Sub>{b.files.length} extract file{b.files.length === 1 ? "" : "s"} ·
+          {" "}{b.field_count} fields · {pct(b.mapped, b.field_count)}% mapped —
+          click a file to follow it through</Sub>
+        {b.files.length > 12 && (
+          <input value={q} onChange={(e) => setQ(e.target.value)}
+            placeholder="Filter files…"
+            style={{ display: "block", margin: "0 auto 14px", width: 280, height: 30,
+              border: "1px solid #c9d4dc", borderRadius: 4, padding: "0 10px",
+              fontSize: 12, fontFamily: "inherit" }} />)}
+        <div style={{ border: "1px solid #c9d4dc", borderRadius: 10,
+                      overflow: "hidden", background: "#fff" }}>
+          {files.map((f, i) => (
+            <div key={f.src_source_table}
+              onClick={() => { setFile(f.src_source_table); setLevel(1);
+                               setTarget(null); setBucket(null); }}
+              style={{ display: "grid", alignItems: "center", gap: 14,
+                gridTemplateColumns: "minmax(0,1fr) 88px 120px",
+                padding: "11px 16px", cursor: "pointer",
+                borderTop: i ? "1px solid #edf1f4" : "none" }}>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ fontFamily: mono, fontSize: 12.5, display: "block",
+                  overflow: "hidden", textOverflow: "ellipsis",
+                  whiteSpace: "nowrap" }}>{f.src_source_table}</span>
+                <small style={{ fontSize: 11, color: "#7b8894" }}>
+                  lands in {f.target_tables} table{f.target_tables === 1 ? "" : "s"} ·
+                  {" "}{f.target_columns} columns</small>
               </span>
-              {m.unmapped > 0 && (
-                <span style={{ marginLeft: "auto", fontSize: 11, fontFamily: mono,
-                               color: t.danger || "#c1113a" }}>
-                  {m.unmapped} to map</span>)}
-            </div>
-            {m.files.map((f) => (
-              <button key={f.src_source_table} style={{ ...rowCss,
-                        gridTemplateColumns: "minmax(0,1fr) 92px 130px 70px" }}
-                onClick={() => { setFile(f.src_source_table); setLevel(1);
-                                 setTarget(null); setBucket(null); }}>
-                <span style={{ minWidth: 0 }}>
-                  <span style={{ fontFamily: mono, fontSize: 12.5, color: navy,
-                                 display: "block", overflow: "hidden",
-                                 textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {f.src_source_table}</span>
-                  <span style={{ fontSize: 10.5, color: muted }}>
-                    lands in {f.target_tables} table{f.target_tables === 1 ? "" : "s"}
-                    {" · "}{f.target_columns} columns
-                    {f.master ? ` · ${f.master}` : ""}</span>
-                </span>
-                <span style={{ fontFamily: mono, fontSize: 11.5, color: sub,
-                               textAlign: "right" }}>{f.field_count} fields</span>
-                {meter(f.mapped, f.field_count)}
-                {gapCell(f.unmapped)}
-              </button>))}
-          </div>))}
-      </>);
+              <small style={{ fontSize: 11, color: "#7b8894", textAlign: "right" }}>
+                {f.field_count} fields</small>
+              {meter(f.mapped, f.field_count)}
+            </div>))}
+          {!files.length && (
+            <div style={{ padding: 18, fontSize: 12, color: "#7b8894",
+              textAlign: "center" }}>No file matches “{q}”.</div>)}
+        </div>
+      </div>);
   };
 
   // ================================================================== L1
@@ -570,7 +666,10 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
   return (
     <div>
       {crumb()}
-      {spine()}
+      {/* L0 draws the Business view's Spine inside renderSources — the data
+          strip below only has values once a file is chosen, and showing it
+          empty above the group cards was 90px of dimmed placeholder. */}
+      {level > 0 && spine()}
       {level === 0 && renderSources()}
       {level === 1 && renderFlow()}
       {level === 2 && renderFields()}
