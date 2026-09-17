@@ -103,3 +103,68 @@ if _MISSING:
              ", ".join(_MISSING))
 
 __all__ = ["_safe", "_ds_scoped", "_norm_code", "_master_from_context"]
+
+
+# ------------------------------------------------------- mapped predicate ---
+# The loaders disagree about how they spell "this field has an agreed target".
+# The rich sheet writes 'Exists', the 4-column loader writes 'mapped', and a
+# live extract was observed carrying neither — which made every coverage figure
+# on the source-first screens read 0 of N mapped, 0%, "not started", on data
+# that is in fact largely mapped.
+#
+# So do not test for a literal. Classify in three steps:
+#
+#   1. a status in _MAPPED_WORDS          -> mapped
+#   2. a status in _UNMAPPED_WORDS        -> not mapped
+#   3. anything else (incl. NULL)         -> mapped iff a dwh target exists
+#
+# Step 3 is the point: an unrecognised vocabulary degrades to the structural
+# truth (the row names a warehouse column, so the field lands somewhere)
+# instead of degrading to zero. Add new spellings to the word lists as they
+# turn up; the fallback means a missed one is not a visible regression.
+#
+# Call GET /legacy-lineage/status-values to see the real vocabulary of a given
+# database and how each value classifies here.
+
+_MAPPED_WORDS = (
+    "mapped", "exists", "exist", "match", "matched", "matches",
+    "complete", "completed", "done", "verified", "confirmed", "approved",
+    "migrated", "in scope", "active", "ok", "y", "yes", "true", "1",
+)
+
+_UNMAPPED_WORDS = (
+    "unmapped", "not mapped", "notmapped", "no match", "nomatch",
+    "missing", "gap", "none", "n/a", "na", "not applicable",
+    "tbd", "to be decided", "pending", "open", "new", "not started",
+    "not required", "out of scope", "excluded", "exclude",
+    "dropped", "drop", "deprecated", "retired",
+    "n", "no", "false", "0",
+)
+
+
+def _sql_list(words) -> str:
+    return ", ".join("'" + w.replace("'", "''") + "'" for w in words)
+
+
+# Drop-in for the old  LOWER(lineage_status) IN ('mapped','exists').
+# Self-contained: binds nothing, so it can be interpolated into any query that
+# selects from legacy_lineage.
+_MAPPED_SQL = (
+    "(LOWER(TRIM(lineage_status)) IN (" + _sql_list(_MAPPED_WORDS) + ")"
+    " OR (dwh_target_column IS NOT NULL"
+    " AND NVL(LOWER(TRIM(lineage_status)), '~') NOT IN ("
+    + _sql_list(_UNMAPPED_WORDS) + ")))"
+)
+
+
+def _is_mapped(status, has_target: bool = False) -> bool:
+    """Python mirror of _MAPPED_SQL — same three steps, same answer."""
+    s = str(status or "").strip().lower()
+    if s in _MAPPED_WORDS:
+        return True
+    if s in _UNMAPPED_WORDS:
+        return False
+    return bool(has_target)
+
+
+__all__ += ["_MAPPED_SQL", "_is_mapped", "_MAPPED_WORDS", "_UNMAPPED_WORDS"]

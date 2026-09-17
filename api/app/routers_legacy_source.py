@@ -6,12 +6,32 @@ reads lineage. It is the wrong shape for "what happens to our account file",
 which is how everyone else reads it, and it gives no entry point at the thing
 the migration actually starts from: the AddVantage extract.
 
-These three endpoints invert that:
+These endpoints invert that:
 
-  /sources       every extract file, grouped by the master it carries
-  /source-flow   one file end to end — STG1, STG2, every warehouse table it
-                 lands in, with per-target coverage
-  /source-fields the file's fields, collapsed into families
+  /sources        every extract file, grouped along a spine (see below)
+  /source-flow    one file end to end — STG1, STG2, every warehouse table it
+                  lands in, with per-target coverage
+  /source-fields  the file's fields, collapsed into families
+  /status-values  diagnostic: the real lineage_status vocabulary, and how the
+                  shared mapped-predicate classifies each value
+
+THE SPINE. L0 was originally grouped by master, resolved from the table names
+by _master_from_context. On the live extract that resolves to None for every
+file — the tables are named Company / Instrument / Portfolio / Transaction,
+which none of the AddVantage master hints match — so the whole screen
+collapsed into one "Unresolved" bucket of 177 tables. functional_group is a
+real column on legacy_lineage, it is what the existing accordion groups by,
+and it is populated. So: group by functional_group, fall back to master, fall
+back to a single bucket, and say in the payload which spine was used so the
+UI can label the column honestly rather than claiming "Masters" either way.
+
+A file can span several functional groups (it is the DWH side of the row that
+carries the group). Each file is filed under its DOMINANT group — most target
+columns — and carries its full group mix, so nothing is hidden by the choice.
+
+COUNTING. field_count and mapped come from a per-file query, never from
+summing the per-(file, group) rows: a source column feeding two functional
+groups appears in both and would be counted twice.
 
 FAMILIES: the AddVantage code is group/section-line, so BI/2-1 .. BI/2-5 are
 five lines of ONE field (Account Long Name). canon() gives BI_2_1 .. BI_2_5.
@@ -32,14 +52,11 @@ from fastapi import APIRouter
 
 from ._legacy_compat import (
     _safe, _ds_scoped, _norm_code, _master_from_context,
+    _MAPPED_SQL, _is_mapped,
 )
 
 log = logging.getLogger("cp.api.legacy_source")
 router = APIRouter(prefix="/legacy-lineage", tags=["legacy-lineage"])
-
-# Both loader conventions mean mapped: the rich sheet writes 'Exists',
-# the 4-column loader writes 'mapped'.
-_MAPPED_SQL = "LOWER(lineage_status) IN ('mapped', 'exists')"
 
 # canon() in SQL — matches _norm_code exactly. The '_\1' backreference must
 # survive as two characters; in a non-raw string Python turns \1 into chr(1)
@@ -51,6 +68,11 @@ _CANON_SRC = r"""REGEXP_REPLACE(
 
 # LETTERS_DIGITS _ DIGITS -> (family, line). Anything else is its own family.
 _FAMILY_RE = _re.compile(r"^([A-Z]+_\d+)_(\d+)$")
+
+# The placeholder NVL(functional_group, ...) writes, and the label the master
+# spine uses when the hints do not match. Neither is a real bucket.
+_NO_GROUP = "Unassigned"
+_NO_MASTER = "Unresolved"
 
 
 def _family(code_norm: str) -> tuple[str, int | None]:
@@ -65,8 +87,7 @@ def _hop_class(r: dict) -> str:
     for the field list. Mirrors the graph's edge kinds."""
     src, s1 = r.get("src_source_column"), r.get("stg1_source_column")
     s2, dwh = r.get("stg2_source_column"), r.get("dwh_target_column")
-    if not str(r.get("lineage_status") or "").lower() in ("mapped", "exists") \
-            or not dwh:
+    if not _is_mapped(r.get("lineage_status"), bool(dwh)) or not dwh:
         return "unmapped"
     xf = " ".join(str(r.get(k) or "") for k in
                   ("src_to_stg1_transform", "stg1_to_stg2_transform",
@@ -84,10 +105,14 @@ def _hop_class(r: dict) -> str:
 
 
 @router.get("/sources")
-def sources(data_source: str | None = None):
-    """Every AddVantage extract file, with the master it carries and how far
-    its fields get. This is the entry point of the source-first drill."""
-    rows = _ds_scoped(f"""
+def sources(data_source: str | None = None, spine: str | None = None):
+    """Every AddVantage extract file, bucketed along the best available spine,
+    with how far its fields get. This is the entry point of the drill.
+
+    spine=group|master|flat forces one; omitted, the best populated one wins.
+    """
+    # --- per file: the authoritative field counts (no double counting) ------
+    files = _ds_scoped(f"""
         SELECT src_source_table,
                MIN(stg1_source_table) AS stg1_source_table,
                MIN(stg2_source_table) AS stg2_source_table,
@@ -97,34 +122,143 @@ def sources(data_source: str | None = None):
                COUNT(DISTINCT dwh_target_table) AS target_tables,
                COUNT(DISTINCT dwh_target_table || '.' || dwh_target_column)
                    AS target_columns,
-               COUNT(DISTINCT NVL(functional_group, 'Unassigned')) AS groups
+               COUNT(DISTINCT NVL(functional_group, '{_NO_GROUP}')) AS groups
         FROM legacy_lineage
         WHERE src_source_table IS NOT NULL {{DS}}
         GROUP BY src_source_table
         ORDER BY COUNT(DISTINCT src_source_column) DESC""", {}, data_source)
 
-    by_master: dict[str, dict] = {}
-    for r in rows:
-        r["master"] = _master_from_context(r.get("src_source_table"),
-                                           r.get("stg1_source_table")) or "Unresolved"
-        r["unmapped"] = (r.get("field_count") or 0) - (r.get("mapped") or 0)
-        m = by_master.setdefault(r["master"], {
-            "master": r["master"], "files": [], "field_count": 0,
-            "mapped": 0, "unmapped": 0, "target_tables": 0})
-        m["files"].append(r)
-        m["field_count"] += r.get("field_count") or 0
-        m["mapped"] += r.get("mapped") or 0
-        m["unmapped"] += r["unmapped"]
-        m["target_tables"] = max(m["target_tables"], r.get("target_tables") or 0)
+    # --- per (file, functional group): the mix, for choosing the bucket -----
+    mix = _ds_scoped(f"""
+        SELECT src_source_table,
+               NVL(functional_group, '{_NO_GROUP}') AS functional_group,
+               COUNT(DISTINCT dwh_target_table || '.' || dwh_target_column)
+                   AS target_columns,
+               COUNT(DISTINCT dwh_target_table) AS target_tables
+        FROM legacy_lineage
+        WHERE src_source_table IS NOT NULL {{DS}}
+        GROUP BY src_source_table, NVL(functional_group, '{_NO_GROUP}')""",
+        {}, data_source)
 
-    masters = sorted(by_master.values(), key=lambda m: -m["field_count"])
-    tot_f = sum(m["field_count"] for m in masters)
-    tot_m = sum(m["mapped"] for m in masters)
+    by_file: dict[str, list[dict]] = {}
+    for m in mix:
+        by_file.setdefault(m.get("src_source_table"), []).append(m)
+
+    for f in files:
+        f["unmapped"] = (f.get("field_count") or 0) - (f.get("mapped") or 0)
+        f["master"] = _master_from_context(f.get("src_source_table"),
+                                           f.get("stg1_source_table"))
+        # dominant group: most target columns, a real group beating the
+        # placeholder even when the placeholder is larger — filing a file
+        # under "Unassigned" when it has any real group is a lost file.
+        gs = sorted(by_file.get(f.get("src_source_table")) or [],
+                    key=lambda g: (g.get("functional_group") == _NO_GROUP,
+                                   -(g.get("target_columns") or 0),
+                                   str(g.get("functional_group") or "")))
+        f["groups_mix"] = [{"functional_group": g.get("functional_group"),
+                            "target_columns": g.get("target_columns"),
+                            "target_tables": g.get("target_tables")}
+                           for g in gs]
+        f["functional_group"] = gs[0]["functional_group"] if gs else _NO_GROUP
+
+    # --- pick the spine -----------------------------------------------------
+    real_groups = {f["functional_group"] for f in files
+                   if f["functional_group"] != _NO_GROUP}
+    real_masters = {f["master"] for f in files if f.get("master")}
+    if spine in ("group", "master", "flat"):
+        chosen = spine
+    elif real_groups:
+        chosen = "group"
+    elif real_masters:
+        chosen = "master"
+    else:
+        chosen = "flat"
+
+    if chosen == "group":
+        key_of, label = (lambda f: f["functional_group"] or _NO_GROUP,
+                         "Functional group")
+    elif chosen == "master":
+        key_of, label = (lambda f: f.get("master") or _NO_MASTER, "Master")
+    else:
+        key_of, label = (lambda f: "All extracts", "Source")
+
+    buckets: dict[str, dict] = {}
+    for f in files:
+        k = key_of(f)
+        b = buckets.setdefault(k, {
+            # "master" is kept as an alias of the bucket name so a client
+            # written against the master-only shape keeps rendering.
+            "key": k, "label": k, "master": k, "spine": chosen,
+            "files": [], "field_count": 0, "mapped": 0, "unmapped": 0,
+            "target_tables": 0})
+        b["files"].append(f)
+        b["field_count"] += f.get("field_count") or 0
+        b["mapped"] += f.get("mapped") or 0
+        b["unmapped"] += f["unmapped"]
+        b["target_tables"] = max(b["target_tables"], f.get("target_tables") or 0)
+
+    # a placeholder bucket sorts last however big it is
+    groups = sorted(buckets.values(),
+                    key=lambda b: (b["key"] in (_NO_GROUP, _NO_MASTER),
+                                   -b["field_count"]))
+    tot_f = sum(b["field_count"] for b in groups)
+    tot_m = sum(b["mapped"] for b in groups)
     return {"data_source": (data_source or "").upper() or None,
-            "masters": masters, "sources": rows,
-            "totals": {"files": len(rows), "masters": len(masters),
+            "spine": chosen, "spine_label": label,
+            "groups": groups,
+            "masters": groups,          # legacy alias, same objects
+            "sources": files,
+            "totals": {"files": len(files), "groups": len(groups),
+                       "masters": len(groups), "spine": chosen,
                        "field_count": tot_f, "mapped": tot_m,
                        "unmapped": tot_f - tot_m}}
+
+
+@router.get("/status-values")
+def status_values(data_source: str | None = None):
+    """Diagnostic. The real lineage_status vocabulary in this database, with
+    row counts and how the shared predicate classifies each value.
+
+    This exists because a live extract read "0 of 177 tables mapped · 0%" on
+    data that was mapped: its lineage_status used neither 'mapped' nor
+    'Exists', the only two values the coverage SQL used to accept. Before
+    arguing with a coverage figure, read this — it says whether the number is
+    a data problem or a vocabulary problem, and names the values to add to
+    _MAPPED_WORDS / _UNMAPPED_WORDS in _legacy_compat.
+    """
+    rows = _ds_scoped("""
+        SELECT NVL(lineage_status, '(null)') AS lineage_status,
+               COUNT(*) AS rows_,
+               COUNT(DISTINCT src_source_table) AS src_tables,
+               COUNT(CASE WHEN dwh_target_column IS NOT NULL THEN 1 END)
+                   AS with_target
+        FROM legacy_lineage
+        WHERE 1 = 1 {DS}
+        GROUP BY NVL(lineage_status, '(null)')
+        ORDER BY COUNT(*) DESC""", {}, data_source)
+
+    out, n_map, n_un = [], 0, 0
+    for r in rows:
+        raw = r.get("lineage_status")
+        status = None if raw == "(null)" else raw
+        total = r.get("rows_") or 0
+        with_t = r.get("with_target") or 0
+        # a value not in either word list splits by whether a target exists
+        mapped = (total if _is_mapped(status, True) and _is_mapped(status, False)
+                  else with_t if _is_mapped(status, True) else 0)
+        n_map += mapped
+        n_un += total - mapped
+        out.append({"lineage_status": raw, "rows": total,
+                    "src_tables": r.get("src_tables"), "with_target": with_t,
+                    "counts_as_mapped": mapped,
+                    "verdict": ("mapped" if _is_mapped(status, False) else
+                                "unmapped" if not _is_mapped(status, True) else
+                                "mapped when the row names a warehouse column")})
+    return {"data_source": (data_source or "").upper() or None,
+            "values": out,
+            "totals": {"distinct_values": len(out),
+                       "rows": n_map + n_un, "mapped": n_map, "unmapped": n_un},
+            "predicate": _MAPPED_SQL}
 
 
 @router.get("/source-flow")
@@ -147,22 +281,32 @@ def source_flow(src_table: str, data_source: str | None = None):
 
     targets = _ds_scoped(f"""
         SELECT dwh_target_table,
-               NVL(functional_group, 'Unassigned') AS functional_group,
+               NVL(functional_group, '{_NO_GROUP}') AS functional_group,
                NVL(data_source, 'PBDW') AS data_source,
                COUNT(DISTINCT dwh_target_column) AS column_count,
                COUNT(DISTINCT CASE WHEN {_MAPPED_SQL}
                                    THEN dwh_target_column END) AS mapped
         FROM legacy_lineage
         WHERE src_source_table = :s AND dwh_target_table IS NOT NULL {{DS}}
-        GROUP BY dwh_target_table, NVL(functional_group, 'Unassigned'),
+        GROUP BY dwh_target_table, NVL(functional_group, '{_NO_GROUP}'),
                  NVL(data_source, 'PBDW')
         ORDER BY COUNT(DISTINCT dwh_target_column) DESC""",
         {"s": src_table}, data_source)
 
     st = stages[0] if stages else {}
+    # the group the file mostly serves — the honest headline when the master
+    # hints do not resolve, which on the live extract is every file
+    groups = {}
+    for tg in targets:
+        g = tg.get("functional_group") or _NO_GROUP
+        groups[g] = groups.get(g, 0) + (tg.get("column_count") or 0)
+    top = sorted(groups.items(), key=lambda kv: (kv[0] == _NO_GROUP, -kv[1]))
     return {"src_table": src_table,
             "master": _master_from_context(src_table,
                                            st.get("stg1_source_table")),
+            "functional_group": top[0][0] if top else None,
+            "functional_groups": [{"functional_group": k, "column_count": v}
+                                  for k, v in top],
             "data_source": (data_source or "").upper() or None,
             "stages": st, "targets": targets,
             "target_count": len(targets)}
@@ -192,7 +336,7 @@ def source_fields(src_table: str, data_source: str | None = None,
                    dwh_target_table, dwh_target_column, dwh_type, dwh_length,
                    src_to_stg1_transform, stg1_to_stg2_transform,
                    stg2_to_dwh_transform, lineage_status,
-                   NVL(functional_group, 'Unassigned') AS functional_group,
+                   NVL(functional_group, '{_NO_GROUP}') AS functional_group,
                    is_ud, ud_key
             FROM legacy_lineage
             WHERE src_source_table = :s AND src_source_column IS NOT NULL

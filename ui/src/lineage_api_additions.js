@@ -62,11 +62,22 @@ export const lineageApi = {
                stats: {}, truncated: false })),
 
   // ---- source-first drill ----
-  lineageSources: (data_source) =>
-    _get(`/legacy-lineage/sources?${_qs({ data_source })}`,
-      () => ({ masters: [], sources: [],
-               totals: { files: 0, masters: 0, field_count: 0,
+  // spine is optional — "group" | "master" | "flat". Omitted, /sources picks
+  // the best populated one and says which in the payload.
+  lineageSources: (data_source, spine) =>
+    _get(`/legacy-lineage/sources?${_qs({ data_source, spine })}`,
+      () => ({ spine: "flat", spine_label: "Source", groups: [], masters: [],
+               sources: [],
+               totals: { files: 0, groups: 0, masters: 0, field_count: 0,
                          mapped: 0, unmapped: 0 } })),
+
+  // Diagnostic. Answers "why does this screen say 0% mapped": prints the real
+  // lineage_status vocabulary with row counts and how each value classifies.
+  // A coverage figure that looks wrong is a vocabulary question first.
+  lineageStatusValues: (data_source) =>
+    _get(`/legacy-lineage/status-values?${_qs({ data_source })}`,
+      () => ({ values: [], totals: { distinct_values: 0, rows: 0,
+                                     mapped: 0, unmapped: 0 } })),
 
   lineageSourceFlow: (src_table, data_source) =>
     _get(`/legacy-lineage/source-flow?${_qs({ src_table, data_source })}`,

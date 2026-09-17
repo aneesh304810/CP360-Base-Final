@@ -42,7 +42,20 @@ const MASTER_C = {
   "Interested Party Master": "#0b7d7d", "Security Issue Master": "#6d3ac0",
   "Beneficiary Submaster": "#4a7c2f", "Co-fiduciary Submaster": "#8a6d1a",
 };
-const masterColor = (m) => MASTER_C[m] || "#6d3ac0";
+// L0 no longer buckets by master alone — the spine is whichever of
+// functional_group / master the data actually populates. The six named masters
+// keep their agreed colours; any other bucket name gets a deterministic slot,
+// so a functional group keeps one colour across renders and between screens.
+const PALETTE = ["#0f4775", "#b5651d", "#0b7d7d", "#6d3ac0", "#4a7c2f",
+                 "#8a6d1a", "#a8560f", "#00577d", "#7c3aed", "#1f7a5a"];
+const bucketColor = (name) => {
+  if (MASTER_C[name]) return MASTER_C[name];
+  const str = String(name || "");
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+  return PALETTE[h % PALETTE.length];
+};
+const masterColor = bucketColor;      // old name, same function
 
 // The organising principle at L2: what HAPPENS to a field, not where it sits.
 // A business reader learns the pipeline by reading which bucket is biggest.
@@ -205,16 +218,26 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
   // ================================================================== L0
   const renderSources = () => {
     if (!srcs) return <div style={{ padding: 20, color: muted }}>Loading sources…</div>;
-    if (!srcs.masters.length)
+    // `groups` is the current shape; `masters` is the alias /sources still
+    // returns for a client written before the spine became configurable.
+    const buckets = srcs.groups || srcs.masters || [];
+    if (!buckets.length)
       return <div style={{ padding: 20, color: muted }}>
         No source files in {ds} — check ingestion for this warehouse.</div>;
     const T = srcs.totals;
+    // The spine is whatever the data supports, so label the tile from the
+    // payload. Hard-coding "Masters" is how L0 came to read one bucket of
+    // "Unresolved · 177 tables" on an extract whose tables are named
+    // Company / Instrument / Portfolio — names no master hint matches.
+    const spineTile = srcs.spine === "master" ? "Masters"
+                    : srcs.spine === "flat"   ? "Source sets"
+                                              : "Functional groups";
     return (
       <>
         <div style={{ display: "grid", gap: 1, background: line, border: `1px solid ${line}`,
                       borderRadius: 8, overflow: "hidden", marginBottom: 16,
                       gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))" }}>
-          {[[T.files, "Extract files"], [T.masters, "Masters"],
+          {[[T.files, "Extract files"], [T.groups ?? T.masters, spineTile],
             [T.field_count, "Fields in"], [T.mapped, "Mapped"],
             [T.unmapped, "Still to map"]].map(([n, l], i) => (
             <div key={l} style={{ background: panel, padding: "12px 14px" }}>
@@ -224,14 +247,14 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
             </div>))}
         </div>
 
-        {srcs.masters.map((m) => (
-          <div key={m.master} style={card}>
+        {buckets.map((m) => (
+          <div key={m.key || m.master} style={card}>
             <div style={{ padding: "11px 15px", borderBottom: `1px solid ${line}`,
                           display: "flex", gap: 10, alignItems: "center",
                           flexWrap: "wrap" }}>
               <span style={{ width: 9, height: 9, borderRadius: 999,
-                             background: masterColor(m.master) }} />
-              <b style={{ fontSize: 13.5, color: navy }}>{m.master}</b>
+                             background: bucketColor(m.label || m.master) }} />
+              <b style={{ fontSize: 13.5, color: navy }}>{m.label || m.master}</b>
               <span style={{ fontSize: 11, color: muted }}>
                 {m.files.length} file{m.files.length === 1 ? "" : "s"} ·
                 {" "}{m.field_count} fields
@@ -253,7 +276,8 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
                     {f.src_source_table}</span>
                   <span style={{ fontSize: 10.5, color: muted }}>
                     lands in {f.target_tables} table{f.target_tables === 1 ? "" : "s"}
-                    {" · "}{f.target_columns} columns</span>
+                    {" · "}{f.target_columns} columns
+                    {f.master ? ` · ${f.master}` : ""}</span>
                 </span>
                 <span style={{ fontFamily: mono, fontSize: 11.5, color: sub,
                                textAlign: "right" }}>{f.field_count} fields</span>
@@ -272,7 +296,8 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
     return (
       <>
         <h1 style={{ fontSize: 20, fontWeight: 700, color: navy, margin: "0 0 4px" }}>
-          {tech ? flow.src_table : (flow.master || flow.src_table)}</h1>
+          {tech ? flow.src_table
+                : (flow.master || flow.functional_group || flow.src_table)}</h1>
         <p style={{ fontSize: 13, color: sub, margin: "0 0 14px", maxWidth: "74ch" }}>
           {tech
             ? <>Lands in <span style={{ fontFamily: mono }}>{st.stg1_source_table}</span>,
@@ -404,7 +429,8 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
                   <span style={{ fontFamily: mono, fontSize: 10, fontWeight: 700,
                                  padding: "2px 7px", borderRadius: 3, color: "#fff",
                                  background: f.unmapped ? (t.danger || "#c1113a")
-                                                        : masterColor(flow && flow.master) }}>
+                                   : bucketColor(flow && (flow.master
+                                                 || flow.functional_group)) }}>
                     {f.family}</span>
                 </button>
                 {multi && famKey === f.family && f.members.map((m) => (

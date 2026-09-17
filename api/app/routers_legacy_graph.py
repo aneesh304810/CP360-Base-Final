@@ -28,6 +28,7 @@ from fastapi import APIRouter
 
 from ._legacy_compat import (
     _safe, _ds_scoped, _norm_code, _master_from_context,
+    _MAPPED_SQL, _is_mapped,
 )
 
 log = logging.getLogger("cp.api.legacy_graph")
@@ -37,9 +38,12 @@ router = APIRouter(prefix="/legacy-lineage", tags=["legacy-lineage"])
 # one can read and a payload no one wants. Cap the chains and say so.
 MAX_CHAINS = 40
 
-# Both loader conventions mean "mapped": the rich sheet writes 'Exists',
-# the 4-column loader writes 'mapped'.
-_MAPPED = ("mapped", "exists")
+# "Is this field mapped" is ONE rule, shared with the source-first router and
+# defined in _legacy_compat. The loaders spell it 'mapped' and 'Exists', and on
+# at least one live extract neither — so an unrecognised status falls back to
+# whether the row names a warehouse column. Testing for those two literals here
+# marked every node unmapped on that extract. GET /legacy-lineage/status-values
+# prints the vocabulary of a given database and how each value classifies.
 
 _STAGES = ("SRC", "STG1", "STG2", "DWH")
 
@@ -111,7 +115,8 @@ def _chain_nodes_edges(r: dict) -> tuple[list[dict], list[dict]]:
                "STG2": r.get("stg1_to_stg2_transform"),
                "DWH":  r.get("stg2_to_dwh_transform")}
 
-    mapped = str(r.get("lineage_status") or "").lower() in _MAPPED
+    mapped = _is_mapped(r.get("lineage_status"),
+                        bool(r.get("dwh_target_column")))
     master = _master_from_context(r.get("src_source_table"),
                                   r.get("stg1_source_table"),
                                   r.get("dwh_target_table"))
@@ -159,8 +164,7 @@ def graph(table: str | None = None, column: str | None = None,
                    lineage_status
             FROM legacy_lineage
             WHERE dwh_target_table = :t AND dwh_target_column = :c {{DS}}
-            ORDER BY CASE WHEN LOWER(lineage_status) IN ('mapped', 'exists')
-                          THEN 0 ELSE 1 END,
+            ORDER BY CASE WHEN {_MAPPED_SQL} THEN 0 ELSE 1 END,
                      src_source_column NULLS LAST""",
             {"t": table, "c": column}, data_source)
         focus_id = _nid("DWH", table, column)
@@ -196,8 +200,7 @@ def graph(table: str | None = None, column: str | None = None,
             SELECT {_GRAPH_COLS}
             FROM legacy_lineage
             WHERE dwh_target_table = :t AND dwh_target_column = :c {{DS}}
-            ORDER BY CASE WHEN LOWER(lineage_status) IN ('mapped', 'exists')
-                          THEN 0 ELSE 1 END""",
+            ORDER BY CASE WHEN {_MAPPED_SQL} THEN 0 ELSE 1 END""",
             {"t": table, "c": column}, data_source))
     elif focus_code and not include_parallel:
         # code-addressed but parallel chains suppressed: keep the code's own rows
