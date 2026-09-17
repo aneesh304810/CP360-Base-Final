@@ -150,11 +150,21 @@ function buildStages(row, derived) {
 
 function Journey({ t, row, derived, dataSource }) {
  const stages = buildStages(row, derived);
+ // Each arrow is grouped WITH the card it points into, as one flex item.
+ // They used to be siblings, so when the strip wrapped — which it always
+ // does at drawer width, four stages into ~610px — a row could end on a
+ // dangling arrow pointing at nothing, and the next row began with a card
+ // no arrow led to. Grouping makes the wrap read as 2x2: SRC → STG1 above,
+ // STG2 → DWH below. rowGap clears the absolutely-positioned boundary
+ // pills, which sit above their card and would otherwise land on the row
+ // above; the bottom margin keeps the last row off the next heading.
  return (
- <div style={{ display: "flex", alignItems: "stretch", flexWrap: "wrap", rowGap: 16,
- padding: "18px 2px 2px" }}>
+ <div style={{ display: "flex", alignItems: "stretch", flexWrap: "wrap",
+ rowGap: 22, padding: "18px 2px 2px", marginBottom: 6 }}>
  {stages.map((s, i) => (
- <React.Fragment key={s.stage + i}>
+ <div key={s.stage + i}
+ style={{ display: "flex", alignItems: "stretch", flex: "0 1 auto",
+ minWidth: 0 }}>
  {i > 0 && (
  <div style={{ display: "flex", flexDirection: "column", alignItems: "center",
  justifyContent: "center", minWidth: 30, color: t.muted || "#999",
@@ -198,7 +208,7 @@ function Journey({ t, row, derived, dataSource }) {
  dictionary text</div>)}
  </div>
  </div>
- </React.Fragment>))}
+ </div>))}
  </div>);
 }
 
