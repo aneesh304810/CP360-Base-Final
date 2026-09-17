@@ -18,12 +18,41 @@ Env:
   (optional) CP_LEGACY_LINEAGE_SHEET / CP_LEGACY_PROOF_SHEET  sheet names
 """
 from __future__ import annotations
-import os, json, logging
+import os, json, hashlib, logging
 from openpyxl import load_workbook
 
 log = logging.getLogger("cp.legacy_lineage")
 
 UD_CLOB_COL = "USER_DEFINED_ATTRIBUTE_CLOB"
+
+# Which warehouse this workbook maps into. sql/29 added the column and said
+# "the loader tags rows at ingestion time"; it never did, so every run relied
+# on the column DEFAULT and a second warehouse would have been indistinguish-
+# able from the first. One workbook is one warehouse, so it comes from env.
+DEFAULT_DATA_SOURCE = os.environ.get("CP_LEGACY_DATA_SOURCE", "PBDW").upper()
+
+# The source chain that distinguishes two rows landing on the same DWH column.
+_CHAIN_COLS = ("src_source_table", "src_source_column",
+               "stg1_source_table", "stg1_source_column",
+               "stg2_source_table", "stg2_source_column")
+
+
+def _chain_hash(rec) -> str:
+    """Short stable digest of a row's source chain.
+
+    THE BUG THIS FIXES. lineage_id was f"{dwh_t}:{dwh_c}" - target table and
+    column only - and load() upserts on it. legacy_lineage's grain is
+    (target column x source), so a DWH column fed by two source chains is two
+    rows in the sheet with ONE id: the second silently overwrote the first and
+    the fan-in disappeared before it ever reached the database. That is the
+    merge rule the column-level graph exists to show, deleted at load time.
+
+    sql/29 already specified the fix in its own comments -
+    "{data_source}:{tgt}:{col}:{srchash}" - and the loader never implemented
+    it. This is that srchash.
+    """
+    raw = "|".join(str(rec.get(c) or "") for c in _CHAIN_COLS)
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:10]
 
 # lineage sheet header -> table column
 LINEAGE_MAP = {
@@ -71,11 +100,13 @@ def _parse_ud(blob):
 class LegacyLineageConnector:
     name = "legacy_lineage"
 
-    def __init__(self, xlsx_path, lineage_sheet=None, proof_sheet=None, dependency_sheet=None):
+    def __init__(self, xlsx_path, lineage_sheet=None, proof_sheet=None,
+                 dependency_sheet=None, data_source=None):
         self.xlsx_path = xlsx_path
         self.lineage_sheet = lineage_sheet
         self.proof_sheet = proof_sheet
         self.dependency_sheet = dependency_sheet
+        self.data_source = (data_source or DEFAULT_DATA_SOURCE).upper()
 
     @classmethod
     def from_env(cls):
@@ -84,6 +115,7 @@ class LegacyLineageConnector:
             os.environ.get("CP_LEGACY_LINEAGE_SHEET"),
             os.environ.get("CP_LEGACY_PROOF_SHEET"),
             os.environ.get("CP_LEGACY_DEPENDENCY_SHEET"),  # default: auto-detect "Table_Dependency_Network"
+            os.environ.get("CP_LEGACY_DATA_SOURCE"),      # which warehouse this workbook maps into
         )
 
     def parse(self):
@@ -94,7 +126,8 @@ class LegacyLineageConnector:
         lineage = self._parse_lineage(wb)
         proof = self._parse_proof(wb)
         deps = self._parse_dependency(wb)
-        log.info("legacy_lineage: %d lineage rows, %d proof rows, %d dependency rows",
+        log.info("legacy_lineage[%s]: %d lineage rows, %d proof rows, "
+                 "%d dependency rows", self.data_source,
                  len(lineage), len(proof), len(deps))
         return {"lineage": lineage, "proof": proof, "dependency": deps}
 
@@ -121,10 +154,23 @@ class LegacyLineageConnector:
             if not dwh_t or not dwh_c:
                 continue
             rec = {v: g(k) for k, v in LINEAGE_MAP.items()}
-            rec["lineage_id"] = f"{dwh_t}:{dwh_c}"
+            rec["data_source"] = self.data_source
+            # {data_source}:{tgt}:{col}:{srchash}, the format sql/29 specified
+            rec["lineage_id"] = (f"{self.data_source}:{dwh_t}:{dwh_c}"
+                                 f":{_chain_hash(rec)}")
             rec["is_ud"] = "N"
             rec["ud_key"] = None
             out.append(rec)
+
+        # say out loud how many chains the old key would have thrown away -
+        # silent data loss is why this went unnoticed through several loads
+        collapsed = len(out) - len({f"{r['dwh_target_table']}:"
+                                    f"{r['dwh_target_column']}" for r in out})
+        if collapsed:
+            log.warning("legacy_lineage: %d of %d rows share a DWH target "
+                        "column with another row (fan-in). The previous "
+                        "lineage_id would have kept only one of each.",
+                        collapsed, len(out))
         return out
 
     # ---- proof sheet (also drives UD explosion, since values live here) ----
@@ -239,15 +285,27 @@ class LegacyLineageConnector:
                 by_table[r["dwh_target_table"]] = (r.get("functional_group"), r.get("table_type"))
         # build UD lineage rows from proof UD keys that lack a lineage entry,
         # so exploded UD fields still appear in the backward trace.
+        # UD rows have no source chain, so their hash is the digest of empty
+        # strings - constant, and unique per (table, column), which is all a
+        # UD attribute needs.
+        ud_hash = _chain_hash({})
         seen = {r["lineage_id"] for r in bundle.get("lineage", [])}
+        have_target = {(r.get("dwh_target_table"), r.get("dwh_target_column"))
+                       for r in bundle.get("lineage", [])}
         for p in bundle.get("proof", []):
             if p.get("is_ud") == "Y":
-                lid = f"{p['proof_table']}:{p['field_name']}"
-                if lid not in seen:
+                lid = (f"{self.data_source}:{p['proof_table']}"
+                       f":{p['field_name']}:{ud_hash}")
+                # the id now carries a hash, so membership must be tested on
+                # the target column, not on the id, or every UD row is
+                # re-synthesised even where the sheet already mapped it
+                if lid not in seen and \
+                        (p["proof_table"], p["field_name"]) not in have_target:
                     seen.add(lid)
                     fg, tt = by_table.get(p["proof_table"], (None, None))
                     loader._merge("legacy_lineage", ("lineage_id",), {
-                        "lineage_id": lid, "dwh_target_table": p["proof_table"],
+                        "lineage_id": lid, "data_source": self.data_source,
+                        "dwh_target_table": p["proof_table"],
                         "dwh_target_column": p["field_name"], "is_ud": "Y", "ud_key": p["ud_key"],
                         "functional_group": fg, "table_type": tt,
                         "lineage_status": "UD Attribute",
