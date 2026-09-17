@@ -54,6 +54,7 @@ from ._legacy_compat import (
     _safe, _ds_scoped, _norm_code, _master_from_context,
     _MAPPED_SQL, _is_mapped,
 )
+from ._legacy_groups import resolve_groups, GROUP_SOURCES
 
 log = logging.getLogger("cp.api.legacy_source")
 router = APIRouter(prefix="/legacy-lineage", tags=["legacy-lineage"])
@@ -105,11 +106,13 @@ def _hop_class(r: dict) -> str:
 
 
 @router.get("/sources")
-def sources(data_source: str | None = None, spine: str | None = None):
-    """Every AddVantage extract file, bucketed along the best available spine,
-    with how far its fields get. This is the entry point of the drill.
+def sources(data_source: str | None = None, spine: str | None = None,
+            system: str = "ADDVANTAGE"):
+    """Every AddVantage extract file, bucketed by a RESOLVED group, with how
+    far its fields get. The entry point of the source-first drill.
 
-    spine=group|master|flat forces one; omitted, the best populated one wins.
+    spine=<source name> forces one resolver (see /group-sources); omitted, the
+    resolvers run in order until every file has a group.
     """
     # --- per file: the authoritative field counts (no double counting) ------
     files = _ds_scoped(f"""
@@ -121,97 +124,79 @@ def sources(data_source: str | None = None, spine: str | None = None):
                                    THEN src_source_column END) AS mapped,
                COUNT(DISTINCT dwh_target_table) AS target_tables,
                COUNT(DISTINCT dwh_target_table || '.' || dwh_target_column)
-                   AS target_columns,
-               COUNT(DISTINCT NVL(functional_group, '{_NO_GROUP}')) AS groups
+                   AS target_columns
         FROM legacy_lineage
         WHERE src_source_table IS NOT NULL {{DS}}
         GROUP BY src_source_table
         ORDER BY COUNT(DISTINCT src_source_column) DESC""", {}, data_source)
 
-    # --- per (file, functional group): the mix, for choosing the bucket -----
-    mix = _ds_scoped(f"""
-        SELECT src_source_table,
-               NVL(functional_group, '{_NO_GROUP}') AS functional_group,
-               COUNT(DISTINCT dwh_target_table || '.' || dwh_target_column)
-                   AS target_columns,
-               COUNT(DISTINCT dwh_target_table) AS target_tables
-        FROM legacy_lineage
-        WHERE src_source_table IS NOT NULL {{DS}}
-        GROUP BY src_source_table, NVL(functional_group, '{_NO_GROUP}')""",
-        {}, data_source)
-
-    by_file: dict[str, list[dict]] = {}
-    for m in mix:
-        by_file.setdefault(m.get("src_source_table"), []).append(m)
+    names = [f.get("src_source_table") for f in files]
+    res = resolve_groups(names, data_source=data_source, system=system,
+                         only=spine)
 
     for f in files:
         f["unmapped"] = (f.get("field_count") or 0) - (f.get("mapped") or 0)
         f["master"] = _master_from_context(f.get("src_source_table"),
                                            f.get("stg1_source_table"))
-        # dominant group: most target columns, a real group beating the
-        # placeholder even when the placeholder is larger — filing a file
-        # under "Unassigned" when it has any real group is a lost file.
-        gs = sorted(by_file.get(f.get("src_source_table")) or [],
-                    key=lambda g: (g.get("functional_group") == _NO_GROUP,
-                                   -(g.get("target_columns") or 0),
-                                   str(g.get("functional_group") or "")))
-        f["groups_mix"] = [{"functional_group": g.get("functional_group"),
-                            "target_columns": g.get("target_columns"),
-                            "target_tables": g.get("target_tables")}
-                           for g in gs]
-        f["functional_group"] = gs[0]["functional_group"] if gs else _NO_GROUP
-
-    # --- pick the spine -----------------------------------------------------
-    real_groups = {f["functional_group"] for f in files
-                   if f["functional_group"] != _NO_GROUP}
-    real_masters = {f["master"] for f in files if f.get("master")}
-    if spine in ("group", "master", "flat"):
-        chosen = spine
-    elif real_groups:
-        chosen = "group"
-    elif real_masters:
-        chosen = "master"
-    else:
-        chosen = "flat"
-
-    if chosen == "group":
-        key_of, label = (lambda f: f["functional_group"] or _NO_GROUP,
-                         "Functional group")
-    elif chosen == "master":
-        key_of, label = (lambda f: f.get("master") or _NO_MASTER, "Master")
-    else:
-        key_of, label = (lambda f: "All extracts", "Source")
+        r = res["by_file"].get(f.get("src_source_table")) or {}
+        f["functional_group"] = r.get("group") or f["master"] or _NO_GROUP
+        f["group_source"] = r.get("source") or ("table_name_hint" if f["master"]
+                                                else None)
+        f["group_alternatives"] = r.get("alternatives") or []
 
     buckets: dict[str, dict] = {}
     for f in files:
-        k = key_of(f)
+        k = f["functional_group"]
         b = buckets.setdefault(k, {
             # "master" is kept as an alias of the bucket name so a client
             # written against the master-only shape keeps rendering.
-            "key": k, "label": k, "master": k, "spine": chosen,
+            "key": k, "label": k, "master": k,
             "files": [], "field_count": 0, "mapped": 0, "unmapped": 0,
-            "target_tables": 0})
+            "target_tables": 0, "sources": set()})
         b["files"].append(f)
         b["field_count"] += f.get("field_count") or 0
         b["mapped"] += f.get("mapped") or 0
         b["unmapped"] += f["unmapped"]
         b["target_tables"] = max(b["target_tables"], f.get("target_tables") or 0)
+        if f.get("group_source"):
+            b["sources"].add(f["group_source"])
 
     # a placeholder bucket sorts last however big it is
     groups = sorted(buckets.values(),
                     key=lambda b: (b["key"] in (_NO_GROUP, _NO_MASTER),
                                    -b["field_count"]))
+    for b in groups:
+        b["sources"] = sorted(b["sources"])
     tot_f = sum(b["field_count"] for b in groups)
     tot_m = sum(b["mapped"] for b in groups)
     return {"data_source": (data_source or "").upper() or None,
-            "spine": chosen, "spine_label": label,
+            # which resolver(s) actually produced the buckets, and what each
+            # one managed to cover. When L0 still reads as one bucket, this
+            # says why without another round trip to the database.
+            "spine": res["spine"], "spine_label": res["spine_label"],
+            "resolution": res["report"],
             "groups": groups,
             "masters": groups,          # legacy alias, same objects
             "sources": files,
             "totals": {"files": len(files), "groups": len(groups),
-                       "masters": len(groups), "spine": chosen,
+                       "masters": len(groups), "spine": res["spine"],
+                       "resolved_files": res["resolved"],
                        "field_count": tot_f, "mapped": tot_m,
                        "unmapped": tot_f - tot_m}}
+
+
+@router.get("/group-sources")
+def group_sources(data_source: str | None = None, system: str = "ADDVANTAGE"):
+    """What each grouping resolver can see, without building the screen.
+
+    Every row is one way of answering "which business area does this extract
+    file belong to". `files_covered` is the only number that matters: a
+    resolver covering 0 files is a column that exists but is not populated,
+    which is the difference between "the grouping is broken" and "there is no
+    grouping in the data yet".
+    """
+    return resolve_groups(None, data_source=data_source, system=system,
+                          probe_only=True)["report"]
 
 
 @router.get("/status-values")
@@ -301,10 +286,19 @@ def source_flow(src_table: str, data_source: str | None = None):
         g = tg.get("functional_group") or _NO_GROUP
         groups[g] = groups.get(g, 0) + (tg.get("column_count") or 0)
     top = sorted(groups.items(), key=lambda kv: (kv[0] == _NO_GROUP, -kv[1]))
+    grp = top[0][0] if top and top[0][0] != _NO_GROUP else None
+    gsrc = "functional_group" if grp else None
+    if not grp:
+        # the column is empty for this file — ask the other resolvers rather
+        # than printing the NVL placeholder as if it were an answer
+        r = resolve_groups([src_table], data_source=data_source, system="ADDVANTAGE")
+        hit = r["by_file"].get(src_table) or {}
+        grp, gsrc = hit.get("group"), hit.get("source")
     return {"src_table": src_table,
             "master": _master_from_context(src_table,
                                            st.get("stg1_source_table")),
-            "functional_group": top[0][0] if top else None,
+            "functional_group": grp,
+            "group_source": gsrc,
             "functional_groups": [{"functional_group": k, "column_count": v}
                                   for k, v in top],
             "data_source": (data_source or "").upper() or None,

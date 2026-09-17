@@ -77,6 +77,13 @@ export const lineageApi = {
   // Structure + content profile of the legacy catalogue tables. Answers
   // "what is actually in this database" when a screen's grouping or numbers
   // are wrong — read it before changing the query that produced them.
+  // What each grouping resolver can actually see, without building a screen.
+  // files_covered = 0 across the board means the grouping is absent from the
+  // data, not broken in the UI.
+  lineageGroupSources: (data_source) =>
+    _get(`/legacy-lineage/group-sources?${_qs({ data_source })}`,
+      () => ({ resolvers: [], files_resolved: 0, spine: "none" })),
+
   lineageProfile: (table) =>
     _get(`/legacy-lineage/profile?${_qs({ table })}`,
       () => ({ tables: {}, other_tables: [], errors: ["profile unreachable"] })),

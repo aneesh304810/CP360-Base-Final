@@ -229,9 +229,14 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
     // payload. Hard-coding "Masters" is how L0 came to read one bucket of
     // "Unresolved · 177 tables" on an extract whose tables are named
     // Company / Instrument / Portfolio — names no master hint matches.
-    const spineTile = srcs.spine === "master" ? "Masters"
-                    : srcs.spine === "flat"   ? "Source sets"
-                                              : "Functional groups";
+    // /sources resolves the grouping through several columns in turn and
+    // reports which one answered. Read the label from the payload: three
+    // rounds were lost to a screen that printed the NVL placeholder
+    // "Unassigned" as though it were a bucket anyone had chosen.
+    const R = srcs.resolution || {};
+    const spineTile = srcs.spine_label || "Groups";
+    const ran = (R.resolvers || []).filter((x) => x.ran);
+    const nothingResolved = ran.length > 0 && !R.files_resolved;
     return (
       <>
         <div style={{ display: "grid", gap: 1, background: line, border: `1px solid ${line}`,
@@ -247,6 +252,30 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
             </div>))}
         </div>
 
+        {nothingResolved && (
+          <div style={{ ...card, borderColor: t.warning || "#e67e22",
+                        padding: "13px 15px" }}>
+            <b style={{ fontSize: 13, color: navy }}>
+              No grouping in the data yet</b>
+            <p style={{ fontSize: 12, color: sub, margin: "6px 0 9px",
+                        maxWidth: "76ch" }}>
+              Every column that could say which business area an extract file
+              belongs to came back empty, so the files below are one flat list.
+              This is a load question, not a screen bug — filling any one of
+              these gives the drill its top level:
+            </p>
+            {ran.map((x) => (
+              <div key={x.source} style={{ display: "flex", gap: 10,
+                        alignItems: "baseline", padding: "3px 0",
+                        borderTop: `1px solid ${line}` }}>
+                <span style={{ fontFamily: mono, fontSize: 11.5, color: navy,
+                               minWidth: 210 }}>{x.origin}</span>
+                <span style={{ fontSize: 11, color: muted }}>
+                  {x.files_covered} of {R.files_requested} files
+                  {x.buckets ? ` · ${x.buckets} groups` : ""}</span>
+              </div>))}
+          </div>)}
+
         {buckets.map((m) => (
           <div key={m.key || m.master} style={card}>
             <div style={{ padding: "11px 15px", borderBottom: `1px solid ${line}`,
@@ -255,6 +284,12 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
               <span style={{ width: 9, height: 9, borderRadius: 999,
                              background: bucketColor(m.label || m.master) }} />
               <b style={{ fontSize: 13.5, color: navy }}>{m.label || m.master}</b>
+              {(m.sources || []).length > 0 && (
+                <span title={`grouped by ${(m.sources || []).join(", ")}`}
+                      style={{ fontSize: 9.5, fontFamily: mono, color: muted,
+                               border: `1px solid ${line}`, borderRadius: 3,
+                               padding: "1px 5px" }}>
+                  {m.sources.join(" + ")}</span>)}
               <span style={{ fontSize: 11, color: muted }}>
                 {m.files.length} file{m.files.length === 1 ? "" : "s"} ·
                 {" "}{m.field_count} fields

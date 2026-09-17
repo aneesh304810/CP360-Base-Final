@@ -32,10 +32,17 @@ identifiers interpolated are ones read back from the database catalogue, and
 each is re-checked against _IDENT before it is used. Every statement is a
 SELECT.
 
-DIALECT
+DIALECT AND SCHEMA
 
-Oracle first (USER_TAB_COLUMNS, ROWNUM), then information_schema + LIMIT, so
-this answers on either without being configured.
+Oracle first (ALL_TAB_COLUMNS, ROWNUM), then information_schema + LIMIT.
+
+ALL_*, not USER_*. The catalogue tables live in schema SILVER, and USER_TAB_
+COLUMNS only lists what the CONNECTING user owns — so on any connection that
+is not SILVER itself (a reader account reaching the tables through grants or
+synonyms, which is the normal shape for a read-only API) the first version of
+this endpoint reported every table as non-existent. That is a diagnostic
+reporting the diagnosis wrongly. The owner is resolved from ALL_TABLES and
+reported in the response, and each query is qualified with it.
 """
 from __future__ import annotations
 import logging
@@ -51,7 +58,7 @@ router = APIRouter(prefix="/legacy-lineage", tags=["legacy-lineage"])
 _IDENT = _re.compile(r"^[A-Za-z][A-Za-z0-9_$#]{0,127}$")
 
 # Tables worth profiling, in the order the screens depend on them.
-_TABLES = ("LEGACY_LINEAGE", "LEGACY_DICTIONARY")
+_TABLES = ("LEGACY_LINEAGE", "LEGACY_DICTIONARY", "LEGACY_TABLE_DEPENDENCY")
 
 # A column can only be a grouping spine if it splits the files into a readable
 # number of buckets. One bucket is the bug being chased; hundreds is a list.
@@ -111,20 +118,49 @@ def _clip(v):
     return str(v)
 
 
-def _columns(table: str) -> tuple[list[dict], str | None, list[str]]:
+def _owner_of(table: str) -> tuple[str | None, str | None]:
+    """Which schema actually holds this table, as seen from this connection.
+
+    Prefer the connecting user's own schema when it has one, so a local copy
+    wins over a granted one; otherwise take the single visible owner. Returns
+    (owner, note) — note explains an ambiguous or missing result.
+    """
+    rows, err = _try("""SELECT owner FROM all_tables WHERE table_name = :t
+                        ORDER BY owner""", {"t": table})
+    if err:
+        return None, f"all_tables: {err}"
+    owners = [r["owner"] for r in rows if r.get("owner")]
+    if not owners:
+        return None, "no visible owner in all_tables"
+    if len(owners) == 1:
+        return owners[0], None
+    me, _ = _try("SELECT USER AS u FROM dual")
+    mine = me[0]["u"] if me else None
+    if mine in owners:
+        return mine, f"visible in {owners}; using the connected schema"
+    return owners[0], f"visible in {owners}; using the first"
+
+
+def _columns(table: str) -> tuple[list[dict], str | None, list[str], str | None]:
     """The table's columns, from whichever catalogue this database has."""
     errs = []
+    owner, note = _owner_of(table)
+    if note:
+        errs.append(note)
+    # ALL_TAB_COLUMNS, not USER_ — the tables live in SILVER and the API may
+    # well not connect as SILVER. See the module docstring.
     rows, err = _try("""
-        SELECT column_name, data_type, data_length, nullable
-        FROM user_tab_columns WHERE table_name = :t ORDER BY column_id""",
-        {"t": table})
+        SELECT owner, column_name, data_type, data_length, nullable
+        FROM all_tab_columns WHERE table_name = :t
+          AND (:o IS NULL OR owner = :o) ORDER BY owner, column_id""",
+        {"t": table, "o": owner})
     if rows:
         return ([{"name": r["column_name"], "type": r["data_type"],
                   "length": r.get("data_length"),
                   "nullable": r.get("nullable") == "Y"} for r in rows],
-                "user_tab_columns", errs)
+                "all_tab_columns", errs, owner or rows[0].get("owner"))
     if err:
-        errs.append(f"user_tab_columns: {err}")
+        errs.append(f"all_tab_columns: {err}")
 
     rows, err = _try("""
         SELECT column_name, data_type, character_maximum_length AS data_length,
@@ -136,10 +172,10 @@ def _columns(table: str) -> tuple[list[dict], str | None, list[str]]:
         return ([{"name": str(r["column_name"]).upper(), "type": r["data_type"],
                   "length": r.get("data_length"),
                   "nullable": str(r.get("nullable")).upper() in ("YES", "Y")}
-                 for r in rows], "information_schema.columns", errs)
+                 for r in rows], "information_schema.columns", errs, owner)
     if err:
         errs.append(f"information_schema.columns: {err}")
-    return [], None, errs
+    return [], None, errs, owner
 
 
 def _top_values(table: str, col: str, n: int = 15):
@@ -173,8 +209,11 @@ def profile(table: str | None = None, samples: int = 3):
 
     out = {"tables": {}, "other_tables": [], "errors": []}
 
-    tabs, err = _try("""SELECT table_name FROM user_tables
-                        ORDER BY table_name""")
+    tabs, err = _try("""SELECT owner || '.' || table_name AS table_name
+                        FROM all_tables
+                        WHERE owner NOT IN ('SYS', 'SYSTEM', 'XDB', 'OUTLN',
+                                            'DBSNMP', 'APPQOSSYS', 'CTXSYS')
+                        ORDER BY owner, table_name""")
     if err:
         tabs, err2 = _try("""SELECT table_name FROM information_schema.tables
                              WHERE table_schema NOT IN
@@ -186,8 +225,11 @@ def profile(table: str | None = None, samples: int = 3):
 
     for tname in wanted:
         t = {"table": tname}
-        cols, via, errs = _columns(tname)
+        cols, via, errs, owner = _columns(tname)
         t["found_via"] = via
+        t["owner"] = owner
+        # every later query must be schema-qualified for the same reason
+        qname = f'{owner}."{tname}"' if owner else tname
         t["columns"] = cols
         if errs:
             t.setdefault("errors", []).extend(errs)
@@ -207,7 +249,7 @@ def profile(table: str | None = None, samples: int = 3):
         aggs = ", ".join(
             f'COUNT("{c}") AS nn_{i}, COUNT(DISTINCT "{c}") AS nd_{i}'
             for i, c in enumerate(names))
-        rows, err = _try(f"SELECT COUNT(*) AS n_rows, {aggs} FROM {tname}")
+        rows, err = _try(f"SELECT COUNT(*) AS n_rows, {aggs} FROM {qname}")
         stats = []
         if rows:
             r = rows[0]
@@ -222,11 +264,11 @@ def profile(table: str | None = None, samples: int = 3):
             # COUNT DISTINCT (CLOB): fall back to one query per column
             if err:
                 t.setdefault("errors", []).append(f"bulk profile: {err}")
-            n_rows, e = _try(f"SELECT COUNT(*) AS n_rows FROM {tname}")
+            n_rows, e = _try(f"SELECT COUNT(*) AS n_rows FROM {qname}")
             t["row_count"] = n_rows[0]["n_rows"] if n_rows else None
             for c in names:
                 r, e = _try(f'SELECT COUNT("{c}") AS nn, '
-                            f'COUNT(DISTINCT "{c}") AS nd FROM {tname}')
+                            f'COUNT(DISTINCT "{c}") AS nd FROM {qname}')
                 stats.append({"column": c,
                               "non_null": r[0]["nn"] if r else None,
                               "nulls": ((t["row_count"] or 0) - r[0]["nn"])
@@ -243,7 +285,7 @@ def profile(table: str | None = None, samples: int = 3):
                 continue
             interesting = (1 <= d <= _SPINE_MAX) or s["column"].endswith("_TABLE")
             if interesting:
-                vals, e = _top_values(tname, s["column"])
+                vals, e = _top_values(qname, s["column"])
                 if vals:
                     samples_by_col[s["column"]] = vals
                 elif e:
@@ -273,10 +315,10 @@ def profile(table: str | None = None, samples: int = 3):
                                  if (s.get("non_null") or 0) == 0]
 
         if samples > 0:
-            rows, err = _try(f"SELECT * FROM {tname} "
+            rows, err = _try(f"SELECT * FROM {qname} "
                              f"WHERE ROWNUM <= {int(samples)}")
             if err:
-                rows, err2 = _try(f"SELECT * FROM {tname} "
+                rows, err2 = _try(f"SELECT * FROM {qname} "
                                   f"LIMIT {int(samples)}")
                 if err2:
                     t.setdefault("errors", []).append(f"sample rows: {err}")
