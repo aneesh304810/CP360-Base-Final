@@ -57,22 +57,10 @@ const isNA = (v) => /not applicable|^n\/a$/i.test(String(v || "").trim());
 // to spend three columns on  VARCHAR2 | 42.0 | —  , which is three saccades
 // to read one declaration and two columns of em-dashes on every field that
 // has no precision.
-// Laptops are the target, and on a laptop the binding constraint is not
-// width, it is HEIGHT: 768px less browser chrome and the app header leaves
-// roughly 470px of content. That is why the drawer gets tabs below, and why
-// its width steps rather than scaling smoothly — a 52vw drawer on a 1366px
-// screen leaves 650px for a table AND 650px for a four-stage pipeline, and
-// neither is enough.
-function useViewport() {
- const [w, setW] = useState(typeof window === "undefined" ? 1600
-                                                          : window.innerWidth);
- useEffect(() => {
-  const on = () => setW(window.innerWidth);
-  window.addEventListener("resize", on);
-  return () => window.removeEventListener("resize", on);
- }, []);
- return w;
-}
+// The row identity used by the table, the sidebar and the focus screen. It
+// was written inline in one place; three callers need to agree on it now.
+const fieldKey = (tbl, f) =>
+ `${tbl}:${f.dwh_target_column}${f.is_ud === "Y" ? ":" + (f.ud_key || "UD") : ""}`;
 
 const fmtType = (f) => {
  const ty = (f.dwh_type || "").trim();
@@ -714,22 +702,6 @@ export default function LegacyLineage({ t, system = "ADDVANTAGE", dataSource = "
  const [openT, setOpenT] = useState({});
  const [openChain, setOpenChain] = useState(null); // "TBL:COL" caret expand
  const [openDef, setOpenDef] = useState(null); // {key, code, ctx, row, table}
- const [defTab, setDefTab] = useState("lineage"); // drawer section
- const vw = useViewport();
- // Stepped, not fluid, and it decides TWO things.
- //
- // Width: under ~1150px a split leaves both halves unusable, so the drawer
- // takes the screen — you are looking at one field anyway.
- //
- // Whether the page reflows: reflowing squeezes the table into what is left,
- // which on a 1366px laptop (less the app sidebar) is about 480px — the
- // five columns re-wrap and the list stops being scannable. Overlaying
- // instead keeps the table at full width with only its right edge hidden,
- // and the columns that matter for keeping your place — the chevron, the
- // field name, the type — are the leftmost ones. So reflow only where there
- // is genuinely room for both.
- const drawerW = vw < 1150 ? "100vw" : vw < 1500 ? 640 : "min(760px, 46vw)";
- const drawerReflow = vw >= 1500;
  const [q, setQ] = useState("");
  const ds = (dataSource || "PBDW").toUpperCase();
 
@@ -786,73 +758,157 @@ export default function LegacyLineage({ t, system = "ADDVANTAGE", dataSource = "
  const jumpWarehouse = (targetDs, loc) => { if (onDataSource) onDataSource(targetDs, loc); };
 
  const openDefFor = (f, tbl, key) => {
- setDefTab("lineage");
  return setOpenDef((cur) => cur && cur.key === key ? null
  : { key, code: f.src_source_column,
  ctx: { srcTable: f.src_source_table || f.stg1_source_table, dwhTable: tbl },
  row: f, table: tbl });
  };
 
- // Esc closes the drawer — it overlays the table, so there has to be a way
- // out that is not "hunt for the ×".
+ // ================= the field focus screen =================
+ //
+ // Clicking a field used to open a panel BESIDE the table — first inline
+ // between two rows, then in a drawer. Both are the same compromise: a
+ // four-stage pipeline and a 251-row list negotiating for one screen, and on
+ // a laptop neither wins. So the field takes the whole screen instead.
+ //
+ //   [ ← back ] group · table · FIELD                    [ Chain | Graph ]
+ //   ┌──────────┬───────────────────────────────────────────────────────┐
+ //   │ 251      │                                                       │
+ //   │ fields   │   lineage at full width, then proof, then definition  │
+ //   │ of this  │                                                       │
+ //   │ table    │                                                       │
+ //   └──────────┴───────────────────────────────────────────────────────┘
+ //
+ // The sidebar is the point as much as the width is: comparing two fields
+ // used to be close, scroll, find, reopen. Now it is one click, and ↑/↓
+ // walk the list without touching the mouse.
+ const focusOn = !!openDef && viewMode === "table" && tab === "fg";
+
+ const [fq, setFq] = useState("");            // sidebar filter
+ const selRef = useRef(null);
+ const focusRows = focusOn ? (fieldsBy[openDef.table] || []) : [];
+ const shownRows = fq
+ ? focusRows.filter((f) => (f.dwh_target_column || "")
+ .toLowerCase().includes(fq.toLowerCase()))
+ : focusRows;
+ const focusIdx = shownRows.findIndex((f) => fieldKey(openDef && openDef.table, f)
+ === (openDef || {}).key);
+
+ const goField = (f) => {
+ if (!f || !f.src_source_column) return;   // no dictionary code, nothing to show
+ setOpenDef({ key: fieldKey(openDef.table, f), code: f.src_source_column,
+ ctx: { srcTable: f.src_source_table || f.stg1_source_table,
+ dwhTable: openDef.table },
+ row: f, table: openDef.table });
+ };
+
+ // Esc leaves, arrows walk. Only fields WITH a source column can be opened,
+ // so stepping skips the ones that would render an empty panel.
  useEffect(() => {
- if (!openDef) return;
- const onKey = (e) => { if (e.key === "Escape") setOpenDef(null); };
+ if (!focusOn) return;
+ const onKey = (e) => {
+ if (e.key === "Escape") { setOpenDef(null); return; }
+ if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+ if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+ e.preventDefault();
+ const step = e.key === "ArrowDown" ? 1 : -1;
+ for (let i = focusIdx + step; i >= 0 && i < shownRows.length; i += step)
+ if (shownRows[i].src_source_column) { goField(shownRows[i]); return; }
+ };
  window.addEventListener("keydown", onKey);
  return () => window.removeEventListener("keydown", onKey);
- }, [openDef]);
+ }, [focusOn, focusIdx, shownRows]);
 
- /* ================= the field drawer =================
- Table mode only. In map and biz mode the panel IS the content, not an
- interruption to a long list, so those keep rendering it in place. */
- const renderDefDrawer = () => {
- if (!openDef || viewMode !== "table" || tab !== "fg") return null;
+ // Arrow-walking past the visible window would otherwise lose the highlight
+ // off-screen in a 251-row list — the panel changes and nothing seems to.
+ useEffect(() => {
+ if (focusOn && selRef.current && selRef.current.scrollIntoView)
+ selRef.current.scrollIntoView({ block: "nearest" });
+ }, [focusOn, (openDef || {}).key]);
+
+ const renderFieldFocus = () => {
+ const tbl = openDef.table;
+ const group = groupNames.find((g) =>
+ (groups[g] || []).some((x) => x.table_name === tbl));
+ const crumb = { fontSize: 11.5, color: t.sub || "#666" };
  return (
- <aside role="dialog" aria-label={`${openDef.code} definition and lineage`}
- style={{ position: "fixed", top: 0, right: 0, bottom: 0, zIndex: 40,
- width: drawerW, background: t.panel || "#fff",
- borderLeft: `1px solid ${t.panel2 || "#dfe6e9"}`,
- boxShadow: "-14px 0 40px rgba(16,25,59,.13)",
- display: "flex", flexDirection: "column" }}>
- <div style={{ display: "flex", alignItems: "center", gap: 10,
- padding: "11px 16px", flex: "0 0 auto",
+ <div>
+ {/* --- breadcrumb + back --- */}
+ <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+ padding: "0 0 11px", marginBottom: 13,
  borderBottom: `1px solid ${t.panel2 || "#dfe6e9"}` }}>
- <span style={{ fontFamily: "Roboto Mono, monospace", fontSize: 12.5,
- fontWeight: 700, color: t.navy || "#10193b", overflow: "hidden",
- textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+ <button onClick={() => setOpenDef(null)} title="Back to the table list (Esc)"
+ style={{ fontSize: 11.5, fontWeight: 700, padding: "6px 13px",
+ cursor: "pointer", fontFamily: "inherit", borderRadius: 3,
+ border: `1px solid ${t.panel2 || "#dfe6e9"}`, background: "#fff",
+ color: t.accent || "#0f4775" }}>← Back</button>
+ {group && <span style={crumb}>{group}</span>}
+ {group && <span style={{ color: t.muted || "#999" }}>›</span>}
+ <span style={{ ...crumb, fontFamily: "Roboto Mono, monospace" }}>{tbl}</span>
+ <span style={{ color: t.muted || "#999" }}>›</span>
+ <span style={{ fontFamily: "Roboto Mono, monospace", fontSize: 13,
+ fontWeight: 700, color: t.navy || "#10193b" }}>
  {(openDef.row && openDef.row.dwh_target_column) || openDef.code}</span>
- <span style={{ fontSize: 10.5, color: t.muted || "#999",
- whiteSpace: "nowrap" }}>{openDef.table}</span>
- <button onClick={() => setOpenDef(null)} title="Close (Esc)"
- style={{ marginLeft: "auto", border: "none", background: "none",
- cursor: "pointer", fontSize: 17, lineHeight: 1,
- color: t.muted || "#999", fontFamily: "inherit" }}>×</button>
+ <span style={{ marginLeft: "auto", fontSize: 10.5, color: t.muted || "#999" }}>
+ ↑ ↓ to walk the list · Esc to go back</span>
  </div>
- {/* Two tabs, not one long scroll. The drawer stacks lineage graph,
- stage proof, plain-terms strip and the dictionary card — four
- sections, roughly three laptop screens. Lineage is the default
- because that is what the click was asking about. */}
- <div style={{ display: "flex", gap: 2, padding: "7px 12px 0", flex: "0 0 auto",
+
+ <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+ {/* --- the table's fields --- */}
+ <aside style={{ flex: "0 0 244px", maxWidth: 244, position: "sticky", top: 8,
+ maxHeight: "calc(100vh - 120px)", overflow: "auto",
+ border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderRadius: 8,
+ background: t.panel || "#fff" }}>
+ <div style={{ padding: "9px 12px", fontSize: 9, fontWeight: 800,
+ textTransform: "uppercase", letterSpacing: 0.4,
+ color: t.muted || "#999", position: "sticky", top: 0,
+ background: "#f7f9fa",
  borderBottom: `1px solid ${t.panel2 || "#dfe6e9"}` }}>
- {[["lineage", "Lineage & proof"], ["def", "Definition"]].map(([k, label]) => (
- <button key={k} onClick={() => setDefTab(k)}
- style={{ fontSize: 11.5, fontWeight: 700, padding: "7px 14px",
- cursor: "pointer", fontFamily: "inherit", border: "none",
- background: "none", marginBottom: -1,
- color: defTab === k ? (t.accent || "#0f4775") : (t.sub || "#666"),
- borderBottom: `2px solid ${defTab === k ? (t.accent || "#0f4775")
- : "transparent"}` }}>
- {label}</button>))}
+ {shownRows.length === focusRows.length
+ ? `${focusRows.length} fields in ${tbl}`
+ : `${shownRows.length} of ${focusRows.length} in ${tbl}`}
+ <input value={fq} onChange={(e) => setFq(e.target.value)}
+ placeholder="Filter fields…"
+ style={{ display: "block", width: "100%", marginTop: 6, height: 26,
+ boxSizing: "border-box", fontFamily: "inherit",
+ border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderRadius: 3,
+ padding: "0 8px", fontSize: 11, fontWeight: 400,
+ textTransform: "none", letterSpacing: 0 }} />
  </div>
- <div style={{ flex: 1, overflow: "auto", padding: "4px 16px 20px" }}>
+ {shownRows.map((f) => {
+ const k = fieldKey(tbl, f);
+ const on = k === openDef.key;
+ const can = !!f.src_source_column;
+ return (
+ <div key={k} ref={on ? selRef : undefined}
+ onClick={can ? () => goField(f) : undefined}
+ title={can ? f.dwh_target_column
+ : `${f.dwh_target_column} — no legacy source column`}
+ style={{ display: "flex", alignItems: "center", gap: 7,
+ padding: "6px 12px", cursor: can ? "pointer" : "default",
+ borderTop: "1px solid #f1f4f6",
+ background: on ? (t.accent || "#0f4775") : "transparent",
+ opacity: can ? 1 : 0.45 }}>
+ <span style={{ fontFamily: "Roboto Mono, monospace", fontSize: 11,
+ fontWeight: on ? 700 : 500, minWidth: 0, overflow: "hidden",
+ textOverflow: "ellipsis", whiteSpace: "nowrap",
+ color: on ? "#fff" : (t.navy || "#10193b") }}>
+ {f.is_ud === "Y" ? "↳ " : ""}{f.dwh_target_column}</span>
+ </div>);
+ })}
+ </aside>
+
+ {/* --- the lineage, at the width it was always meant to have --- */}
+ <div style={{ flex: 1, minWidth: 0 }}>
  <InlineDef t={t} system={system} dataSource={ds} code={openDef.code}
- ctx={openDef.ctx} row={openDef.row} tableName={openDef.table}
- roomy only={defTab} onDataSource={jumpWarehouse}
+ ctx={openDef.ctx} row={openDef.row} tableName={tbl}
+ roomy onDataSource={jumpWarehouse}
  onJump={(u) => {
  setOpenT((m) => ({ ...m, [u.dwh_target_table]: true }));
  ensureFields(u.dwh_target_table); }} />
  </div>
- </aside>);
+ </div>
+ </div>);
  };
 
  /* ================= FG shell — constant across modes ================= */
@@ -950,7 +1006,7 @@ const xfArrow = (xf) => (
  <span /><span>Field</span><span>Type</span>
  <span>UD</span><span>Variance</span></div>
  {rows.map((f) => {
- const key = `${tbl}:${f.dwh_target_column}${f.is_ud === "Y" ? ":" + (f.ud_key || "UD") : ""}`;
+ const key = fieldKey(tbl, f);
  const cOpen = openChain === key;
  const dOpen = openDef && openDef.key === key;
  const na = !f.src_source_column && isNA(f.src_to_stg1_transform || f.lineage_status_detail);
@@ -1068,7 +1124,7 @@ const xfArrow = (xf) => (
  {/* The definition panel used to render HERE, between two field rows.
  In a 251-field table that pushes everything below it off screen and
  you lose your place. It now opens in the right drawer (see
- renderDefDrawer) so the list never moves, and the lineage chain
+ renderFieldFocus) so the list never moves, and the lineage chain
  gets the width it needs to stay on one line. */}
  </div>);
  })}
@@ -1421,11 +1477,14 @@ const visEdges = net.edges.filter((e) => {
  // The drawer is position:fixed, so it does not push anything by itself.
  // Give the page a matching right margin while it is open and the table
  // reflows into what is left instead of hiding under it.
- const drawerOn = !!openDef && viewMode === "table" && tab === "fg";
+ // A focused field replaces the screen rather than sharing it. Everything
+ // above — the tabs, the mode switch, the search — belongs to the LIST, and
+ // showing list chrome above a single field is what made the old panel feel
+ // buried three levels down.
+ if (focusOn) return renderFieldFocus();
+
  return (
- <div style={{ marginRight: drawerOn && drawerReflow ? drawerW : 0,
- transition: "margin-right .18s ease" }}>
- {renderDefDrawer()}
+ <div>
  {/* ONE control row. The tabs, the table/map/passport switch and the
  search used to be three stacked bands above the first group — with a
  "VIEW" label explaining a segmented control that needs no label. The
