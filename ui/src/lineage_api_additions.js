@@ -74,6 +74,13 @@ export const lineageApi = {
   // Diagnostic. Answers "why does this screen say 0% mapped": prints the real
   // lineage_status vocabulary with row counts and how each value classifies.
   // A coverage figure that looks wrong is a vocabulary question first.
+  // Structure + content profile of the legacy catalogue tables. Answers
+  // "what is actually in this database" when a screen's grouping or numbers
+  // are wrong — read it before changing the query that produced them.
+  lineageProfile: (table) =>
+    _get(`/legacy-lineage/profile?${_qs({ table })}`,
+      () => ({ tables: {}, other_tables: [], errors: ["profile unreachable"] })),
+
   lineageStatusValues: (data_source) =>
     _get(`/legacy-lineage/status-values?${_qs({ data_source })}`,
       () => ({ values: [], totals: { distinct_values: 0, rows: 0,
