@@ -30,7 +30,7 @@ import logging
 import re as _re
 from fastapi import APIRouter
 
-from .routers_legacy_lineage import (
+from ._legacy_compat import (
     _safe, _ds_scoped, _norm_code, _master_from_context,
 )
 

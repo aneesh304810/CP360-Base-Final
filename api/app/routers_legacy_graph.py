@@ -16,16 +16,17 @@ One row is already a whole chain (src_* -> stg1_* -> stg2_* -> dwh_*), so a
 row yields 4 nodes and 3 edges; the graph is the union over the rows that
 share a canonical code or a target column.
 
-Helpers are imported from routers_legacy_lineage so the canonicalisation,
-warehouse scoping and master resolution stay defined in exactly one place. If
-that module is older than this one the import raises and main.py's guarded
-mount loop logs and skips this router — the rest of the API is unaffected.
+Helpers come through _legacy_compat, which prefers the real ones in
+routers_legacy_lineage and falls back only for those a given checkout has not
+got yet (_ds_scoped arrived with sql/29, _master_from_context with per-master
+resolution). Importing them directly meant this router silently did not mount
+on any machine running an older copy of that file.
 """
 from __future__ import annotations
 import logging
 from fastapi import APIRouter
 
-from .routers_legacy_lineage import (
+from ._legacy_compat import (
     _safe, _ds_scoped, _norm_code, _master_from_context,
 )
 
