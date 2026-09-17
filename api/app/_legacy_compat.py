@@ -167,4 +167,50 @@ def _is_mapped(status, has_target: bool = False) -> bool:
     return bool(has_target)
 
 
-__all__ += ["_MAPPED_SQL", "_is_mapped", "_MAPPED_WORDS", "_UNMAPPED_WORDS"]
+# ------------------------------------------------------------ feed keys ----
+# CP_SOURCE_FILE names each AddVantage EOD feed:
+#   Addv-ACCT-CHK-REG_BBH-TRP_YYYYMMDDHHMMSS.dat  ->  Account-Check Register
+# legacy_lineage.src_source_table carries the left side, spelled inconsist-
+# ently — sometimes the full transmission name, sometimes a shorter form — so
+# the two meet on a canonical key rather than on the raw string.
+#
+# Kept here because three callers need the SAME rule: the /sources join, the
+# /source-flow lookup and the dataset-family group resolver. It matches
+# ingestion/legacy_source_file_conn.file_key, which writes the stored key.
+
+_FEED_KEY_SQL = """UPPER(TRIM('_' FROM REGEXP_REPLACE(
+        REGEXP_REPLACE({col},
+            '(\.dat|\.txt|\.csv|\.psv|\.tsv)$|<[^>]*>|' ||
+            '[Yy]{4}[Mm]{2}[Dd]{2}([Hh]{2}[Mm]{2}[Ss]{2})?', ''),
+        '[^A-Za-z0-9]+', '_')))"""
+
+
+def _feed_key(col: str) -> str:
+    """The SQL key expression for a column holding a feed / source-table name.
+
+    It deliberately does NOT strip the BBH / TRP transmission tags. Oracle has
+    no cheap "trailing token only" form, and stripping them anywhere would
+    turn BBH_REQUEST_AUTHORIZER — a real source table — into
+    REQUEST_AUTHORIZER and mis-join it to a feed it has nothing to do with.
+    The trailing peel happens in Python, in _peel_feed_key.
+    """
+    return _FEED_KEY_SQL.replace("{col}", col)
+
+
+def _peel_feed_key(key: str) -> str:
+    """Drop trailing BBH / TRP tags from a key produced by _feed_key.
+
+    Peels in a loop rather than once per tag: a real key ends "_BBH_TRP", so
+    testing "_BBH" first never fires and leaves "..._BBH" behind.
+    """
+    k, peeled = str(key or ""), True
+    while peeled:
+        peeled = False
+        for tag in ("_TRP", "_BBH"):
+            if k.endswith(tag):
+                k, peeled = k[: -len(tag)], True
+    return k
+
+
+__all__ += ["_MAPPED_SQL", "_is_mapped", "_MAPPED_WORDS", "_UNMAPPED_WORDS",
+            "_FEED_KEY_SQL", "_feed_key", "_peel_feed_key"]

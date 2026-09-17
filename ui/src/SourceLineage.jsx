@@ -301,14 +301,50 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
     // ---- L0a · the groups ------------------------------------------------
     if (!group) {
       const R = srcs.resolution || {};
+      // name the grouping honestly — it is whichever resolver answered, and
+      // saying "dataset" when the data fell back to functional_group is how a
+      // screen teaches someone the wrong model
+      const spineNote = srcs.spine === "dataset_family"
+        ? `Grouped by dataset — the business name each AddVantage feed carries
+           on the CP_SOURCE_FILE sheet. Pick one to see its files, a file to
+           see every table it reaches, then a field for its full chain.`
+        : `Grouped by ${(srcs.spine_label || "group").toLowerCase()}. Pick one
+           to see its files, a file to see every table it reaches, then a
+           field for its full chain.`;
       const ran = (R.resolvers || []).filter((x) => x.ran);
       const nothingResolved = ran.length > 0 && !R.files_resolved;
       return (
         <div style={{ maxWidth: 1000, margin: "0 auto" }}>
           <H1>Where {ds} data comes from</H1>
           <Sub>{T.files} extract files · {T.field_count} fields ·
-            {" "}{T.mapped} mapped — click an area to zoom in</Sub>
+            {" "}{T.mapped} mapped</Sub>
           <Spine ds={ds} />
+
+          {/* What this door IS. Business view and Source view show the same
+              pipeline from opposite ends, and nothing on either screen said
+              so — you had to work it out by clicking. Two sentences, once,
+              above the fold. */}
+          <div style={{ display: "flex", gap: 13, alignItems: "flex-start",
+                        border: "1px solid #c9d4dc", borderRadius: 10,
+                        background: "#f4f7f9", padding: "13px 16px",
+                        marginBottom: 18 }}>
+            <span style={{ fontSize: 17, lineHeight: 1, flexShrink: 0 }}>🏦</span>
+            <div style={{ fontSize: 12.5, color: "#233240", lineHeight: 1.65 }}>
+              <b style={{ fontWeight: 500 }}>Source view follows a file
+                forward.</b>{" "}
+              <span style={{ color: "#7b8894" }}>
+                Business view starts at a warehouse column and asks where it
+                came from; this starts at the nightly AddVantage extract and
+                asks where it goes — which staging tables it lands in, which
+                warehouse tables it reaches, and which of its fields still
+                have no agreed target. Use it for “what happens to our account
+                file”, rather than “where did this column come from”.
+              </span>
+              <div style={{ marginTop: 6, color: "#7b8894" }}>
+                {spineNote}
+              </div>
+            </div>
+          </div>
 
           {nothingResolved && (
             <div style={{ border: "1px solid #e67e22", borderRadius: 10,

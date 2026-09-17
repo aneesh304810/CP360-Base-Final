@@ -42,7 +42,10 @@ DWH side of the row, one file feeds many targets. Each resolver returns
 from __future__ import annotations
 import logging
 
-from ._legacy_compat import _safe, _ds_scoped
+import collections
+import re
+
+from ._legacy_compat import _safe, _ds_scoped, _feed_key, _peel_feed_key
 
 log = logging.getLogger("cp.api.legacy_groups")
 
@@ -130,7 +133,111 @@ def _q_plain(sql):
     return lambda ds, sysname: _safe(sql, {})
 
 
+# --------------------------------------------------------------------------
+# dataset family — the source-native grouping
+#
+# CP_SOURCE_FILE gives every AddVantage feed a business name, and those names
+# already carry their own hierarchy:
+#
+#     Account-Check Register          Fee-Account Worksheet
+#     Account-Statement Cash          Fee-Receive Open
+#     Audit Trail-Accounts            Map Account Summary
+#
+# 35 datasets collapse to 11 families. This is a better top level for the
+# SOURCE view than functional_group, which is a property of the DWH table a
+# row lands in — a fact about the destination, used to group the origin.
+# --------------------------------------------------------------------------
+
+_PAREN_RE = re.compile(r"\s*\([^)]*\)")
+
+
+def _dataset_base(d: str) -> str:
+    """'Trades (Pending Transactions)' -> 'Trades'. The parenthetical is a
+    gloss on the name, not part of it."""
+    return _PAREN_RE.sub("", str(d or "")).strip()
+
+
+def _dataset_families(datasets) -> dict:
+    """dataset -> family, derived from the names themselves.
+
+    Text before the first '-' is the family: Account-Check Register is
+    Account. A name with no '-' keeps its first word ONLY when that word is
+    already a family — either because a dashed name created it (so 'Fee
+    Schedule Component' joins 'Fee') or because two dash-less names share it
+    (so 'Map Account Details' and 'Map Account Summary' become 'Map').
+
+    Otherwise the whole name is its own family, which is what stops 'Tax Lot'
+    being filed under a family called 'Tax' that nothing else belongs to.
+    """
+    bases = [_dataset_base(d) for d in datasets if _dataset_base(d)]
+    dashed = {b.split("-", 1)[0].strip() for b in bases if "-" in b}
+    nodash = [b for b in bases if "-" not in b]
+    shared = {w for w, n in collections.Counter(
+        b.split(" ", 1)[0] for b in nodash).items() if n >= 2}
+    joinable = dashed | shared
+    out = {}
+    for d in datasets:
+        b = _dataset_base(d)
+        if not b:
+            continue
+        if "-" in b:
+            out[d] = b.split("-", 1)[0].strip()
+        else:
+            first = b.split(" ", 1)[0].strip()
+            out[d] = first if first in joinable else b
+    return out
+
+
+def _q_dataset_family(ds, sysname):
+    """Rows of (src_source_table, family, weight) via CP_SOURCE_FILE.
+
+    Two cheap queries and a join in Python rather than one clever SQL join:
+    the match is three-chance (exact name, canonical key, key with trailing
+    BBH/TRP peeled) and the last of those cannot be expressed safely in
+    Oracle — see _feed_key. Both tables are small at this grain.
+    """
+    feeds = _safe("""SELECT src_file, src_file_key, dataset
+                     FROM legacy_source_file WHERE dataset IS NOT NULL""", {})
+    if not feeds:
+        return []
+    fam = _dataset_families([f.get("dataset") for f in feeds])
+    by_key, by_name = {}, {}
+    for f in feeds:
+        g = fam.get(f.get("dataset"))
+        if not g:
+            continue
+        if f.get("src_file_key"):
+            by_key.setdefault(f["src_file_key"], g)
+        if f.get("src_file"):
+            by_name.setdefault(str(f["src_file"]).strip().upper(), g)
+
+    rows = _ds_scoped(f"""
+        SELECT src_source_table,
+               {_feed_key('src_source_table')} AS k,
+               COUNT(DISTINCT dwh_target_table || '.' || dwh_target_column)
+                   AS weight
+        FROM legacy_lineage
+        WHERE src_source_table IS NOT NULL {{DS}}
+        GROUP BY src_source_table, {_feed_key('src_source_table')}""", {}, ds)
+
+    out = []
+    for r in rows:
+        k = r.get("k") or ""
+        g = (by_name.get(str(r.get("src_source_table") or "").strip().upper())
+             or by_key.get(k) or by_key.get(_peel_feed_key(k)))
+        if g:
+            out.append({"src_source_table": r.get("src_source_table"),
+                        "grp": g, "weight": r.get("weight") or 0})
+    return out
+
+
 GROUP_SOURCES = [
+    # First, because it is the only one that describes the SOURCE. The rest
+    # describe the destination and stand in when CP_SOURCE_FILE has not been
+    # loaded or does not cover a file.
+    ("dataset_family", "Dataset",
+     "legacy_source_file.dataset, family of the feed's business name",
+     _q_dataset_family),
     ("functional_group", "Functional group",
      "legacy_lineage.functional_group", _q_scoped(_SQL_FUNCTIONAL_GROUP)),
     ("dictionary_master", "Master",

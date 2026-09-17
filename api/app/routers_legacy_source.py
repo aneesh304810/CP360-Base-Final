@@ -52,7 +52,7 @@ from fastapi import APIRouter
 
 from ._legacy_compat import (
     _safe, _ds_scoped, _norm_code, _master_from_context,
-    _MAPPED_SQL, _is_mapped,
+    _MAPPED_SQL, _is_mapped, _feed_key, _peel_feed_key,
 )
 from ._legacy_groups import resolve_groups, GROUP_SOURCES
 
@@ -69,27 +69,6 @@ _CANON_SRC = r"""REGEXP_REPLACE(
 
 # LETTERS_DIGITS _ DIGITS -> (family, line). Anything else is its own family.
 _FAMILY_RE = _re.compile(r"^([A-Z]+_\d+)_(\d+)$")
-
-# canon() for a FEED name, matching ingestion/legacy_source_file_conn.file_key.
-# Drops the extension, the YYYYMMDDHHMMSS / <SEQ NO.> placeholders, collapses
-# separators and uppercases, so src_source_table meets legacy_source_file
-# however the lineage sheet happened to spell the transmission name.
-#
-# Note it does NOT strip BBH/TRP: Oracle has no cheap "trailing token only"
-# form, and stripping them anywhere would turn BBH_REQUEST_AUTHORIZER into
-# REQUEST_AUTHORIZER and mis-join a real source table. The loader writes the
-# trailing-stripped key, so the few feeds that differ only by a trailing tag
-# fall back to the LIKE below instead of matching wrongly.
-_FEED_KEY_SQL = """UPPER(TRIM('_' FROM REGEXP_REPLACE(
-        REGEXP_REPLACE({col},
-            '(\.dat|\.txt|\.csv|\.psv|\.tsv)$|<[^>]*>|' ||
-            '[Yy]{4}[Mm]{2}[Dd]{2}([Hh]{2}[Mm]{2}[Ss]{2})?', ''),
-        '[^A-Za-z0-9]+', '_')))"""
-
-
-def _feed_key(col: str) -> str:
-    return _FEED_KEY_SQL.replace("{col}", col)
-
 
 # The placeholder NVL(functional_group, ...) writes, and the label the master
 # spine uses when the hints do not match. Neither is a real bucket.
@@ -175,14 +154,7 @@ def sources(data_source: str | None = None, spine: str | None = None,
         # which SQL cannot express safely, so it happens here
         raw = str(f.get("src_source_table") or "").strip().upper()
         k = f.get("src_file_key") or ""
-        # peel repeatedly, not tag-by-tag: a real key ends "_BBH_TRP", so a
-        # single pass for "_BBH" never fires and leaves "..._BBH" behind
-        k2, peeled = k, True
-        while peeled:
-            peeled = False
-            for tag in ("_TRP", "_BBH"):
-                if k2.endswith(tag):
-                    k2, peeled = k2[: -len(tag)], True
+        k2 = _peel_feed_key(k)
         f["dataset"] = (by_name.get(raw) or by_key.get(k) or by_key.get(k2))
         f["unmapped"] = (f.get("field_count") or 0) - (f.get("mapped") or 0)
         f["master"] = _master_from_context(f.get("src_source_table"),
