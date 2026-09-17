@@ -52,6 +52,20 @@ const DS_C = { PBDW: "#0f4775", IMDS: "#0b7d9e" };
 const masterColor = (m) => MASTER_C[m] || "#6d3ac0";
 const dsColor = (d) => DS_C[(d || "PBDW").toUpperCase()] || "#0f4775";
 const isNA = (v) => /not applicable|^n\/a$/i.test(String(v || "").trim());
+
+// A type is one fact, written the way a developer writes it. The table used
+// to spend three columns on  VARCHAR2 | 42.0 | —  , which is three saccades
+// to read one declaration and two columns of em-dashes on every field that
+// has no precision.
+const fmtType = (f) => {
+ const ty = (f.dwh_type || "").trim();
+ if (!ty) return "—";
+ const n = (v) => String(v ?? "").trim().replace(/\.0+$/, "");
+ const len = n(f.dwh_length), prec = n(f.dwh_precision);
+ if (len && prec && prec !== "0") return `${ty}(${len},${prec})`;
+ if (len) return `${ty}(${len})`;
+ return ty;
+};
 const isDerived = (def) =>
  /supplied by (the )?system/i.test(String((def && (def.long_desc || def.short_desc)) || ""));
 
@@ -728,6 +742,52 @@ export default function LegacyLineage({ t, system = "ADDVANTAGE", dataSource = "
  ctx: { srcTable: f.src_source_table || f.stg1_source_table, dwhTable: tbl },
  row: f, table: tbl });
 
+ // Esc closes the drawer — it overlays the table, so there has to be a way
+ // out that is not "hunt for the ×".
+ useEffect(() => {
+ if (!openDef) return;
+ const onKey = (e) => { if (e.key === "Escape") setOpenDef(null); };
+ window.addEventListener("keydown", onKey);
+ return () => window.removeEventListener("keydown", onKey);
+ }, [openDef]);
+
+ /* ================= the field drawer =================
+ Table mode only. In map and biz mode the panel IS the content, not an
+ interruption to a long list, so those keep rendering it in place. */
+ const renderDefDrawer = () => {
+ if (!openDef || viewMode !== "table" || tab !== "fg") return null;
+ return (
+ <aside role="dialog" aria-label={`${openDef.code} definition and lineage`}
+ style={{ position: "fixed", top: 0, right: 0, bottom: 0, zIndex: 40,
+ width: "min(680px, 52vw)", background: t.panel || "#fff",
+ borderLeft: `1px solid ${t.panel2 || "#dfe6e9"}`,
+ boxShadow: "-14px 0 40px rgba(16,25,59,.13)",
+ display: "flex", flexDirection: "column" }}>
+ <div style={{ display: "flex", alignItems: "center", gap: 10,
+ padding: "11px 16px", flex: "0 0 auto",
+ borderBottom: `1px solid ${t.panel2 || "#dfe6e9"}` }}>
+ <span style={{ fontFamily: "Roboto Mono, monospace", fontSize: 12.5,
+ fontWeight: 700, color: t.navy || "#10193b", overflow: "hidden",
+ textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+ {(openDef.row && openDef.row.dwh_target_column) || openDef.code}</span>
+ <span style={{ fontSize: 10.5, color: t.muted || "#999",
+ whiteSpace: "nowrap" }}>{openDef.table}</span>
+ <button onClick={() => setOpenDef(null)} title="Close (Esc)"
+ style={{ marginLeft: "auto", border: "none", background: "none",
+ cursor: "pointer", fontSize: 17, lineHeight: 1,
+ color: t.muted || "#999", fontFamily: "inherit" }}>×</button>
+ </div>
+ <div style={{ flex: 1, overflow: "auto", padding: "4px 16px 20px" }}>
+ <InlineDef t={t} system={system} dataSource={ds} code={openDef.code}
+ ctx={openDef.ctx} row={openDef.row} tableName={openDef.table}
+ roomy onDataSource={jumpWarehouse}
+ onJump={(u) => {
+ setOpenT((m) => ({ ...m, [u.dwh_target_table]: true }));
+ ensureFields(u.dwh_target_table); }} />
+ </div>
+ </aside>);
+ };
+
  /* ================= FG shell — constant across modes ================= */
  const fgShell = (g, inner) => {
  const tbs = groups[g];
@@ -750,7 +810,9 @@ export default function LegacyLineage({ t, system = "ADDVANTAGE", dataSource = "
  <span style={{ fontSize: 10, color: t.muted || "#999" }}>{open ? "▾" : "▶"}</span>
  <span style={{ fontSize: 14.5, fontWeight: 700, color: t.navy || "#10193b" }}>{g}</span>
  <span style={{ marginLeft: "auto", fontSize: 10.5, color: t.muted || "#999" }}>
- {tbs.length} table{tbs.length !== 1 ? "s" : ""} · {fieldSum} fields · {pct}% mapped · {ds}</span>
+ {/* no "· {ds}" — the warehouse is set once, in the scope chip above,
+ and repeating it on all 17 group rows is pure noise */}
+ {tbs.length} table{tbs.length !== 1 ? "s" : ""} · {fieldSum} fields · {pct}% mapped</span>
  <span style={{ height: 5, width: 100, background: "#e8edf2", borderRadius: 3,
  overflow: "hidden" }}>
  <i style={{ display: "block", height: "100%", width: `${pct}%`,
@@ -808,13 +870,18 @@ const xfArrow = (xf) => (
  {tOpen && Array.isArray(rows) && (
  <div style={{ border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderTop: 0,
  borderRadius: "0 0 6px 6px", overflow: "hidden" }}>
- <div style={{ display: "grid",
- gridTemplateColumns: "16px 1fr 100px 56px 56px 46px 108px",
+ {/* Five columns, not seven. LEN and PREC are how a type is WRITTEN —
+ VARCHAR2(42,0) — not three facts to scan across. And the header no
+ longer explains the click on every table: the field names are already
+ underlined and coloured as links. */}
+ <div style={{ display: "grid", position: "sticky", top: 0, zIndex: 2,
+ gridTemplateColumns: "16px 1fr 132px 46px 108px",
  gap: 10, padding: "6px 14px", background: "#f7f9fa", fontSize: 8.5,
  fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4,
+ borderBottom: `1px solid ${t.panel2 || "#dfe6e9"}`,
  color: t.muted || "#999" }}>
- <span /><span>Field (click for definition + lineage)</span><span>Type</span>
- <span>Len</span><span>Prec</span><span>UD</span><span>Variance</span></div>
+ <span /><span>Field</span><span>Type</span>
+ <span>UD</span><span>Variance</span></div>
  {rows.map((f) => {
  const key = `${tbl}:${f.dwh_target_column}${f.is_ud === "Y" ? ":" + (f.ud_key || "UD") : ""}`;
  const cOpen = openChain === key;
@@ -825,7 +892,7 @@ const xfArrow = (xf) => (
  return (
  <div key={key}>
  <div style={{ display: "grid",
- gridTemplateColumns: "16px 1fr 100px 56px 56px 46px 108px", gap: 10,
+ gridTemplateColumns: "16px 1fr 132px 46px 108px", gap: 10,
  alignItems: "center", padding: "8px 14px", fontSize: 12,
  borderTop: "1px solid #eef1f4",
  background: dOpen ? "#f6fafc" : undefined }}>
@@ -849,11 +916,7 @@ const xfArrow = (xf) => (
  { marginLeft: 6, border: "1px solid #cfe6f2" })}>{srcN} SRC</span>)}
  </span>
  <span style={{ fontFamily: "Roboto Mono, monospace", color: t.sub || "#666",
- fontSize: 11 }}>{f.dwh_type || "—"}</span>
- <span style={{ fontFamily: "Roboto Mono, monospace", color: t.sub || "#666",
- fontSize: 11 }}>{f.dwh_length || "—"}</span>
- <span style={{ fontFamily: "Roboto Mono, monospace", color: t.sub || "#666",
- fontSize: 11 }}>{f.dwh_precision || "—"}</span>
+ fontSize: 11 }}>{fmtType(f)}</span>
  <span>{f.is_ud === "Y" &&
  <span style={pillStyle("#efe6fb", "#7c3aed")}>UD</span>}</span>
  <span>{na ? <span style={pillStyle("#f0f0f2", "#888")}>N/A</span>
@@ -935,15 +998,11 @@ const xfArrow = (xf) => (
  </div>)}
  </>)}
  </div>)}
- {dOpen && (
- <div style={{ padding: "0 14px" }}>
- <InlineDef t={t} system={system} dataSource={ds} code={openDef.code}
- ctx={openDef.ctx} row={openDef.row} tableName={tbl}
- onDataSource={jumpWarehouse}
- onJump={(u) => {
- setOpenT((m) => ({ ...m, [u.dwh_target_table]: true }));
- ensureFields(u.dwh_target_table); }} />
- </div>)}
+ {/* The definition panel used to render HERE, between two field rows.
+ In a 251-field table that pushes everything below it off screen and
+ you lose your place. It now opens in the right drawer (see
+ renderDefDrawer) so the list never moves, and the lineage chain
+ gets the width it needs to stay on one line. */}
  </div>);
  })}
  </div>)}
@@ -1273,8 +1332,10 @@ const visEdges = net.edges.filter((e) => {
  };
 
  /* ================= render ================= */
+ // The caption moves to the title attribute. A segmented control whose
+ // every segment carries two lines of text is a paragraph, not a control.
  const modeBtn = (k, label, sub) => (
- <button key={k} onClick={() => { setViewMode(k); setOpenDef(null);
+ <button key={k} title={sub} onClick={() => { setViewMode(k); setOpenDef(null);
  if (k !== "table")
  groupNames.filter((g) => openG[g]).forEach((g) =>
  groups[g].forEach((tb) => ensureFields(tb.table_name))); }}
@@ -1288,13 +1349,24 @@ const visEdges = net.edges.filter((e) => {
  background: viewMode === k ? (t.accent || "#0f4775") : "#fff",
  color: viewMode === k ? "#fff" : (t.sub || "#666") }}>
  {label}
- <small style={{ display: "block", fontSize: 8, fontWeight: 400, opacity: 0.75 }}>{sub}</small>
  </button>);
 
+ // The drawer is position:fixed, so it does not push anything by itself.
+ // Give the page a matching right margin while it is open and the table
+ // reflows into what is left instead of hiding under it.
+ const drawerOn = !!openDef && viewMode === "table" && tab === "fg";
  return (
- <div>
- {/* subview tabs */}
- <div style={{ display: "flex", gap: 8, margin: "0 0 12px",
+ <div style={{ marginRight: drawerOn ? "min(680px, 52vw)" : 0,
+ transition: "margin-right .18s ease" }}>
+ {renderDefDrawer()}
+ {/* ONE control row. The tabs, the table/map/passport switch and the
+ search used to be three stacked bands above the first group — with a
+ "VIEW" label explaining a segmented control that needs no label. The
+ third option was called "Business", the same word as the Business
+ view door upstairs, meaning something else; "Passports" is what the
+ screen actually shows. */}
+ <div style={{ display: "flex", gap: 8, alignItems: "center", margin: "0 0 14px",
+ flexWrap: "wrap",
  borderBottom: `1px solid ${t.panel2 || "#dfe6e9"}` }}>
  {[["fg", "Lineage by Functional Group"], ["net", "Dependency View"]].map(([k, label]) => (
  <div key={k} onClick={() => setTab(k)}
@@ -1303,21 +1375,22 @@ const visEdges = net.edges.filter((e) => {
  marginBottom: -1,
  borderBottom: `2px solid ${tab === k ? (t.accent || "#0f4775") : "transparent"}` }}>
  {label}</div>))}
+ {tab === "fg" && (
+ <span style={{ marginLeft: "auto", display: "flex", alignItems: "center",
+ gap: 8, paddingBottom: 6 }}>
+ <span style={{ display: "inline-flex" }}>
+ {modeBtn("table", "Table", "field drill — the developer view")}
+ {modeBtn("map", "Map", "DWH → source → definition")}
+ {modeBtn("biz", "Passports", "one card per field")}
+ </span>
+ <input placeholder="Search table…" value={q} onChange={(e) => setQ(e.target.value)}
+ style={{ height: 30, border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+ borderRadius: 3, padding: "0 10px", fontSize: 12, width: 190 }} />
+ </span>)}
  </div>
 
  {tab === "fg" && (
  <>
- <div style={{ display: "flex", alignItems: "center", margin: "2px 0 14px" }}>
- <span style={{ fontSize: 9.5, fontWeight: 800, textTransform: "uppercase",
- letterSpacing: 0.5, color: t.muted || "#999", marginRight: 10 }}>View</span>
- {modeBtn("table", "Table", "drill · developer")}
- {modeBtn("map", "Linkage Map", "DWH → source → definition")}
- {modeBtn("biz", "Business", "field passports")}
- <input placeholder="Search table…" value={q} onChange={(e) => setQ(e.target.value)}
- style={{ marginLeft: "auto", height: 30,
- border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderRadius: 3,
- padding: "0 10px", fontSize: 12, width: 220 }} />
- </div>
  {!tables.length && (
  <div style={{ fontSize: 12, color: t.muted || "#999", padding: 20,
  textAlign: "center" }}>

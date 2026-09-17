@@ -41,6 +41,7 @@ export default function LineageHome({ t, focus }) {
  const [curSys, setCurSys] = useState("ADDVANTAGE");
  const [systems, setSystems] = useState([]);
  const [techFocus, setTechFocus] = useState(null);
+ const [scopeOpen, setScopeOpen] = useState(false);
  const [stats, setStats] = useState({});
  const [dsCounts, setDsCounts] = useState({});
  const enter = (d, v) => { setDs(d); setView(v); };
@@ -198,20 +199,31 @@ export default function LineageHome({ t, focus }) {
    </div>);
  }
 
- /* ---------- shell: scope + system badges + view switch ---------- */
+ /* ---------- shell: view switch + one scope chip ----------
+  This row carried five control groups on one line: warehouse, the
+  Business/Technical/Source switch, SEI vs Non-SEI, three source-system
+  badges, and a note to the developer. Nothing distinguished the controls
+  that NARROW the data (scope) from the one that RESHAPES it (view), so the
+  band read as an undifferentiated wall of pills.
+
+  Now the view switch stays out in the open, because it is the choice people
+  make constantly, and everything that is scope collapses into one chip
+  reading "PBDW · Non-SEI · AddVantage" that opens a popover. Scope is set
+  on arrival and rarely touched again; it does not deserve permanent space. */
+ const sysLabel = (SYS_META[curSys] || {}).label || curSys;
+ const scopeSummary = [ds, scope === "sei" ? "SEI" : "Non-SEI",
+                       scope === "nonsei" ? sysLabel : null]
+                      .filter(Boolean).join(" · ");
+ const popRow = { display: "flex", alignItems: "center", gap: 7,
+                  flexWrap: "wrap", padding: "9px 13px" };
+ const popLbl = { fontSize: 8.5, fontWeight: 800, textTransform: "uppercase",
+                  letterSpacing: 0.5, color: t.muted || "#999",
+                  width: 76, flex: "0 0 auto" };
  return (
   <div>
    {header}
    <div style={{ display: "flex", alignItems: "center", gap: 12,
-    margin: "10px 0 12px", flexWrap: "wrap" }}>
-    <span onClick={() => setDs(null)}
-     style={{ fontSize: 11, fontWeight: 700, borderRadius: 999,
-      padding: "4px 13px", cursor: "pointer", color: "#fff",
-      background: ds === "IMDS" ? "#0b7d9e" : (t.accent || "#0f4775") }}>
-     {ds} ▾{ds === "IMDS" && (
-      <span style={{ marginLeft: 7, fontSize: 8, fontWeight: 700,
-       borderRadius: 999, padding: "1px 6px", background: "#e67e22",
-       color: "#fff" }}>IN BUILD</span>)}</span>
+    margin: "10px 0 14px", flexWrap: "wrap" }}>
     <div style={{ display: "inline-flex", background: t.navy || "#10193b",
      borderRadius: 999, padding: 2 }}>
      <span style={swBtn(view === "business")}
@@ -221,35 +233,91 @@ export default function LineageHome({ t, focus }) {
      <span style={swBtn(view === "source")}
       onClick={() => setView("source")}>Source view</span>
     </div>
-    <span>{scopeBtn("sei", "SEI", true)}{scopeBtn("nonsei", "Non-SEI", false)}</span>
-    {scope === "nonsei" && (
-     <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      {Object.entries(SYS_META).map(([k, m]) => {
-       const present = systems.find((s) => s.source_system === k);
-       const on = curSys === k;
-       return (
-        <span key={k}
-         onClick={present ? () => setCurSys(k) : undefined}
-         title={present ? `${present.def_count || ""} definitions`
-          : `${m.label} workbook pending`}
-         style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11,
-          fontWeight: 700, padding: "4px 11px", borderRadius: 999,
-          border: `1.5px solid ${on ? m.c : (t.panel2 || "#dfe6e9")}`,
-          background: on ? m.c : "#fff",
-          color: on ? "#fff" : (t.sub || "#666"),
-          opacity: present ? 1 : 0.5,
-          cursor: present ? "pointer" : "not-allowed" }}>
-         <span style={{ width: 7, height: 7, borderRadius: "50%",
-          background: on ? "#fff" : m.c }} />
-         {m.label}
-         {present && <span style={{ fontSize: 8.5, opacity: 0.8 }}>
-          {present.def_count}</span>}
-        </span>);
-      })}
-     </span>)}
-    {view === "technical" && scope === "nonsei" && (
-     <span style={{ fontSize: 10.5, color: "#7b8894" }}>
-      your full developer screen — unchanged</span>)}
+
+    <div style={{ position: "relative" }}>
+     <span onClick={() => setScopeOpen((v) => !v)}
+      title="Warehouse, SEI scope and source system"
+      style={{ display: "inline-flex", alignItems: "center", gap: 7,
+       fontSize: 11, fontWeight: 700, borderRadius: 999,
+       padding: "5px 13px", cursor: "pointer", background: "#fff",
+       border: `1.5px solid ${scopeOpen ? (t.accent || "#0f4775")
+                                        : (t.panel2 || "#dfe6e9")}`,
+       color: t.navy || "#10193b" }}>
+      <span style={{ width: 7, height: 7, borderRadius: "50%",
+       background: ds === "IMDS" ? "#0b7d9e" : (t.accent || "#0f4775") }} />
+      {scopeSummary}
+      {ds === "IMDS" && (
+       <span style={{ fontSize: 8, fontWeight: 700, borderRadius: 999,
+        padding: "1px 6px", background: "#e67e22", color: "#fff" }}>IN BUILD</span>)}
+      <span style={{ fontSize: 9, color: t.muted || "#999" }}>▾</span>
+     </span>
+
+     {scopeOpen && (
+      <>
+       {/* click-away catcher, deliberately not a dimming scrim — the page
+           behind stays readable while you change scope */}
+       <div onClick={() => setScopeOpen(false)}
+        style={{ position: "fixed", inset: 0, zIndex: 30 }} />
+       <div style={{ position: "absolute", top: "calc(100% + 7px)", left: 0,
+        zIndex: 31, minWidth: 340, background: t.panel || "#fff",
+        border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderRadius: 8,
+        boxShadow: "0 12px 34px rgba(16,25,59,.16)", overflow: "hidden" }}>
+        <div style={popRow}>
+         <span style={popLbl}>Warehouse</span>
+         {SOURCES.map((o) => (
+          <span key={o.id} onClick={() => { setDs(o.id); setScopeOpen(false); }}
+           style={{ fontSize: 11, fontWeight: 700, padding: "4px 11px",
+            borderRadius: 999, cursor: "pointer",
+            border: `1.5px solid ${ds === o.id ? (t.accent || "#0f4775")
+                                               : (t.panel2 || "#dfe6e9")}`,
+            background: ds === o.id ? (t.accent || "#0f4775") : "#fff",
+            color: ds === o.id ? "#fff" : (t.sub || "#666") }}>
+           {o.id}{o.inBuild && <span style={{ fontSize: 8, marginLeft: 5,
+            opacity: 0.85 }}>IN BUILD</span>}</span>))}
+        </div>
+        <div style={{ ...popRow, borderTop: `1px solid ${t.panel2 || "#dfe6e9"}` }}>
+         <span style={popLbl}>Scope</span>
+         {scopeBtn("sei", "SEI", true)}{scopeBtn("nonsei", "Non-SEI", false)}
+        </div>
+        {scope === "nonsei" && (
+         <div style={{ ...popRow, borderTop: `1px solid ${t.panel2 || "#dfe6e9"}` }}>
+          <span style={popLbl}>System</span>
+          {Object.entries(SYS_META).map(([k, m]) => {
+           const present = systems.find((x) => x.source_system === k);
+           const on = curSys === k;
+           return (
+            <span key={k}
+             onClick={present ? () => setCurSys(k) : undefined}
+             title={present ? `${present.def_count || ""} definitions`
+                            : `${m.label} workbook pending`}
+             style={{ display: "flex", alignItems: "center", gap: 5,
+              fontSize: 11, fontWeight: 700, padding: "4px 11px",
+              borderRadius: 999,
+              border: `1.5px solid ${on ? m.c : (t.panel2 || "#dfe6e9")}`,
+              background: on ? m.c : "#fff",
+              color: on ? "#fff" : (t.sub || "#666"),
+              opacity: present ? 1 : 0.5,
+              cursor: present ? "pointer" : "not-allowed" }}>
+             <span style={{ width: 7, height: 7, borderRadius: "50%",
+              background: on ? "#fff" : m.c }} />
+             {m.label}
+             {present && <span style={{ fontSize: 8.5, opacity: 0.8 }}>
+              {present.def_count}</span>}
+            </span>);
+          })}
+         </div>)}
+        {/* setDs(null) used to live on the old warehouse chip, and it is the
+            ONLY route back to the landing page — removing that chip without
+            this would have stranded anyone who entered through a door. */}
+        <div onClick={() => { setScopeOpen(false); setDs(null); }}
+         style={{ padding: "9px 13px", cursor: "pointer", fontSize: 11,
+          fontWeight: 600, color: t.accent || "#0f4775",
+          background: "#f7f9fb",
+          borderTop: `1px solid ${t.panel2 || "#dfe6e9"}` }}>
+         ← All warehouses</div>
+       </div>
+      </>)}
+    </div>
    </div>
 
    {scope === "sei" ? (
