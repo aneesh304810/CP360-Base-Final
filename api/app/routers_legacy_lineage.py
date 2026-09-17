@@ -35,25 +35,59 @@ def _variance(proof_rows):
     return ("changed", "value differs across stages")
 
 
+# Both loader conventions mean mapped: the rich sheet writes 'Exists', the
+# 4-column loader writes 'mapped'. Testing only for 'mapped' reported a
+# largely-mapped catalogue as 0%. Kept inline rather than imported from
+# _legacy_compat, which imports _safe from THIS module — importing back would
+# be circular. _legacy_compat._MAPPED_SQL is the fuller version.
+_MAPPED = "LOWER(TRIM(lineage_status)) IN ('mapped', 'exists')"
+
+
 @router.get("/tables")
-def tables():
-    """Distinct DWH target tables with summary counts."""
+def tables(data_source: str | None = None):
+    """Distinct DWH target tables with summary counts.
+
+    functional_group is part of the contract, not an extra. LegacyLineage.jsx
+    buckets the Business view with `tb.functional_group || "Unassigned"`, so a
+    row without it is not merely missing a label — it collapses the entire
+    screen into one "Unassigned" card. This query omitted the column, which is
+    why Business view showed 177 tables in a single bucket while a deployment
+    running a newer copy of this file showed the real 17 groups.
+
+    data_source scopes to one warehouse. NULL counts as belonging to it: rows
+    loaded before sql/29 have no tag, and the workbook connector did not write
+    one until recently, so excluding NULLs empties the screen.
+    """
     # NOTE: legacy_lineage grain is (target column x source) — one target column
     # can carry several source rows. Counts here are DISTINCT columns so the UI
     # shows field counts, not source-row counts.
-    rows = _safe("""
+    where, params = "", {}
+    if data_source:
+        where = " AND (data_source = :ds OR data_source IS NULL) "
+        params["ds"] = data_source.upper()
+    rows = _safe(f"""
         SELECT dwh_target_table AS table_name,
+               NVL(functional_group, 'Unassigned') AS functional_group,
+               MIN(table_type) AS table_type,
                COUNT(DISTINCT dwh_target_column) AS field_count,
-               COUNT(DISTINCT CASE WHEN LOWER(lineage_status) = 'mapped'
+               COUNT(DISTINCT CASE WHEN {_MAPPED}
                                    THEN dwh_target_column END) AS mapped,
                COUNT(DISTINCT CASE WHEN LOWER(lineage_status) LIKE 'not applicable%'
                                    THEN dwh_target_column END) AS not_applicable,
                COUNT(DISTINCT CASE WHEN is_ud = 'Y'
                                    THEN dwh_target_column END) AS ud_count
         FROM legacy_lineage
-        WHERE dwh_target_table IS NOT NULL
-        GROUP BY dwh_target_table
-        ORDER BY dwh_target_table""")
+        WHERE dwh_target_table IS NOT NULL {where}
+        GROUP BY dwh_target_table, NVL(functional_group, 'Unassigned')
+        ORDER BY dwh_target_table""", params)
+    if rows and all(r.get("functional_group") == "Unassigned" for r in rows):
+        # every table in one bucket is almost always a load problem, not a
+        # catalogue with no groups. Say so once, in the log, rather than
+        # letting the screen imply the data is ungrouped.
+        log.warning("legacy_lineage: all %d tables have a NULL "
+                    "functional_group — Business view will render one "
+                    "'Unassigned' group. Check the lineage workbook's "
+                    "Functional_Group column and reload.", len(rows))
     return {"tables": rows}
 
 
