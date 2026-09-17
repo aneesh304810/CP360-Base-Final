@@ -390,44 +390,4 @@ export const api = {
   envPulse: () => get('/env/pulse', () => MOCK.envPulse()),
   envRunPulse: () => post('/env/pulse/run', {}, () => ({ ok: true })),
   envInventory: () => get('/env/inventory', () => MOCK.envInventory()),
-
-  // ---- Legacy lineage: column-level graph (Technical view) ----
-  // Address by DWH column or by field code. include_parallel=false drops the
-  // same-code chains through other masters. Falls back to an empty graph so
-  // the panel renders its own "no lineage rows" state rather than throwing.
-  legacyLineageGraph: ({ table, column, code, data_source, include_parallel = true } = {}) => {
-    const q = new URLSearchParams();
-    if (table) q.set('table', table);
-    if (column) q.set('column', column);
-    if (code) q.set('code', code);
-    if (data_source) q.set('data_source', data_source);
-    if (!include_parallel) q.set('include_parallel', 'false');
-    return get(`/legacy-lineage/graph?${q.toString()}`,
-      () => ({ focus: null, code: code || null, nodes: [], edges: [],
-               stats: {}, truncated: false }));
-  },
-
-  // ---- Legacy lineage: source-first drill ----
-  // Entry at the AddVantage extract rather than the warehouse table.
-  legacyLineageSources: (data_source) =>
-    get(`/legacy-lineage/sources${data_source ? `?data_source=${encodeURIComponent(data_source)}` : ''}`,
-      () => ({ masters: [], sources: [],
-               totals: { files: 0, masters: 0, field_count: 0, mapped: 0, unmapped: 0 } })),
-
-  legacyLineageSourceFlow: (src_table, data_source) => {
-    const q = new URLSearchParams({ src_table });
-    if (data_source) q.set('data_source', data_source);
-    return get(`/legacy-lineage/source-flow?${q.toString()}`,
-      () => ({ src_table, master: null, stages: {}, targets: [], target_count: 0 }));
-  },
-
-  legacyLineageSourceFields: (src_table, data_source, target, system) => {
-    const q = new URLSearchParams({ src_table });
-    if (data_source) q.set('data_source', data_source);
-    if (target) q.set('target', target);
-    if (system) q.set('system', system);
-    return get(`/legacy-lineage/source-fields?${q.toString()}`,
-      () => ({ src_table, families: [],
-               totals: { codes: 0, families: 0, by_class: {} } }));
-  },
 };

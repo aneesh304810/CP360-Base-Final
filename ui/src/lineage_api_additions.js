@@ -1,0 +1,83 @@
+// Lineage additions — the source-first drill and the column-level graph.
+//
+// House pattern, same as env360_infra_api_additions.js: self-contained, tries
+// LIVE first, falls back to a safe empty shape so the panel renders its own
+// "nothing here" state instead of throwing.
+//
+// WHY THIS IS A SEPARATE FILE AND NOT api.js
+//
+// These four calls were originally added straight into ui/src/api.js. That
+// broke the Lineage page on a machine that pulled the branch:
+//
+//   Uncaught TypeError: api.legacySystems is not a function
+//     at LineageHome.jsx:50
+//
+// api.js is ahead in working copies and behind in the repo — the committed
+// copy has none of legacySystems, legacyLineageTables, legacyBusinessDef,
+// legacyWhereUsed, legacyDictionary, legacyDataSources,
+// legacyDependencyNetwork, legacyLineageFields or legacyLineageProof. Editing
+// it meant a pull replaced a good file with a stale one plus four additions,
+// and the page died on mount.
+//
+// So nothing here touches api.js. LineageGraph and SourceLineage import
+// `lineageApi` from this file directly. If you would rather reach these as
+// api.lineageGraph(...) for consistency with the rest of the client, add one
+// line to YOUR api.js — it is not required, and nothing breaks without it:
+//
+//     import { lineageApi } from './lineage_api_additions.js';
+//     export const api = { ...lineageApi, /* existing entries */ };
+
+const API_BASE = import.meta.env.VITE_API_BASE || "/api";
+
+// Mirrors api.js: never latch to mock mode on one failure — a slow query must
+// not empty the whole session. Each call tries the network again.
+async function _get(path, fallback) {
+  try {
+    const r = await fetch(`${API_BASE}${path}`, { signal: AbortSignal.timeout(15000) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  } catch {
+    return fallback();
+  }
+}
+
+const _qs = (o) => {
+  const q = new URLSearchParams();
+  Object.entries(o).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== "") q.set(k, v);
+  });
+  return q.toString();
+};
+
+export const lineageApi = {
+  // ---- column-level graph (Technical view) ----
+  // Address by DWH column or by field code. include_parallel=false drops the
+  // same-code chains running through other masters.
+  lineageGraph: ({ table, column, code, data_source,
+                   include_parallel = true } = {}) =>
+    _get(`/legacy-lineage/graph?${_qs({
+          table, column, code, data_source,
+          include_parallel: include_parallel ? undefined : "false" })}`,
+      () => ({ focus: null, code: code || null, nodes: [], edges: [],
+               stats: {}, truncated: false })),
+
+  // ---- source-first drill ----
+  lineageSources: (data_source) =>
+    _get(`/legacy-lineage/sources?${_qs({ data_source })}`,
+      () => ({ masters: [], sources: [],
+               totals: { files: 0, masters: 0, field_count: 0,
+                         mapped: 0, unmapped: 0 } })),
+
+  lineageSourceFlow: (src_table, data_source) =>
+    _get(`/legacy-lineage/source-flow?${_qs({ src_table, data_source })}`,
+      () => ({ src_table, master: null, stages: {}, targets: [],
+               target_count: 0 })),
+
+  lineageSourceFields: (src_table, data_source, target, system) =>
+    _get(`/legacy-lineage/source-fields?${_qs({ src_table, data_source,
+                                                target, system })}`,
+      () => ({ src_table, families: [],
+               totals: { codes: 0, families: 0, by_class: {} } })),
+};
+
+export default lineageApi;

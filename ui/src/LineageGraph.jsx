@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { api } from "./api.js";
+import { lineageApi } from "./lineage_api_additions.js";
 
 // =====================================================================
 // LineageGraph — column-level lineage for the Technical view.
@@ -63,8 +63,8 @@ export default function LineageGraph({ t, table, column, code, dataSource = "PBD
   useEffect(() => {
     let dead = false;
     setData(null); setErr(null);
-    api.legacyLineageGraph({ table, column, code, data_source: ds,
-                             include_parallel: parallel })
+    lineageApi.lineageGraph({ table, column, code, data_source: ds,
+                              include_parallel: parallel })
       .then((d) => { if (dead) return; setData(d); setFocus(d && d.focus); })
       .catch((e) => { if (!dead) setErr(String(e && e.message ? e.message : e)); });
     return () => { dead = true; };

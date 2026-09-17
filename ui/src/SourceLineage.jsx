@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { api } from "./api.js";
+import { lineageApi } from "./lineage_api_additions.js";
 import LineageGraph from "./LineageGraph.jsx";
 
 // =====================================================================
@@ -77,7 +77,7 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
   useEffect(() => {
     let dead = false;
     setSrcs(null); setLevel(0); setFile(null); setTarget(null);
-    api.legacyLineageSources(ds).then((d) => { if (!dead) setSrcs(d); });
+    lineageApi.lineageSources(ds).then((d) => { if (!dead) setSrcs(d); });
     return () => { dead = true; };
   }, [ds]);
 
@@ -85,7 +85,7 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
     if (!file) { setFlow(null); return; }
     let dead = false;
     setFlow(null);
-    api.legacyLineageSourceFlow(file, ds).then((d) => { if (!dead) setFlow(d); });
+    lineageApi.lineageSourceFlow(file, ds).then((d) => { if (!dead) setFlow(d); });
     return () => { dead = true; };
   }, [file, ds]);
 
@@ -93,7 +93,7 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
     if (!file || level < 2) { return; }
     let dead = false;
     setFields(null);
-    api.legacyLineageSourceFields(file, ds, target, system)
+    lineageApi.lineageSourceFields(file, ds, target, system)
       .then((d) => { if (!dead) setFields(d); });
     return () => { dead = true; };
   }, [file, ds, target, level, system]);
