@@ -57,6 +57,23 @@ const isNA = (v) => /not applicable|^n\/a$/i.test(String(v || "").trim());
 // to spend three columns on  VARCHAR2 | 42.0 | —  , which is three saccades
 // to read one declaration and two columns of em-dashes on every field that
 // has no precision.
+// Laptops are the target, and on a laptop the binding constraint is not
+// width, it is HEIGHT: 768px less browser chrome and the app header leaves
+// roughly 470px of content. That is why the drawer gets tabs below, and why
+// its width steps rather than scaling smoothly — a 52vw drawer on a 1366px
+// screen leaves 650px for a table AND 650px for a four-stage pipeline, and
+// neither is enough.
+function useViewport() {
+ const [w, setW] = useState(typeof window === "undefined" ? 1600
+                                                          : window.innerWidth);
+ useEffect(() => {
+  const on = () => setW(window.innerWidth);
+  window.addEventListener("resize", on);
+  return () => window.removeEventListener("resize", on);
+ }, []);
+ return w;
+}
+
 const fmtType = (f) => {
  const ty = (f.dwh_type || "").trim();
  if (!ty) return "—";
@@ -298,8 +315,12 @@ function XformStory({ t, row }) {
 /* reborn inline). Used by every field click in every mode + the rail. */
 /* ------------------------------------------------------------------ */
 
+// `only` renders a single half: "lineage" or "def". The drawer uses it to
+// turn four stacked sections — graph, proof, plain-terms strip, dictionary
+// card, about three laptop screens — into two tabs. Everywhere else (map
+// mode, passports, the rail) leaves it unset and gets both halves as before.
 function InlineDef({ t, system, dataSource, code, ctx, row, tableName, onDataSource,
- onJump, compact = false, roomy = false }) {
+ onJump, compact = false, roomy = false, only = null }) {
  const [def, setDef] = useState(null);
  const [others, setOthers] = useState([]);
  const [resolved, setResolved] = useState(null);
@@ -351,6 +372,7 @@ function InlineDef({ t, system, dataSource, code, ctx, row, tableName, onDataSou
  <div style={{ display: roomy ? "flex" : "grid", flexDirection: "column",
  gridTemplateColumns: compact ? "1fr" : "1fr 1.25fr" }}>
  {/* ------- dictionary half ------- */}
+ {only !== "lineage" && (
  <div style={{ order: roomy ? 2 : 0, minWidth: 0,
  borderRight: (compact || roomy) ? "none" : `1px solid ${t.panel2 || "#dfe6e9"}`,
  borderTop: roomy ? `1px solid ${t.panel2 || "#dfe6e9"}` : "none" }}>
@@ -406,8 +428,9 @@ function InlineDef({ t, system, dataSource, code, ctx, row, tableName, onDataSou
  ? `Shown: ${resolved} — resolved from the source file / staging table (field identity is master + code).`
  : "No source context — showing the first master."}</i></b></div>)}
  </>)}
- </div>
+ </div>)}
  {/* ------- lineage half ------- */}
+ {only !== "def" && (
  <div style={{ minWidth: 0, overflow: "hidden",
  padding: roomy ? "16px 22px" : "10px 14px" }}>
  {row ? (
@@ -495,7 +518,7 @@ function InlineDef({ t, system, dataSource, code, ctx, row, tableName, onDataSou
  background: "#fff", cursor: onDataSource ? "pointer" : "default" }}>
  {u.data_source} — {u.dwh_target_table}.{u.dwh_target_column} ↗</span>))}
  </div>)}
- </div>
+ </div>)}
  </div>
  </div>);
 }
@@ -681,6 +704,22 @@ export default function LegacyLineage({ t, system = "ADDVANTAGE", dataSource = "
  const [openT, setOpenT] = useState({});
  const [openChain, setOpenChain] = useState(null); // "TBL:COL" caret expand
  const [openDef, setOpenDef] = useState(null); // {key, code, ctx, row, table}
+ const [defTab, setDefTab] = useState("lineage"); // drawer section
+ const vw = useViewport();
+ // Stepped, not fluid, and it decides TWO things.
+ //
+ // Width: under ~1150px a split leaves both halves unusable, so the drawer
+ // takes the screen — you are looking at one field anyway.
+ //
+ // Whether the page reflows: reflowing squeezes the table into what is left,
+ // which on a 1366px laptop (less the app sidebar) is about 480px — the
+ // five columns re-wrap and the list stops being scannable. Overlaying
+ // instead keeps the table at full width with only its right edge hidden,
+ // and the columns that matter for keeping your place — the chevron, the
+ // field name, the type — are the leftmost ones. So reflow only where there
+ // is genuinely room for both.
+ const drawerW = vw < 1150 ? "100vw" : vw < 1500 ? 640 : "min(760px, 46vw)";
+ const drawerReflow = vw >= 1500;
  const [q, setQ] = useState("");
  const ds = (dataSource || "PBDW").toUpperCase();
 
@@ -736,11 +775,13 @@ export default function LegacyLineage({ t, system = "ADDVANTAGE", dataSource = "
 
  const jumpWarehouse = (targetDs, loc) => { if (onDataSource) onDataSource(targetDs, loc); };
 
- const openDefFor = (f, tbl, key) =>
- setOpenDef((cur) => cur && cur.key === key ? null
+ const openDefFor = (f, tbl, key) => {
+ setDefTab("lineage");
+ return setOpenDef((cur) => cur && cur.key === key ? null
  : { key, code: f.src_source_column,
  ctx: { srcTable: f.src_source_table || f.stg1_source_table, dwhTable: tbl },
  row: f, table: tbl });
+ };
 
  // Esc closes the drawer — it overlays the table, so there has to be a way
  // out that is not "hunt for the ×".
@@ -759,7 +800,7 @@ export default function LegacyLineage({ t, system = "ADDVANTAGE", dataSource = "
  return (
  <aside role="dialog" aria-label={`${openDef.code} definition and lineage`}
  style={{ position: "fixed", top: 0, right: 0, bottom: 0, zIndex: 40,
- width: "min(680px, 52vw)", background: t.panel || "#fff",
+ width: drawerW, background: t.panel || "#fff",
  borderLeft: `1px solid ${t.panel2 || "#dfe6e9"}`,
  boxShadow: "-14px 0 40px rgba(16,25,59,.13)",
  display: "flex", flexDirection: "column" }}>
@@ -777,10 +818,26 @@ export default function LegacyLineage({ t, system = "ADDVANTAGE", dataSource = "
  cursor: "pointer", fontSize: 17, lineHeight: 1,
  color: t.muted || "#999", fontFamily: "inherit" }}>×</button>
  </div>
+ {/* Two tabs, not one long scroll. The drawer stacks lineage graph,
+ stage proof, plain-terms strip and the dictionary card — four
+ sections, roughly three laptop screens. Lineage is the default
+ because that is what the click was asking about. */}
+ <div style={{ display: "flex", gap: 2, padding: "7px 12px 0", flex: "0 0 auto",
+ borderBottom: `1px solid ${t.panel2 || "#dfe6e9"}` }}>
+ {[["lineage", "Lineage & proof"], ["def", "Definition"]].map(([k, label]) => (
+ <button key={k} onClick={() => setDefTab(k)}
+ style={{ fontSize: 11.5, fontWeight: 700, padding: "7px 14px",
+ cursor: "pointer", fontFamily: "inherit", border: "none",
+ background: "none", marginBottom: -1,
+ color: defTab === k ? (t.accent || "#0f4775") : (t.sub || "#666"),
+ borderBottom: `2px solid ${defTab === k ? (t.accent || "#0f4775")
+ : "transparent"}` }}>
+ {label}</button>))}
+ </div>
  <div style={{ flex: 1, overflow: "auto", padding: "4px 16px 20px" }}>
  <InlineDef t={t} system={system} dataSource={ds} code={openDef.code}
  ctx={openDef.ctx} row={openDef.row} tableName={openDef.table}
- roomy onDataSource={jumpWarehouse}
+ roomy only={defTab} onDataSource={jumpWarehouse}
  onJump={(u) => {
  setOpenT((m) => ({ ...m, [u.dwh_target_table]: true }));
  ensureFields(u.dwh_target_table); }} />
@@ -1356,7 +1413,7 @@ const visEdges = net.edges.filter((e) => {
  // reflows into what is left instead of hiding under it.
  const drawerOn = !!openDef && viewMode === "table" && tab === "fg";
  return (
- <div style={{ marginRight: drawerOn ? "min(680px, 52vw)" : 0,
+ <div style={{ marginRight: drawerOn && drawerReflow ? drawerW : 0,
  transition: "margin-right .18s ease" }}>
  {renderDefDrawer()}
  {/* ONE control row. The tabs, the table/map/passport switch and the

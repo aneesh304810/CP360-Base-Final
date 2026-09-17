@@ -125,12 +125,18 @@ export default function LineageHome({ t, focus }) {
     background: scope === k ? (t.accent || "#0f4775") : "#fff",
     color: scope === k ? "#fff" : (t.sub || "#666") }}>{label}</button>);
 
+ // The strapline explains the page to someone arriving at it. Once you are
+ // inside a warehouse it is two lines of text you have already read, and on
+ // a 768px laptop the content area is only ~470px tall — every band above
+ // the first group row is one fewer row of data. So it shows on the landing
+ // and not after.
  const header = (
   <>
    <SectionHeader t={t}>Lineage</SectionHeader>
-   <div style={{ fontSize: 12, color: t.sub || "#666", margin: "-22px 0 16px" }}>
-    End-to-end lineage — SRC → STG1 → STG2 → DWH with business
-    definitions, proof values, and dependency views</div>
+   {!ds && (
+    <div style={{ fontSize: 12, color: t.sub || "#666", margin: "-22px 0 16px" }}>
+     End-to-end lineage — SRC → STG1 → STG2 → DWH with business
+     definitions, proof values, and dependency views</div>)}
   </>);
 
  /* ---------- landing: pick warehouse + door ---------- */

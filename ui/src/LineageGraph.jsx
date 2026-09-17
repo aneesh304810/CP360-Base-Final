@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { lineageApi } from "./lineage_api_additions.js";
 
 // =====================================================================
@@ -47,9 +47,16 @@ const EDGE_KIND = {
   direct: { c: "#9aa7b2", dash: "",    legend: "Direct" },
 };
 
-// geometry — all fixed, nothing measured
-const LANE_W = 214, LANE_GAP = 76, HDR_H = 22, ROW_H = 21, BOX_PAD = 5,
-      BOX_GAP = 13, TOP = 34, BOT = 10;
+// Geometry. The vertical numbers stay fixed — a row is a row. The two
+// HORIZONTAL ones are measured, because this graph now renders inside a
+// drawer as well as a full-width panel, and at drawer width the old fixed
+// 214/76 lanes came to 1084px against ~610px of space: a horizontal
+// scrollbar under a four-stage pipeline, which is the one shape that has to
+// be readable in a single glance.
+const LANE_W_MAX = 214, LANE_W_MIN = 118;
+const LANE_GAP_MAX = 76, LANE_GAP_MIN = 24;
+const HDR_H = 22, ROW_H = 21, BOX_PAD = 5, BOX_GAP = 13, TOP = 34, BOT = 10;
+const NARROW = 780;        // below this the gaps tighten before lanes shrink
 
 export default function LineageGraph({ t, table, column, code, dataSource = "PBDW",
                                        onOpenColumn }) {
@@ -57,6 +64,27 @@ export default function LineageGraph({ t, table, column, code, dataSource = "PBD
   const [err, setErr] = useState(null);
   const [focus, setFocus] = useState(null);
   const [parallel, setParallel] = useState(true);
+  const [legendOn, setLegendOn] = useState(false);
+
+  // Available width, measured. Falls back to the full-width geometry when
+  // ResizeObserver is unavailable or before the first observation.
+  const wrapRef = useRef(null);
+  const [avail, setAvail] = useState(0);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(([e]) => setAvail(e.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Tighten the gaps first — whitespace is cheaper to lose than a column
+  // name — and only then shrink the lanes, never below LANE_W_MIN.
+  const LANE_GAP = avail && avail < NARROW ? LANE_GAP_MIN : LANE_GAP_MAX;
+  const LANE_W = avail
+    ? Math.max(LANE_W_MIN,
+               Math.min(LANE_W_MAX, (avail - 30 - 3 * LANE_GAP) / 4))
+    : LANE_W_MAX;
 
   const ds = (dataSource || "PBDW").toUpperCase();
 
@@ -102,7 +130,7 @@ export default function LineageGraph({ t, table, column, code, dataSource = "PBD
     return { pos, boxes,
              W: STAGES.length * LANE_W + (STAGES.length - 1) * LANE_GAP,
              H: Math.max(height + BOT, 120) };
-  }, [nodes]);
+  }, [nodes, LANE_W, LANE_GAP]);
 
   // ---- trace: everything upstream and downstream of the focused column ----
   const trace = useMemo(() => {
@@ -215,10 +243,12 @@ export default function LineageGraph({ t, table, column, code, dataSource = "PBD
       </div>
 
       {/* ---------------- graph ---------------- */}
-      <div style={{ overflowX: "auto", padding: 14 }}>
+      <div ref={wrapRef} style={{ overflowX: "auto", padding: 14 }}>
+        {/* no minWidth: the lanes are already sized to this container, so
+            forcing 940px here is what put a scrollbar under the pipeline */}
         <svg viewBox={`-4 0 ${layout.W + 34} ${layout.H}`}
              preserveAspectRatio="xMidYMin meet"
-             style={{ display: "block", minWidth: 940, width: "100%", height: "auto" }}
+             style={{ display: "block", width: "100%", height: "auto" }}
              role="img"
              aria-label="Column-level lineage from source through landing and conformed to warehouse">
           {/* lane headings */}
@@ -317,8 +347,17 @@ export default function LineageGraph({ t, table, column, code, dataSource = "PBD
         </svg>
       </div>
 
-      {/* ---------------- legend + note ---------------- */}
-      <div style={{ padding: "9px 14px", borderTop: `1px solid ${line}`, display: "flex",
+      {/* ---------------- legend + note ----------------
+          Four legend entries wrapped to three lines at drawer width, above
+          the fold, every time — for a key you read once. It folds away. */}
+      <div style={{ padding: "7px 14px", borderTop: `1px solid ${line}`,
+                    fontSize: 10.5, color: muted }}>
+        <span onClick={() => setLegendOn((v) => !v)}
+              style={{ cursor: "pointer", fontWeight: 700, userSelect: "none" }}>
+          {legendOn ? "▾" : "▸"} Legend</span>
+      </div>
+      {legendOn && (
+      <div style={{ padding: "0 14px 9px", display: "flex",
                     gap: 16, flexWrap: "wrap", fontSize: 10.5, color: muted }}>
         {Object.entries(EDGE_KIND).filter(([k]) => k !== "direct").map(([k, v]) => (
           <span key={k} style={{ color: v.c }}>
@@ -328,7 +367,7 @@ export default function LineageGraph({ t, table, column, code, dataSource = "PBD
             </svg>
             {v.legend}
           </span>))}
-      </div>
+      </div>)}
       <div style={{ padding: "10px 14px", borderTop: `1px solid ${line}`,
                     fontSize: 12, color: sub, lineHeight: 1.55 }}>
         {data.truncated && (
