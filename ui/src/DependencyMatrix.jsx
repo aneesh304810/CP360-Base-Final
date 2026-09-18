@@ -19,6 +19,11 @@ import { lineageApi } from "./lineage_api_additions.js";
 //
 // The orphan is the point: it is the migration risk register, and no
 // arrangement of two lists can show it.
+//
+// CLOSED FIRST. Fifteen grids stacked on one page is the same wall of
+// everything the swimlanes were, only denser. The list arrives as counts,
+// and a group's grid is fetched the first time it is opened — so the
+// screen owes you a way in before it owes you detail.
 // =====================================================================
 
 // Sequential ramp, ONE hue (the app's accent navy), light to dark — the rule
@@ -37,50 +42,56 @@ const step = (n) => STEPS.find((s) => (n || 0) <= s.max) || STEPS[0];
 
 const mono = "Roboto Mono, monospace";
 const INK = "#233240", SUB = "#7b8894", RULE = "#c9d4dc";
-const DANGER = "#c1113a", WARN = "#a8560f";
+const ACCENT = "#0f4775", DANGER = "#c1113a", WARN = "#a8560f";
 
 export default function DependencyMatrix({ dataSource = "PBDW", onOpenTable }) {
   const ds = (dataSource || "PBDW").toUpperCase();
-  const [data, setData] = useState(null);
+  const [list, setList] = useState(null);      // the summaries
+  const [open, setOpen] = useState({});        // group -> bool
+  const [detail, setDetail] = useState({});    // group -> full matrix | "loading"
   const [q, setQ] = useState("");
-  // { s, t } of the hovered cell — drives the crosshair. Kept in state rather
-  // than done with CSS :hover because the row AND column headers highlight
-  // too, and they are not descendants of the cell.
-  const [hot, setHot] = useState(null);
   const [onlyProblems, setOnlyProblems] = useState(false);
 
   useEffect(() => {
     let dead = false;
-    setData(null);
-    lineageApi.dependencyMatrix(ds).then((d) => { if (!dead) setData(d); });
+    setList(null); setOpen({}); setDetail({});
+    lineageApi.dependencyMatrix(ds).then((d) => { if (!dead) setList(d); });
     return () => { dead = true; };
   }, [ds]);
 
-  if (!data)
+  // Fetched once per group and kept. Re-opening a group someone has already
+  // looked at should be instant; it is the same data.
+  const toggle = (name) => {
+    const next = !open[name];
+    setOpen((m) => ({ ...m, [name]: next }));
+    if (next && !detail[name]) {
+      setDetail((m) => ({ ...m, [name]: "loading" }));
+      lineageApi.dependencyMatrix(ds, name).then((d) => {
+        const g = (d.groups || []).find((x) => x.group === name) || null;
+        setDetail((m) => ({ ...m, [name]: g }));
+      });
+    }
+  };
+
+  if (!list)
     return <div style={{ padding: 20, fontSize: 12, color: SUB }}>
       Loading dependencies…</div>;
 
-  const groups = (data.groups || []).filter((g) => {
+  const T = list.totals || {};
+  const groups = (list.groups || []).filter((g) => {
     if (onlyProblems && !g.stats.orphans && !g.stats.defects) return false;
-    if (!q) return true;
-    const n = q.toLowerCase();
-    return (g.group || "").toLowerCase().includes(n)
-      || g.sources.some((s) => `${s.dataset || ""} ${s.src}`.toLowerCase().includes(n))
-      || g.targets.some((t) => (t.tgt || "").toLowerCase().includes(n));
+    return !q || (g.group || "").toLowerCase().includes(q.toLowerCase());
   });
-
-  const T = data.totals || {};
 
   return (
     <div>
-      {/* ---- one control row, and the two numbers worth leading with ---- */}
       <div style={{ display: "flex", gap: 10, alignItems: "center",
                     flexWrap: "wrap", marginBottom: 14 }}>
         <label htmlFor="dmq" style={{ position: "absolute", left: -9999 }}>
-          Filter groups, sources and tables</label>
+          Filter functional groups</label>
         <input id="dmq" value={q} onChange={(e) => setQ(e.target.value)}
-          placeholder="Filter groups, sources, tables…"
-          style={{ height: 30, width: 240, border: `1px solid ${RULE}`,
+          placeholder="Filter groups…"
+          style={{ height: 30, width: 220, border: `1px solid ${RULE}`,
                    borderRadius: 4, padding: "0 10px", fontSize: 12,
                    fontFamily: "inherit" }} />
         <label style={{ display: "flex", alignItems: "center", gap: 6,
@@ -99,50 +110,76 @@ export default function DependencyMatrix({ dataSource = "PBDW", onOpenTable }) {
                          background: "#fdf6ec", border: "1px solid #f2d9b4",
                          borderRadius: 999, padding: "4px 12px" }}>
             {T.defects} malformed source name{T.defects === 1 ? "" : "s"}</span>)}
-        <span style={{ marginLeft: "auto", display: "flex", alignItems: "center",
-                       gap: 6, fontSize: 10.5, color: SUB }}>
-          columns on link
-          {STEPS.slice(1).map((s) => (
-            <span key={s.max} title={`up to ${s.max === Infinity ? "any" : s.max}`}
-              style={{ display: "inline-block", width: 20, height: 11,
-                       background: s.bg, border: `1px solid ${RULE}` }} />))}
-        </span>
+        <span style={{ marginLeft: "auto", fontSize: 11, color: SUB }}>
+          {groups.length} group{groups.length === 1 ? "" : "s"} · open one to see
+          which source feeds which table</span>
       </div>
 
       {!groups.length && (
         <div style={{ padding: 20, fontSize: 12, color: SUB, textAlign: "center" }}>
-          No dependency matches “{q}”.</div>)}
+          {onlyProblems ? "No group has an orphan or a malformed source name."
+                        : `No group matches “${q}”.`}</div>)}
 
       {groups.map((g) => (
-        <Matrix key={g.group} g={g} hot={hot} setHot={setHot}
-                onOpenTable={onOpenTable} />))}
+        <GroupRow key={g.group} g={g} open={!!open[g.group]}
+          detail={detail[g.group]} onToggle={() => toggle(g.group)}
+          onOpenTable={onOpenTable} />))}
     </div>);
 }
 
-function Matrix({ g, hot, setHot, onOpenTable }) {
-  const cell = {};
-  (g.cells || []).forEach((c) => { cell[`${c.s}:${c.t}`] = c; });
-  const isHot = (s, t) => hot && (hot.s === s || hot.t === t);
-
+function GroupRow({ g, open, detail, onToggle, onOpenTable }) {
+  const s = g.stats;
+  const problem = s.orphans > 0 || s.defects > 0;
   return (
     <div style={{ background: "#fff", border: `1px solid ${RULE}`,
-                  borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 10,
-                    flexWrap: "wrap", padding: "11px 15px",
-                    borderBottom: `1px solid ${RULE}` }}>
-        <b style={{ fontSize: 13.5, fontWeight: 500, color: INK }}>{g.group}</b>
+                  borderRadius: 10, overflow: "hidden", marginBottom: 8 }}>
+      <button onClick={onToggle}
+        aria-expanded={open}
+        style={{ display: "flex", alignItems: "center", gap: 11, width: "100%",
+                 padding: "12px 15px", cursor: "pointer", textAlign: "left",
+                 border: "none", background: open ? "#f7fafc" : "#fff",
+                 fontFamily: "inherit", color: INK }}>
+        <span style={{ fontSize: 10, color: SUB, width: 9 }}>
+          {open ? "▾" : "▸"}</span>
+        <b style={{ fontSize: 13.5, fontWeight: 500 }}>{g.group}</b>
         <span style={{ fontSize: 11, color: SUB }}>
-          {g.stats.sources} source{g.stats.sources === 1 ? "" : "s"} →
-          {" "}{g.stats.targets} table{g.stats.targets === 1 ? "" : "s"} ·
-          {" "}{g.stats.links} column links</span>
-        {g.stats.orphans > 0 && (
-          <span style={{ fontSize: 10.5, fontWeight: 700, color: DANGER }}>
-            ● {g.stats.orphans} with no source</span>)}
-        {g.stats.defects > 0 && (
-          <span style={{ fontSize: 10.5, fontWeight: 700, color: WARN }}>
-            ● {g.stats.defects} malformed</span>)}
-      </div>
+          {s.sources} source{s.sources === 1 ? "" : "s"} → {s.targets} table
+          {s.targets === 1 ? "" : "s"} · {s.links} column links</span>
+        {s.orphans > 0 && (
+          <span title="warehouse tables nothing feeds"
+            style={{ fontSize: 10.5, fontWeight: 700, color: DANGER,
+                     background: "#fdf0f2", borderRadius: 999,
+                     padding: "2px 9px" }}>{s.orphans} no source</span>)}
+        {s.defects > 0 && (
+          <span title="source names that are not table names"
+            style={{ fontSize: 10.5, fontWeight: 700, color: WARN,
+                     background: "#fdf6ec", borderRadius: 999,
+                     padding: "2px 9px" }}>{s.defects} malformed</span>)}
+        <span style={{ marginLeft: "auto", fontSize: 10.5, color: SUB }}>
+          {open ? "" : problem ? "open to see which" : "open"}</span>
+      </button>
 
+      {open && detail === "loading" && (
+        <div style={{ padding: "14px 15px", fontSize: 11.5, color: SUB,
+                      borderTop: `1px solid ${RULE}` }}>Loading the grid…</div>)}
+      {open && detail && detail !== "loading" && (
+        <Matrix g={detail} onOpenTable={onOpenTable} />)}
+      {open && detail === null && (
+        <div style={{ padding: "14px 15px", fontSize: 11.5, color: SUB,
+                      borderTop: `1px solid ${RULE}` }}>
+          No grid came back for this group.</div>)}
+    </div>);
+}
+
+function Matrix({ g, onOpenTable }) {
+  // The crosshair lights the hovered row AND column, headers included — they
+  // are not descendants of the cell, so CSS :hover alone cannot do it.
+  const [hot, setHot] = useState(null);
+  const cell = {};
+  (g.cells || []).forEach((c) => { cell[`${c.s}:${c.t}`] = c; });
+
+  return (
+    <div style={{ borderTop: `1px solid ${RULE}` }}>
       <div style={{ overflowX: "auto" }}>
         <table style={{ borderCollapse: "separate", borderSpacing: 0,
                         fontSize: 11, minWidth: "100%" }}>
@@ -200,7 +237,7 @@ function Matrix({ g, hot, setHot, onOpenTable }) {
                     const c = cell[`${si}:${ti}`];
                     const n = c ? c.n : 0;
                     const st = step(n);
-                    const lit = isHot(si, ti);
+                    const lit = hot && (hot.s === si || hot.t === ti);
                     return (
                       <td key={t.tgt}
                         onMouseEnter={() => setHot({ s: si, t: ti })}
@@ -229,6 +266,18 @@ function Matrix({ g, hot, setHot, onOpenTable }) {
             })}
           </tbody>
         </table>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 7,
+                    padding: "9px 15px", fontSize: 10.5, color: SUB,
+                    borderTop: "1px solid #edf1f4" }}>
+        columns on link
+        {STEPS.slice(1).map((s) => (
+          <span key={s.max} title={`up to ${s.max === Infinity ? "any" : s.max}`}
+            style={{ display: "inline-block", width: 20, height: 11,
+                     background: s.bg, border: `1px solid ${RULE}` }} />))}
+        <span style={{ marginLeft: "auto" }}>
+          click a cell to open that table in the Explorer</span>
       </div>
 
       {(g.stats.orphans > 0 || g.stats.defects > 0) && (

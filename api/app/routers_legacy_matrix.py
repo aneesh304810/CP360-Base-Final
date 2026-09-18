@@ -80,11 +80,15 @@ def _defect(src: str):
 @router.get("/dependency-matrix")
 def dependency_matrix(data_source: str | None = None, group: str | None = None,
                       min_links: int = 0):
-    """Source file x warehouse table, per functional group.
+    """Source file x warehouse table, for ONE functional group.
 
-    group= restricts to one functional group; omitted, every group is returned
-    (the UI renders one matrix per group, which is how the screen is already
-    organised).
+    group=<name>  the full matrix: sources, targets and every cell.
+    group omitted  a SUMMARY per group — the counts only, no grid.
+
+    The summary mode is not an optimisation detail, it is the screen's shape.
+    Rendering fifteen matrices at once is the same wall of everything the
+    swimlanes were, just denser: the first thing a screen owes you is a way in.
+    So the list arrives small, and a group's grid is fetched when it is opened.
     """
     params: dict = {}
     where = ""
@@ -196,8 +200,20 @@ def dependency_matrix(data_source: str | None = None, group: str | None = None,
             },
         })
 
-    out.sort(key=lambda x: -x["stats"]["links"])
+    # Groups carrying a problem lead, then the biggest. A screen that sorts
+    # purely by size buries the one group someone has to act on.
+    out.sort(key=lambda x: (-(x["stats"]["orphans"] + x["stats"]["defects"] > 0),
+                            -x["stats"]["links"]))
+
+    if not group:
+        # Summary only. The two queries above already ran, so this costs
+        # nothing extra — it keeps the PAYLOAD and the render small, which is
+        # where the cost of "show me everything" actually lands.
+        out = [{"group": x["group"], "stats": x["stats"],
+                "truncated": x["truncated"]} for x in out]
+
     return {"data_source": (data_source or "").upper() or None,
+            "detail": bool(group),
             "groups": out,
             "totals": {
                 "groups": len(out),
