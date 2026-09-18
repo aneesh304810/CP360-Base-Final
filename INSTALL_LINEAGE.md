@@ -16,6 +16,7 @@ api/app/_legacy_compat.py            api/app/routers_legacy_profile.py
 api/app/_legacy_groups.py            api/app/routers_legacy_source.py
 api/app/routers_legacy_graph.py      api/app/routers_legacy_matrix.py
 ingestion/legacy_source_file_conn.py ui/src/DependencyMatrix.jsx
+ui/src/TableExplorer.jsx
 ui/src/LineageGraph.jsx              ui/src/SourceLineage.jsx
 ui/src/lineage_api_additions.js      tools/check_lineage_fanin.py
 sql/49_legacy_lineage_reload_cleanup.sql

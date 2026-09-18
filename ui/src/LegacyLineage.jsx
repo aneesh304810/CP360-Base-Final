@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from
 import { api } from "./api.js";
 import LineageGraph from "./LineageGraph.jsx";
 import DependencyMatrix from "./DependencyMatrix.jsx";
+import TableExplorer from "./TableExplorer.jsx";
 
 // =====================================================================
 // LegacyLineage v5 — the Non-SEI lineage engine.
@@ -1374,75 +1375,11 @@ const visEdges = net.edges.filter((e) => {
  </div>
  </div>);
 
- const renderExplorer = () => {
- const ups = visEdges.filter((e) => e.tgt === xFocus);
- const downs = visEdges.filter((e) => e.src === xFocus);
- const xrow = (n, e) => (
- <div key={n} onClick={() => { setXFocus(n); setXTrail([...xTrail, n]); }}
- style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 9px",
- marginBottom: 3, borderRadius: 4, cursor: "pointer", fontSize: 10.5,
- background: "#f8fafb" }}>
- <span style={{ fontFamily: "Roboto Mono, monospace", fontWeight: 600,
- color: t.navy || "#10193b", flex: 1, overflow: "hidden",
- textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={n}>{n}</span>
- <span style={{ fontSize: 9, color: t.muted || "#999" }}>
- {(e.columns || []).filter((c) => c !== "N/A").length || "N/A"} cols</span>
- </div>);
- return (
- <div>
- <div style={{ fontSize: 11, fontFamily: "Roboto Mono, monospace",
- color: t.muted || "#999", marginBottom: 10 }}>
- Path: {xTrail.map((x, i) =>
- i === xTrail.length - 1
- ? <b key={i} style={{ color: t.navy || "#10193b" }}>{x}</b>
- : <span key={i}>
- <a onClick={() => { setXTrail(xTrail.slice(0, i + 1)); setXFocus(x); }}
- style={{ color: t.accent || "#0f4775", cursor: "pointer" }}>{x}</a>
- {" → "}</span>)}
- </div>
- <div style={{ display: "grid", gridTemplateColumns: "1fr 320px 1fr", gap: 14,
- alignItems: "start" }}>
- <div>
- <div style={{ fontSize: 8.5, fontWeight: 700, textTransform: "uppercase",
- color: t.muted || "#999", marginBottom: 7, textAlign: "center" }}>
- Sources feeding {xFocus} ({ups.length})</div>
- {ups.length ? ups.map((e) => xrow(e.src, e))
- : <div style={{ fontSize: 10.5, color: t.muted || "#999", textAlign: "center",
- border: `1px dashed ${t.panel2 || "#dfe6e9"}`, borderRadius: 8,
- padding: 14 }}>No upstream in the network</div>}
- </div>
- <div style={{ background: "#fff", border: `2px solid ${t.accent || "#0f4775"}`,
- borderRadius: 8, padding: 14, textAlign: "center" }}>
- <div style={{ fontFamily: "Roboto Mono, monospace", fontSize: 14, fontWeight: 700,
- color: t.navy || "#10193b" }}>{xFocus}</div>
- <div style={{ fontSize: 10.5, color: t.sub || "#666", marginTop: 4 }}>
- {ups.length} upstream · {downs.length} downstream · {ds}</div>
- <span onClick={() => {
- setTab("fg"); setViewMode("table");
- const tb = tables.find((x) => x.table_name === xFocus);
- if (tb) {
- setOpenG((m) => ({ ...m, [tb.functional_group || "Unassigned"]: true }));
- setOpenT((m) => ({ ...m, [xFocus]: true }));
- ensureFields(xFocus);
- }
- }}
- style={{ display: "inline-block", fontSize: 10.5, fontWeight: 700,
- padding: "6px 12px", borderRadius: 3, marginTop: 10,
- background: t.accent || "#0f4775", color: "#fff",
- cursor: "pointer" }}>Open in lineage</span>
- </div>
- <div>
- <div style={{ fontSize: 8.5, fontWeight: 700, textTransform: "uppercase",
- color: t.muted || "#999", marginBottom: 7, textAlign: "center" }}>
- {xFocus} feeds ({downs.length})</div>
- {downs.length ? downs.map((e) => xrow(e.tgt, e))
- : <div style={{ fontSize: 10.5, color: t.muted || "#999", textAlign: "center",
- border: `1px dashed ${t.panel2 || "#dfe6e9"}`, borderRadius: 8,
- padding: 14 }}>No downstream in the network</div>}
- </div>
- </div>
- </div>);
- };
+ // renderExplorer lived here. It read BOTH directions from
+ // /dependency-network, whose edges come from legacy_lineage — whose spine
+ // ends at DWH — so its downstream panel was empty for every DIM_ and FACT_
+ // table. TableExplorer replaces it and reads downstream from the
+ // table-level dependency sheet, which can express warehouse-to-warehouse.
 
  /* ================= render ================= */
  // The caption moves to the title attribute. A segmented control whose
@@ -1567,11 +1504,15 @@ const visEdges = net.edges.filter((e) => {
  onOpenTable={(tbl) => { setXFocus(tbl); setXTrail([tbl]);
  setNetModeS("explore"); }} />
  : netMode === "lanes" ? renderLanes()
- : xFocus ? renderExplorer()
- : <div style={{ fontSize: 12, color: t.muted || "#999", padding: 20,
- textAlign: "center" }}>
- Double-click a target in Swimlanes (or pin one and "Explore from here") to start.
- </div>}
+ : <TableExplorer dataSource={ds} table={xFocus} trail={xTrail}
+ onBack={() => setNetModeS("matrix")}
+ onFocus={(name, i) => {
+ // a crumb click truncates the trail; a downstream click extends it
+ if (typeof i === "number") {
+ setXTrail(xTrail.slice(0, i + 1)); setXFocus(name);
+ } else {
+ setXTrail([...xTrail, name]); setXFocus(name);
+ } }} />}
  </>)}
  </div>);
 }

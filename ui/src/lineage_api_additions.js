@@ -80,6 +80,13 @@ export const lineageApi = {
     _get(`/legacy-lineage/dependency-matrix?${_qs({ data_source, group })}`,
       () => ({ groups: [], totals: { groups: 0, orphans: 0, defects: 0, links: 0 } })),
 
+  // One table in focus: upstream with thickness, the column links themselves,
+  // and downstream from the table-level dependency sheet.
+  tableExplorer: (table, data_source, src) =>
+    _get(`/legacy-lineage/table-explorer?${_qs({ table, data_source, src })}`,
+      () => ({ table, upstream: [], column_links: [], column_links_total: 0,
+               downstream: [], columns: 0, mapped: 0, unsourced: 0 })),
+
   // Structure + content profile of the legacy catalogue tables. Answers
   // "what is actually in this database" when a screen's grouping or numbers
   // are wrong — read it before changing the query that produced them.

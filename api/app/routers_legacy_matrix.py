@@ -205,3 +205,115 @@ def dependency_matrix(data_source: str | None = None, group: str | None = None,
                 "defects": sum(x["stats"]["defects"] for x in out),
                 "links": sum(x["stats"]["links"] for x in out),
             }}
+
+
+@router.get("/table-explorer")
+def table_explorer(table: str, data_source: str | None = None,
+                   src: str | None = None, limit: int = 60):
+    """One table in focus: what feeds it, on which columns, and what it feeds.
+
+    UPSTREAM and COLUMN LINKS come from legacy_lineage, which is column-level
+    and knows the SRC -> STG1 -> STG2 -> DWH chain.
+
+    DOWNSTREAM comes from legacy_table_dependency, and that split is not
+    arbitrary. legacy_lineage's spine ends at DWH, so within it a warehouse
+    table never feeds anything — asking it for downstream returns nothing for
+    every DIM_ and FACT_ table, which is exactly the empty panel the old
+    explorer showed. Table-level warehouse-to-warehouse links live in the
+    dependency sheet, so that is where downstream is read from.
+
+    src= narrows the column links to one upstream source, which is what
+    clicking an upstream row does.
+    """
+    params: dict = {"t": table}
+    head = _ds_scoped(f"""
+        SELECT NVL(functional_group, '{_NO_GROUP}') AS grp,
+               NVL(table_type, 'TABLE') AS table_type,
+               COUNT(DISTINCT dwh_target_column) AS columns_,
+               COUNT(DISTINCT CASE WHEN {_MAPPED_SQL}
+                                   THEN dwh_target_column END) AS mapped,
+               COUNT(DISTINCT CASE WHEN src_source_table IS NOT NULL
+                                   THEN dwh_target_column END) AS sourced
+        FROM legacy_lineage
+        WHERE dwh_target_table = :t {{DS}}
+        GROUP BY NVL(functional_group, '{_NO_GROUP}'),
+                 NVL(table_type, 'TABLE')""", params, data_source)
+    h = head[0] if head else {}
+
+    ups = _ds_scoped(f"""
+        SELECT src_source_table AS src,
+               COUNT(DISTINCT dwh_target_column) AS links,
+               COUNT(DISTINCT CASE WHEN {_MAPPED_SQL}
+                                   THEN dwh_target_column END) AS mapped
+        FROM legacy_lineage
+        WHERE dwh_target_table = :t AND src_source_table IS NOT NULL {{DS}}
+        GROUP BY src_source_table
+        ORDER BY COUNT(DISTINCT dwh_target_column) DESC""", params, data_source)
+
+    feeds = _safe("""SELECT src_file, src_file_key, dataset
+                     FROM legacy_source_file WHERE dataset IS NOT NULL""", {})
+    by_key, by_name = {}, {}
+    for f in feeds:
+        if f.get("src_file_key"):
+            by_key.setdefault(f["src_file_key"], f["dataset"])
+        if f.get("src_file"):
+            by_name.setdefault(str(f["src_file"]).strip().upper(), f["dataset"])
+
+    def _name(s):
+        k = _file_key(s)
+        return (by_name.get(str(s or "").strip().upper())
+                or by_key.get(k) or by_key.get(_peel_feed_key(k)))
+
+    top = max((u.get("links") or 0) for u in ups) if ups else 0
+    upstream = [{"src": u["src"], "dataset": _name(u["src"]),
+                 "links": u.get("links") or 0, "mapped": u.get("mapped") or 0,
+                 "defect": _defect(u["src"]),
+                 # width relative to the thickest feed, so the bars compare
+                 # within this table rather than against an absolute scale
+                 "share": round(100 * (u.get("links") or 0) / top) if top else 0}
+                for u in ups]
+
+    col_params = dict(params)
+    src_clause = ""
+    if src:
+        src_clause = " AND src_source_table = :s "
+        col_params["s"] = src
+    cols = _ds_scoped(f"""
+        SELECT src_source_table AS src, src_source_column AS src_column,
+               dwh_target_column AS dwh_column, dwh_type, dwh_length,
+               lineage_status,
+               CASE WHEN {_MAPPED_SQL} THEN 'Y' ELSE 'N' END AS is_mapped
+        FROM legacy_lineage
+        WHERE dwh_target_table = :t
+          AND dwh_target_column IS NOT NULL {src_clause} {{DS}}
+        ORDER BY dwh_target_column""", col_params, data_source)
+
+    # Downstream: the table-level sheet, for the reason in the docstring.
+    # Not DS-scoped — legacy_table_dependency has no data_source column.
+    downs = _safe("""
+        SELECT target_table AS tgt, target_function,
+               COUNT(DISTINCT column_link) AS links
+        FROM legacy_table_dependency
+        WHERE source_table = :t AND target_table IS NOT NULL
+          AND NVL(UPPER(source_function), 'X') <> 'EXCLUDE'
+        GROUP BY target_table, target_function
+        ORDER BY COUNT(DISTINCT column_link) DESC""", {"t": table})
+
+    n_cols = h.get("columns_") or 0
+    return {
+        "table": table,
+        "data_source": (data_source or "").upper() or None,
+        "functional_group": h.get("grp"),
+        "table_type": h.get("table_type"),
+        "columns": n_cols,
+        "mapped": h.get("mapped") or 0,
+        # columns of this table that no source reaches — derived in the
+        # warehouse, or a gap. The screen should not imply which.
+        "unsourced": n_cols - (h.get("sourced") or 0),
+        "upstream": upstream,
+        "column_links": [dict(c) for c in cols[:limit]],
+        "column_links_total": len(cols),
+        "column_links_src": src,
+        "downstream": [{"tgt": d["tgt"], "links": d.get("links") or 0,
+                        "function": d.get("target_function")} for d in downs],
+    }
