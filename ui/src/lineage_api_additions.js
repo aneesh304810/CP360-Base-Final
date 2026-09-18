@@ -74,6 +74,12 @@ export const lineageApi = {
   // Diagnostic. Answers "why does this screen say 0% mapped": prints the real
   // lineage_status vocabulary with row counts and how each value classifies.
   // A coverage figure that looks wrong is a vocabulary question first.
+  // Source file x warehouse table, per functional group: the cell is how many
+  // warehouse columns flow on that link. Empty column = a table nothing feeds.
+  dependencyMatrix: (data_source, group) =>
+    _get(`/legacy-lineage/dependency-matrix?${_qs({ data_source, group })}`,
+      () => ({ groups: [], totals: { groups: 0, orphans: 0, defects: 0, links: 0 } })),
+
   // Structure + content profile of the legacy catalogue tables. Answers
   // "what is actually in this database" when a screen's grouping or numbers
   // are wrong — read it before changing the query that produced them.

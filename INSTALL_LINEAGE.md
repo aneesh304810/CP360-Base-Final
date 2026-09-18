@@ -14,9 +14,10 @@ Everything here is additive. The minimum useful install is **step 1 + step 2**
 ```
 api/app/_legacy_compat.py            api/app/routers_legacy_profile.py
 api/app/_legacy_groups.py            api/app/routers_legacy_source.py
-api/app/routers_legacy_graph.py      ingestion/legacy_source_file_conn.py
+api/app/routers_legacy_graph.py      api/app/routers_legacy_matrix.py
+ingestion/legacy_source_file_conn.py ui/src/DependencyMatrix.jsx
 ui/src/LineageGraph.jsx              ui/src/SourceLineage.jsx
-ui/src/lineage_api_additions.js
+ui/src/lineage_api_additions.js      tools/check_lineage_fanin.py
 sql/49_legacy_lineage_reload_cleanup.sql
 sql/50_legacy_source_file.sql
 sql/diagnose_legacy_lineage.sql
@@ -27,7 +28,7 @@ three cases, so merge by hand rather than overwriting:**
 
 | file | the change | risk |
 |---|---|---|
-| `api/app/main.py` | 3 router names added to the mount tuple | none |
+| `api/app/main.py` | 4 router names added to the mount tuple | none |
 | `api/app/routers_legacy_lineage.py` | `tables()` only: selects `functional_group`, accepts `data_source`, counts `'Exists'` as mapped | none if your copy lacks it — **skip the hunk if your deployed copy already returns `functional_group`** |
 | `ingestion/run.py` | new `legacy_source_file` step + single-step CLI | none |
 | `ingestion/legacy_lineage_conn.py` | **changes `lineage_id` format and writes `data_source`** | **see step 4 — do not take casually** |
@@ -102,7 +103,8 @@ npm run dev                            # from ui/
 Expected at startup — all three must mount:
 
 ```
-routers_legacy_graph ... routers_legacy_source ... routers_legacy_profile
+routers_legacy_graph ... routers_legacy_source
+routers_legacy_profile ... routers_legacy_matrix
 ```
 
 Check without the UI:

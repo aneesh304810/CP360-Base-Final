@@ -197,6 +197,35 @@ def _feed_key(col: str) -> str:
     return _FEED_KEY_SQL.replace("{col}", col)
 
 
+_FEED_EXT_RE = _re.compile(r"\.(dat|txt|csv|psv|tsv)$", _re.I)
+_FEED_PLACEHOLDER_RE = _re.compile(r"<[^>]*>|Y{4}M{2}D{2}(?:H{2}M{2}S{2})?", _re.I)
+
+
+def _file_key(name: str) -> str:
+    """The key AS STORED in legacy_source_file.src_file_key.
+
+    Byte-for-byte what ingestion/legacy_source_file_conn.file_key produces,
+    trailing-token peel included, because that is the function that WRITES the
+    column — a lookup computed any other way misses. The first version of this
+    left the peel out to "match the SQL form", which made the docstring's claim
+    of agreement false and every first-chance lookup miss silently.
+
+    The SQL form (_feed_key) genuinely cannot peel — Oracle has no cheap
+    trailing-token test, and stripping BBH/TRP anywhere would rename
+    BBH_REQUEST_AUTHORIZER. So a caller that keys in SQL computes the unpeeled
+    key and applies _peel_feed_key itself; a caller that keys in Python, like
+    the matrix, uses this and matches on the first try.
+    """
+    if not name:
+        return ""
+    s = _FEED_EXT_RE.sub("", str(name).strip())
+    s = _FEED_PLACEHOLDER_RE.sub(" ", s)
+    parts = [p for p in _re.split(r"[\s/.\-_]+", s.upper()) if p]
+    while parts and parts[-1] in ("BBH", "TRP"):
+        parts.pop()
+    return "_".join(parts)
+
+
 def _peel_feed_key(key: str) -> str:
     """Drop trailing BBH / TRP tags from a key produced by _feed_key.
 
@@ -213,4 +242,4 @@ def _peel_feed_key(key: str) -> str:
 
 
 __all__ += ["_MAPPED_SQL", "_is_mapped", "_MAPPED_WORDS", "_UNMAPPED_WORDS",
-            "_FEED_KEY_SQL", "_feed_key", "_peel_feed_key"]
+            "_FEED_KEY_SQL", "_feed_key", "_file_key", "_peel_feed_key"]

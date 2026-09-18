@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from "react";
 import { api } from "./api.js";
 import LineageGraph from "./LineageGraph.jsx";
+import DependencyMatrix from "./DependencyMatrix.jsx";
 
 // =====================================================================
 // LegacyLineage v5 — the Non-SEI lineage engine.
@@ -1164,7 +1165,7 @@ const xfArrow = (xf) => (
 
  /* ================= Dependency View ================= */
  const [net, setNet] = useState({ edges: [], nodes: [] });
- const [netMode, setNetModeS] = useState("lanes");
+ const [netMode, setNetModeS] = useState("matrix");
  const [netQ, setNetQ] = useState("");
  const [hop1, setHop1] = useState(true);
  const [showExcl, setShowExcl] = useState(false);
@@ -1524,18 +1525,29 @@ const visEdges = net.edges.filter((e) => {
  <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12,
  flexWrap: "wrap", fontSize: 11, color: t.sub || "#666" }}>
  <span>
- {[["lanes", "Swimlanes"], ["explore", "Table Explorer"]].map(([k, label], i) => (
+ {/* the radius was a two-button ternary — with a third option the
+ MIDDLE one gets a rounded right edge butting into its neighbour.
+ Round the ends, square everything between. */}
+ {[["matrix", "Matrix"], ["lanes", "Swimlanes"],
+ ["explore", "Table Explorer"]].map(([k, label], i, arr) => (
  <button key={k} onClick={() => setNetModeS(k)}
+ title={k === "matrix" ? "Which source feeds which table, and how thickly"
+ : undefined}
  style={{ fontSize: 11.5, fontWeight: 700, padding: "6px 14px",
  cursor: "pointer", fontFamily: "inherit",
  borderStyle: "solid",
  borderColor: netMode === k ? (t.accent || "#0f4775") : (t.panel2 || "#dfe6e9"),
  borderTopWidth: 1, borderRightWidth: 1, borderBottomWidth: 1,
  borderLeftWidth: i ? 0 : 1,
- borderRadius: i ? "0 3px 3px 0" : "3px 0 0 3px",
+ borderRadius: i === 0 ? "3px 0 0 3px"
+ : i === arr.length - 1 ? "0 3px 3px 0" : 0,
  background: netMode === k ? (t.accent || "#0f4775") : "#fff",
  color: netMode === k ? "#fff" : (t.sub || "#666") }}>{label}</button>))}
  </span>
+ {/* these three belong to the lanes/explorer wires; Matrix brings its
+ own filter and has no wires to thin, so it does not inherit them */}
+ {netMode !== "matrix" && (
+ <>
  <input placeholder="Filter tables…" value={netQ}
  onChange={(e) => setNetQ(e.target.value)}
  style={{ height: 30, border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderRadius: 3,
@@ -1548,8 +1560,13 @@ const visEdges = net.edges.filter((e) => {
  onChange={(e) => setShowExcl(e.target.checked)} />
  show excluded</label>
  <span style={{ marginLeft: "auto" }}>{visEdges.length} dependencies · {ds}</span>
+ </>)}
  </div>
- {netMode === "lanes" ? renderLanes()
+ {netMode === "matrix"
+ ? <DependencyMatrix dataSource={ds}
+ onOpenTable={(tbl) => { setXFocus(tbl); setXTrail([tbl]);
+ setNetModeS("explore"); }} />
+ : netMode === "lanes" ? renderLanes()
  : xFocus ? renderExplorer()
  : <div style={{ fontSize: 12, color: t.muted || "#999", padding: 20,
  textAlign: "center" }}>
