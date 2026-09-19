@@ -25,6 +25,9 @@
   .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .cap{font-size:9.5px;font-weight:700;letter-spacing:.5px;
        text-transform:uppercase;color:var(--sub)}
+  /* the DB column a panel is showing — provenance, always one line under the cap */
+  .src{font-family:var(--mono);font-size:9.5px;color:var(--sub);margin-top:3px;
+       line-height:1.45}
   button,.btn{font:inherit;font-size:11.5px;font-weight:600;padding:6px 13px;
        border:1px solid var(--rule);background:#fff;color:var(--ink);
        border-radius:4px;cursor:pointer}
@@ -321,20 +324,49 @@ function buildEvents(){
   for(let i=0;i<12;i++) order.push(["Marker","MARKER"]);
   // deterministic shuffle so the list is not visibly blocked by type
   for(let i=order.length-1;i>0;i--){const j=(i*7919+13)%(i+1);[order[i],order[j]]=[order[j],order[i]];}
+  const COLS={ACCOUNT:["ACCOUNT_STATUS","ACCOUNT_TYPE","ACCOUNT_CLOSE_DT","RESTRICTION_CD"],
+    TRANSACTION:["TRAN_STATUS","SETTLE_DT","TRAN_AMOUNT","CANCEL_FLAG"],
+    ASSETS:["POSITION_QTY","MARKET_VALUE","ASSET_CLASS","PRICE_DT"],
+    CLIENT:["CLIENT_STATUS","DOMICILE_CD","KYC_STATUS","CONTACT_PREF"],
+    MARKER:[]};
   IDS.forEach((id,k)=>{
     const [type,domain]=order[k];
     const marker = type==="Marker";
     const nm = NAMES[id];
+    const trigN = marker? 0 : (1 + (k*3)%4);
+    const tbl = domain==="MARKER"?"":domain;
+    const trigCols = Array.from({length:trigN},(_,i)=>
+      `${tbl}.${COLS[domain][(k+i)%COLS[domain].length]}`);
+    const key = marker? null : (k%3===0? "ACCOUNT_ID | ACCOUNT_OWNER_ID" : "ACCOUNT_ID");
+    const view = marker? null : (id===92? null : `${domain}_BASIC_VIEW`);
+    const raw = marker
+      ? `{\n "eventId": ${id},\n "batchDt": "2026-09-18",\n "onlineDt": "2026-09-18"\n}`
+      : `{\n "eventId": ${id},\n "key": 88029080,\n "op": "U",\n "view": ${
+          id===92?'"NULL"':`"${view}"`}\n}`;
     out.push({
       id, section:`4.${k+1}`, page:13+k, type, domain,
       name: nm? nm[0] : (marker? `${domain} batch marker ${k+1}`
             : `${domain[0]+domain.slice(1).toLowerCase()} — ${VERBS[k%VERBS.length]}`),
       desc: nm? nm[1] : `Raised when the underlying ${domain.toLowerCase()} record changes in a way consumers must know about.`,
-      view: marker? null : (id===92? null : `${domain}_BASIC_VIEW`),
-      key: marker? null : (k%3===0? "ACCOUNT_ID | ACCOUNT_OWNER_ID" : "ACCOUNT_ID"),
-      ops: marker? null : (k%4===0? "Insert (I), Update (U)" : "Update (U)"),
+      view, key, ops: marker? null : (k%4===0? "Insert (I), Update (U)" : "Update (U)"),
       payload: marker? ["eventId","batchDt","onlineDt"] : ["eventId","key","op","view"],
-      trigN: marker? 0 : (1 + (k*3)%4),
+      payloadList: marker? "eventId, batchDt, onlineDt" : "eventId, key, op, view",
+      keyParts: key? key.split("|").map(x=>x.trim()) : [],
+      trigN, trigCols,
+      sheetTrigN: id===7? trigN+1 : trigN,      // one row where column R drifted
+      trigCond: marker
+        ? "Not applicable (marker event) — raised when the batch window closes."
+        : `Fires for ${(k%4===0?"INSERT or UPDATE":"UPDATE")} change(s) on ${tbl} when `
+          + trigCols.map(c=>`AFTER.${c.split(".")[1]} <> BEFORE.${c.split(".")[1]}`).join(" OR ")
+          + `${k%5===0?` AND AFTER.${COLS[domain][0]} IS NOT NULL`:""}.`,
+      guidance: marker
+        ? "Treat as a checkpoint for the batch window. There is no record to retrieve."
+        : `On receipt, use the payload key to retrieve the current record from ${
+            view||"the SDC view named in the payload"}. Do not treat the event body as the record.`,
+      raw,
+      detailStatus: "COMPLETE",
+      fieldStatus: "FULLY_EXTRACTED",
+      srcPageRef: `PDF page ${13+k}, section 4.${k+1}`,
       flag: id===92? "REVIEW_REQUIRED" : null,
       flagNote: id===92? "SDC view is “Not applicable” but the sample payload declares \"view\": \"NULL\". Confirm with SEI." : null
     });
@@ -465,6 +497,37 @@ function renderEvt(){
      </div>
    </div>`;
 
+  // ---- technical passport: everything META_EVENT_DEFINITION / META_EVENT_FIELD
+  // actually carries for this event, each panel labelled with its DB column.
+  let parsed=null; try{ parsed=JSON.parse(e.raw); }catch(_){}
+  const ENV_DESC={
+    eventId:"Numeric identifier of the event type. The only envelope field the contract types.",
+    key:"Key of the changed record. Use it to retrieve the row from the SDC view.",
+    op:"Operation code — I insert, U update, D delete.",
+    view:"Name of the SDC view that holds the current record.",
+    batchDt:"Business date of the batch window this marker closes.",
+    onlineDt:"Date the online cycle completed."};
+  const NS='<span class="ns" style="font-size:11px">NOT_SPECIFIED</span>';
+  const byTable={}; e.trigCols.forEach(c=>{
+    const [t,col]=c.split("."); (byTable[t]=byTable[t]||[]).push(col);});
+  const drift = e.sheetTrigN!==e.trigN;
+
+  const fieldRows=[
+    ...e.payload.map((f,i)=>({
+      ord:i+1, cat:"PAYLOAD", name:f,
+      desc:ENV_DESC[f]||"", 
+      type:f==="eventId"?"Numeric":"NOT_SPECIFIED",
+      len:"NOT_SPECIFIED", nullable:"NOT_SPECIFIED",
+      isKey:f==="key"?"Y":"N", tbl:null, col:null,
+      sample: parsed&&parsed[f]!==undefined?JSON.stringify(parsed[f]):null})),
+    ...e.trigCols.map((c,i)=>({
+      ord:e.payload.length+i+1, cat:"TRIGGER_DRIVING", name:c.split(".")[1],
+      desc:"Source column watched by the trigger. A change here can raise the event.",
+      type:"NOT_SPECIFIED", len:"NOT_SPECIFIED", nullable:"NOT_SPECIFIED",
+      isKey:"N", tbl:c.split(".")[0], col:c.split(".")[1], sample:null}))];
+  const cellv=(v)=>v===null||v===undefined||v===""?'<span class="ns" style="font-size:11px">—</span>'
+      :v==="NOT_SPECIFIED"?NS:`<span class="mono" style="font-size:11px">${esc(v)}</span>`;
+
   const tech=`
    <div class="panel pad" style="margin-bottom:12px">
      <div class="row"><h2 class="mono" style="font-size:15px">Event ${e.id}</h2>
@@ -472,50 +535,132 @@ function renderEvt(){
        <span class="mono sub" style="font-size:11px">${e.section} · page ${e.page}</span>
        ${e.flag?`<span class="chip warn">${e.flag}</span>`:""}</div>
      <p style="margin:6px 0 0;font-size:12.5px">${esc(e.name)}</p>
+     <div class="row" style="margin-top:9px;gap:8px;flex-wrap:wrap">
+       <span class="chip ok">DETAIL_EXTRACTION_STATUS · ${e.detailStatus}</span>
+       <span class="chip ok">FIELD_EXTRACTION_STATUS · ${e.fieldStatus}</span>
+       <span class="mono sub" style="font-size:10.5px">SOURCE_PAGE_REFERENCE · ${esc(e.srcPageRef)}</span>
+     </div>
    </div>
    ${sp}
-   ${e.flag?`<div class="note bad" style="margin-bottom:12px"><b>${e.flag}</b> — ${esc(e.flagNote)}</div>`:""}
+   ${e.flag?`<div class="note bad" style="margin-bottom:12px"><b>${e.flag}</b> — ${esc(e.flagNote)}
+      <div class="src" style="margin-top:5px">LOAD_FLAG / LOAD_FLAG_NOTE — set by the loader, not by the sheet.</div></div>`:""}
    <div class="grid2" style="margin-bottom:12px">
      <div class="panel">
-       <div class="pad" style="border-bottom:1px solid var(--rule)"><span class="cap">Sample payload — illustrative, never code against the values</span></div>
-       <div class="pad"><pre>${esc(sample)}</pre></div>
+       <div class="pad" style="border-bottom:1px solid var(--rule)">
+         <span class="cap">Sample payload — verbatim as ingested</span>
+         <div class="src">META_EVENT_DEFINITION.SAMPLE_PAYLOAD (CLOB) · stored unparsed, character for character</div>
+       </div>
+       <div class="pad"><pre>${esc(e.raw)}</pre></div>
+       <div class="pad" style="border-top:1px solid var(--rule)">
+         <span class="cap">Parsed — ${parsed?`${Object.keys(parsed).length} keys, valid JSON`:"NOT PARSEABLE"}</span>
+         ${parsed?`<table style="margin-top:7px"><tbody>${Object.entries(parsed).map(([k,v])=>
+           `<tr><td class="mono" style="font-size:11px;width:110px">${esc(k)}</td>
+                <td class="mono" style="font-size:11px">${esc(JSON.stringify(v))}</td>
+                <td class="sub" style="font-size:10.5px">${esc(typeof v)}</td></tr>`).join("")}
+           </tbody></table>`:`<div class="note bad" style="margin-top:7px">Stored text is not valid JSON. Loaded anyway — the contract is the source of truth, not our parser.</div>`}
+         <div class="note warn" style="margin-top:9px">The values above are the specification's own illustration.
+           <b>88029080 is an example key, not a real one.</b> Code against the field names, never the values.</div>
+       </div>
      </div>
      <div class="panel">
-       <div class="pad" style="border-bottom:1px solid var(--rule)"><span class="cap">Contract</span></div>
+       <div class="pad" style="border-bottom:1px solid var(--rule)">
+         <span class="cap">Contract</span>
+         <div class="src">META_EVENT_DEFINITION — SDC_VIEW, PAYLOAD_KEY, COMPOSITE_KEY_PARTS, OPERATION_CODES, PAYLOAD_FIELD_LIST</div>
+       </div>
        <div class="pad"><dl class="kv">
-         <dt>SDC view</dt><dd>${e.view?`<span class="mono">${e.view}</span>`
-            :`<span class="ns">Not applicable${marker?" — marker":""}</span>`}</dd>
-         <dt>Payload key</dt><dd>${e.key?e.key.split("|").map(p=>`<span class="mono">${p.trim()}</span>`).join(" + ")
+         <dt>SDC_VIEW</dt><dd>${e.view?`<span class="mono">${e.view}</span>`
+            :`<span class="ns">Not applicable${marker?" — marker event":""}</span>`}</dd>
+         <dt>PAYLOAD_KEY</dt><dd>${e.key?`<span class="mono">${esc(e.key)}</span>`
             :"<span class='ns'>Not applicable</span>"}</dd>
-         <dt>Operations</dt><dd>${e.ops?`<span class="mono">${esc(e.ops)}</span>`:"<span class='ns'>Not applicable</span>"}</dd>
-         <dt>Trigger columns</dt><dd class="mono">${e.trigN||0}</dd>
+         <dt>COMPOSITE_KEY_PARTS</dt><dd>${e.keyParts.length
+            ?`${e.keyParts.map(p=>`<span class="mono">${esc(p)}</span>`).join(" + ")}
+              <div class="sub" style="font-size:10.5px;margin-top:3px">${e.keyParts.length} part${e.keyParts.length===1?"":"s"}, split on the newline the sheet uses</div>`
+            :"<span class='ns'>Not applicable</span>"}</dd>
+         <dt>OPERATION_CODES</dt><dd>${e.ops?`<span class="mono">${esc(e.ops)}</span>`:"<span class='ns'>Not applicable</span>"}</dd>
+         <dt>PAYLOAD_FIELD_LIST</dt><dd><span class="mono" style="font-size:11px">${esc(e.payloadList)}</span>
+            <div class="sub" style="font-size:10.5px;margin-top:3px">${e.payload.length} fields — ${
+              marker?"3 is the marker envelope":"4 is the data-event envelope"}. Cross-checked against META_EVENT_FIELD on load.</div></dd>
+         <dt>SECTION / PAGE</dt><dd><span class="mono">${e.section}</span> · page <span class="mono">${e.page}</span></dd>
        </dl></div>
+     </div>
+   </div>
+   <div class="panel" style="margin-bottom:12px">
+     <div class="pad" style="border-bottom:1px solid var(--rule)">
+       <span class="cap">Trigger — what actually fires this</span>
+       <div class="src">META_EVENT_DEFINITION — TRIGGER_CONDITION, TRIGGER_TABLES_COLUMNS, TRIGGER_COLUMN_COUNT</div>
+     </div>
+     <div class="pad">
+       <span class="cap">TRIGGER_CONDITION — verbatim</span>
+       <pre style="margin-top:7px;white-space:pre-wrap">${esc(e.trigCond)}</pre>
+     </div>
+     <div class="pad" style="border-top:1px solid var(--rule)">
+       <div class="row" style="justify-content:space-between">
+         <span class="cap">TRIGGER_TABLES_COLUMNS — ${e.trigN} column${e.trigN===1?"":"s"}</span>
+         <span class="mono sub" style="font-size:10.5px">TRIGGER_COLUMN_COUNT ${e.trigN} (recomputed)${
+            drift?` · sheet column R said ${e.sheetTrigN}`:" · matches the sheet"}</span>
+       </div>
+       ${e.trigN?Object.entries(byTable).map(([t,cols])=>`
+         <div style="margin-top:9px">
+           <div class="mono" style="font-size:11.5px;font-weight:600">${esc(t)}</div>
+           <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:5px">
+             ${cols.map(c=>`<span class="chip n mono" style="font-weight:500">${esc(c)}</span>`).join("")}
+           </div>
+         </div>`).join("")
+        :`<div class="sub" style="margin-top:7px;font-size:12px">No trigger columns — a marker is raised by the batch window closing, not by a row change.</div>`}
+       ${drift?`<div class="note warn" style="margin-top:10px">
+         <b>Count drift.</b> The sheet's TRIGGER_COLUMN_COUNT says ${e.sheetTrigN};
+         the column list holds ${e.trigN}. The loader stores the <b>recomputed</b> ${e.trigN}
+         and keeps the sheet's figure only in this note — a stated count that disagrees with
+         the list it counts is a defect in the spec, not in the list.</div>`:""}
+     </div>
+   </div>
+   <div class="grid2" style="margin-bottom:12px">
+     <div class="panel">
+       <div class="pad" style="border-bottom:1px solid var(--rule)"><span class="cap">DESCRIPTION — verbatim</span></div>
+       <div class="pad" style="font-size:12px;line-height:1.6">${esc(e.desc)}</div>
+     </div>
+     <div class="panel">
+       <div class="pad" style="border-bottom:1px solid var(--rule)"><span class="cap">CONSUMER_GUIDANCE — verbatim</span></div>
+       <div class="pad" style="font-size:12px;line-height:1.6">${esc(e.guidance)}</div>
      </div>
    </div>
    <div class="panel">
      <div class="pad" style="border-bottom:1px solid var(--rule)">
-       <span class="cap">Fields — ${e.payload.length} payload${e.trigN?` + ${e.trigN} trigger-driving`:""}</span>
+       <span class="cap">Fields — ${e.payload.length} PAYLOAD${e.trigN?` + ${e.trigN} TRIGGER_DRIVING`:""} = ${fieldRows.length}</span>
+       <div class="src">META_EVENT_FIELD — every column loaded, grain (SECTION, FIELD_ORDINAL). Ordinal is continuous across both categories.</div>
      </div>
-     <table><thead><tr><th style="width:44px">#</th><th style="width:120px">Category</th>
-       <th>Field</th><th style="width:120px">Type</th><th style="width:120px">Length</th>
-       <th style="width:110px">Nullable</th><th style="width:64px">Key</th></tr></thead><tbody>
-       ${e.payload.map((f,i)=>`<tr><td class="mono sub" style="font-size:10.5px">${i+1}</td>
-         <td><span class="chip n">PAYLOAD</span></td><td class="mono" style="font-size:11.5px">${f}</td>
-         <td>${f==="eventId"?'<span class="mono" style="font-size:11px">Numeric</span>'
-             :'<span class="ns" style="font-size:11px">the spec does not say</span>'}</td>
-         <td><span class="ns" style="font-size:11px">the spec does not say</span></td>
-         <td>${["batchDt","onlineDt"].includes(f)?'<span class="mono" style="font-size:11px">TRUE</span>'
-             :'<span class="ns" style="font-size:11px">the spec does not say</span>'}</td>
-         <td>${f==="key"?'<span class="chip ok">key</span>':""}</td></tr>`).join("")}
-       ${Array.from({length:e.trigN},(_,i)=>`<tr><td class="mono sub" style="font-size:10.5px">${e.payload.length+i+1}</td>
-         <td><span class="chip warn">TRIGGER</span></td>
-         <td class="mono" style="font-size:11.5px">${e.domain}.COL_${i+1}</td>
-         <td colspan="4" class="sub" style="font-size:11px">source column watched by the trigger</td></tr>`).join("")}
+     <div style="overflow-x:auto">
+     <table style="min-width:1180px"><thead><tr>
+       ${[["#","FIELD_ORDINAL","40px"],["Page","SOURCE_PAGE","62px"],
+          ["Category","FIELD_CATEGORY","136px"],["Field","FIELD_NAME","104px"],
+          ["Description","DESCRIPTION","230px"],["Type","DATA_TYPE","106px"],
+          ["Length","LENGTH_PRECISION","106px"],["Nullable","NULLABLE","106px"],
+          ["Key","IS_KEY","48px"],["Source table","SOURCE_TABLE","114px"],
+          ["Source column","SOURCE_COLUMN","134px"],["Sample","SAMPLE_VALUE","114px"],
+          ["Status","EXTRACTION_STATUS","124px"]].map(([h,c,w],i)=>
+         `<th style="${i===4?"min-width":"width"}:${w}">${h}<div class="src">${c}</div></th>`).join("")}
+       </tr></thead><tbody>
+       ${fieldRows.map(r=>`<tr>
+         <td class="mono sub" style="font-size:10.5px">${r.ord}</td>
+         <td class="mono sub" style="font-size:10.5px">${e.page}</td>
+         <td><span class="chip ${r.cat==="PAYLOAD"?"n":"warn"}" style="font-size:9.5px">${r.cat}</span></td>
+         <td class="mono" style="font-size:11.5px">${esc(r.name)}</td>
+         <td class="sub" style="font-size:11px">${esc(r.desc)}</td>
+         <td>${cellv(r.type)}</td><td>${cellv(r.len)}</td><td>${cellv(r.nullable)}</td>
+         <td>${r.isKey==="Y"?'<span class="chip ok" style="font-size:9.5px">Y</span>'
+              :'<span class="sub mono" style="font-size:10.5px">N</span>'}</td>
+         <td>${cellv(r.tbl)}</td><td>${cellv(r.col)}</td>
+         <td>${cellv(r.sample)}</td>
+         <td><span class="chip ok" style="font-size:9.5px">EXTRACTED</span></td></tr>`).join("")}
      </tbody></table>
+     </div>
      <div class="pad note warn" style="margin:10px;border-radius:9px">
-       <b>“the spec does not say” is the fact, not a gap.</b> The specification never
-       states payload field types, lengths or nullability. Showing an empty cell here
-       would invite someone to fill it in; showing the absence keeps it honest.
+       <b><span class="mono">NOT_SPECIFIED</span> is the fact, not a gap.</b> The specification never
+       states payload field data types, lengths or nullability, so the loader writes the literal
+       string <span class="mono">NOT_SPECIFIED</span> rather than inferring one. An empty cell here
+       invites someone to fill it in; the literal keeps an honest absence from turning into a
+       confident fiction that consumers build against. The one exception is
+       <span class="mono">eventId</span>, which the contract does type: <span class="mono">Numeric</span>.
      </div>
    </div>`;
   $("evt").innerHTML = aud==="biz"?biz:tech;
