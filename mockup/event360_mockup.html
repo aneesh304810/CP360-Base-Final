@@ -51,7 +51,6 @@
   .crumb{font-size:12.5px;color:var(--sub);margin-bottom:14px}
   .crumb a{color:var(--link);cursor:pointer;text-decoration:none}
   .crumb i{font-style:normal;margin:0 7px;color:#c2ccd4}
-  .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
   .grid2{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:12px}
   .spine{display:flex;align-items:flex-start;justify-content:center;margin:4px 0 20px}
   .spine .node{display:flex;flex-direction:column;align-items:center;gap:6px;
@@ -111,7 +110,6 @@
       <button id="nCat" aria-pressed="true" onclick="setTab('cat')">Catalog</button>
       <button id="nTrg" aria-pressed="false" onclick="setTab('trg')">Trigger Explorer</button>
       <button id="nCon" aria-pressed="false" onclick="setTab('con')">Contract</button>
-      <button id="nHea" aria-pressed="false" onclick="setTab('hea')">Load health</button>
     </span>
     <span id="hdrChips" class="row" style="margin-left:auto"></span>
   </div>
@@ -224,41 +222,19 @@
             they are how the contract may be used.</div>
         </div>
         <ol class="rule-list pad" style="padding-left:32px" id="rules"></ol>
+        <div class="pad" style="border-top:1px solid var(--rule)">
+          <div class="note info">
+            <b>Known and expected.</b> Event IDs 99&ndash;101 do not exist in the
+            source index — no placeholder rows are generated. Sections 4.97 and 4.98
+            share a title and are told apart by payload key. Typos
+            (<span class="mono">IDENTTIFIERS</span>, <span class="mono">insterest</span>)
+            load verbatim: a typo in a contract may be the real object name.
+          </div>
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- ========================= HEALTH ========================= -->
-  <section id="tab-hea" class="hide">
-    <div class="grid3" style="margin-bottom:12px" id="healthTiles"></div>
-    <div class="grid2">
-      <div class="panel">
-        <div class="pad" style="border-bottom:1px solid var(--rule)">
-          <h2>Load gates</h2>
-          <div class="sub">All nine run before the first row is written. A failure
-            means nothing was loaded — not that some of it was.</div>
-        </div>
-        <table><thead><tr><th>Gate</th><th style="width:130px">Result</th></tr></thead>
-          <tbody id="gates"></tbody></table>
-      </div>
-      <div>
-        <div class="panel" style="margin-bottom:12px">
-          <div class="pad" style="border-bottom:1px solid var(--rule)">
-            <h2>Needs a human</h2>
-            <div class="sub">Loaded and flagged, not silently corrected.</div>
-          </div>
-          <div id="flags"></div>
-        </div>
-        <div class="note info">
-          <b>Known and expected.</b> Event IDs 99&ndash;101 do not exist in the
-          source index — no placeholder rows are generated. Sections 4.97 and 4.98
-          share a title and are told apart by payload key. Typos
-          (<span class="mono">IDENTTIFIERS</span>, <span class="mono">insterest</span>)
-          load verbatim: a typo in a contract may be the real object name.
-        </div>
-      </div>
-    </div>
-  </section>
 
   <div class="banner" style="margin-top:22px">
     <b>Mockup — structure and counts are real, content is illustrative.</b>
@@ -384,9 +360,9 @@ const ink =n=>n>=20?"#fff":"var(--ink)";
 
 function setAud(a){aud=a;$("vBiz").setAttribute("aria-pressed",a==="biz");
   $("vTech").setAttribute("aria-pressed",a==="tech");render();}
-function setTab(t){tab=t;["cat","trg","con","hea"].forEach(x=>{
+function setTab(t){tab=t;["cat","trg","con"].forEach(x=>{
   $("tab-"+x).classList.toggle("hide",x!==t);
-  $("n"+{cat:"Cat",trg:"Trg",con:"Con",hea:"Hea"}[x]).setAttribute("aria-pressed",x===t);});
+  $("n"+{cat:"Cat",trg:"Trg",con:"Con"}[x]).setAttribute("aria-pressed",x===t);});
   render();}
 
 /* ============================ catalog ============================ */
@@ -693,7 +669,7 @@ function renderTrg(){
 }
 function pickTrg(t){trgSel=t;renderTrg();}
 
-/* ============================ contract + health ============================ */
+/* ============================ contract ============================ */
 function renderCon(){
   $("envBody").innerHTML=ENVELOPE.map(([f,d,t,u])=>`<tr>
     <td class="mono" style="font-size:11.5px">${f}</td>
@@ -703,38 +679,16 @@ function renderCon(){
     <td class="sub" style="font-size:11.5px">${u}</td></tr>`).join("");
   $("rules").innerHTML=RULES.map(r=>`<li>${r}</li>`).join("");
 }
-const GATES=[["Event count = 105","pass"],["Field count = 575","pass"],
- ["Sections 4.1 … 4.105 contiguous","pass"],["No event ID in 99–101","pass"],
- ["Every type resolves to Event_Types","pass"],["Every domain resolves to Event_Domains","pass"],
- ["Every payload field is in the envelope","pass"],
- ["Markers carry 3 fields, data events 4","pass"],
- ["4×93 + 3×12 + 167 = 575","pass"]];
-function renderHea(){
-  const tiles=[["105","events loaded","ok"],["575","field rows","ok"],
-    ["167","trigger-driving columns","ok"],["9 / 9","load gates passed","ok"],
-    ["1","needs confirmation with SEI","warn"],["470","fields the spec gives no type for","warn"]];
-  $("healthTiles").innerHTML=tiles.map(([n,l,k])=>`<div class="panel pad">
-    <div style="font-size:22px;font-weight:600;color:${k==="warn"?"var(--warn-ink)":"var(--ink)"}">${n}</div>
-    <div class="sub" style="font-size:11.5px">${l}</div></div>`).join("");
-  $("gates").innerHTML=GATES.map(([g,r])=>`<tr><td style="font-size:12.5px">${g}</td>
-    <td><span class="chip ok">passed</span></td></tr>`).join("");
-  const f=EVENTS.filter(e=>e.flag);
-  $("flags").innerHTML=f.map(e=>`<div class="pad" style="border-bottom:1px solid #edf1f4;cursor:pointer"
-      onclick="setTab('cat');openEvt(${e.id})">
-      <div class="row"><span class="mono" style="font-size:11px">event ${e.id}</span>
-        <span class="chip warn">${e.flag}</span></div>
-      <div style="font-size:12px;margin-top:3px">${esc(e.name)}</div>
-      <div class="sub" style="font-size:11.5px;margin-top:2px">${esc(e.flagNote)}</div>
-    </div>`).join("");
-}
 function renderChips(){
-  $("hdrChips").innerHTML=`<span class="chip ok">9/9 gates passed</span>
-    <span class="chip warn">1 needs SEI</span>
+  const flagged=EVENTS.filter(e=>e.flag);
+  $("hdrChips").innerHTML=`${flagged.map(e=>`<span class="chip warn" style="cursor:pointer"
+      onclick="setTab('cat');openEvt(${e.id})" title="${esc(e.flagNote)}"
+      >event ${e.id} needs SEI</span>`).join("")}
     <span class="chip n">${aud==="biz"?"105 events":"575 fields"}</span>`;
 }
 function render(){renderChips();
   if(tab==="cat"){renderMatrix(); if(evt)renderEvt(); else if(sel)renderL1();}
-  if(tab==="trg")renderTrg(); if(tab==="con")renderCon(); if(tab==="hea")renderHea();}
+  if(tab==="trg")renderTrg(); if(tab==="con")renderCon();}
 render();
 </script>
 </body>
