@@ -31,7 +31,8 @@ WHAT IS DELIBERATELY NOT CLEANED
 * Event IDs 99-101 do not exist. No placeholder rows are generated.
 
 Env:
-    CP_EVENT360_XLSX     path to the workbook
+    CP_EVENT360_XLSX     the workbook, or the folder holding it.
+                         Default: sample-artifacts/EVENT-360/
     CP_EVENT360_STRICT   '0' to downgrade gate failures to warnings
 """
 from __future__ import annotations
@@ -196,13 +197,44 @@ class Event360Connector:
         self.gate_failures: list[str] = []
         self.notes: list[str] = []
 
+    # sample-artifacts/<UPPER-KEBAB>/ is the house convention — LEGACY-LINEAGE,
+    # FEED-CATALOG, API-SPEC. The default is the FOLDER, not a filename, so the
+    # workbook can be dropped in under whatever name it arrives with.
+    DEFAULT_DIR = "sample-artifacts/EVENT-360"
+
     @classmethod
     def from_env(cls):
         return cls(
-            os.environ.get("CP_EVENT360_XLSX",
-                           "sample-artifacts/EVENT360/event_catalog.xlsx"),
+            os.environ.get("CP_EVENT360_XLSX", cls.DEFAULT_DIR),
             os.environ.get("CP_EVENT360_STRICT", "1") not in ("0", "false", "no"),
         )
+
+    def _resolve(self):
+        """A file path is used as given; a folder is searched for one workbook.
+
+        Exactly one .xlsx is taken, and the choice is logged. TWO is refused
+        rather than guessed — picking the alphabetically-first of an old and a
+        new revision, silently, is the kind of thing nobody notices until the
+        counts are wrong.
+        """
+        p = self.xlsx_path
+        if os.path.isfile(p):
+            return p
+        if not os.path.isdir(p):
+            return p                       # let the caller report it missing
+        books = sorted(f for f in os.listdir(p)
+                       if f.lower().endswith((".xlsx", ".xlsm"))
+                       and not f.startswith("~$"))    # skip Excel lock files
+        if not books:
+            return None
+        if len(books) > 1:
+            self.gate_failures.append(
+                f"{p} holds {len(books)} workbooks — {books}. "
+                f"Set CP_EVENT360_XLSX to the one to load.")
+            return None
+        chosen = os.path.join(p, books[0])
+        log.info("event360: using %s", chosen)
+        return chosen
 
     # ---- sheet plumbing --------------------------------------------------
     def _pick(self, wb, slot):
@@ -241,11 +273,16 @@ class Event360Connector:
 
     # ---- parse -----------------------------------------------------------
     def parse(self):
-        if not os.path.exists(self.xlsx_path):
-            log.warning("event360 workbook not found: %s (skipping)",
-                        self.xlsx_path)
+        path = self._resolve()
+        if self.gate_failures:             # ambiguous folder; say so and stop
+            self._finish()
             return {}
-        wb = load_workbook(self.xlsx_path, data_only=True, read_only=True)
+        if not path or not os.path.exists(path):
+            log.warning("event360 workbook not found at %s — put the .xlsx in "
+                        "%s/ or set CP_EVENT360_XLSX (skipping)",
+                        self.xlsx_path, self.DEFAULT_DIR)
+            return {}
+        wb = load_workbook(path, data_only=True, read_only=True)
         got = {k: self._pick(wb, k) for k in _SHEETS}
         for k, v in got.items():
             if not v:

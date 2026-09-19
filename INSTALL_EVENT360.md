@@ -17,9 +17,12 @@ indexes. Idempotent.
 
 ```bash
 export CP_CATALOG_DB_DSN='SILVER/****@host:1521/service'
-export CP_EVENT360_XLSX='/path/to/event_workbook.xlsx'
-
+# Drop the workbook in sample-artifacts/EVENT-360/ and that is all —
+# the loader takes the single .xlsx it finds there and logs which one.
 python -m ingestion.run event360
+
+# Or name it explicitly:
+export CP_EVENT360_XLSX='/path/to/event_workbook.xlsx'
 ```
 
 Load order is handled inside the step: reference sheets → envelope → catalog →
