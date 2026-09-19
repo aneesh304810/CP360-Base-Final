@@ -75,6 +75,11 @@
        font-size:12.5px;line-height:1.6}
   .banner b{font-weight:600} .banner .mono{color:#a9c6e8}
   .ns{font-style:italic;color:var(--sub)}
+  .kv{display:grid;grid-template-columns:150px minmax(0,1fr);gap:8px 12px;
+       font-size:12.5px;margin:0}
+  .kv dt{font-size:9.5px;font-weight:700;text-transform:uppercase;
+       color:var(--sub);padding-top:3px}
+  .kv dd{margin:0}
 
   /* legend — identity is never colour alone; every swatch carries its label */
   .legend{display:flex;gap:14px;align-items:center;font-size:11px;color:var(--sub)}
@@ -92,7 +97,7 @@
   .sbar span{display:block;position:relative;font-size:10px;font-weight:700;color:#fff;
        line-height:22px;text-align:center;box-shadow:2px 0 0 0 var(--panel)}
   .sbar span:last-child{box-shadow:none}
-  .grow{display:grid;grid-template-columns:150px minmax(0,1fr) 54px;gap:11px;
+  .grow{display:grid;grid-template-columns:148px minmax(0,1fr) 52px 74px 88px 76px;gap:11px;
        align-items:center;padding:6px 0;cursor:pointer}
   .grow:hover{background:var(--row)}
   .grow .gname{font-size:12.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;
@@ -124,6 +129,31 @@
   .hm tbody tr:hover{background:#f7fafc}
   .hm th.rh{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:none;
        letter-spacing:0;color:var(--ink);white-space:nowrap}
+
+  .rule-list li{margin-bottom:7px;font-size:12.5px;line-height:1.5}
+  /* ranked bar row — magnitude, one hue, number always printed beside it */
+  .rank{display:grid;grid-template-columns:1fr 92px;gap:10px;align-items:center}
+  .rank .tr{height:8px;background:#edf1f4;border-radius:999px;overflow:hidden}
+  .rank .fl{display:block;height:8px;background:var(--accent);border-radius:999px}
+  .crumb{font-size:12.5px;color:var(--sub);margin-bottom:12px}
+  .crumb a{color:var(--link);cursor:pointer;text-decoration:none}
+  .crumb i{font-style:normal;margin:0 7px;color:#c2ccd4}
+  .band{font-size:10.5px;font-weight:700;border-radius:999px;padding:3px 9px;color:#fff;
+       white-space:nowrap;display:inline-block}
+  .band b{font-weight:400;opacity:.8;margin-left:3px;font-family:var(--mono);font-size:9.5px}
+  .meter{display:grid;grid-template-columns:172px 1fr 46px;gap:10px;align-items:center;
+       padding:5px 0;font-size:11.5px}
+  .meter .tr{height:7px;background:#edf1f4;border-radius:999px}
+  .meter .fl{display:block;height:7px;background:var(--accent);border-radius:999px}
+  .rate{display:grid;grid-template-columns:1fr 128px;gap:10px;align-items:center;
+       padding:5px 0;font-size:12px;border-bottom:1px solid #f1f5f8}
+  .rate:last-child{border-bottom:0}
+  .rate input{font:inherit;font-family:var(--mono);font-size:11.5px;padding:5px 8px;
+       border:1px solid var(--rule);border-radius:4px;width:100%;text-align:right}
+  .spark{display:flex;align-items:flex-end;gap:5px;height:130px}
+  .spark div{flex:1;background:var(--s2);border-radius:3px 3px 0 0;position:relative}
+  .spark div i{position:absolute;inset:auto 0 0 0;background:var(--accent);
+       border-radius:3px 3px 0 0;display:block}
 
   /* tooltip */
   #tt{position:fixed;pointer-events:none;background:#10193b;color:#fff;font-size:11.5px;
@@ -157,6 +187,7 @@
     <a class="sub-item" id="rail-swm" onclick="setTab('swm')">Swimlanes</a>
     <a class="sub-item" id="rail-lnk" onclick="setTab('lnk')">Link view</a>
     <a class="sub-item" id="rail-dep" onclick="setTab('dep')">Interdependence</a>
+    <a class="sub-item" id="rail-sub" onclick="setTab('sub')">Subscriptions &amp; cost</a>
     <a class="sub-item" title="the first mockup — catalogue, trigger explorer, contract">Catalog &amp; Contract</a>
   </nav>
 
@@ -184,12 +215,13 @@
       <span class="mono">51_event360.sql</span> already stores.
     </div>
 
-    <div class="row" style="margin-bottom:16px">
+    <div class="row" style="margin-bottom:16px" id="tabBar">
       <span class="seg row" style="gap:0">
         <button id="nEst" aria-pressed="true" onclick="setTab('est')">Estate</button>
         <button id="nSwm" aria-pressed="false" onclick="setTab('swm')">Swimlanes</button>
         <button id="nLnk" aria-pressed="false" onclick="setTab('lnk')">Link view</button>
         <button id="nDep" aria-pressed="false" onclick="setTab('dep')">Interdependence</button>
+        <button id="nSub" aria-pressed="false" onclick="setTab('sub')">Subscriptions &amp; cost</button>
       </span>
       <span class="legend" style="margin-left:auto">
         event type
@@ -382,6 +414,151 @@
       </div>
     </section>
 
+
+    <!-- ============ SUBSCRIPTIONS & COST ============ -->
+    <section id="tab-sub" class="hide">
+      <div class="banner" style="margin-bottom:12px">
+        <b>Pick the events you subscribe to; the bill follows.</b> The basket starts from what
+        is live today, so the first number you see is what you are paying now. Tick an event on
+        and the projection moves as you tick. Every rate is on this page — the projection stands
+        on a reference client's measured month, scaled by a factor you control, and it says so
+        rather than presenting a modelled number as a measured one.
+      </div>
+
+      <div class="grid5" style="margin-bottom:14px" id="subTiles"></div>
+
+      <div style="display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);
+           gap:12px;margin-bottom:12px;align-items:start">
+        <!-- the basket -->
+        <div class="panel">
+          <div class="pad" style="border-bottom:1px solid var(--rule)">
+            <div class="row"><div><h2>Your subscription</h2>
+              <div class="sub" id="basketSub"></div></div>
+              <span class="row" style="margin-left:auto;gap:6px">
+                <button onclick="basketReset()">Reset to live</button>
+                <button onclick="basketNone()">Clear all</button>
+              </span></div>
+            <div class="row" style="margin-top:9px;gap:6px">
+              <select id="bFilterDom" onchange="renderSub()" style="font:inherit;font-size:11.5px;
+                padding:5px 8px;border:1px solid var(--rule);border-radius:4px"></select>
+              <select id="bFilterCrit" onchange="renderSub()" style="font:inherit;font-size:11.5px;
+                padding:5px 8px;border:1px solid var(--rule);border-radius:4px">
+                <option value="">Any criticality</option><option>Critical</option>
+                <option>High</option><option>Moderate</option><option>Low</option></select>
+              <input id="bq" placeholder="Filter events…" oninput="renderSub()"
+                style="font:inherit;font-size:11.5px;padding:5px 9px;border:1px solid var(--rule);
+                border-radius:4px;flex:1;min-width:120px">
+              <button onclick="basketAllShown()">Add all shown</button>
+            </div>
+          </div>
+          <div style="max-height:900px;overflow:auto"><table id="basket"></table></div>
+        </div>
+
+        <!-- the bill -->
+        <div>
+          <div class="panel" style="margin-bottom:12px">
+            <div class="pad" style="border-bottom:1px solid var(--rule)">
+              <h2>What this basket costs</h2>
+              <div class="sub" id="billSub"></div>
+            </div>
+            <div class="pad" id="bill"></div>
+          </div>
+          <div class="panel" style="margin-bottom:12px">
+            <div class="pad" style="border-bottom:1px solid var(--rule)">
+              <h2>Twelve months</h2>
+              <div class="sub">Cumulative spend for this basket. One axis, one measure — money.</div>
+            </div>
+            <div class="pad" id="costProj"></div>
+          </div>
+          <div class="panel">
+            <div class="pad" style="border-bottom:1px solid var(--rule)">
+              <h2>Assumptions you can move</h2>
+              <div class="sub">Every figure above is a function of these.</div>
+            </div>
+            <div class="pad" id="rates"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:12px">
+        <div class="pad row" style="border-bottom:1px solid var(--rule)">
+          <div><h2>Cost drivers in this basket</h2>
+            <div class="sub">Ranked by what they add to your bill. The tail is long and cheap —
+              most of the spend sits in a handful of high-volume events.</div>
+            <div class="src">messages × volume factor × rate card; read-back is one per message per subscriber</div>
+          </div>
+          <span class="seg row" style="gap:0;margin-left:auto">
+            <button id="cbEvt" aria-pressed="true" onclick="setCostBy('evt')">By event</button>
+            <button id="cbDom" aria-pressed="false" onclick="setCostBy('dom')">By domain</button>
+          </span>
+        </div>
+        <div style="max-height:420px;overflow:auto"><table id="costTbl"></table></div>
+      </div>
+
+      <div class="grid2" style="margin-bottom:12px">
+        <div class="panel">
+          <div class="pad" style="border-bottom:1px solid var(--rule)">
+            <h2>Reference month · where the base model comes from</h2>
+            <div class="sub" id="refSub"></div>
+          </div>
+          <div class="pad"><dl class="kv" id="refKv"></dl></div>
+          <div class="pad" style="border-top:1px solid var(--rule)">
+            <span class="cap">The file this expects</span>
+            <div class="sub" style="font-size:11.5px;margin:5px 0 7px">Hand over the reference
+              client's month in this shape and every number here is measured rather than
+              modelled. Until then it is modelled, and says so.</div>
+            <pre id="refShape"></pre>
+          </div>
+        </div>
+        <div>
+          <div class="panel" style="margin-bottom:12px">
+            <div class="pad" style="border-bottom:1px solid var(--rule)">
+              <h2>Who else consumes these events</h2>
+              <div class="sub">Rows are the other consuming systems, columns are domains.
+                Their read-backs are on their bill, not yours — but their existence is why
+                ordering is never guaranteed.</div>
+              <div class="src">CTL_EVENT_SUBSCRIPTION joined to META_EVENT_DEFINITION.DOMAIN</div>
+            </div>
+            <div class="pad" style="overflow-x:auto"><table class="hm" id="subHm"></table></div>
+          </div>
+          <div class="note warn" id="orphanNote"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="pad row" style="border-bottom:1px solid var(--rule)">
+          <div><h2>Every subscription on the estate</h2>
+            <div class="sub">A subscription is a consumer, a filter and a delivery mode — not
+              just a name on a list. The filter is what decides the bill.</div></div>
+          <select id="subFilter" onchange="renderSub()" style="margin-left:auto;font:inherit;
+            font-size:11.5px;padding:5px 8px;border:1px solid var(--rule);border-radius:4px"></select>
+        </div>
+        <div style="max-height:400px;overflow:auto"><table id="subTbl"></table></div>
+      </div>
+    </section>
+
+
+    <!-- ===================== EVENT DRILL-DOWN ===================== -->
+    <section id="tab-det" class="hide">
+      <div class="crumb" id="detCrumb"></div>
+      <div class="panel pad" style="margin-bottom:12px">
+        <div class="row">
+          <div style="min-width:0">
+            <div class="row" style="gap:8px">
+              <h1 id="detName" style="font-size:18px"></h1>
+              <span id="detChips" class="row" style="gap:6px"></span>
+            </div>
+            <div class="sub" style="margin-top:4px" id="detMeta"></div>
+          </div>
+          <span style="margin-left:auto" id="detCrit"></span>
+        </div>
+      </div>
+      <div class="row" style="margin-bottom:14px">
+        <span class="seg row" style="gap:0" id="detNav"></span>
+      </div>
+      <div id="detBody"></div>
+    </section>
+
   </main>
 </div>
 <div id="tt"></div>
@@ -499,7 +676,8 @@ const EVENTS = buildEvents();
 const TBL_DOM = Object.fromEntries(TABLES.map(([t,d])=>[t,d]));
 
 /* ===================== state + helpers ============================ */
-let aud="biz", tab="est", grpBy="type", laneBy="dom", sel=null, pick=null, blastCol=null;
+let aud="biz", tab="est", grpBy="type", laneBy="dom", sel=null, pick=null,
+    blastCol=null, det=null;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const sum=a=>a.reduce((x,y)=>x+y,0);
@@ -514,7 +692,9 @@ function setAud(a){aud=a;$("vBiz").setAttribute("aria-pressed",a==="biz");
   $("vTech").setAttribute("aria-pressed",a==="tech");
   document.querySelectorAll(".src").forEach(e=>e.classList.toggle("hide",a==="biz"));
   render();}
-function setTab(t){tab=t;["est","swm","lnk","dep"].forEach(x=>{
+function setTab(t){tab=t;det=null;$("tab-det").classList.add("hide");
+  $("tabBar").classList.remove("hide");
+  ["est","swm","lnk","dep","sub"].forEach(x=>{
   $("tab-"+x).classList.toggle("hide",x!==t);
   const b=$("n"+x[0].toUpperCase()+x.slice(1)); if(b)b.setAttribute("aria-pressed",x===t);
   const r=$("rail-"+x); if(r)r.classList.toggle("on",x===t);});
@@ -556,11 +736,18 @@ function groups(){
 function renderTiles(){
   const rows=sum(TABLES.map(t=>t[5])), dcols=sum(TABLES.map(t=>t[6].length));
   const views=new Set(EVENTS.filter(e=>!e.marker).map(e=>e.view)).size;
-  const t=[["105","events in the contract","42 Business · 51 Technical · 12 Marker"],
-   ["93","carry a record to fetch","the other 12 are batch markers"],
-   ["575","field rows","4 × 93 + 3 × 12 payload, + "+rows+" trigger-driving"],
-   [String(dcols),"distinct watched columns",rows+" trigger rows across "+TABLES.length+" tables"],
-   [String(views),"SDC views to read back","every data event names exactly one"]];
+  const subd=EVENTS.filter(e=>activeSubs(e).length).length;
+  const msgs=sum(EVENTS.map(e=>e.vol))*RATES.factor;
+  const estate=sum(EVENTS.map(e=>costOf(e).total));
+  const hot=EVENTS.filter(e=>e.band==="Critical"||e.band==="High").length;
+  const t=[["105","events in the contract",
+      "42 Business · 51 Technical · 12 Marker · 575 field rows · "+views+" SDC views"],
+   [subd+" / 105","subscribed",(105-subd)+" produced for nobody · "+
+      SUBS.filter(x=>x.status==="ACTIVE").length+" live subscriptions"],
+   [num(msgs/1000)+"k","messages a month","reference month × "+RATES.factor+
+      " volume factor · "+dcols+" watched columns"],
+   [money(estate),"estate cost a month",money(estate*12)+" over twelve months, all consumers"],
+   [String(hot),"Critical or High","criticality is CP360's, derived — not SEI's"]];
   $("tiles").innerHTML=t.map(([n,l,d])=>`<div class="tile"><div class="n">${n}</div>
     <div class="l">${l}</div><div class="d">${d}</div></div>`).join("");
 }
@@ -571,8 +758,17 @@ function renderGroups(){
   $("grpSrc").textContent=GROUPERS[grpBy].src;
   const gs=groups(), max=Math.max(...gs.map(g=>g.total)), BARW=620;
   $("grpCount").textContent=`${gs.length} groups · 105 events · every grouping closes on 105`;
-  $("groups").innerHTML=gs.map(g=>{
+  $("groups").innerHTML=`<div class="grow" style="cursor:default;padding-bottom:2px">
+      <div class="cap">Group</div><div class="cap">Events by type</div>
+      <div class="cap" style="text-align:right">Events</div>
+      <div class="cap" style="text-align:right">Subscribed</div>
+      <div class="cap" style="text-align:right">Messages / mo</div>
+      <div class="cap" style="text-align:right">Cost / mo</div></div>`+
+    gs.map(g=>{
     const w=Math.round(g.total/max*100);
+    const nSub=g.ev.filter(e=>activeSubs(e).length).length;
+    const gMsgs=sum(g.ev.map(e=>e.vol))*RATES.factor;
+    const gCost=sum(g.ev.map(e=>costOf(e).total));
     const segs=["Business","Technical","Marker"].filter(t=>g[t]).map(t=>{
       const px=g[t]/max*BARW, lab=px>=26?g[t]:"";
       return `<span style="flex:${g[t]};background:${TCOL[t]}" data-t="${t}">${lab}</span>`;}).join("");
@@ -580,7 +776,10 @@ function renderGroups(){
        onmousemove="tipGroup(event,'${esc(g.key)}')" onmouseleave="untip()">
       <div class="gname" title="${esc(g.key)}">${esc(g.key)}</div>
       <div><div class="sbar" style="width:${w}%">${segs}</div></div>
-      <div class="gn">${g.total}</div></div>`;}).join("");
+      <div class="gn">${g.total}</div>
+      <div class="gn" style="${nSub<g.total?"color:var(--warn-ink)":""}">${nSub}</div>
+      <div class="gn">${gMsgs>=1000?num(gMsgs/1000)+"k":num(gMsgs)}</div>
+      <div class="gn">${money(gCost)}</div></div>`;}).join("");
   $("typeExplain").innerHTML=`<dl style="margin:0;display:grid;
     grid-template-columns:auto minmax(0,1fr);gap:9px 12px;font-size:12.5px">
     <dt><span class="chip" style="background:var(--t-biz);color:#fff">Business · 42</span></dt>
@@ -612,15 +811,19 @@ function renderSel(){
   $("selChips").innerHTML=["Business","Technical","Marker"].filter(t=>g[t]).map(t=>
     `<span class="chip" style="background:${TCOL[t]};color:#fff">${t} ${g[t]}</span>`).join("");
   $("selTbl").innerHTML=`<thead><tr><th style="width:54px">ID</th><th>Event</th>
-    <th style="width:88px">Type</th><th style="width:104px">Domain</th>
-    <th style="width:62px">Cols</th><th style="width:170px">SDC view</th></tr></thead><tbody>`+
-    g.ev.map(e=>`<tr><td class="mono" style="font-size:11px">${e.id}</td>
+    <th style="width:88px">Type</th><th style="width:92px">Domain</th>
+    <th style="width:52px">Cols</th><th style="width:150px">SDC view</th>
+    <th style="width:92px">Criticality</th><th></th></tr></thead><tbody>`+
+    g.ev.map(e=>`<tr style="cursor:pointer" onclick="openEvent(${e.id})">
+      <td class="mono" style="font-size:11px">${e.id}</td>
       <td style="font-size:12px">${esc(e.name)}</td>
       <td><span class="chip" style="background:${TCOL[e.type]};color:#fff">${e.type}</span></td>
       <td class="mono" style="font-size:11px">${e.domain}</td>
       <td class="mono" style="font-size:11px">${e.trig.length||"—"}</td>
       <td class="mono" style="font-size:10.5px">${e.marker
-        ?'<span class="ns">none · marker</span>':esc(e.view)}</td></tr>`).join("")+"</tbody>";
+        ?'<span class="ns">none · marker</span>':esc(e.view)}</td>
+      <td style="width:92px">${critChip(e)}</td>
+      <td style="width:34px;color:var(--link);font-weight:600">›</td></tr>`).join("")+"</tbody>";
 }
 
 /* ===================== SWIMLANES ===================== */
@@ -864,6 +1067,627 @@ function tipCell(ev,d,t,n){
      + (TBL_DOM[t]!==d?`<br><span class="m">cross-domain — ${t} belongs to ${TBL_DOM[t]}</span>`:"")
      : `No ${d} event watches <span class="m">${t}</span>`);}
 
+/* ===================================================================
+   SUBSCRIPTIONS, CRITICALITY, COST
+   None of this comes from the SEI workbook. The contract says what an
+   event is; it says nothing about who consumes it, how much it matters
+   or what it costs. Those are CP360's own, and every screen below says
+   so rather than letting a derived number pass for a stated one.
+   =================================================================== */
+const CONSUMERS = [
+ ["STATEMENTS","Client statements","stream",["ACCOUNT","TRANSACTION","ASSETS"],2],
+ ["BILLING","Fee billing","queue",["ACCOUNT","TRANSACTION"],3],
+ ["CLIENT_PORTAL","Client portal","stream",["ACCOUNT","ASSETS","CLIENT"],2],
+ ["PERF_ENGINE","Performance engine","stream",["ASSETS","TRANSACTION"],2],
+ ["RECON_HUB","Reconciliation hub","batch",["TRANSACTION","ASSETS","MARKER"],3],
+ ["REG_REPORTING","Regulatory reporting","queue",["ACCOUNT","CLIENT","TRANSACTION"],4],
+ ["CRM_SYNC","CRM sync","stream",["CLIENT","ACCOUNT"],3],
+ ["DATA_LAKE","Data lake landing","stream",["ACCOUNT","TRANSACTION","ASSETS","CLIENT","MARKER"],1],
+ ["ALERTS","Operational alerts","stream",["ACCOUNT","TRANSACTION"],5],
+ ["TAX_ENGINE","Tax engine","batch",["ASSETS","TRANSACTION"],4]
+];
+const SUB_STATUS=["ACTIVE","ACTIVE","ACTIVE","ACTIVE","ACTIVE","ACTIVE","REQUESTED","RETIRED"];
+const SUBS=[];
+CONSUMERS.forEach(([code,name,mode,doms,every],ci)=>{
+  const pool=EVENTS.filter(e=>doms.includes(e.domain));
+  pool.forEach((e,i)=>{
+    if(every>1 && (i+ci)%every!==0) return;              // a consumer takes a slice
+    if(code==="DATA_LAKE" && (i*7+ci)%9===0) return;     // even the lake is not everything
+    const st=SUB_STATUS[(ci*5+i)%SUB_STATUS.length];
+    SUBS.push({consumer:code, cname:name, mode, event:e.id, status:st,
+      filter: e.marker? "all" : (st==="RETIRED"? "all" : ((i+ci)%4===0? "op = U only" : "all operations")),
+      since: `202${4+((ci+i)%2)}-${String(1+((ci*3+i)%12)).padStart(2,"0")}`});
+  });
+});
+const SUB_BY_EVENT={}; SUBS.forEach(s=>(SUB_BY_EVENT[s.event]=SUB_BY_EVENT[s.event]||[]).push(s));
+const activeSubs=e=>(SUB_BY_EVENT[e.id]||[]).filter(s=>s.status==="ACTIVE");
+
+/* reference-month message volumes. Domain totals are the reference client's
+   billed month; within a domain a few events carry most of the traffic, which
+   is what makes a per-event cost ranking worth drawing at all.              */
+const REF_MONTH={label:"Reference client · August 2026", accounts:"~52,000 accounts",
+  domTotals:{ASSETS:6400000, TRANSACTION:5100000, ACCOUNT:2600000, CLIENT:400000, MARKER:372}};
+(function volumes(){
+  Object.entries(REF_MONTH.domTotals).forEach(([d,total])=>{
+    const ev=EVENTS.filter(e=>e.domain===d);
+    if(d==="MARKER"){ ev.forEach(e=>e.vol=total/ev.length); return; }
+    const w=ev.map((_,i)=>1/Math.pow(i+1,0.9)), ws=sum(w);
+    let left=total;
+    ev.forEach((e,i)=>{ const v=i===ev.length-1? left : Math.round(total*w[i]/ws);
+      e.vol=v; left-=v; });
+  });
+})();
+
+/* the rate card — six numbers, all editable, all on screen */
+const RATES={pub:1.20, read:2.40, egress:0.09, retain:0.023, subFee:150, bytes:280,
+  factor:0.65, growth:1.5};
+const RATE_META=[
+ ["pub","Publish, per 100k messages","$"],["read","SDC read-back, per 100k reads","$"],
+ ["egress","Egress, per GB","$"],["retain","Retention, per GB-month","$"],
+ ["subFee","Per consumer connection, per month","$"],["bytes","Average payload, bytes",""],
+ ["factor","Volume factor vs the reference client","×"],
+ ["growth","Assumed monthly volume growth, %",""]];
+
+function costOf(e,f){
+  const factor=(f===undefined?RATES.factor:f);
+  const msgs=e.vol*factor, subs=activeSubs(e);
+  const reads=msgs*subs.length;              // consumption rule 1: every consumer refetches
+  const gb=msgs*RATES.bytes/1e9;
+  const pub=msgs/1e5*RATES.pub, read=reads/1e5*RATES.read;
+  const egress=gb*RATES.egress, retain=gb*RATES.retain;
+  let alloc=0;
+  subs.forEach(s=>{const n=SUBS.filter(x=>x.consumer===s.consumer&&x.status==="ACTIVE").length;
+    alloc+=RATES.subFee/n;});
+  const variable=pub+read+egress+retain;
+  return {msgs,reads,subs:subs.length,pub,read,egress,retain,variable,alloc,
+    total:variable+alloc};
+}
+const money=n=>n>=1000?"$"+Math.round(n).toLocaleString()
+  :n>=10?"$"+n.toFixed(0):n>=0.01?"$"+n.toFixed(2):"$0.00";
+const num=n=>Math.round(n).toLocaleString();
+
+/* ---- criticality: derived here, never stated by SEI -------------------- */
+const CRIT_W=[["reach","Consumer reach",.30,"how many live subscriptions read it"],
+  ["vol","Message volume",.25,"how often it actually fires"],
+  ["couple","Coupling",.20,"other events raised by the same column change"],
+  ["surface","Trigger surface",.10,"how many columns can raise it"],
+  ["risk","Contract risk",.15,"anything the specification leaves unstated"]];
+const CO_EVENTS=e=>{const mine=new Set(e.trig.map(t=>t.table+"."+t.col));
+  return EVENTS.filter(x=>x.id!==e.id && x.trig.some(t=>mine.has(t.table+"."+t.col)));};
+(function crit(){
+  const maxSub=Math.max(...EVENTS.map(e=>activeSubs(e).length),1);
+  const maxVol=Math.max(...EVENTS.map(e=>e.vol));
+  const maxCo=Math.max(...EVENTS.map(e=>CO_EVENTS(e).length),1);
+  const maxTr=Math.max(...EVENTS.map(e=>e.trig.length),1);
+  EVENTS.forEach(e=>{
+    const co=CO_EVENTS(e);
+    e.co=co;
+    e.crit={reach:activeSubs(e).length/maxSub,
+      vol:Math.log(e.vol+1)/Math.log(maxVol+1),
+      couple:co.length/maxCo, surface:e.trig.length/maxTr,
+      risk:(e.marker?0:0) + (e.view&&e.view!==NO_VIEW?0:.5) + (e.ops?0:.5)};
+    e.critRaw={reach:activeSubs(e).length, vol:e.vol, couple:co.length,
+      surface:e.trig.length, risk:(e.view&&e.view!==NO_VIEW?0:1)+(e.ops?0:1)};
+    e.score=Math.round(sum(CRIT_W.map(([k,,w])=>Math.min(1,e.crit[k])*w))*100);
+    e.band=e.score>=70?"Critical":e.score>=50?"High":e.score>=30?"Moderate":"Low";
+  });
+})();
+const BANDC={Critical:"#c1113a", High:"#e67e22", Moderate:"#3a6f9e", Low:"#7b8894"};
+const critChip=e=>`<span class="band" style="background:${BANDC[e.band]}"
+  >${e.band}<b>${e.score}</b></span>`;
+
+/* ============ SUBSCRIPTIONS & COST ============
+   The basket is the screen. You pick the events you subscribe to and the bill
+   follows; nothing here is a separate costing exercise you have to reconcile
+   against the catalogue. Cost is computed from ONE consumer's point of view —
+   yours — because that is the question people actually ask: what would it cost
+   me to subscribe to these. Estate-wide cost lives on the Estate dashboard.  */
+let PICKED=new Set(), costBy="evt", PROJ=[];
+(function seedBasket(){ EVENTS.forEach(e=>{ if(activeSubs(e).length) PICKED.add(e.id); }); })();
+const BASE_PICK=new Set(PICKED);
+
+function basketReset(){PICKED=new Set(BASE_PICK);renderSub();render();}
+function basketNone(){PICKED=new Set();renderSub();render();}
+function basketAllShown(){basketRows().forEach(e=>PICKED.add(e.id));renderSub();render();}
+function basketToggle(id){PICKED.has(id)?PICKED.delete(id):PICKED.add(id);renderSub();render();}
+function setCostBy(k){costBy=k;["evt","dom"].forEach(x=>
+  $("cb"+x[0].toUpperCase()+x.slice(1)).setAttribute("aria-pressed",x===k));renderSub();}
+function setRate(k,v){const n=parseFloat(v); if(!isNaN(n)&&n>=0){RATES[k]=n;renderSub();render();}}
+function tipProj(ev,i){const x=PROJ[i]; if(!x)return;
+  tip(ev,`<b>By the end of month ${x.m+1}</b><br>spent ${money(x.cexp)}<br>`+
+    `<span class="m">band ${money(x.clo)} – ${money(x.chi)}</span><br>`+
+    `that month alone ${money(x.exp)}`);}
+
+/* one subscriber's cost for one event: the connection fee is not per event, so
+   it is added once at the basket level, never smeared across rows */
+function mine(e){
+  const msgs=e.vol*RATES.factor;
+  const gb=msgs*RATES.bytes/1e9;
+  const read=msgs/1e5*RATES.read, egress=gb*RATES.egress, retain=gb*RATES.retain;
+  return {msgs, read, egress, retain, total:read+egress+retain};
+}
+function basketRows(){
+  const d=$("bFilterDom").value, c=$("bFilterCrit").value,
+        q=($("bq").value||"").trim().toLowerCase();
+  return EVENTS.filter(e=>(!d||e.domain===d)&&(!c||e.band===c)&&
+    (!q||e.name.toLowerCase().includes(q)||String(e.id)===q));
+}
+function renderSub(){
+  const act=SUBS.filter(s=>s.status==="ACTIVE");
+  if(!$("bFilterDom").options.length)
+    $("bFilterDom").innerHTML=`<option value="">Any domain</option>`+
+      Object.keys(DOMAINS).map(d=>`<option>${d}</option>`).join("");
+  if(!$("subFilter").options.length)
+    $("subFilter").innerHTML=`<option value="">All consumers</option>`+
+      CONSUMERS.map(([c,n])=>`<option value="${c}">${c} — ${n}</option>`).join("");
+
+  const picked=EVENTS.filter(e=>PICKED.has(e.id));
+  const per=picked.map(e=>({e,c:mine(e)}));
+  const variable=sum(per.map(x=>x.c.total));
+  const monthly=variable+(picked.length?RATES.subFee:0);
+  const msgs=sum(per.map(x=>x.c.msgs));
+  const crit=picked.filter(e=>e.band==="Critical"||e.band==="High").length;
+  const delta=monthly-baselineCost();
+
+  $("subTiles").innerHTML=[
+    [String(picked.length)+" / 105","events in your basket",
+      picked.length===BASE_PICK.size?"unchanged from what is live today"
+      :(picked.length>BASE_PICK.size?"+":"")+(picked.length-BASE_PICK.size)+" vs live today"],
+    [num(msgs/1000)+"k","messages a month","reference month × "+RATES.factor+" volume factor"],
+    [money(monthly),"your monthly bill",
+      (delta>0?"+":delta<0?"−":"")+money(Math.abs(delta))+" vs what is live today"],
+    [money(monthly*12),"first twelve months","at "+RATES.growth+"% monthly volume growth"],
+    [String(crit),"Critical or High in the basket","each needs a named owner on your side"]]
+    .map(([n,l,d])=>`<div class="tile"><div class="n" style="font-size:21px">${n}</div>
+      <div class="l">${l}</div><div class="d">${d}</div></div>`).join("");
+
+  /* ---- the basket ---- */
+  const rows=basketRows();
+  $("basketSub").innerHTML=`${picked.length} of 105 events ticked · showing ${rows.length}
+    · <span class="mono">${num(msgs)}</span> messages a month`;
+  $("basket").innerHTML=`<thead><tr><th style="width:36px"></th><th style="width:46px">ID</th>
+    <th>Event</th><th style="width:88px">Domain</th><th style="width:104px">Criticality</th>
+    <th style="width:88px">Messages</th><th style="width:74px">Cost</th>
+    <th style="width:78px">Other subs</th><th style="width:26px"></th></tr></thead><tbody>`+
+    rows.map(e=>{const c=mine(e), on=PICKED.has(e.id), others=activeSubs(e).length;
+      return `<tr style="cursor:pointer;${on?"background:var(--tint)":""}"
+        onclick="basketToggle(${e.id})">
+        <td style="text-align:center;font-size:13px;color:${on?"var(--ok)":"#c9d4dc"}"
+          >${on?"☑":"☐"}</td>
+        <td class="mono" style="font-size:11px">${e.id}</td>
+        <td style="font-size:12px">${esc(e.name)}</td>
+        <td class="mono" style="font-size:10.5px">${e.domain}</td>
+        <td>${critChip(e)}</td>
+        <td class="mono" style="font-size:11px">${num(c.msgs)}</td>
+        <td class="mono" style="font-size:11px">${on?money(c.total):'<span class="sub">—</span>'}</td>
+        <td class="mono" style="font-size:11px">${others||'<span class="sub">0</span>'}</td>
+        <td style="color:var(--link);font-weight:600" onclick="event.stopPropagation();
+          openEvent(${e.id})">›</td></tr>`;}).join("")+"</tbody>";
+
+  /* ---- the bill ---- */
+  const parts=[["Connection fee",picked.length?RATES.subFee:0],
+    ["SDC read-back",sum(per.map(x=>x.c.read))],["Egress",sum(per.map(x=>x.c.egress))],
+    ["Retention",sum(per.map(x=>x.c.retain))]].sort((a,b)=>b[1]-a[1]);
+  const pmax=Math.max(parts[0][1],0.0001);
+  $("billSub").innerHTML=picked.length
+    ? `One connection fee plus one read-back per message — consumption rule 1 says you must
+       fetch the record, so every message you accept is also a read.`
+    : `Nothing selected. A basket with no events still costs nothing — the connection fee
+       only starts when the first subscription goes live.`;
+  $("bill").innerHTML=parts.map(([l,v])=>`<div class="rank" style="margin-bottom:9px">
+      <div><div style="font-size:12px;margin-bottom:4px">${l}${monthly?`
+        <span class="sub" style="font-size:11px">· ${(v/monthly*100).toFixed(1)}%</span>`:""}</div>
+      <div class="tr"><span class="fl" style="width:${Math.round(v/pmax*100)}%"></span></div></div>
+      <div class="mono" style="font-size:12px;text-align:right">${money(v)}</div></div>`).join("")+
+    `<div style="border-top:1px solid var(--rule);margin-top:10px;padding-top:10px" class="row">
+      <b style="font-size:12.5px">Per month</b>
+      <span class="mono" style="margin-left:auto;font-size:17px;font-weight:600">${money(monthly)}</span></div>`+
+    (picked.length?`<div class="note warn" style="margin-top:10px">
+      <b>${((picked.length?RATES.subFee:0)/monthly*100).toFixed(0)}% of your bill does not move
+      with the basket.</b> The connection fee is charged once however many events you take, so
+      dropping a low-volume event saves almost nothing — the saving is in the high-volume ones
+      at the top of the driver list, or in narrowing a filter so fewer messages arrive at all.</div>`:"");
+
+  /* ---- twelve months, cumulative ---- */
+  const fixed=picked.length?RATES.subFee:0, mo=[];
+  let ce=0,cl=0,ch=0;
+  for(let i=0;i<12;i++){const g=Math.pow(1+RATES.growth/100,i);
+    const exp=variable*g+fixed, lo=variable*g*0.75+fixed, hi=variable*g*1.25+fixed;
+    ce+=exp; cl+=lo; ch+=hi; mo.push({m:i,exp,lo,hi,cexp:ce,clo:cl,chi:ch});}
+  PROJ=mo; const hiMax=Math.max(mo[11].chi,0.01);
+  $("costProj").innerHTML=`<div class="spark">`+mo.map(x=>
+    `<div style="height:${Math.max(2,Math.round(x.chi/hiMax*100))}%"
+       onmousemove="tipProj(event,${x.m})" onmouseleave="untip()"
+       ><i style="height:${Math.round(x.cexp/Math.max(x.chi,.01)*100)}%"></i></div>`).join("")+
+    `</div><div class="row" style="justify-content:space-between;margin-top:7px">
+      <span class="sub" style="font-size:11px">cumulative, month 1 → 12</span>
+      <span class="mono" style="font-size:12.5px;font-weight:600">${money(mo[11].cexp)}</span></div>
+    <div class="legend" style="margin-top:9px">
+      <span><i style="background:var(--accent)"></i>expected</span>
+      <span><i style="background:var(--s2)"></i>high end of the band</span>
+      <span style="margin-left:auto">monthly ${money(mo[0].exp)} → ${money(mo[11].exp)}</span></div>
+    <div class="src" style="margin-top:7px">cumulative, because the monthly line is nearly flat —
+      which is itself the finding. Band = volume factor ±25%; the connection fee does not move
+      with it</div>`;
+
+  /* ---- rate card ---- */
+  $("rates").innerHTML=RATE_META.map(([k,l])=>`<div class="rate">
+    <span>${l}</span><span><input value="${RATES[k]}" inputmode="decimal"
+      oninput="setRate('${k}',this.value)"></span></div>`).join("")+
+    `<div class="src" style="margin-top:8px">CP360's assumption — not SEI's, not the reference
+      client's contract. Replace them with your own and every figure on this page follows.</div>`;
+
+  /* ---- drivers ---- */
+  let drows, dhead;
+  if(costBy==="evt"){
+    drows=per.slice().sort((a,b)=>b.c.total-a.c.total)
+      .map(x=>({e:x.e,k:x.e.name,msgs:x.c.msgs,read:x.c.read,t:x.c.total}));
+    dhead=`<th style="width:56px">ID</th><th>Event</th>`;
+  } else {
+    const g={}; per.forEach(x=>{const d=x.e.domain;
+      g[d]=g[d]||{k:d,msgs:0,read:0,t:0,n:0};
+      g[d].msgs+=x.c.msgs; g[d].read+=x.c.read; g[d].t+=x.c.total; g[d].n++;});
+    drows=Object.values(g).sort((a,b)=>b.t-a.t); dhead=`<th>Domain</th>`;
+  }
+  const tmax=Math.max(...drows.map(r=>r.t),0.01);
+  $("costTbl").innerHTML=`<thead><tr>${dhead}<th style="width:100px">Messages</th>
+    <th style="width:92px">Read-back</th>
+    <th style="width:220px">Cost / month</th></tr></thead><tbody>`+
+    (drows.length?drows.map(r=>`<tr ${r.e?`style="cursor:pointer" onclick="openEvent(${r.e.id})"`:""}>
+      ${r.e?`<td class="mono" style="font-size:11px">${r.e.id}</td>
+             <td style="font-size:12px">${esc(r.e.name)}</td>`
+           :`<td class="mono" style="font-size:11.5px">${esc(r.k)} <span class="sub">· ${r.n} events</span></td>`}
+      <td class="mono" style="font-size:11px">${num(r.msgs)}</td>
+      <td class="mono" style="font-size:11px">${money(r.read)}</td>
+      <td><div class="rank"><div class="tr"><span class="fl"
+        style="width:${Math.round(r.t/tmax*100)}%"></span></div>
+        <div class="mono" style="font-size:11.5px;text-align:right">${money(r.t)}</div></div></td>
+      </tr>`).join("")
+     :`<tr><td colspan="4" class="sub" style="padding:16px">Nothing in the basket yet.</td></tr>`)+
+    "</tbody>";
+
+  /* ---- reference month ---- */
+  $("refSub").innerHTML=`${REF_MONTH.label} · ${REF_MONTH.accounts}. Illustrative until the real
+    month lands — the shape below is all it needs to be.`;
+  $("refKv").innerHTML=Object.entries(REF_MONTH.domTotals).map(([d,v])=>
+    `<dt>${d}</dt><dd><span class="mono">${num(v)}</span> messages</dd>`).join("")+
+    `<dt>Total</dt><dd><span class="mono">${num(sum(Object.values(REF_MONTH.domTotals)))}</span>
+      messages in the month</dd>`;
+  $("refShape").textContent=
+`event_id,event_name,messages,avg_payload_bytes,subscriptions,billed_amount
+1,Account Open Event,412880,281,4,118.42
+3,Account — Status change,206440,279,3,54.10
+...one row per event, one month, as billed`;
+
+  /* ---- who else ---- */
+  const doms=Object.keys(DOMAINS);
+  let h=`<thead><tr><th style="width:140px">Consumer</th>`+
+    doms.map(d=>`<th style="text-align:center;font-size:9px">${d}</th>`).join("")+
+    `<th style="text-align:right">All</th></tr></thead><tbody>`;
+  CONSUMERS.forEach(([c,name])=>{
+    h+=`<tr><th class="rh" title="${esc(name)}">${c}</th>`; let t=0;
+    doms.forEach(d=>{const n=act.filter(x=>x.consumer===c &&
+        EVENTS.find(e=>e.id===x.event).domain===d).length; t+=n;
+      h+=`<td class="c"><span style="background:${step(n)};color:${stepInk(n)}"
+        onmousemove="tipSub(event,'${c}','${d}',${n})" onmouseleave="untip()"
+        >${n||""}</span></td>`;});
+    h+=`<td class="mono" style="text-align:right;font-size:11.5px">${t}</td></tr>`;});
+  $("subHm").innerHTML=h+"</tbody>";
+
+  const covered=new Set(act.map(x=>x.event));
+  const orphan=EVENTS.filter(e=>!covered.has(e.id));
+  $("orphanNote").innerHTML=`<b>${orphan.length} events have no live subscription at all.</b>
+    They are produced and retained whether or not anyone reads them. An event with
+    ${Math.max(...EVENTS.map(e=>activeSubs(e).length))} subscribers is the opposite problem:
+    that many consumers must each be idempotent, and none of them can rely on the order the
+    others see.`;
+
+  const f=$("subFilter").value;
+  const list=SUBS.filter(x=>!f||x.consumer===f);
+  $("subTbl").innerHTML=`<thead><tr><th style="width:132px">Consumer</th>
+    <th style="width:52px">Event</th><th>Name</th><th style="width:78px">Delivery</th>
+    <th style="width:116px">Filter</th><th style="width:76px">Since</th>
+    <th style="width:86px">Status</th></tr></thead><tbody>`+
+    list.map(x=>{const e=EVENTS.find(y=>y.id===x.event);
+      return `<tr style="cursor:pointer" onclick="openEvent(${x.event})">
+      <td class="mono" style="font-size:11px">${x.consumer}</td>
+      <td class="mono" style="font-size:11px">${x.event}</td>
+      <td style="font-size:12px">${esc(e.name)}</td>
+      <td class="mono" style="font-size:10.5px">${x.mode}</td>
+      <td class="mono" style="font-size:10.5px">${esc(x.filter)}</td>
+      <td class="mono" style="font-size:10.5px">${x.since}</td>
+      <td><span class="chip ${x.status==="ACTIVE"?"ok":x.status==="REQUESTED"?"n":"warn"}"
+        >${x.status}</span></td></tr>`;}).join("")+"</tbody>";
+}
+function tipSub(ev,c,d,n){tip(ev, n?`<b>${n}</b> ${d} events read by <span class="m">${c}</span>`
+  :`<span class="m">${c}</span> reads no ${d} events`);}
+function baselineCost(){
+  const ev=EVENTS.filter(e=>BASE_PICK.has(e.id));
+  return sum(ev.map(e=>mine(e).total))+(ev.length?RATES.subFee:0);
+}
+
+/* ===================== EVENT DRILL-DOWN ===================== */
+let detTab="over";
+const DET_TABS=[["over","Overview"],["trg","Triggers"],["crit","Criticality"],
+  ["sub","Subscriptions"],["cost","Cost"]];
+function openEvent(id){det=EVENTS.find(e=>e.id===id); detTab="over";
+  ["est","swm","lnk","dep","sub"].forEach(x=>$("tab-"+x).classList.add("hide"));
+  $("tabBar").classList.add("hide"); $("tab-det").classList.remove("hide");
+  window.scrollTo(0,0); renderDet();}
+function setDetTab(t){detTab=t;renderDet();}
+function backFromDet(){setTab(tab);}
+function renderDet(){
+  const e=det, c=costOf(e), subs=SUB_BY_EVENT[e.id]||[], act=activeSubs(e);
+  $("detCrumb").innerHTML=`<a onclick="backFromDet()">Event 360</a><i>›</i>
+    <a onclick="backFromDet()">${{est:"Estate",swm:"Swimlanes",lnk:"Link view",
+      dep:"Interdependence",sub:"Subscriptions",cost:"Cost projection"}[tab]||"Estate"}</a><i>›</i>
+    <b style="color:var(--ink);font-weight:500">Event ${e.id}</b>`;
+  $("detName").textContent=e.name;
+  $("detChips").innerHTML=`<span class="chip" style="background:${TCOL[e.type]};color:#fff"
+      >${e.type}</span><span class="chip n">${e.domain}</span>`;
+  $("detMeta").innerHTML=`<span class="mono">id ${e.id}</span> ·
+    <span class="mono">${e.section}</span> · ${e.trig.length} watched column${
+    e.trig.length===1?"":"s"} · ${act.length} live subscription${act.length===1?"":"s"} ·
+    ${money(c.total)}/month attributed`;
+  $("detCrit").innerHTML=`<div style="text-align:right">${critChip(e)}
+    <div class="sub" style="font-size:10.5px;margin-top:4px">criticality — CP360's, not SEI's</div></div>`;
+  $("detNav").innerHTML=DET_TABS.map(([k,l])=>
+    `<button aria-pressed="${k===detTab}" onclick="setDetTab('${k}')">${l}</button>`).join("");
+  $("detBody").innerHTML=({over:detOver,trg:detTrg,crit:detCrit,sub:detSub,cost:detCost})[detTab](e,c,subs,act);
+}
+function detOver(e,c,subs,act){
+  const stages=[["⚙","Something changes", e.marker?"the batch window closes"
+      :`${e.trig.length} column${e.trig.length===1?"":"s"} watched`],
+    ["📣","The event is raised",`id ${e.id} · ${e.type}`],
+    ["✉","A payload arrives", e.marker?"3 fields":"4 fields"],
+    ["🔎","You fetch the record", e.marker?"nothing to fetch":(e.view||"view unresolved")]];
+  return `
+  <div class="grid2" style="margin-bottom:12px">
+    <div class="panel">
+      <div class="pad" style="border-bottom:1px solid var(--rule)">
+        <span class="cap">Description — verbatim from the specification</span>
+        <div class="src">META_EVENT_DEFINITION.DESCRIPTION</div>
+      </div>
+      <div class="pad" style="font-size:12.5px;line-height:1.65">${esc(e.desc||
+        `Raised when the underlying ${e.domain.toLowerCase()} record changes in a way consumers must know about.`)}</div>
+      <div class="pad" style="border-top:1px solid var(--rule)">
+        <span class="cap">The four stages</span>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:9px">
+        ${stages.map(([i,t,d])=>`<div style="text-align:center">
+          <div style="width:40px;height:40px;border-radius:50%;border:2px solid var(--accent);
+            display:grid;place-items:center;margin:0 auto 6px;font-size:17px">${i}</div>
+          <div style="font-size:11.5px;font-weight:500">${t}</div>
+          <div class="sub" style="font-size:10.5px">${esc(d)}</div></div>`).join("")}</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="pad" style="border-bottom:1px solid var(--rule)">
+        <span class="cap">The contract</span>
+        <div class="src">SDC_VIEW · PAYLOAD_KEY · OPERATION_CODES · PAYLOAD_FIELD_LIST</div>
+      </div>
+      <div class="pad"><dl class="kv">
+        <dt>SDC view</dt><dd>${e.view&&e.view!==NO_VIEW?`<span class="mono">${esc(e.view)}</span>`
+          :`<span class="ns">Not applicable — marker</span>`}</dd>
+        <dt>Payload</dt><dd><span class="mono">${e.marker
+          ?"eventId, batchDt, onlineDt":"eventId, key, op, view"}</span></dd>
+        <dt>Operations</dt><dd>${e.ops?`<span class="mono">${esc(e.ops)}</span>`
+          :`<span class="ns">Not applicable</span>`}</dd>
+        <dt>Then do</dt><dd>${e.marker?"treat as a checkpoint; there is nothing to fetch."
+          :`use <span class="mono">key</span> to read the record from
+            <span class="mono">${esc(e.view)}</span> — never from the payload body.`}</dd>
+      </dl></div>
+      <div class="pad" style="border-top:1px solid var(--rule)">
+        <span class="cap">At a glance</span>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:8px">
+        ${[[num(c.msgs),"messages / month"],[String(act.length),"live subscriptions"],
+           [String(e.co.length),"events arrive with it"],[money(c.total),"attributed / month"]]
+          .map(([n,l])=>`<div style="border:1px solid var(--rule);border-radius:8px;padding:9px 11px">
+            <div class="mono" style="font-size:16px;font-weight:600">${n}</div>
+            <div class="sub" style="font-size:10.5px">${l}</div></div>`).join("")}</div>
+      </div>
+    </div>
+  </div>`;
+}
+function detTrg(e){
+  if(e.marker) return `<div class="panel pad"><h2>Nothing triggers this</h2>
+    <div class="sub" style="max-width:80ch;margin-top:5px">A marker is raised when the batch
+    window closes, not by a row changing. There is no trigger condition, no watched column and
+    nothing to couple to — which is also why its criticality is low and its cost is a rounding
+    error.</div></div>`;
+  const byT={}; e.trig.forEach(t=>(byT[t.table]=byT[t.table]||[]).push(t.col));
+  const cond=`Fires for ${e.ops&&e.ops.includes("Insert")?"INSERT or UPDATE":"UPDATE"} on `+
+    Object.keys(byT).join(", ")+` when `+
+    e.trig.map(t=>`AFTER.${t.col} <> BEFORE.${t.col}`).join(" OR ")+`.`;
+  return `
+  <div class="panel" style="margin-bottom:12px">
+    <div class="pad" style="border-bottom:1px solid var(--rule)">
+      <span class="cap">Trigger condition — verbatim</span>
+      <div class="src">META_EVENT_DEFINITION.TRIGGER_CONDITION</div>
+    </div>
+    <div class="pad"><pre style="white-space:pre-wrap">${esc(cond)}</pre></div>
+  </div>
+  <div class="grid2">
+    <div class="panel">
+      <div class="pad" style="border-bottom:1px solid var(--rule)">
+        <h2>Watched columns — ${e.trig.length}</h2>
+        <div class="sub">And how many other events watch each one. A column with a
+          number above 1 is a column you cannot change quietly.</div>
+        <div class="src">META_EVENT_FIELD where FIELD_CATEGORY = 'TRIGGER_DRIVING'</div>
+      </div>
+      <table><thead><tr><th style="width:150px">Table</th><th>Column</th>
+        <th style="width:86px">Also fires</th></tr></thead><tbody>
+        ${e.trig.map(t=>{const others=(COLIX[t.table+"."+t.col]||[]).filter(x=>x.id!==e.id);
+          return `<tr><td class="mono" style="font-size:11px${
+            TBL_DOM[t.table]!==e.domain?";color:var(--warn-ink)":""}">${t.table}${
+            TBL_DOM[t.table]!==e.domain?` <span class="sub">· ${TBL_DOM[t.table]}</span>`:""}</td>
+            <td class="mono" style="font-size:11.5px">${t.col}</td>
+            <td>${others.length?`<span class="chip warn">${others.length} more</span>`
+              :`<span class="sub" style="font-size:11px">this event only</span>`}</td></tr>`;}).join("")}
+      </tbody></table>
+    </div>
+    <div class="panel">
+      <div class="pad" style="border-bottom:1px solid var(--rule)">
+        <h2>Arrives together — ${e.co.length}</h2>
+        <div class="sub">These events share at least one watched column with this one, so a
+          single change raises all of them. <b>In no guaranteed order.</b></div>
+      </div>
+      <div style="max-height:400px;overflow:auto">${e.co.length?`<table><tbody>`+
+        e.co.map(x=>`<tr style="cursor:pointer" onclick="openEvent(${x.id})">
+          <td class="mono" style="font-size:11px;width:44px">${x.id}</td>
+          <td style="font-size:12px">${esc(x.name)}</td>
+          <td style="width:92px">${critChip(x)}</td></tr>`).join("")+`</tbody></table>`
+        :`<div class="pad sub">Nothing else watches these columns. This event arrives alone.</div>`}</div>
+    </div>
+  </div>`;
+}
+function detCrit(e){
+  const raw={reach:e.critRaw.reach+" live subscriptions", vol:num(e.vol)+" messages / month",
+    couple:e.critRaw.couple+" events share a column", surface:e.critRaw.surface+" watched columns",
+    risk:e.critRaw.risk?e.critRaw.risk+" contract fields unstated":"contract fully stated"};
+  const implies=e.band==="Critical"
+    ? "Changes to this event need a consumer-by-consumer impact review before release. Its read-back is a load-bearing dependency for more than one system."
+    : e.band==="High"
+    ? "Worth a named owner and a deprecation notice period. Several consumers would notice a change the week it shipped."
+    : e.band==="Moderate"
+    ? "Standard change control. One or two consumers, modest volume; a change here is recoverable."
+    : "Low blast radius. Safe to change with ordinary notice — but check the subscription list first, since low today is not low after someone subscribes.";
+  return `
+  <div class="grid2" style="margin-bottom:12px">
+    <div class="panel">
+      <div class="pad" style="border-bottom:1px solid var(--rule)">
+        <div class="row"><div><h2>Why this band</h2>
+          <div class="sub">Five inputs, weighted. The weights are on screen because a
+            criticality score whose arithmetic is hidden is just an opinion in a badge.</div>
+        </div><span style="margin-left:auto">${critChip(e)}</span></div>
+      </div>
+      <div class="pad">
+        ${CRIT_W.map(([k,l,w,d])=>`<div class="meter">
+          <span>${l} <span class="sub">· ${Math.round(w*100)}%</span></span>
+          <span class="tr"><span class="fl" style="width:${Math.round(Math.min(1,e.crit[k])*100)}%"></span></span>
+          <span class="mono" style="font-size:11px;text-align:right">${Math.round(Math.min(1,e.crit[k])*100)}</span>
+          </div><div class="sub" style="font-size:10.5px;margin:-2px 0 7px 0">${d} — ${raw[k]}</div>`).join("")}
+        <div class="note info" style="margin-top:6px">
+          <b>Score ${e.score} of 100 → ${e.band}.</b> Bands: 70+ Critical · 50+ High ·
+          30+ Moderate · below that Low.</div>
+      </div>
+    </div>
+    <div>
+      <div class="panel" style="margin-bottom:12px">
+        <div class="pad" style="border-bottom:1px solid var(--rule)"><h2>What it implies</h2></div>
+        <div class="pad" style="font-size:12.5px;line-height:1.65">${implies}</div>
+      </div>
+      <div class="note warn">
+        <b>This number is ours, not SEI's.</b> The specification says nothing about
+        criticality. This band is computed from things CP360 can observe — live
+        subscriptions, measured volume, column coupling, and whatever the contract
+        leaves unstated. Change the weights and the band changes; that is the point of
+        showing them. Do not quote it back to SEI as though it came from them.
+      </div>
+    </div>
+  </div>`;
+}
+function detSub(e,c,subs,act){
+  return `
+  <div class="grid2" style="margin-bottom:12px">
+    <div class="panel">
+      <div class="pad" style="border-bottom:1px solid var(--rule)">
+        <h2>Subscriptions on this event — ${subs.length}</h2>
+        <div class="sub">${act.length} live${subs.length-act.length?`, ${subs.length-act.length}
+          requested or retired`:""}. Each live one is a consumer that must be idempotent and
+          must not assume ordering.</div>
+        <div class="src">CTL_EVENT_SUBSCRIPTION</div>
+      </div>
+      ${subs.length?`<table><thead><tr><th style="width:134px">Consumer</th><th>System</th>
+        <th style="width:78px">Delivery</th><th style="width:112px">Filter</th>
+        <th style="width:82px">Status</th></tr></thead><tbody>`+
+        subs.map(s=>`<tr><td class="mono" style="font-size:11px">${s.consumer}</td>
+          <td style="font-size:12px">${esc(s.cname)}</td>
+          <td class="mono" style="font-size:10.5px">${s.mode}</td>
+          <td class="mono" style="font-size:10.5px">${esc(s.filter)}</td>
+          <td><span class="chip ${s.status==="ACTIVE"?"ok":s.status==="REQUESTED"?"n":"warn"}"
+            >${s.status}</span></td></tr>`).join("")+`</tbody></table>`
+        :`<div class="pad"><div class="note warn"><b>Nobody subscribes to this event.</b>
+           It is produced, retained and billed anyway — ${money(c.total)} a month. Either a
+           consumer is missing or the event is.</div></div>`}
+    </div>
+    <div>
+      <div class="panel" style="margin-bottom:12px">
+        <div class="pad" style="border-bottom:1px solid var(--rule)">
+          <h2>If this event changed</h2>
+          <div class="sub">Who you would have to tell, and in what order.</div>
+        </div>
+        <div class="pad">${act.length?`<ol class="rule-list" style="padding-left:20px;margin:0">
+          ${act.map(s=>`<li><span class="mono">${s.consumer}</span> — ${esc(s.cname)},
+            ${s.mode} delivery, subscribed since ${s.since}</li>`).join("")}</ol>`
+          :`<div class="sub" style="font-size:12px">No one. That is not the same as safe —
+            check whether a consumer should exist.</div>`}</div>
+      </div>
+      <div class="note info">
+        <b>The filter is what decides the bill.</b> A subscription set to
+        <span class="mono">all operations</span> pays for every insert and update; one
+        narrowed to <span class="mono">op = U only</span> pays for a fraction. This is the
+        cheapest change available on the Cost tab, and nobody has to touch the contract.
+      </div>
+    </div>
+  </div>`;
+}
+function detCost(e,c){
+  const all=EVENTS.map(x=>costOf(x).total).sort((a,b)=>b-a);
+  const rank=all.indexOf(c.total)+1;
+  const parts=[["SDC read-back",c.read],["Publish",c.pub],["Egress",c.egress],
+    ["Retention",c.retain],["Connection fee share",c.alloc]].sort((a,b)=>b[1]-a[1]);
+  const pmax=Math.max(parts[0][1],0.0001);
+  return `
+  <div class="grid2" style="margin-bottom:12px">
+    <div class="panel">
+      <div class="pad" style="border-bottom:1px solid var(--rule)">
+        <h2>What this event costs the estate</h2>
+        <div class="sub">Every consumer's read-back plus a share of their connection fees.
+          Rank ${rank} of ${EVENTS.length}. This is the <b>estate</b> figure — what it would
+          add to <b>your own</b> basket is ${money(mine(e).total)} a month, on the
+          Subscriptions &amp; cost tab.</div>
+      </div>
+      <div class="pad">
+        ${parts.map(([l,v])=>`<div class="rank" style="margin-bottom:9px">
+          <div><div style="font-size:12px;margin-bottom:4px">${l}</div>
+          <div class="tr"><span class="fl" style="width:${Math.round(v/pmax*100)}%"></span></div></div>
+          <div class="mono" style="font-size:12px;text-align:right">${money(v)}</div></div>`).join("")}
+        <div style="border-top:1px solid var(--rule);margin-top:10px;padding-top:10px"
+          class="row"><b style="font-size:12.5px">Attributed per month</b>
+          <span class="mono" style="margin-left:auto;font-size:15px;font-weight:600">${money(c.total)}</span></div>
+        <div class="row"><span class="sub" style="font-size:11.5px">Twelve months, flat</span>
+          <span class="mono sub" style="margin-left:auto;font-size:12px">${money(c.total*12)}</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="panel" style="margin-bottom:12px">
+        <div class="pad" style="border-bottom:1px solid var(--rule)"><h2>How it is worked out</h2></div>
+        <div class="pad"><dl class="kv">
+          <dt>Messages</dt><dd><span class="mono">${num(e.vol)}</span> in the reference month
+            × <span class="mono">${RATES.factor}</span> = <span class="mono">${num(c.msgs)}</span></dd>
+          <dt>Read-backs</dt><dd><span class="mono">${num(c.msgs)}</span> ×
+            <span class="mono">${c.subs}</span> live subscription${c.subs===1?"":"s"} =
+            <span class="mono">${num(c.reads)}</span></dd>
+          <dt>Payload</dt><dd><span class="mono">${RATES.bytes} B</span> ×
+            <span class="mono">${num(c.msgs)}</span> =
+            <span class="mono">${(c.msgs*RATES.bytes/1e9).toFixed(3)} GB</span></dd>
+          <dt>Connection fee</dt><dd>${c.subs?`each consumer's ${money(RATES.subFee)} monthly
+            connection fee, split across the events that consumer covers`
+            :"none — no live subscription"}</dd>
+        </dl></div>
+      </div>
+      <div class="note warn">
+        <b>The read-back, not the message, is the cost.</b> ${c.subs>1
+          ? `This event is published once and read ${c.subs} times, because every consumer
+             must fetch the record rather than trust the payload. Cost here scales with
+             consumers, not with the contract.`
+          : `Add one more consumer and the read-back doubles. That, not the message itself,
+             is what a new subscription buys.`}
+      </div>
+    </div>
+  </div>`;
+}
+
 /* ===================== render ===================== */
 function render(){
   $("lede").textContent = aud==="biz"
@@ -873,6 +1697,8 @@ function render(){
   if(tab==="swm")renderLanes();
   if(tab==="lnk")renderSankey();
   if(tab==="dep")renderDep();
+  if(tab==="sub")renderSub();
+  if(det)renderDet();
 }
 setAud("biz");
 </script>
