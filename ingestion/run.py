@@ -35,6 +35,7 @@ STEPS = [
     "legacy_lineage",    # legacy DWH end-to-end lineage (SRC->STG1->STG2->DWH) + proof
     "legacy_dictionary", # legacy business definitions (AddVantage/CRD/STAR) keyed by field code
     "legacy_source_file",# CP_SOURCE_FILE: the business name of each AddVantage EOD feed
+    "event360",          # Event 360: the SEI event specification workbook
     "search_index",      # MUST be last - indexes everything for full-text search
 ]
 
@@ -188,6 +189,12 @@ def _run_step(step, conn, loader, resolver) -> None:
         from .legacy_lineage_conn import LegacyLineageConnector
         c = LegacyLineageConnector.from_env()
         c.load(loader, c.parse())
+        return
+    if step == "event360":
+        from .event360_conn import Event360Connector
+        c = Event360Connector.from_env()
+        n = c.load(loader, c.parse())
+        log.info("event360: merged %s rows", n)
         return
     if step == "legacy_source_file":
         from .legacy_source_file_conn import LegacySourceFileConnector
