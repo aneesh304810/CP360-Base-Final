@@ -1,0 +1,880 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Event 360 — landing &amp; graphic views</title>
+<style>
+  :root{
+    --ink:#233240; --sub:#7b8894; --rule:#c9d4dc; --page:#f4f7f9; --panel:#fff;
+    --link:#31bced; --accent:#0f4775; --ok:#159943; --warn:#e67e22;
+    --warn-ink:#a8560f; --danger:#c1113a; --tint:#eef3f8; --row:#f4f7f9;
+    --mono:"Roboto Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    /* sequential ramp — one hue, light→dark. Magnitude only. */
+    --s1:#e4edf5; --s2:#c3d8e9; --s3:#9dbdd8; --s4:#3a6f9e; --s5:#0f4775;
+    /* categorical — event type. Three slots, validated all-pairs (CVD ΔE 9.2,
+       normal-vision 24.0). Never cycled, never reused for anything else. */
+    --t-biz:#2a78d6; --t-tech:#eb6834; --t-mark:#1baf7a;
+    --rail:#10193b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);
+       font:14px/1.5 ui-sans-serif,system-ui,"Segoe UI",sans-serif}
+  .app{display:flex;min-height:100vh}
+
+  /* ------------------------------------------------------- left rail --- */
+  .rail{width:216px;flex:none;background:var(--rail);color:#fff;padding:16px 0 40px}
+  .rail .brand{padding:0 16px 14px;font-size:15px;font-weight:600;letter-spacing:.3px}
+  .rail .grp{padding:14px 16px 5px;font-size:9.5px;font-weight:700;letter-spacing:.6px;
+       text-transform:uppercase;color:#7d8bb5}
+  .rail a{display:flex;gap:10px;align-items:center;padding:7px 16px;font-size:12.5px;
+       color:#c8d2ea;text-decoration:none;cursor:pointer;border-left:3px solid transparent}
+  .rail a:hover{background:#1a2450;color:#fff}
+  .rail a.on{background:#1d2a5e;color:#fff;border-left-color:var(--link);font-weight:600}
+  .rail a .ic{width:16px;text-align:center;opacity:.9}
+  .rail .sub-item{padding-left:45px;font-size:12px;color:#9fb0d6}
+  .rail .sub-item.on{color:#fff;background:#243268;border-left-color:var(--link)}
+  .rail .tag{margin-left:auto;font-size:8.5px;font-weight:700;letter-spacing:.4px;
+       background:#2b3a72;color:#9fb0d6;border-radius:3px;padding:1px 5px}
+
+  /* ----------------------------------------------------------- main ---- */
+  .main{flex:1;min-width:0;padding:20px 26px 70px;max-width:1500px}
+  h1{font-size:19px;font-weight:500;margin:0}
+  h2{font-size:15px;font-weight:500;margin:0 0 3px}
+  h3{font-size:12.5px;font-weight:600;margin:0}
+  .sub{font-size:12.5px;color:var(--sub)}
+  .mono{font-family:var(--mono)}
+  .panel{background:var(--panel);border:1px solid var(--rule);border-radius:10px}
+  .pad{padding:14px 16px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .cap{font-size:9.5px;font-weight:700;letter-spacing:.5px;
+       text-transform:uppercase;color:var(--sub)}
+  .src{font-family:var(--mono);font-size:9.5px;color:var(--sub);margin-top:3px;line-height:1.45}
+  button,.btn{font:inherit;font-size:11.5px;font-weight:600;padding:6px 13px;
+       border:1px solid var(--rule);background:#fff;color:var(--ink);
+       border-radius:4px;cursor:pointer}
+  button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+  .seg button{border-radius:0;border-left-width:0}
+  .seg button:first-child{border-radius:4px 0 0 4px;border-left-width:1px}
+  .seg button:last-child{border-radius:0 4px 4px 0}
+  .chip{font-size:10.5px;font-weight:700;border-radius:999px;padding:3px 10px}
+  .chip.ok{background:#e7f6ec;color:var(--ok)}
+  .chip.warn{background:#fdf6ec;color:var(--warn-ink)}
+  .chip.n{background:#eef3f8;color:var(--accent)}
+  table{border-collapse:separate;border-spacing:0;width:100%}
+  th,td{text-align:left;padding:7px 11px;border-bottom:1px solid #edf1f4}
+  thead th{font-size:9.5px;font-weight:700;letter-spacing:.4px;
+       text-transform:uppercase;color:var(--sub);border-bottom:1px solid var(--rule)}
+  .hide{display:none}
+  .grid2{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:12px}
+  .grid5{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+  .note{border-radius:9px;padding:11px 14px;font-size:12px;line-height:1.55}
+  .note.warn{background:#fdf6ec;border:1px solid #f2d9b4}
+  .note.info{background:#eef3f8;border:1px solid #cfe0ee}
+  .banner{background:var(--rail);color:#fff;border-radius:10px;padding:13px 16px;
+       font-size:12.5px;line-height:1.6}
+  .banner b{font-weight:600} .banner .mono{color:#a9c6e8}
+  .ns{font-style:italic;color:var(--sub)}
+
+  /* legend — identity is never colour alone; every swatch carries its label */
+  .legend{display:flex;gap:14px;align-items:center;font-size:11px;color:var(--sub)}
+  .legend i{display:inline-block;width:11px;height:11px;border-radius:2.5px;
+       margin-right:5px;vertical-align:-1px}
+
+  /* stat tile — a headline number is not a chart */
+  .tile{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:13px 15px}
+  .tile .n{font-size:25px;font-weight:600;line-height:1.1;font-family:var(--mono)}
+  .tile .l{font-size:11.5px;color:var(--sub);margin-top:3px}
+  .tile .d{font-size:10.5px;color:var(--sub);margin-top:5px}
+
+  /* stacked bar — 2px surface gap between segments, thin marks */
+  .sbar{display:flex;height:22px;border-radius:4px;overflow:hidden;background:#edf1f4}
+  .sbar span{display:block;position:relative;font-size:10px;font-weight:700;color:#fff;
+       line-height:22px;text-align:center;box-shadow:2px 0 0 0 var(--panel)}
+  .sbar span:last-child{box-shadow:none}
+  .grow{display:grid;grid-template-columns:150px minmax(0,1fr) 54px;gap:11px;
+       align-items:center;padding:6px 0;cursor:pointer}
+  .grow:hover{background:var(--row)}
+  .grow .gname{font-size:12.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;
+       white-space:nowrap}
+  .grow .gn{font-family:var(--mono);font-size:12px;text-align:right}
+  .grow.on{background:var(--tint)}
+
+  /* swimlane */
+  .lane{display:grid;grid-template-columns:132px repeat(4,minmax(0,1fr));
+       border-top:1px solid var(--rule)}
+  .lane:last-child{border-bottom:1px solid var(--rule)}
+  .lane .lh{padding:12px;border-right:1px solid var(--rule);background:var(--row)}
+  .lane .cellw{position:relative;padding:12px 22px 12px 12px;min-width:0}
+  .lane .cellw+.cellw{border-left:1px dashed #dfe6ec}
+  .lane .cellw::after{content:"";position:absolute;right:6px;top:50%;
+       margin-top:-5px;border-left:7px solid var(--rule);
+       border-top:5px solid transparent;border-bottom:5px solid transparent}
+  .lane .cellw:last-child::after{display:none}
+  .stagehdr{display:grid;grid-template-columns:132px repeat(4,minmax(0,1fr))}
+  .stagehdr div{padding:9px 12px}
+  .evdot{display:inline-block;width:9px;height:9px;border-radius:50%;
+       margin:2px 3px 2px 0;box-shadow:0 0 0 2px var(--panel)}
+  .tchip{font-family:var(--mono);font-size:10.5px;background:var(--tint);
+       color:var(--accent);border-radius:3px;padding:2px 6px;display:inline-block;margin:2px 3px 0 0}
+
+  /* heatmap */
+  .hm td.c{text-align:center;padding:0;cursor:pointer}
+  .hm td.c span{display:block;padding:9px 0;font-family:var(--mono);font-size:11.5px}
+  .hm tbody tr:hover{background:#f7fafc}
+  .hm th.rh{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:none;
+       letter-spacing:0;color:var(--ink);white-space:nowrap}
+
+  /* tooltip */
+  #tt{position:fixed;pointer-events:none;background:#10193b;color:#fff;font-size:11.5px;
+       line-height:1.5;padding:7px 10px;border-radius:6px;max-width:300px;z-index:50;
+       box-shadow:0 4px 14px rgba(16,25,59,.28);display:none}
+  #tt b{font-weight:600} #tt .m{font-family:var(--mono);color:#a9c6e8}
+  svg text{font-family:ui-sans-serif,system-ui,"Segoe UI",sans-serif}
+</style>
+</head>
+<body data-palette="#2a78d6,#eb6834,#1baf7a">
+<div class="app">
+
+  <!-- ===================== left rail ===================== -->
+  <nav class="rail">
+    <div class="brand">CP360 Data Catalog</div>
+    <div class="grp">Discover</div>
+    <a><span class="ic">⌂</span>Home</a>
+    <a><span class="ic">▤</span>Global Search</a>
+    <div class="grp">Design</div>
+    <a><span class="ic">◈</span>System Design</a>
+    <a><span class="ic">◉</span>Environment 360</a>
+    <div class="grp">Data</div>
+    <a><span class="ic">↦</span>Lineage 360</a>
+    <a><span class="ic">◆</span>Datapoint 360</a>
+    <a><span class="ic">⇄</span>Interface 360</a>
+    <a><span class="ic">⌘</span>API 360</a>
+    <a><span class="ic">≡</span>Recon 360</a>
+    <a><span class="ic">△</span>Variance 360</a>
+    <a class="on" id="railEvt"><span class="ic">◐</span>Event 360<span class="tag">NEW</span></a>
+    <a class="sub-item on" id="rail-est" onclick="setTab('est')">Estate</a>
+    <a class="sub-item" id="rail-swm" onclick="setTab('swm')">Swimlanes</a>
+    <a class="sub-item" id="rail-lnk" onclick="setTab('lnk')">Link view</a>
+    <a class="sub-item" id="rail-dep" onclick="setTab('dep')">Interdependence</a>
+    <a class="sub-item" title="the first mockup — catalogue, trigger explorer, contract">Catalog &amp; Contract</a>
+  </nav>
+
+  <!-- ===================== main ===================== -->
+  <main class="main">
+
+    <div class="row" style="margin-bottom:6px">
+      <h1>Event 360</h1>
+      <span class="sub">SEI event contract — 105 events, 575 fields, 167 trigger rows over 107 columns</span>
+      <span class="seg row" style="gap:0;margin-left:auto">
+        <button id="vBiz" aria-pressed="true" onclick="setAud('biz')">Business view</button>
+        <button id="vTech" aria-pressed="false" onclick="setAud('tech')">Technical view</button>
+      </span>
+    </div>
+    <p class="sub" style="margin:0 0 14px;max-width:86ch" id="lede"></p>
+
+    <div class="banner" style="margin-bottom:16px">
+      <b>What is real here.</b> The totals, the type and domain splits, the six-field
+      envelope and the 167 trigger-driving rows across 12 tables are the contract's own —
+      every headline number on this page is the number the workbook asserts. The
+      <b>individual table→event edges are illustrative</b> until the workbook is loaded:
+      they come from <span class="mono">META_EVENT_FIELD.SOURCE_TABLE / SOURCE_COLUMN</span>
+      on the <span class="mono">TRIGGER_DRIVING</span> rows, which is exactly what every
+      view below is drawn from. Nothing here needs a new table — this is a read of what
+      <span class="mono">51_event360.sql</span> already stores.
+    </div>
+
+    <div class="row" style="margin-bottom:16px">
+      <span class="seg row" style="gap:0">
+        <button id="nEst" aria-pressed="true" onclick="setTab('est')">Estate</button>
+        <button id="nSwm" aria-pressed="false" onclick="setTab('swm')">Swimlanes</button>
+        <button id="nLnk" aria-pressed="false" onclick="setTab('lnk')">Link view</button>
+        <button id="nDep" aria-pressed="false" onclick="setTab('dep')">Interdependence</button>
+      </span>
+      <span class="legend" style="margin-left:auto">
+        event type
+        <span><i style="background:var(--t-biz)"></i>Business</span>
+        <span><i style="background:var(--t-tech)"></i>Technical</span>
+        <span><i style="background:var(--t-mark)"></i>Marker</span>
+      </span>
+    </div>
+
+    <!-- ===================== ESTATE ===================== -->
+    <section id="tab-est">
+      <div class="grid5" style="margin-bottom:14px" id="tiles"></div>
+
+      <div class="panel" style="margin-bottom:12px">
+        <div class="pad row" style="border-bottom:1px solid var(--rule)">
+          <div>
+            <h2>The whole estate, grouped</h2>
+            <div class="sub" id="grpLede"></div>
+          </div>
+          <span class="row" style="margin-left:auto;gap:6px">
+            <span class="cap">Group by</span>
+            <span class="seg row" style="gap:0" id="grpBy"></span>
+          </span>
+        </div>
+        <div class="pad">
+          <div class="row" style="margin-bottom:8px">
+            <span class="cap" id="grpCount"></span>
+            <span class="legend" style="margin-left:auto">
+              <span><i style="background:var(--t-biz)"></i>Business</span>
+              <span><i style="background:var(--t-tech)"></i>Technical</span>
+              <span><i style="background:var(--t-mark)"></i>Marker</span>
+              <span style="margin-left:6px">bar length = events in the group</span>
+            </span>
+          </div>
+          <div id="groups"></div>
+          <div class="src" id="grpSrc" style="margin-top:10px"></div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="panel">
+          <div class="pad row" style="border-bottom:1px solid var(--rule)">
+            <div><h2 id="selTitle">Pick a group</h2>
+              <div class="sub" id="selSub">Click any bar above to list its events here.</div></div>
+            <span style="margin-left:auto" id="selChips" class="row"></span>
+          </div>
+          <div style="max-height:430px;overflow:auto"><table id="selTbl"></table></div>
+        </div>
+        <div>
+          <div class="panel" style="margin-bottom:12px">
+            <div class="pad" style="border-bottom:1px solid var(--rule)">
+              <h2>Business vs Technical — what the split means</h2>
+            </div>
+            <div class="pad" id="typeExplain"></div>
+          </div>
+          <div class="note info">
+            <b>Markers are the one overlap.</b> Type <span class="mono">Marker</span> (12)
+            and domain <span class="mono">MARKER</span> (12) are the same twelve events,
+            which is why the two groupings both close on 105 without double counting.
+            The other 93 split across four domains and two types.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== SWIMLANES ===================== -->
+    <section id="tab-swm" class="hide">
+      <div class="panel pad" style="margin-bottom:12px">
+        <div class="row">
+          <div>
+            <h2>One lane per <span id="laneBy">domain</span>, four stages, left to right</h2>
+            <div class="sub" style="max-width:92ch">Every event has the same life: a source
+              record changes, the trigger decides whether that change matters, an event is
+              published, and the consumer goes back for the record. The lane shows the real
+              objects at each stage — not a generic diagram.</div>
+          </div>
+          <span class="row" style="margin-left:auto;gap:6px">
+            <span class="cap">Lanes</span>
+            <span class="seg row" style="gap:0">
+              <button id="lnDom" aria-pressed="true" onclick="setLane('dom')">By domain</button>
+              <button id="lnTbl" aria-pressed="false" onclick="setLane('tbl')">By source table</button>
+            </span>
+          </span>
+        </div>
+      </div>
+      <div class="panel" style="overflow:hidden">
+        <div class="stagehdr" style="border-bottom:1px solid var(--rule);background:var(--row)">
+          <div class="cap">Lane</div>
+          <div class="cap">1 · Source record changes</div>
+          <div class="cap">2 · Trigger evaluates</div>
+          <div class="cap">3 · Event is published</div>
+          <div class="cap">4 · Consumer re-reads</div>
+        </div>
+        <div id="lanes"></div>
+      </div>
+      <div class="src" style="margin-top:10px">stage 1 META_EVENT_FIELD.SOURCE_TABLE · stage 2
+        META_EVENT_DEFINITION.TRIGGER_CONDITION + TRIGGER_COLUMN_COUNT · stage 3
+        EVENT_ID / EVENT_TYPE / PAYLOAD_FIELD_LIST · stage 4 SDC_VIEW + PAYLOAD_KEY</div>
+      <div class="note warn" style="margin-top:12px">
+        <b>Stage 4 is the one people skip.</b> The payload is a notification, not the record.
+        A lane whose stage 4 is empty is a lane where consumers have nowhere to go back to —
+        which is why the marker lane is drawn as ending, not as continuing.
+      </div>
+    </section>
+
+    <!-- ===================== LINK VIEW ===================== -->
+    <section id="tab-lnk" class="hide">
+      <div class="panel pad" style="margin-bottom:12px">
+        <div class="row">
+          <div>
+            <h2>Source table → event group → SDC view</h2>
+            <div class="sub" style="max-width:92ch">Ribbon width is the number of events on
+              that path. Click a node to keep only the paths through it; click it again to
+              clear. Each node carries its own Business / Technical split as a bar, so type
+              never depends on the ribbon colour.</div>
+          </div>
+          <span class="row" style="margin-left:auto;gap:6px">
+            <button id="lnkTblBtn" aria-pressed="false" onclick="toggleLinkTable()">Table view</button>
+            <button onclick="clearPick()">Clear selection</button>
+          </span>
+        </div>
+      </div>
+      <div class="panel" style="padding:8px 4px">
+        <div id="sankeyWrap" style="overflow-x:auto"><svg id="sankey" width="1180" height="660"
+          role="img" aria-label="Flow from source tables through event groups to SDC views"></svg></div>
+      </div>
+      <div class="panel hide" id="lnkTable" style="margin-top:12px">
+        <div class="pad" style="border-bottom:1px solid var(--rule)">
+          <span class="cap">Same data as a table — every path, with its event count</span>
+          <div class="src">the accessible equivalent of the diagram above; it is not a fallback, it is the same query</div>
+        </div>
+        <div style="max-height:420px;overflow:auto"><table id="lnkTblBody"></table></div>
+      </div>
+      <div class="src" style="margin-top:10px">left META_EVENT_FIELD.SOURCE_TABLE (TRIGGER_DRIVING rows) ·
+        middle META_EVENT_DEFINITION.DOMAIN × EVENT_TYPE · right META_EVENT_DEFINITION.SDC_VIEW</div>
+    </section>
+
+    <!-- ===================== INTERDEPENDENCE ===================== -->
+    <section id="tab-dep" class="hide">
+      <div class="panel pad" style="margin-bottom:12px">
+        <h2>If this column changes, what fires?</h2>
+        <div class="sub" style="max-width:96ch">Two events are coupled when they watch the
+          same source column — change it once and both arrive, in no guaranteed order. That
+          coupling is invisible in the catalogue and it is the thing that breaks consumers,
+          so it gets its own screen.</div>
+      </div>
+
+      <div class="grid2" style="margin-bottom:12px">
+        <div class="panel">
+          <div class="pad" style="border-bottom:1px solid var(--rule)">
+            <div class="row"><h2>Blast radius</h2>
+              <select id="blastTbl" onchange="pickTable()" style="margin-left:auto;font:inherit;
+                font-size:11.5px;padding:5px 8px;border:1px solid var(--rule);border-radius:4px"></select></div>
+            <div class="sub">Columns of the chosen table, widest blast radius first.</div>
+            <div class="src">COUNT(DISTINCT event_id) GROUP BY source_table, source_column</div>
+          </div>
+          <div style="max-height:400px;overflow:auto"><table id="blast"></table></div>
+        </div>
+        <div class="panel">
+          <div class="pad" style="border-bottom:1px solid var(--rule)">
+            <h2 id="coTitle">Arrives together</h2>
+            <div class="sub" id="coSub">Pick a column on the left to see every event that fires with it.</div>
+          </div>
+          <div style="max-height:400px;overflow:auto" id="coList"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="pad" style="border-bottom:1px solid var(--rule)">
+          <div class="row"><div>
+            <h2>Where the domains reach across</h2>
+            <div class="sub">Events of one domain watching another domain's tables. The
+              off-diagonal cells are the coupling — a table nobody expected to be watched.
+              The <span class="mono">MARKER</span> row is empty on purpose: a marker watches
+              no row, so nothing can couple to it.</div>
+          </div>
+          <span class="legend" style="margin-left:auto">events
+            <span><i style="background:var(--s1);border:1px solid var(--rule)"></i>1</span>
+            <span><i style="background:var(--s2)"></i>4</span>
+            <span><i style="background:var(--s3)"></i>8</span>
+            <span><i style="background:var(--s4)"></i>14</span>
+            <span><i style="background:var(--s5)"></i>20+</span>
+          </span></div>
+        </div>
+        <div class="pad" style="overflow-x:auto"><table class="hm" id="hm"></table></div>
+        <div class="pad" style="padding-top:0"><div class="note warn">
+          <b>Numbers are printed in every cell.</b> The shade is a second reading of the same
+          value, never the only one — a reader who cannot separate the steps still has the count.
+        </div></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+<div id="tt"></div>
+<script>
+/* ===================== data =======================================
+   Totals, splits and the 167 trigger-driving rows are the contract's. The
+   assignment of columns to individual events is the illustrative part —
+   in the loaded system it comes straight from META_EVENT_FIELD.       */
+const TYPES   = {Business:42, Technical:51, Marker:12};
+const DOMAINS = {ACCOUNT:48, TRANSACTION:20, ASSETS:17, MARKER:12, CLIENT:8};
+const SPLIT   = {ACCOUNT:[22,26], TRANSACTION:[9,11], ASSETS:[7,10], CLIENT:[4,4]};
+const IDS = [...Array(98).keys()].map(i=>i+1).concat([102,103,104,105,106,107,108]);
+const TCOL = {Business:"var(--t-biz)", Technical:"var(--t-tech)", Marker:"var(--t-mark)"};
+
+/* 12 tables · 167 TRIGGER_DRIVING field rows over 107 distinct columns.
+   rows > columns is the whole point: a column watched by more than one event
+   is a column whose change raises more than one event. That is what the
+   Interdependence tab is about, and it disappears if you model one row per
+   column. Each entry: table, owning domain, events from that domain, the
+   neighbouring domain that also watches it, how many of its events, rows,
+   distinct columns.                                                        */
+const TABLES = [
+ ["ACCOUNT","ACCOUNT",21,"CLIENT",3,34,["ACCOUNT_STATUS","ACCOUNT_TYPE","SUB_TYPE",
+   "OPEN_DT","CLOSE_DT","CLOSE_RSN","BASE_CCY","DOMICILE_CD","TAX_STATUS","REG_TYPE",
+   "MODEL_CD","STRATEGY_CD","RESTRICTION_CD","DISCRETION_FLG","MGMT_FEE_CD",
+   "BILLING_CYCLE","DORMANT_FLG","RISK_RATING","KYC_STATUS","ADVISOR_ID"]],
+ ["ACCOUNT_OWNER","ACCOUNT",11,"CLIENT",2,19,["OWNER_ID","OWNER_TYPE","OWNER_ROLE",
+   "OWNERSHIP_PCT","PRIMARY_FLG","START_DT","END_DT","RELATIONSHIP_CD","AUTH_LEVEL",
+   "SIGNATORY_FLG","TAX_RESIDENCY_CD","CONSENT_STATUS"]],
+ ["TRANSACTION","TRANSACTION",20,"ASSETS",2,22,["TRAN_STATUS","TRAN_TYPE","TRAN_SUB_TYPE",
+   "TRADE_DT","SETTLE_DT","CANCEL_FLG","REVERSAL_FLG","CORRECTION_FLG","TRAN_AMOUNT",
+   "TRAN_CCY","SETTLE_AMOUNT","QUANTITY","PRICE","COUNTERPARTY_ID"]],
+ ["POSITION","ASSETS",8,"TRANSACTION",2,17,["POSITION_QTY","SETTLED_QTY","MARKET_VALUE",
+   "COST_BASIS","UNREALISED_PL","PRICE","PRICE_DT","ACCRUED_INCOME","ASSET_CLASS",
+   "POSITION_STATUS","PLEDGE_FLG"]],
+ ["INSTRUMENT","ASSETS",7,"TRANSACTION",2,15,["CUSIP","SEDOL","ISIN","TICKER",
+   "INSTRUMENT_NAME","INSTRUMENT_TYPE","ASSET_CLASS","MATURITY_DT","RATING_CD","ACTIVE_FLG"]],
+ ["CLIENT","CLIENT",8,"ACCOUNT",2,12,["CLIENT_STATUS","CLIENT_TYPE","LEGAL_NAME",
+   "DOMICILE_CD","KYC_STATUS","AML_STATUS","RISK_RATING","SEGMENT_CD"]],
+ ["ACCOUNT_TAG","ACCOUNT",6,"ASSETS",1,11,["TAG_CD","TAG_VALUE","TAG_CATEGORY",
+   "EFFECTIVE_DT","EXPIRY_DT","PRIORITY","ACTIVE_FLG"]],
+ ["FEE_SCHEDULE","ACCOUNT",5,"TRANSACTION",1,9,["SCHEDULE_CD","FEE_TYPE","FEE_RATE",
+   "BILLING_FREQ","EFFECTIVE_DT","WAIVER_FLG"]],
+ ["ACCOUNT_RESTRICTION","ACCOUNT",4,"ASSETS",2,8,["RESTRICTION_CD","RESTRICTION_TYPE",
+   "START_DT","END_DT","ACTIVE_FLG"]],
+ ["TAX_LOT","ASSETS",4,"TRANSACTION",1,7,["LOT_ID","OPEN_QTY","REMAIN_QTY","COST_BASIS",
+   "WASH_SALE_FLG"]],
+ ["DSR_TAG","ACCOUNT",4,"ASSETS",1,7,["DSR_CD","DSR_VALUE","DSR_TYPE","EFFECTIVE_DT",
+   "ACTIVE_FLG"]],
+ ["ACCOUNT_ISA_DETAIL","ACCOUNT",3,null,0,6,["ISA_TYPE","SUBSCRIPTION_YR",
+   "SUBSCRIBED_AMT","STATUS_CD"]]
+];
+const VIEWS = {
+ ACCOUNT:["ACCOUNT_BASIC_VIEW","ACCOUNT_DETAIL_VIEW","ACCOUNT_OWNER_VIEW"],
+ TRANSACTION:["TRANSACTION_BASIC_VIEW","TRANSACTION_SETTLE_VIEW"],
+ ASSETS:["POSITION_BASIC_VIEW","INSTRUMENT_BASIC_VIEW"],
+ CLIENT:["CLIENT_BASIC_VIEW"], MARKER:[]};
+const NO_TBL  = "— none · marker";
+const NO_VIEW = "— none · marker";
+const VERBS = ["Open","Close","Status change","Restriction added","Restriction removed",
+ "Tag added","Tag removed","Owner change","Address change","Fee change","Rebalance",
+ "Settlement","Cancellation","Correction","Reversal","Accrual","Maturity","Split"];
+const NAMES = {1:"Account Open Event",
+ 68:"INSTRUMENT IDENTTIFIERS Changes (LIKE CUSIP,SEDOL, ISIN, ETC..)", 92:"New Position"};
+
+function buildEvents(){
+  const out=[], order=[];
+  for(const [d,[b,t]] of Object.entries(SPLIT)){
+    for(let i=0;i<b;i++) order.push(["Business",d]);
+    for(let i=0;i<t;i++) order.push(["Technical",d]);
+  }
+  for(let i=0;i<12;i++) order.push(["Marker","MARKER"]);
+  for(let i=order.length-1;i>0;i--){const j=(i*7919+13)%(i+1);[order[i],order[j]]=[order[j],order[i]];}
+  IDS.forEach((id,k)=>{
+    const [type,domain]=order[k], marker=type==="Marker";
+    out.push({id, section:`4.${k+1}`, type, domain, marker, trig:[],
+      name: NAMES[id] || (marker? `${domain} batch marker ${out.filter(e=>e.marker).length+1}`
+            : `${domain[0]+domain.slice(1).toLowerCase()} — ${VERBS[k%VERBS.length]}`),
+      ops: marker? null : (k%4===0? "Insert (I), Update (U)" : "Update (U)"),
+      payloadN: marker? 3 : 4, view:null, primary:NO_TBL});
+  });
+  // SDC view — cycled per domain, in event order
+  const seen={};
+  out.forEach(e=>{ if(e.marker){e.view=NO_VIEW;return;}
+    const vs=VIEWS[e.domain]; seen[e.domain]=(seen[e.domain]||0);
+    e.view=vs[seen[e.domain]++ % vs.length]; });
+  // trigger rows. Each table deals exactly its stated row count across exactly
+  // its stated events, drawing from a distinct-column pool smaller than that
+  // row count — so the popular columns end up watched by several events.
+  const off={}, xoff={};
+  const take=(dom,n,o)=>{const pool=out.filter(e=>e.domain===dom && !e.marker);
+    const start=o[dom]||0, got=[];
+    for(let i=0;i<n;i++) got.push(pool[(start+i)%pool.length]);
+    o[dom]=(start+n)%pool.length; return got;};
+  TABLES.forEach(([tbl,dom,nOwn,xdom,nX,rows,cols])=>{
+    const picked=take(dom,nOwn,off).concat(xdom?take(xdom,nX,xoff):[]);
+    const D=cols.length, E=picked.length;
+    for(let i=0;i<rows;i++){
+      const e=picked[i%E];
+      // first pass covers every column once; the rest skew towards the head of
+      // the list, which is where the columns people actually watch live
+      let c = i<D ? i : Math.floor(D*Math.pow((i*0.6180339887)%1,2));
+      let guard=0;
+      while(e.trig.some(t=>t.table===tbl && t.col===cols[c]) && guard++<D) c=(c+1)%D;
+      e.trig.push({table:tbl, col:cols[c]});
+    }
+  });
+  // primary table = the one contributing the most watched columns
+  out.forEach(e=>{ if(!e.trig.length) return;
+    const n={}; e.trig.forEach(t=>n[t.table]=(n[t.table]||0)+1);
+    e.primary=Object.entries(n).sort((a,b)=>b[1]-a[1])[0][0]; });
+  return out;
+}
+const EVENTS = buildEvents();
+const TBL_DOM = Object.fromEntries(TABLES.map(([t,d])=>[t,d]));
+
+/* ===================== state + helpers ============================ */
+let aud="biz", tab="est", grpBy="type", laneBy="dom", sel=null, pick=null, blastCol=null;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const sum=a=>a.reduce((x,y)=>x+y,0);
+const step=n=>!n?"#fff":n<4?"var(--s1)":n<8?"var(--s2)":n<14?"var(--s3)":n<20?"var(--s4)":"var(--s5)";
+const stepInk=n=>n>=14?"#fff":"var(--ink)";
+const tip=(ev,html)=>{const t=$("tt");t.innerHTML=html;t.style.display="block";
+  const x=Math.min(ev.clientX+14, innerWidth-320), y=Math.max(10, ev.clientY-12);
+  t.style.left=x+"px"; t.style.top=y+"px";};
+const untip=()=>{$("tt").style.display="none";};
+
+function setAud(a){aud=a;$("vBiz").setAttribute("aria-pressed",a==="biz");
+  $("vTech").setAttribute("aria-pressed",a==="tech");
+  document.querySelectorAll(".src").forEach(e=>e.classList.toggle("hide",a==="biz"));
+  render();}
+function setTab(t){tab=t;["est","swm","lnk","dep"].forEach(x=>{
+  $("tab-"+x).classList.toggle("hide",x!==t);
+  const b=$("n"+x[0].toUpperCase()+x.slice(1)); if(b)b.setAttribute("aria-pressed",x===t);
+  const r=$("rail-"+x); if(r)r.classList.toggle("on",x===t);});
+  render();}
+function setLane(l){laneBy=l;$("lnDom").setAttribute("aria-pressed",l==="dom");
+  $("lnTbl").setAttribute("aria-pressed",l==="tbl");$("laneBy").textContent=
+  l==="dom"?"domain":"source table";renderLanes();}
+
+/* ===================== ESTATE ===================== */
+const GROUPERS = {
+  type:   {label:"Type", of:e=>e.type, order:["Business","Technical","Marker"],
+    lede:"The split the whole programme is planned against.",
+    src:"META_EVENT_DEFINITION.EVENT_TYPE · resolved against REF_EVENT_TYPE"},
+  domain: {label:"Domain", of:e=>e.domain, order:Object.keys(DOMAINS),
+    lede:"Who owns the change, and therefore who owns the consumer.",
+    src:"META_EVENT_DEFINITION.DOMAIN · resolved against REF_EVENT_DOMAIN"},
+  cross:  {label:"Domain × Type", of:e=>`${e.domain} · ${e.type}`,
+    lede:"The two dimensions are orthogonal — this is every combination the contract uses.",
+    src:"META_EVENT_DEFINITION.DOMAIN, EVENT_TYPE"},
+  table:  {label:"Source table", of:e=>e.primary,
+    lede:"Grouped by the table contributing most of the event's watched columns.",
+    src:"META_EVENT_FIELD.SOURCE_TABLE where FIELD_CATEGORY = 'TRIGGER_DRIVING'"},
+  view:   {label:"SDC view", of:e=>e.view,
+    lede:"Grouped by where the consumer goes back for the record.",
+    src:"META_EVENT_DEFINITION.SDC_VIEW"},
+  ops:    {label:"Operation", of:e=>e.ops||"— not applicable · marker",
+    lede:"Which operation codes a consumer must handle for this group.",
+    src:"META_EVENT_DEFINITION.OPERATION_CODES"}
+};
+function groups(){
+  const g={};
+  EVENTS.forEach(e=>{const k=GROUPERS[grpBy].of(e);
+    (g[k]=g[k]||{key:k,Business:0,Technical:0,Marker:0,total:0,ev:[]});
+    g[k][e.type]++; g[k].total++; g[k].ev.push(e);});
+  const ord=GROUPERS[grpBy].order;
+  return Object.values(g).sort((a,b)=> ord
+    ? ord.indexOf(a.key)-ord.indexOf(b.key) : b.total-a.total || a.key.localeCompare(b.key));
+}
+function renderTiles(){
+  const rows=sum(TABLES.map(t=>t[5])), dcols=sum(TABLES.map(t=>t[6].length));
+  const views=new Set(EVENTS.filter(e=>!e.marker).map(e=>e.view)).size;
+  const t=[["105","events in the contract","42 Business · 51 Technical · 12 Marker"],
+   ["93","carry a record to fetch","the other 12 are batch markers"],
+   ["575","field rows","4 × 93 + 3 × 12 payload, + "+rows+" trigger-driving"],
+   [String(dcols),"distinct watched columns",rows+" trigger rows across "+TABLES.length+" tables"],
+   [String(views),"SDC views to read back","every data event names exactly one"]];
+  $("tiles").innerHTML=t.map(([n,l,d])=>`<div class="tile"><div class="n">${n}</div>
+    <div class="l">${l}</div><div class="d">${d}</div></div>`).join("");
+}
+function renderGroups(){
+  $("grpBy").innerHTML=Object.entries(GROUPERS).map(([k,v])=>
+    `<button aria-pressed="${k===grpBy}" onclick="setGrp('${k}')">${v.label}</button>`).join("");
+  $("grpLede").textContent=GROUPERS[grpBy].lede;
+  $("grpSrc").textContent=GROUPERS[grpBy].src;
+  const gs=groups(), max=Math.max(...gs.map(g=>g.total)), BARW=620;
+  $("grpCount").textContent=`${gs.length} groups · 105 events · every grouping closes on 105`;
+  $("groups").innerHTML=gs.map(g=>{
+    const w=Math.round(g.total/max*100);
+    const segs=["Business","Technical","Marker"].filter(t=>g[t]).map(t=>{
+      const px=g[t]/max*BARW, lab=px>=26?g[t]:"";
+      return `<span style="flex:${g[t]};background:${TCOL[t]}" data-t="${t}">${lab}</span>`;}).join("");
+    return `<div class="grow ${sel===g.key?"on":""}" onclick="pickGroup('${esc(g.key)}')"
+       onmousemove="tipGroup(event,'${esc(g.key)}')" onmouseleave="untip()">
+      <div class="gname" title="${esc(g.key)}">${esc(g.key)}</div>
+      <div><div class="sbar" style="width:${w}%">${segs}</div></div>
+      <div class="gn">${g.total}</div></div>`;}).join("");
+  $("typeExplain").innerHTML=`<dl style="margin:0;display:grid;
+    grid-template-columns:auto minmax(0,1fr);gap:9px 12px;font-size:12.5px">
+    <dt><span class="chip" style="background:var(--t-biz);color:#fff">Business · 42</span></dt>
+    <dd style="margin:0">Something happened that a business reader can name — an account
+      opened, a restriction added, a fee changed. The consumer is usually a process.</dd>
+    <dt><span class="chip" style="background:var(--t-tech);color:#fff">Technical · 51</span></dt>
+    <dd style="margin:0">A record changed in a way downstream stores must mirror — an
+      identifier restated, a reference value corrected. Same envelope, same rules; the
+      consumer is usually a store keeping itself in step.</dd>
+    <dt><span class="chip" style="background:var(--t-mark);color:#fff">Marker · 12</span></dt>
+    <dd style="margin:0">Not about a record at all. It says a batch window closed, carries
+      <span class="mono">batchDt</span> and <span class="mono">onlineDt</span>, and has
+      nothing to fetch. Treating a marker like a data event is the commonest way to get
+      this contract wrong.</dd></dl>`;
+}
+function setGrp(k){grpBy=k;sel=groups()[0].key;renderGroups();renderSel();}
+function tipGroup(ev,k){const g=groups().find(x=>x.key===k); if(!g)return;
+  tip(ev,`<b>${esc(g.key)}</b><br>${g.total} events — ${g.Business} Business ·
+    ${g.Technical} Technical · ${g.Marker} Marker<br>
+    <span class="m">click to list them</span>`);}
+function pickGroup(k){sel=(sel===k?null:k);renderGroups();renderSel();}
+function renderSel(){
+  if(!sel){$("selTitle").textContent="Pick a group";
+    $("selSub").textContent="Click any bar above to list its events here.";
+    $("selChips").innerHTML="";$("selTbl").innerHTML="";return;}
+  const g=groups().find(x=>x.key===sel); if(!g)return;
+  $("selTitle").textContent=g.key;
+  $("selSub").textContent=`${g.total} events in this group`;
+  $("selChips").innerHTML=["Business","Technical","Marker"].filter(t=>g[t]).map(t=>
+    `<span class="chip" style="background:${TCOL[t]};color:#fff">${t} ${g[t]}</span>`).join("");
+  $("selTbl").innerHTML=`<thead><tr><th style="width:54px">ID</th><th>Event</th>
+    <th style="width:88px">Type</th><th style="width:104px">Domain</th>
+    <th style="width:62px">Cols</th><th style="width:170px">SDC view</th></tr></thead><tbody>`+
+    g.ev.map(e=>`<tr><td class="mono" style="font-size:11px">${e.id}</td>
+      <td style="font-size:12px">${esc(e.name)}</td>
+      <td><span class="chip" style="background:${TCOL[e.type]};color:#fff">${e.type}</span></td>
+      <td class="mono" style="font-size:11px">${e.domain}</td>
+      <td class="mono" style="font-size:11px">${e.trig.length||"—"}</td>
+      <td class="mono" style="font-size:10.5px">${e.marker
+        ?'<span class="ns">none · marker</span>':esc(e.view)}</td></tr>`).join("")+"</tbody>";
+}
+
+/* ===================== SWIMLANES ===================== */
+function laneData(){
+  if(laneBy==="dom") return Object.keys(DOMAINS).map(d=>{
+    const ev=EVENTS.filter(e=>e.domain===d);
+    const tbls={}; ev.forEach(e=>e.trig.forEach(t=>tbls[t.table]=(tbls[t.table]||0)+1));
+    const views=[...new Set(ev.map(e=>e.view))].filter(v=>v!==NO_VIEW);
+    return {name:d, kind:"domain", ev, tbls, views,
+      cols:sum(ev.map(e=>e.trig.length))};});
+  return TABLES.map(([t,,,,,,cols])=>{
+    const ev=EVENTS.filter(e=>e.trig.some(x=>x.table===t));
+    const views=[...new Set(ev.map(e=>e.view))].filter(v=>v!==NO_VIEW);
+    return {name:t, kind:"table", ev, tbls:{[t]:cols.length}, views,
+      cols:sum(ev.map(e=>e.trig.filter(x=>x.table===t).length))};});
+}
+function renderLanes(){
+  const lanes=laneData(), maxCol=Math.max(...lanes.map(l=>l.cols),1);
+  $("lanes").innerHTML=lanes.map(l=>{
+    const marker=l.name==="MARKER";
+    const byType=["Business","Technical","Marker"].map(t=>[t,l.ev.filter(e=>e.type===t).length])
+      .filter(x=>x[1]);
+    const dots=l.ev.slice(0,44).map(e=>`<span class="evdot" style="background:${TCOL[e.type]}"
+        title="${esc(e.id+" · "+e.name)}"></span>`).join("")
+      + (l.ev.length>44?`<span class="sub" style="font-size:10.5px"> +${l.ev.length-44}</span>`:"");
+    const s1 = marker
+      ? `<div class="sub" style="font-size:12px">No source record. The lane starts when the
+         <b>batch window closes</b>, not when a row changes.</div>`
+      : Object.entries(l.tbls).sort((a,b)=>b[1]-a[1]).map(([t,n])=>
+         `<span class="tchip">${t} <b>${n}</b></span>`).join("")
+        || `<span class="ns" style="font-size:12px">no source table stated in this sample</span>`;
+    const s2 = marker
+      ? `<div class="sub" style="font-size:12px">Nothing is evaluated per row.</div>`
+      : `<div style="font-size:12.5px"><b class="mono">${l.cols}</b> watched columns</div>
+         <div style="height:6px;background:#edf1f4;border-radius:999px;margin:6px 0 5px">
+           <div style="height:6px;width:${Math.round(l.cols/maxCol*100)}%;
+                background:var(--accent);border-radius:999px"></div></div>
+         <div class="sub" style="font-size:11px">fires when any of them differs
+           before → after, and the condition holds</div>`;
+    const s3 = `<div class="row" style="gap:6px;margin-bottom:5px">
+         ${byType.map(([t,n])=>`<span class="chip" style="background:${TCOL[t]};color:#fff"
+            >${t} ${n}</span>`).join("")}</div>
+         <div style="line-height:1.1">${dots}</div>
+         <div class="sub" style="font-size:11px;margin-top:5px">${marker
+           ? "payload: eventId, batchDt, onlineDt" : "payload: eventId, key, op, view"}</div>`;
+    const s4 = marker
+      ? `<div class="note warn" style="padding:8px 10px;font-size:11.5px">
+           <b>Lane ends here.</b> Nothing to fetch — a marker is a checkpoint.</div>`
+      : (l.views.length? l.views.map(v=>`<span class="tchip">${v}</span>`).join("")
+         + `<div class="sub" style="font-size:11px;margin-top:5px">read the record with
+            <span class="mono">key</span>; never from the payload</div>`
+        : `<span class="ns" style="font-size:12px">no view stated</span>`);
+    return `<div class="lane">
+      <div class="lh"><h3 class="mono" style="font-size:12px">${esc(l.name)}</h3>
+        <div class="sub" style="font-size:11px;margin-top:3px">${l.ev.length} events</div></div>
+      <div class="cellw">${s1}</div><div class="cellw">${s2}</div>
+      <div class="cellw">${s3}</div><div class="cellw">${s4}</div></div>`;}).join("");
+}
+
+/* ===================== LINK VIEW (3-stage flow) =====================
+   Unit of flow is the event, so all three stages conserve at 105. The left
+   stage is the event's PRIMARY table — the one contributing most of its
+   watched columns. Events watching more than one table are exactly what the
+   Interdependence tab is for; putting them here would break conservation
+   and make every ribbon a lie.                                            */
+function linkModel(){
+  const A={}, B={}, C={}, ab={}, bc={};
+  EVENTS.forEach(e=>{
+    A[e.primary]=(A[e.primary]||0)+1; B[e.domain]=(B[e.domain]||0)+1; C[e.view]=(C[e.view]||0)+1;
+    ab[e.primary+"\u0000"+e.domain]=(ab[e.primary+"\u0000"+e.domain]||0)+1;
+    bc[e.domain+"\u0000"+e.view]=(bc[e.domain+"\u0000"+e.view]||0)+1;});
+  const mk=(o,stage)=>Object.entries(o).sort((x,y)=>y[1]-x[1])
+    .map(([k,v])=>({id:stage+":"+k, key:k, v, stage}));
+  return {a:mk(A,"a"), b:mk(B,"b"), c:mk(C,"c"),
+    ab:Object.entries(ab).map(([k,v])=>{const [s,t]=k.split("\u0000");return {s:"a:"+s,t:"b:"+t,v};}),
+    bc:Object.entries(bc).map(([k,v])=>{const [s,t]=k.split("\u0000");return {s:"b:"+s,t:"c:"+t,v};})};
+}
+const SK={W:1180,H:660,top:26,nw:13,xa:212,xb:566,xc:920,gap:9,min:11};
+function layout(){
+  const m=linkModel(), scale=(g)=>{
+    const budget=SK.H-SK.top*2-(g.length-1)*SK.gap;
+    const raw=sum(g.map(n=>n.v)), k=budget/raw;
+    g.forEach(n=>n.h=Math.max(SK.min, n.v*k));
+    const over=sum(g.map(n=>n.h))-budget;
+    if(over>0){ const flex=g.filter(n=>n.h>SK.min);
+      const tot=sum(flex.map(n=>n.h-SK.min));
+      flex.forEach(n=>n.h-=(n.h-SK.min)/tot*over); }
+    let y=SK.top+(budget-sum(g.map(n=>n.h)))/2;
+    g.forEach(n=>{n.y=y;y+=n.h+SK.gap;});};
+  [m.a,m.b,m.c].forEach(scale);
+  const by={}; [...m.a,...m.b,...m.c].forEach(n=>{by[n.id]=n;n.ox=n.y;n.ix=n.y;});
+  const order=(links,key,sortBy)=>{
+    links.sort((p,q)=>by[p[sortBy]].y-by[q[sortBy]].y);
+    links.forEach(l=>{const n=by[l[key]];
+      const h=l.v/n.v*n.h;
+      if(key==="s"){l.y0=n.ox;n.ox+=h;} else {l.y1=n.ix;n.ix+=h;}
+      l["h"+(key==="s"?"0":"1")]=h;});};
+  order(m.ab,"s","t"); order(m.ab,"t","s");
+  order(m.bc,"s","t"); order(m.bc,"t","s");
+  m.by=by; return m;
+}
+const SKM = layout();
+function nodeSplit(n){
+  const ev=EVENTS.filter(e=>(n.stage==="a"?e.primary:n.stage==="b"?e.domain:e.view)===n.key);
+  return ["Business","Technical","Marker"].map(t=>[t,ev.filter(e=>e.type===t).length]);
+}
+function onPath(id){
+  if(!pick) return true;
+  const hits=EVENTS.filter(e=>["a:"+e.primary,"b:"+e.domain,"c:"+e.view].includes(pick));
+  return hits.some(e=>["a:"+e.primary,"b:"+e.domain,"c:"+e.view].includes(id));
+}
+function linkOn(l){ if(!pick) return true;
+  return onPath(l.s)&&onPath(l.t)&&(pick===l.s||pick===l.t||
+    (pick[0]==="a"&&l.s[0]==="b")||(pick[0]==="c"&&l.t[0]==="b")||
+    (pick[0]==="b"&&(l.s===pick||l.t===pick)));}
+function ribbon(x0,y0,h0,x1,y1,h1){
+  const c=(x0+x1)/2;
+  return `M${x0},${y0} C${c},${y0} ${c},${y1} ${x1},${y1}
+          L${x1},${y1+h1} C${c},${y1+h1} ${c},${y0+h0} ${x0},${y0+h0} Z`;
+}
+function renderSankey(){
+  const m=SKM, s=[];
+  const draw=(links,xs,xt)=>links.forEach(l=>{
+    const on=linkOn(l);
+    s.push(`<path d="${ribbon(xs,l.y0,l.h0,xt,l.y1,l.h1)}"
+      fill="${on?"#8fa6b8":"#dbe3ea"}" fill-opacity="${on?.42:.3}"
+      style="cursor:pointer" onmousemove="tipLink(event,'${l.s}','${l.t}',${l.v})"
+      onmouseleave="untip()"></path>`);});
+  draw(m.ab, SK.xa+SK.nw, SK.xb); draw(m.bc, SK.xb+SK.nw, SK.xc);
+  const node=(n,x,anchor)=>{
+    const on=onPath(n.id), sp=nodeSplit(n); let y=n.y;
+    const bars=sp.filter(p=>p[1]).map(([t,c])=>{
+      const h=c/n.v*n.h, r=`<rect x="${x}" y="${y.toFixed(1)}" width="${SK.nw}"
+        height="${Math.max(1,h-(h>3?1.5:0)).toFixed(1)}" fill="${TCOL[t]}"
+        opacity="${on?1:.22}" rx="1.5"></rect>`; y+=h; return r;}).join("");
+    const tx=anchor==="end"?x-9:x+SK.nw+9;
+    return `<g style="cursor:pointer" onclick="setPick('${n.id}')"
+       onmousemove="tipNode(event,'${n.id}')" onmouseleave="untip()">
+      ${bars}<rect x="${x-3}" y="${(n.y-3).toFixed(1)}" width="${SK.nw+6}"
+        height="${(n.h+6).toFixed(1)}" fill="transparent"></rect>
+      <text x="${tx}" y="${(n.y+n.h/2+1).toFixed(1)}" text-anchor="${anchor}"
+        dominant-baseline="middle" font-size="11" fill="${on?"#233240":"#aab6c0"}"
+        font-weight="${pick===n.id?600:400}">${esc(n.key)}<tspan
+        fill="${on?"#7b8894":"#c3ccd4"}" font-size="9.5"> · ${n.v}</tspan></text></g>`;};
+  m.a.forEach(n=>s.push(node(n,SK.xa,"end")));
+  m.b.forEach(n=>s.push(node(n,SK.xb,"end")));
+  m.c.forEach(n=>s.push(node(n,SK.xc,"start")));
+  const hdr=(x,t,a)=>`<text x="${x}" y="14" text-anchor="${a}" font-size="9.5"
+     font-weight="700" letter-spacing=".5" fill="#7b8894">${t}</text>`;
+  s.push(hdr(SK.xa+SK.nw,"SOURCE TABLE (PRIMARY)","end"));
+  s.push(hdr(SK.xb+SK.nw,"DOMAIN","end"));
+  s.push(hdr(SK.xc,"SDC VIEW","start"));
+  $("sankey").innerHTML=s.join("");
+  $("lnkTblBody").innerHTML=`<thead><tr><th>Source table</th><th>Domain</th>
+    <th>SDC view</th><th style="width:78px">Events</th></tr></thead><tbody>`+
+    (()=>{const r={}; EVENTS.forEach(e=>{const k=[e.primary,e.domain,e.view].join("\u0000");
+      r[k]=(r[k]||0)+1;});
+      return Object.entries(r).sort((a,b)=>b[1]-a[1]).map(([k,v])=>{
+        const [t,d,w]=k.split("\u0000");
+        return `<tr><td class="mono" style="font-size:11px">${esc(t)}</td>
+          <td class="mono" style="font-size:11px">${d}</td>
+          <td class="mono" style="font-size:11px">${esc(w)}</td>
+          <td class="mono" style="font-size:11px">${v}</td></tr>`;}).join("");})()+"</tbody>";
+}
+function tipNode(ev,id){const n=SKM.by[id]; if(!n)return;
+  tip(ev,`<b>${esc(n.key)}</b><br>${n.v} events<br>`+
+    nodeSplit(n).filter(p=>p[1]).map(([t,c])=>`${t} ${c}`).join(" · ")+
+    `<br><span class="m">click to isolate its paths</span>`);}
+function tipLink(ev,s,t,v){tip(ev,`<b>${esc(s.slice(2))}</b> → <b>${esc(t.slice(2))}</b><br>
+  ${v} event${v===1?"":"s"} take this path`);}
+function setPick(id){pick=(pick===id?null:id);renderSankey();}
+function clearPick(){pick=null;renderSankey();}
+function toggleLinkTable(){const t=$("lnkTable");const on=t.classList.toggle("hide");
+  $("lnkTblBtn").setAttribute("aria-pressed",!on);}
+
+/* ===================== INTERDEPENDENCE ===================== */
+function colIndex(){
+  const ix={};
+  EVENTS.forEach(e=>e.trig.forEach(t=>{const k=t.table+"."+t.col;
+    (ix[k]=ix[k]||[]).push(e);}));
+  return ix;
+}
+const COLIX = colIndex();
+function pickTable(){blastCol=null;renderDep();}
+function renderDep(){
+  if(!$("blastTbl").options.length)
+    $("blastTbl").innerHTML=TABLES.map(([t])=>`<option>${t}</option>`).join("");
+  const tbl=$("blastTbl").value||TABLES[0][0];
+  if(blastCol===null){ const w=Object.entries(COLIX).filter(([k])=>k.startsWith(tbl+"."))
+    .sort((a,b)=>b[1].length-a[1].length)[0]; if(w) blastCol=w[0]; }
+  const cols=(TABLES.find(t=>t[0]===tbl)[6]).map(c=>[c,(COLIX[tbl+"."+c]||[]).length])
+    .sort((a,b)=>b[1]-a[1]);
+  const max=Math.max(...cols.map(c=>c[1]),1);
+  $("blast").innerHTML=`<thead><tr><th>Column</th><th style="width:210px">Events that fire</th>
+    </tr></thead><tbody>`+cols.map(([c,n])=>`
+    <tr style="cursor:pointer;${blastCol===tbl+"."+c?"background:var(--tint)":""}"
+        onclick="pickCol('${tbl}.${c}')">
+      <td class="mono" style="font-size:11.5px">${c}</td>
+      <td><div class="row" style="gap:8px"><span style="flex:1;height:6px;background:#edf1f4;
+        border-radius:999px"><span style="display:block;height:6px;width:${Math.round(n/max*100)}%;
+        background:var(--accent);border-radius:999px"></span></span>
+        <span class="mono" style="font-size:11px;width:16px;text-align:right">${n}</span>
+      </div></td></tr>`).join("")+"</tbody>";
+  const ev=blastCol?(COLIX[blastCol]||[]):[];
+  $("coTitle").textContent=blastCol?`Arrives together — ${blastCol}`:"Arrives together";
+  $("coSub").innerHTML=blastCol
+    ? `Change <span class="mono">${esc(blastCol)}</span> once and <b>${ev.length}</b>
+       event${ev.length===1?"":"s"} are raised, in no guaranteed order.`
+    : "Pick a column on the left to see every event that fires with it.";
+  $("coList").innerHTML=blastCol
+    ? (ev.length?`<table><thead><tr><th style="width:52px">ID</th><th>Event</th>
+        <th style="width:88px">Type</th><th style="width:150px">SDC view</th></tr></thead><tbody>`+
+        ev.map(e=>`<tr><td class="mono" style="font-size:11px">${e.id}</td>
+          <td style="font-size:12px">${esc(e.name)}</td>
+          <td><span class="chip" style="background:${TCOL[e.type]};color:#fff">${e.type}</span></td>
+          <td class="mono" style="font-size:10.5px">${esc(e.view)}</td></tr>`).join("")+"</tbody></table>"
+      : `<div class="pad sub">No event watches this column.</div>`)
+    : `<div class="pad sub" style="font-size:12px">Nothing selected.</div>`;
+  // domain × table heatmap
+  const doms=Object.keys(DOMAINS);
+  let h=`<thead><tr><th style="width:118px">Event domain</th>`+
+    TABLES.map(([t,d])=>`<th style="text-align:center;font-size:8.5px">${t.replace(/_/g,"<br>")}
+      <div style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--sub)">${d}</div></th>`).join("")+
+    `<th style="text-align:right">All</th></tr></thead><tbody>`;
+  doms.forEach(d=>{
+    h+=`<tr><th class="rh">${d}</th>`;
+    let tot=0;
+    TABLES.forEach(([t])=>{
+      const n=EVENTS.filter(e=>e.domain===d && e.trig.some(x=>x.table===t)).length;
+      tot+=n;
+      h+=`<td class="c"><span style="background:${step(n)};color:${stepInk(n)}"
+        onmousemove="tipCell(event,'${d}','${t}',${n})" onmouseleave="untip()"
+        >${n||""}</span></td>`;});
+    h+=`<td class="mono" style="text-align:right;font-size:11.5px">${tot}</td></tr>`;});
+  h+=`</tbody>`;
+  $("hm").innerHTML=h;
+}
+function pickCol(k){blastCol=(blastCol===k?null:k);renderDep();}
+function tipCell(ev,d,t,n){
+  tip(ev, n? `<b>${n}</b> ${d} event${n===1?"":"s"} watch <span class="m">${t}</span>`
+     + (TBL_DOM[t]!==d?`<br><span class="m">cross-domain — ${t} belongs to ${TBL_DOM[t]}</span>`:"")
+     : `No ${d} event watches <span class="m">${t}</span>`);}
+
+/* ===================== render ===================== */
+function render(){
+  $("lede").textContent = aud==="biz"
+    ? "An event is a notification that something changed — not the change itself. Start with the estate, then follow one through its life."
+    : "105 rows in META_EVENT_DEFINITION, 575 in META_EVENT_FIELD. Every view below is a read of those two tables; each panel names the columns it uses.";
+  if(tab==="est"){if(!sel)sel=groups()[0].key;renderTiles();renderGroups();renderSel();}
+  if(tab==="swm")renderLanes();
+  if(tab==="lnk")renderSankey();
+  if(tab==="dep")renderDep();
+}
+setAud("biz");
+</script>
+</body>
+</html>
