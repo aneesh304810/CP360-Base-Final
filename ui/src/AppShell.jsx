@@ -17,6 +17,9 @@ const NAV_GROUPS = [
  { group: 'Lineage', items: [
  ['lineage', 'Lineage', '\u{1F9EC}'],
  ] },
+ { group: 'Events', items: [
+ ['event360', 'Event 360', '\u25D0'],
+ ] },
  { group: 'Utilities', items: [
  ['mapper', 'Auto Mapper', '\u21F2'],
  ] },

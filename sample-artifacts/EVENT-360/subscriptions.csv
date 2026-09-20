@@ -1,0 +1,8 @@
+consumer_code,event_id,filter_expr,delivery_mode,status,since_dt,requested_by,notes
+STATEMENTS,1,all operations,stream,ACTIVE,2026-01-01,,
+STATEMENTS,3,op = U only,stream,ACTIVE,2026-01-01,,
+DATA_LAKE,1,all operations,stream,ACTIVE,2026-02-01,,
+DATA_LAKE,2,all operations,stream,ACTIVE,2026-02-01,,
+BILLING,1,op = U only,queue,ACTIVE,2026-03-01,,
+RECON_HUB,3,all operations,batch,ACTIVE,2026-03-01,,
+CRM_SYNC,2,all operations,stream,REQUESTED,,a.nair,phase 2

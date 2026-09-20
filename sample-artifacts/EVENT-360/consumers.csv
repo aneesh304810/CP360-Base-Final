@@ -1,0 +1,9 @@
+consumer_code,consumer_name,delivery_mode,owner_team,status,notes
+STATEMENTS,Client statements,stream,Client Reporting,ACTIVE,
+BILLING,Fee billing,queue,Revenue Ops,ACTIVE,
+CLIENT_PORTAL,Client portal,stream,Digital,ACTIVE,
+PERF_ENGINE,Performance engine,stream,Investment Ops,ACTIVE,
+RECON_HUB,Reconciliation hub,batch,Operations,ACTIVE,
+REG_REPORTING,Regulatory reporting,queue,Compliance,ACTIVE,
+CRM_SYNC,CRM sync,stream,Relationship Mgmt,PLANNED,not live until phase 2
+DATA_LAKE,Data lake landing,stream,Data Platform,ACTIVE,

@@ -12,6 +12,7 @@ import SearchResults from "./SearchResults.jsx";
 import PiiExplorer from "./PiiExplorer.jsx";
 import Guardrails from "./Guardrails.jsx";
 import LineageHome from "./LineageHome.jsx";
+import Event360 from "./Event360.jsx";
 import ImpactAnalysis from "./ImpactAnalysis.jsx";
 import Mapper from "./Mapper.jsx";
 import Variance360 from "./Variance360.jsx";
@@ -69,6 +70,7 @@ export default function App() {
  apiconsole: <Api360Console t={t} />,
  apicatalog: <ApiCatalogAdmin t={t} />,
  lineage: <LineageHome t={t} focus={route === "lineage" ? selection : null} />,
+ event360: <Event360 t={t} />,
  impact: <ImpactAnalysis t={t} />,
  mapper: <Mapper t={t} />,
  environment: <Environment360 t={t} />,

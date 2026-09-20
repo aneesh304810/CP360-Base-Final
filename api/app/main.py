@@ -28,7 +28,8 @@ for _mod in ("routers_projects", "routers_data360",
              "routers_reference_legacy",
              "routers_variance360",
              "routers_recon360", "routers_admin_datasources",
-             "routers_environment360", "routers_env_infra"):
+             "routers_environment360", "routers_env_infra",
+             "routers_event360"):
     try:
         _m = __import__(f"app.{_mod}", fromlist=["router"])
         app.include_router(_m.router)
