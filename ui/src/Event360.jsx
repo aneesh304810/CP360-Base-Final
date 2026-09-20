@@ -482,24 +482,62 @@ function LinkView({ onOpen }) {
 
 // One height budget for all three columns, so their marks total the same and a
 // ribbon does not taper merely because its column holds fewer nodes.
+//
+// ORDER IS WHAT MAKES THIS READABLE, NOT COLOUR OR OPACITY
+//
+// The API returns each stage sorted by event count, which is the worst
+// possible order for a flow diagram: it interleaves tables feeding different
+// domains, so every ribbon crosses the canvas. With the mockup's 12 tidy
+// source tables that cost ~600 crossings and still read; against the real
+// contract's ~45 tables and ~40 views it was over 1,900 and read as a
+// hairball.
+//
+// So the outer stages are re-ordered by the barycentre of the domains they
+// connect to — the standard crossing-reduction for a layered graph. A table
+// feeding only ACCOUNT sits beside the other ACCOUNT tables, and the ribbons
+// run in bands. The middle stage keeps the order it arrived in: by event
+// count when zoomed out, by event id when zoomed into a domain, because that
+// is the order a person reads it in.
 function layout(d, zoom) {
-  const SK = { W: 1180, top: 26, nw: 13, xa: 212, xb: 566, xc: 920 };
+  const SK = { W: 1180, top: 44, nw: 13, xa: 212, xb: 566, xc: 920 };
   const cols = [d.a || [], d.b || [], d.c || []];
+  barycentre(cols[0], cols[1], d.ab || [], 's', 't');
+  barycentre(cols[2], cols[1], d.bc || [], 't', 's');
   const most = Math.max(...cols.map((c) => c.length), 1);
   const gap = zoom ? 5 : 9, min = zoom ? 9 : 11;
-  const H = zoom ? Math.max(560, (d.b || []).length * 17 + SK.top * 2) : 660;
+  // The canvas grows with the LONGEST column, not just with the middle one.
+  // Fixing it at 660 was fine for the mockup's 12 source tables; against the
+  // real contract's 40-odd tables and as many views, the gaps alone
+  // (104 x 9px) exceeded the whole canvas and the budget went NEGATIVE, so
+  // every node came out zero-height. Forty labels in 660px was unreadable
+  // long before that anyway — the panel scrolls, so let it.
+  const H = Math.max(zoom ? 560 : 660,
+                     most * (min + gap) + SK.top * 2,
+                     (d.b || []).length * 17 + SK.top * 2);
   const budget = H - SK.top * 2 - (most - 1) * gap;
   const by = {};
   cols.forEach((g, gi) => {
     const stage = 'abc'[gi];
     const raw = g.reduce((s, n) => s + n.value, 0) || 1;
     const k = budget / raw;
-    g.forEach((n) => { n.stage = stage; n.h = Math.max(min, n.value * k); });
-    const over = g.reduce((s, n) => s + n.h, 0) - budget;
-    if (over > 0) {
-      const flex = g.filter((n) => n.h > min);
-      const tot = flex.reduce((s, n) => s + (n.h - min), 0);
-      if (tot > 0) flex.forEach((n) => { n.h -= (n.h - min) / tot * over; });
+    // A minimum that cannot fit is not a minimum, it is an overflow. With 40
+    // source tables in a 570px budget the wanted 11px floor needs 440px, and
+    // the single-pass correction below then took the whole overflow out of
+    // the two or three tall nodes — driving them past the floor and, in the
+    // real contract's shape, NEGATIVE. A negative rect height renders nothing
+    // and puts its label above the canvas, on top of the column header.
+    const minH = Math.min(min, budget / Math.max(1, g.length));
+    g.forEach((n) => { n.stage = stage; n.h = Math.max(minH, n.value * k); });
+    // Take the overflow only from nodes that are above the floor, repeatedly,
+    // because one pass can ask a node for more than it has to give.
+    let over = g.reduce((s, n) => s + n.h, 0) - budget;
+    for (let pass = 0; over > 0.01 && pass < 50; pass++) {
+      const flex = g.filter((n) => n.h > minH + 1e-9);
+      const tot = flex.reduce((s, n) => s + (n.h - minH), 0);
+      if (tot <= 1e-9) break;
+      const take = Math.min(over, tot);
+      flex.forEach((n) => { n.h -= (n.h - minH) / tot * take; });
+      over -= take;
     }
     const g2 = (H - SK.top * 2 - g.reduce((s, n) => s + n.h, 0)) / Math.max(1, g.length - 1);
     let y = SK.top;
@@ -520,6 +558,29 @@ function layout(d, zoom) {
   };
   wire(d.ab || [], 'a', 'b'); wire(d.bc || [], 'b', 'c');
   return { SK, H, a: cols[0], b: cols[1], c: cols[2], ab: d.ab || [], bc: d.bc || [], by };
+}
+
+// Sort `outer` by the weighted mean position of the `mid` nodes it links to.
+// Ties fall back to event count, so the order is stable and the busiest node
+// in a band still leads it. A node with no link keeps to the end rather than
+// being dropped into the middle of someone else's band.
+function barycentre(outer, mid, links, selfKey, otherKey) {
+  if (!outer.length || !mid.length || !links.length) return;
+  const pos = {};
+  mid.forEach((n, i) => { pos[n.key] = i; });
+  const acc = {};
+  links.forEach((l) => {
+    const at = pos[l[otherKey]];
+    if (at === undefined) return;
+    const a = acc[l[selfKey]] || (acc[l[selfKey]] = { w: 0, s: 0 });
+    a.w += l.v; a.s += l.v * at;
+  });
+  outer.sort((x, y) => {
+    const ax = acc[x.key], ay = acc[y.key];
+    const bx = ax && ax.w ? ax.s / ax.w : Number.MAX_SAFE_INTEGER;
+    const by = ay && ay.w ? ay.s / ay.w : Number.MAX_SAFE_INTEGER;
+    return bx - by || y.value - x.value || String(x.key).localeCompare(String(y.key));
+  });
 }
 
 function Sankey({ lay, onNode }) {
