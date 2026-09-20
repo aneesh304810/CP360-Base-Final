@@ -50,6 +50,12 @@ SUB_STATUSES = ("ACTIVE", "REQUESTED", "RETIRED")
 MODES = ("stream", "queue", "batch")
 
 
+
+def _strict(name):
+    """House pattern, same as event360_conn: 0 / false / no all turn a gate
+    off. Accepting only "0" meant `NAME=false` looked set and did nothing."""
+    return os.environ.get(name, "1").strip().lower() not in ("0", "false", "no")
+
 class EventSubscriptionLoadError(RuntimeError):
     """Raised before anything is written."""
 
@@ -82,7 +88,7 @@ class EventSubscriptionConnector:
     @classmethod
     def from_env(cls):
         return cls(os.environ.get("CP_EVENT_SUB_DIR") or DEFAULT_DIR,
-                   strict=os.environ.get("CP_EVENT_SUB_STRICT", "1") != "0")
+                   strict=_strict("CP_EVENT_SUB_STRICT"))
 
     def parse(self):
         cons, subs = [], []

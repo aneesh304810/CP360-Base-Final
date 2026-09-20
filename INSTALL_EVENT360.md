@@ -75,6 +75,34 @@ decoration**: a subscription taking all operations pays for every insert and
 update; narrowing it is the cheapest saving available and needs no change to
 the contract.
 
+### Environment variables
+
+Every one is optional except the database. The defaults are the paths in the
+table above, so the three commands work with no environment set at all.
+
+| Variable | Used by | Default | What it does |
+|---|---|---|---|
+| `CP_CATALOG_DB_DSN` | **all steps** | *(required)* | Oracle DSN. `oracle://user:pwd@host:port/service`, `user/pwd@host:port/service`, or `host:port/service` for external auth |
+| `CP_EVENT360_XLSX` | `event360` | `sample-artifacts/EVENT-360` | the workbook, or a folder holding exactly one |
+| `CP_EVENT360_STRICT` | `event360` | `1` | `0`/`false`/`no` downgrades gate failures to warnings |
+| `CP_SDC_COMPUTE_XLSX` | `sdc_compute` | `sample-artifacts/SDC-COMPUTE` | the workbook, or a folder holding exactly one |
+| `CP_SDC_COMPUTE_CLIENT` | `sdc_compute` | the Summary sheet's client name | the code to store the period under, when the sheet's name is not the one you want |
+| `CP_SDC_COMPUTE_STRICT` | `sdc_compute` | `1` | as above |
+| `CP_EVENT_SUB_DIR` | `event_subscription` | `sample-artifacts/EVENT-360` | folder holding `consumers.csv` and `subscriptions.csv` |
+| `CP_EVENT_SUB_STRICT` | `event_subscription` | `1` | as above |
+
+`*_STRICT` accepts `0`, `false` or `no` in any case; anything else keeps the
+gates hard. **Turning one off does not make a bad load good** — it writes the
+rows anyway and logs the failure at ERROR. Use it to inspect a workbook you
+know is mid-revision, not to get past a gate you do not want to read.
+
+```bash
+export CP_CATALOG_DB_DSN="oracle://user:pwd@host:1521/SILVER"
+export CP_SDC_COMPUTE_XLSX="$HOME/extracts/client_b_october.xlsx"
+export CP_SDC_COMPUTE_CLIENT="CLIENT_B"
+python -m ingestion.run sdc_compute
+```
+
 ### Adding more compute extracts as they arrive
 
 Nothing needs rebuilding. `PERIOD_ID` is `<CLIENT>:<first_day>:<last_day>`,

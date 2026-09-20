@@ -206,7 +206,8 @@ class Event360Connector:
     def from_env(cls):
         return cls(
             os.environ.get("CP_EVENT360_XLSX", cls.DEFAULT_DIR),
-            os.environ.get("CP_EVENT360_STRICT", "1") not in ("0", "false", "no"),
+            os.environ.get("CP_EVENT360_STRICT", "1").strip().lower()
+            not in ("0", "false", "no"),
         )
 
     def _resolve(self):

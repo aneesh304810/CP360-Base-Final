@@ -68,6 +68,12 @@ FIELDS = {
 }
 
 
+
+def _strict(name):
+    """House pattern, same as event360_conn: 0 / false / no all turn a gate
+    off. Accepting only "0" meant `NAME=false` looked set and did nothing."""
+    return os.environ.get(name, "1").strip().lower() not in ("0", "false", "no")
+
 class SdcComputeLoadError(RuntimeError):
     """Raised before anything is written."""
 
@@ -156,7 +162,7 @@ class SdcComputeConnector:
     @classmethod
     def from_env(cls):
         return cls(os.environ.get("CP_SDC_COMPUTE_XLSX") or DEFAULT_DIR,
-                   strict=os.environ.get("CP_SDC_COMPUTE_STRICT", "1") != "0",
+                   strict=_strict("CP_SDC_COMPUTE_STRICT"),
                    client_code=os.environ.get("CP_SDC_COMPUTE_CLIENT"))
 
     # ------------------------------------------------------------------ parse
