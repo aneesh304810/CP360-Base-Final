@@ -34,6 +34,33 @@ $env:BUSINESS_FLOWS_XLSX          = Join-Path $env:CP_CATALOG_ROOT "BUSINESS-FLO
 # Ingested by the reference_data step (after datapoint_index).
 $env:REFERENCE_DATA_XLSX          = Join-Path $env:CP_CATALOG_ROOT "REFERENCE\SWP_EOD_Data_Feeds_Reference_List.xlsx"
 
+# --- Event 360 -------------------------------------------------------------
+# Three steps, three sources, kept apart on purpose:
+#   event360           the CONTRACT       — what SEI says an event is
+#   event_subscription OUR decisions      — who consumes it (CSV you maintain)
+#   sdc_compute        the MEASURED bill  — warehouse time per SDC view
+# All three default to these same paths, so you can leave every one of these
+# unset and the commands still work from the repo root. They are set here so
+# the load runs the same from any working directory.
+$env:CP_EVENT360_XLSX     = Join-Path $env:CP_CATALOG_ROOT "EVENT-360"
+$env:CP_EVENT_SUB_DIR     = Join-Path $env:CP_CATALOG_ROOT "EVENT-360"
+$env:CP_SDC_COMPUTE_XLSX  = Join-Path $env:CP_CATALOG_ROOT "SDC-COMPUTE"
+
+# The folder may hold ONE workbook at a time — two are two different clients or
+# periods, and guessing between them is worse than refusing. Point at the file
+# directly when you have several:
+# $env:CP_SDC_COMPUTE_XLSX = "D:\drops\SDC Client compute sizing reference.xlsx"
+# $env:CP_SDC_COMPUTE_CLIENT = "CLIENT_A"   # only if the Summary sheet's name
+#                                           # is not the code you want stored
+
+# Gates are hard by default and that is the point: a load that is four rows
+# short looks right on screen and quietly under-reports. 0/false/no downgrades
+# a failure to a logged ERROR and writes the rows ANYWAY — for inspecting a
+# workbook you know is mid-revision, not for getting past a gate.
+# $env:CP_EVENT360_STRICT     = "0"
+# $env:CP_SDC_COMPUTE_STRICT  = "0"
+# $env:CP_EVENT_SUB_STRICT    = "0"
+
 # --- 4. dbt (simulated manifest) --------------------------------------
 $env:DBT_MANIFEST_PATH = Join-Path $env:CP_CATALOG_ROOT "dbt-artifacts\manifest.json"
 $env:DBT_DIALECT       = "oracle"
@@ -60,7 +87,8 @@ Write-Host ">>> Environment set:" -ForegroundColor Green
   "CP_CATALOG_DB_DSN","CP_CATALOG_ROOT","INTERFACE360_XLSX_PATH",
   "DATA360_FEED_DICTIONARY_PATH","PII_ATTRIBUTES_PATH","API_SPEC_ROOT",
   "POSTMAN_ROOT","DBT_MANIFEST_PATH","DBT_DIALECT","AIRFLOW_DSN",
-  "SEI_ORACLE_SCHEMAS","ENVIRONMENT","CATALOG_DISABLE_SECURITY"
+  "SEI_ORACLE_SCHEMAS","ENVIRONMENT","CATALOG_DISABLE_SECURITY",
+  "CP_EVENT360_XLSX","CP_EVENT_SUB_DIR","CP_SDC_COMPUTE_XLSX"
 ) | ForEach-Object {
   $val = [Environment]::GetEnvironmentVariable($_, "Process")
   "{0,-30} = {1}" -f $_, $val
@@ -75,4 +103,33 @@ Write-Host ">>> File check:" -ForegroundColor Green
 ) | ForEach-Object {
   if (Test-Path $_) { Write-Host "  [OK]      $_" -ForegroundColor Green }
   else              { Write-Host "  [MISSING] $_" -ForegroundColor Red }
+}
+
+# --- Event 360 drop folders -------------------------------------------
+# Reported separately because a missing one is not a broken setup: the steps
+# are independent, and "no subscriptions yet" is a real state the screens
+# show honestly rather than an error.
+Write-Host ">>> Event 360 sources:" -ForegroundColor Green
+@(
+  @{ n = "event360 workbook";    p = $env:CP_EVENT360_XLSX;    f = "*.xlsx" },
+  @{ n = "sdc_compute workbook"; p = $env:CP_SDC_COMPUTE_XLSX; f = "*.xlsx" },
+  @{ n = "consumers.csv";        p = $env:CP_EVENT_SUB_DIR;    f = "consumers.csv" },
+  @{ n = "subscriptions.csv";    p = $env:CP_EVENT_SUB_DIR;    f = "subscriptions.csv" }
+) | ForEach-Object {
+  # Capture the item before the inner pipeline: $_ is rebound inside
+  # Where-Object, and relying on it being restored afterwards is the kind of
+  # thing that works until it does not.
+  $src  = $_
+  $hits = @()
+  if (Test-Path $src.p) {
+    $hits = @(Get-ChildItem -Path $src.p -Filter $src.f -File -ErrorAction SilentlyContinue |
+              Where-Object { $_.Name -notlike '~$*' })
+  }
+  if ($hits.Count -eq 1) {
+    Write-Host ("  [OK]      {0,-22} {1}" -f $src.n, $hits[0].Name) -ForegroundColor Green
+  } elseif ($hits.Count -gt 1) {
+    Write-Host ("  [AMBIG]   {0,-22} {1} files - name one with the *_XLSX var" -f $src.n, $hits.Count) -ForegroundColor Yellow
+  } else {
+    Write-Host ("  [none]    {0,-22} nothing in {1}" -f $src.n, $src.p) -ForegroundColor DarkGray
+  }
 }
