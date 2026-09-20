@@ -331,32 +331,45 @@
     <section id="tab-lnk" class="hide">
       <div class="panel pad" style="margin-bottom:12px">
         <div class="row">
-          <div>
-            <h2>Source table → event group → SDC view</h2>
-            <div class="sub" style="max-width:92ch">Ribbon width is the number of events on
-              that path. Click a node to keep only the paths through it; click it again to
-              clear. Each node carries its own Business / Technical split as a bar, so type
-              never depends on the ribbon colour.</div>
+          <div style="min-width:0">
+            <h2 id="lnkTitle"></h2>
+            <div class="sub" style="max-width:96ch" id="lnkLede"></div>
           </div>
           <span class="row" style="margin-left:auto;gap:6px">
-            <button id="lnkTblBtn" aria-pressed="false" onclick="toggleLinkTable()">Table view</button>
-            <button onclick="clearPick()">Clear selection</button>
+            <button id="lnkTblBtn" aria-pressed="false" onclick="toggleLinkTable()">Paths as a table</button>
+            <button onclick="clearPick()">Clear highlight</button>
           </span>
+        </div>
+        <div class="row" style="margin-top:10px;gap:6px">
+          <span class="cap">Show</span>
+          <span class="seg row" style="gap:0" id="zoomBar"></span>
         </div>
       </div>
       <div class="panel" style="padding:8px 4px">
         <div id="sankeyWrap" style="overflow-x:auto"><svg id="sankey" width="1180" height="660"
-          role="img" aria-label="Flow from source tables through event groups to SDC views"></svg></div>
+          role="img" aria-label="Flow from source tables through events to SDC views"></svg></div>
       </div>
       <div class="panel hide" id="lnkTable" style="margin-top:12px">
         <div class="pad" style="border-bottom:1px solid var(--rule)">
-          <span class="cap">Same data as a table — every path, with its event count</span>
-          <div class="src">the accessible equivalent of the diagram above; it is not a fallback, it is the same query</div>
+          <span class="cap">Every path, with its event count</span>
+          <div class="src">the same query as the diagram, not a fallback for it</div>
         </div>
         <div style="max-height:420px;overflow:auto"><table id="lnkTblBody"></table></div>
       </div>
+      <div class="panel" style="margin-top:12px">
+        <div class="pad row" style="border-bottom:1px solid var(--rule)">
+          <div><h2 id="lnkListTitle"></h2>
+            <div class="sub">Every event in the diagram above, in the same order, each one a
+              door into its details. A band four pixels tall is hard to hit; this list is not.</div>
+          </div>
+          <input id="lnkq" placeholder="Filter events…" oninput="renderSankey()"
+            style="margin-left:auto;font:inherit;font-size:11.5px;padding:5px 9px;
+            border:1px solid var(--rule);border-radius:4px;min-width:180px">
+        </div>
+        <div style="max-height:460px;overflow:auto"><table id="lnkList"></table></div>
+      </div>
       <div class="src" style="margin-top:10px">left META_EVENT_FIELD.SOURCE_TABLE (TRIGGER_DRIVING rows) ·
-        middle META_EVENT_DEFINITION.DOMAIN × EVENT_TYPE · right META_EVENT_DEFINITION.SDC_VIEW</div>
+        middle META_EVENT_DEFINITION.EVENT_ID / DOMAIN / EVENT_TYPE · right META_EVENT_DEFINITION.SDC_VIEW</div>
     </section>
 
     <!-- ===================== INTERDEPENDENCE ===================== -->
@@ -884,119 +897,179 @@ function renderLanes(){
 }
 
 /* ===================== LINK VIEW (3-stage flow) =====================
-   Unit of flow is the event, so all three stages conserve at 105. The left
-   stage is the event's PRIMARY table — the one contributing most of its
-   watched columns. Events watching more than one table are exactly what the
-   Interdependence tab is for; putting them here would break conservation
-   and make every ribbon a lie.                                            */
-function linkModel(){
-  const A={}, B={}, C={}, ab={}, bc={};
-  EVENTS.forEach(e=>{
-    A[e.primary]=(A[e.primary]||0)+1; B[e.domain]=(B[e.domain]||0)+1; C[e.view]=(C[e.view]||0)+1;
-    ab[e.primary+"\u0000"+e.domain]=(ab[e.primary+"\u0000"+e.domain]||0)+1;
-    bc[e.domain+"\u0000"+e.view]=(bc[e.domain+"\u0000"+e.view]||0)+1;});
-  const mk=(o,stage)=>Object.entries(o).sort((x,y)=>y[1]-x[1])
-    .map(([k,v])=>({id:stage+":"+k, key:k, v, stage}));
+   Unit of flow is the event, so all three stages conserve. The left stage is
+   the event's PRIMARY table — the one contributing most of its watched columns.
+   Events watching more than one table are the Interdependence tab's subject;
+   putting them here would break conservation and make every ribbon a lie.
+
+   Zoomed out, the middle stage is the five domains. Zoomed into a domain it is
+   one band per event, so you can see and click the event itself rather than the
+   bucket it lives in. The canvas grows with the number of bands instead of
+   squeezing them, because a four-pixel band with no label is not a drill-down.
+   =================================================================== */
+let zoom=null, SKM=null;
+const SK={W:1180,top:26,nw:13,xa:212,xb:566,xc:920};
+function linkModel(z){
+  const evs=z?EVENTS.filter(e=>e.domain===z):EVENTS;
+  const put=(o,k,e)=>{(o[k]=o[k]||[]).push(e);};
+  const A={},B={},C={},ab={},bc={};
+  evs.forEach(e=>{const b=z?String(e.id):e.domain;
+    put(A,e.primary,e); put(B,b,e); put(C,e.view,e);
+    put(ab,e.primary+"\u0000"+b,e); put(bc,b+"\u0000"+e.view,e);});
+  const mk=(o,stage)=>Object.entries(o)
+    .sort((x,y)=> (stage==="b"&&z) ? x[1][0].id-y[1][0].id : y[1].length-x[1].length)
+    .map(([k,ev])=>({id:stage+":"+k, key:k, ev, v:ev.length, stage,
+      label:(stage==="b"&&z)?`${ev[0].id} · ${ev[0].name}`:k,
+      event:(stage==="b"&&z)?ev[0]:null}));
+  const lk=(o,sp,tp)=>Object.entries(o).map(([k,ev])=>{const [x,y]=k.split("\u0000");
+    return {s:sp+":"+x, t:tp+":"+y, v:ev.length, ev};});
   return {a:mk(A,"a"), b:mk(B,"b"), c:mk(C,"c"),
-    ab:Object.entries(ab).map(([k,v])=>{const [s,t]=k.split("\u0000");return {s:"a:"+s,t:"b:"+t,v};}),
-    bc:Object.entries(bc).map(([k,v])=>{const [s,t]=k.split("\u0000");return {s:"b:"+s,t:"c:"+t,v};})};
+          ab:lk(ab,"a","b"), bc:lk(bc,"b","c"), evs};
 }
-const SK={W:1180,H:660,top:26,nw:13,xa:212,xb:566,xc:920,gap:9,min:11};
-function layout(){
-  const m=linkModel(), scale=(g)=>{
-    const budget=SK.H-SK.top*2-(g.length-1)*SK.gap;
+function layout(z){
+  const m=linkModel(z);
+  const cols=[m.a,m.b,m.c], most=Math.max(...cols.map(c=>c.length));
+  const gap = z? 5 : 9, min = z? 9 : 11;
+  const H = z? Math.max(560, m.b.length*17+SK.top*2) : 660;
+  // one budget for all three columns, so the marks total the same height in each
+  // and a ribbon does not taper just because its column has fewer nodes
+  const budget = H - SK.top*2 - (most-1)*gap;
+  cols.forEach(g=>{
     const raw=sum(g.map(n=>n.v)), k=budget/raw;
-    g.forEach(n=>n.h=Math.max(SK.min, n.v*k));
+    g.forEach(n=>n.h=Math.max(min, n.v*k));
     const over=sum(g.map(n=>n.h))-budget;
-    if(over>0){ const flex=g.filter(n=>n.h>SK.min);
-      const tot=sum(flex.map(n=>n.h-SK.min));
-      flex.forEach(n=>n.h-=(n.h-SK.min)/tot*over); }
-    let y=SK.top+(budget-sum(g.map(n=>n.h)))/2;
-    g.forEach(n=>{n.y=y;y+=n.h+SK.gap;});};
-  [m.a,m.b,m.c].forEach(scale);
-  const by={}; [...m.a,...m.b,...m.c].forEach(n=>{by[n.id]=n;n.ox=n.y;n.ix=n.y;});
+    if(over>0){const flex=g.filter(n=>n.h>min), tot=sum(flex.map(n=>n.h-min));
+      if(tot>0) flex.forEach(n=>n.h-=(n.h-min)/tot*over);}
+    const g2=(H-SK.top*2-sum(g.map(n=>n.h)))/Math.max(1,g.length-1);
+    let y=SK.top; g.forEach(n=>{n.y=y; y+=n.h+g2;});
+  });
+  const by={}; cols.flat().forEach(n=>{by[n.id]=n; n.ox=n.y; n.ix=n.y;});
   const order=(links,key,sortBy)=>{
     links.sort((p,q)=>by[p[sortBy]].y-by[q[sortBy]].y);
-    links.forEach(l=>{const n=by[l[key]];
-      const h=l.v/n.v*n.h;
-      if(key==="s"){l.y0=n.ox;n.ox+=h;} else {l.y1=n.ix;n.ix+=h;}
-      l["h"+(key==="s"?"0":"1")]=h;});};
+    links.forEach(l=>{const n=by[l[key]], h=l.v/n.v*n.h;
+      if(key==="s"){l.y0=n.ox; n.ox+=h; l.h0=h;} else {l.y1=n.ix; n.ix+=h; l.h1=h;}});};
   order(m.ab,"s","t"); order(m.ab,"t","s");
   order(m.bc,"s","t"); order(m.bc,"t","s");
-  m.by=by; return m;
+  m.by=by; m.H=H; return m;
 }
-const SKM = layout();
+function setZoom(z){zoom=(z===zoom?null:z); pick=null; renderSankey();}
 function nodeSplit(n){
-  const ev=EVENTS.filter(e=>(n.stage==="a"?e.primary:n.stage==="b"?e.domain:e.view)===n.key);
-  return ["Business","Technical","Marker"].map(t=>[t,ev.filter(e=>e.type===t).length]);
-}
+  return ["Business","Technical","Marker"].map(t=>[t,n.ev.filter(e=>e.type===t).length]);}
 function onPath(id){
   if(!pick) return true;
-  const hits=EVENTS.filter(e=>["a:"+e.primary,"b:"+e.domain,"c:"+e.view].includes(pick));
-  return hits.some(e=>["a:"+e.primary,"b:"+e.domain,"c:"+e.view].includes(id));
+  const key=e=>["a:"+e.primary, "b:"+(zoom?String(e.id):e.domain), "c:"+e.view];
+  const hits=SKM.evs.filter(e=>key(e).includes(pick));
+  return hits.some(e=>key(e).includes(id));
 }
-function linkOn(l){ if(!pick) return true;
-  return onPath(l.s)&&onPath(l.t)&&(pick===l.s||pick===l.t||
-    (pick[0]==="a"&&l.s[0]==="b")||(pick[0]==="c"&&l.t[0]==="b")||
-    (pick[0]==="b"&&(l.s===pick||l.t===pick)));}
-function ribbon(x0,y0,h0,x1,y1,h1){
-  const c=(x0+x1)/2;
+function linkOn(l){ if(!pick) return true; return onPath(l.s)&&onPath(l.t); }
+function ribbon(x0,y0,h0,x1,y1,h1){const c=(x0+x1)/2;
   return `M${x0},${y0} C${c},${y0} ${c},${y1} ${x1},${y1}
-          L${x1},${y1+h1} C${c},${y1+h1} ${c},${y0+h0} ${x0},${y0+h0} Z`;
-}
+          L${x1},${y1+h1} C${c},${y1+h1} ${c},${y0+h0} ${x0},${y0+h0} Z`;}
 function renderSankey(){
-  const m=SKM, s=[];
-  const draw=(links,xs,xt)=>links.forEach(l=>{
-    const on=linkOn(l);
+  SKM=layout(zoom); const m=SKM, s=[];
+  $("zoomBar").innerHTML=`<button aria-pressed="${!zoom}" onclick="setZoom(null)"
+      >All 105 events</button>`+
+    Object.keys(DOMAINS).map(d=>`<button aria-pressed="${zoom===d}" onclick="setZoom('${d}')"
+      >${d} · ${DOMAINS[d]}</button>`).join("");
+  $("lnkTitle").textContent = zoom
+    ? `${zoom} — source table → event → SDC view`
+    : "Source table → domain → SDC view";
+  $("lnkLede").innerHTML = zoom
+    ? `One band per event, ${m.b.length} of them, in id order. Click a band — or a row in the
+       list below — to open the event. Click a table or a view to keep only the paths through
+       it. <a style="color:var(--link);cursor:pointer" onclick="setZoom(null)">Back to all
+       domains</a>.`
+    : `Ribbon width is the number of events on that path. <b>Click a domain to open it into its
+       individual events</b>; click a table or a view to keep only the paths through it. Each
+       node carries its own Business / Technical split as a bar, so type never depends on the
+       ribbon colour.`;
+  $("sankey").setAttribute("height", m.H);
+  $("sankey").setAttribute("aria-label", zoom
+    ? `Flow from source tables through each ${zoom} event to its SDC view`
+    : "Flow from source tables through event domains to SDC views");
+
+  const draw=(links,xs,xt)=>links.forEach(l=>{const on=linkOn(l);
     s.push(`<path d="${ribbon(xs,l.y0,l.h0,xt,l.y1,l.h1)}"
-      fill="${on?"#8fa6b8":"#dbe3ea"}" fill-opacity="${on?.42:.3}"
+      fill="${on?"#8fa6b8":"#dbe3ea"}" fill-opacity="${on?.42:.28}"
       style="cursor:pointer" onmousemove="tipLink(event,'${l.s}','${l.t}',${l.v})"
       onmouseleave="untip()"></path>`);});
   draw(m.ab, SK.xa+SK.nw, SK.xb); draw(m.bc, SK.xb+SK.nw, SK.xc);
+
   const node=(n,x,anchor)=>{
-    const on=onPath(n.id), sp=nodeSplit(n); let y=n.y;
-    const bars=sp.filter(p=>p[1]).map(([t,c])=>{
+    const on=onPath(n.id), isEvt=!!n.event; let y=n.y;
+    const bars=nodeSplit(n).filter(p=>p[1]).map(([t,c])=>{
       const h=c/n.v*n.h, r=`<rect x="${x}" y="${y.toFixed(1)}" width="${SK.nw}"
         height="${Math.max(1,h-(h>3?1.5:0)).toFixed(1)}" fill="${TCOL[t]}"
         opacity="${on?1:.22}" rx="1.5"></rect>`; y+=h; return r;}).join("");
     const tx=anchor==="end"?x-9:x+SK.nw+9;
-    return `<g style="cursor:pointer" onclick="setPick('${n.id}')"
-       onmousemove="tipNode(event,'${n.id}')" onmouseleave="untip()">
-      ${bars}<rect x="${x-3}" y="${(n.y-3).toFixed(1)}" width="${SK.nw+6}"
-        height="${(n.h+6).toFixed(1)}" fill="transparent"></rect>
-      <text x="${tx}" y="${(n.y+n.h/2+1).toFixed(1)}" text-anchor="${anchor}"
-        dominant-baseline="middle" font-size="11" fill="${on?"#233240":"#aab6c0"}"
-        font-weight="${pick===n.id?600:400}">${esc(n.key)}<tspan
-        fill="${on?"#7b8894":"#c3ccd4"}" font-size="9.5"> · ${n.v}</tspan></text></g>`;};
+    const lab=n.h>=9 ? `<text x="${tx}" y="${(n.y+n.h/2+1).toFixed(1)}" text-anchor="${anchor}"
+        dominant-baseline="middle" font-size="${isEvt?10:11}" fill="${on?"#233240":"#aab6c0"}"
+        ${isEvt?'style="paint-order:stroke;stroke:#fff;stroke-width:3.5px;stroke-linejoin:round"':""}
+        font-weight="${pick===n.id?600:400}">${esc(isEvt?clip(n.label,42):n.key)}${
+        isEvt?"":`<tspan fill="${on?"#7b8894":"#c3ccd4"}" font-size="9.5"> · ${n.v}</tspan>`}</text>`
+      : "";
+    const act = isEvt? `openEvent(${n.event.id})`
+      : (n.stage==="b" ? `setZoom('${n.key}')` : `setPick('${n.id}')`);
+    return `<g style="cursor:pointer" onclick="${act}"
+      onmousemove="tipNode(event,'${n.id}')" onmouseleave="untip()">
+      ${bars}<rect x="${x-5}" y="${(n.y-2.5).toFixed(1)}" width="${SK.nw+10}"
+        height="${(n.h+5).toFixed(1)}" fill="transparent"></rect>${lab}</g>`;};
   m.a.forEach(n=>s.push(node(n,SK.xa,"end")));
   m.b.forEach(n=>s.push(node(n,SK.xb,"end")));
   m.c.forEach(n=>s.push(node(n,SK.xc,"start")));
   const hdr=(x,t,a)=>`<text x="${x}" y="14" text-anchor="${a}" font-size="9.5"
      font-weight="700" letter-spacing=".5" fill="#7b8894">${t}</text>`;
   s.push(hdr(SK.xa+SK.nw,"SOURCE TABLE (PRIMARY)","end"));
-  s.push(hdr(SK.xb+SK.nw,"DOMAIN","end"));
+  s.push(hdr(SK.xb+SK.nw, zoom? "EVENT" : "DOMAIN","end"));
   s.push(hdr(SK.xc,"SDC VIEW","start"));
   $("sankey").innerHTML=s.join("");
+
+  const r={}; m.evs.forEach(e=>{const k=[e.primary,zoom?e.domain:e.domain,e.view].join("\u0000");
+    r[k]=(r[k]||0)+1;});
   $("lnkTblBody").innerHTML=`<thead><tr><th>Source table</th><th>Domain</th>
     <th>SDC view</th><th style="width:78px">Events</th></tr></thead><tbody>`+
-    (()=>{const r={}; EVENTS.forEach(e=>{const k=[e.primary,e.domain,e.view].join("\u0000");
-      r[k]=(r[k]||0)+1;});
-      return Object.entries(r).sort((a,b)=>b[1]-a[1]).map(([k,v])=>{
-        const [t,d,w]=k.split("\u0000");
-        return `<tr><td class="mono" style="font-size:11px">${esc(t)}</td>
-          <td class="mono" style="font-size:11px">${d}</td>
-          <td class="mono" style="font-size:11px">${esc(w)}</td>
-          <td class="mono" style="font-size:11px">${v}</td></tr>`;}).join("");})()+"</tbody>";
+    Object.entries(r).sort((a,b)=>b[1]-a[1]).map(([k,v])=>{const [t,d,w]=k.split("\u0000");
+      return `<tr><td class="mono" style="font-size:11px">${esc(t)}</td>
+        <td class="mono" style="font-size:11px">${d}</td>
+        <td class="mono" style="font-size:11px">${esc(w)}</td>
+        <td class="mono" style="font-size:11px">${v}</td></tr>`;}).join("")+"</tbody>";
+
+  /* the list is the reliable way in: a band can be four pixels tall, a row cannot */
+  const q=($("lnkq").value||"").trim().toLowerCase();
+  const list=m.evs.filter(e=>!q||e.name.toLowerCase().includes(q)||String(e.id)===q);
+  $("lnkListTitle").textContent = zoom
+    ? `${zoom} — ${list.length} event${list.length===1?"":"s"}`
+    : `All ${list.length} events`;
+  $("lnkList").innerHTML=`<thead><tr><th style="width:50px">ID</th><th>Event</th>
+    <th style="width:88px">Type</th><th style="width:100px">Domain</th>
+    <th style="width:150px">Source table</th><th style="width:158px">SDC view</th>
+    <th style="width:104px">Criticality</th><th style="width:26px"></th></tr></thead><tbody>`+
+    list.map(e=>`<tr style="cursor:pointer" onclick="openEvent(${e.id})">
+      <td class="mono" style="font-size:11px">${e.id}</td>
+      <td style="font-size:12px">${esc(e.name)}</td>
+      <td><span class="chip" style="background:${TCOL[e.type]};color:#fff">${e.type}</span></td>
+      <td class="mono" style="font-size:10.5px">${e.domain}</td>
+      <td class="mono" style="font-size:10.5px">${esc(e.primary)}</td>
+      <td class="mono" style="font-size:10.5px">${esc(e.view)}</td>
+      <td>${critChip(e)}</td>
+      <td style="color:var(--link);font-weight:600">›</td></tr>`).join("")+"</tbody>";
 }
+const clip=(t,n)=>t.length>n?t.slice(0,n-1)+"…":t;
 function tipNode(ev,id){const n=SKM.by[id]; if(!n)return;
+  if(n.event) return tip(ev,`<b>${esc(n.event.name)}</b><br>
+    <span class="m">id ${n.event.id} · ${n.event.type} · ${n.event.domain}</span><br>
+    ${n.event.trig.length} watched columns · ${activeSubs(n.event).length} live subscriptions<br>
+    <span class="m">click to open the event</span>`);
   tip(ev,`<b>${esc(n.key)}</b><br>${n.v} events<br>`+
     nodeSplit(n).filter(p=>p[1]).map(([t,c])=>`${t} ${c}`).join(" · ")+
-    `<br><span class="m">click to isolate its paths</span>`);}
-function tipLink(ev,s,t,v){tip(ev,`<b>${esc(s.slice(2))}</b> → <b>${esc(t.slice(2))}</b><br>
-  ${v} event${v===1?"":"s"} take this path`);}
+    `<br><span class="m">${n.stage==="b"?"click to open this domain into its events"
+      :"click to isolate its paths"}</span>`);}
+function tipLink(ev,s,t,v){const a=SKM.by[s], b=SKM.by[t];
+  tip(ev,`<b>${esc(a?(a.event?a.label:a.key):s.slice(2))}</b> → <b>${
+    esc(b?(b.event?b.label:b.key):t.slice(2))}</b><br>${v} event${v===1?"":"s"} take this path`);}
 function setPick(id){pick=(pick===id?null:id);renderSankey();}
 function clearPick(){pick=null;renderSankey();}
-function toggleLinkTable(){const t=$("lnkTable");const on=t.classList.toggle("hide");
+function toggleLinkTable(){const t=$("lnkTable"), on=t.classList.toggle("hide");
   $("lnkTblBtn").setAttribute("aria-pressed",!on);}
 
 /* ===================== INTERDEPENDENCE ===================== */
