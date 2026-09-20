@@ -188,6 +188,29 @@ def build(path, a):
 
     ref_cost = sum(v["reference_month_cost"] for v in out_views)
     prj_cost = sum(v["projected_month_cost"] for v in out_views)
+
+    # A contracted floor changes the question. Below it, usage does not decide
+    # the bill and the marginal cost of one more subscription is zero; what
+    # matters is how much headroom is left. Report the floor as the answer and
+    # the usage as the thing consuming headroom, never the other way round.
+    floor = None
+    if a.minimum:
+        per_month = prj_cost / period_days * 30
+        annual = per_month * 12
+        use = per_month if a.minimum_per == "month" else annual
+        floor = {"amount": a.minimum, "per": a.minimum_per,
+                 "projected_usage_same_basis": round(use, 2),
+                 "binding": use < a.minimum,
+                 "headroom_hours": round(a.minimum / hour_cost - (
+                     sum(v["sec"] * v["scale"] for v in out_views) / 3600
+                     * (30 / period_days) * (1 if a.minimum_per == "month" else 12)), 1),
+                 "usage_as_pct_of_floor": round(use / a.minimum * 100, 1)}
+        if floor["binding"]:
+            note.append(
+                f"the ${a.minimum:,.0f} per {a.minimum_per} floor is {a.minimum/use:.0f}x "
+                f"projected usage of ${use:,.0f}. You pay the floor. Until usage reaches "
+                f"it, one more subscription costs nothing and the number worth tracking "
+                f"is headroom, not spend")
     gq = a.growth_per_quarter / 100.0
     top = out_views[0] if out_views else None
     if top and top["share_of_seconds"] > 0.25:
@@ -208,6 +231,7 @@ def build(path, a):
                       "credit_price": a.credit_price, "concurrency": a.concurrency,
                       "cost_per_elapsed_hour": round(hour_cost, 4)},
         "reconciliation": recon,
+        "minimum": floor,
         "totals": {"reference_period_cost": round(ref_cost, 2),
                    "projected_period_cost": round(prj_cost, 2),
                    "projected_per_day": round(prj_cost / period_days, 2),
@@ -250,6 +274,13 @@ def report(m):
       f"({t['reference_hours']:,.1f} elapsed hours)")
     p(f"  projected period ${t['projected_period_cost']:,.2f}  "
       f"({t['projected_hours']:,.1f} hours) = ${t['projected_per_30_days']:,.2f} / 30 days")
+    if m.get("minimum"):
+        f = m["minimum"]
+        p(f"  contracted floor ${f['amount']:,.0f} per {f['per']}  vs usage "
+          f"${f['projected_usage_same_basis']:,.0f} ({f['usage_as_pct_of_floor']}% of it)"
+          f"  -> {'THE FLOOR IS THE BILL' if f['binding'] else 'usage exceeds the floor'}")
+        p(f"  headroom         {f['headroom_hours']:,.0f} warehouse-hours before usage "
+          f"reaches the floor")
     p(f"  growth           {m['growth']['per_quarter_pct']}%/quarter "
       f"= {m['growth']['per_month_pct']}%/month")
     for n in m["notes"]:
@@ -304,7 +335,11 @@ def main(argv=None):
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("file", nargs="?")
     ap.add_argument("--explain", action="store_true")
-    ap.add_argument("--credit-price", type=float, default=3.00)
+    ap.add_argument("--credit-price", type=float, default=7.00,
+                    help="$ per credit-hour. $7 on an XS is the BBH agreement.")
+    ap.add_argument("--minimum", type=float,
+                    help="contracted floor for the period named by --minimum-per")
+    ap.add_argument("--minimum-per", choices=("month", "year"), default="year")
     ap.add_argument("--warehouse")
     ap.add_argument("--client", help="store the reference under this code")
     ap.add_argument("--concurrency", type=float, default=1.0)
