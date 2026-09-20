@@ -36,6 +36,7 @@ STEPS = [
     "legacy_dictionary", # legacy business definitions (AddVantage/CRD/STAR) keyed by field code
     "legacy_source_file",# CP_SOURCE_FILE: the business name of each AddVantage EOD feed
     "event360",          # Event 360: the SEI event specification workbook
+    "sdc_compute",       # SDC client compute sizing: the read-back bill, per view
     "search_index",      # MUST be last - indexes everything for full-text search
 ]
 
@@ -195,6 +196,12 @@ def _run_step(step, conn, loader, resolver) -> None:
         c = Event360Connector.from_env()
         n = c.load(loader, c.parse())
         log.info("event360: merged %s rows", n)
+        return
+    if step == "sdc_compute":
+        from .sdc_compute_conn import SdcComputeConnector
+        c = SdcComputeConnector.from_env()
+        n = c.load(loader, c.parse())
+        log.info("sdc_compute: merged %s rows", n)
         return
     if step == "legacy_source_file":
         from .legacy_source_file_conn import LegacySourceFileConnector
