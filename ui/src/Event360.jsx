@@ -37,6 +37,13 @@ const TC = { Business: '#2a78d6', Technical: '#eb6834', Marker: '#1baf7a' };
 const BC = { Critical: '#c1113a', High: '#e67e22', Moderate: '#3a6f9e', Low: '#7b8894' };
 
 const num = (v) => (v == null ? '—' : Math.round(Number(v)).toLocaleString());
+const title = (s) => String(s || '').split('_').map(
+  (w) => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
+// The group table drops its two technical columns in business view rather than
+// showing a business reader "distinct views" and "sec", which mean nothing
+// without the cost model behind them.
+const COLS = { biz: '148px minmax(0,1fr) 52px 84px',
+               tech: '148px minmax(0,1fr) 52px 84px 92px 74px' };
 const money = (n) => (n == null ? '—' : n >= 1000 ? '$' + Math.round(n).toLocaleString()
   : n >= 10 ? '$' + n.toFixed(0) : n >= 0.01 ? '$' + n.toFixed(2) : '$0.00');
 const step = (n) => (!n ? '#fff' : n < 4 ? P.s[0] : n < 8 ? P.s[1] : n < 14 ? P.s[2]
@@ -107,6 +114,11 @@ export default function Event360() {
   const [tab, setTab] = useState('est');
   const [sum, setSum] = useState(null);
   const [det, setDet] = useState(null);      // open event id
+  // Business and technical want the SAME data at different densities, not
+  // different data. The toggle changes what a screen leads with and how much
+  // jargon it spends; it never shows one audience a number the other cannot
+  // reach. Every business view drills into the technical one.
+  const [aud, setAud] = useState('biz');
 
   useEffect(() => { evt360.summary().then(setSum); }, []);
 
@@ -136,6 +148,19 @@ export default function Event360() {
           {sum.events} events · {num(sum.fields)} fields · {num(sum.trigger_rows)} trigger
           rows over {num(sum.trigger_columns)} columns
         </span>
+        <span style={{ marginLeft: 'auto', display: 'flex', gap: 0 }}>
+          {[['biz', 'Business view'], ['tech', 'Technical view']].map(([k, l], i) => (
+            <button key={k} onClick={() => setAud(k)} aria-pressed={aud === k}
+              style={{ font: 'inherit', fontSize: 11.5, fontWeight: 600,
+                padding: '6px 13px', cursor: 'pointer',
+                border: `1px solid ${aud === k ? P.accent : P.rule}`,
+                borderLeftWidth: i === 0 ? 1 : 0,
+                borderRadius: i === 0 ? '4px 0 0 4px' : '0 4px 4px 0',
+                background: aud === k ? P.accent : '#fff',
+                color: aud === k ? '#fff' : P.ink }}>{l}</button>))}
+        </span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 14, fontSize: 11,
           color: P.sub, alignItems: 'center' }}>
           event type
@@ -164,9 +189,11 @@ export default function Event360() {
                   background: tab === k ? P.accent : '#fff',
                   color: tab === k ? '#fff' : P.ink }}>{l}</button>))}
           </div>
-          {tab === 'est' && <Estate sum={sum} onOpen={setDet} />}
+          {tab === 'est' && <Estate sum={sum} aud={aud} onOpen={setDet}
+            onTech={() => setAud('tech')} />}
           {tab === 'swm' && <Lanes onOpen={setDet} />}
-          {tab === 'lnk' && <LinkView onOpen={setDet} />}
+          {tab === 'lnk' && <LinkView aud={aud} onOpen={setDet}
+            onTech={() => setAud('tech')} />}
           {tab === 'dep' && <Interdep onOpen={setDet} />}
           {tab === 'sub' && <SubsCost onOpen={setDet} />}
         </>}
@@ -177,8 +204,11 @@ export default function Event360() {
 const GROUPERS = [['type', 'Type'], ['domain', 'Domain'], ['cross', 'Domain × Type'],
   ['view', 'SDC view'], ['ops', 'Operation']];
 
-function Estate({ sum, onOpen }) {
+function Estate({ sum, aud, onOpen, onTech }) {
   const [by, setBy] = useState('type');
+  const [contract, setContract] = useState(null);
+  useEffect(() => { if (aud === 'biz' && !contract) evt360.contract().then(setContract); },
+    [aud, contract]);
   const [g, setG] = useState(null);
   const [sel, setSel] = useState(null);
   const [rows, setRows] = useState([]);
@@ -192,7 +222,60 @@ function Estate({ sum, onOpen }) {
   }, [sel, g]);
   const groups = (g && g.groups) || [];
   const max = Math.max(...groups.map((x) => x.total), 1);
+  const openTech = (key) => { setBy('domain'); setSel(key); onTech(); };
   return (<>
+    {aud === 'biz' && (
+      <Panel title="What changes, and who needs to know"
+        hint="Five business areas. An event is a notification that something in one of them changed — not the change itself. Open one to see its events and their detail.">
+        <div style={{ display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 12 }}>
+          {Object.entries(sum.domains).sort((a, b) => b[1] - a[1]).map(([dom, n]) => {
+            const cov = contract && (contract.domains || [])
+              .find((x) => x.domain === dom);
+            const grp = groups.find((x) => x.key === dom);
+            const subd = grp ? grp.subscribed : null;
+            return (
+              <div key={dom} onClick={() => openTech(dom)}
+                style={{ border: `1px solid ${P.rule}`, borderRadius: 10, padding: '14px 16px',
+                  cursor: 'pointer', background: P.panel }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                  <div style={{ fontSize: 15, fontWeight: 500 }}>{title(dom)}</div>
+                  <div style={{ marginLeft: 'auto', fontFamily: P.mono, fontSize: 20,
+                    fontWeight: 600 }}>{n}</div>
+                </div>
+                <div style={{ fontSize: 12, color: P.sub, marginTop: 4, minHeight: 32 }}>
+                  {cov && cov.coverage ? cov.coverage
+                    : dom === 'MARKER'
+                      ? 'Not about a record at all — these say a batch window closed.'
+                      : `Changes to ${dom.toLowerCase()} records that consumers must know about.`}
+                </div>
+                {grp && (
+                  <div style={{ display: 'flex', height: 20, borderRadius: 4,
+                    overflow: 'hidden', background: '#edf1f4', marginTop: 10 }}>
+                    {['Business', 'Technical', 'Marker'].filter((t) => grp[t]).map((t, i, a) => (
+                      <span key={t} style={{ flex: grp[t], background: TC[t], color: '#fff',
+                        fontSize: 10, fontWeight: 700, lineHeight: '20px',
+                        textAlign: 'center',
+                        boxShadow: i < a.length - 1 ? `2px 0 0 0 ${P.panel}` : undefined }}>
+                        {grp[t]}</span>))}
+                  </div>)}
+                <div style={{ display: 'flex', fontSize: 11.5, color: P.sub, marginTop: 8 }}>
+                  <span>{subd == null ? '' : subd === n
+                    ? 'every one has a consumer'
+                    : `${n - subd} of these nobody reads yet`}</span>
+                  <span style={{ marginLeft: 'auto', color: P.link, fontWeight: 600 }}>
+                    open &rsaquo;</span>
+                </div>
+              </div>);
+          })}
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <Note tone="info"><b>Markers are the one overlap.</b> The twelve marker events are
+            also the whole MARKER area — they carry no record, so there is nothing to fetch
+            and nothing to reconcile. Treating one like a data event is the commonest way to
+            get this contract wrong.</Note>
+        </div>
+      </Panel>)}
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,minmax(0,1fr))',
       gap: 12, marginBottom: 14 }}>
       <Tile n={sum.events} label="events in the contract"
@@ -221,20 +304,18 @@ function Estate({ sum, onOpen }) {
               color: by === k ? '#fff' : P.ink }}>{l}</button>))}
       </span>}>
       {!g ? <div style={{ color: P.sub, fontSize: 12 }}>Loading…</div> : (<>
-        <div style={{ display: 'grid',
-          gridTemplateColumns: '148px minmax(0,1fr) 52px 84px 92px 74px',
+        <div style={{ display: 'grid', gridTemplateColumns: COLS[aud],
           gap: 11, alignItems: 'center', padding: '4px 0', fontSize: 9.5,
           fontWeight: 700, textTransform: 'uppercase', color: P.sub, letterSpacing: .5 }}>
           <div>Group</div><div>Events by type</div>
           <div style={{ textAlign: 'right' }}>Events</div>
           <div style={{ textAlign: 'right' }}>Subscribed</div>
-          <div style={{ textAlign: 'right' }}>Distinct views</div>
-          <div style={{ textAlign: 'right' }}>Sec</div>
+          {aud === 'tech' && <div style={{ textAlign: 'right' }}>Distinct views</div>}
+          {aud === 'tech' && <div style={{ textAlign: 'right' }}>Sec</div>}
         </div>
         {groups.map((x) => (
           <div key={x.key} onClick={() => setSel(sel === x.key ? null : x.key)}
-            style={{ display: 'grid',
-              gridTemplateColumns: '148px minmax(0,1fr) 52px 84px 92px 74px',
+            style={{ display: 'grid', gridTemplateColumns: COLS[aud],
               gap: 11, alignItems: 'center', padding: '6px 0', cursor: 'pointer',
               background: sel === x.key ? P.tint : undefined }}>
             <div style={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden',
@@ -251,11 +332,13 @@ function Estate({ sum, onOpen }) {
             <div style={{ fontFamily: P.mono, fontSize: 12, textAlign: 'right' }}>{x.total}</div>
             <div style={{ fontFamily: P.mono, fontSize: 12, textAlign: 'right',
               color: x.subscribed < x.total ? P.warnInk : undefined }}>{x.subscribed}</div>
-            <div style={{ fontFamily: P.mono, fontSize: 12, textAlign: 'right' }}>
-              {x.distinct_views}{x.measured_views < x.distinct_views
-                ? <span style={{ color: P.sub }}> ({x.measured_views}m)</span> : null}</div>
-            <div style={{ fontFamily: P.mono, fontSize: 12, textAlign: 'right' }}>
-              {num(x.elapsed_sec)}</div>
+            {aud === 'tech' && (
+              <div style={{ fontFamily: P.mono, fontSize: 12, textAlign: 'right' }}>
+                {x.distinct_views}{x.measured_views < x.distinct_views
+                  ? <span style={{ color: P.sub }}> ({x.measured_views}m)</span> : null}</div>)}
+            {aud === 'tech' && (
+              <div style={{ fontFamily: P.mono, fontSize: 12, textAlign: 'right' }}>
+                {num(x.elapsed_sec)}</div>)}
           </div>))}
       </>)}
     </Panel>
@@ -562,12 +645,16 @@ function LaneDetail({ sel, lane, onOpen, onClose }) {
 // event, and the canvas grows with the band count rather than squeezing them —
 // a four-pixel band with no label is not a drill-down. The list beneath is the
 // reliable way in; a band can be thin, a row cannot.
-function LinkView({ onOpen }) {
+function LinkView({ aud, onOpen, onTech }) {
   const [zoom, setZoom] = useState(null);
   const [d, setD] = useState(null);
   const [q, setQ] = useState('');
+  // Business view never zooms: zooming replaces the domain stage with one band
+  // per event, which is the technical question. Clicking a domain in business
+  // view therefore switches audience AND zooms, which is the drill-down.
+  const biz = aud === 'biz' && !zoom;
   useEffect(() => { setD(null); evt360.link(zoom).then(setD); }, [zoom]);
-  const lay = useMemo(() => d && layout(d, zoom), [d, zoom]);
+  const lay = useMemo(() => d && layout(d, zoom, biz), [d, zoom, biz]);
   const doms = useMemo(() => {
     const m = {};
     ((d && d.b) || []).forEach((n) => { if (!zoom) m[n.key] = n.value; });
@@ -579,11 +666,15 @@ function LinkView({ onOpen }) {
       || String(n.event_id) === q);
   return (<>
     <Panel title={zoom ? `${zoom} — source table → event → SDC view`
-      : 'Source table → domain → SDC view'}
+      : biz ? 'Where a change happens, and where you read it back'
+        : 'Source table → domain → SDC view'}
       hint={zoom
         ? `One band per event, ${(d.b || []).length} of them, in id order. Click a band — or a row below — to open the event.`
-        : 'Ribbon width is the number of events on that path. Click a domain to open it into its individual events.'}
-      src="left META_EVENT_FIELD.SOURCE_TABLE (TRIGGER_DRIVING) · middle EVENT_ID / DOMAIN · right SDC_VIEW"
+        : biz
+          ? 'Every event tells you something changed and where to go for the record. Ribbon width is how many events take that path. Click a business area to open its events — that switches to the technical view, where the source tables appear.'
+          : 'Ribbon width is the number of events on that path. Click a domain to open it into its individual events.'}
+      src={biz ? undefined
+        : 'left META_EVENT_FIELD.SOURCE_TABLE (TRIGGER_DRIVING) · middle EVENT_ID / DOMAIN · right SDC_VIEW'}
       right={<Btn onClick={() => setZoom(null)} on={!zoom}>All events</Btn>}>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {Object.keys(doms).length > 0 && Object.entries(doms).map(([k, v]) => (
@@ -596,9 +687,15 @@ function LinkView({ onOpen }) {
       padding: '8px 4px', overflowX: 'auto', marginBottom: 12 }}>
       <Sankey lay={lay} onNode={(n) => {
         if (n.event_id) onOpen(n.event_id);
-        else if (n.stage === 'b') setZoom(n.key);
+        else if (n.stage === 'b') { setZoom(n.key); if (biz) onTech(); }
       }} />
     </div>
+    {biz && (
+      <Note tone="info"><b>The source tables are not here on purpose.</b> Which physical
+        table fired the trigger is a technical question, and putting forty-five of them on
+        screen is what made this diagram unreadable. Open a business area, or switch to the
+        technical view, and they appear.</Note>)}
+    <div style={{ height: biz ? 12 : 0 }} />
     <Panel title={zoom ? `${zoom} — ${list.length} events` : 'Open a domain to list its events'}
       hint="Every event in the diagram above, in the same order, each one a door into its details. A band four pixels tall is hard to hit; this list is not."
       right={<input value={q} onChange={(e) => setQ(e.target.value)}
@@ -645,11 +742,19 @@ function LinkView({ onOpen }) {
 // run in bands. The middle stage keeps the order it arrived in: by event
 // count when zoomed out, by event id when zoomed into a domain, because that
 // is the order a person reads it in.
-function layout(d, zoom) {
-  const SK = { W: 1180, top: 44, nw: 13, xa: 212, xb: 566, xc: 920 };
-  const cols = [d.a || [], d.b || [], d.c || []];
-  barycentre(cols[0], cols[1], d.ab || [], 's', 't');
-  barycentre(cols[2], cols[1], d.bc || [], 't', 's');
+function layout(d, zoom, biz) {
+  // Business view drops the source-table stage entirely. Which physical table
+  // fired the trigger is a technical question; a business reader wants where
+  // the change happened and where to read the record back. Two stages of five
+  // and forty read; three stages of forty-five, five and forty do not.
+  const SK = biz
+    ? { W: 1180, top: 44, nw: 15, xs: [300, 800], keys: ['b', 'c'] }
+    : { W: 1180, top: 44, nw: 13, xs: [212, 566, 920], keys: ['a', 'b', 'c'] };
+  const cols = SK.keys.map((k) => d[k] || []);
+  const links = biz ? [d.bc || []] : [d.ab || [], d.bc || []];
+  if (!biz) barycentre(cols[0], cols[1], d.ab || [], 's', 't');
+  barycentre(cols[cols.length - 1], cols[cols.length - 2],
+             d.bc || [], 't', 's');
   const most = Math.max(...cols.map((c) => c.length), 1);
   const gap = zoom ? 5 : 9, min = zoom ? 9 : 11;
   // The canvas grows with the LONGEST column, not just with the middle one.
@@ -664,7 +769,7 @@ function layout(d, zoom) {
   const budget = H - SK.top * 2 - (most - 1) * gap;
   const by = {};
   cols.forEach((g, gi) => {
-    const stage = 'abc'[gi];
+    const stage = SK.keys[gi];
     const raw = g.reduce((s, n) => s + n.value, 0) || 1;
     const k = budget / raw;
     // A minimum that cannot fit is not a minimum, it is an overflow. With 40
@@ -703,8 +808,11 @@ function layout(d, zoom) {
           });
       });
   };
-  wire(d.ab || [], 'a', 'b'); wire(d.bc || [], 'b', 'c');
-  return { SK, H, a: cols[0], b: cols[1], c: cols[2], ab: d.ab || [], bc: d.bc || [], by };
+  if (!biz) wire(d.ab || [], 'a', 'b');
+  wire(d.bc || [], 'b', 'c');
+  return { SK, H, cols, links, by, biz,
+           a: d.a || [], b: cols[biz ? 0 : 1], c: cols[cols.length - 1],
+           ab: d.ab || [], bc: d.bc || [] };
 }
 
 // Sort `outer` by the weighted mean position of the `mid` nodes it links to.
@@ -733,6 +841,10 @@ function barycentre(outer, mid, links, selfKey, otherKey) {
 function Sankey({ lay, onNode }) {
   if (!lay) return <div style={{ color: P.sub, fontSize: 12, padding: 12 }}>Loading…</div>;
   const { SK, H } = lay;
+  const HEAD = lay.biz
+    ? ['WHERE IT CHANGED', 'WHERE YOU READ IT BACK']
+    : ['SOURCE TABLE (PRIMARY)', lay.b.some((n) => n.event_id) ? 'EVENT' : 'DOMAIN',
+       'SDC VIEW'];
   const ribbon = (x0, y0, h0, x1, y1, h1) => {
     const c = (x0 + x1) / 2;
     return `M${x0},${y0} C${c},${y0} ${c},${y1} ${x1},${y1} L${x1},${y1 + h1}
@@ -767,20 +879,17 @@ function Sankey({ lay, onNode }) {
   return (
     <svg width={SK.W} height={H} role="img"
       aria-label="Flow from source tables through events to SDC views">
-      {lay.ab.map((l, i) => l.h0 > 0 && (
-        <path key={`ab${i}`} d={ribbon(SK.xa + SK.nw, l.y0, l.h0, SK.xb, l.y1, l.h1)}
-          fill="#8fa6b8" fillOpacity={.42}><title>{`${l.s} → ${l.t}: ${l.v}`}</title></path>))}
-      {lay.bc.map((l, i) => l.h0 > 0 && (
-        <path key={`bc${i}`} d={ribbon(SK.xb + SK.nw, l.y0, l.h0, SK.xc, l.y1, l.h1)}
-          fill="#8fa6b8" fillOpacity={.42}><title>{`${l.s} → ${l.t}: ${l.v}`}</title></path>))}
-      {lay.a.map((n) => <Node key={n.id} n={n} x={SK.xa} anchor="end" />)}
-      {lay.b.map((n) => <Node key={n.id} n={n} x={SK.xb} anchor="end" />)}
-      {lay.c.map((n) => <Node key={n.id} n={n} x={SK.xc} anchor="start" />)}
-      {[[SK.xa + SK.nw, 'SOURCE TABLE (PRIMARY)', 'end'],
-        [SK.xb + SK.nw, lay.b.some((n) => n.event_id) ? 'EVENT' : 'DOMAIN', 'end'],
-        [SK.xc, 'SDC VIEW', 'start']].map(([x, t, a]) => (
-          <text key={t} x={x} y={14} textAnchor={a} fontSize={9.5} fontWeight={700}
-            letterSpacing={.5} fill={P.sub}>{t}</text>))}
+      {lay.links.map((set, si) => set.map((l, i) => l.h0 > 0 && (
+        <path key={`r${si}-${i}`}
+          d={ribbon(SK.xs[si] + SK.nw, l.y0, l.h0, SK.xs[si + 1], l.y1, l.h1)}
+          fill="#8fa6b8" fillOpacity={.42}><title>{`${l.s} → ${l.t}: ${l.v}`}</title></path>)))}
+      {lay.cols.map((g, gi) => g.map((n) => (
+        <Node key={n.id} n={n} x={SK.xs[gi]}
+          anchor={gi === lay.cols.length - 1 ? 'start' : 'end'} />)))}
+      {HEAD.map((t, i) => (
+        <text key={t} x={i === HEAD.length - 1 ? SK.xs[i] : SK.xs[i] + SK.nw} y={14}
+          textAnchor={i === HEAD.length - 1 ? 'start' : 'end'} fontSize={9.5}
+          fontWeight={700} letterSpacing={.5} fill={P.sub}>{t}</text>))}
     </svg>);
 }
 
