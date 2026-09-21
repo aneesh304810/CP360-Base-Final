@@ -51,6 +51,12 @@ export const evt360 = {
     { blast: [], heat: [], tables: [] }),
   column: (t, c) => get(`/event360/column/${encodeURIComponent(t)}/${encodeURIComponent(c)}`,
     { events: [] }),
+  table: (t, domain) => get(`/event360/table/${encodeURIComponent(t)}`
+    + (domain ? `?domain=${encodeURIComponent(domain)}` : ''),
+    { columns: [], events: [] }),
+  view: (v, domain) => get(`/event360/view/${encodeURIComponent(v)}`
+    + (domain ? `?domain=${encodeURIComponent(domain)}` : ''),
+    { events: [], profile: null, money: null }),
   subscriptions: (consumer) => get('/event360/subscriptions'
     + (consumer ? `?consumer=${encodeURIComponent(consumer)}` : ''),
     { subscriptions: [], consumers: [], matrix: [], unsubscribed: [] }),

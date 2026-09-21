@@ -484,6 +484,75 @@ def column(table: str, column: str):
             "events": [e for e in ev if int(e["event_id"]) in ids]}
 
 
+# ---- the swimlane's drill-downs ------------------------------------------
+# Each stage of a lane is a door: a source table, a watched column, an event,
+# an SDC view. Three of the four already had an endpoint; these are the two
+# that did not, kept in the same shape as /column/{table}/{column} rather than
+# folded into one generic handler that would need a `kind` parameter and a
+# switch to read.
+
+@router.get("/table/{table}")
+def table(table: str, domain: str | None = None):
+    """A source table: which of its columns are watched, how widely, and which
+    events watch them. `domain` narrows to one swimlane."""
+    ev = _score(_events(), _coupling(), _volumes())
+    rows = query("""SELECT f.source_column,
+                           COUNT(DISTINCT f.event_id) AS events,
+                           (SELECT COUNT(DISTINCT g.event_id) FROM meta_event_field g
+                             WHERE g.source_table = f.source_table
+                               AND g.source_column = f.source_column
+                               AND g.field_category = 'TRIGGER_DRIVING') AS watchers
+                      FROM meta_event_field f
+                     WHERE f.field_category = 'TRIGGER_DRIVING'
+                       AND f.source_table = :t
+                     GROUP BY f.source_table, f.source_column
+                     ORDER BY watchers DESC, f.source_column""", {"t": table})
+    ids = {int(r["event_id"]) for r in query(
+        """SELECT DISTINCT event_id FROM meta_event_field
+            WHERE field_category = 'TRIGGER_DRIVING' AND source_table = :t""",
+        {"t": table})}
+    hits = [e for e in ev if int(e["event_id"]) in ids
+            and (not domain or e["domain"] == domain)]
+    return {"table": table, "domain": domain, "columns": rows, "events": hits,
+            "note": "a column watched by more than one event cannot be changed "
+                    "quietly - they all arrive, in no fixed order"}
+
+
+@router.get("/view/{view}")
+def view(view: str, domain: str | None = None):
+    """An SDC view: which events send you to it, and what reading it measured.
+
+    This is where the cost of a swimlane actually sits. The events naming a
+    view share its cost rather than each carrying one, so the panel reports the
+    view's measured compute ONCE and lists the events beside it, instead of
+    dividing it between them.
+    """
+    ev = _score(_events(), _coupling(), _volumes())
+    hits = [e for e in ev if e["sdc_view"] == view
+            and (not domain or e["domain"] == domain)]
+    prof = _view_profile().get(view)
+    ag, per = _agreement(), _period()
+    money = None
+    if prof and _num(ag.get("credit_price")):
+        credits = _wh_credits(ag.get("default_wh"))
+        conc = _num(ag.get("concurrency"), 1.0) or 1.0
+        hour = credits * _num(ag["credit_price"]) / conc
+        ratio = (_num(ag.get("target_accounts")) / _num(per["accounts"])
+                 if per and _num(per.get("accounts")) and _num(ag.get("target_accounts"))
+                 else None)
+        days = _num(per.get("period_days"), 30) if per else 30
+        money = {"cost_per_query": round(prof["sec_per_query"] / 3600 * hour, 6),
+                 "reference_period_cost": round(prof["sec"] / 3600 * hour, 2),
+                 "projected_month_cost": (round(prof["sec"] * ratio / 3600 * hour
+                                                * (30 / days), 2) if ratio else None),
+                 "scaled_by": ratio, "cost_per_elapsed_hour": round(hour, 4)}
+    return {"view": view, "domain": domain, "events": hits, "profile": prof,
+            "money": money,
+            "note": ("measured on the reference client's warehouse" if prof else
+                     "this view was not in the compute extract - that is not the "
+                     "same as free, and nothing here should be read as zero cost")}
+
+
 @router.get("/subscriptions")
 def subscriptions(consumer: str | None = None):
     rows = query("""SELECT s.consumer_code, c.consumer_name, s.event_id,

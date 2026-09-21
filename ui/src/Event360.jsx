@@ -165,7 +165,7 @@ export default function Event360() {
                   color: tab === k ? '#fff' : P.ink }}>{l}</button>))}
           </div>
           {tab === 'est' && <Estate sum={sum} onOpen={setDet} />}
-          {tab === 'swm' && <Lanes />}
+          {tab === 'swm' && <Lanes onOpen={setDet} />}
           {tab === 'lnk' && <LinkView onOpen={setDet} />}
           {tab === 'dep' && <Interdep onOpen={setDet} />}
           {tab === 'sub' && <SubsCost onOpen={setDet} />}
@@ -299,10 +299,17 @@ function EventTable({ rows, onOpen }) {
 }
 
 /* ============================ Swimlanes ============================ */
-function Lanes() {
+function Lanes({ onOpen }) {
   const [by, setBy] = useState('domain');
   const [d, setD] = useState(null);
-  useEffect(() => { setD(null); evt360.lanes(by).then(setD); }, [by]);
+  // What is open, and under which lane. Every stage of a lane is a door, and
+  // the detail opens UNDER that lane rather than in a side panel or a new
+  // screen, so the row you clicked from stays on screen to be read against.
+  const [sel, setSel] = useState(null);   // {lane, kind, key}
+  useEffect(() => { setD(null); setSel(null); evt360.lanes(by).then(setD); }, [by]);
+  const pick = (lane, kind, key) => setSel(
+    (s) => (s && s.lane === lane && s.kind === kind && s.key === key
+      ? null : { lane, kind, key }));
   const lanes = (d && d.lanes) || [];
   const maxCol = Math.max(...lanes.map((l) => l.cols || 0), 1);
   const Stage = ({ children, last }) => (
@@ -338,11 +345,13 @@ function Lanes() {
           .map((t) => [t, l.events.filter((e) => e.event_type === t).length])
           .filter((x) => x[1]);
         return (
-          <div key={l.lane} style={{ display: 'grid',
+          <React.Fragment key={l.lane}>
+          <div style={{ display: 'grid',
             gridTemplateColumns: '132px repeat(4,minmax(0,1fr))',
             borderTop: `1px solid ${P.rule}` }}>
-            <div style={{ padding: 12, borderRight: `1px solid ${P.rule}`,
-              background: '#f4f7f9' }}>
+            <div onClick={() => pick(l.lane, 'events', l.lane)}
+              style={{ padding: 12, borderRight: `1px solid ${P.rule}`, cursor: 'pointer',
+                background: sel && sel.lane === l.lane ? P.tint : '#f4f7f9' }}>
               <div style={{ fontFamily: P.mono, fontSize: 12, fontWeight: 600 }}>{l.lane}</div>
               <div style={{ fontSize: 11, color: P.sub, marginTop: 3 }}>
                 {l.event_count} events</div>
@@ -351,11 +360,18 @@ function Lanes() {
               ? <div style={{ fontSize: 12, color: P.sub }}>No source record. The lane
                 starts when the <b>batch window closes</b>, not when a row changes.</div>
               : (l.tables.length
-                ? l.tables.map((t) => (
-                  <span key={t.table} style={{ fontFamily: P.mono, fontSize: 10.5,
-                    background: P.tint, color: P.accent, borderRadius: 3,
-                    padding: '2px 6px', display: 'inline-block', margin: '2px 3px 0 0' }}>
-                    {t.table} <b>{t.cols}</b></span>))
+                ? l.tables.map((t) => {
+                  const on = sel && sel.lane === l.lane && sel.kind === 'table'
+                    && sel.key === t.table;
+                  return (
+                    <span key={t.table} onClick={() => pick(l.lane, 'table', t.table)}
+                      title={`${t.cols} watched columns - open`}
+                      style={{ fontFamily: P.mono, fontSize: 10.5, cursor: 'pointer',
+                        background: on ? P.accent : P.tint, color: on ? '#fff' : P.accent,
+                        borderRadius: 3, padding: '2px 6px', display: 'inline-block',
+                        margin: '2px 3px 0 0' }}>
+                      {t.table} <b>{t.cols}</b></span>);
+                })
                 : <i style={{ color: P.sub, fontSize: 12 }}>no source table stated</i>)}
             </Stage>
             <Stage>{marker
@@ -368,7 +384,12 @@ function Lanes() {
                   <div style={{ height: 6, borderRadius: 999, background: P.accent,
                     width: `${Math.round((l.cols || 0) / maxCol * 100)}%` }} /></div>
                 <div style={{ fontSize: 11, color: P.sub }}>fires when any of them differs
-                  before → after, and the condition holds</div></>)}
+                  before → after, and the condition holds</div>
+                {l.tables.length > 0 && (
+                  <a onClick={() => pick(l.lane, 'columns', l.tables[0].table)}
+                    style={{ color: P.link, cursor: 'pointer', fontSize: 11,
+                      display: 'inline-block', marginTop: 5 }}>
+                    which columns, and what else they fire &rsaquo;</a>)}</>)}
             </Stage>
             <Stage>
               <div style={{ display: 'flex', gap: 6, marginBottom: 5, flexWrap: 'wrap' }}>
@@ -378,27 +399,42 @@ function Lanes() {
               </div>
               <div style={{ lineHeight: 1.1 }}>
                 {l.events.slice(0, 44).map((e) => (
-                  <span key={e.event_id} title={`${e.event_id} · ${e.event_name}`}
+                  <span key={e.event_id} onClick={() => onOpen(e.event_id)}
+                    title={`${e.event_id} - ${e.event_name} (${e.band}) - open`}
                     style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%',
-                      margin: '2px 3px 2px 0', background: TC[e.event_type],
+                      margin: '2px 3px 2px 0', background: TC[e.event_type], cursor: 'pointer',
                       boxShadow: `0 0 0 2px ${P.panel}` }} />))}
                 {l.events.length > 44 && <span style={{ fontSize: 10.5, color: P.sub }}>
                   {' '}+{l.events.length - 44}</span>}
               </div>
+              <a onClick={() => pick(l.lane, 'events', l.lane)}
+                style={{ color: P.link, cursor: 'pointer', fontSize: 11,
+                  display: 'inline-block', marginTop: 4 }}>
+                list all {l.event_count} &rsaquo;</a>
             </Stage>
             <Stage last>{marker
               ? <Note><b>Lane ends here.</b> Nothing to fetch — a marker is a checkpoint.</Note>
               : (l.views.length
-                ? <>{l.views.map((v) => (
-                  <span key={v} style={{ fontFamily: P.mono, fontSize: 10.5,
-                    background: P.tint, color: P.accent, borderRadius: 3, padding: '2px 6px',
-                    display: 'inline-block', margin: '2px 3px 0 0' }}>{v}</span>))}
+                ? <>{l.views.map((v) => {
+                  const on = sel && sel.lane === l.lane && sel.kind === 'view' && sel.key === v;
+                  return (
+                    <span key={v} onClick={() => pick(l.lane, 'view', v)}
+                      title="what reading this view costs - open"
+                      style={{ fontFamily: P.mono, fontSize: 10.5, cursor: 'pointer',
+                        background: on ? P.accent : P.tint, color: on ? '#fff' : P.accent,
+                        borderRadius: 3, padding: '2px 6px',
+                        display: 'inline-block', margin: '2px 3px 0 0' }}>{v}</span>);
+                })}
                   <div style={{ fontSize: 11, color: P.sub, marginTop: 5 }}>read the record
                     with <span style={{ fontFamily: P.mono }}>key</span>; never from the
                     payload</div></>
                 : <i style={{ color: P.sub, fontSize: 12 }}>no view stated</i>)}
             </Stage>
-          </div>);
+          </div>
+          {sel && sel.lane === l.lane && (
+            <LaneDetail sel={sel} lane={l} onOpen={onOpen}
+              onClose={() => setSel(null)} />)}
+          </React.Fragment>);
       })}
     </div>
     <div style={{ marginTop: 12 }}>
@@ -407,6 +443,117 @@ function Lanes() {
         back to — which is why the marker lane is drawn as ending, not as continuing.</Note>
     </div>
   </>);
+}
+
+
+// The strip that opens under a lane. One component for all four doors, because
+// they all answer the same shape of question - which events, and what does it
+// cost - and splitting them would mean four near-identical tables drifting
+// apart. What differs is only the header and the middle column.
+function LaneDetail({ sel, lane, onOpen, onClose }) {
+  const [d, setD] = useState(null);
+  useEffect(() => {
+    setD(null);
+    const dom = lane.lane;
+    if (sel.kind === 'table')   evt360.table(sel.key, dom).then(setD);
+    else if (sel.kind === 'columns') evt360.table(sel.key, dom).then(setD);
+    else if (sel.kind === 'view')    evt360.view(sel.key, dom).then(setD);
+    else setD({ events: lane.events.map((e) => ({ ...e, _lane: true })) });
+  }, [sel.kind, sel.key, lane.lane]);
+
+  const title = {
+    table:   `${sel.key} - watched columns and the events that watch them`,
+    columns: `${sel.key} - watched columns and the events that watch them`,
+    view:    `${sel.key} - what reading this view costs`,
+    events:  `${lane.lane} - all ${lane.event_count} events`,
+  }[sel.kind];
+
+  return (
+    <div style={{ borderTop: `2px solid ${P.accent}`, background: '#fbfdfe',
+      padding: '12px 16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <h3 style={{ fontSize: 12.5, fontWeight: 600, margin: 0,
+          fontFamily: sel.kind === 'events' ? undefined : P.mono }}>{title}</h3>
+        <button onClick={onClose} style={{ marginLeft: 'auto', font: 'inherit',
+          fontSize: 11.5, fontWeight: 600, padding: '4px 10px', cursor: 'pointer',
+          border: `1px solid ${P.rule}`, borderRadius: 4, background: '#fff',
+          color: P.ink }}>Close</button>
+      </div>
+      {!d ? <div style={{ color: P.sub, fontSize: 12 }}>Loading...</div> : (
+        <div style={{ display: 'grid',
+          gridTemplateColumns: sel.kind === 'events' ? '1fr' : 'minmax(0,1fr) minmax(0,1.2fr)',
+          gap: 14, alignItems: 'start' }}>
+
+          {sel.kind !== 'events' && (
+            <div>
+              {sel.kind === 'view' ? (
+                d.profile ? (<>
+                  <KV rows={[
+                    ['Seconds per query', Number(d.profile.sec_per_query).toFixed(2)],
+                    ['GB per query', Number(d.profile.gb_per_query).toFixed(4)],
+                    ['Queries measured', num(d.profile.queries)],
+                    ['Measured period', d.profile.period_id],
+                    ['Cost per read', d.money ? money(d.money.cost_per_query) : '-'],
+                    ['Projected / month', d.money && d.money.projected_month_cost != null
+                      ? money(d.money.projected_month_cost) : '-'],
+                  ]} />
+                  <div style={{ marginTop: 10 }}>
+                    <Note><b>{d.events.length} event{d.events.length === 1 ? '' : 's'} in
+                      this lane send you here, and they share this cost.</b> The view is
+                      read once however many events name it, so dropping one of them saves
+                      nothing unless it is the last.</Note>
+                  </div>
+                </>) : <Note tone="bad"><b>Not measured.</b> {d.note}</Note>
+              ) : (
+                <table style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%' }}>
+                  <thead><tr><th style={th}>Column</th>
+                    <th style={{ ...th, width: 92 }}>Events</th>
+                    <th style={{ ...th, width: 104 }}>Total watchers</th></tr></thead>
+                  <tbody>{(d.columns || []).map((c) => (
+                    <tr key={c.source_column}>
+                      <td style={mtd}>{c.source_column}</td>
+                      <td style={mtd}>{c.events}</td>
+                      <td style={td}>{Number(c.watchers) > 1
+                        ? <span style={{ fontSize: 10.5, fontWeight: 700, borderRadius: 999,
+                          padding: '3px 9px', background: '#fdf6ec', color: P.warnInk }}>
+                          {c.watchers} events fire</span>
+                        : <span style={{ color: P.sub, fontSize: 11 }}>one event only</span>}</td>
+                    </tr>))}
+                    {!(d.columns || []).length && <tr><td colSpan={3}
+                      style={{ ...td, color: P.sub }}>No watched columns.</td></tr>}
+                  </tbody>
+                </table>)}
+            </div>)}
+
+          <div>
+            <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: .5,
+              textTransform: 'uppercase', color: P.sub, marginBottom: 6 }}>
+              {(d.events || []).length} event{(d.events || []).length === 1 ? '' : 's'}
+              {sel.kind === 'events' ? '' : ` in ${lane.lane}`}
+            </div>
+            <div style={{ maxHeight: 300, overflow: 'auto' }}>
+              <table style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%' }}>
+                <tbody>{(d.events || []).map((e) => (
+                  <tr key={e.event_id} onClick={() => onOpen(Number(e.event_id))}
+                    style={{ cursor: 'pointer' }}>
+                    <td style={{ ...mtd, width: 46 }}>{e.event_id}</td>
+                    <td style={td}>{e.event_name}</td>
+                    <td style={{ ...td, width: 92 }}><TypeChip t={e.event_type} /></td>
+                    <td style={{ ...td, width: 104 }}>
+                      {e.criticality ? <Band e={e} />
+                        : e.band ? <span style={{ fontSize: 10.5, fontWeight: 700,
+                          borderRadius: 999, padding: '3px 9px', color: '#fff',
+                          background: BC[e.band] }}>{e.band}</span> : null}</td>
+                    <td style={{ ...td, width: 26, color: P.link, fontWeight: 600 }}>&rsaquo;</td>
+                  </tr>))}
+                  {!(d.events || []).length && <tr><td style={{ ...td, color: P.sub }}>
+                    No events.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>)}
+    </div>);
 }
 
 /* ============================ Link view ============================ */
