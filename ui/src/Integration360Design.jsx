@@ -11,6 +11,16 @@ import {
 // L3 components → detail. Read-only observability over BBH ↔ SEI.
 // =====================================================================
 
+const OBSERVATION_CHAIN = [
+ ["SEI publishes", "not observable", "inferred only from a gap in micro-batch IDs"],
+ ["Listener receives", "SDC_STAGED_ID \u00b7 offset, enqueued_ts", "offset gap inside a box; consumer lag climbing"],
+ ["Micro-batch boxed", "MB Start/End per partition", "start with no end; one partition stalled while others move"],
+ ["Collapse + pull", "micro-batch registry", "FAILED; not-found keys above the delete rate"],
+ ["Stage 1 load", "registry + Airflow task", "FAILED, rolled back"],
+ ["STG \u2192 INT \u2192 Gold", "Airflow task_instance + dbt run results", "task failed; date stuck at TRIGGER"],
+ ["Date close", "DATE_CONTROL \u00b7 RECON_RESULT", "never reaches COMPLETE"],
+];
+
 const PLANE_KEYS = Object.keys(I360_PLANES);
 const compsIn = (k) => I360_COMPONENTS.filter((c) => c.plane === k);
 const readiness = (k) => {
@@ -242,6 +252,10 @@ export default function Integration360Design({ t }) {
       from within the tool.
      </div>
     </div>
+    <div style={{ fontSize: 10, color: sub, marginTop: 8, maxWidth: 900 }}>
+     Chips are a representative subset; the count on each plane header is the full
+     figure. Click a plane to list all of its components.
+    </div>
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
      gap: 8, marginTop: 12 }}>
      {PLANE_KEYS.map((k) => {
@@ -395,6 +409,63 @@ export default function Integration360Design({ t }) {
        <div style={{ fontSize: 10, color: sub, marginTop: 3 }}>
         <b style={{ color: "#a8560f" }}>cannot:</b> {c.cant}</div></div>
      </div>))}
+   </div>
+
+   {/* observation model — two clocks */}
+   <div style={{ fontSize: 15, fontWeight: 700, color: navy, margin: "22px 0 4px" }}>
+    Observation model — two clocks</div>
+   <div style={{ fontSize: 10.5, color: sub, marginBottom: 10 }}>
+    all intraday and EOD data arrives as SDC events through one pipeline to Stage 1,
+    Stage 2 and Gold</div>
+   <div style={{ display: "grid",
+    gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 10,
+    marginBottom: 12 }}>
+    <div style={{ background: "#e6f4f2", border: "1px solid #0e8f7e", borderRadius: 8,
+     padding: "12px 14px" }}>
+     <b style={{ fontSize: 12.5, color: navy }}>Intraday — continuous</b>
+     <div style={{ fontSize: 11, color: "#33414d", marginTop: 4, lineHeight: 1.55 }}>
+      There is no “complete”, only flowing at an acceptable rate or falling behind.
+      Health is lag, boxing continuity and Stage 1 load success over a rolling window.
+     </div></div>
+    <div style={{ background: "#f4f8fb", border: `1px solid ${panel}`, borderRadius: 8,
+     padding: "12px 14px" }}>
+     <b style={{ fontSize: 12.5, color: navy }}>EOD — a gate</b>
+     <div style={{ fontSize: 11, color: "#33414d", marginTop: 4, lineHeight: 1.55 }}>
+      Binary: EOD marker received, every micro-batch LOADED, transformation run,
+      reconciliation clean, DATE_CONTROL at COMPLETE.
+     </div></div>
+   </div>
+
+   <div style={{ fontSize: 11, color: "#33414d", background: "#fff",
+    border: `1px solid ${panel}`, borderLeft: "3px solid #a8560f", borderRadius: 8,
+    padding: "12px 14px", lineHeight: 1.6, marginBottom: 14, maxWidth: 940 }}>
+    <b>Why both are needed.</b> Intraday micro-batches load into Stage 1 all day while
+    the date sits at PENDING, and the transformation runs once at EOD over whatever
+    accumulated. A micro-batch that failed at 11am and went unnoticed means the
+    transformation runs on incomplete Stage 1 — and the reconciliation boundaries will
+    not catch it, because STG→INT ties perfectly against a Stage 1 that is itself short.
+    So the gate requires every micro-batch LOADED, not merely that the EOD marker arrived.
+   </div>
+
+   <div style={{ background: "#fff", border: `1px solid ${panel}`, borderRadius: 10,
+    overflow: "hidden" }}>
+    {OBSERVATION_CHAIN.map(([hop, src, fail]) => (
+     <div key={hop} style={{ display: "grid",
+      gridTemplateColumns: "minmax(0,150px) minmax(0,1fr) minmax(0,1.2fr)", gap: 12,
+      padding: "9px 16px", fontSize: 11, borderTop: "1px solid #eef1f4",
+      alignItems: "start" }}>
+      <b style={{ color: navy }}>{hop}</b>
+      <span style={{ fontFamily: "Roboto Mono, monospace", fontSize: 10, color: sub }}>
+       {src}</span>
+      <span style={{ fontSize: 10.5, color: "#33414d" }}>{fail}</span>
+     </div>))}
+   </div>
+   <div style={{ fontSize: 10.5, color: sub, marginTop: 8, maxWidth: 940,
+    lineHeight: 1.6 }}>
+    End-to-end latency BBH controls is broker <b>enqueued_ts</b> → <b>stage1_load_ts</b>.
+    Everything before the broker is SEI’s, and invisible. Because the pull re-reads
+    current state, lineage runs Gold row → micro-batch → key — never Gold row → the
+    specific change that caused it.
    </div>
   </div>);
 }

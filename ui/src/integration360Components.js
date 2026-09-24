@@ -5,7 +5,7 @@
 
 export const I360_SUMMARY = {
  title: "Integration360 — read-only observability over BBH ↔ SEI integration",
- line: "32 components across 6 planes. Observes four channels and answers three questions per business date: completeness, timeliness, correctness. Owns no integration state — the Integration Hub owns quarantine, error handling and remediation.",
+ line: "35 components across 6 planes. Observes four channels and answers three questions per business date: completeness, timeliness, correctness. Owns no integration state — the Integration Hub owns quarantine, error handling and remediation.",
 };
 
 export const I360_PLANES = {
@@ -43,6 +43,14 @@ export const I360_COMPONENTS = [
    deliverable: "One list over three sources with different vocabularies",
    detail: "Row-level business DQ, dbt structural tests, and the Hub's quarantine and transport errors. Sorted by days to expiry first.",
    note: "Read-only. The SEI diagram labels this 'Exception Management'; here it is exception visibility." },
+ { id: "UI-7", plane: "UI", component: "LiveFlowBoard", state: "Blocked",
+   deliverable: "The intraday clock \u2014 micro-batch by partition, live",
+   detail: "Grid of micro-batch against partition, with consumer lag per partition, last batch per topic and current backlog. Localises a stall: 'partition 2 stopped at 04:12' rather than 'the event channel is behind'.",
+   note: "Blocked on partition count per domain topic. Without a denominator, 'all partitions reported' cannot be distinguished from 'the ones I happened to see'." },
+ { id: "UI-8", plane: "UI", component: "StageFunnel", state: "Specified",
+   deliverable: "Six numbers for one date that must tie",
+   detail: "Events received \u2192 distinct keys \u2192 rows pulled \u2192 Stage 1 \u2192 INT \u2192 Gold, each with its explained deduction: duplicates collapsed, not-found keys, source-DQ filtered, missing-dimension held.",
+   note: "Puts the four event-side boundaries in front of the medallion's existing four, so the chain reads as one funnel rather than two disconnected halves." },
  { id: "UI-6", plane: "UI", component: "BusinessDateTimeline", state: "Specified",
    deliverable: "Date → intraday cycle → micro-batch → transformation task",
    detail: "Resolves to 'the transformation failed at build_dim, attempt 2, at 04:12', then deep-links to the Airflow UI.",
@@ -126,6 +134,10 @@ export const I360_COMPONENTS = [
  { id: "ENG-4", plane: "ENG", component: "gap_detector", state: "Specified",
    deliverable: "Sequence gaps · missing markers · stale loads · silent callbacks",
    detail: "Four checks with no owner anywhere else. Event Hub sequence numbers are monotonic per partition, so a gap is a provably lost event — a stronger completeness check than the file channel has." },
+ { id: "ENG-7", plane: "ENG", component: "cadence_baseline", state: "Specified",
+   deliverable: "Rolling inter-micro-batch interval, per topic",
+   detail: "Turns 'MB 1049 has not arrived' into 'MB 1049 is 40 minutes overdue against a 6-minute norm'. Lateness on the event channel comes from the stream's own rhythm \u2014 micro-batch IDs are sequential and arrive at a characteristic interval.",
+   note: "Does not cover EOD. There is one marker a day and no rhythm to baseline against, so its expected arrival time still has to be stated." },
  { id: "ENG-5", plane: "ENG", component: "rollup_builder", state: "Specified",
    deliverable: "Daily aggregates per channel",
    detail: "So a ninety-day trend does not scan the registries live, and cross-source correlation is precomputed rather than assembled per page load." },
