@@ -40,6 +40,7 @@ const NAV_GROUPS = [
  ['datasources', 'Data Sources', '⛭'],
  ['apicatalog', 'API Catalog Admin', '\u2699'],
  ["hub", "CP Integration Hub", "🏛"],
+      ["integration360", "Integration 360", "◉"],
       ['environment', 'Environment 360', '🖧'],
  ]
 },

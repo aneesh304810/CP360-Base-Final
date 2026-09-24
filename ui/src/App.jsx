@@ -21,6 +21,7 @@ import Recon360 from "./Recon360.jsx";
 import Api360Console, { ApiCatalogAdmin } from "./Api360Console.jsx";
 import Environment360 from "./Environment360.jsx";
 import HubDesign from "./HubDesign.jsx";
+import Integration360Design from "./Integration360Design.jsx";
 
 function currentRoute() {
  const h = (window.location.hash || "#home").replace(/^#/, "");
@@ -75,6 +76,7 @@ export default function App() {
  mapper: <Mapper t={t} />,
  environment: <Environment360 t={t} />,
  hub: <HubDesign t={t} />,
+ integration360: <Integration360Design t={t} />,
  };
 
  return (
