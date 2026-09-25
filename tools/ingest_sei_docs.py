@@ -35,6 +35,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -42,6 +43,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_SRC = ROOT / "sei-source"
 DEFAULT_OUT = ROOT / "ui" / "src" / "seiSourceDocs.js"
+PUBLIC_DIR = ROOT / "ui" / "public" / "sei-docs"
 
 # A heading is one of these, and short. Order matters: most specific first.
 HEADING_PATTERNS = [
@@ -70,6 +72,7 @@ class Doc:
     source_file: str
     backend: str
     pages: int
+    pdf_url: str = ""
     sections: list = field(default_factory=list)
 
 
@@ -189,6 +192,9 @@ def main():
     ap.add_argument("--src", type=Path, default=DEFAULT_SRC)
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
     ap.add_argument("--check", action="store_true", help="report only, write nothing")
+    ap.add_argument("--publish", action="store_true",
+                    help="also copy the PDFs where the browser can reach them, so the "
+                         "popup can link straight to the right page")
     args = ap.parse_args()
 
     if not args.src.is_dir():
@@ -212,9 +218,15 @@ def main():
         pages, backend = extract(path)
         doc_id, title, version = meta_from_name(path)
         sections = sectionise(pages)
+        pdf_url = ""
+        if args.publish and path.suffix.lower() == ".pdf":
+            PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, PUBLIC_DIR / path.name)
+            # Vite serves ui/public at the site root
+            pdf_url = f"/sei-docs/{path.name}"
         docs.append(Doc(id=doc_id, title=title, version=version,
                         source_file=path.name, backend=backend,
-                        pages=len(pages), sections=sections))
+                        pages=len(pages), sections=sections, pdf_url=pdf_url))
         chars = sum(len(s.text) for s in sections)
         print(f"  {path.name:<44} {backend:<10} {len(pages):>4}p  "
               f"{len(sections):>4} sections  {chars:>8,} chars")
@@ -230,6 +242,7 @@ def main():
         {
             "id": d.id, "title": d.title, "version": d.version,
             "sourceFile": d.source_file, "pages": d.pages, "backend": d.backend,
+            "pdfUrl": d.pdf_url,
             "sections": [
                 {"id": s.id, "label": s.label, "page": s.page, "text": s.text}
                 for s in d.sections
@@ -248,6 +261,11 @@ def main():
         fh.write(";\n")
 
     total = sum(len(s["text"]) for d in payload for s in d["sections"])
+    if args.publish:
+        pub = [d for d in payload if d["pdfUrl"]]
+        if pub:
+            print(f"\nPublished {len(pub)} PDF(s) to {PUBLIC_DIR.relative_to(ROOT)} — "
+                  f"the popup can now link straight to a page.")
     print(f"\nWrote {args.out.relative_to(ROOT)} — {len(payload)} documents, "
           f"{sum(len(d['sections']) for d in payload)} sections, {total:,} chars.")
     print("Citations live in ui/src/seiCitations.js and are maintained by hand.")

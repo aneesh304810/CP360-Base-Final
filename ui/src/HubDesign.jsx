@@ -9,6 +9,7 @@ import { AR_FINDINGS, AR_VERDICTS, AR_ASSUMPTIONS, AR_BOTTLENECKS, AR_ERRORS,
 import { FM_SUMMARY, FM_AREAS, FM_STATE, FM_PROVIDED, FM_TABLES, FM_REC }
  from "./hubFoundationModel.js";
 import SourceReference, { citationsFor } from "./SourceReference.jsx";
+import SeiDocModal from "./SeiDocModal.jsx";
 
 // =====================================================================
 // HubDesign — the CP Integration Hub route: C4 landing (L1 context +
@@ -71,6 +72,11 @@ export default function HubDesign({ t }) {
  const [flat, setFlat] = useState(false);       // "all components" flat tracker
  const [expand, setExpand] = useState(null);    // L3 component detail panel
  const [srcOf, setSrcOf] = useState(null);      // component shown beside its SEI source
+ const [seiDoc, setSeiDoc] = useState(null);    // {doc, section} open in the popup
+ const openDoc = (doc, section) => setSeiDoc({ doc, section });
+ const Popup = () => seiDoc ? (
+  <SeiDocModal t={t} docId={seiDoc.doc} sectionId={seiDoc.section}
+   onClose={() => setSeiDoc(null)} />) : null;
 
  const [live, setLive] = useState(false);   // true = Oracle-backed (shared)
  useEffect(() => {
@@ -186,7 +192,9 @@ export default function HubDesign({ t }) {
   if (c) return (
    <div>
     <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <Popup />
     <SourceReference t={t} comp={c} finding={FIND[c.id]} coverage={covOf(c)}
+     onOpenDoc={openDoc}
      onBack={
       <span onClick={() => setSrcOf(null)} style={{ fontSize: 11.5, fontWeight: 700,
        padding: "7px 16px", borderRadius: 5, background: t.navy || "#10193b",

@@ -2,7 +2,7 @@
 
 Drop the SEI-provided documents here, then run:
 
-    python3 tools/ingest_sei_docs.py
+    python3 tools/ingest_sei_docs.py --publish
 
 Name them so the id and version are picked up from the filename:
 
@@ -21,3 +21,6 @@ re-ingest does not lose it.
 
 **These documents are not committed.** `.gitignore` excludes everything here
 except this README — they are SEI's, and the repository is not where they live.
+
+`--publish` also copies the PDFs to `ui/public/sei-docs/` so the document popup
+can link straight to a page (`#page=N`). That directory is ignored too.

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { SEI_DOCS } from "./seiSourceDocs.js";
 import { SEI_CITATIONS, SEI_SOURCE_INDEX, CITE_KIND } from "./seiCitations.js";
+import { DocLink, hasSeiDoc } from "./SeiDocModal.jsx";
 
 // =====================================================================
 // SourceReference — the design on the left, the SEI document that
@@ -27,7 +28,7 @@ const sectionText = (docId, sectionId) => {
   return child ? { doc: d, sec: child, approximate: true } : null;
 };
 
-export default function SourceReference({ t, comp, finding, coverage, onBack }) {
+export default function SourceReference({ t, comp, finding, coverage, onBack, onOpenDoc }) {
   const [openSec, setOpenSec] = useState(null);
   const navy = t.navy || "#10193b";
   const panel = t.panel2 || "#dfe6e9";
@@ -112,11 +113,14 @@ export default function SourceReference({ t, comp, finding, coverage, onBack }) 
                 <div style={{ padding: "12px 16px" }}>
                   <div style={{ display: "flex", gap: 8, alignItems: "center",
                     flexWrap: "wrap" }}>
-                    <b style={{ fontSize: 11.5, color: navy }}>{src.title}</b>
+                    <b style={{ fontSize: 11.5 }}>
+                      <DocLink doc={c.doc} section={c.section} onOpen={onOpenDoc}
+                        tone={navy}>{src.title}</DocLink></b>
                     {src.version && chip("#eef3f8", "#0f4775", "v" + src.version)}
-                    <code style={{ fontFamily: "Roboto Mono, monospace", fontSize: 10,
-                      color: "#0f4775" }}>
-                      {c.section === "front" ? "whole document" : "§" + c.section}</code>
+                    <code style={{ fontFamily: "Roboto Mono, monospace", fontSize: 10 }}>
+                      <DocLink doc={c.doc} section={c.section} onOpen={onOpenDoc}>
+                        {c.section === "front" ? "open the document" : "§" + c.section}
+                      </DocLink></code>
                     <span style={{ marginLeft: "auto" }}>{chip(kc + "1f", kc,
                       klabel.toUpperCase())}</span>
                   </div>
@@ -129,6 +133,16 @@ export default function SourceReference({ t, comp, finding, coverage, onBack }) 
                       <b style={{ color: "#cc3344" }}>disagreement: </b>{c.conflict}</div>)}
                 </div>
 
+                {hit ? (
+                  <div style={{ borderTop: "1px solid #eef1f4", padding: "7px 16px",
+                    fontSize: 10.5, background: "#f7fafc" }}>
+                    <DocLink doc={c.doc} section={c.section} onOpen={onOpenDoc}>
+                      Open {hit.sec.label} in the document viewer
+                    </DocLink>
+                    <span style={{ color: sub, marginLeft: 8 }}>
+                      p.{hit.sec.page}{hit.approximate ? " · nearest subsection" : ""}
+                    </span>
+                  </div>) : null}
                 {hit ? (
                   <div style={{ borderTop: "1px solid #eef1f4" }}>
                     <div onClick={() => setOpenSec(isOpen ? null : key)}
