@@ -4,8 +4,8 @@ import { TRACKER_COMPONENTS } from "./seiDesignTracker.js";
 import DocDrill, { DOCS, DEFAULT_DOC, docFor } from "./DocDrill.jsx";
 import SeiDesignPack from "./SeiDesignPack.jsx";
 import { HUB_EVENT_COMPONENTS } from "./hubEventComponents.js";
-import { AR_FINDINGS, AR_VERDICTS, AR_ASSUMPTIONS, AR_BOTTLENECKS, AR_ERRORS }
- from "./hubArchitectReview.js";
+import { AR_FINDINGS, AR_VERDICTS, AR_ASSUMPTIONS, AR_BOTTLENECKS, AR_ERRORS,
+ AR_COVERAGE, AR_SEI_COVER, AR_OWNER, AR_PLANE_REC } from "./hubArchitectReview.js";
 
 // =====================================================================
 // HubDesign — the CP Integration Hub route: C4 landing (L1 context +
@@ -24,7 +24,12 @@ const COMPS = [...TRACKER_COMPONENTS, ...HUB_EVENT_COMPONENTS]
  .map((c) => ({ ...c, container: contOf(c) }));
 const FIND = {};
 AR_FINDINGS.forEach((f) => { FIND[f.id] = f; });
+const COV = {};
+AR_COVERAGE.forEach((r) => { COV[r.id] = r; });
+const covOf = (c) => COV[c.arId] || COV[c.id];
 const newIn = (k) => COMPS.filter((c) => c.container === k && c.isNew).length;
+const asksIn = (k) => COMPS.filter((c) => c.container === k)
+ .filter((c) => (covOf(c) || {}).ask).length;
 const findIn = (k) => COMPS.filter((c) => c.container === k && FIND[c.id]).length;
 const CONTAINERS = {
  EVT: ["Event Ingestion", "⚡", "listener · staging · collapse · pull · micro-batch registry · quarantine"],
@@ -225,6 +230,48 @@ export default function HubDesign({ t }) {
        <b style={{ display: "block", fontSize: 20, color: "#ffc477" }}>{findIn(cont)}</b>
        affected</div>)}
     </div>
+    {(() => {
+      const cvs = rows.map(covOf).filter(Boolean);
+      if (!cvs.length) return null;
+      const n = (k) => cvs.filter((x) => x.sei === k).length;
+      const pr = AR_PLANE_REC[cont];
+      return (
+       <div style={{ background: "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+        borderRadius: 8, padding: "12px 16px", marginBottom: 10 }}>
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center",
+         fontSize: 10.5, color: t.sub || "#666" }}>
+         <b style={{ fontSize: 11, color: t.navy || "#10193b" }}>
+          Against the SEI design pack</b>
+         {Object.entries(AR_SEI_COVER).map(([k, [col, label]]) => (
+          <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+           <span style={{ width: 8, height: 8, borderRadius: 2, background: col }} />
+           <b style={{ color: col }}>{n(k)}</b> {label}</span>))}
+         {asksIn(cont) > 0 && (
+          <span style={{ marginLeft: "auto" }}>{chip("#6d3ac01f", "#6d3ac0",
+           `${asksIn(cont)} QUESTIONS TO PUT TO THEM`)}</span>)}
+        </div>
+        {pr && (
+         <div style={{ marginTop: 11, borderTop: "1px solid #eef1f4", paddingTop: 10 }}>
+          <div style={{ display: "grid",
+           gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 12 }}>
+           <div><div style={{ fontSize: 8.5, fontWeight: 800, color: "#159943",
+            letterSpacing: .4 }}>WHAT THE PACK HAS</div>
+            <div style={{ fontSize: 11, color: "#33414d", lineHeight: 1.6,
+             marginTop: 3 }}>{pr.has}</div></div>
+           <div><div style={{ fontSize: 8.5, fontWeight: 800, color: "#cc3344",
+            letterSpacing: .4 }}>WHAT IT DOES NOT</div>
+            <div style={{ fontSize: 11, color: "#33414d", lineHeight: 1.6,
+             marginTop: 3 }}>{pr.lacks}</div></div>
+          </div>
+          <div style={{ marginTop: 10, background: "#f4f8fb", borderRadius: 6,
+           borderLeft: "3px solid #0b5e83", padding: "10px 12px" }}>
+           <div style={{ fontSize: 8.5, fontWeight: 800, color: "#0b5e83",
+            letterSpacing: .4 }}>RECOMMENDATION · {pr.verdict.toUpperCase()}</div>
+           <div style={{ fontSize: 11, color: "#33414d", lineHeight: 1.6,
+            marginTop: 3 }}>{pr.rec}</div></div>
+         </div>)}
+       </div>);
+    })()}
     <div style={{ border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderRadius: 8,
      overflow: "hidden", background: "#fff" }}>
      {rows.map((c) => {
@@ -232,7 +279,8 @@ export default function HubDesign({ t }) {
       const lab = d.chip || (d.default ? "Arch" : d.id === "l2-planes" ? "Planes"
        : d.id === "l3-stages" ? "Stage 1/2" : d.id === "l3-errors" ? "Errors" : d.title);
       const f = FIND[c.id];
-      const hasPanel = c.isNew || !!f;
+      const cv = covOf(c);
+      const hasPanel = c.isNew || !!f || !!cv;
       const vc = c.isNew ? "#cc3344" : f ? (AR_VERDICTS[f.verdict] || ["#5c7c94"])[0] : null;
       const vt = c.isNew ? "NEW · MISSING" : f ? f.verdict.toUpperCase() : null;
       const isX = expand === c.id;
@@ -245,8 +293,12 @@ export default function HubDesign({ t }) {
          cursor: hasPanel ? "pointer" : "default" }}
          onClick={hasPanel ? () => setExpand(isX ? null : c.id) : undefined}>
          <span style={{ fontFamily: "Roboto Mono, monospace", fontSize: 10,
-          fontWeight: 700, color: c.isNew ? "#cc3344" : Z_C[c.zone] || "#888" }}>
-          {hasPanel ? (isX ? "− " : "+ ") : ""}{c.id}</span>
+          fontWeight: 700, color: c.isNew ? "#cc3344" : Z_C[c.zone] || "#888",
+          display: "flex", alignItems: "center", gap: 5 }}>
+          {cv && <span title={`SEI pack: ${AR_SEI_COVER[cv.sei][1]}`}
+           style={{ width: 7, height: 7, borderRadius: 2, flex: "0 0 auto",
+            background: AR_SEI_COVER[cv.sei][0] }} />}
+          {hasPanel ? (isX ? "−" : "+") : ""}{c.id}</span>
          <b style={{ color: t.navy || "#10193b", overflow: "hidden",
           textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.component}>
           {c.component}</b>
@@ -274,6 +326,17 @@ export default function HubDesign({ t }) {
           {f && <>
            <Fld k={`finding · ${f.verdict}`} v={f.finding} tone={vc} />
            <Fld k="action" v={f.action} tone="#159943" />
+          </>}
+          {cv && <>
+           <div style={{ marginTop: 11, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {chip(AR_SEI_COVER[cv.sei][0] + "1f", AR_SEI_COVER[cv.sei][0],
+             AR_SEI_COVER[cv.sei][1].toUpperCase())}
+            {chip(AR_OWNER[cv.owner][0] + "1f", AR_OWNER[cv.owner][0],
+             AR_OWNER[cv.owner][1].toUpperCase())}
+           </div>
+           {cv.ask && <Fld k={cv.owner === "SEI" ? "ask SEI" : "ask — both sides"}
+            v={cv.ask} tone={AR_OWNER[cv.owner][0]} />}
+           <Fld k="recommendation" v={cv.rec} tone="#0b5e83" />
           </>}
          </div>)}
        </div>);
@@ -333,8 +396,7 @@ export default function HubDesign({ t }) {
        CP INTEGRATION HUB · zone 2</text>
 
       {/* orchestration band */}
-      <text x="216" y="96" fontSize="9.5" fontWeight="800" fill="#0f4775">
-       🛠 Orchestration · {cnt("ORCH")} components</text>
+      <Grp x={212} y={78} w={708} h={58} k="ORCH" />
       <Mini x={216} y={108} w={94} label="DAG Fan-out" k="fan-out" />
       <Mini x={317} y={108} w={94} label="Dim→Fact" k="dim-before" />
       <Mini x={418} y={108} w={94} label="Intraday Cadence" k="intraday cadence" />
@@ -542,6 +604,52 @@ export default function HubDesign({ t }) {
      note="the first four lose data silently — no alert fires and no count disagrees"
      n={AR_ERRORS.length} label="unowned" />
     <List rows={AR_ERRORS} tone="#cc3344" />
+
+    <Bar icon="?" title="Questions for the SEI design team"
+     note="only the gaps that are theirs or joint — the BBH-owned ones are left off on purpose"
+     n={AR_COVERAGE.filter((r) => r.ask).length} label="to put to them" />
+    {["SEI", "Joint"].map((own) => {
+     const rows2 = AR_COVERAGE.filter((r) => r.ask && r.owner === own);
+     const [col, lab] = AR_OWNER[own];
+     return (
+      <div key={own} style={{ marginBottom: 12 }}>
+       <div style={{ fontSize: 10.5, fontWeight: 800, color: col, margin: "10px 0 6px",
+        letterSpacing: .3 }}>
+        {lab.toUpperCase()} · {rows2.length}</div>
+       <div style={{ border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderRadius: 8,
+        overflow: "hidden", background: "#fff" }}>
+        {rows2.map((r) => {
+         const c = COMPS.find((z) => z.arId === r.id || z.id === r.id);
+         return (
+          <div key={r.id} style={{ display: "grid",
+           gridTemplateColumns: "180px minmax(0,1fr)", gap: 12, padding: "10px 14px",
+           fontSize: 11, borderTop: "1px solid #eef1f4", alignItems: "start" }}>
+           <div>
+            <b style={{ color: t.navy || "#10193b", fontSize: 10.5 }}>
+             {c ? c.component : r.id}</b>
+            <div style={{ fontSize: 9, color: t.sub || "#666", marginTop: 2 }}>
+             {c ? `#${c.id} · ${c.plane}` : ""}</div>
+            <div style={{ marginTop: 4 }}>{chip(AR_SEI_COVER[r.sei][0] + "1f",
+             AR_SEI_COVER[r.sei][0], r.sei.toUpperCase())}</div>
+           </div>
+           <div>
+            <div style={{ color: "#33414d", lineHeight: 1.6 }}>{r.ask}</div>
+            <div style={{ fontSize: 10.5, color: "#0b5e83", lineHeight: 1.55,
+             marginTop: 5 }}>
+             <b>recommendation:</b> {r.rec}</div>
+           </div>
+          </div>);
+        })}
+       </div>
+      </div>);
+    })}
+    <div style={{ fontSize: 10.5, color: t.sub || "#666", marginTop: 6, maxWidth: 940,
+     lineHeight: 1.6 }}>
+     {AR_COVERAGE.filter((r) => r.owner === "BBH").length} further gaps are BBH-owned and
+     are deliberately not on this list — the event staging store, the collapser, the
+     quarantine, the submission registry and the payload store among them. Taking those
+     to SEI would spend the meeting on work that is ours.
+    </div>
    </div>);
  }
 
