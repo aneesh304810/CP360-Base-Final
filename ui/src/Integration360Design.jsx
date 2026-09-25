@@ -3,7 +3,7 @@ import { SectionHeader } from "./AppShell.jsx";
 import Integration360Screens from "./integration360Screens.jsx";
 import {
  I360_SUMMARY, I360_PLANES, I360_COMPONENTS, I360_STATES, I360_PCT, I360_COLOR,
- I360_CHANNELS, I360_OUTBOUND,
+ I360_CHANNELS, I360_OUTBOUND, I360_API, I360_ERROR_CLASS,
 } from "./integration360Components.js";
 
 // =====================================================================
@@ -462,6 +462,62 @@ export default function Integration360Design({ t }) {
     pure push model leaves — a submission whose notification never arrives is found by
     the poller and becomes STATUS_UNRESOLVED past its max age, rather than sitting at
     SUBMITTED unnoticed.
+   </div>
+
+   {/* error taxonomy */}
+   <div style={{ fontSize: 15, fontWeight: 700, color: navy, margin: "22px 0 4px" }}>
+    Error taxonomy — three classes, three owners</div>
+   <div style={{ fontSize: 10.5, color: sub, marginBottom: 10 }}>
+    the axis that decides who is woken up, and whether a retry is legitimate at all</div>
+   <div style={{ display: "grid",
+    gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 10 }}>
+    {I360_ERROR_CLASS.map((e) => (
+     <div key={e.cls} style={{ background: "#fff", border: `1px solid ${panel}`,
+      borderLeft: `3px solid ${e.tone}`, borderRadius: 8, padding: "12px 14px" }}>
+      <b style={{ fontSize: 12.5, color: e.tone, letterSpacing: .3 }}>{e.cls}</b>
+      <div style={{ fontSize: 9.5, color: sub, marginTop: 1 }}>{e.owner}</div>
+      <div style={{ fontSize: 11, color: "#33414d", marginTop: 6,
+       lineHeight: 1.55 }}>{e.what}</div>
+      <div style={{ fontSize: 10.5, color: e.tone, marginTop: 6, lineHeight: 1.5 }}>
+       <b>retry:</b> {e.retry}</div>
+     </div>))}
+   </div>
+   <div style={{ fontSize: 11, color: "#33414d", background: "#fff",
+    border: `1px solid ${panel}`, borderLeft: "3px solid #a8560f", borderRadius: 8,
+    padding: "12px 14px", lineHeight: 1.6, margin: "10px 0 0", maxWidth: 940 }}>
+    <b>Why the class matters more than the count.</b> A day that is ninety percent
+    SYSTEM is a platform incident. A day that is ninety percent BUSINESS is a source
+    data problem. The same total means opposite things, and without the class the
+    exception list is one undifferentiated pile that nobody owns. It also decides
+    retryability: a BUSINESS error carrying a retry budget is a configuration mistake,
+    because every attempt produces the same rejection.
+   </div>
+
+   {/* API surface */}
+   <div style={{ fontSize: 15, fontWeight: 700, color: navy, margin: "22px 0 4px" }}>
+    API surface — 22 operations, one of them a write</div>
+   <div style={{ fontSize: 10.5, color: sub, marginBottom: 10 }}>
+    full contract in integration360-openapi.yaml · OAuth2 client credentials through
+    Apigee · business keys masked on read unless the caller holds int360.pii.read</div>
+   <div style={{ background: "#fff", border: `1px solid ${panel}`, borderRadius: 10,
+    overflow: "hidden" }}>
+    {I360_API.map((g) => (
+     <div key={g.tag} style={{ borderTop: "1px solid #eef1f4" }}>
+      <div style={{ padding: "9px 16px 4px", fontSize: 10,
+       fontWeight: 800, letterSpacing: .3, color: g.tone }}>{g.tag.toUpperCase()}</div>
+      {g.ops.map(([verb, path, note]) => (
+       <div key={path} style={{ display: "grid",
+        gridTemplateColumns: "46px minmax(0,252px) minmax(0,1fr)", gap: 12,
+        padding: "5px 16px 7px", fontSize: 11, alignItems: "start" }}>
+        <span style={{ fontSize: 8.5, fontWeight: 800, padding: "2px 6px",
+         borderRadius: 4, textAlign: "center",
+         background: verb === "POST" ? "#10193b" : `${g.tone}1f`,
+         color: verb === "POST" ? "#fff" : g.tone }}>{verb}</span>
+        <code style={{ fontFamily: "Roboto Mono, monospace", fontSize: 10,
+         color: navy }}>{path}</code>
+        <span style={{ fontSize: 10.5, color: "#33414d" }}>{note}</span>
+       </div>))}
+     </div>))}
    </div>
 
    {/* observation model — two clocks */}

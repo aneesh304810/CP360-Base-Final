@@ -5,7 +5,7 @@
 
 export const I360_SUMMARY = {
  title: "Integration360 — read-only observability over BBH ↔ SEI integration",
- line: "38 components across 6 planes. Observes four channels and answers three questions per business date: completeness, timeliness, correctness. Owns no integration state — the Integration Hub owns quarantine, error handling and remediation.",
+ line: "44 components across 6 planes. Observes four channels and answers three questions per business date: completeness, timeliness, correctness. Owns no integration state — the Integration Hub owns quarantine, error handling and remediation.",
 };
 
 export const I360_PLANES = {
@@ -51,6 +51,10 @@ export const I360_COMPONENTS = [
    deliverable: "Six numbers for one date that must tie",
    detail: "Events received \u2192 distinct keys \u2192 rows pulled \u2192 Stage 1 \u2192 INT \u2192 Gold, each with its explained deduction: duplicates collapsed, not-found keys, source-DQ filtered, missing-dimension held.",
    note: "Puts the four event-side boundaries in front of the medallion's existing four, so the chain reads as one funnel rather than two disconnected halves." },
+ { id: "UI-9", plane: "UI", component: "ErrorTaxonomyView", state: "Specified",
+   deliverable: "Today's failures by class, domain and code, against their baseline",
+   detail: "Three columns, not one list: BUSINESS is for operations and the source, TECHNICAL for engineering, SYSTEM for platform. A code that normally fires twice and fired two hundred times is the signal; the absolute count is not.",
+   note: "Class also decides retryability. A BUSINESS error with a retry budget is a configuration mistake — retrying it produces the same rejection and spends the attempt allowance." },
  { id: "UI-6", plane: "UI", component: "BusinessDateTimeline", state: "Specified",
    deliverable: "Date → intraday cycle → micro-batch → transformation task",
    detail: "Resolves to 'the transformation failed at build_dim, attempt 2, at 04:12', then deep-links to the Airflow UI.",
@@ -71,12 +75,20 @@ export const I360_COMPONENTS = [
    deliverable: "GET /loader/{date} · /submission/{id} · /submission/{id}/errors",
    detail: "Submissions joined to their status history, with the template version in force at generation and the source of every transition. Reject detail is served from what the Hub already fetched and stored — Integration360 never calls SEI.",
    note: "Still depends on the Hub recording a submission at send time. Without that record, silence is indistinguishable from success — settling the callback contract did not remove that dependency." },
+ { id: "API-7", plane: "RTR", component: "process_router", state: "Specified",
+   deliverable: "GET /process/dates/{date} · /microbatches · /microbatches/{id} · /lag · /runs/{id}",
+   detail: "Process tracking in one place: the date lifecycle and what is holding its gate, the box with its per-partition funnel, consumer lag against the rolling baseline, and the Airflow run beneath it.",
+   note: "partitions_expected returns null rather than a guess when the topic's partition count is unknown. Completeness is never asserted against a null denominator." },
+ { id: "API-8", plane: "RTR", component: "taxonomy_router", state: "Specified",
+   deliverable: "GET /errors/taxonomy · /errors · /errors/{id} · /errors/summary",
+   detail: "The catalogue, the occurrences, and the shape of the day's failure by class and domain.",
+   note: "Default sort is days_to_expiry ascending, because a held row past the INT retention window is silently gone from FACT for ever." },
  { id: "API-5", plane: "RTR", component: "exception_router", state: "Specified",
    deliverable: "GET /exceptions · /{source}/{id}",
    detail: "Filters by grain so row-level and model-level failures appear together without being merged." },
  { id: "API-6", plane: "RTR", component: "recon_router", state: "Assumed",
    deliverable: "GET /recon/{date} · /boundary/{name}",
-   detail: "The pipeline's four boundaries, the event channel's four, the outbound six, and the cross-channel check that exists only here.",
+   detail: "Twelve boundaries — four on the event path, three in the pipeline, five outbound — plus the cross-channel check that exists only here. The SEI pack specifies three, all downstream of Stage 1 and all inbound, which is why event loss is undetectable by construction today.",
    note: "Assumes RECON_RESULT gains MODEL_NAME. Without it, account, client and transaction results collide." },
 
  // ---- Adapters ----
@@ -88,10 +100,10 @@ export const I360_COMPONENTS = [
    deliverable: "dag_run · task_instance · task_fail",
    detail: "Replica only. The scheduler polls its metadata database continuously and uses SELECT FOR UPDATE; an analytical scan against the primary degrades scheduling.",
    note: "Postgres does not hold task logs — the log table holds audit events. Blocked on whether a replica exists and how the API authenticates." },
- { id: "ADP-3", plane: "ADP", component: "hub_reader", state: "Blocked",
+ { id: "ADP-3", plane: "ADP", component: "hub_reader", state: "Specified",
    deliverable: "Quarantine, transport errors, remediation, submissions",
-   detail: "Reads what the Integration Hub is holding and what it retried.",
-   note: "Blocked on where the Hub's store lives — its own persistence is likely rather than the shared Oracle schema." },
+   detail: "Reads what the Integration Hub is holding and what it retried, from the Foundation framework tables in the shared Oracle control schema.",
+   note: "Unblocked: the Hub's error, status and guardrail models are estate-wide tables rather than private persistence, so this is a read-only grant rather than an integration." },
  { id: "ADP-4", plane: "ADP", component: "inbox_reader", state: "Not owned",
    deliverable: "Consumes the shared callback inbox",
    detail: "Tracks its own progress marker, independent of the Hub’s. The inbox holds notifications, not reject payloads — detail is fetched separately on the poll leg. Stored encrypted, masked on read.",
@@ -109,6 +121,19 @@ export const I360_COMPONENTS = [
    deliverable: "LOADER_SUBMISSION · LOADER_STATUS_HISTORY · LOADER_ERROR",
    detail: "Reads the outbound state the Hub maintains from both sources. Requires LOADER_STATUS_HISTORY to carry a SOURCE column separating CALLBACK from POLL; without it the two channels cannot be told apart and divergence is unmeasurable.",
    note: "Assumes reject detail is persisted when fetched rather than re-read from SEI on demand. If SEI purges detail after a retention window, a missed fetch is permanent loss and the persisted copy is all that survives." },
+
+ { id: "ADP-8", plane: "ADP", component: "error_reader", state: "Specified",
+   deliverable: "ERROR_CATALOG · ERROR_EVENT · EVENT_DEAD_LETTER",
+   detail: "One error shape over what are four vocabularies today. error_class splits BUSINESS from TECHNICAL from SYSTEM, which is what decides who is woken up — a day that is 90% SYSTEM is a platform incident, a day that is 90% BUSINESS is a source data problem, and the same total count means opposite things.",
+   note: "Reads the catalogue as reference data, so an unknown native code raises rather than being mapped to its nearest neighbour." },
+ { id: "ADP-9", plane: "ADP", component: "dq_result_reader", state: "Specified",
+   deliverable: "DQ_RULE · DQ_RUN_RESULT · DQ_VALIDATION_FAILURE",
+   detail: "Rules, the evidence that each one ran, and the records that failed. NOT_RUN is a real verdict and is displayed as one.",
+   note: "Without DQ_RUN_RESULT, zero failures means either every rule passed or no rule ran — and a gate that silently did not execute would look exactly like a clean night." },
+ { id: "ADP-10", plane: "ADP", component: "guardrail_reader", state: "Specified",
+   deliverable: "GUARDRAIL_POLICY · CIRCUIT_BREAKER_STATE",
+   detail: "The threshold in force for a date, read rather than re-derived, plus whether a protected dependency is currently open.",
+   note: "The single change that stops Integration360 and Splunk telling the support team different stories about the same business date." },
 
  // ---- Shared services ----
  { id: "SVC-1", plane: "SVC", component: "correlation_service", state: "Specified",
@@ -129,14 +154,14 @@ export const I360_COMPONENTS = [
    note: "Without the rule, a retried PROCESSING notification landing after a COMPLETED poll walks the status backwards and raises a false exception. Two writers into one status field and no precedence is how a status board loses its audience." },
 
  // ---- Observation engine ----
- { id: "ENG-1", plane: "ENG", component: "verdict_computer", state: "Blocked",
+ { id: "ENG-1", plane: "ENG", component: "verdict_computer", state: "Specified",
    deliverable: "SLA state and reconciliation verdict, per channel per date",
    detail: "Writes each verdict with the threshold that was in force at computation time. The verdict stays derived; storing the input makes it reproducible and stops this system disagreeing with Splunk.",
-   note: "Blocked on where the recon tolerance and SLA warning percentage live in configuration. Neither is persisted today." },
- { id: "ENG-2", plane: "ENG", component: "expectation_evaluator", state: "Blocked",
+   note: "Unblocked by GUARDRAIL_POLICY in the Hub’s Foundation framework: every threshold versioned in one place, with the value in force copied onto each verdict. That is also what stops this system and Splunk disagreeing about the same date." },
+ { id: "ENG-2", plane: "ENG", component: "expectation_evaluator", state: "Specified",
    deliverable: "What was due, against what happened",
    detail: "Without it Integration360 reports presence and absence but never lateness — and lateness is what operations needs.",
-   note: "No channel has an expectation model. One table covering feeds, loaders and markers closes all three, because the marker gives events the same shape as files." },
+   note: "Unblocked by the Expectation Store in the Hub’s Foundation framework — interface calendar, loader cadence, marker schedule and event cadence baseline in one table. Its acceptance is still a joint question with SEI." },
  { id: "ENG-3", plane: "ENG", component: "cross_channel_reconciler", state: "Assumed",
    deliverable: "File trailer count vs events received vs marker count",
    detail: "Three numbers that must agree. A missing file is obvious; a stream that quietly dropped three percent of ACCOUNT events is not, and nothing else in the estate would catch it.",
@@ -208,4 +233,59 @@ export const I360_OUTBOUND = [
  { leg: "3 · Poll", dir: "BBH → SEI", owner: "Integration Hub · monitoring worker",
    what: "Non-terminal submissions only, on a tiered cadence that is tight after submission and backs off. Fetches current state, and reject detail once on reaching a terminal-with-errors state — paginated, stored, never re-fetched per poll.",
    obs: "Submissions past max age, poll results contradicting a notification, and terminal states no notification announced." },
+];
+
+// The published API surface. Twenty-two operations, twenty-one of them reads;
+// the single write is the endpoint SEI calls. Full contract in
+// integration360-openapi.yaml.
+export const I360_API = [
+ { tag: "Status monitoring", tone: "#0e8f7e", ops: [
+   ["GET", "/estate", "Four channels against three questions, from stored verdicts only"],
+   ["GET", "/estate/history", "The same twelve cells across a date range"],
+   ["GET", "/status/{domain}/{id}", "Current status and every transition, for any state machine"],
+ ]},
+ { tag: "Process tracking", tone: "#0b5e83", ops: [
+   ["GET", "/process/dates/{date}", "The date lifecycle and what is holding its gate"],
+   ["GET", "/process/microbatches", "Boxes for a date, with their state"],
+   ["GET", "/process/microbatches/{id}", "One box, per partition, with the funnel beneath it"],
+   ["GET", "/process/lag", "Consumer lag per partition against the rolling baseline"],
+   ["GET", "/process/runs/{id}", "The Airflow run and the dbt models under it"],
+ ]},
+ { tag: "Error management", tone: "#cc3344", ops: [
+   ["GET", "/errors/taxonomy", "The catalogue: code, class, disposition, owner, retry budget"],
+   ["GET", "/errors", "Occurrences across every domain in one shape"],
+   ["GET", "/errors/{id}", "One occurrence with its correlation trail"],
+   ["GET", "/errors/summary", "Counts by class and domain — the shape of today's failure"],
+ ]},
+ { tag: "Loader / outbound", tone: "#a8560f", ops: [
+   ["GET", "/loaders", "Loader types with the day's submission funnel"],
+   ["GET", "/loaders/submissions", "Filterable by state and by how that state was learned"],
+   ["GET", "/loaders/submissions/{id}", "Lifecycle, counts and both status sources"],
+   ["GET", "/loaders/submissions/{id}/records", "Bad records, business and technical and system, separated"],
+ ]},
+ { tag: "Data quality", tone: "#6d3ac0", ops: [
+   ["GET", "/dq/rules", "The rule registry — gate, scope, blocking, cost class"],
+   ["GET", "/dq/results", "Evidence a rule ran, including when it found nothing"],
+   ["GET", "/dq/failures", "Failing records with days_to_expiry"],
+ ]},
+ { tag: "Reconciliation", tone: "#159943", ops: [
+   ["GET", "/reconciliation/{date}", "All twelve boundaries, with the tolerance in force"],
+   ["GET", "/reconciliation/{date}/{boundary}", "One boundary, both legs, every deduction named"],
+ ]},
+ { tag: "Inbound · the only write", tone: "#10193b", ops: [
+   ["POST", "/sei/notifications", "SEI pushes a status transition or an error summary. 202 on durable write, never on successful processing."],
+ ]},
+];
+
+// The axis that decides who is woken up.
+export const I360_ERROR_CLASS = [
+ { cls: "BUSINESS", tone: "#a8560f", owner: "Operations and the source",
+   what: "The data is wrong — a missing mandatory attribute, a code outside its domain, an unresolved reference, a control total that does not tie.",
+   retry: "Never. Retrying produces the same rejection and spends the attempt budget." },
+ { cls: "TECHNICAL", tone: "#6d3ac0", owner: "Engineering",
+   what: "The pipeline is wrong — a transformation failed, a model test failed, a schema mismatch, an unparseable envelope.",
+   retry: "Only after a fix. An unchanged retry is an unchanged failure." },
+ { cls: "SYSTEM", tone: "#0b5e83", owner: "Platform",
+   what: "The platform is wrong — a timeout, a lost connection, a pod eviction, a broker rebalance, a rate limit.",
+   retry: "The only class where blind retry is legitimate, and the only one with a circuit breaker behind it." },
 ];
