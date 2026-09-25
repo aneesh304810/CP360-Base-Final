@@ -15,10 +15,10 @@ export const AR_SUMMARY = {
   title: "Architect review — events-primary Integration Hub",
   line:
     "One assumption substituted: SDC events replace files as the primary ingestion path. " +
-    "Stage 1 onward is unchanged from the SEI pack. 23 components are missing, 11 bottlenecks " +
-    "appear that a daily file cycle never had, and 14 error paths have no owner. The inbound " +
+    "Stage 1 onward is unchanged from the SEI pack. 25 components are missing, 11 bottlenecks " +
+    "appear that a daily file cycle never had, and 15 error paths have no owner. The inbound " +
     "event path and the outbound loader path are both unowned end to end.",
-  counts: { missing: 23, bottlenecks: 11, errors: 14, mapped: 25, unchanged: 40 },
+  counts: { missing: 25, bottlenecks: 11, errors: 15, mapped: 25, unchanged: 40 },
 };
 
 /* ------------------------------------------------------------------ *
@@ -190,6 +190,18 @@ export const AR_MISSING = [
     perf: "Daily set-based aggregate per loader type.",
     err: "RECON_RESULT’s three boundaries are all inbound. Sent versus accepted is a boundary that exists nowhere, so a loader that silently dropped three percent of its records on the way out is invisible to every control in the estate.",
     why: "The outbound counterpart of the four event-side boundaries. Same omission, opposite direction." },
+  { id: "M24", plane: "Processing", name: "Transformation Rule Registry", pri: "P1", build: "High",
+    tech: "Oracle DDL + BA authoring surface",
+    deliverable: "Stage 2 to Gold mapping and business logic as versioned, effective-dated data rather than SQL",
+    perf: "Read once per dbt run and cached. Nothing in the registry is evaluated row by row \u2014 it is compiled ahead of the run, not interpreted during it.",
+    err: "Effective dating is not optional. A rule that changed on 1 March must still explain a row loaded on 28 February, so every Gold row carries the RULE_SET_VERSION that produced it. Without that, restatement is unreproducible \u2014 the same defect the event pull already has.",
+    why: "Today a mapping change is a code change: a PR, a review, a release. The people who own the business meaning of a column cannot change it, and the people who can do not own the meaning." },
+  { id: "M25", plane: "Processing", name: "Rule-to-dbt Compiler", pri: "P1", build: "High",
+    tech: "Python \u00b7 dbt \u00b7 CI",
+    deliverable: "Generates dbt models from the rule registry; the generated SQL is reviewed in a pull request like any other",
+    perf: "Compile time, not run time. A runtime rule interpreter inside the warehouse would be slower, unobservable and would lose dbt\u2019s lineage, tests and documentation.",
+    err: "Every rule needs at least one expectation \u2014 sample input, expected output \u2014 running in CI. Without it a BA ships broken SQL confidently, and the first thing anyone notices is a wrong number in Gold.",
+    why: "The alternative, interpreting rules at run time, is how externalisation usually fails. Generating dbt keeps every existing guarantee and makes the BA\u2019s change visible as a SQL diff." },
   { id: "M17", plane: "Foundation", name: "Schema Contract Registry", pri: "P1", build: "Medium",
     tech: "Oracle DDL + CI",
     deliverable: "Per-view column contract, versioned, checked before the pull is trusted",
@@ -320,6 +332,10 @@ export const AR_ERRORS = [
     comp: ["M21", "M3"],
     body: "A rejection names records in a payload nobody kept. Without the generated artefact and its hash written before submission, a reject cannot be tied back to the bytes that caused it, a partial send cannot be told from a complete one, and a disagreement with SEI has no evidence on the BBH side.",
     owner: "Unowned. The submission registry records that a send happened, not what it contained." },
+  { id: "E15", sev: "high", title: "A Gold row cannot be explained by the rule that produced it",
+    comp: ["M24", "16"],
+    body: "Transformation logic lives in dbt SQL at a commit. Three months later, explaining why a figure came out as it did means finding the commit that was deployed that night and reading it \u2014 assuming the model was not changed for an unrelated reason in between. Nothing on the row records which version of the logic produced it.",
+    owner: "Unowned. Externalising the rules without effective dating and a RULE_SET_VERSION stamp would make this worse, not better: more people changing logic, still no record of which logic ran." },
   { id: "E12", sev: "medium", title: "Dimension arriving after fact starts the 7-day clock",
     comp: ["M7", "17"],
     body: "Hold-and-replay handles a fact whose dimension has not arrived, marking MISSING_DIMENSION_KEY with reprocess_eligible. But INT retains seven days, so a dimension that arrives on day eight means the held fact is silently gone from FACT for ever.",
@@ -349,8 +365,8 @@ export const AR_FINDINGS = [
     finding: "Two problems. This design names a Pre-Gold Exadata tier and an Enriched layer that the SEI pack does not have; the pack has STG as a view and INT as Silver. And the STG view is recomputed on every incremental run, which events turn from once a day into 288 times a day.",
     action: "Reconcile the layer model first, then B2." },
   { id: "16", verdict: "risk", name: "Gold (dbt)",
-    finding: "on_schema_change='fail' with DML-only MERGE. Correct for safety, and it means an upstream column addition halts the pipeline with no notification path and no forward fix that is not a deploy.",
-    action: "M17, plus a stated schema-change protocol with SEI." },
+    finding: "Two risks. on_schema_change='fail' with DML-only MERGE is correct for safety, and it means an upstream column addition halts the pipeline with no notification path and no forward fix that is not a deploy. Separately, every Stage 2 to Gold mapping and derivation is hand-written SQL, so a business rule change is an engineering release and the people who own the meaning of a column cannot change it.",
+    action: "M17 plus a schema-change protocol with SEI for the first. M24 and M25 for the second \u2014 externalise the rules as versioned data and generate the dbt models from them." },
   { id: "17", verdict: "gap", name: "Correction Handling",
     finding: "Written for restatement and in-place merge. A delete arriving as an event has no defined downstream behaviour, and an outbound correction — a new submission referencing the one it corrects — is not modelled at all.",
     action: "Define op=D semantics and the outbound correction protocol." },
@@ -612,4 +628,52 @@ export const AR_PLANE_REC = {
     rec: "Foundation is where the substitution costs most, because every one of its components is estate-wide. Extend rather than duplicate: one quarantine with an event and an outbound reason taxonomy, one reconciliation framework with twelve boundaries instead of three, one configuration store holding the three new catalogues. Resist building a parallel event-side foundation.",
     verdict: "2 of 12 specified · 4 partly · 6 absent",
   },
+};
+
+/* ------------------------------------------------------------------ *
+ * Externalising the Stage 2 to Gold transformation rules              *
+ * ------------------------------------------------------------------ */
+export const AR_RULE_EXTERNALISATION = {
+  title: "Stage 2 \u2192 Gold: externalise the rules so a BA owns them",
+  problem:
+    "Every mapping and derivation between Stage 2 and Gold is hand-written dbt SQL. A change to what a " +
+    "column means is therefore a code change, a pull request and a release. The people who own the business " +
+    "meaning cannot change it; the people who can change it do not own the meaning. That gap is where wrong " +
+    "numbers come from, and it gets worse as the mapping surface grows.",
+  principle:
+    "Externalise the rules, not the engine. Generate dbt from them; never interpret them at run time.",
+  owns: [
+    ["BA owns", "#159943", "Source column to target column mapping \u00b7 code and value translations \u00b7 derived expressions and their conditions \u00b7 defaults \u00b7 which attributes are SCD-tracked \u00b7 the rule's business description"],
+    ["Engineering owns", "#0b5e83", "Join strategy \u00b7 incremental predicates \u00b7 merge keys \u00b7 partitioning \u00b7 SCD2 close and open mechanics \u00b7 dim-before-fact ordering \u00b7 hold-and-replay"],
+  ],
+  rules: [
+    { name: "TRANSFORM_RULESET", grain: "one row per target model per version",
+      cols: "TARGET_MODEL \u00b7 VERSION \u00b7 STATUS \u00b7 EFFECTIVE_FROM / TO \u00b7 APPROVED_BY \u00b7 APPROVED_TS",
+      note: "Never updated in place \u2014 superseded. A ruleset that produced a row must stay readable for as long as that row is explainable." },
+    { name: "TRANSFORM_RULE", grain: "one row per target column per ruleset",
+      cols: "RULESET_ID \u00b7 SEQ \u00b7 TARGET_COLUMN \u00b7 RULE_TYPE \u00b7 SOURCE_EXPRESSION \u00b7 CONDITION \u00b7 DEFAULT_VALUE \u00b7 BUSINESS_DESCRIPTION",
+      note: "RULE_TYPE is a closed set: DIRECT, CONSTANT, LOOKUP, DERIVED_EXPR, CONDITIONAL, AGGREGATE. An open expression language is how a rule registry becomes a second programming language nobody can review." },
+    { name: "TRANSFORM_LOOKUP", grain: "one row per source value per domain per version",
+      cols: "LOOKUP_DOMAIN \u00b7 SOURCE_VALUE \u00b7 TARGET_VALUE \u00b7 EFFECTIVE_FROM / TO",
+      note: "The classic BA-owned artefact, and the one most often kept in a spreadsheet today. An unmapped source value raises; it never passes through or defaults silently." },
+    { name: "TRANSFORM_RULE_TEST", grain: "one row per expectation",
+      cols: "RULE_ID \u00b7 INPUT_JSON \u00b7 EXPECTED_VALUE \u00b7 LAST_RUN_TS \u00b7 LAST_RESULT",
+      note: "At least one per rule, run in CI on every regeneration. Without it, externalisation means more people able to ship a wrong number rather than fewer." },
+  ],
+  flow: [
+    ["1", "BA edits a rule", "Authoring surface writes to the registry as a draft ruleset. Nothing downstream moves."],
+    ["2", "Approval", "STATUS_TRANSITION marks the draft-to-active move as REQUIRES_APPROVAL. A derivation on fact_transactions is a change to the firm's books, and four eyes is the control."],
+    ["3", "Compile", "CI regenerates the dbt models from the approved ruleset. The generated SQL lands in a pull request as a diff \u2014 the BA's change made reviewable in engineering's own terms."],
+    ["4", "Test", "Rule expectations run against the generated SQL, alongside the existing dbt tests."],
+    ["5", "Run", "An ordinary dbt run. Lineage, tests and documentation all still work, because the output is dbt and not an interpreter."],
+    ["6", "Stamp", "Every Gold row carries RULE_SET_VERSION. Three months later the number is explainable without archaeology in the commit log."],
+  ],
+  risk:
+    "Externalised without effective dating, generated SQL and CI tests, this produces a system where more " +
+    "people can change logic and nobody can explain a number \u2014 strictly worse than hard-coded SQL. The " +
+    "three guardrails are not refinements to add later; they are what makes the idea safe at all.",
+  scope:
+    "Stage 2 to Gold only. Do not extend it to Stage 1 ingestion, where the RAW DDL is the contract and there " +
+    "is no business logic to own, and do not let it absorb the correctness machinery \u2014 SCD2 mechanics, merge " +
+    "semantics and hold-and-replay stay in code.",
 };

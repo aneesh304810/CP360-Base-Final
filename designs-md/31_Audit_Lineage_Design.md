@@ -5,152 +5,122 @@ component_name: Audit & Lineage
 zone: 2. Hub
 plane: Foundation
 priority: P1
-technology: Python + dbt (artifacts) + Oracle
+technology: Python + dbt
 custom_build: Medium
-depends_on: [13, 16, 21, 28, 30, 33]
+depends_on: [14, 17]
+status: Not Started
+owner: TBD
 architecture_decisions: [AD-2, AD-8]
 pipeline_tiers: [Stage1-Oracle, Stage2-Oracle, Stage3-Exadata-Gold, Consumer-Movement]
-status: In Design
-owner: TBD
 last_updated: 2026-08-13
 tags: [SEI-BBH, Integration-Hub, foundation]
+origin: SEI-BBH component tracker
+sei_coverage: partial
+gap_owner: SEI
 in_scope: true
 ---
 
 # Audit & Lineage
 
 ## 1. Purpose & Scope
-The defensibility layer: for any datapoint BBH served, reconstruct **where it came from, what touched it, who decided, and what it looked like at any prior moment** — under NYDFS Part 500 expectations and the open question's standard: *is lineage audit-defensible under AD-2?* Target state answers **yes, by construction**: because every store is bitemporal-append (AD-2) and RAW is immutable (AD-8), history is *data*, not logs — this component's job is to bind that data into one navigable spine: an append-only audit event store keyed by the four join keys (LOAD_ID, replay_id, corr_id, business_date), dbt-artifact-derived transformation lineage, and the decision records (gates, replays, overrides, config changes) that turn "what happened" into "who approved it."
+
+**End-to-end lineage design, evidence retention**
+
+Scope as recorded in the component tracker: dbt docs covers model lineage only. Custom row-level lineage via LOAD_ID chain..
 
 ## 2. Context & Dependencies
-- **Event producers**: every component — #13 loads, gates (via #28 dq_result), #21 ledger, #22 decisions, #29 quarantine, #10 submissions, #33 config changes, #12 access logs (envelope refs).
-- **Transformation lineage**: dbt `manifest.json`/`run_results.json` per run (models, refs, columns) — harvested, versioned, joined to run identity.
-- **Consumers**: #30 (record joins), CP360 lineage module (the UI over this spine), auditors/ARB.
+
+- Depends on components: 14, 17
+- Technology: Python + dbt
+- Custom build: Medium — High means a design document is mandatory before code.
+- Source of record: Both
+
+### The Foundation plane
+
+**What the pack has.** Quarantine, reconciliation and the configuration store are all genuinely specified — FILE_REGISTRY's lifecycle, dq_validation_failure with resolution_status and reprocess_eligible, RECON_RESULT's three boundaries, FILE_SCHEMA_CONFIG. The error and recovery thinking in D.1 to D.6 is the strongest part of the whole pack.
+
+**What it does not.** Every one of them is inbound and file-shaped. No event dead-letter, no outbound quarantine, nine reconciliation boundaries missing, no schema contract, no expectation model, no loader template registry, no read-only grant, no PII classification, and nine of thirteen Splunk signals with no payload contract. Lineage also degrades permanently under events and the pack does not say so.
+
+**Plane verdict:** 2 of 12 specified · 4 partly · 6 absent.
 
 ## 3. Design Decisions
-| Decision | Choice | Rationale | Consequence |
-|---|---|---|---|
-| Lineage defensible under AD-2? (open q) | **Yes — bitemporal appends make state history queryable; this component adds the binding, not the history** | Log-file archaeology is not defensible; queryable as-of state + bound decisions is | The audit answer to "what did you report on the 3rd" is a SQL query, demonstrable live in an exam |
-| Event store shape | **One append-only AUDIT_EVENT table + typed detail refs (not one table per event kind)** | Auditors traverse one spine; kinds evolve without DDL sprawl | detail_ref points into the owning ledger (replay_ledger, quarantine_ledger, dq_result…) — no duplication |
-| Transformation lineage source | **dbt artifacts harvested per run (+ #13's registry for pre-dbt hops)** | The graph that *ran* beats any drawn diagram; column-level available from manifest | Harvest step in every build's on-run-end; artifact retention = audit retention |
-| Identity on events | **Human actions carry the person (#32 identity); machine actions carry service identity + triggering context** | "The system did it" is not an audit answer | Every override/resolve/config-change event has a who; 4-eyes events carry both |
-| Retention | **7 years online-queryable (partitioned, HCC-compressed), aligned to records policy** | Regulated-records horizon; compression makes online feasible | Yearly partitions; no purge without records-management sign-off |
 
-## 4a. Diagrams
-```mermaid
-flowchart LR
- subgraph PROD["event producers (all components)"]
-  P1["#13 loads"]
-  P2["gates → #28"]
-  P3["#21/#22/#29 decisions"]
-  P4["#33 config changes"]
- end
- subgraph SPINE["audit spine (this component)"]
-  AE[("AUDIT_EVENT<br/>append-only · 4 join keys")]
-  TL[("TRANSFORM_LINEAGE<br/>dbt artifacts per run")]
-  ASQ["as-of query layer<br/>AD-2 bitemporal views"]
- end
- subgraph CONS["consumers"]
-  CP["CP360 lineage module"]
-  AUD["auditor / ARB"]
-  R30["#30 recon joins"]
- end
- P1 --> AE
- P2 --> AE
- P3 --> AE
- P4 --> AE
- DBT["dbt manifest/run_results"] --> TL
- AE --> ASQ
- TL --> ASQ
- ASQ --> CP
- ASQ --> AUD
- AE --> R30
- classDef ora fill:#e8eef5,stroke:#0f4775;
- class AE,TL ora
-```
-```mermaid
-sequenceDiagram
- participant Q as Auditor
- participant L as Lineage spine
- participant G as Pre-Gold (AD-2)
- Q->>L: "Position X for account Y as reported 2026-08-03 — justify it"
- L->>G: as-of query (valid_from ≤ t < valid_to) → the exact served version
- L->>L: version → load_id → AUDIT_EVENT chain
- L-->>Q: file (SEI name, manifest hash) → G1/G2 verdicts → transform run (models+refs from TRANSFORM_LINEAGE) → G3/G4 evidence → publish + G5 verify → served
- Q->>L: "It changed on the 5th — why?"
- L-->>Q: correction version (valid_from 08-05) → #17 correction ref → #21 replay R... (reason SEI_RESEND, approved_by ...) → re-gated → republished (REPUBLISH event)
- Note over Q,L: every arrow is a stored row, not a log grep — the AD-2 dividend
-```
+**Review verdict: degraded.** Because the pull re-reads current state, lineage runs Gold row → micro-batch → key and never Gold row → the specific change that caused it. That is a permanent reduction in what lineage can answer, and it should be stated rather than discovered.
 
-## 4b. Flow Walkthrough
-1. Components emit audit events through the shared writer (`cp_audit.emit(kind, keys, actor, detail_ref)`) — a library sibling of #29's, adoption guardrail-enforced.
-2. Each event carries whichever of the four join keys exist — LOAD_ID (batch), corr_id (API/outbound), replay_id, business_date — the spine's navigation is these keys.
-3. dbt on-run-end harvests manifest + run_results → TRANSFORM_LINEAGE rows (run_id, model, refs, columns-hash, status) → the executed graph, versioned per run.
-4. Decision events (gate verdicts, replay approvals, overrides, quarantine resolutions, config/tolerance changes) bind *who* to *what* — the difference between history and defensibility.
-5. The as-of layer packages AD-2: parameterized views answering "state at time T" per store, joined to the events active at T.
-6. CP360's lineage module reads this spine (it is the LIVE source the E2E lineage UI will graduate to); auditors get the walkthrough in §4a's sequence — live, in SQL.
+**Direction.** Accept it, and state the event-path limit explicitly: because the pull re-reads current state, lineage runs Gold row to micro-batch to key and never to the change that caused it.
 
-## 4c. Detailed Design
-**Spine (#33 schema)**
-```sql
-CREATE TABLE audit_event (
-  event_id      NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  event_ts      TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
-  event_kind    VARCHAR2(30) NOT NULL,   -- LOAD/GATE/PUBLISH/REPLAY/OVERRIDE/QUARANTINE/CONFIG/ACCESS...
-  load_id       VARCHAR2(40), corr_id VARCHAR2(40),
-  replay_id     VARCHAR2(40), business_date DATE,
-  component_id  NUMBER,                  -- tracker id of the emitter
-  actor         VARCHAR2(60) NOT NULL,   -- person or service identity
-  actor2        VARCHAR2(60),            -- 4-eyes second identity
-  detail_ref    VARCHAR2(200)            -- pointer into owning ledger
-) PARTITION BY RANGE (event_ts) INTERVAL (NUMTOYMINTERVAL(1,'YEAR'))
-  ( PARTITION a0 VALUES LESS THAN (TIMESTAMP '2026-01-01 00:00:00') )
-  COMPRESS FOR ARCHIVE LOW;
-CREATE TABLE transform_lineage (
-  run_id       VARCHAR2(60) NOT NULL, model_name VARCHAR2(120) NOT NULL,
-  refs_json    CLOB CHECK (refs_json IS JSON),     -- upstream models/sources
-  columns_hash VARCHAR2(64),                        -- schema fingerprint
-  status       VARCHAR2(10), load_id VARCHAR2(40), replay_id VARCHAR2(40),
-  run_ts       TIMESTAMP,
-  CONSTRAINT pk_tl PRIMARY KEY (run_id, model_name)
-);
-```
-**Append-only enforcement**: no UPDATE/DELETE grants on audit_event to any identity including the writer (INSERT only); corrections to audit are new events referencing the corrected one (`event_kind=CORRECTION_OF`, detail_ref=event_id).
-**As-of views**: per bitemporal store, `<table>_asof(t)` pattern (pipelined or SQL-macro) — the exam-day interface.
-**Emitter contract**: emit is fire-and-forget with local spool on Oracle unavailability (events must never block the pipeline; spool drains with ordering preserved, gap alarm in #34).
-**External contract**: records-management retention schedule sign-off; #12 access events stored as envelope refs (Splunk is the payload-holder, the spine holds the pointer + subject).
+## 4. Detailed Design
+
+**Deliverable.** End-to-end lineage design, evidence retention
+
+### Framework tables this component needs
+
+| Table | State | Purpose |
+| --- | --- | --- |
+| `DQ_RULE` | new | The rules themselves, as data: which gate, what scope, blocking or advisory, at what threshold. |
+| `DQ_RUN_RESULT` | new | Evidence that a rule ran, and what it found — including when it found nothing. |
+| `DQ_VALIDATION_FAILURE` | extend | Keep as specified; add three columns. |
 
 ## 5. Data Quality, Reconciliation & Lineage
-The spine's own quality is completeness: expected-event assertions (every LOAD has G1+G2 events; every PUBLISH has a G4 and a G5; every replay_id in any ledger has ledger events) run nightly — a hole in the audit trail is itself an incident (#29 SYSTEM class). Recon (#30) and lineage share join keys by design — one spine, two lenses.
 
-## 6. RECOMMENDATION
-**6.1** An append-only audit spine on four join keys with harvested-from-execution transformation lineage, identity-bound decisions, as-of query packaging of AD-2, and 7-year online retention — defensibility as a queryable property, not a document.
-**6.2**
-| Option | Description | Pros | Cons | Fit |
-|---|---|---|---|---|
-| A. Spine + harvested lineage + as-of layer (recommended) | As designed | Exam answers are live SQL; lineage = what ran; decisions carry humans; no duplication (refs into owning ledgers) | Emitter adoption across all components; spool discipline | **High** |
-| B. Splunk as the audit store | Everything to logs, retained 7y | One pipe already exists | Log retention ≠ queryable defensibility; joins across kinds brittle; as-of state impossible from logs; cost at 7y | Low — Splunk stays the *ops* eye (#34), pointers only here |
-| C. Drawn/maintained lineage diagrams + doc trail | Wiki-grade lineage | Familiar | Diverges from execution the week after it's drawn; not evidence | Prohibited as the system of record |
-| D. Full CDC/audit-vault on every table | Database-level audit everything | Total capture | Massive volume duplicating what AD-2 tables already keep; noise burying decisions | Low |
-**6.3** > **Recommended: Option A.** AD-2 already paid for the hard part — state history lives in the tables — so the design refuses to duplicate it and instead binds it: events for *what happened*, harvested artifacts for *what ran*, identities for *who decided*, as-of views for *what was true*. That refusal (detail_ref pointers instead of copies, Splunk pointers instead of payloads) is what keeps seven online years feasible. The measure of success is operational: the §4a auditor walkthrough executable live for any datapoint, any date; expected-event completeness at 100%; zero UPDATE/DELETE physically possible on the spine.
-**6.4** Observer across all tiers; AD-2/AD-8 are its foundations (and its answer); feeds #30 and the CP360 lineage UI; no open-AD dependencies (AD-6's outcome only labels who *reads* jointly, not who writes).
+No DQ, reconciliation or lineage obligation specific to this component beyond the estate-wide framework.
 
-## 7. Failure, Replay & Idempotency
-Emitter spool covers Oracle outage (ordered drain, gap alarm); event inserts are idempotent by producer-supplied natural keys where re-emission is possible (kind+keys+detail_ref uniqueness). The spine under replay: replays *add* events (the replay is itself audited); nothing is ever restated. Spine-loss DR: yearly partitions in #63 backup scope with restore-verify drills.
+## 6. Performance & Scale
+
+No performance concern identified for this component under the events-primary assumption.
+
+## 7. Error Handling, Failure & Replay
+
+No unowned error path identified for this component.
 
 ## 8. Security & Access Control
-Read: audit role (#32) — broad by design for examiners, with access itself evented (ACCESS kind). Write: INSERT-only identities. actor fields carry directory identities for humans (via #32's SSO-adjacent identity, independent of the deferred SSO component), service accounts for machines. No payload values in the spine — refs only.
 
-## 9. Open Questions & Risks
-- Records-management ratification of 7-year online + partition strategy — owner: TBD.
-- Expected-event assertion catalog first cut — with #28's conventions; owner: TBD.
-- Risk: emitter adoption gaps leaving spine holes → cp-guardrails: components' key paths must show emit calls (static check) + nightly completeness assertions (runtime check).
-- Risk: spool loss on pod eviction before drain → spool on the #50 PVC, not emptyDir; drain-on-start.
+Estate defaults apply: a dedicated read-only account for any consumer, business keys masked on read rather than at rest, and secrets from the platform secret store.
 
-## 10. Acceptance Criteria
-- [ ] The §4a auditor walkthrough executed live in a lower region for a seeded datapoint with a correction — every hop resolved in SQL.
-- [ ] UPDATE/DELETE on audit_event fails for every identity (negative grants test).
-- [ ] Kill-Oracle drill: events spool, drain in order, gap alarm exercised.
-- [ ] Expected-event assertions catch a suppressed G2 emission (fault injection).
-- [ ] transform_lineage matches dbt manifest for a run (model + refs parity check).
-- [ ] As-of view returns the pre-correction version for T before the correction, post- for after.
+**Open.** A12 grants the loader DML on RAW plus the registry, and DML-only on Gold. No consumer grant is described anywhere in the pack, so a read-only role gets improvised at connection time — which in practice means reusing the loader's account. The masking policy for the 786 PII fields in SDC scope is unapproved.
+
+## 9. SEI Source Coverage
+
+**SEI pack coverage: partial** — partly specified — named, not sufficient.
+**Who answers for the gap: SEI** — SEI must answer.
+
+| Document | Section | Kind | What it says |
+| --- | --- | --- | --- |
+| BBH File Ingestion Framework TDD v2.0 | §6.2 | touches it, does not specify it | FILE_REGISTRY unique on FILE_NAME plus BUSINESS_DATE, with RETRY_COUNT. |
+| BBH File Ingestion Framework TDD v2.0 | §Appendix F | the pack and this design disagree | The glossary says FILE_REGISTRY is versioned per interface and date with one current version. |
+
+**Disagreement with §Appendix F.** §6.2's unique key gives exactly one row; D.1 and D.5 reuse it and D.4 deletes it. History survives only as RETRY_COUNT. Either the schema gains version history or the glossary line goes.
+
+## 10. Gaps, Risks & What Is Missing
+
+### What is missing
+
+Because the pull re-reads current state, lineage runs Gold row → micro-batch → key and never Gold row → the specific change that caused it. That is a permanent reduction in what lineage can answer, and it should be stated rather than discovered.
+
+### Risk
+
+No ranked bottleneck or unowned error path touches this component.
+
+### Gap against the SEI pack
+
+No absent-coverage citation recorded.
+
+## 11. Recommendation
+
+Accept it, and state the event-path limit explicitly: because the pull re-reads current state, lineage runs Gold row to micro-batch to key and never to the change that caused it.
+
+**Action.** State the limit. Add MICROBATCH_ID to carry what remains.
+
+**Foundation-wide.** Five control tables are specified and each is sound on its own. What is absent is anything that spans them, and that absence is why four error vocabularies already exist in one pipeline before a line of event code has been written. Build the four models once, estate-wide, rather than letting each component grow its own.
+
+## 12. Open Questions & Acceptance Criteria
+
+### Open questions
+
+- **For SEI.** RAW_*.FILE_REGISTRY_ID is still a proposal. Will it be accepted? Without it, tracing a row back to its delivering file degrades to business-date granularity.
+- **From the tracker.** Is lineage audit-defensible under AD-2?
+
+### Acceptance criteria
+
+- The deliverable above exists and is reviewed.
+- The open question above has a written answer from the named owner.

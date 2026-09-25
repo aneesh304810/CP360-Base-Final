@@ -5,143 +5,120 @@ component_name: Error Handling & Quarantine
 zone: 2. Hub
 plane: Foundation
 priority: P1
-technology: Python (shared library) + Oracle
-custom_build: Medium
-depends_on: [8, 13, 21, 23, 24, 33, 34]
+technology: Python
+custom_build: High
+depends_on: [23, 50]
+status: Not Started
+owner: TBD
 architecture_decisions: [AD-2, AD-8]
 pipeline_tiers: [Stage1-Oracle, Stage2-Oracle]
-status: In Design
-owner: TBD
 last_updated: 2026-08-13
 tags: [SEI-BBH, Integration-Hub, foundation]
+origin: SEI-BBH component tracker
+sei_coverage: covered
+gap_owner: BBH
 in_scope: true
 ---
 
 # Error Handling & Quarantine
 
 ## 1. Purpose & Scope
-The Hub's shared failure discipline: one error taxonomy, one quarantine mechanism, one reprocessing route — used by every component instead of thirty private try/excepts. Target state: a Python error library (`cp_errors`) that classifies every failure into a governed taxonomy, routes quarantinable artifacts (files, row sets, payloads) into a registered quarantine store with reason + lineage, and resolves the open question: **quarantine retention is 30 days active + archive-to-90 aligned with #8, and the ONLY reprocessing route is back through the front door** — re-ingest/re-transform via #21 after the cause is fixed, never in-place repair (AD-2/AD-8).
+
+**Error taxonomy, quarantine store, resubmission path**
+
+Scope as recorded in the component tracker: Custom taxonomy + quarantine lifecycle + resubmission path..
 
 ## 2. Context & Dependencies
-- **Callers**: #13 (load errors), #23/#24 (gate BLOCKs), #16/#25 (rejects escalation), #10 (submission failures), sensors (#9 timeouts).
-- **Stores**: quarantine filesystem area (#8 layout), QUARANTINE_LEDGER (#33 schema).
-- **Exit route**: #21 replay classes; **signals**: #34 (error-rate SLOs, quarantine aging alerts).
+
+- Depends on components: 23, 50
+- Technology: Python
+- Custom build: High — High means a design document is mandatory before code.
+- Source of record: Both
+
+### The Foundation plane
+
+**What the pack has.** Quarantine, reconciliation and the configuration store are all genuinely specified — FILE_REGISTRY's lifecycle, dq_validation_failure with resolution_status and reprocess_eligible, RECON_RESULT's three boundaries, FILE_SCHEMA_CONFIG. The error and recovery thinking in D.1 to D.6 is the strongest part of the whole pack.
+
+**What it does not.** Every one of them is inbound and file-shaped. No event dead-letter, no outbound quarantine, nine reconciliation boundaries missing, no schema contract, no expectation model, no loader template registry, no read-only grant, no PII classification, and nine of thirteen Splunk signals with no payload contract. Lineage also degrades permanently under events and the pack does not say so.
+
+**Plane verdict:** 2 of 12 specified · 4 partly · 6 absent.
 
 ## 3. Design Decisions
-| Decision | Choice | Rationale | Consequence |
-|---|---|---|---|
-| Quarantine retention + route? (open q) | **30d active / 90d archived; reprocess ONLY via #21 re-ingest/re-transform** | Fix-then-replay preserves bitemporal truth; direct repair edits corrupt lineage | An untouched 30-day quarantine item is an *unworked incident*, alerting escalates at 7d |
-| Error taxonomy | **Five classes: TRANSIENT / STRUCTURAL / DATA / CONTRACT / SYSTEM** | Retry policy, ownership, and paging differ by class, not by component | Class is mandatory at raise-time; the library refuses unclassified errors |
-| Retry ownership | **TRANSIENT auto-retry (bounded, jittered) inside the library; everything else never auto-retries** | Retrying a STRUCTURAL error is denial; not retrying a network blip is fragility | Retry budgets per call-site in #33; exhaustion promotes to SYSTEM |
-| Quarantine granularity | **File (G1/G2), row-set (rejects escalation), payload (outbound)** | One mechanism, three artifact shapes | Ledger rows carry artifact_kind + locator; store layout per kind |
-| Poison-pill guard | **Same artifact quarantined twice → CONTRACT class + hold** | Endless requeue loops are the classic failure | Second-strike detection via artifact hash in the ledger |
 
-## 4a. Diagrams
-```mermaid
-flowchart LR
- subgraph SRC["any Hub component"]
-  ERR["cp_errors.raise_(class, ctx)"]
- end
- subgraph LIB["cp_errors library"]
-  CLS["classify + policy"]
-  RTY["bounded retry (TRANSIENT)"]
-  QRT["quarantine(artifact, reason)"]
- end
- subgraph STORE["stores"]
-  QFS["/quarantine/<date>/<kind>/"]
-  QL[("QUARANTINE_LEDGER #33")]
- end
- R21["#21 replay (fix → re-enter)"]
- OBS["#34 alerts · aging"]
- ERR --> CLS
- CLS -->|"TRANSIENT"| RTY
- CLS -->|"DATA/STRUCTURAL/CONTRACT"| QRT
- QRT --> QFS
- QRT --> QL
- QL -.-> OBS
- QL -->|"resolved: cause fixed"| R21
- classDef ora fill:#e8eef5,stroke:#0f4775;
- class QL ora
-```
-```mermaid
-sequenceDiagram
- participant C as #13 loader
- participant L as cp_errors
- participant Q as Quarantine store+ledger
- participant O as Ops
- participant R as #21
- C->>L: raise_(DATA, file=X, load_id=..., reason=BAD_ENCODING)
- L->>Q: move X → /quarantine/2026-08-13/file/ · ledger OPEN(hash, reason, lineage)
- L-->>C: quarantined → loader continues with remaining set
- Q-->>O: #34 alert (class DATA, feed, aging clock starts)
- O->>O: root cause: SEI encoding defect → fixed extract resent
- O->>Q: ledger RESOLVED(cause_ref)
- O->>R: re-ingest via #21 (new LOAD_ID, normal gates)
- R-->>Q: ledger CLOSED(replay_id)
- Note over Q: 30d unresolved → escalation; 30d resolved → archive tier
-```
+**Review verdict: gap.** A file quarantine. The event path has no dead-letter, so a poison envelope has no escape and stalls its partition.
 
-## 4b. Flow Walkthrough
-1. Any component raises through the library with mandatory class + context (load_id/corr_id, artifact ref, reason code from #33 taxonomy).
-2. TRANSIENT → bounded jittered retry at the call site; exhaustion promotes to SYSTEM (paging class) — retries are never silent (#34 counter).
-3. Quarantinable classes → artifact moved to the kind-specific quarantine area, ledger row OPEN with hash, reason, full lineage keys.
-4. Pipeline continues where the design allows (a quarantined file removes one feed; #22 handles the domain consequence) — errors isolate, never cascade by default.
-5. Ops works the ledger queue (the #34 aging clock is the SLA): root cause fixed → RESOLVED with cause reference.
-6. Reprocessing = #21 only: re-ingest (fixed file arrives as new LOAD_ID) or re-transform — the artifact re-earns every gate; the quarantine copy is evidence, never the input.
-7. Second-strike on the same hash → CONTRACT hold: something systematic is wrong; no more automatic anything.
+**Direction.** The pack specifies a file quarantine well. Extend it: an event dead-letter with a reason taxonomy, and an outbound quarantine for rejected records. Neither exists.
 
-## 4c. Detailed Design
-**Ledger (#33)**
-```sql
-CREATE TABLE quarantine_ledger (
-  q_id          VARCHAR2(40) PRIMARY KEY,
-  artifact_kind VARCHAR2(10) NOT NULL,      -- FILE / ROWSET / PAYLOAD
-  artifact_ref  VARCHAR2(400) NOT NULL,     -- path or table+predicate or payload_ref
-  artifact_hash VARCHAR2(64),
-  err_class     VARCHAR2(12) NOT NULL,
-  reason_code   VARCHAR2(30) NOT NULL,      -- #33 taxonomy
-  load_id       VARCHAR2(40), corr_id VARCHAR2(40), feed_id VARCHAR2(20),
-  state         VARCHAR2(10) NOT NULL,      -- OPEN/RESOLVED/CLOSED/EXPIRED
-  cause_ref     VARCHAR2(200), replay_id VARCHAR2(40),
-  opened_at TIMESTAMP DEFAULT SYSTIMESTAMP, resolved_at TIMESTAMP, closed_at TIMESTAMP
-);
-```
-**Library surface**: `raise_(cls, reason, **ctx)`, `retryable(policy_id)` decorator, `quarantine(kind, ref, reason, **lineage)` — Nexus-published wheel, versioned; adoption enforced by cp-guardrails (bare `except:` and unclassified raises are CI findings).
-**Taxonomy (#33)**: reason codes per class with owner_group — DATA→domain owners, CONTRACT→SEI liaison, SYSTEM→platform. The routing table *is* the on-call map.
-**Retention jobs**: nightly — RESOLVED/CLOSED > 30d → archive tier; OPEN > 7d → escalate; > 30d → EXPIRED + management report (an expired quarantine is a process failure, made visible).
-**Row-set kind**: rejects (#25) escalate to quarantine only on threshold breach — normal rejects stay in `_rejects` models; the ledger references table + predicate, data stays in Oracle.
+## 4. Detailed Design
+
+**Deliverable.** Error taxonomy, quarantine store, resubmission path
+
+### Framework tables this component needs
+
+| Table | State | Purpose |
+| --- | --- | --- |
+| `ERROR_CATALOG` | new | The error vocabulary, as reference data rather than string literals at call sites. |
+| `ERROR_EVENT` | new | Every error instance in one place, whatever produced it. |
+| `EVENT_DEAD_LETTER` | new | The event path's quarantine. Holds the envelope, its position and why it could not be processed. |
+| `OUTBOUND_ERROR` | new | Rejections, from both sides: what G6 refused to send, and what SEI refused to accept. |
 
 ## 5. Data Quality, Reconciliation & Lineage
-Quarantine is where DQ verdicts become work: every G1/G2 BLOCK lands here with the gate evidence attached (dq_result join), so the queue is self-documenting. Lineage: q_id ↔ load_id/corr_id ↔ replay_id closes the loop — an auditor can walk defect → decision → fix → re-entry → gates re-passed (#31). Recon (#30) treats OPEN quarantine as explained variance: missing data with a named reason, not a mystery.
 
-## 6. RECOMMENDATION
-**6.1** One shared error library with a five-class taxonomy, three-shape quarantine with a governed ledger, 30/90 retention, second-strike holds, and re-entry exclusively through #21 — errors as governed work items, never private exceptions.
-**6.2**
-| Option | Description | Pros | Cons | Fit |
-|---|---|---|---|---|
-| A. Shared library + ledgered quarantine + replay-only re-entry (recommended) | As designed | Uniform ops; lineage-complete incidents; AD-2-safe repair; taxonomy = on-call routing | Library adoption discipline; ledger hygiene | **High** |
-| B. Per-component error handling | Each component does its own | No shared dependency | 30 taxonomies, invisible retries, quarantines in log messages — the legacy pattern being replaced | Low |
-| C. Dead-letter-queue middleware (Kafka-style DLQ) | Streaming DLQ infra | Familiar pattern elsewhere | Wrong shape for file/batch artifacts; new platform in the air-gap for what a share + table already do | Low |
-| D. Fix-in-place repair scripts | Edit quarantined data, resume | "Fast" | Violates AD-2/AD-8; un-audited data surgery — prohibited for the same reasons as #21 Option C | Prohibited |
-**6.3** > **Recommended: Option A.** The design's center is the re-entry rule: quarantine is evidence, the front door is the only way back in — which keeps every recovered artifact gate-verified and bitemporally honest, and makes the 2 a.m. question ("can I just fix the file?") answer itself. The taxonomy earns its place by *routing*: class determines retry, ownership, and paging, so incident response is a lookup, not a judgment. Measurements that must hold: zero re-entries bypassing #21 (ledger↔replay join complete), OPEN-aging within SLA, EXPIRED count ≈ 0, second-strike holds catching every poison pill in fault drills.
-**6.4** Touches Stage 1/2 boundaries as a *service*, owns no pipeline tier; AD-2/AD-8 are its constitution; no open-AD dependencies.
+No DQ, reconciliation or lineage obligation specific to this component beyond the estate-wide framework.
 
-## 7. Failure, Replay & Idempotency
-The handler failing: quarantine move is copy-verify-delete (crash-safe); ledger insert idempotent on q_id; a failed quarantine leaves the artifact in place with a SYSTEM page (fail-loud). Library retry state is in-process only — restart re-runs the task under normal Airflow semantics.
+## 6. Performance & Scale
+
+No performance concern identified for this component under the events-primary assumption.
+
+## 7. Error Handling, Failure & Replay
+
+No unowned error path identified for this component.
 
 ## 8. Security & Access Control
-Quarantined artifacts retain source classification (client data stays restricted — quarantine is not a downgrade); store area permissions mirror #8 with ops-read; ledger writes via library service identity; RESOLVED/CLOSED transitions require the ops role (#32) and are audited (#31).
 
-## 9. Open Questions & Risks
-- Reason-code taxonomy first cut + owner_group mapping — with Hema's inventory; owner: TBD.
-- Escalation channels per class (page vs ticket) — ops runbook decision; owner: TBD.
-- Risk: library version skew across components → single Nexus wheel, version floor enforced in CI.
-- Risk: quarantine volume spikes on a bad SEI day → store shares #8's capacity alerting; ledger-driven bulk-resolve tooling for common-cause days.
+Estate defaults apply: a dedicated read-only account for any consumer, business keys masked on read rather than at rest, and secrets from the platform secret store.
 
-## 10. Acceptance Criteria
-- [ ] Each artifact kind quarantined + re-entered via #21 end-to-end in a lower region, ledger states walked OPEN→CLOSED.
-- [ ] Second-strike drill: same hash twice → CONTRACT hold, no auto path.
-- [ ] TRANSIENT storm test: bounded retries, counter visible, promotion to SYSTEM on exhaustion.
-- [ ] Aging alerts at 7d/30d fire in a clock-advanced test.
-- [ ] cp-guardrails: bare except / unclassified raise fails CI on a seeded repo.
-- [ ] Direct-write attempt to quarantined RAW rows blocked by grants (negative test).
+**Open.** A12 grants the loader DML on RAW plus the registry, and DML-only on Gold. No consumer grant is described anywhere in the pack, so a read-only role gets improvised at connection time — which in practice means reusing the loader's account. The masking policy for the 786 PII fields in SDC scope is unapproved.
+
+## 9. SEI Source Coverage
+
+**SEI pack coverage: covered** — specified in the SEI pack.
+**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.
+
+| Document | Section | Kind | What it says |
+| --- | --- | --- | --- |
+| BBH File Ingestion Framework TDD v2.0 | §D.2 | specifies this component | QUARANTINED recovery for a file. |
+| BBH File Ingestion Framework TDD v2.0 | §D.6 | specifies this component | Stale in-progress recovery — a registry row left at LOADING past the timeout. |
+| BBH File Ingestion Framework TDD v2.0 | whole document | nothing in the pack covers it | No event dead-letter and no outbound quarantine. With at-least-once delivery and ordering inside a partition, one unprocessable envelope stalls that partition permanently and redelivery keeps returning it. |
+
+## 10. Gaps, Risks & What Is Missing
+
+### What is missing
+
+A file quarantine. The event path has no dead-letter, so a poison envelope has no escape and stalls its partition.
+
+### Risk
+
+No ranked bottleneck or unowned error path touches this component.
+
+### Gap against the SEI pack
+
+- No event dead-letter and no outbound quarantine. With at-least-once delivery and ordering inside a partition, one unprocessable envelope stalls that partition permanently and redelivery keeps returning it. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*
+
+## 11. Recommendation
+
+The pack specifies a file quarantine well. Extend it: an event dead-letter with a reason taxonomy, and an outbound quarantine for rejected records. Neither exists.
+
+**Action.** M15 — the highest-value single addition in this review.
+
+**Foundation-wide.** Five control tables are specified and each is sound on its own. What is absent is anything that spans them, and that absence is why four error vocabularies already exist in one pipeline before a line of event code has been written. Build the four models once, estate-wide, rather than letting each component grow its own.
+
+## 12. Open Questions & Acceptance Criteria
+
+### Open questions
+
+- **From the tracker.** Quarantine retention and reprocessing route?
+
+### Acceptance criteria
+
+- The deliverable above exists and is reviewed.
