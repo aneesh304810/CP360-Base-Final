@@ -3,6 +3,7 @@ import { SectionHeader } from "./AppShell.jsx";
 import { TRACKER_COMPONENTS } from "./seiDesignTracker.js";
 import DocDrill, { DOCS, DEFAULT_DOC, docFor } from "./DocDrill.jsx";
 import SeiDesignPack from "./SeiDesignPack.jsx";
+import HubArchitectReview from "./HubArchitectReview.jsx";
 
 // =====================================================================
 // HubDesign — the CP Integration Hub route: C4 landing (L1 context +
@@ -353,6 +354,18 @@ export default function HubDesign({ t }) {
    </div>);
  }
 
+ /* ---------- Architect review ---------- */
+ if (view === "REVIEW")
+  return (
+   <div>
+    <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <HubArchitectReview t={t} onBack={
+     <span onClick={() => setView("L1")} style={{ fontSize: 11.5, fontWeight: 700,
+      padding: "7px 16px", borderRadius: 5, background: t.navy || "#10193b",
+      color: "#fff", cursor: "pointer", display: "inline-block", marginBottom: 12 }}>
+      ← context + dashboard</span>} />
+   </div>);
+
  /* ---------- L1: context + dashboard ---------- */
  const o = overall(null);
  const rows = COMPS.filter((c) =>
@@ -361,8 +374,12 @@ export default function HubDesign({ t }) {
  return (
   <div>
    <SectionHeader t={t}>CP Integration Hub</SectionHeader>
-   <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-    <span onClick={() => setFlat(true)} style={{ marginLeft: "auto", fontSize: 10.5,
+   <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center" }}>
+    <span onClick={() => setView("REVIEW")} style={{ marginLeft: "auto", fontSize: 10.5,
+     fontWeight: 700, padding: "5px 14px", borderRadius: 999, cursor: "pointer",
+     background: "#fdf1f2", color: "#cc3344", border: "1px solid #f0c9ce" }}>
+     ⚠ architect review · events-primary</span>
+    <span onClick={() => setFlat(true)} style={{ fontSize: 10.5,
      fontWeight: 700, padding: "5px 14px", borderRadius: 999, cursor: "pointer",
      background: "#eef3f8", color: t.accent || "#0f4775" }}>
      ☰ all components (flat tracker)</span>
