@@ -8,6 +8,7 @@ import { AR_FINDINGS, AR_VERDICTS, AR_ASSUMPTIONS, AR_BOTTLENECKS, AR_ERRORS,
  AR_COVERAGE, AR_SEI_COVER, AR_OWNER, AR_PLANE_REC } from "./hubArchitectReview.js";
 import { FM_SUMMARY, FM_AREAS, FM_STATE, FM_PROVIDED, FM_TABLES, FM_REC }
  from "./hubFoundationModel.js";
+import SourceReference, { citationsFor } from "./SourceReference.jsx";
 
 // =====================================================================
 // HubDesign — the CP Integration Hub route: C4 landing (L1 context +
@@ -69,6 +70,7 @@ export default function HubDesign({ t }) {
  const [dq, setDq] = useState("");
  const [flat, setFlat] = useState(false);       // "all components" flat tracker
  const [expand, setExpand] = useState(null);    // L3 component detail panel
+ const [srcOf, setSrcOf] = useState(null);      // component shown beside its SEI source
 
  const [live, setLive] = useState(false);   // true = Oracle-backed (shared)
  useEffect(() => {
@@ -177,6 +179,21 @@ export default function HubDesign({ t }) {
     .hub-flow{stroke-dasharray:7 6;animation:hubdash 1.2s linear infinite}
     .hub-fast{animation-duration:.8s}
     .hub-still{stroke-dasharray:5 6}`}</style></defs>);
+
+ /* ---------- component beside its SEI source ---------- */
+ if (srcOf) {
+  const c = COMPS.find((x) => x.id === srcOf);
+  if (c) return (
+   <div>
+    <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <SourceReference t={t} comp={c} finding={FIND[c.id]} coverage={covOf(c)}
+     onBack={
+      <span onClick={() => setSrcOf(null)} style={{ fontSize: 11.5, fontWeight: 700,
+       padding: "7px 16px", borderRadius: 5, background: t.navy || "#10193b",
+       color: "#fff", cursor: "pointer", display: "inline-block", marginBottom: 12 }}>
+       ← {CONTAINERS[cont] ? CONTAINERS[cont][0] : "components"}</span>} />
+   </div>);
+ }
 
  /* ---------- L4 ---------- */
  if (doc)
@@ -287,6 +304,7 @@ export default function HubDesign({ t }) {
        : d.id === "l3-stages" ? "Stage 1/2" : d.id === "l3-errors" ? "Errors" : d.title);
       const f = FIND[c.id];
       const cv = covOf(c);
+      const nCite = citationsFor(c).length;
       const hasPanel = c.isNew || !!f || !!cv;
       const vc = c.isNew ? "#cc3344" : f ? (AR_VERDICTS[f.verdict] || ["#5c7c94"])[0] : null;
       const vt = c.isNew ? "NEW · MISSING" : f ? f.verdict.toUpperCase() : null;
@@ -295,7 +313,7 @@ export default function HubDesign({ t }) {
        <div key={c.id} style={{ borderTop: "1px solid #eef1f4",
         background: isX ? "#fafcfe" : undefined }}>
         <div style={{ display: "grid",
-         gridTemplateColumns: "34px minmax(0,1.15fr) minmax(0,1.4fr) 104px 90px 128px",
+         gridTemplateColumns: "34px minmax(0,1.05fr) minmax(0,1.25fr) 104px 90px 196px",
          gap: 10, padding: "8px 14px", fontSize: 11, alignItems: "center",
          cursor: hasPanel ? "pointer" : "default" }}
          onClick={hasPanel ? () => setExpand(isX ? null : c.id) : undefined}>
@@ -315,11 +333,20 @@ export default function HubDesign({ t }) {
          <span>{vt ? chip(vc + "1f", vc, vt) : null}</span>
          <span>{chip((STCOL[sx.status] || "#eef1f4") + "22",
           STCOL[sx.status] || "#8a97a3", `${sx.status.toUpperCase()} · ${sx.pct}%`)}</span>
-         <span onClick={(e) => { e.stopPropagation(); setDoc({ key: dk, from: c }); }}
-          style={{ fontSize: 9, fontWeight: 800, padding: "3px 9px", borderRadius: 999,
-           background: d.bg, color: d.color, border: `1px solid ${d.color}`,
-           cursor: "pointer", textAlign: "center", whiteSpace: "nowrap" }}>
-          {d.icon} {lab} →</span>
+         <span style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+          {nCite > 0 && (
+           <span onClick={(e) => { e.stopPropagation(); setSrcOf(c.id); }}
+            title={`${nCite} SEI citation${nCite === 1 ? "" : "s"} — read side by side`}
+            style={{ fontSize: 9, fontWeight: 800, padding: "3px 8px", borderRadius: 999,
+             background: "#f3eefb", color: "#6d3ac0", border: "1px solid #d9c9f0",
+             cursor: "pointer", whiteSpace: "nowrap" }}>
+            ◧ SEI · {nCite}</span>)}
+          <span onClick={(e) => { e.stopPropagation(); setDoc({ key: dk, from: c }); }}
+           style={{ fontSize: 9, fontWeight: 800, padding: "3px 9px", borderRadius: 999,
+            background: d.bg, color: d.color, border: `1px solid ${d.color}`,
+            cursor: "pointer", textAlign: "center", whiteSpace: "nowrap" }}>
+           {d.icon} {lab} →</span>
+         </span>
         </div>
         {isX && (
          <div style={{ padding: "2px 14px 14px 48px", borderTop: "1px dashed #e3eaf0" }}>
