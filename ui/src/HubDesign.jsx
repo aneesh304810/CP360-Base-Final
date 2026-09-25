@@ -368,14 +368,15 @@ export default function HubDesign({ t }) {
       <Mini x={222} y={610} w={190} label="Consumer Lag Monitor" k="consumer lag" />
 
       {/* file ingress, now standby, plus the outbound loop */}
-      <Grp x={212} y={672} w={214} h={222} k="IE" />
+      <Grp x={212} y={672} w={214} h={248} k="IE" />
       <Mini x={222} y={702} w={190} label="Landing + Transport" k="landing" />
       <Mini x={222} y={729} w={190} label="File Arrival Sensors" k="arrival" />
       <Mini x={222} y={756} w={190} label="API Gateway" k="gateway" />
       <Mini x={222} y={783} w={190} label="Apigee Proxy" k="apigee" />
       <Mini x={222} y={810} w={190} label="Outbound Producers" k="outbound produc" />
-      <Mini x={222} y={837} w={190} label="Callback Receiver" k="callback receiver" />
-      <Mini x={222} y={864} w={190} label="Submission Registry" k="submission registry" />
+      <Mini x={222} y={837} w={190} label="Loader Payload Store" cyl k="loader payload" />
+      <Mini x={222} y={864} w={190} label="Callback Receiver" k="callback receiver" />
+      <Mini x={222} y={891} w={190} label="Submission Registry" cyl k="submission registry" />
 
       {/* processing */}
       <Grp x={444} y={180} w={226} h={470} k="PROC" />
@@ -397,10 +398,20 @@ export default function HubDesign({ t }) {
       <Mini x={700} y={322} w={208} label="G4 Tie-out" k="g4" />
       <Mini x={700} y={358} w={208} label="G5 Post-Publish Recon" k="g5" />
       <Mini x={700} y={394} w={208} label="DQ Framework" k="dq framework" />
-      <text x="700" y="446" fontSize="8" fontStyle="italic" fill="#a8560f">
+      <Mini x={700} y={430} w={208} label="G6 Outbound Validation" k="g6 outbound" />
+      <Mini x={700} y={466} w={208} label="Outbound Reconciliation" k="outbound reconcil" />
+      <text x="700" y="514" fontSize="8" fontStyle="italic" fill="#a8560f">
        G0/G1/G3 per micro-batch · G2/G4/G5 at the EOD gate only</text>
-      <text x="700" y="460" fontSize="8" fontStyle="italic" fill="#a8560f">
+      <text x="700" y="528" fontSize="8" fontStyle="italic" fill="#a8560f">
        running the set-level gates per box is 288× a day [B5]</text>
+      <text x="700" y="548" fontSize="8" fontStyle="italic" fill="#cc3344">
+       G1–G5 all face inbound. G6 is the only gate before a loader</text>
+      <text x="700" y="562" fontSize="8" fontStyle="italic" fill="#cc3344">
+       reaches SEI — today SEI is the first validator [E13]</text>
+      <text x="700" y="582" fontSize="8" fontStyle="italic" fill="#a8560f">
+       G6 blocks Outbound Producers; the payload is recorded</text>
+      <text x="700" y="596" fontSize="8" fontStyle="italic" fill="#a8560f">
+       before the send, never after [E14]</text>
 
       {/* foundation */}
       <Grp x={212} y={930} w={708} h={110} k="FND" />
@@ -413,7 +424,9 @@ export default function HubDesign({ t }) {
       <Mini x={826} y={968} w={84} label="Integr.360" k="integration360" />
       <Mini x={222} y={1000} w={44} label="SSO" k="sso" />
       <Mini x={274} y={1000} w={150} label="Schema Contract Registry" k="schema contract" />
-      <Mini x={432} y={1000} w={128} label="Expectation Store" k="expectation store" />
+      <Mini x={432} y={1000} w={128} label="Expectation Store" cyl k="expectation store" />
+      <Mini x={568} y={1000} w={150} label="Loader Template Registry" cyl k="loader template" />
+      <Mini x={726} y={1000} w={150} label="Outbound Quarantine" k="outbound quarantine" />
 
       {/* consumers + platform */}
       <Sys x={970} y={300} w={210} label="PBDW · IMDS · Pivotal"
@@ -427,10 +440,10 @@ export default function HubDesign({ t }) {
       <Ortho pts={[[176,285],[212,285]]} label="events [primary]" lx={194} ly={272} />
       <Ortho pts={[[212,470],[192,470],[192,466],[176,466]]} label="set-based pull" lx={196} ly={500} />
       <Ortho pts={[[176,775],[212,775]]} label="files [standby]" lx={194} ly={762} />
-      <Ortho pts={[[212,850],[190,850],[190,800],[176,800]]} label="submit · push + poll" kind="out" lx={188} ly={880} />
+      <Ortho pts={[[212,905],[190,905],[190,800],[176,800]]} label="submit · push + poll" kind="out" lx={186} ly={932} />
       <Ortho pts={[[426,514],[436,514],[436,292],[452,292]]} label="" />
-      <text x="318" y="646" fontSize="8" fontStyle="italic" fill="#159943">
-       one commit per micro-batch, straight into Stage 1</text>
+      <text x="222" y="644" fontSize="8" fontStyle="italic" fill="#159943">
+       one commit per micro-batch → Stage 1</text>
       <Ortho pts={[[426,712],[557,712],[557,654]]} label="standby load" lx={600} ly={706} />
       <Ortho pts={[[670,232],[688,232]]} label="" kind="gate" />
       <Ortho pts={[[688,300],[670,300]]} label="blocks publish [G4]" kind="gate" lx={672} ly={324} />
