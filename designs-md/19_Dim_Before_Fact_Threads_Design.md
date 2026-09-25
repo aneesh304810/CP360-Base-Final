@@ -28,9 +28,13 @@ in_scope: true
 
 Scope as recorded in the component tracker: Selector config and thread tuning..
 
+**Custom build: Low.** Largely platform or vendor capability. The design work is the contract around it — what it guarantees, what it does not, and who is called when it stops.
+
+**Where it sits.** Hub · orchestration. C.1's three-task DAG is careful and complete for one daily cycle. It assumes a discrete moment when everything has arrived, and events never produce one. Do not extend the daily DAG to run 288 times; separate the clocks.
+
 ## 2. Context & Dependencies
 
-- Depends on components: 16, 55
+- **Upstream** — depends on #16 Gold (dbt), #55 Oracle Connection Pooling
 - Technology: Airflow + dbt
 - Custom build: Low — High means a design document is mandatory before code.
 - Source of record: NEW
@@ -63,6 +67,18 @@ Every mapping and derivation between Stage 2 and Gold is hand-written dbt SQL. A
 ## 4. Detailed Design
 
 **Deliverable.** Build-order and concurrency design
+
+### Implementation — Hub · orchestration
+
+C.1's three-task DAG is careful and complete for one daily cycle. It assumes a discrete moment when everything has arrived, and events never produce one. Do not extend the daily DAG to run 288 times; separate the clocks.
+
+| Concern | How to build it |
+| --- | --- |
+| **Two runtimes** | A long-running consumer owns the intraday path. The existing DAG owns the EOD transformation. They meet at a gate that requires every micro-batch LOADED plus the marker received. |
+| **The gate** | Marker-only gating lets the transformation run on short Stage 1, and STG_TO_INT still reconciles because it ties against a Stage 1 that is itself short. The gate must count micro-batches, not trust a signal. |
+| **Conditional ordering** | Only serialise dim-before-fact when the micro-batch actually contains both domains. Paying the ordering cost 288 times for boxes holding one domain is waste. |
+| **Bounded retry** | Maximum attempts per work item before quarantine. The replay engine has no limit today, so a permanently failing item retries for ever and consumes capacity every cycle. |
+| **Partial-batch policy for views** | The existing policy covers partial file batches. Three of five views pulling successfully inside one micro-batch is the equivalent case and the more frequent one, and it is unowned. |
 
 ### Rule registry data model
 
@@ -121,7 +137,7 @@ This has to fit the dbt project as it stands — incremental models, on_schema_c
 
 ## 5. Data Quality, Reconciliation & Lineage
 
-No DQ, reconciliation or lineage obligation specific to this component beyond the estate-wide framework.
+No DQ or reconciliation obligation specific to this component. Two estate rules bind it: anything derived stores the input it was derived from — the threshold in force, the ruleset version, the counts — so a verdict can be reproduced months later; and an unknown value raises rather than being mapped to its nearest neighbour.
 
 ## 6. Performance & Scale
 
@@ -133,13 +149,21 @@ Under a daily batch the ordering cost is paid once. Under intraday it is paid 28
 
 ## 7. Error Handling, Failure & Replay
 
-No unowned error path identified for this component.
+No unowned error path identified for this component. Two estate conventions still bind it: durable write first, then acknowledge — committing an offset or returning a 202 before the write lands loses data with no trace; and absence is a state to record rather than a gap to infer, which is where most of the silent failures in this estate come from.
 
 ## 8. Security & Access Control
 
 Estate defaults apply: a dedicated read-only account for any consumer, business keys masked on read rather than at rest, and secrets from the platform secret store.
 
 **Rule authoring is a privileged action.** A derivation on `fact_transactions` is a change to the firm's books. Draft-to-active on a ruleset carries `REQUIRES_APPROVAL` and a four-eyes flow; the BA authors, someone else approves, and both are recorded.
+
+### Estate conventions this component inherits
+
+- **Configuration, not code.** Thresholds, mappings, calendars and status vocabularies live in tables and are read at run time. An unknown value raises; it is never mapped to its nearest neighbour or defaulted silently.
+- **Reproducible verdicts.** Anything derived stores the input it was derived from — the threshold in force, the ruleset version, the counts. A verdict that cannot be reproduced three months later cannot be defended.
+- **Bound everything that fans out.** Pods per micro-batch, connections per pod, retries per work item, calls per poll window. Every unbounded fan-out in this design eventually lands on the same Oracle.
+- **Write then acknowledge.** Durable write first, then commit the offset or return the 202. The reverse order loses data silently in both the event path and the callback path.
+- **Absence is a state.** NOT_RUN, STATUS_UNRESOLVED and 'no partition count known' are values to record, not gaps to infer. Most of the silent failure modes in this estate come from treating an empty result as a healthy one.
 
 ## 9. SEI Source Coverage
 
@@ -160,6 +184,16 @@ The ordering cost moves from once a day to once per micro-batch, including on bo
 
 - **MEDIUM · performance (B8).** DIM-before-FACT serialisation is now paid per micro-batch.
 
+### Not specified — and what to do until it is
+
+**How transform__<BUSINESS_DATE> and restatement both hold.** The run already exists and succeeded, so Airflow refuses a second one, and C.1's reconciliation path fires only when no matching run exists — the opposite case. As written the run-id rule and the recovery procedure contradict each other.
+
+  *Recommended default:* Restatement runs as a separate DAG with its own run id, which is how they coexist today. Say so explicitly in the document; the contradiction is only resolved by a convention nobody wrote down.
+
+**Whether there is an intraday SLA at all.** The pack's only clock is the EOD cutoff. Without an intraday definition of 'behind', a micro-batch that failed at 11am is not late, only absent, and nothing escalates.
+
+  *Recommended default:* Derive lateness from the stream's own rhythm — a rolling baseline of the inter-micro-batch interval — rather than waiting for a calendar nobody will write.
+
 ### Gap against the SEI pack
 
 The pack specifies this component. The gap is not in the documentation.
@@ -172,11 +206,15 @@ Fully specified by the pack, and sound. Order conditionally on the collapsed key
 
 **On externalising the rules.** Externalised without effective dating, generated SQL and CI tests, this produces a system where more people can change logic and nobody can explain a number — strictly worse than hard-coded SQL. The three guardrails are not refinements to add later; they are what makes the idea safe at all.
 
+**Hub · orchestration.** Answer the run-id contradiction before anything else on this plane is built. Every recovery procedure in the pack depends on a mechanism that cannot currently execute.
+
 ## 12. Open Questions & Acceptance Criteria
 
 ### Open questions
 
 - **From the tracker.** Thread count vs Oracle contention ceiling?
+- **How transform__<BUSINESS_DATE> and restatement both hold** — unanswered. Until it is: Restatement runs as a separate DAG with its own run id, which is how they coexist today. Say so explicitly in the document; the contradiction is only resolved by a convention nobody wrote down.
+- **Whether there is an intraday SLA at all** — unanswered. Until it is: Derive lateness from the stream's own rhythm — a rolling baseline of the inter-micro-batch interval — rather than waiting for a calendar nobody will write.
 
 ### Acceptance criteria
 

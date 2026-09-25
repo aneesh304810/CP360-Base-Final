@@ -36,6 +36,8 @@ const {
 } = await import(join(SRC, "hubArchitectReview.js"));
 const { SEI_CITATIONS, SEI_SOURCE_INDEX, CITE_KIND } = await import(join(SRC, "seiCitations.js"));
 const { FM_TABLES, FM_REC } = await import(join(SRC, "hubFoundationModel.js"));
+const { archetypeFor, IMPL_COMPONENT, IMPL_CONVENTIONS } =
+  await import(join(SRC, "hubImplementation.js"));
 
 // ---------------------------------------------------------------- indexes
 const ALL = [...TRACKER_COMPONENTS, ...HUB_EVENT_COMPONENTS];
@@ -49,6 +51,21 @@ const RULE_SPAN = ["15", "16", "17", "19", "59", "66", "M24", "M25"];
 const inRuleSpan = (c) => RULE_SPAN.includes(keyOf(c));
 const cite = (c) => SEI_CITATIONS[c.arId] || SEI_CITATIONS[c.id] || [];
 const cov = (c) => COV[c.arId] || COV[c.id];
+const DEPENDENTS = {};
+for (const c of ALL) {
+  for (const d of String(c.depends || "").split(",").map((x) => x.trim()).filter((x) => x && x !== "-"))
+    (DEPENDENTS[d] ||= []).push(c);
+}
+const nameOf = (id) => {
+  const c = ALL.find((x) => x.id === String(id));
+  return c ? `#${c.id} ${c.component}` : `#${id}`;
+};
+const BUILD_STANCE = {
+  High: "**Custom build: High.** A design document is mandatory before code, and this one is that document. High means there is no vendor default to fall back on — every behaviour below is a decision somebody has to make and own.",
+  Medium: "**Custom build: Medium.** Configuration and glue over an existing capability. The risk is not writing it; it is that the configuration lives in code rather than in the metadata store, where it cannot be changed without a release.",
+  Low: "**Custom build: Low.** Largely platform or vendor capability. The design work is the contract around it — what it guarantees, what it does not, and who is called when it stops.",
+  None: "**Custom build: None.** Nothing is built here. The deliverable is a contract, a configuration entry or a review, and treating it as build work is how it ends up unowned.",
+};
 const hits = (list, c) =>
   list.filter((x) => (x.comp || []).some((k) => k === c.id || k === c.arId));
 
@@ -122,15 +139,39 @@ function sPurpose(c) {
   } else {
     out.push(`Scope as recorded in the component tracker: ${c.scope || "not stated"}.`);
   }
+  out.push("", BUILD_STANCE[c.custom] || BUILD_STANCE.None);
+  const A = archetypeFor(c);
+  if (A) out.push("", `**Where it sits.** ${A.label}. ${A.build}`);
+  const deps = DEPENDENTS[c.id] || [];
+  if (deps.length) {
+    out.push("", `**What breaks if this is wrong.** ${deps.length} component` +
+      `${deps.length === 1 ? "" : "s"} depend` + `${deps.length === 1 ? "s" : ""} on it: ` +
+      deps.map((d) => nameOf(d.id)).join(", ") + ".");
+  }
   return out.join("\n");
 }
 
 function sContext(c) {
   const rows = [];
-  if (c.depends && c.depends !== "-") rows.push(`Depends on components: ${c.depends}`);
+  const ups = String(c.depends || "").split(",").map((x) => x.trim()).filter((x) => x && x !== "-");
+  if (ups.length) rows.push(`**Upstream** — depends on ${ups.map(nameOf).join(", ")}`);
+  const downs = DEPENDENTS[c.id] || [];
+  if (downs.length) rows.push(`**Downstream** — depended on by ${downs.map((d) => nameOf(d.id)).join(", ")}`);
+  if (!ups.length && !downs.length)
+    rows.push("**No recorded dependency either way.** Either it is genuinely standalone, or the " +
+      "tracker's depends_on column was never filled for it — worth confirming, because an unrecorded " +
+      "dependency is the one that surfaces during integration testing.");
   if (c.technology) rows.push(`Technology: ${c.technology}`);
   if (c.custom) rows.push(`Custom build: ${c.custom} — High means a design document is mandatory before code.`);
   if (c.source) rows.push(`Source of record: ${c.source}`);
+  const gate = c.plane === "Event Ingestion" || ["13", "14"].includes(c.id)
+    ? "**Before the gate.** Its output is counted by the completeness gate, so a silent failure here makes the business date close on incomplete data."
+    : ["Processing"].includes(c.plane)
+      ? "**At or after the gate.** It runs on what the gate admitted, so its reconciliation ties against whatever Stage 1 holds \u2014 including a Stage 1 that is short."
+      : c.zone === "3. Consumers"
+        ? "**After publication.** It reads Gold and does not participate in the gate."
+        : null;
+  if (gate) rows.push(gate);
   const pr = AR_PLANE_REC[
     { "Ingress/Egress": "IE", Processing: "PROC", Orchestration: "ORCH",
       "Data Quality": "DQ", Foundation: "FND" }[c.plane]];
@@ -150,7 +191,11 @@ function sDecisions(c) {
   const out = [];
   if (f) out.push(`**Review verdict: ${f.verdict}.** ${f.finding}`);
   else if (c.isNew) out.push("No prior design decisions exist — this component has never been specified.");
-  else out.push("No review finding against this component: the events-primary substitution does not change it.");
+  else {
+    const A0 = archetypeFor(c);
+    out.push("No review finding against this component: the events-primary substitution does not " +
+      "change what it does." + (A0 ? ` The design decisions that remain are build decisions. ${A0.build}` : ""));
+  }
   if (cv && cv.rec) out.push("", `**Direction.** ${cv.rec}`);
   if (inRuleSpan(c)) {
     const R = AR_RULE_EXTERNALISATION;
@@ -167,6 +212,14 @@ function sDetailed(c) {
   const out = [];
   if (m) out.push(`**Deliverable.** ${m.deliverable}`, "", `**Technology.** ${m.tech}`);
   else out.push(`**Deliverable.** ${c.deliverable}`);
+  const A = archetypeFor(c);
+  if (A) {
+    out.push("", `### Implementation \u2014 ${A.label}`, "", A.build, "",
+      "| Concern | How to build it |", "| --- | --- |",
+      ...A.implement.map(([k, v]) => `| **${esc(k)}** | ${esc(v)} |`));
+  }
+  const note = IMPL_COMPONENT[c.id];
+  if (note) out.push("", `**Build note for this component.** ${note.note}`);
 
   if (inRuleSpan(c)) {
     const R = AR_RULE_EXTERNALISATION;
@@ -219,8 +272,12 @@ function sDqRecon(c) {
       "explainable by reading the ruleset that was effective that night, not by finding the commit " +
       "that happened to be deployed.");
   }
-  if (!out.length) out.push("No DQ, reconciliation or lineage obligation specific to this component " +
-    "beyond the estate-wide framework.");
+  if (!out.length) {
+    out.push("No DQ or reconciliation obligation specific to this component. Two estate rules bind " +
+      "it: anything derived stores the input it was derived from \u2014 the threshold in force, the " +
+      "ruleset version, the counts \u2014 so a verdict can be reproduced months later; and an unknown " +
+      "value raises rather than being mapped to its nearest neighbour.");
+  }
   return out.join("\n");
 }
 
@@ -233,8 +290,16 @@ function sPerf(c) {
     out.push("", ...bs.map((b) =>
       `### ${b.id} · ${b.title} (${b.sev})\n\n${b.body}\n\n**What to do.** ${b.fix}`));
   }
-  if (!out.filter(Boolean).length) out.push("No performance concern identified for this component " +
-    "under the events-primary assumption.");
+  if (!out.filter(Boolean).length) {
+    const A = archetypeFor(c);
+    out.push(A && A.key === "runtime"
+      ? "Sizing is unresolved because micro-batch cadence and volume are both unstated. Instrument " +
+        "the ratio of micro-batch duration to cadence interval and treat 0.7 as the ceiling \u2014 above " +
+        "it there is no recovery headroom left and a small latency regression becomes an unbounded backlog."
+      : "No ranked bottleneck touches this component. The estate rule still binds it: bound anything " +
+        "that fans out \u2014 pods per micro-batch, connections per pod, retries per work item, calls per " +
+        "poll window. Every unbounded fan-out in this design eventually lands on the same Oracle.");
+  }
   return out.filter(Boolean).join("\n");
 }
 
@@ -247,7 +312,11 @@ function sErrors(c) {
     out.push("", ...es.map((e) =>
       `### ${e.id} · ${e.title} (${e.sev})\n\n${e.body}\n\n**Who owns it today.** ${e.owner}`));
   }
-  if (!out.filter(Boolean).length) out.push("No unowned error path identified for this component.");
+  if (!out.filter(Boolean).length) out.push(
+    "No unowned error path identified for this component. Two estate conventions still bind it: " +
+    "durable write first, then acknowledge \u2014 committing an offset or returning a 202 before the " +
+    "write lands loses data with no trace; and absence is a state to record rather than a gap to " +
+    "infer, which is where most of the silent failures in this estate come from.");
   return out.filter(Boolean).join("\n");
 }
 
@@ -265,6 +334,8 @@ function sSecurity(c) {
       "change to the firm's books. Draft-to-active on a ruleset carries `REQUIRES_APPROVAL` and a " +
       "four-eyes flow; the BA authors, someone else approves, and both are recorded.");
   }
+  out.push("", "### Estate conventions this component inherits", "",
+    IMPL_CONVENTIONS.map(([k, v]) => `- **${k}.** ${v}`).join("\n"));
   return out.join("\n");
 }
 
@@ -276,7 +347,12 @@ function sCoverage(c) {
     out.push(`**SEI pack coverage: ${cv.sei}** — ${AR_SEI_COVER[cv.sei][1]}.`,
       `**Who answers for the gap: ${cv.owner}** — ${AR_OWNER[cv.owner][1]}.`);
   } else {
-    out.push("Not assessed against the SEI pack.");
+    out.push("**Not assessed against the SEI pack.** No citation has been mapped for this component, " +
+      "which is a gap in the review rather than a statement that the pack covers it. Assessing it " +
+      "means one pass: find the section that governs it, record whether that section specifies it, " +
+      "partly touches it or is silent, and name who answers for the difference. That is a four-line " +
+      "entry in `ui/src/seiCitations.js` and it is what turns an assertion into something that can " +
+      "be put in front of SEI beside the page.");
   }
   if (cs.length) {
     out.push("", "| Document | Section | Kind | What it says |", "| --- | --- | --- | --- |",
@@ -297,6 +373,14 @@ function sCoverage(c) {
   return out.join("\n");
 }
 
+function notSpecified(c) {
+  const A = archetypeFor(c);
+  if (!A || !A.unknown.length) return null;
+  return ["### Not specified \u2014 and what to do until it is", "",
+    A.unknown.map(([what, why, rec]) =>
+      `**${what}.** ${why}\n\n  *Recommended default:* ${rec}`).join("\n\n")].join("\n");
+}
+
 function sGaps(c) {
   const m = MISS[c.arId];
   const f = FIND[c.id];
@@ -310,8 +394,12 @@ function sGaps(c) {
   } else if (f) {
     out.push("### What is missing", "", f.finding);
   } else {
-    out.push("### What is missing", "", "Nothing identified. The component is specified and the " +
-      "events-primary substitution does not change it.");
+    const A2 = archetypeFor(c);
+    out.push("### What is missing", "",
+      A2 ? `No review finding: the events-primary substitution does not change what this component ` +
+           `does. What is missing is build detail rather than design. ${A2.build}`
+         : "Nothing identified. The component is specified and the events-primary substitution does " +
+           "not change it.");
   }
   const bs = hits(AR_BOTTLENECKS, c), es = hits(AR_ERRORS, c);
   out.push("", "### Risk", "");
@@ -320,6 +408,8 @@ function sGaps(c) {
     ...es.map((e) => `**${e.sev.toUpperCase()} · error path (${e.id}).** ${e.title}.`),
   ];
   out.push(risks.length ? bullets(risks) : "No ranked bottleneck or unowned error path touches this component.");
+  const ns = notSpecified(c);
+  if (ns) out.push("", ns);
   out.push("", "### Gap against the SEI pack", "");
   out.push(absent.length
     ? bullets(absent.map((x) => {
@@ -340,7 +430,8 @@ function sRecommendation(c) {
   const out = [];
   if (cv && cv.rec) out.push(cv.rec);
   else if (f && f.action) out.push(f.action);
-  else out.push("No change recommended.");
+  else out.push("No component-specific change is recommended: the review found nothing wrong with " +
+    "what this component does. The recommendation below is about how it should be built.");
   if (f && f.action && cv && cv.rec && f.action !== cv.rec) out.push("", `**Action.** ${f.action}`);
   if (inRuleSpan(c)) {
     out.push("", `**On externalising the rules.** ${AR_RULE_EXTERNALISATION.risk}`);
@@ -348,6 +439,8 @@ function sRecommendation(c) {
   if (c.plane === "Foundation" && !c.isNew) {
     out.push("", `**Foundation-wide.** ${FM_REC.body}`);
   }
+  const A = archetypeFor(c);
+  if (A) out.push("", `**${A.label}.** ${A.recommend}`);
   return out.join("\n");
 }
 
@@ -357,7 +450,10 @@ function sQuestions(c) {
   const qs = [];
   if (cv && cv.ask) qs.push(`**${cv.owner === "SEI" ? "For SEI" : "For both sides"}.** ${cv.ask}`);
   if (c.questions && c.questions !== "-" && !c.isNew) qs.push(`**From the tracker.** ${c.questions}`);
-  out.push(qs.length ? bullets(qs) : "None outstanding.");
+  const A = archetypeFor(c);
+  if (A) for (const [what, , rec] of A.unknown)
+    qs.push(`**${what}** \u2014 unanswered. Until it is: ${rec}`);
+  out.push(qs.length ? bullets(qs) : "None outstanding against this component.");
   out.push("", "### Acceptance criteria", "");
   out.push(bullets([
     "The deliverable above exists and is reviewed.",

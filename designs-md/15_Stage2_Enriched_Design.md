@@ -28,12 +28,20 @@ in_scope: true
 
 Scope as recorded in the component tracker: Standard dbt models. Custom macros for dedup and latest-record selection..
 
+**Custom build: Medium.** Configuration and glue over an existing capability. The risk is not writing it; it is that the configuration lives in code rather than in the metadata store, where it cannot be changed without a release.
+
+**Where it sits.** Hub · processing. RAW to Gold, and the layer where the events substitution costs most. The models themselves are specified; what changes is how often they run and what that does to a design shaped for one nightly pass.
+
+**What breaks if this is wrong.** 7 components depend on it: #16 Gold (dbt), #17 Correction Handling, #25 G3 dbt Tests + Business Rules, #38 IMDS Stage -> IMDS, #39 Pivotal Database, #40 CP DW Canonical Model, #59 dbt Release & Rollback.
+
 ## 2. Context & Dependencies
 
-- Depends on components: 14, 17, 25
+- **Upstream** — depends on #14 Stage 1 RAW, #17 Correction Handling, #25 G3 dbt Tests + Business Rules
+- **Downstream** — depended on by #16 Gold (dbt), #17 Correction Handling, #25 G3 dbt Tests + Business Rules, #38 IMDS Stage -> IMDS, #39 Pivotal Database, #40 CP DW Canonical Model, #59 dbt Release & Rollback
 - Technology: dbt
 - Custom build: Medium — High means a design document is mandatory before code.
 - Source of record: SEI v5
+- **At or after the gate.** It runs on what the gate admitted, so its reconciliation ties against whatever Stage 1 holds — including a Stage 1 that is short.
 
 ## 3. Design Decisions
 
@@ -55,6 +63,18 @@ Every mapping and derivation between Stage 2 and Gold is hand-written dbt SQL. A
 ## 4. Detailed Design
 
 **Deliverable.** 5 STG2_* models, 8 processing steps, tests
+
+### Implementation — Hub · processing
+
+RAW to Gold, and the layer where the events substitution costs most. The models themselves are specified; what changes is how often they run and what that does to a design shaped for one nightly pass.
+
+| Concern | How to build it |
+| --- | --- |
+| **Commit granularity** | One commit per micro-batch into Stage 1. Per-row commits thrash the redo log; one commit per day is not available any more. |
+| **Incremental predicates** | Push the INT predicate down to Stage 1's partition so the STG view scans one micro-batch rather than the accumulated day. Verify it on the actual execution plan — do not assume the push-down happens. |
+| **Partition strategy** | INT's current-day partition is written to continuously under intraday, so an incremental MERGE degrades as the day goes on. Subpartition by micro-batch, or load append-only with a late dedupe at the gate. |
+| **Traceability** | Add MICROBATCH_ID to Stage 1 and carry it forward. Without it, lineage from a Gold row stops at the business date — free now, a change request after deployment. |
+| **Schema change** | Gold runs on_schema_change='fail' and the RAW DDL is the schema contract. Any column change is a coordinated release, so the contract with SEI has to state notification and lead time. |
 
 ### Rule registry data model
 
@@ -113,7 +133,7 @@ This has to fit the dbt project as it stands — incremental models, on_schema_c
 
 ## 5. Data Quality, Reconciliation & Lineage
 
-No DQ, reconciliation or lineage obligation specific to this component beyond the estate-wide framework.
+No DQ or reconciliation obligation specific to this component. Two estate rules bind it: anything derived stores the input it was derived from — the threshold in force, the ruleset version, the counts — so a verdict can be reproduced months later; and an unknown value raises rather than being mapped to its nearest neighbour.
 
 ## 6. Performance & Scale
 
@@ -130,13 +150,21 @@ INT is partitioned by BUSINESS_DATE with a 7-day window. Under intraday events t
 
 ## 7. Error Handling, Failure & Replay
 
-No unowned error path identified for this component.
+No unowned error path identified for this component. Two estate conventions still bind it: durable write first, then acknowledge — committing an offset or returning a 202 before the write lands loses data with no trace; and absence is a state to record rather than a gap to infer, which is where most of the silent failures in this estate come from.
 
 ## 8. Security & Access Control
 
 Estate defaults apply: a dedicated read-only account for any consumer, business keys masked on read rather than at rest, and secrets from the platform secret store.
 
 **Rule authoring is a privileged action.** A derivation on `fact_transactions` is a change to the firm's books. Draft-to-active on a ruleset carries `REQUIRES_APPROVAL` and a four-eyes flow; the BA authors, someone else approves, and both are recorded.
+
+### Estate conventions this component inherits
+
+- **Configuration, not code.** Thresholds, mappings, calendars and status vocabularies live in tables and are read at run time. An unknown value raises; it is never mapped to its nearest neighbour or defaulted silently.
+- **Reproducible verdicts.** Anything derived stores the input it was derived from — the threshold in force, the ruleset version, the counts. A verdict that cannot be reproduced three months later cannot be defended.
+- **Bound everything that fans out.** Pods per micro-batch, connections per pod, retries per work item, calls per poll window. Every unbounded fan-out in this design eventually lands on the same Oracle.
+- **Write then acknowledge.** Durable write first, then commit the offset or return the 202. The reverse order loses data silently in both the event path and the callback path.
+- **Absence is a state.** NOT_RUN, STATUS_UNRESOLVED and 'no partition count known' are values to record, not gaps to infer. Most of the silent failure modes in this estate come from treating an empty result as a healthy one.
 
 ## 9. SEI Source Coverage
 
@@ -160,6 +188,16 @@ Two problems. This design names a Pre-Gold Exadata tier and an Enriched layer th
 - **CRITICAL · performance (B2).** STG is a view, and events make it run 288 times a day.
 - **HIGH · performance (B6).** INT's incremental MERGE into a growing current-day partition.
 
+### Not specified — and what to do until it is
+
+**Which layer model is real.** The SEI pack has RAW to STG (a view) to INT to DIM and FACT. This codebase names a Stage 2 Enriched layer and a Pre-Gold Exadata tier that the pack does not have.
+
+  *Recommended default:* Reconcile before build. Two layer models in two documents means whichever one a developer opens first becomes the implementation.
+
+**Volume per micro-batch.** Partition strategy, commit size and the degradation curve on the current-day partition all depend on it, and none of it is stated.
+
+  *Recommended default:* Measure the degradation curve in a lower environment before choosing a partition strategy. It may be acceptable at real volumes — but nobody knows the real volumes.
+
 ### Gap against the SEI pack
 
 No absent-coverage citation recorded.
@@ -172,12 +210,16 @@ Reconcile the layer model before either document is treated as a spec. Then fix 
 
 **On externalising the rules.** Externalised without effective dating, generated SQL and CI tests, this produces a system where more people can change logic and nobody can explain a number — strictly worse than hard-coded SQL. The three guardrails are not refinements to add later; they are what makes the idea safe at all.
 
+**Hub · processing.** The STG view is the one to look at first. A view recomputed once a night is elegant; the same view recomputed 288 times a day, each time scanning Stage 1, is the largest single cost the substitution introduces.
+
 ## 12. Open Questions & Acceptance Criteria
 
 ### Open questions
 
 - **For both sides.** The pack's layer model is RAW to STG (a view) to INT to DIM and FACT. This design names Stage 2 Enriched and a Pre-Gold Exadata tier that the pack does not have. Which is the build target?
 - **From the tracker.** Full refresh or incremental per model?
+- **Which layer model is real** — unanswered. Until it is: Reconcile before build. Two layer models in two documents means whichever one a developer opens first becomes the implementation.
+- **Volume per micro-batch** — unanswered. Until it is: Measure the degradation curve in a lower environment before choosing a partition strategy. It may be acceptable at real volumes — but nobody knows the real volumes.
 
 ### Acceptance criteria
 

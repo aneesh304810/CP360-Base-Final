@@ -28,9 +28,16 @@ in_scope: true
 
 Scope as recorded in the component tracker: CORE BUILD. dbt tests cannot do this - it crosses the graph and must gate the publish..
 
+**Custom build: High.** A design document is mandatory before code, and this one is that document. High means there is no vendor default to fall back on — every behaviour below is a decision somebody has to make and own.
+
+**Where it sits.** Hub · data quality. Five gates designed for a daily file cycle, and they split cleanly by cost. Getting the split wrong is the difference between 288 cheap checks a day and 288 full-table aggregates.
+
+**What breaks if this is wrong.** 2 components depend on it: #16 Gold (dbt), #30 Reconciliation Framework.
+
 ## 2. Context & Dependencies
 
-- Depends on components: 14, 16, 28
+- **Upstream** — depends on #14 Stage 1 RAW, #16 Gold (dbt), #28 DQ Framework
+- **Downstream** — depended on by #16 Gold (dbt), #30 Reconciliation Framework
 - Technology: Airflow + SQL
 - Custom build: High — High means a design document is mandatory before code.
 - Source of record: NEW
@@ -44,6 +51,18 @@ Scope as recorded in the component tracker: CORE BUILD. dbt tests cannot do this
 ## 4. Detailed Design
 
 **Deliverable.** RAW-to-Gold reconciliation. BLOCKS Gold publish. Per-target
+
+### Implementation — Hub · data quality
+
+Five gates designed for a daily file cycle, and they split cleanly by cost. Getting the split wrong is the difference between 288 cheap checks a day and 288 full-table aggregates.
+
+| Concern | How to build it |
+| --- | --- |
+| **Cost class decides cadence** | Row-level gates (G0 envelope, G1 structural, G3 dbt tests) run per micro-batch. Set-level gates (G2 profiling, G4 tie-out, G5 post-publish recon) run at the EOD gate only. |
+| **Rules as data** | A rule registry with is_blocking per rule, not per gate. That settles the blocking-versus-advisory argument one rule at a time instead of as a single estate-wide decision nobody can make. |
+| **Evidence a rule ran** | Record PASS, WARN, FAIL and NOT_RUN. Recording only failures makes zero rows ambiguous — either everything passed or nothing ran, and a gate that silently did not execute looks exactly like a clean night. |
+| **Threshold in force** | Copy the applied threshold onto the result row. Changing a threshold must never rewrite history, and a verdict has to stay defensible three months later. |
+| **Outbound has a gate too** | G6 validates a loader before submission and blocks it. G1 to G5 all face inbound, so today the first validator of a BBH loader is SEI. |
 
 ## 5. Data Quality, Reconciliation & Lineage
 
@@ -59,11 +78,19 @@ G2 profiling, G4 tie-out and G5 post-publish recon are set-level aggregates. Run
 
 ## 7. Error Handling, Failure & Replay
 
-No unowned error path identified for this component.
+No unowned error path identified for this component. Two estate conventions still bind it: durable write first, then acknowledge — committing an offset or returning a 202 before the write lands loses data with no trace; and absence is a state to record rather than a gap to infer, which is where most of the silent failures in this estate come from.
 
 ## 8. Security & Access Control
 
 Estate defaults apply: a dedicated read-only account for any consumer, business keys masked on read rather than at rest, and secrets from the platform secret store.
+
+### Estate conventions this component inherits
+
+- **Configuration, not code.** Thresholds, mappings, calendars and status vocabularies live in tables and are read at run time. An unknown value raises; it is never mapped to its nearest neighbour or defaulted silently.
+- **Reproducible verdicts.** Anything derived stores the input it was derived from — the threshold in force, the ruleset version, the counts. A verdict that cannot be reproduced three months later cannot be defended.
+- **Bound everything that fans out.** Pods per micro-batch, connections per pod, retries per work item, calls per poll window. Every unbounded fan-out in this design eventually lands on the same Oracle.
+- **Write then acknowledge.** Durable write first, then commit the offset or return the 202. The reverse order loses data silently in both the event path and the callback path.
+- **Absence is a state.** NOT_RUN, STATUS_UNRESOLVED and 'no partition count known' are values to record, not gaps to infer. Most of the silent failure modes in this estate come from treating an empty result as a healthy one.
 
 ## 9. SEI Source Coverage
 
@@ -84,6 +111,16 @@ Full-table control totals. Same cost class as G2 and the same 288× exposure.
 
 - **HIGH · performance (B5).** DQ gates were designed per file, not per micro-batch.
 
+### Not specified — and what to do until it is
+
+**Which rules exist.** The gates are code with no registry, so which rules ran against which model on which date is unanswerable today.
+
+  *Recommended default:* Extract the existing checks into the registry as the first migration rather than designing a new rule set. The rules already exist; what is missing is that they are not data.
+
+**Whether a failed reconciliation may publish to Gold.** RECON_RESULT stores counts and no status, and the verdict is derived in Splunk, so reconciliation is advisory by construction and the current answer is yes.
+
+  *Recommended default:* Decide explicitly. If the answer is meant to be no, it needs a blocking gate, because nothing stops it today.
+
 ### Gap against the SEI pack
 
 The pack specifies this component. The gap is not in the documentation.
@@ -94,11 +131,15 @@ EOD gate only, and it is the gate's strongest check.
 
 **Action.** B5 — EOD gate only, and it is the gate's strongest check.
 
+**Hub · data quality.** Write the cost class onto every rule before the first one is built. It is one column, and it is what stops the 288x problem being rediscovered by whoever writes the DAG.
+
 ## 12. Open Questions & Acceptance Criteria
 
 ### Open questions
 
 - **From the tracker.** Recount or compare to captured ingest metadata?
+- **Which rules exist** — unanswered. Until it is: Extract the existing checks into the registry as the first migration rather than designing a new rule set. The rules already exist; what is missing is that they are not data.
+- **Whether a failed reconciliation may publish to Gold** — unanswered. Until it is: Decide explicitly. If the answer is meant to be no, it needs a blocking gate, because nothing stops it today.
 
 ### Acceptance criteria
 
