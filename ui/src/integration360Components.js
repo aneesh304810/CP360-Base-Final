@@ -5,7 +5,7 @@
 
 export const I360_SUMMARY = {
  title: "Integration360 — read-only observability over BBH ↔ SEI integration",
- line: "35 components across 6 planes. Observes four channels and answers three questions per business date: completeness, timeliness, correctness. Owns no integration state — the Integration Hub owns quarantine, error handling and remediation.",
+ line: "38 components across 6 planes. Observes four channels and answers three questions per business date: completeness, timeliness, correctness. Owns no integration state — the Integration Hub owns quarantine, error handling and remediation.",
 };
 
 export const I360_PLANES = {
@@ -35,10 +35,10 @@ export const I360_COMPONENTS = [
    deliverable: "Fallback readiness per interface, plus the trailer count",
    detail: "Three states: absent, arrived-and-held, unavailable. Answers 'is the parachute packed', not 'did the data arrive'.",
    note: "FILE_REGISTRY has no terminal state meaning 'available and deliberately unused'." },
- { id: "UI-4", plane: "UI", component: "OutboundView", state: "Blocked",
-   deliverable: "Loader submissions with returning status — three counts",
-   detail: "Submitted, accepted, rejected. Never a boolean: partial acceptance is the norm and Unified Cash and Free Movement carry record-level approval.",
-   note: "Blocked on the callback grain. File-level gives a status table; record-level gives an exception workbench." },
+ { id: "UI-4", plane: "UI", component: "OutboundView", state: "Specified",
+   deliverable: "Submission lifecycle per loader type, with both status sources on the row",
+   detail: "Generated → submitted → notified → terminal, carrying submitted, accepted and rejected counts. Never a boolean: partial acceptance is the norm and Unified Cash and Free Movement carry record-level approval. Each status transition shows whether it arrived by push or by poll.",
+   note: "Unblocked: SEI pushes the notification, BBH polls SEI for detail and as backstop. A submission whose terminal state was found only by poll is shown as such — that is the measure of the push channel’s own health." },
  { id: "UI-5", plane: "UI", component: "ExceptionList", state: "Specified",
    deliverable: "One list over three sources with different vocabularies",
    detail: "Row-level business DQ, dbt structural tests, and the Hub's quarantine and transport errors. Sorted by days to expiry first.",
@@ -67,10 +67,10 @@ export const I360_COMPONENTS = [
  { id: "API-3", plane: "RTR", component: "file_router", state: "Specified",
    deliverable: "GET /file/{date} · /interface/{name}",
    detail: "Distinguishes the three states the completeness gate collapses into two: absent, committed-but-not-released, released." },
- { id: "API-4", plane: "RTR", component: "loader_router", state: "Blocked",
-   deliverable: "GET /loader/{date} · /submission/{id}",
-   detail: "Submissions joined to callbacks, with the template version in force at generation.",
-   note: "Blocked on the callback contract and on whether the Hub records a submission at send time. Without the send record, silence is indistinguishable from success." },
+ { id: "API-4", plane: "RTR", component: "loader_router", state: "Specified",
+   deliverable: "GET /loader/{date} · /submission/{id} · /submission/{id}/errors",
+   detail: "Submissions joined to their status history, with the template version in force at generation and the source of every transition. Reject detail is served from what the Hub already fetched and stored — Integration360 never calls SEI.",
+   note: "Still depends on the Hub recording a submission at send time. Without that record, silence is indistinguishable from success — settling the callback contract did not remove that dependency." },
  { id: "API-5", plane: "RTR", component: "exception_router", state: "Specified",
    deliverable: "GET /exceptions · /{source}/{id}",
    detail: "Filters by grain so row-level and model-level failures appear together without being merged." },
@@ -94,7 +94,7 @@ export const I360_COMPONENTS = [
    note: "Blocked on where the Hub's store lives — its own persistence is likely rather than the shared Oracle schema." },
  { id: "ADP-4", plane: "ADP", component: "inbox_reader", state: "Not owned",
    deliverable: "Consumes the shared callback inbox",
-   detail: "Tracks its own progress marker, independent of the Hub's. Payloads stored encrypted, masked on read.",
+   detail: "Tracks its own progress marker, independent of the Hub’s. The inbox holds notifications, not reject payloads — detail is fetched separately on the poll leg. Stored encrypted, masked on read.",
    note: "Dedupe must key on a SEI-supplied message id stable across retries, not a timestamp. BBH defines the contract, so this can be required." },
  { id: "ADP-5", plane: "ADP", component: "dbt_results_reader", state: "Assumed",
    deliverable: "Per-model status, timing, rows affected, test outcomes",
@@ -104,6 +104,11 @@ export const I360_COMPONENTS = [
    deliverable: "Header and trailer of a standby file — two lines",
    detail: "Obtains the declared row count. Never loads the file. It is the left-hand side of the only independent check on the primary ingestion path.",
    note: "Blocked on a landing-zone read mount, or an upstream component publishing the count instead." },
+
+ { id: "ADP-7", plane: "ADP", component: "loader_status_reader", state: "Assumed",
+   deliverable: "LOADER_SUBMISSION · LOADER_STATUS_HISTORY · LOADER_ERROR",
+   detail: "Reads the outbound state the Hub maintains from both sources. Requires LOADER_STATUS_HISTORY to carry a SOURCE column separating CALLBACK from POLL; without it the two channels cannot be told apart and divergence is unmeasurable.",
+   note: "Assumes reject detail is persisted when fetched rather than re-read from SEI on demand. If SEI purges detail after a retention window, a missed fetch is permanent loss and the persisted copy is all that survives." },
 
  // ---- Shared services ----
  { id: "SVC-1", plane: "SVC", component: "correlation_service", state: "Specified",
@@ -117,6 +122,11 @@ export const I360_COMPONENTS = [
    deliverable: "Masks business keys on the way out",
    detail: "Applied on read rather than at rest, so a wrong mask can be corrected without having destroyed the original.",
    note: "786 PII fields are in SDC scope and the masking policy is unapproved. Default to hashing business keys." },
+
+ { id: "SVC-4", plane: "SVC", component: "status_precedence", state: "Specified",
+   deliverable: "One current status from two writers, by a written rule",
+   detail: "The poll wins. A poll is a read of SEI’s current state; a notification is a point-in-time event that can arrive late or out of order. History keeps every row from both sources; the current status is derived as the latest POLL at or after the newest CALLBACK, otherwise the highest terminal state reached. Terminal never regresses.",
+   note: "Without the rule, a retried PROCESSING notification landing after a COMPLETED poll walks the status backwards and raises a false exception. Two writers into one status field and no precedence is how a status board loses its audience." },
 
  // ---- Observation engine ----
  { id: "ENG-1", plane: "ENG", component: "verdict_computer", state: "Blocked",
@@ -146,6 +156,11 @@ export const I360_COMPONENTS = [
    detail: "Covers only findings no other system sees. The Hub alerts on what it manages, Splunk on what the pipeline emits.",
    note: "Blocked: no egress exists. Splunk is out of scope by decision and no email, Teams or ServiceNow path has an owner." },
 
+ { id: "ENG-8", plane: "ENG", component: "divergence_detector", state: "Specified",
+   deliverable: "Where push and poll disagree, and where push never spoke",
+   detail: "Three findings. A terminal state found by poll that no notification announced. A notification the next poll contradicts. A submission still non-terminal past its max age, which becomes STATUS_UNRESOLVED rather than sitting at SUBMITTED for ever. The first is a direct measurement of SEI’s push channel and costs nothing once SOURCE is recorded.",
+   note: "This finding class exists only because there are two sources. It is the outbound counterpart of the event channel’s sequence-gap check — both turn an absence into a provable one." },
+
  // ---- Store ----
  { id: "ST-1", plane: "STORE", component: "int360_verdict_snapshot", state: "Specified",
    deliverable: "(channel, business_date, verdict_type)",
@@ -172,10 +187,25 @@ export const I360_CHANNELS = [
  { ch: "File",   dir: "SEI → BBH", status: "daily standby", tone: "#159943",
    can: "Fallback readiness per interface, plus the trailer count for the cross-channel check",
    cant: "Nothing about the data itself — the file is not loaded" },
- { ch: "Loader", dir: "BBH → SEI", status: "outbound, live", tone: "#a8560f",
-   can: "Submitted, accepted and rejected counts, and the template version in force",
+ { ch: "Loader", dir: "BBH → SEI", status: "push + poll", tone: "#a8560f",
+   can: "Submission lifecycle, accepted and rejected counts, reject detail, template version in force, and whether each status arrived by push or by poll",
    cant: "Lateness — nothing records which loaders were due" },
  { ch: "API",    dir: "both",      status: "not Day 1", tone: "#8a97a3",
    can: "Nothing yet — Day 1 is file and event based",
    cant: "Its first production member is the loader callback endpoint itself" },
+];
+
+// The outbound loader channel — settled mechanism. Push notifies, poll fetches
+// detail and backstops a notification that never arrives. The Integration Hub owns
+// all three legs; Integration360 observes them and measures where they disagree.
+export const I360_OUTBOUND = [
+ { leg: "1 · Submit", dir: "BBH → SEI", owner: "Integration Hub",
+   what: "Loader file generated to SEI’s template and submitted through Apigee. Returns the submission identifier every later leg correlates on.",
+   obs: "Generated but never submitted, and the template version in force at generation." },
+ { leg: "2 · Notify", dir: "SEI → BBH", owner: "Integration Hub · shared inbox",
+   what: "SEI calls the BBH endpoint with a status transition and an error summary. Thin and event-shaped. Acknowledged on durable write, never on successful processing — parsing and correlation happen downstream of the 202.",
+   obs: "Notification arrival and its latency against submission, plus duplicates collapsed on the SEI-supplied message id." },
+ { leg: "3 · Poll", dir: "BBH → SEI", owner: "Integration Hub · monitoring worker",
+   what: "Non-terminal submissions only, on a tiered cadence that is tight after submission and backs off. Fetches current state, and reject detail once on reaching a terminal-with-errors state — paginated, stored, never re-fetched per poll.",
+   obs: "Submissions past max age, poll results contradicting a notification, and terminal states no notification announced." },
 ];

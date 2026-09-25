@@ -3,7 +3,7 @@ import { SectionHeader } from "./AppShell.jsx";
 import Integration360Screens from "./integration360Screens.jsx";
 import {
  I360_SUMMARY, I360_PLANES, I360_COMPONENTS, I360_STATES, I360_PCT, I360_COLOR,
- I360_CHANNELS,
+ I360_CHANNELS, I360_OUTBOUND,
 } from "./integration360Components.js";
 
 // =====================================================================
@@ -249,8 +249,8 @@ export default function Integration360Design({ t }) {
        sub="persisted to Oracle" kind="mute" />
       <Box x={1000} y={338} w={236} h={48} label="Landing zone"
        sub="trailer only · no load" kind="mute" />
-      <Box x={1000} y={400} w={236} h={48} label="Callback inbox"
-       sub="shared · SEI writes" kind="ext" />
+      <Box x={1000} y={400} w={236} h={48} label="Notification inbox"
+       sub="shared · SEI pushes" kind="ext" />
       <text x="1118" y="470" fontSize="9" fill="#5c7c94" textAnchor="middle">
        six sources · no cross-database join</text>
 
@@ -264,7 +264,7 @@ export default function Integration360Design({ t }) {
      </svg>
      <div style={{ fontSize: 10, color: "#5c7c94", marginTop: 10, maxWidth: 900 }}>
       Routers and adapters read the six sources on the right; the Observation Engine
-      consumes the callback inbox, writes verdicts and rollups to the INT360 store, and
+      consumes the notification inbox, writes verdicts and rollups to the INT360 store, and
       raises findings to the Alert Dispatcher. Operations reads the Web UI and cannot act
       from within the tool.
      </div>
@@ -318,7 +318,7 @@ export default function Integration360Design({ t }) {
      <Box x={300} y={66} w={228} label="Oracle control schema" sub="registries · DQ · recon" />
      <Box x={300} y={132} w={228} label="Airflow metadata" sub="Postgres read replica" />
      <Box x={300} y={198} w={228} label="CP Integration Hub" sub="quarantine · submissions" />
-     <Box x={300} y={264} w={228} label="Callback inbox" sub="shared · two consumers" kind="acc" />
+     <Box x={300} y={264} w={228} label="Notification inbox" sub="shared · two consumers" kind="acc" />
      <Box x={300} y={330} w={228} label="dbt run results" sub="persisted to Oracle" />
      <Box x={300} y={396} w={228} label="Landing zone" sub="trailer only" />
 
@@ -426,6 +426,42 @@ export default function Integration360Design({ t }) {
        <div style={{ fontSize: 10, color: sub, marginTop: 3 }}>
         <b style={{ color: "#a8560f" }}>cannot:</b> {c.cant}</div></div>
      </div>))}
+   </div>
+
+   {/* outbound loader — three legs */}
+   <div style={{ fontSize: 15, fontWeight: 700, color: navy, margin: "22px 0 4px" }}>
+    Outbound loader — push notifies, poll fetches detail</div>
+   <div style={{ fontSize: 10.5, color: sub, marginBottom: 10 }}>
+    the Integration Hub owns all three legs; Integration360 observes them and measures
+    where they disagree</div>
+   <div style={{ background: "#fff", border: `1px solid ${panel}`, borderRadius: 10,
+    overflow: "hidden" }}>
+    {I360_OUTBOUND.map((o) => (
+     <div key={o.leg} style={{ display: "grid",
+      gridTemplateColumns: "96px minmax(0,1.5fr) minmax(0,1fr)", gap: 14,
+      padding: "11px 16px", fontSize: 11, borderTop: "1px solid #eef1f4",
+      alignItems: "start" }}>
+      <div>
+       <b style={{ color: navy, display: "block" }}>{o.leg}</b>
+       <span style={{ fontSize: 9.5, color: sub }}>{o.dir}</span></div>
+      <div>
+       <div style={{ color: "#33414d", lineHeight: 1.55 }}>{o.what}</div>
+       <div style={{ fontSize: 9.5, color: sub, marginTop: 4 }}>
+        owner: {o.owner}</div></div>
+      <div style={{ fontSize: 10.5, color: "#33414d", lineHeight: 1.55 }}>
+       <b style={{ color: "#0e8f7e" }}>observed:</b> {o.obs}</div>
+     </div>))}
+   </div>
+   <div style={{ fontSize: 11, color: "#33414d", background: "#fff",
+    border: `1px solid ${panel}`, borderLeft: "3px solid #a8560f", borderRadius: 8,
+    padding: "12px 14px", lineHeight: 1.6, margin: "10px 0 0", maxWidth: 940 }}>
+    <b>When the two sources disagree, the poll wins.</b> A poll is a read of SEI’s
+    current state; a notification is a point-in-time event that can arrive late, out of
+    order, or twice. History keeps every row from both with its source; the current
+    status is derived, and terminal never regresses. The pairing also closes the hole a
+    pure push model leaves — a submission whose notification never arrives is found by
+    the poller and becomes STATUS_UNRESOLVED past its max age, rather than sitting at
+    SUBMITTED unnoticed.
    </div>
 
    {/* observation model — two clocks */}

@@ -307,11 +307,15 @@ export default function Integration360Screens({ t, onBack }) {
    <div style={{ fontSize: 11, color: "#33414d", background: "#fff",
     border: `1px solid ${panel}`, borderLeft: `3px solid ${ST.warn}`, borderRadius: 8,
     padding: "12px 14px", lineHeight: 1.6, maxWidth: 940 }}>
-    <b>The one screen not designed yet.</b> Outbound. Its shape depends on whether
-    SEI’s callback carries record-level rejection detail or only a file-level
-    outcome — a status table and an exception workbench are different screens, and
-    building both is waste. The loader row above is drawn at record level on the
-    assumption that it does.
+    <b>The fifth screen — outbound submissions.</b> The mechanism is now settled:
+    SEI pushes a notification, BBH polls SEI for reject detail and as backstop. So
+    the screen is a submission lifecycle with a status history, each row tagged
+    push or poll, and reject detail paginated beneath it. Two columns carry their
+    weight only because there are two sources: <i>found by</i>, and <i>notified
+    at</i> against <i>polled at</i>. A terminal state with no notification is the
+    running measure of SEI’s push channel. What is still open is the grain of the
+    reject detail SEI returns — the loader row above is drawn at record level on
+    the assumption that it is per record, not per file.
    </div>
   </div>);
 }
