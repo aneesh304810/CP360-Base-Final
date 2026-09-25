@@ -6,6 +6,8 @@ import SeiDesignPack from "./SeiDesignPack.jsx";
 import { HUB_EVENT_COMPONENTS } from "./hubEventComponents.js";
 import { AR_FINDINGS, AR_VERDICTS, AR_ASSUMPTIONS, AR_BOTTLENECKS, AR_ERRORS,
  AR_COVERAGE, AR_SEI_COVER, AR_OWNER, AR_PLANE_REC } from "./hubArchitectReview.js";
+import { FM_SUMMARY, FM_AREAS, FM_STATE, FM_PROVIDED, FM_TABLES, FM_REC }
+ from "./hubFoundationModel.js";
 
 // =====================================================================
 // HubDesign — the CP Integration Hub route: C4 landing (L1 context +
@@ -229,6 +231,11 @@ export default function HubDesign({ t }) {
       <div style={{ textAlign: "center", fontSize: 10, color: "#f3d3a8" }}>
        <b style={{ display: "block", fontSize: 20, color: "#ffc477" }}>{findIn(cont)}</b>
        affected</div>)}
+     {cont === "FND" && (
+      <span onClick={() => { setView("FNDMODEL"); setExpand(null); }}
+       style={{ fontSize: 10.5, fontWeight: 700, padding: "7px 14px", borderRadius: 999,
+        background: "#fdf1f2", color: "#cc3344", cursor: "pointer",
+        whiteSpace: "nowrap" }}>▤ framework data model · 11 missing</span>)}
     </div>
     {(() => {
       const cvs = rows.map(covOf).filter(Boolean);
@@ -520,6 +527,136 @@ export default function HubDesign({ t }) {
         <span style={{ width: 9, height: 9, borderRadius: "50%",
          background: STCOL[k], display: "inline-block" }} />{k}</span>))}
       <span>dot on each component = delivery status (edit on the L1 dashboard)</span>
+     </div>
+    </div>
+   </div>);
+ }
+
+ /* ---------- Foundation framework — the data models ---------- */
+ if (view === "FNDMODEL") {
+  const Bar = ({ icon, title, note, n, label }) => (
+   <div style={{ display: "flex", alignItems: "center", gap: 12,
+    background: t.navy || "#10193b", color: "#fff", borderRadius: 10,
+    padding: "14px 20px", margin: "18px 0 10px" }}>
+    <span style={{ fontSize: 24 }}>{icon}</span>
+    <div><b>{title}</b>
+     <div style={{ fontSize: 10, color: "#a9c1de", marginTop: 2 }}>{note}</div></div>
+    <div style={{ marginLeft: "auto", textAlign: "center", fontSize: 10,
+     color: "#a9c1de" }}><b style={{ display: "block", fontSize: 20,
+     color: "#fff" }}>{n}</b>{label}</div>
+   </div>);
+  return (
+   <div>
+    <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <span onClick={() => { setCont("FND"); setView("L3"); }}
+     style={{ fontSize: 11.5, fontWeight: 700, padding: "7px 16px", borderRadius: 5,
+      background: t.navy || "#10193b", color: "#fff", cursor: "pointer",
+      display: "inline-block", marginBottom: 12 }}>← Foundation</span>
+
+    <div style={{ background: "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+     borderRadius: 10, padding: "14px 18px", borderLeft: "3px solid #cc3344" }}>
+     <b style={{ fontSize: 14, color: t.navy || "#10193b" }}>{FM_SUMMARY.title}</b>
+     <div style={{ fontSize: 11.5, color: "#33414d", lineHeight: 1.65, marginTop: 5,
+      maxWidth: 980 }}>{FM_SUMMARY.line}</div>
+    </div>
+
+    <Bar icon="✓" title="What the SEI pack does provide"
+     note="stated first, so the gap is a fair one" n={FM_PROVIDED.length} label="control tables" />
+    <div style={{ border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderRadius: 8,
+     overflow: "hidden", background: "#fff" }}>
+     {FM_PROVIDED.map((r) => (
+      <div key={r.name} style={{ display: "grid",
+       gridTemplateColumns: "184px minmax(0,1fr)", gap: 12, padding: "11px 14px",
+       fontSize: 11, borderTop: "1px solid #eef1f4", alignItems: "start" }}>
+       <div><b style={{ fontFamily: "Roboto Mono, monospace", fontSize: 10,
+        color: t.navy || "#10193b" }}>{r.name}</b>
+        <div style={{ marginTop: 4 }}>{chip(FM_AREAS[r.area][1] + "1f",
+         FM_AREAS[r.area][1], FM_AREAS[r.area][0].toUpperCase())}</div></div>
+       <div><div style={{ color: "#33414d", lineHeight: 1.6 }}>{r.what}</div>
+        <div style={{ fontSize: 10.5, color: "#a8560f", lineHeight: 1.55, marginTop: 5 }}>
+         <b>limit:</b> {r.limit}</div></div>
+      </div>))}
+    </div>
+
+    {Object.entries(FM_AREAS).map(([k, [label, col, note]]) => {
+     const rows2 = FM_TABLES.filter((x) => x.area === k);
+     return (
+      <div key={k}>
+       <Bar icon="▤" title={`${label} model`} note={note}
+        n={rows2.length} label="tables" />
+       <div style={{ display: "grid", gap: 8 }}>
+        {rows2.map((tb) => {
+         const isX = expand === tb.name;
+         const [sc, sl] = FM_STATE[tb.state];
+         return (
+          <div key={tb.name} style={{ background: "#fff",
+           border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderRadius: 8,
+           overflow: "hidden" }}>
+           <div onClick={() => setExpand(isX ? null : tb.name)}
+            style={{ display: "grid",
+             gridTemplateColumns: "18px minmax(0,1fr) 150px 170px", gap: 10,
+             padding: "11px 14px", fontSize: 11, alignItems: "center",
+             cursor: "pointer" }}>
+            <span style={{ color: col, fontWeight: 700 }}>{isX ? "−" : "+"}</span>
+            <b style={{ fontFamily: "Roboto Mono, monospace", fontSize: 11,
+             color: t.navy || "#10193b" }}>{tb.name}</b>
+            <span style={{ fontSize: 9.5, color: t.sub || "#666" }}>{tb.grain}</span>
+            <span>{chip(sc + "1f", sc, sl.toUpperCase())}</span>
+           </div>
+           {isX && (
+            <div style={{ padding: "0 14px 14px 42px",
+             borderTop: "1px dashed #e3eaf0" }}>
+             <Fld k="purpose" v={tb.purpose} />
+             <Fld k="why it is needed" v={tb.why} tone={col} />
+             <div style={{ marginTop: 11 }}>
+              <div style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: .4,
+               color: t.sub || "#666" }}>COLUMNS</div>
+              <div style={{ border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+               borderRadius: 6, overflow: "hidden", marginTop: 4, maxWidth: 940 }}>
+               {tb.cols.map(([cn, ct, note2], i) => (
+                <div key={cn + i} style={{ display: "grid",
+                 gridTemplateColumns: "minmax(0,200px) minmax(0,190px) minmax(0,1fr)",
+                 gap: 10, padding: "6px 10px", fontSize: 10.5,
+                 borderTop: i ? "1px solid #f2f5f8" : "none",
+                 background: i % 2 ? "#fafcfe" : "#fff" }}>
+                 <b style={{ fontFamily: "Roboto Mono, monospace", fontSize: 10,
+                  color: "#0f4775" }}>{cn}</b>
+                 <span style={{ fontFamily: "Roboto Mono, monospace", fontSize: 9.5,
+                  color: t.sub || "#666" }}>{ct}</span>
+                 <span style={{ color: "#33414d" }}>{note2}</span>
+                </div>))}
+              </div>
+             </div>
+             {tb.notes.map((nt, i) => (
+              <div key={i} style={{ fontSize: 10.5, color: "#33414d", lineHeight: 1.6,
+               marginTop: 7, paddingLeft: 10, borderLeft: `2px solid ${col}` }}>{nt}</div>))}
+            </div>)}
+          </div>);
+        })}
+       </div>
+      </div>);
+    })}
+
+    <Bar icon="⚑" title="Recommendation" note={FM_REC.verdict}
+     n={FM_TABLES.filter((x) => x.state === "new").length}
+     label={`new tables · ${FM_TABLES.filter((x) => x.state === "extend").length} extension`} />
+    <div style={{ background: "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+     borderRadius: 8, padding: "14px 18px" }}>
+     <div style={{ fontSize: 11.5, color: "#33414d", lineHeight: 1.65,
+      maxWidth: 980 }}>{FM_REC.body}</div>
+     <div style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: .4, color: "#159943",
+      margin: "14px 0 6px" }}>BUILD ORDER</div>
+     <ol style={{ margin: 0, paddingLeft: 20, fontSize: 11, color: "#33414d",
+      lineHeight: 1.65, maxWidth: 980 }}>
+      {FM_REC.order.map((o, i) => (
+       <li key={i} style={{ marginBottom: 5 }}>{o}</li>))}
+     </ol>
+     <div style={{ marginTop: 14, background: "#f7f3fd", borderRadius: 6,
+      borderLeft: "3px solid #6d3ac0", padding: "11px 13px" }}>
+      <div style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: .4,
+       color: "#6d3ac0" }}>ASK — BOTH SIDES</div>
+      <div style={{ fontSize: 11, color: "#33414d", lineHeight: 1.65,
+       marginTop: 3 }}>{FM_REC.ask}</div>
      </div>
     </div>
    </div>);
