@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { SectionHeader } from "./AppShell.jsx";
+import Integration360Screens from "./integration360Screens.jsx";
 import {
  I360_SUMMARY, I360_PLANES, I360_COMPONENTS, I360_STATES, I360_PCT, I360_COLOR,
  I360_CHANNELS,
@@ -82,6 +83,15 @@ export default function Integration360Design({ t }) {
    {label && <text x={lx} y={ly} fontSize="8.5" fontStyle="italic"
     fill={acc ? "#0e8f7e" : "#5c7c94"}>{label}</text>}
   </g>);
+
+ /* ---------- screens ---------- */
+ if (view === "SCREENS")
+  return (
+   <div>
+    <SectionHeader t={t}>Integration360</SectionHeader>
+    <Integration360Screens t={t}
+     onBack={backBtn("← planes", () => setView("L2"))} />
+   </div>);
 
  /* ---------- L3 ---------- */
  if (view === "L3" && plane) {
@@ -175,7 +185,14 @@ export default function Integration360Design({ t }) {
   return (
    <div>
     <SectionHeader t={t}>Integration360</SectionHeader>
-    {backBtn("← context + readiness", () => setView("L1"))}
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+     {backBtn("← context + readiness", () => setView("L1"))}
+     <span onClick={() => setView("SCREENS")} style={{ fontSize: 11.5, fontWeight: 700,
+      padding: "7px 16px", borderRadius: 5, background: "#e6f4f2",
+      border: "1px solid #0e8f7e", color: "#0b5f6a", cursor: "pointer",
+      display: "inline-block", marginBottom: 12 }}>
+      ▤ screen designs →</span>
+    </div>
     <div style={{ background: "#fff", border: `1px solid ${panel}`, borderRadius: 10,
      padding: 16, overflowX: "auto" }}>
      <svg viewBox="0 0 1280 700" style={{ minWidth: 900, display: "block" }}>
