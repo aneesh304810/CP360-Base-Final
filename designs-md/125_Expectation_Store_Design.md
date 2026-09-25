@@ -1,34 +1,34 @@
 ---
 cp360_type: design_document
-component_id: 89
-component_name: Schema Contract Registry
+component_id: 125
+component_name: Expectation Store
 zone: 2. Hub
 plane: Foundation
 priority: P1
-technology: Oracle DDL + CI
+technology: Oracle DDL
 custom_build: Medium
 depends_on: []
 status: Not Started
 owner: TBD
 origin: events-primary architect review
 sei_coverage: absent
-gap_owner: SEI
+gap_owner: Joint
 in_scope: true
 ---
 
-# Schema Contract Registry
+# Expectation Store
 
 ## 1. Purpose & Scope
 
-**Per-view column contract, versioned, checked before the pull is trusted**
+**Interface calendar, loader cadence, marker schedule, event cadence baseline**
 
-The most predictable future incident in the pack, and nothing watches for it.
+EXPECTED_INTERFACE_CALENDAR and REQUIRED_IND are still proposals, and no channel has an expectation model.
 
 This component does not exist in the SEI design pack and has no entry in the original 65-component tracker. It is required by one substituted assumption: **SDC events are the primary ingestion path**, with everything from Stage 1 onward exactly as the pack specifies it.
 
 ## 2. Context & Dependencies
 
-- Technology: Oracle DDL + CI
+- Technology: Oracle DDL
 - Custom build: Medium — High means a design document is mandatory before code.
 - Source of record: Architect review — events-primary
 
@@ -44,13 +44,13 @@ This component does not exist in the SEI design pack and has no entry in the ori
 
 No prior design decisions exist — this component has never been specified.
 
-**Direction.** Two individually sound decisions — RAW DDL as the contract, and on_schema_change='fail' — are jointly a production incident with no owner. This registry is the guard.
+**Direction.** The single largest dependency in the P list. Without it, 'what was expected today' is wrong every weekend and holiday, and false missing interfaces are worse than no report.
 
 ## 4. Detailed Design
 
-**Deliverable.** Per-view column contract, versioned, checked before the pull is trusted
+**Deliverable.** Interface calendar, loader cadence, marker schedule, event cadence baseline
 
-**Technology.** Oracle DDL + CI
+**Technology.** Oracle DDL
 
 ## 5. Data Quality, Reconciliation & Lineage
 
@@ -58,11 +58,11 @@ No DQ, reconciliation or lineage obligation specific to this component beyond th
 
 ## 6. Performance & Scale
 
-One cached read per view per run.
+n/a
 
 ## 7. Error Handling, Failure & Replay
 
-FILE_SCHEMA_CONFIG holds no column mapping, so RAW DDL is the schema contract, while Gold runs on_schema_change='fail'. A column added upstream breaks the pipeline by design with no notification path. This component is the guard.
+Without it nothing can be late, only absent. On the event channel lateness is derivable from the stream's own rhythm; on every other channel it needs a stated expectation.
 
 ## 8. Security & Access Control
 
@@ -73,17 +73,17 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 ## 9. SEI Source Coverage
 
 **SEI pack coverage: absent** — nothing in the SEI pack.
-**Who answers for the gap: SEI** — SEI must answer.
+**Who answers for the gap: Joint** — needs both sides.
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §6.1 | nothing in the pack covers it | §6.1 makes the RAW DDL the schema contract by holding no column mapping, and Gold runs on_schema_change='fail'. No section describes how a schema change is notified, with what lead time or what compatibility rule. |
+| BBH File Ingestion Framework TDD v2.0 | §5.2 | nothing in the pack covers it | §5.2 leans on required-versus-optional interfaces twice, and §6.1's field list has no such column. EXPECTED_INTERFACE_CALENDAR and REQUIRED_IND remain proposals. |
 
 ## 10. Gaps, Risks & What Is Missing
 
 ### What is missing
 
-This component does not exist. The most predictable future incident in the pack, and nothing watches for it.
+This component does not exist. EXPECTED_INTERFACE_CALENDAR and REQUIRED_IND are still proposals, and no channel has an expectation model.
 
 **Priority P1, custom build Medium.**
 
@@ -93,17 +93,17 @@ No ranked bottleneck or unowned error path touches this component.
 
 ### Gap against the SEI pack
 
-- §6.1 makes the RAW DDL the schema contract by holding no column mapping, and Gold runs on_schema_change='fail'. No section describes how a schema change is notified, with what lead time or what compatibility rule. *(nearest counterpart: BBH File Ingestion Framework TDD, §6.1)*
+- §5.2 leans on required-versus-optional interfaces twice, and §6.1's field list has no such column. EXPECTED_INTERFACE_CALENDAR and REQUIRED_IND remain proposals. *(nearest counterpart: BBH File Ingestion Framework TDD, §5.2)*
 
 ## 11. Recommendation
 
-Two individually sound decisions — RAW DDL as the contract, and on_schema_change='fail' — are jointly a production incident with no owner. This registry is the guard.
+The single largest dependency in the P list. Without it, 'what was expected today' is wrong every weekend and holiday, and false missing interfaces are worse than no report.
 
 ## 12. Open Questions & Acceptance Criteria
 
 ### Open questions
 
-- **For SEI.** There is no schema-change protocol anywhere in the pack. How is a change notified, with what lead time, and what is the backward-compatibility rule?
+- **For both sides.** EXPECTED_INTERFACE_CALENDAR and REQUIRED_IND are still proposals. Will they be accepted, and what is each interface's cadence and holiday calendar?
 
 ### Acceptance criteria
 

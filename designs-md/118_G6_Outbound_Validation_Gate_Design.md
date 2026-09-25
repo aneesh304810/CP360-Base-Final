@@ -1,6 +1,6 @@
 ---
 cp360_type: design_document
-component_id: 83
+component_id: 118
 component_name: G6 Outbound Validation Gate
 zone: 2. Hub
 plane: Data Quality

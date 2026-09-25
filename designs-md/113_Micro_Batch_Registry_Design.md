@@ -1,6 +1,6 @@
 ---
 cp360_type: design_document
-component_id: 78
+component_id: 113
 component_name: Micro-Batch Registry
 zone: 2. Hub
 plane: Event Ingestion

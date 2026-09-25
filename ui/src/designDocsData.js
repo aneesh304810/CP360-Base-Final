@@ -5272,7 +5272,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "4. Detailed Design",
-"md": "\n**Deliverable.** 5 STG2_* models, 8 processing steps, tests\n\n### Rule registry data model\n\n| Table | Grain | Columns |\n| --- | --- | --- |\n| `TRANSFORM_RULESET` | one row per target model per version | TARGET_MODEL · VERSION · STATUS · EFFECTIVE_FROM / TO · APPROVED_BY · APPROVED_TS |\n| `TRANSFORM_RULE` | one row per target column per ruleset | RULESET_ID · SEQ · TARGET_COLUMN · RULE_TYPE · SOURCE_EXPRESSION · CONDITION · DEFAULT_VALUE · BUSINESS_DESCRIPTION |\n| `TRANSFORM_LOOKUP` | one row per source value per domain per version | LOOKUP_DOMAIN · SOURCE_VALUE · TARGET_VALUE · EFFECTIVE_FROM / TO |\n| `TRANSFORM_RULE_TEST` | one row per expectation | RULE_ID · INPUT_JSON · EXPECTED_VALUE · LAST_RUN_TS · LAST_RESULT |\n\n- **TRANSFORM_RULESET** — Never updated in place — superseded. A ruleset that produced a row must stay readable for as long as that row is explainable.\n- **TRANSFORM_RULE** — RULE_TYPE is a closed set: DIRECT, CONSTANT, LOOKUP, DERIVED_EXPR, CONDITIONAL, AGGREGATE. An open expression language is how a rule registry becomes a second programming language nobody can review.\n- **TRANSFORM_LOOKUP** — The classic BA-owned artefact, and the one most often kept in a spreadsheet today. An unmapped source value raises; it never passes through or defaults silently.\n- **TRANSFORM_RULE_TEST** — At least one per rule, run in CI on every regeneration. Without it, externalisation means more people able to ship a wrong number rather than fewer.\n\n### Authoring to production\n\n| Step | Stage | What happens |\n| --- | --- | --- |\n| 1 | BA edits a rule | Authoring surface writes to the registry as a draft ruleset. Nothing downstream moves. |\n| 2 | Approval | STATUS_TRANSITION marks the draft-to-active move as REQUIRES_APPROVAL. A derivation on fact_transactions is a change to the firm's books, and four eyes is the control. |\n| 3 | Compile | CI regenerates the dbt models from the approved ruleset. The generated SQL lands in a pull request as a diff — the BA's change made reviewable in engineering's own terms. |\n| 4 | Test | Rule expectations run against the generated SQL, alongside the existing dbt tests. |\n| 5 | Run | An ordinary dbt run. Lineage, tests and documentation all still work, because the output is dbt and not an interpreter. |\n| 6 | Stamp | Every Gold row carries RULE_SET_VERSION. Three months later the number is explainable without archaeology in the commit log. |\n\n**Scope boundary.** Stage 2 to Gold only. Do not extend it to Stage 1 ingestion, where the RAW DDL is the contract and there is no business logic to own, and do not let it absorb the correctness machinery — SCD2 mechanics, merge semantics and hold-and-replay stay in code.",
+"md": "\n**Deliverable.** 5 STG2_* models, 8 processing steps, tests\n\n### Rule registry data model\n\n| Table | Grain | Columns |\n| --- | --- | --- |\n| `TRANSFORM_RULESET` | one row per target model per version | TARGET_MODEL · VERSION · STATUS · EFFECTIVE_FROM / TO · APPROVED_BY · APPROVED_TS |\n| `TRANSFORM_RULE` | one row per target column per ruleset | RULESET_ID · SEQ · TARGET_COLUMN · RULE_TYPE · SOURCE_EXPRESSION · CONDITION · DEFAULT_VALUE · BUSINESS_DESCRIPTION |\n| `TRANSFORM_LOOKUP` | one row per source value per domain per version | LOOKUP_DOMAIN · SOURCE_VALUE · TARGET_VALUE · EFFECTIVE_FROM / TO |\n| `TRANSFORM_RULE_TEST` | one row per expectation | RULE_ID · INPUT_JSON · EXPECTED_VALUE · LAST_RUN_TS · LAST_RESULT |\n\n- **TRANSFORM_RULESET** — Never updated in place — superseded. A ruleset that produced a row must stay readable for as long as that row is explainable.\n- **TRANSFORM_RULE** — RULE_TYPE is a closed set: DIRECT, CONSTANT, LOOKUP, DERIVED_EXPR, CONDITIONAL, AGGREGATE. An open expression language is how a rule registry becomes a second programming language nobody can review.\n- **TRANSFORM_LOOKUP** — The classic BA-owned artefact, and the one most often kept in a spreadsheet today. An unmapped source value raises; it never passes through or defaults silently.\n- **TRANSFORM_RULE_TEST** — At least one per rule, run in CI on every regeneration. Without it, externalisation means more people able to ship a wrong number rather than fewer.\n\n### Authoring to production\n\n| Step | Stage | What happens |\n| --- | --- | --- |\n| 1 | BA edits a rule | Authoring surface writes to the registry as a draft ruleset. Nothing downstream moves. |\n| 2 | Approval | STATUS_TRANSITION marks the draft-to-active move as REQUIRES_APPROVAL. A derivation on fact_transactions is a change to the firm's books, and four eyes is the control. |\n| 3 | Compile | CI regenerates the dbt models from the approved ruleset. The generated SQL lands in a pull request as a diff — the BA's change made reviewable in engineering's own terms. |\n| 4 | Test | Rule expectations run against the generated SQL, alongside the existing dbt tests. |\n| 5 | Run | An ordinary dbt run. Lineage, tests and documentation all still work, because the output is dbt and not an interpreter. |\n| 6 | Stamp | Every Gold row carries RULE_SET_VERSION. Three months later the number is explainable without archaeology in the commit log. |\n\n**Scope boundary.** Stage 2 to Gold only. Do not extend it to Stage 1 ingestion, where the RAW DDL is the contract and there is no business logic to own, and do not let it absorb the correctness machinery — SCD2 mechanics, merge semantics and hold-and-replay stay in code.\n\n### How it lands in the dbt project\n\nThis has to fit the dbt project as it stands — incremental models, on_schema_change='fail', DML-only MERGE into Gold, dim before fact. The shape that fits is code generation into the existing models directory, not a runtime lookup inside a model.\n\n| Piece | Lives in | What it is |\n| --- | --- | --- |\n| **Registry** | `Oracle` | TRANSFORM_RULESET, TRANSFORM_RULE, TRANSFORM_LOOKUP, TRANSFORM_RULE_TEST. The BA's authoring surface writes here and nowhere else. |\n| **Generator** | `dbt-codegen step in CI` | Reads the approved ruleset and writes models/gold/*.sql. Runs before dbt parse, never during it. |\n| **Generated models** | `models/gold/` | Real .sql files, committed. A rule change arrives as a SQL diff in a pull request. |\n| **Expectations** | `dbt unit tests` | TRANSFORM_RULE_TEST rows compile to dbt unit tests (dbt 1.8+) beside the model, so a rule is proven before the model runs against real data. |\n| **Lookups** | `dbt seeds` | TRANSFORM_LOOKUP exports to seeds/ so the mapping is version-controlled with the model that uses it, and an unmapped value fails the build rather than the night. |\n\n**Considered and rejected**\n\n- **Jinja macro reading a seed at parse time** — The seed becomes the source of truth but the pull request diff is a CSV, so review is meaningless. dbt docs then shows generated SQL that nobody wrote and nobody can explain.\n- **A rule interpreter running inside the warehouse** — Slower, unobservable, and it discards dbt's lineage, tests and documentation — the three things that make the current design defensible.\n- **Externalising Stage 1 as well** — There is no business logic there to own. The RAW DDL is the schema contract, and adding a rule layer would put a second contract in front of it.\n\n**Guardrails**\n\n- A rule that adds a target column is a schema change, and Gold runs on_schema_change='fail'. The generator must detect the new column at compile time and demand an explicit migration — discovering it when the model fails at 3am is the outcome this is meant to prevent.\n- The generated model carries the ruleset id and version in a header comment and as a column, so the SQL and the row agree about which logic produced it.\n- Generation is deterministic: the same ruleset produces byte-identical SQL. A noisy generator makes every diff unreadable and the review worthless.\n- dbt unit tests need 1.8 or later. On an older version the expectations have to run as a separate CI step against the compiled SQL, which is weaker but still better than none.\n- A correction becomes a new ruleset version with an effective date, never an edit to the version that already ran. Correction Handling keeps its restatement path; what changes is that a mapping fix no longer needs a code release.\n\n**Release.** dbt Release & Rollback changes shape. Today a model version is the unit of release. With the registry it is a ruleset version plus the generated model, and the two must travel together — rolling back the model without the ruleset leaves rows stamped with a version whose logic is no longer deployed. Roll back both, or neither.",
 "blocks": [
 {
 "t": "p",
@@ -5368,6 +5368,79 @@ export const DESIGN_DOCS = [
 {
 "t": "p",
 "x": "**Scope boundary.** Stage 2 to Gold only. Do not extend it to Stage 1 ingestion, where the RAW DDL is the contract and there is no business logic to own, and do not let it absorb the correctness machinery — SCD2 mechanics, merge semantics and hold-and-replay stay in code."
+},
+{
+"t": "h",
+"x": "How it lands in the dbt project"
+},
+{
+"t": "p",
+"x": "This has to fit the dbt project as it stands — incremental models, on_schema_change='fail', DML-only MERGE into Gold, dim before fact. The shape that fits is code generation into the existing models directory, not a runtime lookup inside a model."
+},
+{
+"t": "tbl",
+"rows": [
+[
+"Piece",
+"Lives in",
+"What it is"
+],
+[
+"**Registry**",
+"`Oracle`",
+"TRANSFORM_RULESET, TRANSFORM_RULE, TRANSFORM_LOOKUP, TRANSFORM_RULE_TEST. The BA's authoring surface writes here and nowhere else."
+],
+[
+"**Generator**",
+"`dbt-codegen step in CI`",
+"Reads the approved ruleset and writes models/gold/*.sql. Runs before dbt parse, never during it."
+],
+[
+"**Generated models**",
+"`models/gold/`",
+"Real .sql files, committed. A rule change arrives as a SQL diff in a pull request."
+],
+[
+"**Expectations**",
+"`dbt unit tests`",
+"TRANSFORM_RULE_TEST rows compile to dbt unit tests (dbt 1.8+) beside the model, so a rule is proven before the model runs against real data."
+],
+[
+"**Lookups**",
+"`dbt seeds`",
+"TRANSFORM_LOOKUP exports to seeds/ so the mapping is version-controlled with the model that uses it, and an unmapped value fails the build rather than the night."
+]
+]
+},
+{
+"t": "p",
+"x": "**Considered and rejected**"
+},
+{
+"t": "ul",
+"items": [
+"**Jinja macro reading a seed at parse time** — The seed becomes the source of truth but the pull request diff is a CSV, so review is meaningless. dbt docs then shows generated SQL that nobody wrote and nobody can explain.",
+"**A rule interpreter running inside the warehouse** — Slower, unobservable, and it discards dbt's lineage, tests and documentation — the three things that make the current design defensible.",
+"**Externalising Stage 1 as well** — There is no business logic there to own. The RAW DDL is the schema contract, and adding a rule layer would put a second contract in front of it."
+]
+},
+{
+"t": "p",
+"x": "**Guardrails**"
+},
+{
+"t": "ul",
+"items": [
+"A rule that adds a target column is a schema change, and Gold runs on_schema_change='fail'. The generator must detect the new column at compile time and demand an explicit migration — discovering it when the model fails at 3am is the outcome this is meant to prevent.",
+"The generated model carries the ruleset id and version in a header comment and as a column, so the SQL and the row agree about which logic produced it.",
+"Generation is deterministic: the same ruleset produces byte-identical SQL. A noisy generator makes every diff unreadable and the review worthless.",
+"dbt unit tests need 1.8 or later. On an older version the expectations have to run as a separate CI step against the compiled SQL, which is weaker but still better than none.",
+"A correction becomes a new ruleset version with an effective date, never an edit to the version that already ran. Correction Handling keeps its restatement path; what changes is that a mapping fix no longer needs a code release."
+]
+},
+{
+"t": "p",
+"x": "**Release.** dbt Release & Rollback changes shape. Today a model version is the unit of release. With the registry it is a ruleset version plus the generated model, and the two must travel together — rolling back the model without the ruleset leaves rows stamped with a version whose logic is no longer deployed. Roll back both, or neither."
 }
 ]
 },
@@ -5666,7 +5739,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "4. Detailed Design",
-"md": "\n**Deliverable.** 2 SCD2 dims + 3 facts; SCD2 and merge logic\n\n### Rule registry data model\n\n| Table | Grain | Columns |\n| --- | --- | --- |\n| `TRANSFORM_RULESET` | one row per target model per version | TARGET_MODEL · VERSION · STATUS · EFFECTIVE_FROM / TO · APPROVED_BY · APPROVED_TS |\n| `TRANSFORM_RULE` | one row per target column per ruleset | RULESET_ID · SEQ · TARGET_COLUMN · RULE_TYPE · SOURCE_EXPRESSION · CONDITION · DEFAULT_VALUE · BUSINESS_DESCRIPTION |\n| `TRANSFORM_LOOKUP` | one row per source value per domain per version | LOOKUP_DOMAIN · SOURCE_VALUE · TARGET_VALUE · EFFECTIVE_FROM / TO |\n| `TRANSFORM_RULE_TEST` | one row per expectation | RULE_ID · INPUT_JSON · EXPECTED_VALUE · LAST_RUN_TS · LAST_RESULT |\n\n- **TRANSFORM_RULESET** — Never updated in place — superseded. A ruleset that produced a row must stay readable for as long as that row is explainable.\n- **TRANSFORM_RULE** — RULE_TYPE is a closed set: DIRECT, CONSTANT, LOOKUP, DERIVED_EXPR, CONDITIONAL, AGGREGATE. An open expression language is how a rule registry becomes a second programming language nobody can review.\n- **TRANSFORM_LOOKUP** — The classic BA-owned artefact, and the one most often kept in a spreadsheet today. An unmapped source value raises; it never passes through or defaults silently.\n- **TRANSFORM_RULE_TEST** — At least one per rule, run in CI on every regeneration. Without it, externalisation means more people able to ship a wrong number rather than fewer.\n\n### Authoring to production\n\n| Step | Stage | What happens |\n| --- | --- | --- |\n| 1 | BA edits a rule | Authoring surface writes to the registry as a draft ruleset. Nothing downstream moves. |\n| 2 | Approval | STATUS_TRANSITION marks the draft-to-active move as REQUIRES_APPROVAL. A derivation on fact_transactions is a change to the firm's books, and four eyes is the control. |\n| 3 | Compile | CI regenerates the dbt models from the approved ruleset. The generated SQL lands in a pull request as a diff — the BA's change made reviewable in engineering's own terms. |\n| 4 | Test | Rule expectations run against the generated SQL, alongside the existing dbt tests. |\n| 5 | Run | An ordinary dbt run. Lineage, tests and documentation all still work, because the output is dbt and not an interpreter. |\n| 6 | Stamp | Every Gold row carries RULE_SET_VERSION. Three months later the number is explainable without archaeology in the commit log. |\n\n**Scope boundary.** Stage 2 to Gold only. Do not extend it to Stage 1 ingestion, where the RAW DDL is the contract and there is no business logic to own, and do not let it absorb the correctness machinery — SCD2 mechanics, merge semantics and hold-and-replay stay in code.",
+"md": "\n**Deliverable.** 2 SCD2 dims + 3 facts; SCD2 and merge logic\n\n### Rule registry data model\n\n| Table | Grain | Columns |\n| --- | --- | --- |\n| `TRANSFORM_RULESET` | one row per target model per version | TARGET_MODEL · VERSION · STATUS · EFFECTIVE_FROM / TO · APPROVED_BY · APPROVED_TS |\n| `TRANSFORM_RULE` | one row per target column per ruleset | RULESET_ID · SEQ · TARGET_COLUMN · RULE_TYPE · SOURCE_EXPRESSION · CONDITION · DEFAULT_VALUE · BUSINESS_DESCRIPTION |\n| `TRANSFORM_LOOKUP` | one row per source value per domain per version | LOOKUP_DOMAIN · SOURCE_VALUE · TARGET_VALUE · EFFECTIVE_FROM / TO |\n| `TRANSFORM_RULE_TEST` | one row per expectation | RULE_ID · INPUT_JSON · EXPECTED_VALUE · LAST_RUN_TS · LAST_RESULT |\n\n- **TRANSFORM_RULESET** — Never updated in place — superseded. A ruleset that produced a row must stay readable for as long as that row is explainable.\n- **TRANSFORM_RULE** — RULE_TYPE is a closed set: DIRECT, CONSTANT, LOOKUP, DERIVED_EXPR, CONDITIONAL, AGGREGATE. An open expression language is how a rule registry becomes a second programming language nobody can review.\n- **TRANSFORM_LOOKUP** — The classic BA-owned artefact, and the one most often kept in a spreadsheet today. An unmapped source value raises; it never passes through or defaults silently.\n- **TRANSFORM_RULE_TEST** — At least one per rule, run in CI on every regeneration. Without it, externalisation means more people able to ship a wrong number rather than fewer.\n\n### Authoring to production\n\n| Step | Stage | What happens |\n| --- | --- | --- |\n| 1 | BA edits a rule | Authoring surface writes to the registry as a draft ruleset. Nothing downstream moves. |\n| 2 | Approval | STATUS_TRANSITION marks the draft-to-active move as REQUIRES_APPROVAL. A derivation on fact_transactions is a change to the firm's books, and four eyes is the control. |\n| 3 | Compile | CI regenerates the dbt models from the approved ruleset. The generated SQL lands in a pull request as a diff — the BA's change made reviewable in engineering's own terms. |\n| 4 | Test | Rule expectations run against the generated SQL, alongside the existing dbt tests. |\n| 5 | Run | An ordinary dbt run. Lineage, tests and documentation all still work, because the output is dbt and not an interpreter. |\n| 6 | Stamp | Every Gold row carries RULE_SET_VERSION. Three months later the number is explainable without archaeology in the commit log. |\n\n**Scope boundary.** Stage 2 to Gold only. Do not extend it to Stage 1 ingestion, where the RAW DDL is the contract and there is no business logic to own, and do not let it absorb the correctness machinery — SCD2 mechanics, merge semantics and hold-and-replay stay in code.\n\n### How it lands in the dbt project\n\nThis has to fit the dbt project as it stands — incremental models, on_schema_change='fail', DML-only MERGE into Gold, dim before fact. The shape that fits is code generation into the existing models directory, not a runtime lookup inside a model.\n\n| Piece | Lives in | What it is |\n| --- | --- | --- |\n| **Registry** | `Oracle` | TRANSFORM_RULESET, TRANSFORM_RULE, TRANSFORM_LOOKUP, TRANSFORM_RULE_TEST. The BA's authoring surface writes here and nowhere else. |\n| **Generator** | `dbt-codegen step in CI` | Reads the approved ruleset and writes models/gold/*.sql. Runs before dbt parse, never during it. |\n| **Generated models** | `models/gold/` | Real .sql files, committed. A rule change arrives as a SQL diff in a pull request. |\n| **Expectations** | `dbt unit tests` | TRANSFORM_RULE_TEST rows compile to dbt unit tests (dbt 1.8+) beside the model, so a rule is proven before the model runs against real data. |\n| **Lookups** | `dbt seeds` | TRANSFORM_LOOKUP exports to seeds/ so the mapping is version-controlled with the model that uses it, and an unmapped value fails the build rather than the night. |\n\n**Considered and rejected**\n\n- **Jinja macro reading a seed at parse time** — The seed becomes the source of truth but the pull request diff is a CSV, so review is meaningless. dbt docs then shows generated SQL that nobody wrote and nobody can explain.\n- **A rule interpreter running inside the warehouse** — Slower, unobservable, and it discards dbt's lineage, tests and documentation — the three things that make the current design defensible.\n- **Externalising Stage 1 as well** — There is no business logic there to own. The RAW DDL is the schema contract, and adding a rule layer would put a second contract in front of it.\n\n**Guardrails**\n\n- A rule that adds a target column is a schema change, and Gold runs on_schema_change='fail'. The generator must detect the new column at compile time and demand an explicit migration — discovering it when the model fails at 3am is the outcome this is meant to prevent.\n- The generated model carries the ruleset id and version in a header comment and as a column, so the SQL and the row agree about which logic produced it.\n- Generation is deterministic: the same ruleset produces byte-identical SQL. A noisy generator makes every diff unreadable and the review worthless.\n- dbt unit tests need 1.8 or later. On an older version the expectations have to run as a separate CI step against the compiled SQL, which is weaker but still better than none.\n- A correction becomes a new ruleset version with an effective date, never an edit to the version that already ran. Correction Handling keeps its restatement path; what changes is that a mapping fix no longer needs a code release.\n\n**Release.** dbt Release & Rollback changes shape. Today a model version is the unit of release. With the registry it is a ruleset version plus the generated model, and the two must travel together — rolling back the model without the ruleset leaves rows stamped with a version whose logic is no longer deployed. Roll back both, or neither.",
 "blocks": [
 {
 "t": "p",
@@ -5762,6 +5835,79 @@ export const DESIGN_DOCS = [
 {
 "t": "p",
 "x": "**Scope boundary.** Stage 2 to Gold only. Do not extend it to Stage 1 ingestion, where the RAW DDL is the contract and there is no business logic to own, and do not let it absorb the correctness machinery — SCD2 mechanics, merge semantics and hold-and-replay stay in code."
+},
+{
+"t": "h",
+"x": "How it lands in the dbt project"
+},
+{
+"t": "p",
+"x": "This has to fit the dbt project as it stands — incremental models, on_schema_change='fail', DML-only MERGE into Gold, dim before fact. The shape that fits is code generation into the existing models directory, not a runtime lookup inside a model."
+},
+{
+"t": "tbl",
+"rows": [
+[
+"Piece",
+"Lives in",
+"What it is"
+],
+[
+"**Registry**",
+"`Oracle`",
+"TRANSFORM_RULESET, TRANSFORM_RULE, TRANSFORM_LOOKUP, TRANSFORM_RULE_TEST. The BA's authoring surface writes here and nowhere else."
+],
+[
+"**Generator**",
+"`dbt-codegen step in CI`",
+"Reads the approved ruleset and writes models/gold/*.sql. Runs before dbt parse, never during it."
+],
+[
+"**Generated models**",
+"`models/gold/`",
+"Real .sql files, committed. A rule change arrives as a SQL diff in a pull request."
+],
+[
+"**Expectations**",
+"`dbt unit tests`",
+"TRANSFORM_RULE_TEST rows compile to dbt unit tests (dbt 1.8+) beside the model, so a rule is proven before the model runs against real data."
+],
+[
+"**Lookups**",
+"`dbt seeds`",
+"TRANSFORM_LOOKUP exports to seeds/ so the mapping is version-controlled with the model that uses it, and an unmapped value fails the build rather than the night."
+]
+]
+},
+{
+"t": "p",
+"x": "**Considered and rejected**"
+},
+{
+"t": "ul",
+"items": [
+"**Jinja macro reading a seed at parse time** — The seed becomes the source of truth but the pull request diff is a CSV, so review is meaningless. dbt docs then shows generated SQL that nobody wrote and nobody can explain.",
+"**A rule interpreter running inside the warehouse** — Slower, unobservable, and it discards dbt's lineage, tests and documentation — the three things that make the current design defensible.",
+"**Externalising Stage 1 as well** — There is no business logic there to own. The RAW DDL is the schema contract, and adding a rule layer would put a second contract in front of it."
+]
+},
+{
+"t": "p",
+"x": "**Guardrails**"
+},
+{
+"t": "ul",
+"items": [
+"A rule that adds a target column is a schema change, and Gold runs on_schema_change='fail'. The generator must detect the new column at compile time and demand an explicit migration — discovering it when the model fails at 3am is the outcome this is meant to prevent.",
+"The generated model carries the ruleset id and version in a header comment and as a column, so the SQL and the row agree about which logic produced it.",
+"Generation is deterministic: the same ruleset produces byte-identical SQL. A noisy generator makes every diff unreadable and the review worthless.",
+"dbt unit tests need 1.8 or later. On an older version the expectations have to run as a separate CI step against the compiled SQL, which is weaker but still better than none.",
+"A correction becomes a new ruleset version with an effective date, never an edit to the version that already ran. Correction Handling keeps its restatement path; what changes is that a mapping fix no longer needs a code release."
+]
+},
+{
+"t": "p",
+"x": "**Release.** dbt Release & Rollback changes shape. Today a model version is the unit of release. With the registry it is a ruleset version plus the generated model, and the two must travel together — rolling back the model without the ruleset leaves rows stamped with a version whose logic is no longer deployed. Roll back both, or neither."
 }
 ]
 },
@@ -6006,7 +6152,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "3. Design Decisions",
-"md": "\n**Review verdict: gap.** Written for restatement and in-place merge. A delete arriving as an event has no defined downstream behaviour, and an outbound correction — a new submission referencing the one it corrects — is not modelled at all.\n\n**Direction.** Component 17 predates events entirely. Both answers are needed before correction handling can be built.",
+"md": "\n**Review verdict: gap.** Written for restatement and in-place merge. A delete arriving as an event has no defined downstream behaviour, and an outbound correction — a new submission referencing the one it corrects — is not modelled at all.\n\n**Direction.** Component 17 predates events entirely. Both answers are needed before correction handling can be built.\n\n### Stage 2 → Gold: externalise the rules so a BA owns them\n\nEvery mapping and derivation between Stage 2 and Gold is hand-written dbt SQL. A change to what a column means is therefore a code change, a pull request and a release. The people who own the business meaning cannot change it; the people who can change it do not own the meaning. That gap is where wrong numbers come from, and it gets worse as the mapping surface grows.\n\n**Principle.** Externalise the rules, not the engine. Generate dbt from them; never interpret them at run time.\n\n| Ownership | Covers |\n| --- | --- |\n| **BA owns** | Source column to target column mapping · code and value translations · derived expressions and their conditions · defaults · which attributes are SCD-tracked · the rule's business description |\n| **Engineering owns** | Join strategy · incremental predicates · merge keys · partitioning · SCD2 close and open mechanics · dim-before-fact ordering · hold-and-replay |",
 "blocks": [
 {
 "t": "p",
@@ -6015,16 +6161,209 @@ export const DESIGN_DOCS = [
 {
 "t": "p",
 "x": "**Direction.** Component 17 predates events entirely. Both answers are needed before correction handling can be built."
+},
+{
+"t": "h",
+"x": "Stage 2 → Gold: externalise the rules so a BA owns them"
+},
+{
+"t": "p",
+"x": "Every mapping and derivation between Stage 2 and Gold is hand-written dbt SQL. A change to what a column means is therefore a code change, a pull request and a release. The people who own the business meaning cannot change it; the people who can change it do not own the meaning. That gap is where wrong numbers come from, and it gets worse as the mapping surface grows."
+},
+{
+"t": "p",
+"x": "**Principle.** Externalise the rules, not the engine. Generate dbt from them; never interpret them at run time."
+},
+{
+"t": "tbl",
+"rows": [
+[
+"Ownership",
+"Covers"
+],
+[
+"**BA owns**",
+"Source column to target column mapping · code and value translations · derived expressions and their conditions · defaults · which attributes are SCD-tracked · the rule's business description"
+],
+[
+"**Engineering owns**",
+"Join strategy · incremental predicates · merge keys · partitioning · SCD2 close and open mechanics · dim-before-fact ordering · hold-and-replay"
+]
+]
 }
 ]
 },
 {
 "h": "4. Detailed Design",
-"md": "\n**Deliverable.** Bitemporal vs merge design, applied across Stage 2 and Gold",
+"md": "\n**Deliverable.** Bitemporal vs merge design, applied across Stage 2 and Gold\n\n### Rule registry data model\n\n| Table | Grain | Columns |\n| --- | --- | --- |\n| `TRANSFORM_RULESET` | one row per target model per version | TARGET_MODEL · VERSION · STATUS · EFFECTIVE_FROM / TO · APPROVED_BY · APPROVED_TS |\n| `TRANSFORM_RULE` | one row per target column per ruleset | RULESET_ID · SEQ · TARGET_COLUMN · RULE_TYPE · SOURCE_EXPRESSION · CONDITION · DEFAULT_VALUE · BUSINESS_DESCRIPTION |\n| `TRANSFORM_LOOKUP` | one row per source value per domain per version | LOOKUP_DOMAIN · SOURCE_VALUE · TARGET_VALUE · EFFECTIVE_FROM / TO |\n| `TRANSFORM_RULE_TEST` | one row per expectation | RULE_ID · INPUT_JSON · EXPECTED_VALUE · LAST_RUN_TS · LAST_RESULT |\n\n- **TRANSFORM_RULESET** — Never updated in place — superseded. A ruleset that produced a row must stay readable for as long as that row is explainable.\n- **TRANSFORM_RULE** — RULE_TYPE is a closed set: DIRECT, CONSTANT, LOOKUP, DERIVED_EXPR, CONDITIONAL, AGGREGATE. An open expression language is how a rule registry becomes a second programming language nobody can review.\n- **TRANSFORM_LOOKUP** — The classic BA-owned artefact, and the one most often kept in a spreadsheet today. An unmapped source value raises; it never passes through or defaults silently.\n- **TRANSFORM_RULE_TEST** — At least one per rule, run in CI on every regeneration. Without it, externalisation means more people able to ship a wrong number rather than fewer.\n\n### Authoring to production\n\n| Step | Stage | What happens |\n| --- | --- | --- |\n| 1 | BA edits a rule | Authoring surface writes to the registry as a draft ruleset. Nothing downstream moves. |\n| 2 | Approval | STATUS_TRANSITION marks the draft-to-active move as REQUIRES_APPROVAL. A derivation on fact_transactions is a change to the firm's books, and four eyes is the control. |\n| 3 | Compile | CI regenerates the dbt models from the approved ruleset. The generated SQL lands in a pull request as a diff — the BA's change made reviewable in engineering's own terms. |\n| 4 | Test | Rule expectations run against the generated SQL, alongside the existing dbt tests. |\n| 5 | Run | An ordinary dbt run. Lineage, tests and documentation all still work, because the output is dbt and not an interpreter. |\n| 6 | Stamp | Every Gold row carries RULE_SET_VERSION. Three months later the number is explainable without archaeology in the commit log. |\n\n**Scope boundary.** Stage 2 to Gold only. Do not extend it to Stage 1 ingestion, where the RAW DDL is the contract and there is no business logic to own, and do not let it absorb the correctness machinery — SCD2 mechanics, merge semantics and hold-and-replay stay in code.\n\n### How it lands in the dbt project\n\nThis has to fit the dbt project as it stands — incremental models, on_schema_change='fail', DML-only MERGE into Gold, dim before fact. The shape that fits is code generation into the existing models directory, not a runtime lookup inside a model.\n\n| Piece | Lives in | What it is |\n| --- | --- | --- |\n| **Registry** | `Oracle` | TRANSFORM_RULESET, TRANSFORM_RULE, TRANSFORM_LOOKUP, TRANSFORM_RULE_TEST. The BA's authoring surface writes here and nowhere else. |\n| **Generator** | `dbt-codegen step in CI` | Reads the approved ruleset and writes models/gold/*.sql. Runs before dbt parse, never during it. |\n| **Generated models** | `models/gold/` | Real .sql files, committed. A rule change arrives as a SQL diff in a pull request. |\n| **Expectations** | `dbt unit tests` | TRANSFORM_RULE_TEST rows compile to dbt unit tests (dbt 1.8+) beside the model, so a rule is proven before the model runs against real data. |\n| **Lookups** | `dbt seeds` | TRANSFORM_LOOKUP exports to seeds/ so the mapping is version-controlled with the model that uses it, and an unmapped value fails the build rather than the night. |\n\n**Considered and rejected**\n\n- **Jinja macro reading a seed at parse time** — The seed becomes the source of truth but the pull request diff is a CSV, so review is meaningless. dbt docs then shows generated SQL that nobody wrote and nobody can explain.\n- **A rule interpreter running inside the warehouse** — Slower, unobservable, and it discards dbt's lineage, tests and documentation — the three things that make the current design defensible.\n- **Externalising Stage 1 as well** — There is no business logic there to own. The RAW DDL is the schema contract, and adding a rule layer would put a second contract in front of it.\n\n**Guardrails**\n\n- A rule that adds a target column is a schema change, and Gold runs on_schema_change='fail'. The generator must detect the new column at compile time and demand an explicit migration — discovering it when the model fails at 3am is the outcome this is meant to prevent.\n- The generated model carries the ruleset id and version in a header comment and as a column, so the SQL and the row agree about which logic produced it.\n- Generation is deterministic: the same ruleset produces byte-identical SQL. A noisy generator makes every diff unreadable and the review worthless.\n- dbt unit tests need 1.8 or later. On an older version the expectations have to run as a separate CI step against the compiled SQL, which is weaker but still better than none.\n- A correction becomes a new ruleset version with an effective date, never an edit to the version that already ran. Correction Handling keeps its restatement path; what changes is that a mapping fix no longer needs a code release.\n\n**Release.** dbt Release & Rollback changes shape. Today a model version is the unit of release. With the registry it is a ruleset version plus the generated model, and the two must travel together — rolling back the model without the ruleset leaves rows stamped with a version whose logic is no longer deployed. Roll back both, or neither.",
 "blocks": [
 {
 "t": "p",
 "x": "**Deliverable.** Bitemporal vs merge design, applied across Stage 2 and Gold"
+},
+{
+"t": "h",
+"x": "Rule registry data model"
+},
+{
+"t": "tbl",
+"rows": [
+[
+"Table",
+"Grain",
+"Columns"
+],
+[
+"`TRANSFORM_RULESET`",
+"one row per target model per version",
+"TARGET_MODEL · VERSION · STATUS · EFFECTIVE_FROM / TO · APPROVED_BY · APPROVED_TS"
+],
+[
+"`TRANSFORM_RULE`",
+"one row per target column per ruleset",
+"RULESET_ID · SEQ · TARGET_COLUMN · RULE_TYPE · SOURCE_EXPRESSION · CONDITION · DEFAULT_VALUE · BUSINESS_DESCRIPTION"
+],
+[
+"`TRANSFORM_LOOKUP`",
+"one row per source value per domain per version",
+"LOOKUP_DOMAIN · SOURCE_VALUE · TARGET_VALUE · EFFECTIVE_FROM / TO"
+],
+[
+"`TRANSFORM_RULE_TEST`",
+"one row per expectation",
+"RULE_ID · INPUT_JSON · EXPECTED_VALUE · LAST_RUN_TS · LAST_RESULT"
+]
+]
+},
+{
+"t": "ul",
+"items": [
+"**TRANSFORM_RULESET** — Never updated in place — superseded. A ruleset that produced a row must stay readable for as long as that row is explainable.",
+"**TRANSFORM_RULE** — RULE_TYPE is a closed set: DIRECT, CONSTANT, LOOKUP, DERIVED_EXPR, CONDITIONAL, AGGREGATE. An open expression language is how a rule registry becomes a second programming language nobody can review.",
+"**TRANSFORM_LOOKUP** — The classic BA-owned artefact, and the one most often kept in a spreadsheet today. An unmapped source value raises; it never passes through or defaults silently.",
+"**TRANSFORM_RULE_TEST** — At least one per rule, run in CI on every regeneration. Without it, externalisation means more people able to ship a wrong number rather than fewer."
+]
+},
+{
+"t": "h",
+"x": "Authoring to production"
+},
+{
+"t": "tbl",
+"rows": [
+[
+"Step",
+"Stage",
+"What happens"
+],
+[
+"1",
+"BA edits a rule",
+"Authoring surface writes to the registry as a draft ruleset. Nothing downstream moves."
+],
+[
+"2",
+"Approval",
+"STATUS_TRANSITION marks the draft-to-active move as REQUIRES_APPROVAL. A derivation on fact_transactions is a change to the firm's books, and four eyes is the control."
+],
+[
+"3",
+"Compile",
+"CI regenerates the dbt models from the approved ruleset. The generated SQL lands in a pull request as a diff — the BA's change made reviewable in engineering's own terms."
+],
+[
+"4",
+"Test",
+"Rule expectations run against the generated SQL, alongside the existing dbt tests."
+],
+[
+"5",
+"Run",
+"An ordinary dbt run. Lineage, tests and documentation all still work, because the output is dbt and not an interpreter."
+],
+[
+"6",
+"Stamp",
+"Every Gold row carries RULE_SET_VERSION. Three months later the number is explainable without archaeology in the commit log."
+]
+]
+},
+{
+"t": "p",
+"x": "**Scope boundary.** Stage 2 to Gold only. Do not extend it to Stage 1 ingestion, where the RAW DDL is the contract and there is no business logic to own, and do not let it absorb the correctness machinery — SCD2 mechanics, merge semantics and hold-and-replay stay in code."
+},
+{
+"t": "h",
+"x": "How it lands in the dbt project"
+},
+{
+"t": "p",
+"x": "This has to fit the dbt project as it stands — incremental models, on_schema_change='fail', DML-only MERGE into Gold, dim before fact. The shape that fits is code generation into the existing models directory, not a runtime lookup inside a model."
+},
+{
+"t": "tbl",
+"rows": [
+[
+"Piece",
+"Lives in",
+"What it is"
+],
+[
+"**Registry**",
+"`Oracle`",
+"TRANSFORM_RULESET, TRANSFORM_RULE, TRANSFORM_LOOKUP, TRANSFORM_RULE_TEST. The BA's authoring surface writes here and nowhere else."
+],
+[
+"**Generator**",
+"`dbt-codegen step in CI`",
+"Reads the approved ruleset and writes models/gold/*.sql. Runs before dbt parse, never during it."
+],
+[
+"**Generated models**",
+"`models/gold/`",
+"Real .sql files, committed. A rule change arrives as a SQL diff in a pull request."
+],
+[
+"**Expectations**",
+"`dbt unit tests`",
+"TRANSFORM_RULE_TEST rows compile to dbt unit tests (dbt 1.8+) beside the model, so a rule is proven before the model runs against real data."
+],
+[
+"**Lookups**",
+"`dbt seeds`",
+"TRANSFORM_LOOKUP exports to seeds/ so the mapping is version-controlled with the model that uses it, and an unmapped value fails the build rather than the night."
+]
+]
+},
+{
+"t": "p",
+"x": "**Considered and rejected**"
+},
+{
+"t": "ul",
+"items": [
+"**Jinja macro reading a seed at parse time** — The seed becomes the source of truth but the pull request diff is a CSV, so review is meaningless. dbt docs then shows generated SQL that nobody wrote and nobody can explain.",
+"**A rule interpreter running inside the warehouse** — Slower, unobservable, and it discards dbt's lineage, tests and documentation — the three things that make the current design defensible.",
+"**Externalising Stage 1 as well** — There is no business logic there to own. The RAW DDL is the schema contract, and adding a rule layer would put a second contract in front of it."
+]
+},
+{
+"t": "p",
+"x": "**Guardrails**"
+},
+{
+"t": "ul",
+"items": [
+"A rule that adds a target column is a schema change, and Gold runs on_schema_change='fail'. The generator must detect the new column at compile time and demand an explicit migration — discovering it when the model fails at 3am is the outcome this is meant to prevent.",
+"The generated model carries the ruleset id and version in a header comment and as a column, so the SQL and the row agree about which logic produced it.",
+"Generation is deterministic: the same ruleset produces byte-identical SQL. A noisy generator makes every diff unreadable and the review worthless.",
+"dbt unit tests need 1.8 or later. On an older version the expectations have to run as a separate CI step against the compiled SQL, which is weaker but still better than none.",
+"A correction becomes a new ruleset version with an effective date, never an edit to the version that already ran. Correction Handling keeps its restatement path; what changes is that a mapping fix no longer needs a code release."
+]
+},
+{
+"t": "p",
+"x": "**Release.** dbt Release & Rollback changes shape. Today a model version is the unit of release. With the registry it is a ruleset version plus the generated model, and the two must travel together — rolling back the model without the ruleset leaves rows stamped with a version whose logic is no longer deployed. Roll back both, or neither."
 }
 ]
 },
@@ -6080,11 +6419,15 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "8. Security & Access Control",
-"md": "\nEstate defaults apply: a dedicated read-only account for any consumer, business keys masked on read rather than at rest, and secrets from the platform secret store.",
+"md": "\nEstate defaults apply: a dedicated read-only account for any consumer, business keys masked on read rather than at rest, and secrets from the platform secret store.\n\n**Rule authoring is a privileged action.** A derivation on `fact_transactions` is a change to the firm's books. Draft-to-active on a ruleset carries `REQUIRES_APPROVAL` and a four-eyes flow; the BA authors, someone else approves, and both are recorded.",
 "blocks": [
 {
 "t": "p",
 "x": "Estate defaults apply: a dedicated read-only account for any consumer, business keys masked on read rather than at rest, and secrets from the platform secret store."
+},
+{
+"t": "p",
+"x": "**Rule authoring is a privileged action.** A derivation on `fact_transactions` is a change to the firm's books. Draft-to-active on a ruleset carries `REQUIRES_APPROVAL` and a four-eyes flow; the BA authors, someone else approves, and both are recorded."
 }
 ]
 },
@@ -6168,7 +6511,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "11. Recommendation",
-"md": "\nComponent 17 predates events entirely. Both answers are needed before correction handling can be built.\n\n**Action.** Define op=D semantics and the outbound correction protocol.",
+"md": "\nComponent 17 predates events entirely. Both answers are needed before correction handling can be built.\n\n**Action.** Define op=D semantics and the outbound correction protocol.\n\n**On externalising the rules.** Externalised without effective dating, generated SQL and CI tests, this produces a system where more people can change logic and nobody can explain a number — strictly worse than hard-coded SQL. The three guardrails are not refinements to add later; they are what makes the idea safe at all.",
 "blocks": [
 {
 "t": "p",
@@ -6177,6 +6520,10 @@ export const DESIGN_DOCS = [
 {
 "t": "p",
 "x": "**Action.** Define op=D semantics and the outbound correction protocol."
+},
+{
+"t": "p",
+"x": "**On externalising the rules.** Externalised without effective dating, generated SQL and CI tests, this produces a system where more people can change logic and nobody can explain a number — strictly worse than hard-coded SQL. The three guardrails are not refinements to add later; they are what makes the idea safe at all."
 }
 ]
 },
@@ -6574,7 +6921,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "3. Design Decisions",
-"md": "\n**Review verdict: bottleneck.** The ordering cost moves from once a day to once per micro-batch, including on boxes containing a single domain.\n\n**Direction.** Fully specified by the pack, and sound. Order conditionally on the collapsed key set so single-domain boxes pay nothing.",
+"md": "\n**Review verdict: bottleneck.** The ordering cost moves from once a day to once per micro-batch, including on boxes containing a single domain.\n\n**Direction.** Fully specified by the pack, and sound. Order conditionally on the collapsed key set so single-domain boxes pay nothing.\n\n### Stage 2 → Gold: externalise the rules so a BA owns them\n\nEvery mapping and derivation between Stage 2 and Gold is hand-written dbt SQL. A change to what a column means is therefore a code change, a pull request and a release. The people who own the business meaning cannot change it; the people who can change it do not own the meaning. That gap is where wrong numbers come from, and it gets worse as the mapping surface grows.\n\n**Principle.** Externalise the rules, not the engine. Generate dbt from them; never interpret them at run time.\n\n| Ownership | Covers |\n| --- | --- |\n| **BA owns** | Source column to target column mapping · code and value translations · derived expressions and their conditions · defaults · which attributes are SCD-tracked · the rule's business description |\n| **Engineering owns** | Join strategy · incremental predicates · merge keys · partitioning · SCD2 close and open mechanics · dim-before-fact ordering · hold-and-replay |",
 "blocks": [
 {
 "t": "p",
@@ -6583,16 +6930,209 @@ export const DESIGN_DOCS = [
 {
 "t": "p",
 "x": "**Direction.** Fully specified by the pack, and sound. Order conditionally on the collapsed key set so single-domain boxes pay nothing."
+},
+{
+"t": "h",
+"x": "Stage 2 → Gold: externalise the rules so a BA owns them"
+},
+{
+"t": "p",
+"x": "Every mapping and derivation between Stage 2 and Gold is hand-written dbt SQL. A change to what a column means is therefore a code change, a pull request and a release. The people who own the business meaning cannot change it; the people who can change it do not own the meaning. That gap is where wrong numbers come from, and it gets worse as the mapping surface grows."
+},
+{
+"t": "p",
+"x": "**Principle.** Externalise the rules, not the engine. Generate dbt from them; never interpret them at run time."
+},
+{
+"t": "tbl",
+"rows": [
+[
+"Ownership",
+"Covers"
+],
+[
+"**BA owns**",
+"Source column to target column mapping · code and value translations · derived expressions and their conditions · defaults · which attributes are SCD-tracked · the rule's business description"
+],
+[
+"**Engineering owns**",
+"Join strategy · incremental predicates · merge keys · partitioning · SCD2 close and open mechanics · dim-before-fact ordering · hold-and-replay"
+]
+]
 }
 ]
 },
 {
 "h": "4. Detailed Design",
-"md": "\n**Deliverable.** Build-order and concurrency design",
+"md": "\n**Deliverable.** Build-order and concurrency design\n\n### Rule registry data model\n\n| Table | Grain | Columns |\n| --- | --- | --- |\n| `TRANSFORM_RULESET` | one row per target model per version | TARGET_MODEL · VERSION · STATUS · EFFECTIVE_FROM / TO · APPROVED_BY · APPROVED_TS |\n| `TRANSFORM_RULE` | one row per target column per ruleset | RULESET_ID · SEQ · TARGET_COLUMN · RULE_TYPE · SOURCE_EXPRESSION · CONDITION · DEFAULT_VALUE · BUSINESS_DESCRIPTION |\n| `TRANSFORM_LOOKUP` | one row per source value per domain per version | LOOKUP_DOMAIN · SOURCE_VALUE · TARGET_VALUE · EFFECTIVE_FROM / TO |\n| `TRANSFORM_RULE_TEST` | one row per expectation | RULE_ID · INPUT_JSON · EXPECTED_VALUE · LAST_RUN_TS · LAST_RESULT |\n\n- **TRANSFORM_RULESET** — Never updated in place — superseded. A ruleset that produced a row must stay readable for as long as that row is explainable.\n- **TRANSFORM_RULE** — RULE_TYPE is a closed set: DIRECT, CONSTANT, LOOKUP, DERIVED_EXPR, CONDITIONAL, AGGREGATE. An open expression language is how a rule registry becomes a second programming language nobody can review.\n- **TRANSFORM_LOOKUP** — The classic BA-owned artefact, and the one most often kept in a spreadsheet today. An unmapped source value raises; it never passes through or defaults silently.\n- **TRANSFORM_RULE_TEST** — At least one per rule, run in CI on every regeneration. Without it, externalisation means more people able to ship a wrong number rather than fewer.\n\n### Authoring to production\n\n| Step | Stage | What happens |\n| --- | --- | --- |\n| 1 | BA edits a rule | Authoring surface writes to the registry as a draft ruleset. Nothing downstream moves. |\n| 2 | Approval | STATUS_TRANSITION marks the draft-to-active move as REQUIRES_APPROVAL. A derivation on fact_transactions is a change to the firm's books, and four eyes is the control. |\n| 3 | Compile | CI regenerates the dbt models from the approved ruleset. The generated SQL lands in a pull request as a diff — the BA's change made reviewable in engineering's own terms. |\n| 4 | Test | Rule expectations run against the generated SQL, alongside the existing dbt tests. |\n| 5 | Run | An ordinary dbt run. Lineage, tests and documentation all still work, because the output is dbt and not an interpreter. |\n| 6 | Stamp | Every Gold row carries RULE_SET_VERSION. Three months later the number is explainable without archaeology in the commit log. |\n\n**Scope boundary.** Stage 2 to Gold only. Do not extend it to Stage 1 ingestion, where the RAW DDL is the contract and there is no business logic to own, and do not let it absorb the correctness machinery — SCD2 mechanics, merge semantics and hold-and-replay stay in code.\n\n### How it lands in the dbt project\n\nThis has to fit the dbt project as it stands — incremental models, on_schema_change='fail', DML-only MERGE into Gold, dim before fact. The shape that fits is code generation into the existing models directory, not a runtime lookup inside a model.\n\n| Piece | Lives in | What it is |\n| --- | --- | --- |\n| **Registry** | `Oracle` | TRANSFORM_RULESET, TRANSFORM_RULE, TRANSFORM_LOOKUP, TRANSFORM_RULE_TEST. The BA's authoring surface writes here and nowhere else. |\n| **Generator** | `dbt-codegen step in CI` | Reads the approved ruleset and writes models/gold/*.sql. Runs before dbt parse, never during it. |\n| **Generated models** | `models/gold/` | Real .sql files, committed. A rule change arrives as a SQL diff in a pull request. |\n| **Expectations** | `dbt unit tests` | TRANSFORM_RULE_TEST rows compile to dbt unit tests (dbt 1.8+) beside the model, so a rule is proven before the model runs against real data. |\n| **Lookups** | `dbt seeds` | TRANSFORM_LOOKUP exports to seeds/ so the mapping is version-controlled with the model that uses it, and an unmapped value fails the build rather than the night. |\n\n**Considered and rejected**\n\n- **Jinja macro reading a seed at parse time** — The seed becomes the source of truth but the pull request diff is a CSV, so review is meaningless. dbt docs then shows generated SQL that nobody wrote and nobody can explain.\n- **A rule interpreter running inside the warehouse** — Slower, unobservable, and it discards dbt's lineage, tests and documentation — the three things that make the current design defensible.\n- **Externalising Stage 1 as well** — There is no business logic there to own. The RAW DDL is the schema contract, and adding a rule layer would put a second contract in front of it.\n\n**Guardrails**\n\n- A rule that adds a target column is a schema change, and Gold runs on_schema_change='fail'. The generator must detect the new column at compile time and demand an explicit migration — discovering it when the model fails at 3am is the outcome this is meant to prevent.\n- The generated model carries the ruleset id and version in a header comment and as a column, so the SQL and the row agree about which logic produced it.\n- Generation is deterministic: the same ruleset produces byte-identical SQL. A noisy generator makes every diff unreadable and the review worthless.\n- dbt unit tests need 1.8 or later. On an older version the expectations have to run as a separate CI step against the compiled SQL, which is weaker but still better than none.\n- A correction becomes a new ruleset version with an effective date, never an edit to the version that already ran. Correction Handling keeps its restatement path; what changes is that a mapping fix no longer needs a code release.\n\n**Release.** dbt Release & Rollback changes shape. Today a model version is the unit of release. With the registry it is a ruleset version plus the generated model, and the two must travel together — rolling back the model without the ruleset leaves rows stamped with a version whose logic is no longer deployed. Roll back both, or neither.",
 "blocks": [
 {
 "t": "p",
 "x": "**Deliverable.** Build-order and concurrency design"
+},
+{
+"t": "h",
+"x": "Rule registry data model"
+},
+{
+"t": "tbl",
+"rows": [
+[
+"Table",
+"Grain",
+"Columns"
+],
+[
+"`TRANSFORM_RULESET`",
+"one row per target model per version",
+"TARGET_MODEL · VERSION · STATUS · EFFECTIVE_FROM / TO · APPROVED_BY · APPROVED_TS"
+],
+[
+"`TRANSFORM_RULE`",
+"one row per target column per ruleset",
+"RULESET_ID · SEQ · TARGET_COLUMN · RULE_TYPE · SOURCE_EXPRESSION · CONDITION · DEFAULT_VALUE · BUSINESS_DESCRIPTION"
+],
+[
+"`TRANSFORM_LOOKUP`",
+"one row per source value per domain per version",
+"LOOKUP_DOMAIN · SOURCE_VALUE · TARGET_VALUE · EFFECTIVE_FROM / TO"
+],
+[
+"`TRANSFORM_RULE_TEST`",
+"one row per expectation",
+"RULE_ID · INPUT_JSON · EXPECTED_VALUE · LAST_RUN_TS · LAST_RESULT"
+]
+]
+},
+{
+"t": "ul",
+"items": [
+"**TRANSFORM_RULESET** — Never updated in place — superseded. A ruleset that produced a row must stay readable for as long as that row is explainable.",
+"**TRANSFORM_RULE** — RULE_TYPE is a closed set: DIRECT, CONSTANT, LOOKUP, DERIVED_EXPR, CONDITIONAL, AGGREGATE. An open expression language is how a rule registry becomes a second programming language nobody can review.",
+"**TRANSFORM_LOOKUP** — The classic BA-owned artefact, and the one most often kept in a spreadsheet today. An unmapped source value raises; it never passes through or defaults silently.",
+"**TRANSFORM_RULE_TEST** — At least one per rule, run in CI on every regeneration. Without it, externalisation means more people able to ship a wrong number rather than fewer."
+]
+},
+{
+"t": "h",
+"x": "Authoring to production"
+},
+{
+"t": "tbl",
+"rows": [
+[
+"Step",
+"Stage",
+"What happens"
+],
+[
+"1",
+"BA edits a rule",
+"Authoring surface writes to the registry as a draft ruleset. Nothing downstream moves."
+],
+[
+"2",
+"Approval",
+"STATUS_TRANSITION marks the draft-to-active move as REQUIRES_APPROVAL. A derivation on fact_transactions is a change to the firm's books, and four eyes is the control."
+],
+[
+"3",
+"Compile",
+"CI regenerates the dbt models from the approved ruleset. The generated SQL lands in a pull request as a diff — the BA's change made reviewable in engineering's own terms."
+],
+[
+"4",
+"Test",
+"Rule expectations run against the generated SQL, alongside the existing dbt tests."
+],
+[
+"5",
+"Run",
+"An ordinary dbt run. Lineage, tests and documentation all still work, because the output is dbt and not an interpreter."
+],
+[
+"6",
+"Stamp",
+"Every Gold row carries RULE_SET_VERSION. Three months later the number is explainable without archaeology in the commit log."
+]
+]
+},
+{
+"t": "p",
+"x": "**Scope boundary.** Stage 2 to Gold only. Do not extend it to Stage 1 ingestion, where the RAW DDL is the contract and there is no business logic to own, and do not let it absorb the correctness machinery — SCD2 mechanics, merge semantics and hold-and-replay stay in code."
+},
+{
+"t": "h",
+"x": "How it lands in the dbt project"
+},
+{
+"t": "p",
+"x": "This has to fit the dbt project as it stands — incremental models, on_schema_change='fail', DML-only MERGE into Gold, dim before fact. The shape that fits is code generation into the existing models directory, not a runtime lookup inside a model."
+},
+{
+"t": "tbl",
+"rows": [
+[
+"Piece",
+"Lives in",
+"What it is"
+],
+[
+"**Registry**",
+"`Oracle`",
+"TRANSFORM_RULESET, TRANSFORM_RULE, TRANSFORM_LOOKUP, TRANSFORM_RULE_TEST. The BA's authoring surface writes here and nowhere else."
+],
+[
+"**Generator**",
+"`dbt-codegen step in CI`",
+"Reads the approved ruleset and writes models/gold/*.sql. Runs before dbt parse, never during it."
+],
+[
+"**Generated models**",
+"`models/gold/`",
+"Real .sql files, committed. A rule change arrives as a SQL diff in a pull request."
+],
+[
+"**Expectations**",
+"`dbt unit tests`",
+"TRANSFORM_RULE_TEST rows compile to dbt unit tests (dbt 1.8+) beside the model, so a rule is proven before the model runs against real data."
+],
+[
+"**Lookups**",
+"`dbt seeds`",
+"TRANSFORM_LOOKUP exports to seeds/ so the mapping is version-controlled with the model that uses it, and an unmapped value fails the build rather than the night."
+]
+]
+},
+{
+"t": "p",
+"x": "**Considered and rejected**"
+},
+{
+"t": "ul",
+"items": [
+"**Jinja macro reading a seed at parse time** — The seed becomes the source of truth but the pull request diff is a CSV, so review is meaningless. dbt docs then shows generated SQL that nobody wrote and nobody can explain.",
+"**A rule interpreter running inside the warehouse** — Slower, unobservable, and it discards dbt's lineage, tests and documentation — the three things that make the current design defensible.",
+"**Externalising Stage 1 as well** — There is no business logic there to own. The RAW DDL is the schema contract, and adding a rule layer would put a second contract in front of it."
+]
+},
+{
+"t": "p",
+"x": "**Guardrails**"
+},
+{
+"t": "ul",
+"items": [
+"A rule that adds a target column is a schema change, and Gold runs on_schema_change='fail'. The generator must detect the new column at compile time and demand an explicit migration — discovering it when the model fails at 3am is the outcome this is meant to prevent.",
+"The generated model carries the ruleset id and version in a header comment and as a column, so the SQL and the row agree about which logic produced it.",
+"Generation is deterministic: the same ruleset produces byte-identical SQL. A noisy generator makes every diff unreadable and the review worthless.",
+"dbt unit tests need 1.8 or later. On an older version the expectations have to run as a separate CI step against the compiled SQL, which is weaker but still better than none.",
+"A correction becomes a new ruleset version with an effective date, never an edit to the version that already ran. Correction Handling keeps its restatement path; what changes is that a mapping fix no longer needs a code release."
+]
+},
+{
+"t": "p",
+"x": "**Release.** dbt Release & Rollback changes shape. Today a model version is the unit of release. With the registry it is a ruleset version plus the generated model, and the two must travel together — rolling back the model without the ruleset leaves rows stamped with a version whose logic is no longer deployed. Roll back both, or neither."
 }
 ]
 },
@@ -6636,11 +7176,15 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "8. Security & Access Control",
-"md": "\nEstate defaults apply: a dedicated read-only account for any consumer, business keys masked on read rather than at rest, and secrets from the platform secret store.",
+"md": "\nEstate defaults apply: a dedicated read-only account for any consumer, business keys masked on read rather than at rest, and secrets from the platform secret store.\n\n**Rule authoring is a privileged action.** A derivation on `fact_transactions` is a change to the firm's books. Draft-to-active on a ruleset carries `REQUIRES_APPROVAL` and a four-eyes flow; the BA authors, someone else approves, and both are recorded.",
 "blocks": [
 {
 "t": "p",
 "x": "Estate defaults apply: a dedicated read-only account for any consumer, business keys masked on read rather than at rest, and secrets from the platform secret store."
+},
+{
+"t": "p",
+"x": "**Rule authoring is a privileged action.** A derivation on `fact_transactions` is a change to the firm's books. Draft-to-active on a ruleset carries `REQUIRES_APPROVAL` and a four-eyes flow; the BA authors, someone else approves, and both are recorded."
 }
 ]
 },
@@ -6709,7 +7253,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "11. Recommendation",
-"md": "\nFully specified by the pack, and sound. Order conditionally on the collapsed key set so single-domain boxes pay nothing.\n\n**Action.** B8 — order conditionally on the collapsed key set.",
+"md": "\nFully specified by the pack, and sound. Order conditionally on the collapsed key set so single-domain boxes pay nothing.\n\n**Action.** B8 — order conditionally on the collapsed key set.\n\n**On externalising the rules.** Externalised without effective dating, generated SQL and CI tests, this produces a system where more people can change logic and nobody can explain a number — strictly worse than hard-coded SQL. The three guardrails are not refinements to add later; they are what makes the idea safe at all.",
 "blocks": [
 {
 "t": "p",
@@ -6718,6 +7262,10 @@ export const DESIGN_DOCS = [
 {
 "t": "p",
 "x": "**Action.** B8 — order conditionally on the collapsed key set."
+},
+{
+"t": "p",
+"x": "**On externalising the rules.** Externalised without effective dating, generated SQL and CI tests, this produces a system where more people can change logic and nobody can explain a number — strictly worse than hard-coded SQL. The three guardrails are not refinements to add later; they are what makes the idea safe at all."
 }
 ]
 },
@@ -15800,21 +16348,214 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "3. Design Decisions",
-"md": "\nNo review finding against this component: the events-primary substitution does not change it.",
+"md": "\nNo review finding against this component: the events-primary substitution does not change it.\n\n### Stage 2 → Gold: externalise the rules so a BA owns them\n\nEvery mapping and derivation between Stage 2 and Gold is hand-written dbt SQL. A change to what a column means is therefore a code change, a pull request and a release. The people who own the business meaning cannot change it; the people who can change it do not own the meaning. That gap is where wrong numbers come from, and it gets worse as the mapping surface grows.\n\n**Principle.** Externalise the rules, not the engine. Generate dbt from them; never interpret them at run time.\n\n| Ownership | Covers |\n| --- | --- |\n| **BA owns** | Source column to target column mapping · code and value translations · derived expressions and their conditions · defaults · which attributes are SCD-tracked · the rule's business description |\n| **Engineering owns** | Join strategy · incremental predicates · merge keys · partitioning · SCD2 close and open mechanics · dim-before-fact ordering · hold-and-replay |",
 "blocks": [
 {
 "t": "p",
 "x": "No review finding against this component: the events-primary substitution does not change it."
+},
+{
+"t": "h",
+"x": "Stage 2 → Gold: externalise the rules so a BA owns them"
+},
+{
+"t": "p",
+"x": "Every mapping and derivation between Stage 2 and Gold is hand-written dbt SQL. A change to what a column means is therefore a code change, a pull request and a release. The people who own the business meaning cannot change it; the people who can change it do not own the meaning. That gap is where wrong numbers come from, and it gets worse as the mapping surface grows."
+},
+{
+"t": "p",
+"x": "**Principle.** Externalise the rules, not the engine. Generate dbt from them; never interpret them at run time."
+},
+{
+"t": "tbl",
+"rows": [
+[
+"Ownership",
+"Covers"
+],
+[
+"**BA owns**",
+"Source column to target column mapping · code and value translations · derived expressions and their conditions · defaults · which attributes are SCD-tracked · the rule's business description"
+],
+[
+"**Engineering owns**",
+"Join strategy · incremental predicates · merge keys · partitioning · SCD2 close and open mechanics · dim-before-fact ordering · hold-and-replay"
+]
+]
 }
 ]
 },
 {
 "h": "4. Detailed Design",
-"md": "\n**Deliverable.** dbt versioning, release cadence, rollback design",
+"md": "\n**Deliverable.** dbt versioning, release cadence, rollback design\n\n### Rule registry data model\n\n| Table | Grain | Columns |\n| --- | --- | --- |\n| `TRANSFORM_RULESET` | one row per target model per version | TARGET_MODEL · VERSION · STATUS · EFFECTIVE_FROM / TO · APPROVED_BY · APPROVED_TS |\n| `TRANSFORM_RULE` | one row per target column per ruleset | RULESET_ID · SEQ · TARGET_COLUMN · RULE_TYPE · SOURCE_EXPRESSION · CONDITION · DEFAULT_VALUE · BUSINESS_DESCRIPTION |\n| `TRANSFORM_LOOKUP` | one row per source value per domain per version | LOOKUP_DOMAIN · SOURCE_VALUE · TARGET_VALUE · EFFECTIVE_FROM / TO |\n| `TRANSFORM_RULE_TEST` | one row per expectation | RULE_ID · INPUT_JSON · EXPECTED_VALUE · LAST_RUN_TS · LAST_RESULT |\n\n- **TRANSFORM_RULESET** — Never updated in place — superseded. A ruleset that produced a row must stay readable for as long as that row is explainable.\n- **TRANSFORM_RULE** — RULE_TYPE is a closed set: DIRECT, CONSTANT, LOOKUP, DERIVED_EXPR, CONDITIONAL, AGGREGATE. An open expression language is how a rule registry becomes a second programming language nobody can review.\n- **TRANSFORM_LOOKUP** — The classic BA-owned artefact, and the one most often kept in a spreadsheet today. An unmapped source value raises; it never passes through or defaults silently.\n- **TRANSFORM_RULE_TEST** — At least one per rule, run in CI on every regeneration. Without it, externalisation means more people able to ship a wrong number rather than fewer.\n\n### Authoring to production\n\n| Step | Stage | What happens |\n| --- | --- | --- |\n| 1 | BA edits a rule | Authoring surface writes to the registry as a draft ruleset. Nothing downstream moves. |\n| 2 | Approval | STATUS_TRANSITION marks the draft-to-active move as REQUIRES_APPROVAL. A derivation on fact_transactions is a change to the firm's books, and four eyes is the control. |\n| 3 | Compile | CI regenerates the dbt models from the approved ruleset. The generated SQL lands in a pull request as a diff — the BA's change made reviewable in engineering's own terms. |\n| 4 | Test | Rule expectations run against the generated SQL, alongside the existing dbt tests. |\n| 5 | Run | An ordinary dbt run. Lineage, tests and documentation all still work, because the output is dbt and not an interpreter. |\n| 6 | Stamp | Every Gold row carries RULE_SET_VERSION. Three months later the number is explainable without archaeology in the commit log. |\n\n**Scope boundary.** Stage 2 to Gold only. Do not extend it to Stage 1 ingestion, where the RAW DDL is the contract and there is no business logic to own, and do not let it absorb the correctness machinery — SCD2 mechanics, merge semantics and hold-and-replay stay in code.\n\n### How it lands in the dbt project\n\nThis has to fit the dbt project as it stands — incremental models, on_schema_change='fail', DML-only MERGE into Gold, dim before fact. The shape that fits is code generation into the existing models directory, not a runtime lookup inside a model.\n\n| Piece | Lives in | What it is |\n| --- | --- | --- |\n| **Registry** | `Oracle` | TRANSFORM_RULESET, TRANSFORM_RULE, TRANSFORM_LOOKUP, TRANSFORM_RULE_TEST. The BA's authoring surface writes here and nowhere else. |\n| **Generator** | `dbt-codegen step in CI` | Reads the approved ruleset and writes models/gold/*.sql. Runs before dbt parse, never during it. |\n| **Generated models** | `models/gold/` | Real .sql files, committed. A rule change arrives as a SQL diff in a pull request. |\n| **Expectations** | `dbt unit tests` | TRANSFORM_RULE_TEST rows compile to dbt unit tests (dbt 1.8+) beside the model, so a rule is proven before the model runs against real data. |\n| **Lookups** | `dbt seeds` | TRANSFORM_LOOKUP exports to seeds/ so the mapping is version-controlled with the model that uses it, and an unmapped value fails the build rather than the night. |\n\n**Considered and rejected**\n\n- **Jinja macro reading a seed at parse time** — The seed becomes the source of truth but the pull request diff is a CSV, so review is meaningless. dbt docs then shows generated SQL that nobody wrote and nobody can explain.\n- **A rule interpreter running inside the warehouse** — Slower, unobservable, and it discards dbt's lineage, tests and documentation — the three things that make the current design defensible.\n- **Externalising Stage 1 as well** — There is no business logic there to own. The RAW DDL is the schema contract, and adding a rule layer would put a second contract in front of it.\n\n**Guardrails**\n\n- A rule that adds a target column is a schema change, and Gold runs on_schema_change='fail'. The generator must detect the new column at compile time and demand an explicit migration — discovering it when the model fails at 3am is the outcome this is meant to prevent.\n- The generated model carries the ruleset id and version in a header comment and as a column, so the SQL and the row agree about which logic produced it.\n- Generation is deterministic: the same ruleset produces byte-identical SQL. A noisy generator makes every diff unreadable and the review worthless.\n- dbt unit tests need 1.8 or later. On an older version the expectations have to run as a separate CI step against the compiled SQL, which is weaker but still better than none.\n- A correction becomes a new ruleset version with an effective date, never an edit to the version that already ran. Correction Handling keeps its restatement path; what changes is that a mapping fix no longer needs a code release.\n\n**Release.** dbt Release & Rollback changes shape. Today a model version is the unit of release. With the registry it is a ruleset version plus the generated model, and the two must travel together — rolling back the model without the ruleset leaves rows stamped with a version whose logic is no longer deployed. Roll back both, or neither.",
 "blocks": [
 {
 "t": "p",
 "x": "**Deliverable.** dbt versioning, release cadence, rollback design"
+},
+{
+"t": "h",
+"x": "Rule registry data model"
+},
+{
+"t": "tbl",
+"rows": [
+[
+"Table",
+"Grain",
+"Columns"
+],
+[
+"`TRANSFORM_RULESET`",
+"one row per target model per version",
+"TARGET_MODEL · VERSION · STATUS · EFFECTIVE_FROM / TO · APPROVED_BY · APPROVED_TS"
+],
+[
+"`TRANSFORM_RULE`",
+"one row per target column per ruleset",
+"RULESET_ID · SEQ · TARGET_COLUMN · RULE_TYPE · SOURCE_EXPRESSION · CONDITION · DEFAULT_VALUE · BUSINESS_DESCRIPTION"
+],
+[
+"`TRANSFORM_LOOKUP`",
+"one row per source value per domain per version",
+"LOOKUP_DOMAIN · SOURCE_VALUE · TARGET_VALUE · EFFECTIVE_FROM / TO"
+],
+[
+"`TRANSFORM_RULE_TEST`",
+"one row per expectation",
+"RULE_ID · INPUT_JSON · EXPECTED_VALUE · LAST_RUN_TS · LAST_RESULT"
+]
+]
+},
+{
+"t": "ul",
+"items": [
+"**TRANSFORM_RULESET** — Never updated in place — superseded. A ruleset that produced a row must stay readable for as long as that row is explainable.",
+"**TRANSFORM_RULE** — RULE_TYPE is a closed set: DIRECT, CONSTANT, LOOKUP, DERIVED_EXPR, CONDITIONAL, AGGREGATE. An open expression language is how a rule registry becomes a second programming language nobody can review.",
+"**TRANSFORM_LOOKUP** — The classic BA-owned artefact, and the one most often kept in a spreadsheet today. An unmapped source value raises; it never passes through or defaults silently.",
+"**TRANSFORM_RULE_TEST** — At least one per rule, run in CI on every regeneration. Without it, externalisation means more people able to ship a wrong number rather than fewer."
+]
+},
+{
+"t": "h",
+"x": "Authoring to production"
+},
+{
+"t": "tbl",
+"rows": [
+[
+"Step",
+"Stage",
+"What happens"
+],
+[
+"1",
+"BA edits a rule",
+"Authoring surface writes to the registry as a draft ruleset. Nothing downstream moves."
+],
+[
+"2",
+"Approval",
+"STATUS_TRANSITION marks the draft-to-active move as REQUIRES_APPROVAL. A derivation on fact_transactions is a change to the firm's books, and four eyes is the control."
+],
+[
+"3",
+"Compile",
+"CI regenerates the dbt models from the approved ruleset. The generated SQL lands in a pull request as a diff — the BA's change made reviewable in engineering's own terms."
+],
+[
+"4",
+"Test",
+"Rule expectations run against the generated SQL, alongside the existing dbt tests."
+],
+[
+"5",
+"Run",
+"An ordinary dbt run. Lineage, tests and documentation all still work, because the output is dbt and not an interpreter."
+],
+[
+"6",
+"Stamp",
+"Every Gold row carries RULE_SET_VERSION. Three months later the number is explainable without archaeology in the commit log."
+]
+]
+},
+{
+"t": "p",
+"x": "**Scope boundary.** Stage 2 to Gold only. Do not extend it to Stage 1 ingestion, where the RAW DDL is the contract and there is no business logic to own, and do not let it absorb the correctness machinery — SCD2 mechanics, merge semantics and hold-and-replay stay in code."
+},
+{
+"t": "h",
+"x": "How it lands in the dbt project"
+},
+{
+"t": "p",
+"x": "This has to fit the dbt project as it stands — incremental models, on_schema_change='fail', DML-only MERGE into Gold, dim before fact. The shape that fits is code generation into the existing models directory, not a runtime lookup inside a model."
+},
+{
+"t": "tbl",
+"rows": [
+[
+"Piece",
+"Lives in",
+"What it is"
+],
+[
+"**Registry**",
+"`Oracle`",
+"TRANSFORM_RULESET, TRANSFORM_RULE, TRANSFORM_LOOKUP, TRANSFORM_RULE_TEST. The BA's authoring surface writes here and nowhere else."
+],
+[
+"**Generator**",
+"`dbt-codegen step in CI`",
+"Reads the approved ruleset and writes models/gold/*.sql. Runs before dbt parse, never during it."
+],
+[
+"**Generated models**",
+"`models/gold/`",
+"Real .sql files, committed. A rule change arrives as a SQL diff in a pull request."
+],
+[
+"**Expectations**",
+"`dbt unit tests`",
+"TRANSFORM_RULE_TEST rows compile to dbt unit tests (dbt 1.8+) beside the model, so a rule is proven before the model runs against real data."
+],
+[
+"**Lookups**",
+"`dbt seeds`",
+"TRANSFORM_LOOKUP exports to seeds/ so the mapping is version-controlled with the model that uses it, and an unmapped value fails the build rather than the night."
+]
+]
+},
+{
+"t": "p",
+"x": "**Considered and rejected**"
+},
+{
+"t": "ul",
+"items": [
+"**Jinja macro reading a seed at parse time** — The seed becomes the source of truth but the pull request diff is a CSV, so review is meaningless. dbt docs then shows generated SQL that nobody wrote and nobody can explain.",
+"**A rule interpreter running inside the warehouse** — Slower, unobservable, and it discards dbt's lineage, tests and documentation — the three things that make the current design defensible.",
+"**Externalising Stage 1 as well** — There is no business logic there to own. The RAW DDL is the schema contract, and adding a rule layer would put a second contract in front of it."
+]
+},
+{
+"t": "p",
+"x": "**Guardrails**"
+},
+{
+"t": "ul",
+"items": [
+"A rule that adds a target column is a schema change, and Gold runs on_schema_change='fail'. The generator must detect the new column at compile time and demand an explicit migration — discovering it when the model fails at 3am is the outcome this is meant to prevent.",
+"The generated model carries the ruleset id and version in a header comment and as a column, so the SQL and the row agree about which logic produced it.",
+"Generation is deterministic: the same ruleset produces byte-identical SQL. A noisy generator makes every diff unreadable and the review worthless.",
+"dbt unit tests need 1.8 or later. On an older version the expectations have to run as a separate CI step against the compiled SQL, which is weaker but still better than none.",
+"A correction becomes a new ruleset version with an effective date, never an edit to the version that already ran. Correction Handling keeps its restatement path; what changes is that a mapping fix no longer needs a code release."
+]
+},
+{
+"t": "p",
+"x": "**Release.** dbt Release & Rollback changes shape. Today a model version is the unit of release. With the registry it is a ruleset version plus the generated model, and the two must travel together — rolling back the model without the ruleset leaves rows stamped with a version whose logic is no longer deployed. Roll back both, or neither."
 }
 ]
 },
@@ -15850,11 +16591,15 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "8. Security & Access Control",
-"md": "\nEstate defaults apply: a dedicated read-only account for any consumer, business keys masked on read rather than at rest, and secrets from the platform secret store.",
+"md": "\nEstate defaults apply: a dedicated read-only account for any consumer, business keys masked on read rather than at rest, and secrets from the platform secret store.\n\n**Rule authoring is a privileged action.** A derivation on `fact_transactions` is a change to the firm's books. Draft-to-active on a ruleset carries `REQUIRES_APPROVAL` and a four-eyes flow; the BA authors, someone else approves, and both are recorded.",
 "blocks": [
 {
 "t": "p",
 "x": "Estate defaults apply: a dedicated read-only account for any consumer, business keys masked on read rather than at rest, and secrets from the platform secret store."
+},
+{
+"t": "p",
+"x": "**Rule authoring is a privileged action.** A derivation on `fact_transactions` is a change to the firm's books. Draft-to-active on a ruleset carries `REQUIRES_APPROVAL` and a four-eyes flow; the BA authors, someone else approves, and both are recorded."
 }
 ]
 },
@@ -15904,11 +16649,15 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "11. Recommendation",
-"md": "\nNo change recommended.",
+"md": "\nNo change recommended.\n\n**On externalising the rules.** Externalised without effective dating, generated SQL and CI tests, this produces a system where more people can change logic and nobody can explain a number — strictly worse than hard-coded SQL. The three guardrails are not refinements to add later; they are what makes the idea safe at all.",
 "blocks": [
 {
 "t": "p",
 "x": "No change recommended."
+},
+{
+"t": "p",
+"x": "**On externalising the rules.** Externalised without effective dating, generated SQL and CI tests, this produces a system where more people can change logic and nobody can explain a number — strictly worse than hard-coded SQL. The three guardrails are not refinements to add later; they are what makes the idea safe at all."
 }
 ]
 },
@@ -17187,13 +17936,13 @@ export const DESIGN_DOCS = [
 },
 {
 "id": "c66",
-"title": "SDC Event Listener",
+"title": "Pre-Gold (Exadata) — dimensional assembly & tie-out",
 "level": "L3",
-"icon": "📐",
-"color": "#0f4775",
-"bg": "#e6eef5",
+"icon": "🧪",
+"color": "#0e8f7e",
+"bg": "#dff2ef",
 "order": 166,
-"sub": "#66 · 2. Hub · Event Ingestion · Python · Event Hub consumer · P1 · custom High · status Not Started",
+"sub": "#66 · 2. Hub · Processing · dbt + Oracle Exadata · P1 · custom High · status In Design",
 "match": "",
 "zone_default": "",
 "default": false,
@@ -17202,11 +17951,19 @@ export const DESIGN_DOCS = [
 ],
 "chip": "#66 design",
 "meta": {
-"status": "Not Started",
+"status": "In Design",
 "owner": "TBD",
 "priority": "P1",
 "custom": "High",
-"depends_on": [],
+"depends_on": [
+"15",
+"17",
+"26",
+"28",
+"31",
+"33",
+"67"
+],
 "decisions": [
 "AD-1",
 "AD-2",
@@ -17221,6 +17978,839 @@ export const DESIGN_DOCS = [
 "updated": "2026-08-10"
 },
 "src": "66_Pre-Gold_Exadata_Design.md",
+"sections": [
+{
+"h": "1. Purpose & Scope",
+"md": "\nPre-Gold is the dimensional assembly layer. It takes conformed Stage 2 output and builds the finished SCD2 dimensions, fact tables and bitemporal history that consumers will eventually see — then reconciles them against RAW before anything leaves Exadata. Its single deliverable is a set of **publish-ready staging tables**, one per Gold target object, already tied out and already in the exact shape Gold expects.\n\nIt exists because the Gold database is a standalone Oracle instance at 12 CPU / 64 GB with no Exadata features. Every heavy set-based operation — SCD2 merge, window functions over full history, fact assembly, control-total aggregation — must complete on Exadata where Smart Scan, HCC and storage offload are available. Gold receives rows; it does not compute them.\n\n**Tiers touched:** reads Stage 2 (Oracle/Exadata), writes Pre-Gold (Stage 3 Exadata). Hands off to component 67 for movement into Gold. Does not touch Stage 1 and does not touch the consumer tier.\n\n---",
+"blocks": [
+{
+"t": "p",
+"x": "Pre-Gold is the dimensional assembly layer. It takes conformed Stage 2 output and builds the finished SCD2 dimensions, fact tables and bitemporal history that consumers will eventually see — then reconciles them against RAW before anything leaves Exadata. Its single deliverable is a set of **publish-ready staging tables**, one per Gold target object, already tied out and already in the exact shape Gold expects."
+},
+{
+"t": "p",
+"x": "It exists because the Gold database is a standalone Oracle instance at 12 CPU / 64 GB with no Exadata features. Every heavy set-based operation — SCD2 merge, window functions over full history, fact assembly, control-total aggregation — must complete on Exadata where Smart Scan, HCC and storage offload are available. Gold receives rows; it does not compute them."
+},
+{
+"t": "p",
+"x": "**Tiers touched:** reads Stage 2 (Oracle/Exadata), writes Pre-Gold (Stage 3 Exadata). Hands off to component 67 for movement into Gold. Does not touch Stage 1 and does not touch the consumer tier."
+}
+]
+},
+{
+"h": "2. Context & Dependencies",
+"md": "\n### Upstream (Depends On)\n\n| ID | Component | Why required |\n|---|---|---|\n| 15 | Stage 2 Enriched | Source of conformed, typed, corrected records across all 9 domains |\n| 17 | Correction handling | Supplies the bitemporal version chain (`RECORD_VERSION`, `IS_CURRENT`, effective timestamps) that Pre-Gold preserves rather than re-derives |\n| 26 | G4 tie-out | Executes here, before the Gold hop — Pre-Gold is where the gate physically runs |\n| 28 | DQ framework | Rule registry, severity resolution, blocking semantics |\n| 31 | Audit & lineage | `LOAD_ID` chain must survive dimensional assembly |\n| 33 | Metadata & config store | Domain registry, SCD2 attribute lists, tie-out rule sets, retention windows |\n| 67 | Gold publish / movement | Consumes Pre-Gold's staging tables (design contract, not a runtime dependency) |\n\n### Downstream\n\n- **67 Gold publish** — partition-exchange movement of Pre-Gold output into the standalone Gold database\n- **31 Audit & lineage** — receives the assembly-level lineage records\n- **35 Integration360** — receives tie-out results and exception events\n\n### Tier placement\n\n```\n  SEI feeds (9 domains, ~30 feeds)\n        │\n        ▼\n  ┌─────────────────────────── EXADATA ───────────────────────────┐\n  │                                                               │\n  │  Stage 1 RAW ──▶ Stage 2 Enriched ──▶ THIS COMPONENT (66)     │\n  │  immutable       conformed,            SCD2 · facts ·          │\n  │  append-only     bitemporal            bitemporal history ·    │\n  │                                        G4 tie-out              │\n  └───────────────────────────────┬───────────────────────────────┘\n                                  │ 67 · partition exchange\n                                  │ current-state + bounded as-of window\n                                  ▼\n                   ┌─── GOLD (standalone Oracle, 12 CPU / 64 GB) ───┐\n                   │        publish-only · no transformation        │\n                   └───────────┬──────────┬──────────┬─────────────┘\n                               ▼          ▼          ▼\n                            PBDW        IMDS      Pivotal\n                               │\n                               ▼\n                       ~1,000 consumers\n```\n\n---",
+"blocks": [
+{
+"t": "h",
+"x": "Upstream (Depends On)"
+},
+{
+"t": "tbl",
+"rows": [
+[
+"ID",
+"Component",
+"Why required"
+],
+[
+"15",
+"Stage 2 Enriched",
+"Source of conformed, typed, corrected records across all 9 domains"
+],
+[
+"17",
+"Correction handling",
+"Supplies the bitemporal version chain (`RECORD_VERSION`, `IS_CURRENT`, effective timestamps) that Pre-Gold preserves rather than re-derives"
+],
+[
+"26",
+"G4 tie-out",
+"Executes here, before the Gold hop — Pre-Gold is where the gate physically runs"
+],
+[
+"28",
+"DQ framework",
+"Rule registry, severity resolution, blocking semantics"
+],
+[
+"31",
+"Audit & lineage",
+"`LOAD_ID` chain must survive dimensional assembly"
+],
+[
+"33",
+"Metadata & config store",
+"Domain registry, SCD2 attribute lists, tie-out rule sets, retention windows"
+],
+[
+"67",
+"Gold publish / movement",
+"Consumes Pre-Gold's staging tables (design contract, not a runtime dependency)"
+]
+]
+},
+{
+"t": "h",
+"x": "Downstream"
+},
+{
+"t": "ul",
+"items": [
+"**67 Gold publish** — partition-exchange movement of Pre-Gold output into the standalone Gold database",
+"**31 Audit & lineage** — receives the assembly-level lineage records",
+"**35 Integration360** — receives tie-out results and exception events"
+]
+},
+{
+"t": "h",
+"x": "Tier placement"
+},
+{
+"t": "pre",
+"x": "  SEI feeds (9 domains, ~30 feeds)\n        │\n        ▼\n  ┌─────────────────────────── EXADATA ───────────────────────────┐\n  │                                                               │\n  │  Stage 1 RAW ──▶ Stage 2 Enriched ──▶ THIS COMPONENT (66)     │\n  │  immutable       conformed,            SCD2 · facts ·          │\n  │  append-only     bitemporal            bitemporal history ·    │\n  │                                        G4 tie-out              │\n  └───────────────────────────────┬───────────────────────────────┘\n                                  │ 67 · partition exchange\n                                  │ current-state + bounded as-of window\n                                  ▼\n                   ┌─── GOLD (standalone Oracle, 12 CPU / 64 GB) ───┐\n                   │        publish-only · no transformation        │\n                   └───────────┬──────────┬──────────┬─────────────┘\n                               ▼          ▼          ▼\n                            PBDW        IMDS      Pivotal\n                               │\n                               ▼\n                       ~1,000 consumers",
+"lang": ""
+}
+]
+},
+{
+"h": "3. Design Decisions",
+"md": "\n**D1 · Where does dimensional assembly execute?**\n**Decision:** Entirely on Exadata, in Pre-Gold. Gold performs no joins, no merges, no window functions.\n**Rationale:** The Gold box has no HCC, no Smart Scan, no storage indexes. A full-history SCD2 merge on 12 CPU / 64 GB spills to temp and competes with the publish window.\n**Consequence:** Gold's CPU and memory are reserved for load and extract. Pre-Gold owns all compute cost. Honours AD-1 (Hub-owned Gold that publishes).\n\n**D2 · Does Pre-Gold hold full bitemporal history, or does Gold?**\n**Decision:** Pre-Gold holds the complete version chain under HCC. Gold receives current-state plus a bounded as-of window (default 90 days, configurable per object).\n**Rationale:** Full versioned history on 64 GB with only basic compression will outgrow the box. Exadata absorbs it at roughly 10× compression; Gold cannot.\n**Consequence:** As-of queries beyond the window resolve against Pre-Gold on Exadata, not Gold. This is a **refinement to AD-2** — bitemporal append still holds everywhere, but the retention horizon differs by tier. Requires explicit ARB acknowledgement rather than silent implementation.\n\n**D3 · Is Pre-Gold rebuilt or incrementally maintained?**\n**Decision:** Incrementally maintained, keyed on `BUSINESS_DATE` with a configurable correction lookback per domain.\n**Rationale:** Full rebuild on ~30 feeds nightly is not affordable inside the EOD window regardless of Exadata's throughput, and it forfeits the ability to replay one domain in isolation.\n**Consequence:** Every Pre-Gold object needs a deterministic incremental predicate and a documented rebuild path for deliberate full reconstruction.\n\n**D4 · Where does the G4 tie-out run?**\n**Decision:** On Exadata, inside Pre-Gold, before any data crosses to Gold.\n**Rationale:** Both sides of the comparison — RAW counts and assembled Gold-shaped rows — are local. A tie-out spanning two databases over a link inside the EOD window is materially harder and slower.\n**Consequence:** What crosses to Gold is already reconciled. Component 67's post-move check reduces to a row-count verify, which is the correct amount of work for the small box. Honours AD-9 (blocking, tie-out before publish).\n\n**D5 · How is `LOAD_ID` lineage preserved through dimensional assembly?**\n**Decision:** Every Pre-Gold row carries `SRC_LOAD_ID` (or a `LOAD_ID` array for aggregated facts) and the originating `BUSINESS_DATE`.\n**Rationale:** Replay scope is a `LOAD_ID` set (component 21). If lineage breaks at dimensional assembly, targeted replay becomes date-level replay and the fan-out advantage is lost.\n**Consequence:** Aggregating facts must carry a collection, not a scalar. Modest storage cost, absorbed by HCC.\n\n**D6 · What is the handoff unit to Gold?**\n**Decision:** A partition-ready staging table per Gold target object, matching Gold's DDL exactly.\n**Rationale:** Enables partition exchange in component 67 — readers see the previous partition until the swap, then the new one. No half-loaded state, no long lock.\n**Consequence:** Pre-Gold staging DDL and Gold DDL are a coupled contract generated from one config definition, not maintained separately.\n\n**D7 · Does Pre-Gold serve the real-time lane?**\n**Decision:** No. The real-time lane (API Gateway → real-time consumers) is independent and has no batch dependency.\n**Rationale:** Coupling would make the API route wait on an EOD build.\n**Consequence:** Contingent on **AD-4** remaining \"independent lanes\". If intraday is later routed through the batch pipeline, this decision reopens.\n\n---",
+"blocks": [
+{
+"t": "p",
+"x": "**D1 · Where does dimensional assembly execute?**"
+},
+{
+"t": "p",
+"x": "**Decision:** Entirely on Exadata, in Pre-Gold. Gold performs no joins, no merges, no window functions."
+},
+{
+"t": "p",
+"x": "**Rationale:** The Gold box has no HCC, no Smart Scan, no storage indexes. A full-history SCD2 merge on 12 CPU / 64 GB spills to temp and competes with the publish window."
+},
+{
+"t": "p",
+"x": "**Consequence:** Gold's CPU and memory are reserved for load and extract. Pre-Gold owns all compute cost. Honours AD-1 (Hub-owned Gold that publishes)."
+},
+{
+"t": "p",
+"x": "**D2 · Does Pre-Gold hold full bitemporal history, or does Gold?**"
+},
+{
+"t": "p",
+"x": "**Decision:** Pre-Gold holds the complete version chain under HCC. Gold receives current-state plus a bounded as-of window (default 90 days, configurable per object)."
+},
+{
+"t": "p",
+"x": "**Rationale:** Full versioned history on 64 GB with only basic compression will outgrow the box. Exadata absorbs it at roughly 10× compression; Gold cannot."
+},
+{
+"t": "p",
+"x": "**Consequence:** As-of queries beyond the window resolve against Pre-Gold on Exadata, not Gold. This is a **refinement to AD-2** — bitemporal append still holds everywhere, but the retention horizon differs by tier. Requires explicit ARB acknowledgement rather than silent implementation."
+},
+{
+"t": "p",
+"x": "**D3 · Is Pre-Gold rebuilt or incrementally maintained?**"
+},
+{
+"t": "p",
+"x": "**Decision:** Incrementally maintained, keyed on `BUSINESS_DATE` with a configurable correction lookback per domain."
+},
+{
+"t": "p",
+"x": "**Rationale:** Full rebuild on ~30 feeds nightly is not affordable inside the EOD window regardless of Exadata's throughput, and it forfeits the ability to replay one domain in isolation."
+},
+{
+"t": "p",
+"x": "**Consequence:** Every Pre-Gold object needs a deterministic incremental predicate and a documented rebuild path for deliberate full reconstruction."
+},
+{
+"t": "p",
+"x": "**D4 · Where does the G4 tie-out run?**"
+},
+{
+"t": "p",
+"x": "**Decision:** On Exadata, inside Pre-Gold, before any data crosses to Gold."
+},
+{
+"t": "p",
+"x": "**Rationale:** Both sides of the comparison — RAW counts and assembled Gold-shaped rows — are local. A tie-out spanning two databases over a link inside the EOD window is materially harder and slower."
+},
+{
+"t": "p",
+"x": "**Consequence:** What crosses to Gold is already reconciled. Component 67's post-move check reduces to a row-count verify, which is the correct amount of work for the small box. Honours AD-9 (blocking, tie-out before publish)."
+},
+{
+"t": "p",
+"x": "**D5 · How is `LOAD_ID` lineage preserved through dimensional assembly?**"
+},
+{
+"t": "p",
+"x": "**Decision:** Every Pre-Gold row carries `SRC_LOAD_ID` (or a `LOAD_ID` array for aggregated facts) and the originating `BUSINESS_DATE`."
+},
+{
+"t": "p",
+"x": "**Rationale:** Replay scope is a `LOAD_ID` set (component 21). If lineage breaks at dimensional assembly, targeted replay becomes date-level replay and the fan-out advantage is lost."
+},
+{
+"t": "p",
+"x": "**Consequence:** Aggregating facts must carry a collection, not a scalar. Modest storage cost, absorbed by HCC."
+},
+{
+"t": "p",
+"x": "**D6 · What is the handoff unit to Gold?**"
+},
+{
+"t": "p",
+"x": "**Decision:** A partition-ready staging table per Gold target object, matching Gold's DDL exactly."
+},
+{
+"t": "p",
+"x": "**Rationale:** Enables partition exchange in component 67 — readers see the previous partition until the swap, then the new one. No half-loaded state, no long lock."
+},
+{
+"t": "p",
+"x": "**Consequence:** Pre-Gold staging DDL and Gold DDL are a coupled contract generated from one config definition, not maintained separately."
+},
+{
+"t": "p",
+"x": "**D7 · Does Pre-Gold serve the real-time lane?**"
+},
+{
+"t": "p",
+"x": "**Decision:** No. The real-time lane (API Gateway → real-time consumers) is independent and has no batch dependency."
+},
+{
+"t": "p",
+"x": "**Rationale:** Coupling would make the API route wait on an EOD build."
+},
+{
+"t": "p",
+"x": "**Consequence:** Contingent on **AD-4** remaining \"independent lanes\". If intraday is later routed through the batch pipeline, this decision reopens."
+}
+]
+},
+{
+"h": "4a. Diagrams",
+"md": "\n### (1) Component / architecture\n\n```mermaid\nflowchart LR\n  subgraph EXT[\"EXTERNAL — SEI / SWP, out of scope\"]\n    SEI[\"SWP Platform<br/>batch extracts EOD\"]\n  end\n\n  subgraph S1[\"Stage 1 (Oracle / Exadata)\"]\n    LZ[\"8 Landing Zone\"]\n    RAW[\"14 Stage 1 RAW<br/>immutable · append-only<br/>~30 feeds · 9 domains\"]\n  end\n\n  subgraph S2[\"Stage 2 (Oracle / Exadata)\"]\n    ACCT[\"Account &amp; Client\"]\n    POS[\"Positions\"]\n    TXN[\"Transactions\"]\n    REF[\"Reference &amp; Asset\"]\n    OTH[\"Other · Fee &amp; Billing<br/>Portfolio &amp; Model<br/>Reporting · Cash\"]\n    CORR[\"17 Corrections<br/>bitemporal append\"]\n  end\n\n  subgraph S3[\"Stage 3 — PRE-GOLD (Exadata) · COMPONENT 66\"]\n    direction TB\n    DIM[\"Dimension assembly<br/>SCD2 · surrogate keys\"]\n    FACT[\"Fact assembly<br/>grain conform · FK resolve\"]\n    BITE[\"Bitemporal history<br/>full chain · HCC\"]\n    G4[\"26 · G4 tie-out<br/>RAW ↔ Pre-Gold<br/>BLOCKING\"]\n    STG[\"Publish staging tables<br/>partition-ready, Gold-shaped\"]\n    DIM --> FACT --> BITE --> G4 --> STG\n  end\n\n  subgraph GOLD[\"Gold (standalone Oracle · 12 CPU / 64 GB)\"]\n    GLD[\"16 Gold<br/>publish-only<br/>current + 90d as-of\"]\n  end\n\n  subgraph CONS[\"Consumers (movement only)\"]\n    PBDW[\"37 PBDW<br/>system of record<br/>~1,000 consumers\"]\n    IMDS[\"38 IMDS Stage → IMDS\"]\n    PIV[\"39 Pivotal\"]\n    CPDW[\"40 CP DW Canonical<br/>FUTURE\"]\n  end\n\n  subgraph RT[\"Real-time lane — independent\"]\n    APIGW[\"12 API Gateway / Data Plane\"]\n    RTC[\"42 Real-time consumers\"]\n  end\n\n  subgraph FDN[\"Foundation\"]\n    CFG[\"33 Config store<br/>domain registry · SCD2 attrs<br/>tie-out rules · retention\"]\n    LIN[\"31 Audit &amp; lineage\"]\n    DQ[\"28 DQ framework\"]\n  end\n\n  SEI -.->|\"file contract\"| LZ\n  SEI -.->|\"SWP APIs\"| APIGW\n  APIGW ==> RTC\n\n  LZ --> RAW\n  RAW --> ACCT & POS & TXN & REF & OTH\n  ACCT & POS & TXN & REF & OTH --> CORR\n  CORR --> DIM\n  RAW -.->|\"counts by LOAD_ID\"| G4\n\n  STG ==>|\"67 · partition exchange<br/>DB-link direct-path APPEND\"| GLD\n  GLD --> PBDW & IMDS & PIV\n  GLD -.-> CPDW\n\n  CFG -.-> DIM & FACT & G4\n  DIM & FACT --> LIN\n  G4 --> DQ\n\n  classDef ext stroke-dasharray:5 5,stroke:#A82316,color:#A82316\n  classDef future stroke-dasharray:5 5,stroke:#9A5B00,color:#9A5B00\n  classDef focal stroke-width:3px,stroke:#16305B\n  class SEI,EXT ext\n  class CPDW future\n  class DIM,FACT,BITE,G4,STG focal\n```\n\n### (2) Data flow / sequence\n\n```mermaid\nsequenceDiagram\n  autonumber\n  participant AF as 18 Airflow\n  participant S2 as Stage 2 (Exadata)\n  participant PG as 66 Pre-Gold (Exadata)\n  participant G4 as 26 G4 tie-out\n  participant MV as 67 Movement\n  participant GD as Gold (standalone)\n  participant CN as PBDW / IMDS / Pivotal\n\n  AF->>S2: Stage 2 complete for all 9 domains (G3 passed)\n  AF->>PG: trigger assembly, mapped over domain registry (33)\n  PG->>PG: build dimensions — SCD2 close/open, surrogate keys\n  PG->>PG: build facts — grain conform, dimension FK resolve\n  PG->>PG: append bitemporal versions, full chain retained (HCC)\n  PG->>G4: submit assembled objects for tie-out\n  G4->>G4: compare RAW counts by LOAD_ID vs Pre-Gold rows\n  alt tie-out fails\n    G4-->>AF: BLOCK — no publish, error event raised (29)\n    AF-->>AF: alert · exception queue · replay candidate (21)\n  else tie-out passes\n    G4->>PG: build publish staging tables, partition-ready\n    PG->>MV: staging ready, current-state + 90d as-of window\n    MV->>GD: direct-path APPEND over DB-link into staging partition\n    MV->>GD: partition exchange — atomic swap, readers unaffected\n    MV->>MV: post-move row-count verify (lightweight)\n    GD->>CN: scheduled extracts — movement only, no transformation\n    CN-->>AF: publish confirmed · G5 advisory recon (27)\n  end\n```\n\n---",
+"blocks": [
+{
+"t": "h",
+"x": "(1) Component / architecture"
+},
+{
+"t": "pre",
+"x": "flowchart LR\n  subgraph EXT[\"EXTERNAL — SEI / SWP, out of scope\"]\n    SEI[\"SWP Platform<br/>batch extracts EOD\"]\n  end\n\n  subgraph S1[\"Stage 1 (Oracle / Exadata)\"]\n    LZ[\"8 Landing Zone\"]\n    RAW[\"14 Stage 1 RAW<br/>immutable · append-only<br/>~30 feeds · 9 domains\"]\n  end\n\n  subgraph S2[\"Stage 2 (Oracle / Exadata)\"]\n    ACCT[\"Account &amp; Client\"]\n    POS[\"Positions\"]\n    TXN[\"Transactions\"]\n    REF[\"Reference &amp; Asset\"]\n    OTH[\"Other · Fee &amp; Billing<br/>Portfolio &amp; Model<br/>Reporting · Cash\"]\n    CORR[\"17 Corrections<br/>bitemporal append\"]\n  end\n\n  subgraph S3[\"Stage 3 — PRE-GOLD (Exadata) · COMPONENT 66\"]\n    direction TB\n    DIM[\"Dimension assembly<br/>SCD2 · surrogate keys\"]\n    FACT[\"Fact assembly<br/>grain conform · FK resolve\"]\n    BITE[\"Bitemporal history<br/>full chain · HCC\"]\n    G4[\"26 · G4 tie-out<br/>RAW ↔ Pre-Gold<br/>BLOCKING\"]\n    STG[\"Publish staging tables<br/>partition-ready, Gold-shaped\"]\n    DIM --> FACT --> BITE --> G4 --> STG\n  end\n\n  subgraph GOLD[\"Gold (standalone Oracle · 12 CPU / 64 GB)\"]\n    GLD[\"16 Gold<br/>publish-only<br/>current + 90d as-of\"]\n  end\n\n  subgraph CONS[\"Consumers (movement only)\"]\n    PBDW[\"37 PBDW<br/>system of record<br/>~1,000 consumers\"]\n    IMDS[\"38 IMDS Stage → IMDS\"]\n    PIV[\"39 Pivotal\"]\n    CPDW[\"40 CP DW Canonical<br/>FUTURE\"]\n  end\n\n  subgraph RT[\"Real-time lane — independent\"]\n    APIGW[\"12 API Gateway / Data Plane\"]\n    RTC[\"42 Real-time consumers\"]\n  end\n\n  subgraph FDN[\"Foundation\"]\n    CFG[\"33 Config store<br/>domain registry · SCD2 attrs<br/>tie-out rules · retention\"]\n    LIN[\"31 Audit &amp; lineage\"]\n    DQ[\"28 DQ framework\"]\n  end\n\n  SEI -.->|\"file contract\"| LZ\n  SEI -.->|\"SWP APIs\"| APIGW\n  APIGW ==> RTC\n\n  LZ --> RAW\n  RAW --> ACCT & POS & TXN & REF & OTH\n  ACCT & POS & TXN & REF & OTH --> CORR\n  CORR --> DIM\n  RAW -.->|\"counts by LOAD_ID\"| G4\n\n  STG ==>|\"67 · partition exchange<br/>DB-link direct-path APPEND\"| GLD\n  GLD --> PBDW & IMDS & PIV\n  GLD -.-> CPDW\n\n  CFG -.-> DIM & FACT & G4\n  DIM & FACT --> LIN\n  G4 --> DQ\n\n  classDef ext stroke-dasharray:5 5,stroke:#A82316,color:#A82316\n  classDef future stroke-dasharray:5 5,stroke:#9A5B00,color:#9A5B00\n  classDef focal stroke-width:3px,stroke:#16305B\n  class SEI,EXT ext\n  class CPDW future\n  class DIM,FACT,BITE,G4,STG focal",
+"lang": "mermaid"
+},
+{
+"t": "h",
+"x": "(2) Data flow / sequence"
+},
+{
+"t": "pre",
+"x": "sequenceDiagram\n  autonumber\n  participant AF as 18 Airflow\n  participant S2 as Stage 2 (Exadata)\n  participant PG as 66 Pre-Gold (Exadata)\n  participant G4 as 26 G4 tie-out\n  participant MV as 67 Movement\n  participant GD as Gold (standalone)\n  participant CN as PBDW / IMDS / Pivotal\n\n  AF->>S2: Stage 2 complete for all 9 domains (G3 passed)\n  AF->>PG: trigger assembly, mapped over domain registry (33)\n  PG->>PG: build dimensions — SCD2 close/open, surrogate keys\n  PG->>PG: build facts — grain conform, dimension FK resolve\n  PG->>PG: append bitemporal versions, full chain retained (HCC)\n  PG->>G4: submit assembled objects for tie-out\n  G4->>G4: compare RAW counts by LOAD_ID vs Pre-Gold rows\n  alt tie-out fails\n    G4-->>AF: BLOCK — no publish, error event raised (29)\n    AF-->>AF: alert · exception queue · replay candidate (21)\n  else tie-out passes\n    G4->>PG: build publish staging tables, partition-ready\n    PG->>MV: staging ready, current-state + 90d as-of window\n    MV->>GD: direct-path APPEND over DB-link into staging partition\n    MV->>GD: partition exchange — atomic swap, readers unaffected\n    MV->>MV: post-move row-count verify (lightweight)\n    GD->>CN: scheduled extracts — movement only, no transformation\n    CN-->>AF: publish confirmed · G5 advisory recon (27)\n  end",
+"lang": "mermaid"
+}
+]
+},
+{
+"h": "4b. Flow Walkthrough",
+"md": "\n1. **Airflow (18)** → confirms Stage 2 complete and G3 passed for all 9 domains → releases the Pre-Gold task group\n2. **Airflow (18)** → dynamic task mapping over the domain registry in config (33) → one assembly branch per domain, not 30 static tasks\n3. **Pre-Gold (66)** → builds dimensions from Account & Client and Reference & Asset first → SCD2 close/open, surrogate key assignment\n4. **Pre-Gold (66)** → builds facts from Positions, Transactions, Fee & Billing, Reporting, Cash → resolves dimension foreign keys against step 3 output\n5. **Pre-Gold (66)** → appends bitemporal versions, retaining the full chain under HCC → `IS_CURRENT` maintained, prior versions closed\n6. **Pre-Gold (66)** → attaches satellite feeds (Optional Fields, Supplement) to their parent entities → never modelled as standalone facts\n7. **G4 tie-out (26)** → compares RAW row counts by `LOAD_ID` against assembled Pre-Gold rows, per target object → **both sides local to Exadata**\n8. **G4 fails** → BLOCK. Nothing crosses to Gold. Error event raised (29), exception queued (30), replay candidate flagged (21). Gold retains yesterday's state.\n9. **G4 passes** → Pre-Gold builds publish staging tables in Gold's exact DDL shape → current-state plus the bounded as-of window\n10. **Movement (67)** → **CROSS-DATABASE HOP: Exadata → standalone Gold** → direct-path `APPEND` over DB-link into a staging partition\n11. **Movement (67)** → partition exchange, atomic swap → readers see the prior partition until the swap completes\n12. **Movement (67)** → post-move row-count verify against the Pre-Gold source count → lightweight, appropriate for the 12-CPU box\n13. **Gold (16)** → three scheduled extracts → PBDW, IMDS Stage → IMDS, Pivotal → movement only, no transformation in flight\n14. **G5 (27)** → advisory post-publish reconciliation → alert and replay trigger only; blocks nothing\n\n**Failure branch (steps 8, 10, 12):** any failure leaves Gold on the prior partition. Remediation is fix-then-replay from `LOAD_ID` (21), never in-place repair of Gold.\n\n---",
+"blocks": [
+{
+"t": "p",
+"x": "1. **Airflow (18)** → confirms Stage 2 complete and G3 passed for all 9 domains → releases the Pre-Gold task group"
+},
+{
+"t": "p",
+"x": "2. **Airflow (18)** → dynamic task mapping over the domain registry in config (33) → one assembly branch per domain, not 30 static tasks"
+},
+{
+"t": "p",
+"x": "3. **Pre-Gold (66)** → builds dimensions from Account & Client and Reference & Asset first → SCD2 close/open, surrogate key assignment"
+},
+{
+"t": "p",
+"x": "4. **Pre-Gold (66)** → builds facts from Positions, Transactions, Fee & Billing, Reporting, Cash → resolves dimension foreign keys against step 3 output"
+},
+{
+"t": "p",
+"x": "5. **Pre-Gold (66)** → appends bitemporal versions, retaining the full chain under HCC → `IS_CURRENT` maintained, prior versions closed"
+},
+{
+"t": "p",
+"x": "6. **Pre-Gold (66)** → attaches satellite feeds (Optional Fields, Supplement) to their parent entities → never modelled as standalone facts"
+},
+{
+"t": "p",
+"x": "7. **G4 tie-out (26)** → compares RAW row counts by `LOAD_ID` against assembled Pre-Gold rows, per target object → **both sides local to Exadata**"
+},
+{
+"t": "p",
+"x": "8. **G4 fails** → BLOCK. Nothing crosses to Gold. Error event raised (29), exception queued (30), replay candidate flagged (21). Gold retains yesterday's state."
+},
+{
+"t": "p",
+"x": "9. **G4 passes** → Pre-Gold builds publish staging tables in Gold's exact DDL shape → current-state plus the bounded as-of window"
+},
+{
+"t": "p",
+"x": "10. **Movement (67)** → **CROSS-DATABASE HOP: Exadata → standalone Gold** → direct-path `APPEND` over DB-link into a staging partition"
+},
+{
+"t": "p",
+"x": "11. **Movement (67)** → partition exchange, atomic swap → readers see the prior partition until the swap completes"
+},
+{
+"t": "p",
+"x": "12. **Movement (67)** → post-move row-count verify against the Pre-Gold source count → lightweight, appropriate for the 12-CPU box"
+},
+{
+"t": "p",
+"x": "13. **Gold (16)** → three scheduled extracts → PBDW, IMDS Stage → IMDS, Pivotal → movement only, no transformation in flight"
+},
+{
+"t": "p",
+"x": "14. **G5 (27)** → advisory post-publish reconciliation → alert and replay trigger only; blocks nothing"
+},
+{
+"t": "p",
+"x": "**Failure branch (steps 8, 10, 12):** any failure leaves Gold on the prior partition. Remediation is fix-then-replay from `LOAD_ID` (21), never in-place repair of Gold."
+}
+]
+},
+{
+"h": "4c. Detailed Design",
+"md": "\n### Data model — Pre-Gold objects\n\n| Object | Type | Grain | Source domains | Gold retention |\n|---|---|---|---|---|\n| `PG_DIM_ACCOUNT` | SCD2 dim | Account, versioned | Account & Client (+ Optional Fields, Supplement satellites) | Current + 90d |\n| `PG_DIM_CLIENT` | SCD2 dim | Client, versioned | Account & Client | Current + 90d |\n| `PG_DIM_ASSET` | SCD2 dim | Asset, versioned | Reference & Asset (+ Optional Fields, Investment Class) | Current + 90d |\n| `PG_DIM_PORTFOLIO` | SCD2 dim | Portfolio, versioned | Portfolio & Model | Current + 90d |\n| `PG_FACT_POSITION` | Fact | Account + Asset + business date | Positions (5 feeds) | Current + 90d |\n| `PG_FACT_TAXLOT` | Fact | Account + Lot + business date | Positions (Taxlot) | Current + 90d |\n| `PG_FACT_TRANSACTION` | Fact | Transaction, versioned | Transactions (Header + Detail) | Current + 90d |\n| `PG_FACT_FEE` | Fact | Fee computation event | Fee & Billing | Current + 90d |\n| `PG_FACT_CASH` | Fact | Cash activity | Cash, Other (Custody & Nostro) | Current + 90d |\n| `PG_FACT_STATEMENT` | Fact | Statement event + item | Reporting | Current + 90d |\n\nObject list is **generated from the domain registry in config (33)**, not hand-maintained. Adding a tenth domain is a config change.\n\n### DDL pattern — dimension\n\n```sql\nCREATE TABLE PG_DIM_ACCOUNT (\n  ACCOUNT_SK        NUMBER(18) GENERATED ALWAYS AS IDENTITY,\n  ACCOUNT_ID        VARCHAR2(64)  NOT NULL,     -- natural key\n  -- SCD2 axis (happened-at)\n  VALID_FROM_DATE   DATE          NOT NULL,\n  VALID_TO_DATE     DATE          NOT NULL,     -- 9999-12-31 for current\n  IS_CURRENT        CHAR(1)       NOT NULL,\n  -- bitemporal axis (knew-at)\n  EFFECTIVE_FROM_TS TIMESTAMP     NOT NULL,\n  EFFECTIVE_TO_TS   TIMESTAMP,\n  RECORD_VERSION    NUMBER(6)     NOT NULL,\n  -- lineage\n  SRC_LOAD_ID       NUMBER(18)    NOT NULL,\n  SRC_BUSINESS_DATE DATE          NOT NULL,\n  -- attributes (from Account + Account Optional Fields + Account Supplement)\n  ACCOUNT_NAME      VARCHAR2(240),\n  ACCOUNT_TYPE      VARCHAR2(64),\n  BASE_CURRENCY     VARCHAR2(3),\n  ...\n  CONSTRAINT PK_PG_DIM_ACCOUNT PRIMARY KEY (ACCOUNT_SK)\n)\nPARTITION BY RANGE (SRC_BUSINESS_DATE)\n  INTERVAL (NUMTODSINTERVAL(1,'DAY'))\n  (PARTITION P_INIT VALUES LESS THAN (DATE '2026-01-01'))\nCOMPRESS FOR QUERY HIGH;          -- HCC: Exadata only, not available in Gold\n\nCREATE INDEX IX_PGDA_NK ON PG_DIM_ACCOUNT (ACCOUNT_ID, IS_CURRENT) LOCAL;\nCREATE INDEX IX_PGDA_LOAD ON PG_DIM_ACCOUNT (SRC_LOAD_ID) LOCAL;\n```\n\n### DDL pattern — publish staging (Gold-shaped)\n\n```sql\n-- generated from the SAME config definition as the Gold target DDL.\n-- no HCC: must match the standalone Gold box, which lacks it.\nCREATE TABLE PGS_DIM_ACCOUNT (\n  ... identical column list to GOLD.DIM_ACCOUNT ...\n)\nPARTITION BY RANGE (SRC_BUSINESS_DATE)\n  INTERVAL (NUMTODSINTERVAL(1,'DAY'))\n  (PARTITION P_INIT VALUES LESS THAN (DATE '2026-01-01'))\nROW STORE COMPRESS BASIC;         -- direct-path only; the compression Gold can actually use\n```\n\n### Transformation logic — SCD2 with bitemporal preservation\n\n```sql\n-- macro: build_scd2_dim(entity, natural_key, tracked_attrs, satellites)\n-- invoked per dimension from the config registry. NOT dbt snapshot —\n-- snapshot cannot carry the bitemporal chain from component 17.\n\nWITH incoming AS (\n  SELECT s.*, {{ satellite_join(satellites) }}    -- Optional Fields / Supplement attach here\n  FROM   {{ ref('stg2_' ~ entity) }} s\n  WHERE  s.is_current = 'Y'\n  AND    s.business_date >= (SELECT MAX(src_business_date) FROM {{ this }})\n),\nchanged AS (\n  SELECT i.*\n  FROM   incoming i\n  LEFT JOIN {{ this }} c\n    ON  c.{{ natural_key }} = i.{{ natural_key }}\n    AND c.is_current = 'Y'\n  WHERE c.{{ natural_key }} IS NULL                          -- new member\n     OR ora_hash({{ tracked_attrs }}) <> c.attr_hash          -- tracked change\n),\nclosed AS (                                                   -- close the prior version\n  UPDATE {{ this }} SET valid_to_date = :business_date - 1,\n                        is_current    = 'N',\n                        effective_to_ts = :run_ts\n  WHERE  is_current = 'Y'\n  AND    {{ natural_key }} IN (SELECT {{ natural_key }} FROM changed)\n)\nSELECT ... FROM changed;                                      -- open the new version\n```\n\n### Exadata-specific design\n\n| Lever | Use |\n|---|---|\n| **HCC `QUERY HIGH`** | All Pre-Gold history tables. ~10× on repeated daily snapshots (Account, Client, Taxlot). Not available downstream — this is why history stays here. |\n| **Smart Scan** | Full-table predicates during fact assembly and tie-out aggregation. Requires direct-path reads — avoid index-driven plans on the large fact builds. |\n| **Storage indexes** | Automatic on `SRC_BUSINESS_DATE`. Reinforced by matching the partition key. |\n| **Parallel DML** | `PARALLEL` on the fact assembly and the tie-out aggregation. Degree bounded by the Exadata session budget, not the Gold box. |\n| **Direct-path insert** | `APPEND` hint on all Pre-Gold and staging writes — required for both HCC and BASIC compression to engage. |\n\n### Orchestration\n\n```\n  Airflow (18) · dynamic task mapping over domain registry (33)\n    ├─ wave 1  dimensions   Reference & Asset · Account & Client · Portfolio & Model\n    │            └─ must complete before wave 2 (FK resolution)\n    ├─ wave 2  facts        Positions · Transactions · Fee & Billing · Reporting · Cash · Other\n    ├─ wave 3  G4 tie-out   per target object, parallel, BLOCKING\n    └─ wave 4  staging      publish-table build, then hand to 67\n  retries = 0 on all gate tasks (only E6 infrastructure is retryable)\n```\n\n### Config surface (component 33)\n\n- Domain registry — 9 domains, ~30 feeds, parent/satellite relationships\n- Dimension definitions — natural key, tracked attributes, satellite attachments\n- Fact definitions — grain, dimension FKs, aggregation rules\n- Tie-out rule sets per target object\n- Gold retention window per object (default 90 days)\n- Correction lookback per domain\n- Parallel degree per assembly task\n\n---",
+"blocks": [
+{
+"t": "h",
+"x": "Data model — Pre-Gold objects"
+},
+{
+"t": "tbl",
+"rows": [
+[
+"Object",
+"Type",
+"Grain",
+"Source domains",
+"Gold retention"
+],
+[
+"`PG_DIM_ACCOUNT`",
+"SCD2 dim",
+"Account, versioned",
+"Account & Client (+ Optional Fields, Supplement satellites)",
+"Current + 90d"
+],
+[
+"`PG_DIM_CLIENT`",
+"SCD2 dim",
+"Client, versioned",
+"Account & Client",
+"Current + 90d"
+],
+[
+"`PG_DIM_ASSET`",
+"SCD2 dim",
+"Asset, versioned",
+"Reference & Asset (+ Optional Fields, Investment Class)",
+"Current + 90d"
+],
+[
+"`PG_DIM_PORTFOLIO`",
+"SCD2 dim",
+"Portfolio, versioned",
+"Portfolio & Model",
+"Current + 90d"
+],
+[
+"`PG_FACT_POSITION`",
+"Fact",
+"Account + Asset + business date",
+"Positions (5 feeds)",
+"Current + 90d"
+],
+[
+"`PG_FACT_TAXLOT`",
+"Fact",
+"Account + Lot + business date",
+"Positions (Taxlot)",
+"Current + 90d"
+],
+[
+"`PG_FACT_TRANSACTION`",
+"Fact",
+"Transaction, versioned",
+"Transactions (Header + Detail)",
+"Current + 90d"
+],
+[
+"`PG_FACT_FEE`",
+"Fact",
+"Fee computation event",
+"Fee & Billing",
+"Current + 90d"
+],
+[
+"`PG_FACT_CASH`",
+"Fact",
+"Cash activity",
+"Cash, Other (Custody & Nostro)",
+"Current + 90d"
+],
+[
+"`PG_FACT_STATEMENT`",
+"Fact",
+"Statement event + item",
+"Reporting",
+"Current + 90d"
+]
+]
+},
+{
+"t": "p",
+"x": "Object list is **generated from the domain registry in config (33)**, not hand-maintained. Adding a tenth domain is a config change."
+},
+{
+"t": "h",
+"x": "DDL pattern — dimension"
+},
+{
+"t": "pre",
+"x": "CREATE TABLE PG_DIM_ACCOUNT (\n  ACCOUNT_SK        NUMBER(18) GENERATED ALWAYS AS IDENTITY,\n  ACCOUNT_ID        VARCHAR2(64)  NOT NULL,     -- natural key\n  -- SCD2 axis (happened-at)\n  VALID_FROM_DATE   DATE          NOT NULL,\n  VALID_TO_DATE     DATE          NOT NULL,     -- 9999-12-31 for current\n  IS_CURRENT        CHAR(1)       NOT NULL,\n  -- bitemporal axis (knew-at)\n  EFFECTIVE_FROM_TS TIMESTAMP     NOT NULL,\n  EFFECTIVE_TO_TS   TIMESTAMP,\n  RECORD_VERSION    NUMBER(6)     NOT NULL,\n  -- lineage\n  SRC_LOAD_ID       NUMBER(18)    NOT NULL,\n  SRC_BUSINESS_DATE DATE          NOT NULL,\n  -- attributes (from Account + Account Optional Fields + Account Supplement)\n  ACCOUNT_NAME      VARCHAR2(240),\n  ACCOUNT_TYPE      VARCHAR2(64),\n  BASE_CURRENCY     VARCHAR2(3),\n  ...\n  CONSTRAINT PK_PG_DIM_ACCOUNT PRIMARY KEY (ACCOUNT_SK)\n)\nPARTITION BY RANGE (SRC_BUSINESS_DATE)\n  INTERVAL (NUMTODSINTERVAL(1,'DAY'))\n  (PARTITION P_INIT VALUES LESS THAN (DATE '2026-01-01'))\nCOMPRESS FOR QUERY HIGH;          -- HCC: Exadata only, not available in Gold\n\nCREATE INDEX IX_PGDA_NK ON PG_DIM_ACCOUNT (ACCOUNT_ID, IS_CURRENT) LOCAL;\nCREATE INDEX IX_PGDA_LOAD ON PG_DIM_ACCOUNT (SRC_LOAD_ID) LOCAL;",
+"lang": "sql"
+},
+{
+"t": "h",
+"x": "DDL pattern — publish staging (Gold-shaped)"
+},
+{
+"t": "pre",
+"x": "-- generated from the SAME config definition as the Gold target DDL.\n-- no HCC: must match the standalone Gold box, which lacks it.\nCREATE TABLE PGS_DIM_ACCOUNT (\n  ... identical column list to GOLD.DIM_ACCOUNT ...\n)\nPARTITION BY RANGE (SRC_BUSINESS_DATE)\n  INTERVAL (NUMTODSINTERVAL(1,'DAY'))\n  (PARTITION P_INIT VALUES LESS THAN (DATE '2026-01-01'))\nROW STORE COMPRESS BASIC;         -- direct-path only; the compression Gold can actually use",
+"lang": "sql"
+},
+{
+"t": "h",
+"x": "Transformation logic — SCD2 with bitemporal preservation"
+},
+{
+"t": "pre",
+"x": "-- macro: build_scd2_dim(entity, natural_key, tracked_attrs, satellites)\n-- invoked per dimension from the config registry. NOT dbt snapshot —\n-- snapshot cannot carry the bitemporal chain from component 17.\n\nWITH incoming AS (\n  SELECT s.*, {{ satellite_join(satellites) }}    -- Optional Fields / Supplement attach here\n  FROM   {{ ref('stg2_' ~ entity) }} s\n  WHERE  s.is_current = 'Y'\n  AND    s.business_date >= (SELECT MAX(src_business_date) FROM {{ this }})\n),\nchanged AS (\n  SELECT i.*\n  FROM   incoming i\n  LEFT JOIN {{ this }} c\n    ON  c.{{ natural_key }} = i.{{ natural_key }}\n    AND c.is_current = 'Y'\n  WHERE c.{{ natural_key }} IS NULL                          -- new member\n     OR ora_hash({{ tracked_attrs }}) <> c.attr_hash          -- tracked change\n),\nclosed AS (                                                   -- close the prior version\n  UPDATE {{ this }} SET valid_to_date = :business_date - 1,\n                        is_current    = 'N',\n                        effective_to_ts = :run_ts\n  WHERE  is_current = 'Y'\n  AND    {{ natural_key }} IN (SELECT {{ natural_key }} FROM changed)\n)\nSELECT ... FROM changed;                                      -- open the new version",
+"lang": "sql"
+},
+{
+"t": "h",
+"x": "Exadata-specific design"
+},
+{
+"t": "tbl",
+"rows": [
+[
+"Lever",
+"Use"
+],
+[
+"**HCC `QUERY HIGH`**",
+"All Pre-Gold history tables. ~10× on repeated daily snapshots (Account, Client, Taxlot). Not available downstream — this is why history stays here."
+],
+[
+"**Smart Scan**",
+"Full-table predicates during fact assembly and tie-out aggregation. Requires direct-path reads — avoid index-driven plans on the large fact builds."
+],
+[
+"**Storage indexes**",
+"Automatic on `SRC_BUSINESS_DATE`. Reinforced by matching the partition key."
+],
+[
+"**Parallel DML**",
+"`PARALLEL` on the fact assembly and the tie-out aggregation. Degree bounded by the Exadata session budget, not the Gold box."
+],
+[
+"**Direct-path insert**",
+"`APPEND` hint on all Pre-Gold and staging writes — required for both HCC and BASIC compression to engage."
+]
+]
+},
+{
+"t": "h",
+"x": "Orchestration"
+},
+{
+"t": "pre",
+"x": "  Airflow (18) · dynamic task mapping over domain registry (33)\n    ├─ wave 1  dimensions   Reference & Asset · Account & Client · Portfolio & Model\n    │            └─ must complete before wave 2 (FK resolution)\n    ├─ wave 2  facts        Positions · Transactions · Fee & Billing · Reporting · Cash · Other\n    ├─ wave 3  G4 tie-out   per target object, parallel, BLOCKING\n    └─ wave 4  staging      publish-table build, then hand to 67\n  retries = 0 on all gate tasks (only E6 infrastructure is retryable)",
+"lang": ""
+},
+{
+"t": "h",
+"x": "Config surface (component 33)"
+},
+{
+"t": "ul",
+"items": [
+"Domain registry — 9 domains, ~30 feeds, parent/satellite relationships",
+"Dimension definitions — natural key, tracked attributes, satellite attachments",
+"Fact definitions — grain, dimension FKs, aggregation rules",
+"Tie-out rule sets per target object",
+"Gold retention window per object (default 90 days)",
+"Correction lookback per domain",
+"Parallel degree per assembly task"
+]
+}
+]
+},
+{
+"h": "5. Data Quality, Reconciliation & Lineage",
+"md": "\n| Gate | Where | Blocking | Behaviour |\n|---|---|---|---|\n| G3 (25) | Upstream, Stage 2 | Yes | Must have passed before Pre-Gold runs |\n| **G4 (26)** | **Inside Pre-Gold, on Exadata** | **Yes** | RAW counts by `LOAD_ID` vs assembled rows, per target. Fails → nothing crosses to Gold. **Not override-eligible.** |\n| Post-move verify | Component 67, Gold side | Yes | Row-count only. Cheap by design — the real reconciliation already happened. |\n| G5 (27) | After publish | No — advisory | Cross-system totals; triggers replay |\n\n**Quarantine:** not applicable. Quarantine is pre-RAW only. A Pre-Gold failure blocks and is remediated by replay, never by removing rows.\n\n**Lineage:** `SRC_LOAD_ID` and `SRC_BUSINESS_DATE` on every dimension and fact row. Aggregated facts carry a `LOAD_ID` collection. A Gold value traces back through Pre-Gold → Stage 2 → RAW `LOAD_ID` + `ROW_NUM` → a physical line in a named file.\n\n---",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"Gate",
+"Where",
+"Blocking",
+"Behaviour"
+],
+[
+"G3 (25)",
+"Upstream, Stage 2",
+"Yes",
+"Must have passed before Pre-Gold runs"
+],
+[
+"**G4 (26)**",
+"**Inside Pre-Gold, on Exadata**",
+"**Yes**",
+"RAW counts by `LOAD_ID` vs assembled rows, per target. Fails → nothing crosses to Gold. **Not override-eligible.**"
+],
+[
+"Post-move verify",
+"Component 67, Gold side",
+"Yes",
+"Row-count only. Cheap by design — the real reconciliation already happened."
+],
+[
+"G5 (27)",
+"After publish",
+"No — advisory",
+"Cross-system totals; triggers replay"
+]
+]
+},
+{
+"t": "p",
+"x": "**Quarantine:** not applicable. Quarantine is pre-RAW only. A Pre-Gold failure blocks and is remediated by replay, never by removing rows."
+},
+{
+"t": "p",
+"x": "**Lineage:** `SRC_LOAD_ID` and `SRC_BUSINESS_DATE` on every dimension and fact row. Aggregated facts carry a `LOAD_ID` collection. A Gold value traces back through Pre-Gold → Stage 2 → RAW `LOAD_ID` + `ROW_NUM` → a physical line in a named file."
+}
+]
+},
+{
+"h": "6. RECOMMENDATION",
+"md": "\n### 6.1 Central design choice\n\n**Where does dimensional assembly execute, and what unit of data crosses to the standalone Gold box?**\n\n### 6.2 Options comparison\n\n| Option | Description | Pros | Cons | Fit to Oracle → Exadata → movement stack |\n|---|---|---|---|---|\n| **A · Thin Pre-Gold, assemble in Gold** | Ship conformed Stage 2 rows to Gold; build SCD2 and facts on the standalone box | Simplest movement — one bulk copy. Gold owns its own model, so schema changes are local. | Full-history SCD2 merge on 12 CPU / 64 GB spills to temp; PGA ~16 GB is insufficient for window functions over multi-year dims. Build contends directly with the three extract jobs. No HCC to absorb history. | Poor. Puts the heaviest compute on the weakest tier and forfeits every Exadata lever. |\n| **B · Full Pre-Gold on Exadata, publish finished partitions** *(recommended)* | Assemble dimensions, facts and bitemporal history on Exadata; tie out locally; ship partition-ready staging tables | All heavy compute where HCC, Smart Scan and offload live. Gold is insert-only and its CPU is reserved for extracts. G4 runs with both sides local. Partition exchange gives atomic publish with no reader disruption. | Two DDL definitions to keep in lockstep (Pre-Gold staging and Gold target). Larger Exadata storage footprint. Requires a full-history retention split between tiers. | Strong. Respects the tier boundary exactly: Exadata transforms, Gold publishes, consumers receive movement only. |\n| **C · Assemble in Stage 2, no Pre-Gold layer** | Push SCD2 and fact logic into the Stage 2 dbt models; ship directly to Gold | One fewer layer. Fewer objects to maintain. | Conflates conforming with dimensional modelling — Stage 2 stops being consumer-neutral and can no longer serve a second consumer without change. G4 has no natural place to run. Replay granularity degrades. | Weak. Violates the Stage 2 contract (reusable, not consumer-shaped) established in the L3 design. |\n\n### 6.3 Recommendation\n\n> **Recommended: Option B — full dimensional assembly and tie-out on Exadata, publishing partition-ready staging tables to Gold.**\n\nOption B wins because the Gold box's hardware profile makes the choice for us: at 12 CPU / 64 GB with no HCC and no Smart Scan, it can absorb a direct-path load and serve three scheduled extracts, but it cannot run a full-history SCD2 merge inside an EOD window without spilling to temp and starving the extracts. Option A puts the heaviest work on the weakest tier; option C buys simplicity by destroying Stage 2's consumer-neutrality, which is the property that lets a fourth consumer be added later without a rewrite.\n\n**What it costs:** two coupled DDL definitions — the Pre-Gold staging table and the Gold target must match exactly, and drift between them is a silent failure mode. Mitigated by generating both from one config definition rather than maintaining them separately. It also means a larger Exadata footprint, since full bitemporal history lives there permanently.\n\n**Tier placement:** assembly and tie-out sit in Stage 3 on Exadata; the boundary falls immediately after G4, so **only reconciled data crosses the database hop**. That boundary is correct because it makes the cross-database movement a pure transport problem — no logic, no validation in flight, restartable — which is what the consumer-movement principle requires and what the small box can sustain.\n\n**Must be confirmed for this to hold:**\n1. **Exadata ↔ Gold network bandwidth** and the nightly Gold delta volume across all 9 domains. At 1 GbE the practical ceiling is ~400 GB/hour before overhead; the ratio decides DB-link vs Data Pump vs transportable tablespace in component 67.\n2. **Exadata session and parallel-degree budget** from the DBA (relates to component 55). This bounds the assembly fan-out width.\n3. **The 90-day Gold as-of window** must be confirmed as sufficient for PBDW, IMDS and Pivotal. If any needs deeper history, the retention split changes.\n\n### 6.4 Rules respected\n\n- ✅ Tier boundary crisp — Oracle owns Stage 1/2, Exadata owns Pre-Gold and assembly, Gold publishes, consumers receive movement only\n- ✅ Cross-database hop explicit — Exadata → Gold via DB-link direct-path `APPEND` with partition exchange, `LOAD_ID` lineage preserved\n- ✅ AD-8 — RAW untouched, immutable, append-only\n- ✅ AD-9 — G4 blocking, tie-out **before** Gold publish\n- ✅ AD-2 — bitemporal append, not in-place merge; **flagged refinement** on tier retention split\n- ✅ AD-1 — Hub-owned Gold that publishes to consumers\n- ⚠️ **AD-4 contingent** — D7 assumes the real-time lane stays independent. If intraday routes through batch, Pre-Gold's cadence design reopens.\n\n---",
+"blocks": [
+{
+"t": "h",
+"x": "6.1 Central design choice"
+},
+{
+"t": "p",
+"x": "**Where does dimensional assembly execute, and what unit of data crosses to the standalone Gold box?**"
+},
+{
+"t": "h",
+"x": "6.2 Options comparison"
+},
+{
+"t": "tbl",
+"rows": [
+[
+"Option",
+"Description",
+"Pros",
+"Cons",
+"Fit to Oracle → Exadata → movement stack"
+],
+[
+"**A · Thin Pre-Gold, assemble in Gold**",
+"Ship conformed Stage 2 rows to Gold; build SCD2 and facts on the standalone box",
+"Simplest movement — one bulk copy. Gold owns its own model, so schema changes are local.",
+"Full-history SCD2 merge on 12 CPU / 64 GB spills to temp; PGA ~16 GB is insufficient for window functions over multi-year dims. Build contends directly with the three extract jobs. No HCC to absorb history.",
+"Poor. Puts the heaviest compute on the weakest tier and forfeits every Exadata lever."
+],
+[
+"**B · Full Pre-Gold on Exadata, publish finished partitions** *(recommended)*",
+"Assemble dimensions, facts and bitemporal history on Exadata; tie out locally; ship partition-ready staging tables",
+"All heavy compute where HCC, Smart Scan and offload live. Gold is insert-only and its CPU is reserved for extracts. G4 runs with both sides local. Partition exchange gives atomic publish with no reader disruption.",
+"Two DDL definitions to keep in lockstep (Pre-Gold staging and Gold target). Larger Exadata storage footprint. Requires a full-history retention split between tiers.",
+"Strong. Respects the tier boundary exactly: Exadata transforms, Gold publishes, consumers receive movement only."
+],
+[
+"**C · Assemble in Stage 2, no Pre-Gold layer**",
+"Push SCD2 and fact logic into the Stage 2 dbt models; ship directly to Gold",
+"One fewer layer. Fewer objects to maintain.",
+"Conflates conforming with dimensional modelling — Stage 2 stops being consumer-neutral and can no longer serve a second consumer without change. G4 has no natural place to run. Replay granularity degrades.",
+"Weak. Violates the Stage 2 contract (reusable, not consumer-shaped) established in the L3 design."
+]
+]
+},
+{
+"t": "h",
+"x": "6.3 Recommendation"
+},
+{
+"t": "p",
+"x": "> **Recommended: Option B — full dimensional assembly and tie-out on Exadata, publishing partition-ready staging tables to Gold.**"
+},
+{
+"t": "p",
+"x": "Option B wins because the Gold box's hardware profile makes the choice for us: at 12 CPU / 64 GB with no HCC and no Smart Scan, it can absorb a direct-path load and serve three scheduled extracts, but it cannot run a full-history SCD2 merge inside an EOD window without spilling to temp and starving the extracts. Option A puts the heaviest work on the weakest tier; option C buys simplicity by destroying Stage 2's consumer-neutrality, which is the property that lets a fourth consumer be added later without a rewrite."
+},
+{
+"t": "p",
+"x": "**What it costs:** two coupled DDL definitions — the Pre-Gold staging table and the Gold target must match exactly, and drift between them is a silent failure mode. Mitigated by generating both from one config definition rather than maintaining them separately. It also means a larger Exadata footprint, since full bitemporal history lives there permanently."
+},
+{
+"t": "p",
+"x": "**Tier placement:** assembly and tie-out sit in Stage 3 on Exadata; the boundary falls immediately after G4, so **only reconciled data crosses the database hop**. That boundary is correct because it makes the cross-database movement a pure transport problem — no logic, no validation in flight, restartable — which is what the consumer-movement principle requires and what the small box can sustain."
+},
+{
+"t": "p",
+"x": "**Must be confirmed for this to hold:**"
+},
+{
+"t": "p",
+"x": "1. **Exadata ↔ Gold network bandwidth** and the nightly Gold delta volume across all 9 domains. At 1 GbE the practical ceiling is ~400 GB/hour before overhead; the ratio decides DB-link vs Data Pump vs transportable tablespace in component 67."
+},
+{
+"t": "p",
+"x": "2. **Exadata session and parallel-degree budget** from the DBA (relates to component 55). This bounds the assembly fan-out width."
+},
+{
+"t": "p",
+"x": "3. **The 90-day Gold as-of window** must be confirmed as sufficient for PBDW, IMDS and Pivotal. If any needs deeper history, the retention split changes."
+},
+{
+"t": "h",
+"x": "6.4 Rules respected"
+},
+{
+"t": "ul",
+"items": [
+"✅ Tier boundary crisp — Oracle owns Stage 1/2, Exadata owns Pre-Gold and assembly, Gold publishes, consumers receive movement only",
+"✅ Cross-database hop explicit — Exadata → Gold via DB-link direct-path `APPEND` with partition exchange, `LOAD_ID` lineage preserved",
+"✅ AD-8 — RAW untouched, immutable, append-only",
+"✅ AD-9 — G4 blocking, tie-out **before** Gold publish",
+"✅ AD-2 — bitemporal append, not in-place merge; **flagged refinement** on tier retention split",
+"✅ AD-1 — Hub-owned Gold that publishes to consumers",
+"⚠️ **AD-4 contingent** — D7 assumes the real-time lane stays independent. If intraday routes through batch, Pre-Gold's cadence design reopens."
+]
+}
+]
+},
+{
+"h": "7. Failure, Replay & Idempotency",
+"md": "\n| Failure | Behaviour |\n|---|---|\n| Dimension build fails | Facts for that domain do not run (FK dependency). Other domains unaffected under per-domain fan-out. |\n| Fact build fails | That target object does not reach G4. Others proceed to their own tie-out. |\n| **G4 fails** | **BLOCK.** Nothing crosses to Gold. Gold retains the prior partition. Error event (29), exception queued (30). Not override-eligible. |\n| Movement fails mid-transfer (67) | Partition exchange has not occurred — Gold still serves the prior partition. Restart the transfer; no partial state is visible. |\n| Post-move verify fails | Exchange is rolled back or the prior partition is re-exchanged in. Replay candidate raised. |\n\n**Idempotency:** every assembly task is keyed on `(target_object, business_date, LOAD_ID set)`. Re-running produces the same result — bitemporal append means a re-run either finds the versions already present or appends a new version with a distinct `EFFECTIVE_FROM_TS`, never overwrites.\n\n**Replay (21):** scope is a `LOAD_ID` set. A replayed correction appends a new version in Pre-Gold, rebuilds the affected staging partition, and re-exchanges it into Gold. **Because AD-2 is append, replay is a forward operation — nothing is undone.** Under in-place merge this component could not offer replay at all.\n\n---",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"Failure",
+"Behaviour"
+],
+[
+"Dimension build fails",
+"Facts for that domain do not run (FK dependency). Other domains unaffected under per-domain fan-out."
+],
+[
+"Fact build fails",
+"That target object does not reach G4. Others proceed to their own tie-out."
+],
+[
+"**G4 fails**",
+"**BLOCK.** Nothing crosses to Gold. Gold retains the prior partition. Error event (29), exception queued (30). Not override-eligible."
+],
+[
+"Movement fails mid-transfer (67)",
+"Partition exchange has not occurred — Gold still serves the prior partition. Restart the transfer; no partial state is visible."
+],
+[
+"Post-move verify fails",
+"Exchange is rolled back or the prior partition is re-exchanged in. Replay candidate raised."
+]
+]
+},
+{
+"t": "p",
+"x": "**Idempotency:** every assembly task is keyed on `(target_object, business_date, LOAD_ID set)`. Re-running produces the same result — bitemporal append means a re-run either finds the versions already present or appends a new version with a distinct `EFFECTIVE_FROM_TS`, never overwrites."
+},
+{
+"t": "p",
+"x": "**Replay (21):** scope is a `LOAD_ID` set. A replayed correction appends a new version in Pre-Gold, rebuilds the affected staging partition, and re-exchanges it into Gold. **Because AD-2 is append, replay is a forward operation — nothing is undone.** Under in-place merge this component could not offer replay at all."
+}
+]
+},
+{
+"h": "8. Security & Access",
+"md": "\n- **AuthN/AuthZ:** Pre-Gold schema accessible only to the Hub's dbt and Airflow service accounts. No consumer access — consumers reach Gold, and only three extract jobs read Gold.\n- **DB-link credentials:** the Exadata → Gold link account holds insert and partition-exchange privileges on staging objects only. No `DROP`, no `SELECT` on unrelated Gold schemas. Credentials in the OpenShift secret store (48), rotated per policy.\n- **Data classification:** TBD — BBH security. Client and Account attributes from the Account & Client domain are the likely PII carriers. If masking is required it must apply from Stage 2 onward; retrofitting into RAW is precluded by immutability.\n- **Audit:** all Pre-Gold DDL and any manual intervention logged to the lineage store (31), same evidence trail as the pipeline itself.\n\n---",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**AuthN/AuthZ:** Pre-Gold schema accessible only to the Hub's dbt and Airflow service accounts. No consumer access — consumers reach Gold, and only three extract jobs read Gold.",
+"**DB-link credentials:** the Exadata → Gold link account holds insert and partition-exchange privileges on staging objects only. No `DROP`, no `SELECT` on unrelated Gold schemas. Credentials in the OpenShift secret store (48), rotated per policy.",
+"**Data classification:** TBD — BBH security. Client and Account attributes from the Account & Client domain are the likely PII carriers. If masking is required it must apply from Stage 2 onward; retrofitting into RAW is precluded by immutability.",
+"**Audit:** all Pre-Gold DDL and any manual intervention logged to the lineage store (31), same evidence trail as the pipeline itself."
+]
+}
+]
+},
+{
+"h": "9. Open Questions & Risks",
+"md": "\n| # | Question / risk | Owner | Blocks |\n|---|---|---|---|\n| 1 | Exadata ↔ Gold network bandwidth and nightly delta volume | BBH infra + DBA | Component 67 movement mechanism; EOD window feasibility |\n| 2 | Is a 90-day as-of window in Gold sufficient for PBDW, IMDS, Pivotal? | Business + consumer owners | D2 retention split; Gold storage sizing |\n| 3 | ARB acknowledgement of the AD-2 tier retention refinement | ARB | Formal AD-2 closure |\n| 4 | Exadata parallel-degree and session budget | DBA | Assembly fan-out width; window sizing |\n| 5 | Natural keys confirmed for all 9 domains | SEI | SCD2 and FK resolution across every dimension |\n| 6 | Satellite feed semantics — are Optional Fields / Supplement point-in-time or SCD2-tracked? | SEI + BBH | Dimension attribute modelling |\n| 7 | Reference data ownership — FX rates, security master, hierarchy | BBH | Fact assembly; currently assumed to exist, named in neither source deck |\n| 8 | Does PBDW remain system of record now that Gold sits above it? | ARB | Consumer contract; AD-1 completeness |\n| 9 | AD-4 — intraday lane independence | ARB | D7; Pre-Gold cadence |\n\n---",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Question / risk",
+"Owner",
+"Blocks"
+],
+[
+"1",
+"Exadata ↔ Gold network bandwidth and nightly delta volume",
+"BBH infra + DBA",
+"Component 67 movement mechanism; EOD window feasibility"
+],
+[
+"2",
+"Is a 90-day as-of window in Gold sufficient for PBDW, IMDS, Pivotal?",
+"Business + consumer owners",
+"D2 retention split; Gold storage sizing"
+],
+[
+"3",
+"ARB acknowledgement of the AD-2 tier retention refinement",
+"ARB",
+"Formal AD-2 closure"
+],
+[
+"4",
+"Exadata parallel-degree and session budget",
+"DBA",
+"Assembly fan-out width; window sizing"
+],
+[
+"5",
+"Natural keys confirmed for all 9 domains",
+"SEI",
+"SCD2 and FK resolution across every dimension"
+],
+[
+"6",
+"Satellite feed semantics — are Optional Fields / Supplement point-in-time or SCD2-tracked?",
+"SEI + BBH",
+"Dimension attribute modelling"
+],
+[
+"7",
+"Reference data ownership — FX rates, security master, hierarchy",
+"BBH",
+"Fact assembly; currently assumed to exist, named in neither source deck"
+],
+[
+"8",
+"Does PBDW remain system of record now that Gold sits above it?",
+"ARB",
+"Consumer contract; AD-1 completeness"
+],
+[
+"9",
+"AD-4 — intraday lane independence",
+"ARB",
+"D7; Pre-Gold cadence"
+]
+]
+}
+]
+},
+{
+"h": "10. Acceptance Criteria",
+"md": "\n**Design complete when:**\n\n- [ ] All 10 Pre-Gold objects defined with grain, source domains and tracked attributes, generated from the config registry\n- [ ] SCD2 macro validated against every dimension, including satellite attachment\n- [ ] Bitemporal chain demonstrably preserved from Stage 2 through Pre-Gold to Gold\n- [ ] G4 tie-out rule set defined per target object, with expected-vs-actual sourced from captured `LOAD_ID` metadata\n- [ ] Pre-Gold staging DDL and Gold target DDL proven to generate from one config definition\n- [ ] Movement mechanism recommended in component 67, justified by measured bandwidth and volume\n- [ ] Retention split confirmed with consumer owners and acknowledged by ARB\n\n**Build complete when:**\n\n- [ ] A full EOD run across all 9 domains completes inside the agreed window, measured\n- [ ] G4 demonstrably blocks: an injected count mismatch prevents publish and Gold retains its prior partition\n- [ ] Partition exchange proven atomic — a reader query spanning the swap returns consistent results\n- [ ] Replay of a single domain's `LOAD_ID` set rebuilds only that domain's Gold partitions\n- [ ] A Gold row traces to a physical line in a named source file via the `LOAD_ID` chain\n- [ ] HCC compression ratio measured on the largest history table and within expected range\n- [ ] Gold box CPU and memory headroom confirmed during a concurrent load-plus-extract window",
+"blocks": [
+{
+"t": "p",
+"x": "**Design complete when:**"
+},
+{
+"t": "ul",
+"items": [
+"[ ] All 10 Pre-Gold objects defined with grain, source domains and tracked attributes, generated from the config registry",
+"[ ] SCD2 macro validated against every dimension, including satellite attachment",
+"[ ] Bitemporal chain demonstrably preserved from Stage 2 through Pre-Gold to Gold",
+"[ ] G4 tie-out rule set defined per target object, with expected-vs-actual sourced from captured `LOAD_ID` metadata",
+"[ ] Pre-Gold staging DDL and Gold target DDL proven to generate from one config definition",
+"[ ] Movement mechanism recommended in component 67, justified by measured bandwidth and volume",
+"[ ] Retention split confirmed with consumer owners and acknowledged by ARB"
+]
+},
+{
+"t": "p",
+"x": "**Build complete when:**"
+},
+{
+"t": "ul",
+"items": [
+"[ ] A full EOD run across all 9 domains completes inside the agreed window, measured",
+"[ ] G4 demonstrably blocks: an injected count mismatch prevents publish and Gold retains its prior partition",
+"[ ] Partition exchange proven atomic — a reader query spanning the swap returns consistent results",
+"[ ] Replay of a single domain's `LOAD_ID` set rebuilds only that domain's Gold partitions",
+"[ ] A Gold row traces to a physical line in a named source file via the `LOAD_ID` chain",
+"[ ] HCC compression ratio measured on the largest history table and within expected range",
+"[ ] Gold box CPU and memory headroom confirmed during a concurrent load-plus-extract window"
+]
+}
+]
+}
+],
+"fm_raw": "cp360_type: design_document\ncatalog_module: Datapoint 360\ncomponent_id: 66\ncomponent_name: Pre-Gold (Exadata) — dimensional assembly & tie-out\nzone: 2. Hub\nplane: Processing\npriority: P1\ntechnology: dbt + Oracle Exadata\ncustom_build: High\ndepends_on: [15, 17, 26, 28, 31, 33, 67]\narchitecture_decisions: [AD-1, AD-2, AD-8, AD-9, AD-4]\npipeline_tiers: [Stage2-Oracle, Stage3-Exadata-Gold]\nstatus: In Design\nowner: TBD\nlast_updated: 2026-08-10\ntags: [SEI-BBH, Integration-Hub, hub, exadata, pre-gold]\nin_scope: true"
+},
+{
+"id": "c101",
+"title": "SDC Event Listener",
+"level": "L3",
+"icon": "📐",
+"color": "#0f4775",
+"bg": "#e6eef5",
+"order": 201,
+"sub": "#101 · 2. Hub · Event Ingestion · Python · Event Hub consumer · P1 · custom High · status Not Started",
+"match": "",
+"zone_default": "",
+"default": false,
+"component_ids": [
+"101"
+],
+"chip": "#101 design",
+"meta": {
+"status": "Not Started",
+"owner": "TBD",
+"priority": "P1",
+"custom": "High",
+"depends_on": [],
+"decisions": [],
+"tiers": [],
+"updated": ""
+},
+"src": "101_SDC_Event_Listener_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -17453,24 +19043,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 66\ncomponent_name: SDC Event Listener\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · Event Hub consumer\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-1, AD-2, AD-8, AD-9, AD-4]\npipeline_tiers: [Stage2-Oracle, Stage3-Exadata-Gold]\nlast_updated: 2026-08-10\ntags: [SEI-BBH, Integration-Hub, hub, exadata, pre-gold]\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 101\ncomponent_name: SDC Event Listener\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · Event Hub consumer\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true"
 },
 {
-"id": "c67",
+"id": "c102",
 "title": "Callback Receiver",
 "level": "L3",
 "icon": "📥",
 "color": "#0b5e83",
 "bg": "#e0f5fd",
-"order": 167,
-"sub": "#67 · 2. Hub · Ingress/Egress · Python · Apigee-fronted endpoint · P1 · custom Medium · status Not Started",
+"order": 202,
+"sub": "#102 · 2. Hub · Ingress/Egress · Python · Apigee-fronted endpoint · P1 · custom Medium · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"67"
+"102"
 ],
-"chip": "#67 design",
+"chip": "#102 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -17481,7 +19071,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "67_Callback_Receiver_Design.md",
+"src": "102_Callback_Receiver_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -17689,24 +19279,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 67\ncomponent_name: Callback Receiver\nzone: 2. Hub\nplane: Ingress/Egress\npriority: P1\ntechnology: Python · Apigee-fronted endpoint\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 102\ncomponent_name: Callback Receiver\nzone: 2. Hub\nplane: Ingress/Egress\npriority: P1\ntechnology: Python · Apigee-fronted endpoint\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true"
 },
 {
-"id": "c68",
+"id": "c103",
 "title": "Loader Submission Registry",
 "level": "L3",
 "icon": "📥",
 "color": "#0b5e83",
 "bg": "#e0f5fd",
-"order": 168,
-"sub": "#68 · 2. Hub · Ingress/Egress · Oracle DDL + Python · P1 · custom High · status Not Started",
+"order": 203,
+"sub": "#103 · 2. Hub · Ingress/Egress · Oracle DDL + Python · P1 · custom High · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"68"
+"103"
 ],
-"chip": "#68 design",
+"chip": "#103 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -17717,7 +19307,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "68_Loader_Submission_Registry_Design.md",
+"src": "103_Loader_Submission_Registry_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -17950,24 +19540,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 68\ncomponent_name: Loader Submission Registry\nzone: 2. Hub\nplane: Ingress/Egress\npriority: P1\ntechnology: Oracle DDL + Python\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 103\ncomponent_name: Loader Submission Registry\nzone: 2. Hub\nplane: Ingress/Egress\npriority: P1\ntechnology: Oracle DDL + Python\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true"
 },
 {
-"id": "c69",
+"id": "c104",
 "title": "Key-Set Collapser",
 "level": "L3",
 "icon": "📐",
 "color": "#0f4775",
 "bg": "#e6eef5",
-"order": 169,
-"sub": "#69 · 2. Hub · Event Ingestion · Python · P1 · custom High · status Not Started",
+"order": 204,
+"sub": "#104 · 2. Hub · Event Ingestion · Python · P1 · custom High · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"69"
+"104"
 ],
-"chip": "#69 design",
+"chip": "#104 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -17978,7 +19568,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "69_Key_Set_Collapser_Design.md",
+"src": "104_Key_Set_Collapser_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -18212,24 +19802,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 69\ncomponent_name: Key-Set Collapser\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 104\ncomponent_name: Key-Set Collapser\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true"
 },
 {
-"id": "c70",
+"id": "c105",
 "title": "Set-Based Puller",
 "level": "L3",
 "icon": "📐",
 "color": "#0f4775",
 "bg": "#e6eef5",
-"order": 170,
-"sub": "#70 · 2. Hub · Event Ingestion · Python · SEI view API · P1 · custom High · status Not Started",
+"order": 205,
+"sub": "#105 · 2. Hub · Event Ingestion · Python · SEI view API · P1 · custom High · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"70"
+"105"
 ],
-"chip": "#70 design",
+"chip": "#105 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -18240,7 +19830,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "70_Set_Based_Puller_Design.md",
+"src": "105_Set_Based_Puller_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -18516,24 +20106,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 70\ncomponent_name: Set-Based Puller\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · SEI view API\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 105\ncomponent_name: Set-Based Puller\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · SEI view API\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true"
 },
 {
-"id": "c71",
+"id": "c106",
 "title": "Intraday Stage-1 Loader",
 "level": "L3",
 "icon": "📐",
 "color": "#0f4775",
 "bg": "#e6eef5",
-"order": 171,
-"sub": "#71 · 2. Hub · Event Ingestion · Python · Oracle array insert · P1 · custom Medium · status Not Started",
+"order": 206,
+"sub": "#106 · 2. Hub · Event Ingestion · Python · Oracle array insert · P1 · custom Medium · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"71"
+"106"
 ],
-"chip": "#71 design",
+"chip": "#106 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -18544,7 +20134,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "71_Intraday_Stage_1_Loader_Design.md",
+"src": "106_Intraday_Stage_1_Loader_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -18817,24 +20407,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 71\ncomponent_name: Intraday Stage-1 Loader\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · Oracle array insert\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 106\ncomponent_name: Intraday Stage-1 Loader\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · Oracle array insert\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true"
 },
 {
-"id": "c72",
+"id": "c107",
 "title": "Domain Sequencer",
 "level": "L3",
 "icon": "📐",
 "color": "#0f4775",
 "bg": "#e6eef5",
-"order": 172,
-"sub": "#72 · 2. Hub · Event Ingestion · Python · Airflow · P1 · custom Medium · status Not Started",
+"order": 207,
+"sub": "#107 · 2. Hub · Event Ingestion · Python · Airflow · P1 · custom Medium · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"72"
+"107"
 ],
-"chip": "#72 design",
+"chip": "#107 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -18845,7 +20435,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "72_Domain_Sequencer_Design.md",
+"src": "107_Domain_Sequencer_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -19082,24 +20672,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 72\ncomponent_name: Domain Sequencer\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · Airflow\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 107\ncomponent_name: Domain Sequencer\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · Airflow\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true"
 },
 {
-"id": "c73",
+"id": "c108",
 "title": "Event Gate Evaluator",
 "level": "L3",
 "icon": "🛠",
 "color": "#6d3ac0",
 "bg": "#efe6fb",
-"order": 173,
-"sub": "#73 · 2. Hub · Orchestration · Python · Oracle · P1 · custom Medium · status Not Started",
+"order": 208,
+"sub": "#108 · 2. Hub · Orchestration · Python · Oracle · P1 · custom Medium · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"73"
+"108"
 ],
-"chip": "#73 design",
+"chip": "#108 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -19110,7 +20700,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "73_Event_Gate_Evaluator_Design.md",
+"src": "108_Event_Gate_Evaluator_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -19355,24 +20945,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 73\ncomponent_name: Event Gate Evaluator\nzone: 2. Hub\nplane: Orchestration\npriority: P1\ntechnology: Python · Oracle\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 108\ncomponent_name: Event Gate Evaluator\nzone: 2. Hub\nplane: Orchestration\npriority: P1\ntechnology: Python · Oracle\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true"
 },
 {
-"id": "c74",
+"id": "c109",
 "title": "SEI Status Poller",
 "level": "L3",
 "icon": "🛠",
 "color": "#6d3ac0",
 "bg": "#efe6fb",
-"order": 174,
-"sub": "#74 · 2. Hub · Orchestration · Python · Airflow · Apigee · P2 · custom Medium · status Not Started",
+"order": 209,
+"sub": "#109 · 2. Hub · Orchestration · Python · Airflow · Apigee · P2 · custom Medium · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"74"
+"109"
 ],
-"chip": "#74 design",
+"chip": "#109 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -19383,7 +20973,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "74_SEI_Status_Poller_Design.md",
+"src": "109_SEI_Status_Poller_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -19607,24 +21197,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 74\ncomponent_name: SEI Status Poller\nzone: 2. Hub\nplane: Orchestration\npriority: P2\ntechnology: Python · Airflow · Apigee\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 109\ncomponent_name: SEI Status Poller\nzone: 2. Hub\nplane: Orchestration\npriority: P2\ntechnology: Python · Airflow · Apigee\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true"
 },
 {
-"id": "c75",
+"id": "c110",
 "title": "Sequence Gap Detector",
 "level": "L3",
 "icon": "📐",
 "color": "#0f4775",
 "bg": "#e6eef5",
-"order": 175,
-"sub": "#75 · 2. Hub · Event Ingestion · Python · SQL · P1 · custom Medium · status Not Started",
+"order": 210,
+"sub": "#110 · 2. Hub · Event Ingestion · Python · SQL · P1 · custom Medium · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"75"
+"110"
 ],
-"chip": "#75 design",
+"chip": "#110 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -19635,7 +21225,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "75_Sequence_Gap_Detector_Design.md",
+"src": "110_Sequence_Gap_Detector_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -19864,24 +21454,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 75\ncomponent_name: Sequence Gap Detector\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · SQL\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 110\ncomponent_name: Sequence Gap Detector\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · SQL\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true"
 },
 {
-"id": "c76",
+"id": "c111",
 "title": "G0 Envelope Gate",
 "level": "L3",
 "icon": "📐",
 "color": "#0f4775",
 "bg": "#e6eef5",
-"order": 176,
-"sub": "#76 · 2. Hub · Event Ingestion · Python · P1 · custom Medium · status Not Started",
+"order": 211,
+"sub": "#111 · 2. Hub · Event Ingestion · Python · P1 · custom Medium · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"76"
+"111"
 ],
-"chip": "#76 design",
+"chip": "#111 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -19892,7 +21482,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "76_G0_Envelope_Gate_Design.md",
+"src": "111_G0_Envelope_Gate_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -20115,24 +21705,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 76\ncomponent_name: G0 Envelope Gate\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 111\ncomponent_name: G0 Envelope Gate\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true"
 },
 {
-"id": "c77",
+"id": "c112",
 "title": "Event Staging Store",
 "level": "L3",
 "icon": "📐",
 "color": "#0f4775",
 "bg": "#e6eef5",
-"order": 177,
-"sub": "#77 · 2. Hub · Event Ingestion · Oracle DDL · P1 · custom High · status Not Started",
+"order": 212,
+"sub": "#112 · 2. Hub · Event Ingestion · Oracle DDL · P1 · custom High · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"77"
+"112"
 ],
-"chip": "#77 design",
+"chip": "#112 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -20143,7 +21733,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "77_Event_Staging_Store_Design.md",
+"src": "112_Event_Staging_Store_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -20377,24 +21967,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 77\ncomponent_name: Event Staging Store\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Oracle DDL\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 112\ncomponent_name: Event Staging Store\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Oracle DDL\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true"
 },
 {
-"id": "c78",
+"id": "c113",
 "title": "Micro-Batch Registry",
 "level": "L3",
 "icon": "📐",
 "color": "#0f4775",
 "bg": "#e6eef5",
-"order": 178,
-"sub": "#78 · 2. Hub · Event Ingestion · Oracle DDL + Python · P1 · custom High · status Not Started",
+"order": 213,
+"sub": "#113 · 2. Hub · Event Ingestion · Oracle DDL + Python · P1 · custom High · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"78"
+"113"
 ],
-"chip": "#78 design",
+"chip": "#113 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -20405,7 +21995,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "78_Micro_Batch_Registry_Design.md",
+"src": "113_Micro_Batch_Registry_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -20628,24 +22218,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 78\ncomponent_name: Micro-Batch Registry\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Oracle DDL + Python\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 113\ncomponent_name: Micro-Batch Registry\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Oracle DDL + Python\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true"
 },
 {
-"id": "c79",
+"id": "c114",
 "title": "Idempotency Service",
 "level": "L3",
 "icon": "📐",
 "color": "#0f4775",
 "bg": "#e6eef5",
-"order": 179,
-"sub": "#79 · 2. Hub · Event Ingestion · Python · Oracle · P1 · custom High · status Not Started",
+"order": 214,
+"sub": "#114 · 2. Hub · Event Ingestion · Python · Oracle · P1 · custom High · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"79"
+"114"
 ],
-"chip": "#79 design",
+"chip": "#114 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -20656,7 +22246,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "79_Idempotency_Service_Design.md",
+"src": "114_Idempotency_Service_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -20864,24 +22454,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 79\ncomponent_name: Idempotency Service\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · Oracle\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 114\ncomponent_name: Idempotency Service\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · Oracle\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true"
 },
 {
-"id": "c80",
+"id": "c115",
 "title": "Event Quarantine",
 "level": "L3",
 "icon": "📐",
 "color": "#0f4775",
 "bg": "#e6eef5",
-"order": 180,
-"sub": "#80 · 2. Hub · Event Ingestion · Oracle DDL + Python · P1 · custom High · status Not Started",
+"order": 215,
+"sub": "#115 · 2. Hub · Event Ingestion · Oracle DDL + Python · P1 · custom High · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"80"
+"115"
 ],
-"chip": "#80 design",
+"chip": "#115 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -20892,7 +22482,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "80_Event_Quarantine_Design.md",
+"src": "115_Event_Quarantine_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -21125,24 +22715,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 80\ncomponent_name: Event Quarantine\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Oracle DDL + Python\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 115\ncomponent_name: Event Quarantine\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Oracle DDL + Python\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true"
 },
 {
-"id": "c81",
+"id": "c116",
 "title": "Consumer Lag Monitor",
 "level": "L3",
 "icon": "📐",
 "color": "#0f4775",
 "bg": "#e6eef5",
-"order": 181,
-"sub": "#81 · 2. Hub · Event Ingestion · Python · Splunk · P1 · custom Low · status Not Started",
+"order": 216,
+"sub": "#116 · 2. Hub · Event Ingestion · Python · Splunk · P1 · custom Low · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"81"
+"116"
 ],
-"chip": "#81 design",
+"chip": "#116 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -21153,7 +22743,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "81_Consumer_Lag_Monitor_Design.md",
+"src": "116_Consumer_Lag_Monitor_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -21376,24 +22966,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 81\ncomponent_name: Consumer Lag Monitor\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · Splunk\ncustom_build: Low\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 116\ncomponent_name: Consumer Lag Monitor\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · Splunk\ncustom_build: Low\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true"
 },
 {
-"id": "c82",
+"id": "c117",
 "title": "Loader Template Registry",
 "level": "L3",
 "icon": "🧱",
 "color": "#5a6472",
 "bg": "#eef1f4",
-"order": 182,
-"sub": "#82 · 2. Hub · Foundation · Oracle DDL + Python · P1 · custom High · status Not Started",
+"order": 217,
+"sub": "#117 · 2. Hub · Foundation · Oracle DDL + Python · P1 · custom High · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"82"
+"117"
 ],
-"chip": "#82 design",
+"chip": "#117 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -21404,7 +22994,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "82_Loader_Template_Registry_Design.md",
+"src": "117_Loader_Template_Registry_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -21632,24 +23222,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 82\ncomponent_name: Loader Template Registry\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Oracle DDL + Python\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 117\ncomponent_name: Loader Template Registry\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Oracle DDL + Python\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true"
 },
 {
-"id": "c83",
+"id": "c118",
 "title": "G6 Outbound Validation Gate",
 "level": "L3",
 "icon": "📐",
 "color": "#0f4775",
 "bg": "#e6eef5",
-"order": 183,
-"sub": "#83 · 2. Hub · Data Quality · Python · SQL · P1 · custom High · status Not Started",
+"order": 218,
+"sub": "#118 · 2. Hub · Data Quality · Python · SQL · P1 · custom High · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"83"
+"118"
 ],
-"chip": "#83 design",
+"chip": "#118 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -21660,7 +23250,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "83_G6_Outbound_Validation_Gate_Design.md",
+"src": "118_G6_Outbound_Validation_Gate_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -21897,24 +23487,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 83\ncomponent_name: G6 Outbound Validation Gate\nzone: 2. Hub\nplane: Data Quality\npriority: P1\ntechnology: Python · SQL\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 118\ncomponent_name: G6 Outbound Validation Gate\nzone: 2. Hub\nplane: Data Quality\npriority: P1\ntechnology: Python · SQL\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true"
 },
 {
-"id": "c84",
+"id": "c119",
 "title": "Loader Payload Store",
 "level": "L3",
 "icon": "📥",
 "color": "#0b5e83",
 "bg": "#e0f5fd",
-"order": 184,
-"sub": "#84 · 2. Hub · Ingress/Egress · Oracle DDL + object store · P1 · custom Medium · status Not Started",
+"order": 219,
+"sub": "#119 · 2. Hub · Ingress/Egress · Oracle DDL + object store · P1 · custom Medium · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"84"
+"119"
 ],
-"chip": "#84 design",
+"chip": "#119 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -21925,7 +23515,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "84_Loader_Payload_Store_Design.md",
+"src": "119_Loader_Payload_Store_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -22145,24 +23735,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 84\ncomponent_name: Loader Payload Store\nzone: 2. Hub\nplane: Ingress/Egress\npriority: P1\ntechnology: Oracle DDL + object store\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 119\ncomponent_name: Loader Payload Store\nzone: 2. Hub\nplane: Ingress/Egress\npriority: P1\ntechnology: Oracle DDL + object store\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true"
 },
 {
-"id": "c85",
+"id": "c120",
 "title": "Outbound Quarantine & Correction",
 "level": "L3",
 "icon": "🧱",
 "color": "#5a6472",
 "bg": "#eef1f4",
-"order": 185,
-"sub": "#85 · 2. Hub · Foundation · Python · Oracle · P1 · custom High · status Not Started",
+"order": 220,
+"sub": "#120 · 2. Hub · Foundation · Python · Oracle · P1 · custom High · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"85"
+"120"
 ],
-"chip": "#85 design",
+"chip": "#120 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -22173,7 +23763,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "85_Outbound_Quarantine_and_Correction_Design.md",
+"src": "120_Outbound_Quarantine_and_Correction_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -22401,24 +23991,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 85\ncomponent_name: Outbound Quarantine & Correction\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Python · Oracle\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 120\ncomponent_name: Outbound Quarantine & Correction\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Python · Oracle\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true"
 },
 {
-"id": "c86",
+"id": "c121",
 "title": "Outbound Reconciliation",
 "level": "L3",
 "icon": "📐",
 "color": "#0f4775",
 "bg": "#e6eef5",
-"order": 186,
-"sub": "#86 · 2. Hub · Data Quality · Python · SQL · P1 · custom Medium · status Not Started",
+"order": 221,
+"sub": "#121 · 2. Hub · Data Quality · Python · SQL · P1 · custom Medium · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"86"
+"121"
 ],
-"chip": "#86 design",
+"chip": "#121 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -22429,7 +24019,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "86_Outbound_Reconciliation_Design.md",
+"src": "121_Outbound_Reconciliation_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -22662,24 +24252,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 86\ncomponent_name: Outbound Reconciliation\nzone: 2. Hub\nplane: Data Quality\npriority: P1\ntechnology: Python · SQL\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 121\ncomponent_name: Outbound Reconciliation\nzone: 2. Hub\nplane: Data Quality\npriority: P1\ntechnology: Python · SQL\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true"
 },
 {
-"id": "c87",
+"id": "c122",
 "title": "Transformation Rule Registry",
 "level": "L3",
 "icon": "🧪",
 "color": "#0e8f7e",
 "bg": "#dff2ef",
-"order": 187,
-"sub": "#87 · 2. Hub · Processing · Oracle DDL + BA authoring surface · P1 · custom High · status Not Started",
+"order": 222,
+"sub": "#122 · 2. Hub · Processing · Oracle DDL + BA authoring surface · P1 · custom High · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"87"
+"122"
 ],
-"chip": "#87 design",
+"chip": "#122 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -22690,7 +24280,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "87_Transformation_Rule_Registry_Design.md",
+"src": "122_Transformation_Rule_Registry_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -22765,7 +24355,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "4. Detailed Design",
-"md": "\n**Deliverable.** Stage 2 to Gold mapping and business logic as versioned, effective-dated data rather than SQL\n\n**Technology.** Oracle DDL + BA authoring surface\n\n### Rule registry data model\n\n| Table | Grain | Columns |\n| --- | --- | --- |\n| `TRANSFORM_RULESET` | one row per target model per version | TARGET_MODEL · VERSION · STATUS · EFFECTIVE_FROM / TO · APPROVED_BY · APPROVED_TS |\n| `TRANSFORM_RULE` | one row per target column per ruleset | RULESET_ID · SEQ · TARGET_COLUMN · RULE_TYPE · SOURCE_EXPRESSION · CONDITION · DEFAULT_VALUE · BUSINESS_DESCRIPTION |\n| `TRANSFORM_LOOKUP` | one row per source value per domain per version | LOOKUP_DOMAIN · SOURCE_VALUE · TARGET_VALUE · EFFECTIVE_FROM / TO |\n| `TRANSFORM_RULE_TEST` | one row per expectation | RULE_ID · INPUT_JSON · EXPECTED_VALUE · LAST_RUN_TS · LAST_RESULT |\n\n- **TRANSFORM_RULESET** — Never updated in place — superseded. A ruleset that produced a row must stay readable for as long as that row is explainable.\n- **TRANSFORM_RULE** — RULE_TYPE is a closed set: DIRECT, CONSTANT, LOOKUP, DERIVED_EXPR, CONDITIONAL, AGGREGATE. An open expression language is how a rule registry becomes a second programming language nobody can review.\n- **TRANSFORM_LOOKUP** — The classic BA-owned artefact, and the one most often kept in a spreadsheet today. An unmapped source value raises; it never passes through or defaults silently.\n- **TRANSFORM_RULE_TEST** — At least one per rule, run in CI on every regeneration. Without it, externalisation means more people able to ship a wrong number rather than fewer.\n\n### Authoring to production\n\n| Step | Stage | What happens |\n| --- | --- | --- |\n| 1 | BA edits a rule | Authoring surface writes to the registry as a draft ruleset. Nothing downstream moves. |\n| 2 | Approval | STATUS_TRANSITION marks the draft-to-active move as REQUIRES_APPROVAL. A derivation on fact_transactions is a change to the firm's books, and four eyes is the control. |\n| 3 | Compile | CI regenerates the dbt models from the approved ruleset. The generated SQL lands in a pull request as a diff — the BA's change made reviewable in engineering's own terms. |\n| 4 | Test | Rule expectations run against the generated SQL, alongside the existing dbt tests. |\n| 5 | Run | An ordinary dbt run. Lineage, tests and documentation all still work, because the output is dbt and not an interpreter. |\n| 6 | Stamp | Every Gold row carries RULE_SET_VERSION. Three months later the number is explainable without archaeology in the commit log. |\n\n**Scope boundary.** Stage 2 to Gold only. Do not extend it to Stage 1 ingestion, where the RAW DDL is the contract and there is no business logic to own, and do not let it absorb the correctness machinery — SCD2 mechanics, merge semantics and hold-and-replay stay in code.",
+"md": "\n**Deliverable.** Stage 2 to Gold mapping and business logic as versioned, effective-dated data rather than SQL\n\n**Technology.** Oracle DDL + BA authoring surface\n\n### Rule registry data model\n\n| Table | Grain | Columns |\n| --- | --- | --- |\n| `TRANSFORM_RULESET` | one row per target model per version | TARGET_MODEL · VERSION · STATUS · EFFECTIVE_FROM / TO · APPROVED_BY · APPROVED_TS |\n| `TRANSFORM_RULE` | one row per target column per ruleset | RULESET_ID · SEQ · TARGET_COLUMN · RULE_TYPE · SOURCE_EXPRESSION · CONDITION · DEFAULT_VALUE · BUSINESS_DESCRIPTION |\n| `TRANSFORM_LOOKUP` | one row per source value per domain per version | LOOKUP_DOMAIN · SOURCE_VALUE · TARGET_VALUE · EFFECTIVE_FROM / TO |\n| `TRANSFORM_RULE_TEST` | one row per expectation | RULE_ID · INPUT_JSON · EXPECTED_VALUE · LAST_RUN_TS · LAST_RESULT |\n\n- **TRANSFORM_RULESET** — Never updated in place — superseded. A ruleset that produced a row must stay readable for as long as that row is explainable.\n- **TRANSFORM_RULE** — RULE_TYPE is a closed set: DIRECT, CONSTANT, LOOKUP, DERIVED_EXPR, CONDITIONAL, AGGREGATE. An open expression language is how a rule registry becomes a second programming language nobody can review.\n- **TRANSFORM_LOOKUP** — The classic BA-owned artefact, and the one most often kept in a spreadsheet today. An unmapped source value raises; it never passes through or defaults silently.\n- **TRANSFORM_RULE_TEST** — At least one per rule, run in CI on every regeneration. Without it, externalisation means more people able to ship a wrong number rather than fewer.\n\n### Authoring to production\n\n| Step | Stage | What happens |\n| --- | --- | --- |\n| 1 | BA edits a rule | Authoring surface writes to the registry as a draft ruleset. Nothing downstream moves. |\n| 2 | Approval | STATUS_TRANSITION marks the draft-to-active move as REQUIRES_APPROVAL. A derivation on fact_transactions is a change to the firm's books, and four eyes is the control. |\n| 3 | Compile | CI regenerates the dbt models from the approved ruleset. The generated SQL lands in a pull request as a diff — the BA's change made reviewable in engineering's own terms. |\n| 4 | Test | Rule expectations run against the generated SQL, alongside the existing dbt tests. |\n| 5 | Run | An ordinary dbt run. Lineage, tests and documentation all still work, because the output is dbt and not an interpreter. |\n| 6 | Stamp | Every Gold row carries RULE_SET_VERSION. Three months later the number is explainable without archaeology in the commit log. |\n\n**Scope boundary.** Stage 2 to Gold only. Do not extend it to Stage 1 ingestion, where the RAW DDL is the contract and there is no business logic to own, and do not let it absorb the correctness machinery — SCD2 mechanics, merge semantics and hold-and-replay stay in code.\n\n### How it lands in the dbt project\n\nThis has to fit the dbt project as it stands — incremental models, on_schema_change='fail', DML-only MERGE into Gold, dim before fact. The shape that fits is code generation into the existing models directory, not a runtime lookup inside a model.\n\n| Piece | Lives in | What it is |\n| --- | --- | --- |\n| **Registry** | `Oracle` | TRANSFORM_RULESET, TRANSFORM_RULE, TRANSFORM_LOOKUP, TRANSFORM_RULE_TEST. The BA's authoring surface writes here and nowhere else. |\n| **Generator** | `dbt-codegen step in CI` | Reads the approved ruleset and writes models/gold/*.sql. Runs before dbt parse, never during it. |\n| **Generated models** | `models/gold/` | Real .sql files, committed. A rule change arrives as a SQL diff in a pull request. |\n| **Expectations** | `dbt unit tests` | TRANSFORM_RULE_TEST rows compile to dbt unit tests (dbt 1.8+) beside the model, so a rule is proven before the model runs against real data. |\n| **Lookups** | `dbt seeds` | TRANSFORM_LOOKUP exports to seeds/ so the mapping is version-controlled with the model that uses it, and an unmapped value fails the build rather than the night. |\n\n**Considered and rejected**\n\n- **Jinja macro reading a seed at parse time** — The seed becomes the source of truth but the pull request diff is a CSV, so review is meaningless. dbt docs then shows generated SQL that nobody wrote and nobody can explain.\n- **A rule interpreter running inside the warehouse** — Slower, unobservable, and it discards dbt's lineage, tests and documentation — the three things that make the current design defensible.\n- **Externalising Stage 1 as well** — There is no business logic there to own. The RAW DDL is the schema contract, and adding a rule layer would put a second contract in front of it.\n\n**Guardrails**\n\n- A rule that adds a target column is a schema change, and Gold runs on_schema_change='fail'. The generator must detect the new column at compile time and demand an explicit migration — discovering it when the model fails at 3am is the outcome this is meant to prevent.\n- The generated model carries the ruleset id and version in a header comment and as a column, so the SQL and the row agree about which logic produced it.\n- Generation is deterministic: the same ruleset produces byte-identical SQL. A noisy generator makes every diff unreadable and the review worthless.\n- dbt unit tests need 1.8 or later. On an older version the expectations have to run as a separate CI step against the compiled SQL, which is weaker but still better than none.\n- A correction becomes a new ruleset version with an effective date, never an edit to the version that already ran. Correction Handling keeps its restatement path; what changes is that a mapping fix no longer needs a code release.\n\n**Release.** dbt Release & Rollback changes shape. Today a model version is the unit of release. With the registry it is a ruleset version plus the generated model, and the two must travel together — rolling back the model without the ruleset leaves rows stamped with a version whose logic is no longer deployed. Roll back both, or neither.",
 "blocks": [
 {
 "t": "p",
@@ -22865,6 +24455,79 @@ export const DESIGN_DOCS = [
 {
 "t": "p",
 "x": "**Scope boundary.** Stage 2 to Gold only. Do not extend it to Stage 1 ingestion, where the RAW DDL is the contract and there is no business logic to own, and do not let it absorb the correctness machinery — SCD2 mechanics, merge semantics and hold-and-replay stay in code."
+},
+{
+"t": "h",
+"x": "How it lands in the dbt project"
+},
+{
+"t": "p",
+"x": "This has to fit the dbt project as it stands — incremental models, on_schema_change='fail', DML-only MERGE into Gold, dim before fact. The shape that fits is code generation into the existing models directory, not a runtime lookup inside a model."
+},
+{
+"t": "tbl",
+"rows": [
+[
+"Piece",
+"Lives in",
+"What it is"
+],
+[
+"**Registry**",
+"`Oracle`",
+"TRANSFORM_RULESET, TRANSFORM_RULE, TRANSFORM_LOOKUP, TRANSFORM_RULE_TEST. The BA's authoring surface writes here and nowhere else."
+],
+[
+"**Generator**",
+"`dbt-codegen step in CI`",
+"Reads the approved ruleset and writes models/gold/*.sql. Runs before dbt parse, never during it."
+],
+[
+"**Generated models**",
+"`models/gold/`",
+"Real .sql files, committed. A rule change arrives as a SQL diff in a pull request."
+],
+[
+"**Expectations**",
+"`dbt unit tests`",
+"TRANSFORM_RULE_TEST rows compile to dbt unit tests (dbt 1.8+) beside the model, so a rule is proven before the model runs against real data."
+],
+[
+"**Lookups**",
+"`dbt seeds`",
+"TRANSFORM_LOOKUP exports to seeds/ so the mapping is version-controlled with the model that uses it, and an unmapped value fails the build rather than the night."
+]
+]
+},
+{
+"t": "p",
+"x": "**Considered and rejected**"
+},
+{
+"t": "ul",
+"items": [
+"**Jinja macro reading a seed at parse time** — The seed becomes the source of truth but the pull request diff is a CSV, so review is meaningless. dbt docs then shows generated SQL that nobody wrote and nobody can explain.",
+"**A rule interpreter running inside the warehouse** — Slower, unobservable, and it discards dbt's lineage, tests and documentation — the three things that make the current design defensible.",
+"**Externalising Stage 1 as well** — There is no business logic there to own. The RAW DDL is the schema contract, and adding a rule layer would put a second contract in front of it."
+]
+},
+{
+"t": "p",
+"x": "**Guardrails**"
+},
+{
+"t": "ul",
+"items": [
+"A rule that adds a target column is a schema change, and Gold runs on_schema_change='fail'. The generator must detect the new column at compile time and demand an explicit migration — discovering it when the model fails at 3am is the outcome this is meant to prevent.",
+"The generated model carries the ruleset id and version in a header comment and as a column, so the SQL and the row agree about which logic produced it.",
+"Generation is deterministic: the same ruleset produces byte-identical SQL. A noisy generator makes every diff unreadable and the review worthless.",
+"dbt unit tests need 1.8 or later. On an older version the expectations have to run as a separate CI step against the compiled SQL, which is weaker but still better than none.",
+"A correction becomes a new ruleset version with an effective date, never an edit to the version that already ran. Correction Handling keeps its restatement path; what changes is that a mapping fix no longer needs a code release."
+]
+},
+{
+"t": "p",
+"x": "**Release.** dbt Release & Rollback changes shape. Today a model version is the unit of release. With the registry it is a ruleset version plus the generated model, and the two must travel together — rolling back the model without the ruleset leaves rows stamped with a version whose logic is no longer deployed. Roll back both, or neither."
 }
 ]
 },
@@ -23015,24 +24678,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 87\ncomponent_name: Transformation Rule Registry\nzone: 2. Hub\nplane: Processing\npriority: P1\ntechnology: Oracle DDL + BA authoring surface\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 122\ncomponent_name: Transformation Rule Registry\nzone: 2. Hub\nplane: Processing\npriority: P1\ntechnology: Oracle DDL + BA authoring surface\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true"
 },
 {
-"id": "c88",
+"id": "c123",
 "title": "Rule-to-dbt Compiler",
 "level": "L3",
 "icon": "🧪",
 "color": "#0e8f7e",
 "bg": "#dff2ef",
-"order": 188,
-"sub": "#88 · 2. Hub · Processing · Python · dbt · CI · P1 · custom High · status Not Started",
+"order": 223,
+"sub": "#123 · 2. Hub · Processing · Python · dbt · CI · P1 · custom High · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"88"
+"123"
 ],
-"chip": "#88 design",
+"chip": "#123 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -23043,7 +24706,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "88_Rule_to_dbt_Compiler_Design.md",
+"src": "123_Rule_to_dbt_Compiler_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -23118,7 +24781,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "4. Detailed Design",
-"md": "\n**Deliverable.** Generates dbt models from the rule registry; the generated SQL is reviewed in a pull request like any other\n\n**Technology.** Python · dbt · CI\n\n### Rule registry data model\n\n| Table | Grain | Columns |\n| --- | --- | --- |\n| `TRANSFORM_RULESET` | one row per target model per version | TARGET_MODEL · VERSION · STATUS · EFFECTIVE_FROM / TO · APPROVED_BY · APPROVED_TS |\n| `TRANSFORM_RULE` | one row per target column per ruleset | RULESET_ID · SEQ · TARGET_COLUMN · RULE_TYPE · SOURCE_EXPRESSION · CONDITION · DEFAULT_VALUE · BUSINESS_DESCRIPTION |\n| `TRANSFORM_LOOKUP` | one row per source value per domain per version | LOOKUP_DOMAIN · SOURCE_VALUE · TARGET_VALUE · EFFECTIVE_FROM / TO |\n| `TRANSFORM_RULE_TEST` | one row per expectation | RULE_ID · INPUT_JSON · EXPECTED_VALUE · LAST_RUN_TS · LAST_RESULT |\n\n- **TRANSFORM_RULESET** — Never updated in place — superseded. A ruleset that produced a row must stay readable for as long as that row is explainable.\n- **TRANSFORM_RULE** — RULE_TYPE is a closed set: DIRECT, CONSTANT, LOOKUP, DERIVED_EXPR, CONDITIONAL, AGGREGATE. An open expression language is how a rule registry becomes a second programming language nobody can review.\n- **TRANSFORM_LOOKUP** — The classic BA-owned artefact, and the one most often kept in a spreadsheet today. An unmapped source value raises; it never passes through or defaults silently.\n- **TRANSFORM_RULE_TEST** — At least one per rule, run in CI on every regeneration. Without it, externalisation means more people able to ship a wrong number rather than fewer.\n\n### Authoring to production\n\n| Step | Stage | What happens |\n| --- | --- | --- |\n| 1 | BA edits a rule | Authoring surface writes to the registry as a draft ruleset. Nothing downstream moves. |\n| 2 | Approval | STATUS_TRANSITION marks the draft-to-active move as REQUIRES_APPROVAL. A derivation on fact_transactions is a change to the firm's books, and four eyes is the control. |\n| 3 | Compile | CI regenerates the dbt models from the approved ruleset. The generated SQL lands in a pull request as a diff — the BA's change made reviewable in engineering's own terms. |\n| 4 | Test | Rule expectations run against the generated SQL, alongside the existing dbt tests. |\n| 5 | Run | An ordinary dbt run. Lineage, tests and documentation all still work, because the output is dbt and not an interpreter. |\n| 6 | Stamp | Every Gold row carries RULE_SET_VERSION. Three months later the number is explainable without archaeology in the commit log. |\n\n**Scope boundary.** Stage 2 to Gold only. Do not extend it to Stage 1 ingestion, where the RAW DDL is the contract and there is no business logic to own, and do not let it absorb the correctness machinery — SCD2 mechanics, merge semantics and hold-and-replay stay in code.",
+"md": "\n**Deliverable.** Generates dbt models from the rule registry; the generated SQL is reviewed in a pull request like any other\n\n**Technology.** Python · dbt · CI\n\n### Rule registry data model\n\n| Table | Grain | Columns |\n| --- | --- | --- |\n| `TRANSFORM_RULESET` | one row per target model per version | TARGET_MODEL · VERSION · STATUS · EFFECTIVE_FROM / TO · APPROVED_BY · APPROVED_TS |\n| `TRANSFORM_RULE` | one row per target column per ruleset | RULESET_ID · SEQ · TARGET_COLUMN · RULE_TYPE · SOURCE_EXPRESSION · CONDITION · DEFAULT_VALUE · BUSINESS_DESCRIPTION |\n| `TRANSFORM_LOOKUP` | one row per source value per domain per version | LOOKUP_DOMAIN · SOURCE_VALUE · TARGET_VALUE · EFFECTIVE_FROM / TO |\n| `TRANSFORM_RULE_TEST` | one row per expectation | RULE_ID · INPUT_JSON · EXPECTED_VALUE · LAST_RUN_TS · LAST_RESULT |\n\n- **TRANSFORM_RULESET** — Never updated in place — superseded. A ruleset that produced a row must stay readable for as long as that row is explainable.\n- **TRANSFORM_RULE** — RULE_TYPE is a closed set: DIRECT, CONSTANT, LOOKUP, DERIVED_EXPR, CONDITIONAL, AGGREGATE. An open expression language is how a rule registry becomes a second programming language nobody can review.\n- **TRANSFORM_LOOKUP** — The classic BA-owned artefact, and the one most often kept in a spreadsheet today. An unmapped source value raises; it never passes through or defaults silently.\n- **TRANSFORM_RULE_TEST** — At least one per rule, run in CI on every regeneration. Without it, externalisation means more people able to ship a wrong number rather than fewer.\n\n### Authoring to production\n\n| Step | Stage | What happens |\n| --- | --- | --- |\n| 1 | BA edits a rule | Authoring surface writes to the registry as a draft ruleset. Nothing downstream moves. |\n| 2 | Approval | STATUS_TRANSITION marks the draft-to-active move as REQUIRES_APPROVAL. A derivation on fact_transactions is a change to the firm's books, and four eyes is the control. |\n| 3 | Compile | CI regenerates the dbt models from the approved ruleset. The generated SQL lands in a pull request as a diff — the BA's change made reviewable in engineering's own terms. |\n| 4 | Test | Rule expectations run against the generated SQL, alongside the existing dbt tests. |\n| 5 | Run | An ordinary dbt run. Lineage, tests and documentation all still work, because the output is dbt and not an interpreter. |\n| 6 | Stamp | Every Gold row carries RULE_SET_VERSION. Three months later the number is explainable without archaeology in the commit log. |\n\n**Scope boundary.** Stage 2 to Gold only. Do not extend it to Stage 1 ingestion, where the RAW DDL is the contract and there is no business logic to own, and do not let it absorb the correctness machinery — SCD2 mechanics, merge semantics and hold-and-replay stay in code.\n\n### How it lands in the dbt project\n\nThis has to fit the dbt project as it stands — incremental models, on_schema_change='fail', DML-only MERGE into Gold, dim before fact. The shape that fits is code generation into the existing models directory, not a runtime lookup inside a model.\n\n| Piece | Lives in | What it is |\n| --- | --- | --- |\n| **Registry** | `Oracle` | TRANSFORM_RULESET, TRANSFORM_RULE, TRANSFORM_LOOKUP, TRANSFORM_RULE_TEST. The BA's authoring surface writes here and nowhere else. |\n| **Generator** | `dbt-codegen step in CI` | Reads the approved ruleset and writes models/gold/*.sql. Runs before dbt parse, never during it. |\n| **Generated models** | `models/gold/` | Real .sql files, committed. A rule change arrives as a SQL diff in a pull request. |\n| **Expectations** | `dbt unit tests` | TRANSFORM_RULE_TEST rows compile to dbt unit tests (dbt 1.8+) beside the model, so a rule is proven before the model runs against real data. |\n| **Lookups** | `dbt seeds` | TRANSFORM_LOOKUP exports to seeds/ so the mapping is version-controlled with the model that uses it, and an unmapped value fails the build rather than the night. |\n\n**Considered and rejected**\n\n- **Jinja macro reading a seed at parse time** — The seed becomes the source of truth but the pull request diff is a CSV, so review is meaningless. dbt docs then shows generated SQL that nobody wrote and nobody can explain.\n- **A rule interpreter running inside the warehouse** — Slower, unobservable, and it discards dbt's lineage, tests and documentation — the three things that make the current design defensible.\n- **Externalising Stage 1 as well** — There is no business logic there to own. The RAW DDL is the schema contract, and adding a rule layer would put a second contract in front of it.\n\n**Guardrails**\n\n- A rule that adds a target column is a schema change, and Gold runs on_schema_change='fail'. The generator must detect the new column at compile time and demand an explicit migration — discovering it when the model fails at 3am is the outcome this is meant to prevent.\n- The generated model carries the ruleset id and version in a header comment and as a column, so the SQL and the row agree about which logic produced it.\n- Generation is deterministic: the same ruleset produces byte-identical SQL. A noisy generator makes every diff unreadable and the review worthless.\n- dbt unit tests need 1.8 or later. On an older version the expectations have to run as a separate CI step against the compiled SQL, which is weaker but still better than none.\n- A correction becomes a new ruleset version with an effective date, never an edit to the version that already ran. Correction Handling keeps its restatement path; what changes is that a mapping fix no longer needs a code release.\n\n**Release.** dbt Release & Rollback changes shape. Today a model version is the unit of release. With the registry it is a ruleset version plus the generated model, and the two must travel together — rolling back the model without the ruleset leaves rows stamped with a version whose logic is no longer deployed. Roll back both, or neither.",
 "blocks": [
 {
 "t": "p",
@@ -23218,6 +24881,79 @@ export const DESIGN_DOCS = [
 {
 "t": "p",
 "x": "**Scope boundary.** Stage 2 to Gold only. Do not extend it to Stage 1 ingestion, where the RAW DDL is the contract and there is no business logic to own, and do not let it absorb the correctness machinery — SCD2 mechanics, merge semantics and hold-and-replay stay in code."
+},
+{
+"t": "h",
+"x": "How it lands in the dbt project"
+},
+{
+"t": "p",
+"x": "This has to fit the dbt project as it stands — incremental models, on_schema_change='fail', DML-only MERGE into Gold, dim before fact. The shape that fits is code generation into the existing models directory, not a runtime lookup inside a model."
+},
+{
+"t": "tbl",
+"rows": [
+[
+"Piece",
+"Lives in",
+"What it is"
+],
+[
+"**Registry**",
+"`Oracle`",
+"TRANSFORM_RULESET, TRANSFORM_RULE, TRANSFORM_LOOKUP, TRANSFORM_RULE_TEST. The BA's authoring surface writes here and nowhere else."
+],
+[
+"**Generator**",
+"`dbt-codegen step in CI`",
+"Reads the approved ruleset and writes models/gold/*.sql. Runs before dbt parse, never during it."
+],
+[
+"**Generated models**",
+"`models/gold/`",
+"Real .sql files, committed. A rule change arrives as a SQL diff in a pull request."
+],
+[
+"**Expectations**",
+"`dbt unit tests`",
+"TRANSFORM_RULE_TEST rows compile to dbt unit tests (dbt 1.8+) beside the model, so a rule is proven before the model runs against real data."
+],
+[
+"**Lookups**",
+"`dbt seeds`",
+"TRANSFORM_LOOKUP exports to seeds/ so the mapping is version-controlled with the model that uses it, and an unmapped value fails the build rather than the night."
+]
+]
+},
+{
+"t": "p",
+"x": "**Considered and rejected**"
+},
+{
+"t": "ul",
+"items": [
+"**Jinja macro reading a seed at parse time** — The seed becomes the source of truth but the pull request diff is a CSV, so review is meaningless. dbt docs then shows generated SQL that nobody wrote and nobody can explain.",
+"**A rule interpreter running inside the warehouse** — Slower, unobservable, and it discards dbt's lineage, tests and documentation — the three things that make the current design defensible.",
+"**Externalising Stage 1 as well** — There is no business logic there to own. The RAW DDL is the schema contract, and adding a rule layer would put a second contract in front of it."
+]
+},
+{
+"t": "p",
+"x": "**Guardrails**"
+},
+{
+"t": "ul",
+"items": [
+"A rule that adds a target column is a schema change, and Gold runs on_schema_change='fail'. The generator must detect the new column at compile time and demand an explicit migration — discovering it when the model fails at 3am is the outcome this is meant to prevent.",
+"The generated model carries the ruleset id and version in a header comment and as a column, so the SQL and the row agree about which logic produced it.",
+"Generation is deterministic: the same ruleset produces byte-identical SQL. A noisy generator makes every diff unreadable and the review worthless.",
+"dbt unit tests need 1.8 or later. On an older version the expectations have to run as a separate CI step against the compiled SQL, which is weaker but still better than none.",
+"A correction becomes a new ruleset version with an effective date, never an edit to the version that already ran. Correction Handling keeps its restatement path; what changes is that a mapping fix no longer needs a code release."
+]
+},
+{
+"t": "p",
+"x": "**Release.** dbt Release & Rollback changes shape. Today a model version is the unit of release. With the registry it is a ruleset version plus the generated model, and the two must travel together — rolling back the model without the ruleset leaves rows stamped with a version whose logic is no longer deployed. Roll back both, or neither."
 }
 ]
 },
@@ -23353,24 +25089,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 88\ncomponent_name: Rule-to-dbt Compiler\nzone: 2. Hub\nplane: Processing\npriority: P1\ntechnology: Python · dbt · CI\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 123\ncomponent_name: Rule-to-dbt Compiler\nzone: 2. Hub\nplane: Processing\npriority: P1\ntechnology: Python · dbt · CI\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true"
 },
 {
-"id": "c89",
+"id": "c124",
 "title": "Schema Contract Registry",
 "level": "L3",
 "icon": "🧱",
 "color": "#5a6472",
 "bg": "#eef1f4",
-"order": 189,
-"sub": "#89 · 2. Hub · Foundation · Oracle DDL + CI · P1 · custom Medium · status Not Started",
+"order": 224,
+"sub": "#124 · 2. Hub · Foundation · Oracle DDL + CI · P1 · custom Medium · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"89"
+"124"
 ],
-"chip": "#89 design",
+"chip": "#124 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -23381,7 +25117,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "89_Schema_Contract_Registry_Design.md",
+"src": "124_Schema_Contract_Registry_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -23609,24 +25345,24 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 89\ncomponent_name: Schema Contract Registry\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Oracle DDL + CI\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 124\ncomponent_name: Schema Contract Registry\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Oracle DDL + CI\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true"
 },
 {
-"id": "c90",
+"id": "c125",
 "title": "Expectation Store",
 "level": "L3",
 "icon": "🧱",
 "color": "#5a6472",
 "bg": "#eef1f4",
-"order": 190,
-"sub": "#90 · 2. Hub · Foundation · Oracle DDL · P1 · custom Medium · status Not Started",
+"order": 225,
+"sub": "#125 · 2. Hub · Foundation · Oracle DDL · P1 · custom Medium · status Not Started",
 "match": "",
 "zone_default": "",
 "default": false,
 "component_ids": [
-"90"
+"125"
 ],
-"chip": "#90 design",
+"chip": "#125 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -23637,7 +25373,7 @@ export const DESIGN_DOCS = [
 "tiers": [],
 "updated": ""
 },
-"src": "90_Expectation_Store_Design.md",
+"src": "125_Expectation_Store_Design.md",
 "sections": [
 {
 "h": "1. Purpose & Scope",
@@ -23865,6 +25601,6 @@ export const DESIGN_DOCS = [
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 90\ncomponent_name: Expectation Store\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Oracle DDL\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 125\ncomponent_name: Expectation Store\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Oracle DDL\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true"
 }
 ];

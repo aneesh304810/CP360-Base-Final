@@ -1,6 +1,6 @@
 ---
 cp360_type: design_document
-component_id: 81
+component_id: 116
 component_name: Consumer Lag Monitor
 zone: 2. Hub
 plane: Event Ingestion

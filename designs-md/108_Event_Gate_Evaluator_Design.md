@@ -1,6 +1,6 @@
 ---
 cp360_type: design_document
-component_id: 73
+component_id: 108
 component_name: Event Gate Evaluator
 zone: 2. Hub
 plane: Orchestration

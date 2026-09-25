@@ -1,6 +1,6 @@
 ---
 cp360_type: design_document
-component_id: 82
+component_id: 117
 component_name: Loader Template Registry
 zone: 2. Hub
 plane: Foundation

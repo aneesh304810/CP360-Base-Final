@@ -43,6 +43,10 @@ const FIND = Object.fromEntries(AR_FINDINGS.map((f) => [f.id, f]));
 const COV = Object.fromEntries(AR_COVERAGE.map((c) => [c.id, c]));
 const MISS = Object.fromEntries(AR_MISSING.map((m) => [m.id, m]));
 const keyOf = (c) => c.arId || c.id;
+// every dbt model between Stage 2 and Gold, plus the two new components and
+// the release process the change reshapes
+const RULE_SPAN = ["15", "16", "17", "19", "59", "66", "M24", "M25"];
+const inRuleSpan = (c) => RULE_SPAN.includes(keyOf(c));
 const cite = (c) => SEI_CITATIONS[c.arId] || SEI_CITATIONS[c.id] || [];
 const cov = (c) => COV[c.arId] || COV[c.id];
 const hits = (list, c) =>
@@ -72,8 +76,12 @@ try {
 
 const slug = (s) => s.replace(/&/g, "and").replace(/[^A-Za-z0-9]+/g, "_")
   .replace(/^_|_$/g, "").replace(/__+/g, "_");
+// A new component never inherits an existing document's filename: the id spaces
+// overlapped once (component 66 vs the Pre-Gold doc) and the doc was overwritten
+// silently. Only a tracker component may reuse its own file.
 const fileFor = (c) =>
-  existingName[c.id] || `${String(c.id).padStart(2, "0")}_${slug(c.component)}_Design.md`;
+  (!c.isNew && existingName[c.id]) ||
+  `${String(c.id).padStart(2, "0")}_${slug(c.component)}_Design.md`;
 
 const esc = (s) => String(s ?? "").replace(/\|/g, "\\|").replace(/\n+/g, " ").trim();
 const bullets = (xs) => xs.filter(Boolean).map((x) => `- ${x}`).join("\n");
@@ -144,7 +152,7 @@ function sDecisions(c) {
   else if (c.isNew) out.push("No prior design decisions exist — this component has never been specified.");
   else out.push("No review finding against this component: the events-primary substitution does not change it.");
   if (cv && cv.rec) out.push("", `**Direction.** ${cv.rec}`);
-  if (["15", "16", "M24", "M25"].includes(keyOf(c))) {
+  if (inRuleSpan(c)) {
     const R = AR_RULE_EXTERNALISATION;
     out.push("", `### ${R.title}`, "", R.problem, "",
       `**Principle.** ${R.principle}`, "",
@@ -160,7 +168,7 @@ function sDetailed(c) {
   if (m) out.push(`**Deliverable.** ${m.deliverable}`, "", `**Technology.** ${m.tech}`);
   else out.push(`**Deliverable.** ${c.deliverable}`);
 
-  if (["15", "16", "M24", "M25"].includes(keyOf(c))) {
+  if (inRuleSpan(c)) {
     const R = AR_RULE_EXTERNALISATION;
     out.push("", "### Rule registry data model", "",
       "| Table | Grain | Columns |", "| --- | --- | --- |",
@@ -169,7 +177,14 @@ function sDetailed(c) {
       "", "### Authoring to production", "",
       "| Step | Stage | What happens |", "| --- | --- | --- |",
       ...R.flow.map(([n, stage, what]) => `| ${n} | ${esc(stage)} | ${esc(what)} |`),
-      "", `**Scope boundary.** ${R.scope}`);
+      "", `**Scope boundary.** ${R.scope}`,
+      "", "### How it lands in the dbt project", "", R.dbt.lead, "",
+      "| Piece | Lives in | What it is |", "| --- | --- | --- |",
+      ...R.dbt.layout.map(([a2, b2, c2]) => `| **${esc(a2)}** | \`${esc(b2)}\` | ${esc(c2)} |`),
+      "", "**Considered and rejected**", "",
+      ...R.dbt.rejected.map(([what, why]) => `- **${what}** — ${why}`),
+      "", "**Guardrails**", "", bullets(R.dbt.guards),
+      "", `**Release.** ${R.dbt.release}`);
   }
   if (c.plane === "Foundation" && !c.isNew) {
     const owned = FM_TABLES.filter((t) =>
@@ -199,7 +214,7 @@ function sDqRecon(c) {
       "| Pipeline | `STG_TO_INT` · `INT_TO_DIM` · `INT_TO_FACT` |",
       "| Outbound | `GENERATED_TO_VALIDATED` · `VALIDATED_TO_SUBMITTED` · `SUBMITTED_TO_ACKED` · `ACKED_TO_ACCEPTED` · `ACCEPTED_TO_REJECTED` |");
   }
-  if (["16", "M24"].includes(keyOf(c))) {
+  if (["16", "M24", "66"].includes(keyOf(c))) {
     out.push("", "Every Gold row carries `RULE_SET_VERSION`. A figure produced three months ago is " +
       "explainable by reading the ruleset that was effective that night, not by finding the commit " +
       "that happened to be deployed.");
@@ -245,7 +260,7 @@ function sSecurity(c) {
       "connection time — which in practice means reusing the loader's account. The masking policy for " +
       "the 786 PII fields in SDC scope is unapproved.");
   }
-  if (["M24", "M25", "15", "16"].includes(keyOf(c))) {
+  if (inRuleSpan(c)) {
     out.push("", "**Rule authoring is a privileged action.** A derivation on `fact_transactions` is a " +
       "change to the firm's books. Draft-to-active on a ruleset carries `REQUIRES_APPROVAL` and a " +
       "four-eyes flow; the BA authors, someone else approves, and both are recorded.");
@@ -327,7 +342,7 @@ function sRecommendation(c) {
   else if (f && f.action) out.push(f.action);
   else out.push("No change recommended.");
   if (f && f.action && cv && cv.rec && f.action !== cv.rec) out.push("", `**Action.** ${f.action}`);
-  if (["15", "16", "M24", "M25"].includes(keyOf(c))) {
+  if (inRuleSpan(c)) {
     out.push("", `**On externalising the rules.** ${AR_RULE_EXTERNALISATION.risk}`);
   }
   if (c.plane === "Foundation" && !c.isNew) {

@@ -1,6 +1,6 @@
 ---
 cp360_type: design_document
-component_id: 85
+component_id: 120
 component_name: Outbound Quarantine & Correction
 zone: 2. Hub
 plane: Foundation

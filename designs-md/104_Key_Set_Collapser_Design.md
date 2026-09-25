@@ -1,6 +1,6 @@
 ---
 cp360_type: design_document
-component_id: 69
+component_id: 104
 component_name: Key-Set Collapser
 zone: 2. Hub
 plane: Event Ingestion

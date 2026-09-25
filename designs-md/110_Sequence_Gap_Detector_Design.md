@@ -1,9 +1,9 @@
 ---
 cp360_type: design_document
-component_id: 86
-component_name: Outbound Reconciliation
+component_id: 110
+component_name: Sequence Gap Detector
 zone: 2. Hub
-plane: Data Quality
+plane: Event Ingestion
 priority: P1
 technology: Python · SQL
 custom_build: Medium
@@ -12,17 +12,17 @@ status: Not Started
 owner: TBD
 origin: events-primary architect review
 sei_coverage: absent
-gap_owner: SEI
+gap_owner: Joint
 in_scope: true
 ---
 
-# Outbound Reconciliation
+# Sequence Gap Detector
 
 ## 1. Purpose & Scope
 
-**Generated → validated → submitted → accepted → rejected: five counts that must tie**
+**Monotonic sequence numbers per partition; a gap is a provably lost event**
 
-The outbound counterpart of the four event-side boundaries. Same omission, opposite direction.
+Absent from the pack and from the 65, despite costing almost nothing.
 
 This component does not exist in the SEI design pack and has no entry in the original 65-component tracker. It is required by one substituted assumption: **SDC events are the primary ingestion path**, with everything from Stage 1 onward exactly as the pack specifies it.
 
@@ -36,17 +36,15 @@ This component does not exist in the SEI design pack and has no entry in the ori
 
 No prior design decisions exist — this component has never been specified.
 
-**Direction.** Without the counts, no outbound completeness claim is provable.
+**Direction.** If yes, this is the strongest completeness proof in the estate and it costs almost nothing. Build it first.
 
 ## 4. Detailed Design
 
-**Deliverable.** Generated → validated → submitted → accepted → rejected: five counts that must tie
+**Deliverable.** Monotonic sequence numbers per partition; a gap is a provably lost event
 
 **Technology.** Python · SQL
 
 ## 5. Data Quality, Reconciliation & Lineage
-
-Gates G0, G1 and G3 are row-level and run per micro-batch. G2, G4 and G5 are set-level aggregates and run at the EOD gate only — running them per box is 288 full passes a day. G6 is the outbound gate and blocks a submission rather than warning.
 
 Twelve reconciliation boundaries are required, against the three the pack specifies:
 
@@ -58,11 +56,11 @@ Twelve reconciliation boundaries are required, against the three the pack specif
 
 ## 6. Performance & Scale
 
-Daily set-based aggregate per loader type.
+One ordered scan per partition per micro-batch. Cheap.
 
 ## 7. Error Handling, Failure & Replay
 
-RECON_RESULT’s three boundaries are all inbound. Sent versus accepted is a boundary that exists nowhere, so a loader that silently dropped three percent of its records on the way out is invisible to every control in the estate.
+This is the strongest completeness proof in the whole estate and it currently has no owner. The file channel has nothing comparable.
 
 ## 8. Security & Access Control
 
@@ -71,17 +69,17 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 ## 9. SEI Source Coverage
 
 **SEI pack coverage: absent** — nothing in the SEI pack.
-**Who answers for the gap: SEI** — SEI must answer.
+**Who answers for the gap: Joint** — needs both sides.
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH dbt Transformation TDD v2 | §B.5 | nothing in the pack covers it | B.5's three boundaries are inbound. Sent versus accepted is a boundary that exists nowhere, so a loader that silently dropped three percent on the way out is invisible. |
+| BBH File Ingestion Framework TDD v2.0 | whole document | nothing in the pack covers it | Event Hub sequence numbers are monotonic per partition, so a gap is a provably lost event — the strongest completeness proof available, and no document mentions it. |
 
 ## 10. Gaps, Risks & What Is Missing
 
 ### What is missing
 
-This component does not exist. The outbound counterpart of the four event-side boundaries. Same omission, opposite direction.
+This component does not exist. Absent from the pack and from the 65, despite costing almost nothing.
 
 **Priority P1, custom build Medium.**
 
@@ -91,17 +89,17 @@ No ranked bottleneck or unowned error path touches this component.
 
 ### Gap against the SEI pack
 
-- B.5's three boundaries are inbound. Sent versus accepted is a boundary that exists nowhere, so a loader that silently dropped three percent on the way out is invisible. *(nearest counterpart: BBH dbt Transformation TDD, §B.5)*
+- Event Hub sequence numbers are monotonic per partition, so a gap is a provably lost event — the strongest completeness proof available, and no document mentions it. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*
 
 ## 11. Recommendation
 
-Without the counts, no outbound completeness claim is provable.
+If yes, this is the strongest completeness proof in the estate and it costs almost nothing. Build it first.
 
 ## 12. Open Questions & Acceptance Criteria
 
 ### Open questions
 
-- **For SEI.** Will SEI return accepted and rejected counts per submission, so sent-versus-accepted can be made to tie?
+- **For both sides.** Are Event Hub sequence numbers monotonic per partition and gap-free under normal operation?
 
 ### Acceptance criteria
 

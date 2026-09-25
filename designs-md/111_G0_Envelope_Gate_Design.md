@@ -1,48 +1,48 @@
 ---
 cp360_type: design_document
-component_id: 80
-component_name: Event Quarantine
+component_id: 111
+component_name: G0 Envelope Gate
 zone: 2. Hub
 plane: Event Ingestion
 priority: P1
-technology: Oracle DDL + Python
-custom_build: High
+technology: Python
+custom_build: Medium
 depends_on: []
 status: Not Started
 owner: TBD
 origin: events-primary architect review
 sei_coverage: absent
-gap_owner: BBH
+gap_owner: Joint
 in_scope: true
 ---
 
-# Event Quarantine
+# G0 Envelope Gate
 
 ## 1. Purpose & Scope
 
-**Dead-letter with a reason taxonomy and a bounded replay counter**
+**Per-envelope structural validation before staging**
 
-Component 29 is a file quarantine. The event path has no equivalent and therefore no poison-pill escape.
+G1 validates a file's structure. Nothing validates an envelope.
 
 This component does not exist in the SEI design pack and has no entry in the original 65-component tracker. It is required by one substituted assumption: **SDC events are the primary ingestion path**, with everything from Stage 1 onward exactly as the pack specifies it.
 
 ## 2. Context & Dependencies
 
-- Technology: Oracle DDL + Python
-- Custom build: High — High means a design document is mandatory before code.
+- Technology: Python
+- Custom build: Medium — High means a design document is mandatory before code.
 - Source of record: Architect review — events-primary
 
 ## 3. Design Decisions
 
 No prior design decisions exist — this component has never been specified.
 
-**Direction.** BBH-owned and the highest-value single addition. Without a dead-letter path a poison envelope stalls its partition permanently.
+**Direction.** Without the catalogue, routing an event to the right view is inference rather than contract.
 
 ## 4. Detailed Design
 
-**Deliverable.** Dead-letter with a reason taxonomy and a bounded replay counter
+**Deliverable.** Per-envelope structural validation before staging
 
-**Technology.** Oracle DDL + Python
+**Technology.** Python
 
 ## 5. Data Quality, Reconciliation & Lineage
 
@@ -50,21 +50,16 @@ No DQ, reconciliation or lineage obligation specific to this component beyond th
 
 ## 6. Performance & Scale
 
-n/a
+Must run in the consumer loop, so it has to be O(1) per envelope with no database lookup.
 
 ## 7. Error Handling, Failure & Replay
 
-A file that fails becomes QUARANTINED. An event that fails has nowhere to go. Reasons needed: unknown view, invalid op, key not found, pull timeout, unparseable envelope, sequencer cycle.
+Unknown eventid, unresolvable view, invalid op, missing key. Each needs a disposition. Without a dead-letter path a single poison envelope stalls its partition for ever.
 ### E2 · Poison envelope stalls a partition indefinitely (critical)
 
 Ordering is guaranteed within a partition, so a single unprocessable envelope blocks everything behind it until a human intervenes. At-least-once redelivery means it returns for ever.
 
 **Who owns it today.** No dead-letter path exists for events. Component 29 quarantines files.
-### E10 · Replay has no attempt limit (medium)
-
-The Replay / Rerun Engine has no maximum attempt count before a work item is quarantined. A permanently failing item retries for ever and consumes capacity every cycle.
-
-**Who owns it today.** Bounded retry plus quarantine. Trivial to add now, painful to retrofit.
 
 ## 8. Security & Access Control
 
@@ -73,41 +68,41 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 ## 9. SEI Source Coverage
 
 **SEI pack coverage: absent** — nothing in the SEI pack.
-**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.
+**Who answers for the gap: Joint** — needs both sides.
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §D.2 | nothing in the pack covers it | D.2 recovers a QUARANTINED file. There is no event equivalent, so a poison envelope has no escape route. |
+| BBH File Ingestion Framework TDD v2.0 | §C.4 | nothing in the pack covers it | C.4 validates a file's structure before load. Nothing validates an envelope, so an unknown view or an invalid op reaches the collapser. |
 
 ## 10. Gaps, Risks & What Is Missing
 
 ### What is missing
 
-This component does not exist. Component 29 is a file quarantine. The event path has no equivalent and therefore no poison-pill escape.
+This component does not exist. G1 validates a file's structure. Nothing validates an envelope.
 
-**Priority P1, custom build High.**
+**Priority P1, custom build Medium.**
 
 ### Risk
 
 - **CRITICAL · error path (E2).** Poison envelope stalls a partition indefinitely.
-- **MEDIUM · error path (E10).** Replay has no attempt limit.
 
 ### Gap against the SEI pack
 
-- D.2 recovers a QUARANTINED file. There is no event equivalent, so a poison envelope has no escape route. *(nearest counterpart: BBH File Ingestion Framework TDD, §D.2)*
+- C.4 validates a file's structure before load. Nothing validates an envelope, so an unknown view or an invalid op reaches the collapser. *(nearest counterpart: BBH File Ingestion Framework TDD, §C.4)*
 
 ## 11. Recommendation
 
-BBH-owned and the highest-value single addition. Without a dead-letter path a poison envelope stalls its partition permanently.
+Without the catalogue, routing an event to the right view is inference rather than contract.
 
 ## 12. Open Questions & Acceptance Criteria
 
 ### Open questions
 
-None outstanding.
+- **For both sides.** Is there a published catalogue mapping eventid to domain and view? eventid is a type code, not a message identifier.
 
 ### Acceptance criteria
 
 - The deliverable above exists and is reviewed.
+- The open question above has a written answer from the named owner.
 - Each unowned error path above has a named owner and a disposition in `ERROR_CATALOG`.
 - The component appears in the tracker with a status other than Not Started.

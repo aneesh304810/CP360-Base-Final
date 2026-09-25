@@ -1,6 +1,6 @@
 ---
 cp360_type: design_document
-component_id: 79
+component_id: 114
 component_name: Idempotency Service
 zone: 2. Hub
 plane: Event Ingestion

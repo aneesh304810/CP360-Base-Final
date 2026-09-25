@@ -1,6 +1,6 @@
 ---
 cp360_type: design_document
-component_id: 72
+component_id: 107
 component_name: Domain Sequencer
 zone: 2. Hub
 plane: Event Ingestion

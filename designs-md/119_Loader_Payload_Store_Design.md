@@ -1,12 +1,12 @@
 ---
 cp360_type: design_document
-component_id: 68
-component_name: Loader Submission Registry
+component_id: 119
+component_name: Loader Payload Store
 zone: 2. Hub
 plane: Ingress/Egress
 priority: P1
-technology: Oracle DDL + Python
-custom_build: High
+technology: Oracle DDL + object store
+custom_build: Medium
 depends_on: []
 status: Not Started
 owner: TBD
@@ -16,33 +16,33 @@ gap_owner: BBH
 in_scope: true
 ---
 
-# Loader Submission Registry
+# Loader Payload Store
 
 ## 1. Purpose & Scope
 
-**LOADER_SUBMISSION · LOADER_STATUS_HISTORY (with SOURCE) · LOADER_ERROR**
+**What was generated and what was sent, with a content hash, written before submission**
 
-The outbound path has no FILE_REGISTRY equivalent anywhere in the pack or the 65.
+Without it a rejected record cannot be tied to the bytes that caused it, and a disagreement with SEI has no evidence on the BBH side.
 
 This component does not exist in the SEI design pack and has no entry in the original 65-component tracker. It is required by one substituted assumption: **SDC events are the primary ingestion path**, with everything from Stage 1 onward exactly as the pack specifies it.
 
 ## 2. Context & Dependencies
 
-- Technology: Oracle DDL + Python
-- Custom build: High — High means a design document is mandatory before code.
+- Technology: Oracle DDL + object store
+- Custom build: Medium — High means a design document is mandatory before code.
 - Source of record: Architect review — events-primary
 
 ## 3. Design Decisions
 
 No prior design decisions exist — this component has never been specified.
 
-**Direction.** BBH-owned. Record the submission at send time — without that row, a submission that never reached SEI is indistinguishable from one that succeeded.
+**Direction.** BBH-owned. Write the payload and its hash before the send, not after.
 
 ## 4. Detailed Design
 
-**Deliverable.** LOADER_SUBMISSION · LOADER_STATUS_HISTORY (with SOURCE) · LOADER_ERROR
+**Deliverable.** What was generated and what was sent, with a content hash, written before submission
 
-**Technology.** Oracle DDL + Python
+**Technology.** Oracle DDL + object store
 
 ## 5. Data Quality, Reconciliation & Lineage
 
@@ -50,16 +50,11 @@ No DQ, reconciliation or lineage obligation specific to this component beyond th
 
 ## 6. Performance & Scale
 
-Error detail is fetched once on reaching terminal-with-errors, paginated and stored. Re-fetching per poll pulls the same rejected records repeatedly.
+Store the artefact once and reference it. Never regenerate it to answer a question about it.
 
 ## 7. Error Handling, Failure & Replay
 
-Without a row written at send time, a submission that never reached SEI is indistinguishable from one that succeeded. Silence looks exactly like success.
-### E11 · Outbound has no error model at all (medium)
-
-Loader submissions have no registry, no status history, no error store and no correction protocol. A retry reuses the submission id; a correction is a new submission that references the one it corrects. Neither is defined.
-
-**Who owns it today.** The whole outbound half of the estate.
+Write before send, in that order. A payload recorded only after a successful send cannot explain a send that failed halfway, and a rejection arriving two days later has nothing to be read against.
 ### E14 · No record of what was actually sent (high)
 
 A rejection names records in a payload nobody kept. Without the generated artefact and its hash written before submission, a reject cannot be tied back to the bytes that caused it, a partial send cannot be told from a complete one, and a disagreement with SEI has no evidence on the BBH side.
@@ -77,28 +72,27 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §6.2 | nothing in the pack covers it | FILE_REGISTRY is the inbound record of a file. The outbound path has no submission registry, so a submission that never reached SEI is indistinguishable from one that succeeded. |
+| BBH File Ingestion Framework TDD v2.0 | whole document | nothing in the pack covers it | Nothing records what was sent. A rejection names records in a payload nobody kept. |
 
 ## 10. Gaps, Risks & What Is Missing
 
 ### What is missing
 
-This component does not exist. The outbound path has no FILE_REGISTRY equivalent anywhere in the pack or the 65.
+This component does not exist. Without it a rejected record cannot be tied to the bytes that caused it, and a disagreement with SEI has no evidence on the BBH side.
 
-**Priority P1, custom build High.**
+**Priority P1, custom build Medium.**
 
 ### Risk
 
-- **MEDIUM · error path (E11).** Outbound has no error model at all.
 - **HIGH · error path (E14).** No record of what was actually sent.
 
 ### Gap against the SEI pack
 
-- FILE_REGISTRY is the inbound record of a file. The outbound path has no submission registry, so a submission that never reached SEI is indistinguishable from one that succeeded. *(nearest counterpart: BBH File Ingestion Framework TDD, §6.2)*
+- Nothing records what was sent. A rejection names records in a payload nobody kept. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*
 
 ## 11. Recommendation
 
-BBH-owned. Record the submission at send time — without that row, a submission that never reached SEI is indistinguishable from one that succeeded.
+BBH-owned. Write the payload and its hash before the send, not after.
 
 ## 12. Open Questions & Acceptance Criteria
 

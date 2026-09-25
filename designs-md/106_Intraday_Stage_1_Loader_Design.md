@@ -1,6 +1,6 @@
 ---
 cp360_type: design_document
-component_id: 71
+component_id: 106
 component_name: Intraday Stage-1 Loader
 zone: 2. Hub
 plane: Event Ingestion

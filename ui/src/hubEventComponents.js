@@ -7,8 +7,10 @@
 
 import { AR_MISSING } from "./hubArchitectReview.js";
 
-// ids continue the tracker's numbering so sort order and CSV export hold
-const FIRST_ID = 66;
+// Ids start at 101, clear of the tracker's 1-65 AND of the existing design-doc
+// numbering, which already used 66 for Pre-Gold. Anything >= 101 came from the
+// events-primary review rather than the original pack.
+const FIRST_ID = 101;
 
 export const HUB_EVENT_COMPONENTS = AR_MISSING.map((m, i) => ({
   id: String(FIRST_ID + i),
