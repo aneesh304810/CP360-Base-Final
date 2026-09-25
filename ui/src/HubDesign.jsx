@@ -3,7 +3,9 @@ import { SectionHeader } from "./AppShell.jsx";
 import { TRACKER_COMPONENTS } from "./seiDesignTracker.js";
 import DocDrill, { DOCS, DEFAULT_DOC, docFor } from "./DocDrill.jsx";
 import SeiDesignPack from "./SeiDesignPack.jsx";
-import HubArchitectReview from "./HubArchitectReview.jsx";
+import { HUB_EVENT_COMPONENTS } from "./hubEventComponents.js";
+import { AR_FINDINGS, AR_VERDICTS, AR_ASSUMPTIONS, AR_BOTTLENECKS, AR_ERRORS }
+ from "./hubArchitectReview.js";
 
 // =====================================================================
 // HubDesign — the CP Integration Hub route: C4 landing (L1 context +
@@ -15,11 +17,17 @@ const contOf = (c) => {
  if (c.zone === "1. SEI") return "EXT";
  if (c.zone === "3. Consumers") return "CONS";
  if (c.zone === "4. OpenShift") return "PLAT";
- return { "Ingress/Egress": "IE", Processing: "PROC", Orchestration: "ORCH",
-  "Data Quality": "DQ", Foundation: "FND" }[c.plane] || "FND";
+ return { "Event Ingestion": "EVT", "Ingress/Egress": "IE", Processing: "PROC",
+  Orchestration: "ORCH", "Data Quality": "DQ", Foundation: "FND" }[c.plane] || "FND";
 };
-const COMPS = TRACKER_COMPONENTS.map((c) => ({ ...c, container: contOf(c) }));
+const COMPS = [...TRACKER_COMPONENTS, ...HUB_EVENT_COMPONENTS]
+ .map((c) => ({ ...c, container: contOf(c) }));
+const FIND = {};
+AR_FINDINGS.forEach((f) => { FIND[f.id] = f; });
+const newIn = (k) => COMPS.filter((c) => c.container === k && c.isNew).length;
+const findIn = (k) => COMPS.filter((c) => c.container === k && FIND[c.id]).length;
 const CONTAINERS = {
+ EVT: ["Event Ingestion", "⚡", "listener · staging · collapse · pull · micro-batch registry · quarantine"],
  IE: ["Ingress / Egress", "📥", "Landing+Transport · Sensors · Outbound Producers · Apigee · Gateway"],
  PROC: ["Processing", "🧪", "Python Ingestion · RAW · Stage 2 dbt · Gold dbt · Corrections"],
  ORCH: ["Orchestration", "🛠", "DAG fan-out · dim-before-fact · intraday · replay · partial-batch"],
@@ -53,6 +61,7 @@ export default function HubDesign({ t }) {
  const [dc, setDc] = useState("");
  const [dq, setDq] = useState("");
  const [flat, setFlat] = useState(false);       // "all components" flat tracker
+ const [expand, setExpand] = useState(null);    // L3 component detail panel
 
  const [live, setLive] = useState(false);   // true = Oracle-backed (shared)
  useEffect(() => {
@@ -147,6 +156,13 @@ export default function HubDesign({ t }) {
       textAnchor="middle">{l}</text>))}
    </g>);
  };
+ const Fld = ({ k, v, tone }) => (
+  <div style={{ marginTop: 9 }}>
+   <div style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: .4,
+    color: tone || t.sub || "#666" }}>{k.toUpperCase()}</div>
+   <div style={{ fontSize: 11, color: "#33414d", lineHeight: 1.6, marginTop: 2,
+    maxWidth: 940 }}>{v}</div>
+  </div>);
  const Defs = () => (
   <defs><marker id="hubarr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8"
    markerHeight="8" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#555" /></marker>
@@ -200,6 +216,14 @@ export default function HubDesign({ t }) {
      <div style={{ textAlign: "center", fontSize: 10, color: "#a9c1de" }}>
       <b style={{ display: "block", fontSize: 20, color: "#fff" }}>{rows.length}</b>
       components</div>
+     {newIn(cont) > 0 && (
+      <div style={{ textAlign: "center", fontSize: 10, color: "#f0b7bd" }}>
+       <b style={{ display: "block", fontSize: 20, color: "#ff9ba4" }}>{newIn(cont)}</b>
+       missing</div>)}
+     {findIn(cont) > 0 && (
+      <div style={{ textAlign: "center", fontSize: 10, color: "#f3d3a8" }}>
+       <b style={{ display: "block", fontSize: 20, color: "#ffc477" }}>{findIn(cont)}</b>
+       affected</div>)}
     </div>
     <div style={{ border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderRadius: 8,
      overflow: "hidden", background: "#fff" }}>
@@ -207,26 +231,51 @@ export default function HubDesign({ t }) {
       const dk = docFor(c), d = DOCS[dk], sx = stOf(c);
       const lab = d.chip || (d.default ? "Arch" : d.id === "l2-planes" ? "Planes"
        : d.id === "l3-stages" ? "Stage 1/2" : d.id === "l3-errors" ? "Errors" : d.title);
+      const f = FIND[c.id];
+      const hasPanel = c.isNew || !!f;
+      const vc = c.isNew ? "#cc3344" : f ? (AR_VERDICTS[f.verdict] || ["#5c7c94"])[0] : null;
+      const vt = c.isNew ? "NEW · MISSING" : f ? f.verdict.toUpperCase() : null;
+      const isX = expand === c.id;
       return (
-       <div key={c.id} style={{ display: "grid",
-        gridTemplateColumns: "34px minmax(0,1.2fr) minmax(0,1.5fr) 90px 128px",
-        gap: 10, padding: "8px 14px", fontSize: 11, borderTop: "1px solid #eef1f4",
-        alignItems: "center" }}>
-        <span style={{ fontFamily: "Roboto Mono, monospace", fontSize: 10,
-         fontWeight: 700, color: Z_C[c.zone] || "#888" }}>{c.id}</span>
-        <b style={{ color: t.navy || "#10193b", overflow: "hidden",
-         textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.component}>
-         {c.component}</b>
-        <span style={{ fontSize: 10, color: t.sub || "#666", overflow: "hidden",
-         textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.deliverable}>
-         {c.deliverable}</span>
-        <span>{chip((STCOL[sx.status] || "#eef1f4") + "22",
-         STCOL[sx.status] || "#8a97a3", `${sx.status.toUpperCase()} · ${sx.pct}%`)}</span>
-        <span onClick={() => setDoc({ key: dk, from: c })}
-         style={{ fontSize: 9, fontWeight: 800, padding: "3px 9px", borderRadius: 999,
-          background: d.bg, color: d.color, border: `1px solid ${d.color}`,
-          cursor: "pointer", textAlign: "center", whiteSpace: "nowrap" }}>
-         {d.icon} {lab} →</span>
+       <div key={c.id} style={{ borderTop: "1px solid #eef1f4",
+        background: isX ? "#fafcfe" : undefined }}>
+        <div style={{ display: "grid",
+         gridTemplateColumns: "34px minmax(0,1.15fr) minmax(0,1.4fr) 104px 90px 128px",
+         gap: 10, padding: "8px 14px", fontSize: 11, alignItems: "center",
+         cursor: hasPanel ? "pointer" : "default" }}
+         onClick={hasPanel ? () => setExpand(isX ? null : c.id) : undefined}>
+         <span style={{ fontFamily: "Roboto Mono, monospace", fontSize: 10,
+          fontWeight: 700, color: c.isNew ? "#cc3344" : Z_C[c.zone] || "#888" }}>
+          {hasPanel ? (isX ? "− " : "+ ") : ""}{c.id}</span>
+         <b style={{ color: t.navy || "#10193b", overflow: "hidden",
+          textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.component}>
+          {c.component}</b>
+         <span style={{ fontSize: 10, color: t.sub || "#666", overflow: "hidden",
+          textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.deliverable}>
+          {c.deliverable}</span>
+         <span>{vt ? chip(vc + "1f", vc, vt) : null}</span>
+         <span>{chip((STCOL[sx.status] || "#eef1f4") + "22",
+          STCOL[sx.status] || "#8a97a3", `${sx.status.toUpperCase()} · ${sx.pct}%`)}</span>
+         <span onClick={(e) => { e.stopPropagation(); setDoc({ key: dk, from: c }); }}
+          style={{ fontSize: 9, fontWeight: 800, padding: "3px 9px", borderRadius: 999,
+           background: d.bg, color: d.color, border: `1px solid ${d.color}`,
+           cursor: "pointer", textAlign: "center", whiteSpace: "nowrap" }}>
+          {d.icon} {lab} →</span>
+        </div>
+        {isX && (
+         <div style={{ padding: "2px 14px 14px 48px", borderTop: "1px dashed #e3eaf0" }}>
+          {c.isNew && <>
+           <Fld k="deliverable" v={c.deliverable} />
+           <Fld k="performance" v={c.perf} tone="#a8560f" />
+           <Fld k="error handling" v={c.err} tone="#cc3344" />
+           <Fld k="why it is missing" v={c.questions} />
+           <Fld k="build" v={`${c.technology} · custom build ${c.custom} · ${c.priority}`} />
+          </>}
+          {f && <>
+           <Fld k={`finding · ${f.verdict}`} v={f.finding} tone={vc} />
+           <Fld k="action" v={f.action} tone="#159943" />
+          </>}
+         </div>)}
        </div>);
      })}
     </div>
@@ -276,71 +325,118 @@ export default function HubDesign({ t }) {
      ← context + dashboard</span>
     <div style={{ background: "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
      borderRadius: 10, padding: 16, overflowX: "auto" }}>
-     <svg viewBox="0 0 1280 840" style={{ minWidth: 880, display: "block" }}>
+     <svg viewBox="0 0 1240 1070" style={{ minWidth: 940, display: "block" }}>
       <Defs />
-      <rect x="196" y="24" width="820" height="786" rx="10" fill="none"
+      <rect x="196" y="24" width="740" height="1016" rx="10" fill="none"
        stroke="#1168bd" strokeDasharray="8 5" strokeWidth="1.5" />
-      <text x="214" y="46" fontSize="11" fontWeight="800" fill="#1168bd">
-       CP INTEGRATION HUB — plane groups · click a group for its components</text>
-      <Grp x={250} y={58} w={742} h={92} k="ORCH" />
-      <Mini x={262} y={108} w={138} label="DAG + Fan-out" k="fan-out" />
-      <Mini x={408} y={108} w={138} label="Dim-before-Fact" k="dim-before" />
-      <Mini x={554} y={108} w={130} label="Intraday Cadence" k="intraday" />
-      <Mini x={692} y={108} w={130} label="Replay / Rerun" k="replay" />
-      <Mini x={830} y={108} w={150} label="Partial-Batch Policy" k="partial" />
-      <Sys x={24} y={330} w={150} label="SEI SWP" sub="batch + APIs|+ loader endpoint"
-       kind="ext" onClick={() => { setCont("EXT"); setView("L3"); }} />
-      <Grp x={216} y={180} w={190} h={440} k="IE" />
-      <Mini x={230} y={214} w={162} label="Landing + Transport" k="landing" />
-      <Mini x={230} y={252} w={162} label="File Arrival Sensors" k="arrival" />
-      <Mini x={230} y={330} w={162} label="API Gateway / Data Plane" k="gateway" />
-      <Mini x={230} y={368} w={162} label="Apigee Proxy" k="apigee" />
-      <Mini x={230} y={520} w={162} label="Outbound Producers" k="outbound produc" />
-      <Grp x={446} y={180} w={240} h={440} k="PROC" />
-      <Mini x={468} y={214} w={196} label="Python Ingestion Fwk" k="python ingestion" />
-      <Mini x={468} y={268} w={196} label="Stage 1 RAW" cyl k="stage 1" />
-      <Mini x={468} y={322} w={196} label="Correction Handling · AD-2" k="correction" />
-      <Mini x={468} y={376} w={196} label="Stage 2 Enriched · dbt" cyl k="stage 2" />
-      <Mini x={468} y={440} w={196} label="Pre-Gold Exadata · dbt" cyl k="gold" />
-      <Rel x1={566} y1={238} x2={566} y2={268} label="" />
-      <Rel x1={566} y1={292} x2={566} y2={322} label="" />
-      <Rel x1={566} y1={346} x2={566} y2={376} label="" />
-      <Rel x1={566} y1={400} x2={566} y2={440} label="" />
-      <Grp x={726} y={180} w={180} h={440} k="DQ" />
-      <Mini x={740} y={214} w={152} label="G1 Structural" k="g1" />
-      <Mini x={740} y={252} w={152} label="G2 RAW Profiling" k="g2" />
-      <Mini x={740} y={290} w={152} label="G3 dbt + Business" k="g3" />
-      <Mini x={740} y={328} w={152} label="G4 Tie-out" k="g4" />
-      <Mini x={740} y={366} w={152} label="G5 Post-Publish Recon" k="g5" />
-      <Mini x={740} y={404} w={152} label="DQ Framework" k="dq framework" />
-      <Grp x={250} y={712} w={742} h={82} k="FND" />
-      <Mini x={258} y={756} w={96} label="Errors/Quar." k="error" />
-      <Mini x={360} y={756} w={80} label="Recon Fwk" k="reconcil" />
-      <Mini x={446} y={756} w={96} label="Audit/Lineage" k="audit" />
-      <Mini x={548} y={756} w={74} label="Security" k="security" />
-      <Mini x={628} y={756} w={110} label="Metadata/Config" k="metadata" />
-      <Mini x={744} y={756} w={96} label="Observability" k="observab" />
-      <Mini x={846} y={756} w={90} label="Integration360" k="integration360" />
-      <Mini x={942} y={756} w={44} label="SSO" k="sso" />
-      <Sys x={1050} y={320} w={206} label="PBDW · IMDS · Pivotal"
-       sub={`FINAL GOLD · consumers + producers|▼ ${cnt("CONS")} components`}
+      <text x="212" y="46" fontSize="10.5" fontWeight="800" fill="#1168bd">
+       CP INTEGRATION HUB · zone 2</text>
+
+      {/* orchestration band */}
+      <text x="216" y="96" fontSize="9.5" fontWeight="800" fill="#0f4775">
+       🛠 Orchestration · {cnt("ORCH")} components</text>
+      <Mini x={216} y={108} w={94} label="DAG Fan-out" k="fan-out" />
+      <Mini x={317} y={108} w={94} label="Dim→Fact" k="dim-before" />
+      <Mini x={418} y={108} w={94} label="Intraday Cadence" k="intraday cadence" />
+      <Mini x={519} y={108} w={94} label="Replay / Rerun" k="replay" />
+      <Mini x={620} y={108} w={94} label="Partial-Batch" k="partial" />
+      <Mini x={721} y={108} w={94} label="Gate Evaluator" k="gate evaluator" />
+      <Mini x={822} y={108} w={94} label="Status Poller" k="status poller" />
+
+      {/* external sources */}
+      <Sys x={24} y={250} w={150} label="SDC Event Hub"
+       sub="PRIMARY · 4-field envelope|micro-batch boxed" kind="ext" />
+      <Sys x={24} y={430} w={150} label="SEI source views"
+       sub="current state only|read by the pull" kind="ext" />
+      <Sys x={24} y={740} w={150} label="SEI SWP"
+       sub="STANDBY files|+ loader endpoint" kind="ext"
+       onClick={() => { setCont("EXT"); setView("L3"); }} />
+
+      {/* event ingestion */}
+      <Grp x={212} y={180} w={214} h={470} k="EVT" />
+      <Mini x={222} y={214} w={190} label="SDC Event Listener" k="event listener" />
+      <Mini x={222} y={250} w={190} label="G0 Envelope Gate" k="envelope gate" />
+      <Mini x={222} y={286} w={190} label="Event Staging Store" cyl k="event staging" />
+      <Mini x={222} y={322} w={190} label="Micro-Batch Registry" cyl k="micro-batch registry" />
+      <Mini x={222} y={358} w={190} label="Key-Set Collapser" k="key-set collapser" />
+      <Mini x={222} y={394} w={190} label="Idempotency Service" k="idempotency" />
+      <Mini x={222} y={430} w={190} label="Domain Sequencer" k="domain sequencer" />
+      <Mini x={222} y={466} w={190} label="Set-Based Puller" k="set-based puller" />
+      <Mini x={222} y={502} w={190} label="Intraday Stage-1 Loader" k="intraday stage-1" />
+      <Mini x={222} y={538} w={190} label="Event Quarantine" k="event quarantine" />
+      <Mini x={222} y={574} w={190} label="Sequence Gap Detector" k="sequence gap" />
+      <Mini x={222} y={610} w={190} label="Consumer Lag Monitor" k="consumer lag" />
+
+      {/* file ingress, now standby, plus the outbound loop */}
+      <Grp x={212} y={672} w={214} h={222} k="IE" />
+      <Mini x={222} y={702} w={190} label="Landing + Transport" k="landing" />
+      <Mini x={222} y={729} w={190} label="File Arrival Sensors" k="arrival" />
+      <Mini x={222} y={756} w={190} label="API Gateway" k="gateway" />
+      <Mini x={222} y={783} w={190} label="Apigee Proxy" k="apigee" />
+      <Mini x={222} y={810} w={190} label="Outbound Producers" k="outbound produc" />
+      <Mini x={222} y={837} w={190} label="Callback Receiver" k="callback receiver" />
+      <Mini x={222} y={864} w={190} label="Submission Registry" k="submission registry" />
+
+      {/* processing */}
+      <Grp x={444} y={180} w={226} h={470} k="PROC" />
+      <Mini x={454} y={214} w={200} label="Python Ingestion Fwk" k="python ingestion" />
+      <Mini x={454} y={280} w={200} label="Stage 1 RAW" cyl k="stage 1" />
+      <Mini x={454} y={346} w={200} label="Correction Handling" k="correction" />
+      <Mini x={454} y={412} w={200} label="Stage 2 Enriched · dbt" cyl k="stage 2" />
+      <Mini x={454} y={478} w={200} label="Pre-Gold Exadata · dbt" cyl k="gold" />
+      <Rel x1={554} y1={238} x2={554} y2={280} label="" />
+      <Rel x1={554} y1={304} x2={554} y2={346} label="" />
+      <Rel x1={554} y1={370} x2={554} y2={412} label="" />
+      <Rel x1={554} y1={436} x2={554} y2={478} label="" />
+
+      {/* data quality */}
+      <Grp x={688} y={180} w={232} h={470} k="DQ" />
+      <Mini x={700} y={214} w={208} label="G1 Structural" k="g1" />
+      <Mini x={700} y={250} w={208} label="G2 RAW Profiling" k="g2" />
+      <Mini x={700} y={286} w={208} label="G3 dbt + Business" k="g3" />
+      <Mini x={700} y={322} w={208} label="G4 Tie-out" k="g4" />
+      <Mini x={700} y={358} w={208} label="G5 Post-Publish Recon" k="g5" />
+      <Mini x={700} y={394} w={208} label="DQ Framework" k="dq framework" />
+      <text x="700" y="446" fontSize="8" fontStyle="italic" fill="#a8560f">
+       G0/G1/G3 per micro-batch · G2/G4/G5 at the EOD gate only</text>
+      <text x="700" y="460" fontSize="8" fontStyle="italic" fill="#a8560f">
+       running the set-level gates per box is 288× a day [B5]</text>
+
+      {/* foundation */}
+      <Grp x={212} y={930} w={708} h={110} k="FND" />
+      <Mini x={222} y={968} w={96} label="Errors/Quar." k="error handling" />
+      <Mini x={326} y={968} w={82} label="Recon Fwk" k="reconcil" />
+      <Mini x={416} y={968} w={96} label="Audit/Lineage" k="audit" />
+      <Mini x={520} y={968} w={74} label="Security" k="security" />
+      <Mini x={602} y={968} w={112} label="Metadata/Config" k="metadata" />
+      <Mini x={722} y={968} w={96} label="Observability" k="observab" />
+      <Mini x={826} y={968} w={84} label="Integr.360" k="integration360" />
+      <Mini x={222} y={1000} w={44} label="SSO" k="sso" />
+      <Mini x={274} y={1000} w={150} label="Schema Contract Registry" k="schema contract" />
+      <Mini x={432} y={1000} w={128} label="Expectation Store" k="expectation store" />
+
+      {/* consumers + platform */}
+      <Sys x={970} y={300} w={210} label="PBDW · IMDS · Pivotal"
+       sub={`FINAL GOLD · consumers|▼ ${cnt("CONS")} components`}
        onClick={() => { setCont("CONS"); setView("L3"); }} />
-      <Sys x={1050} y={712} w={206} label={CONTAINERS.PLAT[0]}
+      <Sys x={970} y={930} w={210} label={CONTAINERS.PLAT[0]}
        sub={`runtime · CI/CD · ops|▼ ${cnt("PLAT")} components`}
        onClick={() => { setCont("PLAT"); setView("L3"); }} />
-      <Ortho pts={[[174,352],[200,352],[200,226],[230,226]]} label="feeds + manifest" lx={187} ly={300} />
-      <Ortho pts={[[174,375],[212,375],[212,342],[230,342]]} label="APIs in" kind="rt" lx={205} ly={395} />
-      <Ortho pts={[[392,264],[426,264],[426,226],[468,226]]} label="accepted" lx={428} ly={250} />
-      <Ortho pts={[[740,264],[700,264],[700,280],[664,280]]} label="intake G1·G2" kind="gate" lx={703} ly={246} />
-      <Ortho pts={[[740,302],[712,302],[712,388],[664,388]]} label="in dbt G3" kind="gate" lx={712} ly={415} />
-      <Ortho pts={[[740,340],[724,340],[724,452],[676,452]]} label="blocks publish G4 [AD-9]" kind="gate" lx={790} ly={475} />
-      <Ortho pts={[[892,378],[1050,378]]} label="post-publish G5" kind="gate" lx={975} ly={368} />
-      <Ortho pts={[[566,464],[566,682],[1153,682],[1153,430]]} label="Pre-Gold → publish final Gold [movement]" kind="move" thick lx={880} ly={694} />
-      <Ortho pts={[[392,348],[420,348],[420,640],[1130,640],[1130,430]]} label="consumer APIs" kind="rt" lx={900} ly={630} />
-      <Ortho pts={[[1050,415],[1004,415],[1004,662],[350,662],[350,544]]} label="outbound · consumers as producers [AD-11]" kind="out" lx={690} ly={652} />
-      <Ortho pts={[[230,532],[99,532],[99,415]]} label="submission/ack [AD-11]" kind="out" lx={164} ly={554} />
-      <Ortho pts={[[621,150],[621,165],[566,165],[566,180]]} label="orchestrates" kind="ctl" lx={660} ly={166} />
-      <Ortho pts={[[500,712],[500,620]]} label="drives · config" kind="ctl" lx={548} ly={676} />
+
+      {/* relationships */}
+      <Ortho pts={[[176,285],[212,285]]} label="events [primary]" lx={194} ly={272} />
+      <Ortho pts={[[212,470],[192,470],[192,466],[176,466]]} label="set-based pull" lx={196} ly={500} />
+      <Ortho pts={[[176,775],[212,775]]} label="files [standby]" lx={194} ly={762} />
+      <Ortho pts={[[212,850],[190,850],[190,800],[176,800]]} label="submit · push + poll" kind="out" lx={188} ly={880} />
+      <Ortho pts={[[426,514],[436,514],[436,292],[452,292]]} label="" />
+      <text x="318" y="646" fontSize="8" fontStyle="italic" fill="#159943">
+       one commit per micro-batch, straight into Stage 1</text>
+      <Ortho pts={[[426,712],[557,712],[557,654]]} label="standby load" lx={600} ly={706} />
+      <Ortho pts={[[670,232],[688,232]]} label="" kind="gate" />
+      <Ortho pts={[[688,300],[670,300]]} label="blocks publish [G4]" kind="gate" lx={672} ly={324} />
+      <Ortho pts={[[554,652],[554,692],[952,692],[952,412],[968,412]]} label="publish final Gold" kind="move" thick lx={780} ly={686} />
+      <Ortho pts={[[554,140],[554,178]]} label="orchestrates" kind="ctl" lx={606} ly={166} />
+      <Ortho pts={[[566,928],[566,896]]} label="drives · config" kind="ctl" lx={620} ly={916} />
      </svg>
      <div style={{ display: "flex", gap: 14, marginTop: 10, fontSize: 9.5,
       color: "#5c6b7a", flexWrap: "wrap" }}>
@@ -354,17 +450,87 @@ export default function HubDesign({ t }) {
    </div>);
  }
 
- /* ---------- Architect review ---------- */
- if (view === "REVIEW")
+ /* ---------- cross-cutting concerns (events-primary) ---------- */
+ if (view === "XC") {
+  const Bar = ({ icon, title, note, n, label }) => (
+   <div style={{ display: "flex", alignItems: "center", gap: 12,
+    background: t.navy || "#10193b", color: "#fff", borderRadius: 10,
+    padding: "14px 20px", margin: "18px 0 10px" }}>
+    <span style={{ fontSize: 24 }}>{icon}</span>
+    <div><b>{title}</b>
+     <div style={{ fontSize: 10, color: "#a9c1de", marginTop: 2 }}>{note}</div></div>
+    <div style={{ marginLeft: "auto", textAlign: "center", fontSize: 10,
+     color: "#a9c1de" }}><b style={{ display: "block", fontSize: 20,
+     color: "#fff" }}>{n}</b>{label}</div>
+   </div>);
+  const List = ({ rows, tone }) => (
+   <div style={{ border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderRadius: 8,
+    overflow: "hidden", background: "#fff" }}>
+    {rows.map((r) => {
+     const isX = expand === r.id;
+     return (
+      <div key={r.id} style={{ borderTop: "1px solid #eef1f4",
+       background: isX ? "#fafcfe" : undefined }}>
+       <div onClick={() => setExpand(isX ? null : r.id)} style={{ display: "grid",
+        gridTemplateColumns: "48px minmax(0,1fr) 78px", gap: 10, padding: "9px 14px",
+        fontSize: 11, alignItems: "center", cursor: "pointer" }}>
+        <span style={{ fontFamily: "Roboto Mono, monospace", fontSize: 10,
+         fontWeight: 700, color: tone }}>{isX ? "− " : "+ "}{r.id}</span>
+        <b style={{ color: t.navy || "#10193b" }}>{r.title}</b>
+        <span>{chip(tone + "1f", tone, (r.sev || "").toUpperCase())}</span>
+       </div>
+       {isX && (
+        <div style={{ padding: "2px 14px 14px 62px", borderTop: "1px dashed #e3eaf0" }}>
+         <Fld k="what happens" v={r.body} />
+         <Fld k={r.fix ? "what to do" : "who owns it today"} v={r.fix || r.owner}
+          tone={r.fix ? "#159943" : "#cc3344"} />
+         <Fld k="components" v={r.comp.map((x) => {
+          const c = COMPS.find((z) => z.arId === x || z.id === x);
+          return c ? `#${c.id} ${c.component}` : x; }).join("  ·  ")} />
+        </div>)}
+      </div>);
+    })}
+   </div>);
   return (
    <div>
     <SectionHeader t={t}>CP Integration Hub</SectionHeader>
-    <HubArchitectReview t={t} onBack={
-     <span onClick={() => setView("L1")} style={{ fontSize: 11.5, fontWeight: 700,
-      padding: "7px 16px", borderRadius: 5, background: t.navy || "#10193b",
-      color: "#fff", cursor: "pointer", display: "inline-block", marginBottom: 12 }}>
-      ← context + dashboard</span>} />
+    <span onClick={() => setView("L1")} style={{ fontSize: 11.5, fontWeight: 700,
+     padding: "7px 16px", borderRadius: 5, background: t.navy || "#10193b",
+     color: "#fff", cursor: "pointer", display: "inline-block", marginBottom: 12 }}>
+     ← context + dashboard</span>
+
+    <Bar icon="◈" title="The assumption set"
+     note="one substitution: SDC events are the primary ingestion path · Stage 1 onward per the SEI pack"
+     n="5" label="of 8 changed" />
+    <div style={{ border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderRadius: 8,
+     overflow: "hidden", background: "#fff" }}>
+     {AR_ASSUMPTIONS.map((a) => (
+      <div key={a.id} style={{ display: "grid",
+       gridTemplateColumns: "48px 84px minmax(0,1fr)", gap: 10, padding: "10px 14px",
+       fontSize: 11, borderTop: "1px solid #eef1f4", alignItems: "start" }}>
+       <span style={{ fontFamily: "Roboto Mono, monospace", fontSize: 10,
+        fontWeight: 700, color: t.sub || "#666" }}>{a.id}</span>
+       <span>{a.holds === "changed" ? chip("#cc33441f", "#cc3344", "CHANGED")
+        : chip("#1599431f", "#159943", "HELD")}</span>
+       <div><b style={{ color: t.navy || "#10193b" }}>{a.what}</b>
+        <div style={{ fontSize: 10.5, color: "#33414d", lineHeight: 1.6,
+         marginTop: 3 }}>{a.detail}</div>
+        <div style={{ fontSize: 9.5, color: t.sub || "#666", marginTop: 3 }}>
+         source: {a.src}</div></div>
+      </div>))}
+    </div>
+
+    <Bar icon="◔" title="Performance bottlenecks"
+     note="every one was a correct decision for a daily file cycle and stops being correct at 288 cycles a day"
+     n={AR_BOTTLENECKS.length} label="ranked" />
+    <List rows={AR_BOTTLENECKS} tone="#a8560f" />
+
+    <Bar icon="⚠" title="Error paths with no owner"
+     note="the first four lose data silently — no alert fires and no count disagrees"
+     n={AR_ERRORS.length} label="unowned" />
+    <List rows={AR_ERRORS} tone="#cc3344" />
    </div>);
+ }
 
  /* ---------- L1: context + dashboard ---------- */
  const o = overall(null);
@@ -375,10 +541,10 @@ export default function HubDesign({ t }) {
   <div>
    <SectionHeader t={t}>CP Integration Hub</SectionHeader>
    <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center" }}>
-    <span onClick={() => setView("REVIEW")} style={{ marginLeft: "auto", fontSize: 10.5,
+    <span onClick={() => setView("XC")} style={{ marginLeft: "auto", fontSize: 10.5,
      fontWeight: 700, padding: "5px 14px", borderRadius: 999, cursor: "pointer",
      background: "#fdf1f2", color: "#cc3344", border: "1px solid #f0c9ce" }}>
-     ⚠ architect review · events-primary</span>
+     ⚠ cross-cutting · {AR_BOTTLENECKS.length} bottlenecks · {AR_ERRORS.length} error paths</span>
     <span onClick={() => setFlat(true)} style={{ fontSize: 10.5,
      fontWeight: 700, padding: "5px 14px", borderRadius: 999, cursor: "pointer",
      background: "#eef3f8", color: t.accent || "#0f4775" }}>
@@ -394,19 +560,22 @@ export default function HubDesign({ t }) {
        textAnchor="middle">CP Data Ops</text>
       <text x="640" y="92" fontSize="8" fill="#b8c9dd" textAnchor="middle">
        runs batch · quarantine · overrides</text></g>
-     <Sys x={60} y={200} w={190} label="SEI SWP Platform"
-      sub="batch extracts + LOADERS|~30 feeds in · 16 loaders back" kind="ext" />
-     <Sys x={60} y={420} w={190} label="SEI SWP APIs" sub="real-time source" kind="ext" />
+     <Sys x={60} y={150} w={190} label="SEI SDC Event Hub"
+      sub="PRIMARY · intraday + EOD|4-field envelope · micro-batch boxed" kind="ext" />
+     <Sys x={60} y={300} w={190} label="SEI SWP Platform"
+      sub="STANDBY files + LOADERS|generated and held · 16 loaders back" kind="ext" />
+     <Sys x={60} y={440} w={190} label="SEI SWP APIs" sub="real-time source" kind="ext" />
      <Sys x={480} y={250} w={320} label="CP INTEGRATION HUB"
-      sub={`Landing → RAW → Enriched → Gold → publish|inbound + OUTBOUND lanes|▼ CLICK TO OPEN · ${COMPS.length} components`}
+      sub={`events → Stage 1 → STG → INT → Gold → publish|inbound + OUTBOUND lanes|▼ CLICK TO OPEN · ${COMPS.length} components · ${COMPS.filter((c) => c.isNew).length} missing`}
       onClick={() => setView("L2")} />
      <Sys x={1010} y={120} w={210} label="PBDW" sub="SYSTEM OF RECORD · existing" />
      <Sys x={1010} y={240} w={210} label="Pivotal DB" sub="existing" />
      <Sys x={1010} y={345} w={210} label="IMDS" sub="existing" />
      <Sys x={1010} y={460} w={210} label="CP DW Canonical" sub="not built this phase" kind="fut" />
-     <Ortho pts={[[250,225],[300,225],[300,270],[480,270]]} label="sFTP feeds + manifest [EOD]" lx={368} ly={258} />
-     <Ortho pts={[[480,300],[330,300],[330,240],[250,240]]} label="16 loaders · submission/ack [AD-11]" kind="out" lx={392} ly={314} />
-     <Ortho pts={[[250,445],[360,445],[360,315],[480,315]]} label="APIs via Gateway [no batch dep]" kind="rt" lx={368} ly={398} />
+     <Ortho pts={[[250,186],[350,186],[350,262],[480,262]]} label="SDC events [primary · continuous]" kind="rt" thick lx={372} ly={200} />
+     <Ortho pts={[[250,330],[320,330],[320,276],[480,276]]} label="files [standby only]" lx={392} ly={266} />
+     <Ortho pts={[[480,308],[288,308],[288,352],[250,352]]} label="loaders · submit + push/poll" kind="out" lx={384} ly={322} />
+     <Ortho pts={[[250,465],[380,465],[380,312],[480,312]]} label="APIs via Gateway" kind="rt" lx={386} ly={410} />
      <Ortho pts={[[640,110],[640,250]]} label="operates · approves" kind="ctl" lx={700} ly={180} />
      <Ortho pts={[[800,262],[860,262],[860,145],[1010,145]]} label="" kind="move" />
      <Ortho pts={[[800,275],[905,275],[905,265],[1010,265]]} label="publish [movement only]" kind="move" lx={905} ly={296} />

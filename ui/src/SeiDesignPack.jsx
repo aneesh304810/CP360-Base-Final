@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { TRACKER_SUMMARY, TRACKER_COMPONENTS, TRACKER_DECISIONS }
  from "./seiDesignTracker.js";
+import { HUB_EVENT_COMPONENTS } from "./hubEventComponents.js";
 import DocDrill, { DOCS, DEFAULT_DOC, docFor } from "./DocDrill.jsx";
 
 // =====================================================================
@@ -35,7 +36,8 @@ export default function SeiDesignPack({ t }) {
  if (doc) return <DocDrill t={t} docKey={doc.key} from={doc.from} onBack={() => setDoc(null)} />;
 
  /* ================= LANDING: architecture hero + tracker ================= */
- const rows = TRACKER_COMPONENTS.filter((c) =>
+ const ALL = [...TRACKER_COMPONENTS, ...HUB_EVENT_COMPONENTS];
+ const rows = ALL.filter((c) =>
   (!zone || c.zone === zone) &&
   (!onlyHigh || c.custom === "High") &&
   (!q || (c.component + " " + c.plane + " " + c.technology + " " + c.deliverable)
@@ -58,11 +60,17 @@ export default function SeiDesignPack({ t }) {
     <div style={{ flex: 1, minWidth: 0 }}>
      <b style={{ fontSize: 15 }}>Component Architecture — SEI ↔ BBH Integration</b>
      <div style={{ fontSize: 10.5, color: "#a9c1de", marginTop: 3 }}>{S.line}</div>
+     <div style={{ fontSize: 10.5, color: "#ff9ba4", marginTop: 3 }}>
+      Plus {HUB_EVENT_COMPONENTS.length} the events-primary assumption requires and the
+      SEI pack does not cover — shown in red below, and listed under the new
+      Event Ingestion plane.</div>
     </div>
     <div style={{ display: "flex", gap: 14, fontSize: 10.5, color: "#a9c1de",
      alignItems: "center" }}>
-     {[["components", S.totals.components], ["P1", S.totals.p1],
-       ["high custom", S.totals.high]].map((kv) => (
+     {[["components", ALL.length],
+       ["P1", ALL.filter((c) => c.priority === "P1").length],
+       ["high custom", ALL.filter((c) => c.custom === "High").length],
+       ["missing", ALL.filter((c) => c.isNew).length]].map((kv) => (
       <span key={kv[0]} style={{ textAlign: "center" }}>
        <b style={{ display: "block", fontSize: 17, color: "#fff" }}>{kv[1]}</b>{kv[0]}</span>))}
      <span style={{ fontSize: 13, fontWeight: 700, color: t.pop || "#31bced",
@@ -150,9 +158,11 @@ export default function SeiDesignPack({ t }) {
          color: Z_C[c.zone] || "#888", fontWeight: 700 }}>{c.id}</span>
         <span style={{ fontSize: 9.5, color: t.sub || "#666", overflow: "hidden",
          textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.plane}>{c.plane}</span>
-        <b style={{ color: t.navy || "#10193b", minWidth: 0, overflow: "hidden",
-         textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.component}>
-         {c.component}</b>
+        <b style={{ color: c.isNew ? "#cc3344" : t.navy || "#10193b", minWidth: 0,
+         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+         title={c.isNew ? `${c.component} — missing from the SEI pack and the original 65`
+          : c.component}>
+         {c.isNew ? "● " : ""}{c.component}</b>
         <span style={{ fontSize: 10, color: t.sub || "#666", minWidth: 0,
          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
          title={c.deliverable}>{c.deliverable}</span>
