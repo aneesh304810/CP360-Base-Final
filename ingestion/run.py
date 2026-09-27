@@ -35,6 +35,7 @@ STEPS = [
     "legacy_lineage",    # legacy DWH end-to-end lineage (SRC->STG1->STG2->DWH) + proof
     "legacy_dictionary", # legacy business definitions (AddVantage/CRD/STAR) keyed by field code
     "legacy_source_file",# CP_SOURCE_FILE: the business name of each AddVantage EOD feed
+    "sei_crosswalk",     # IMDS/STAR/UAF/SEI crosswalk workbook — lanes, mapping, verdicts
     "event360",          # Event 360: the SEI event specification workbook
     "sdc_compute",       # SDC client compute sizing: the read-back bill, per view
     "event_subscription",# who consumes which event, from CSV — BBH's own decision
@@ -209,6 +210,12 @@ def _run_step(step, conn, loader, resolver) -> None:
         c = SdcComputeConnector.from_env()
         n = c.load(loader, c.parse())
         log.info("sdc_compute: merged %s rows", n)
+        return
+    if step == "sei_crosswalk":
+        from .lane_lineage_conn import SeiCrosswalkConnector
+        c = SeiCrosswalkConnector.from_env()
+        n = c.load(loader, c.parse())
+        log.info("sei_crosswalk: merged %s rows", n)
         return
     if step == "legacy_source_file":
         from .legacy_source_file_conn import LegacySourceFileConnector

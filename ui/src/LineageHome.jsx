@@ -4,6 +4,7 @@ import { api } from "./api.js";
 import BizLineage from "./BizLineage.jsx";
 import LegacyLineage from "./LegacyLineage.jsx";
 import SourceLineage from "./SourceLineage.jsx";
+import CrosswalkDashboard from "./CrosswalkDashboard.jsx";
 
 // =====================================================================
 // LineageHome — the Lineage shell, superseding the old Lineage.jsx
@@ -326,14 +327,12 @@ export default function LineageHome({ t, focus }) {
     </div>
    </div>
 
+   {/* scope === "sei" was a placeholder panel reserving this slot for the
+       SWP program. CrosswalkDashboard is what goes in it. It self-hides when
+       the warehouse has no crosswalk loaded, so PBDW is unchanged until its
+       own workbook is ingested — no flag, the data decides. */}
    {scope === "sei" ? (
-    <div style={{ background: t.panel || "#fff",
-     border: `1px solid ${t.panel2 || "#dfe6e9"}`,
-     borderRadius: 3, padding: 44, textAlign: "center",
-     color: t.muted || "#999", fontSize: 13 }}>
-     🧬 SEI lineage — arriving with the SWP program.<br />
-     <span style={{ fontSize: 11 }}>Non-SEI (AddVantage) is available now.</span>
-    </div>
+    <CrosswalkDashboard t={t} dataSource={ds} onOpenTechnical={openTechnical} />
    ) : view === "source" ? (
     <SourceLineage t={t} system={curSys} dataSource={ds} tech={false}
      onOpenTechnical={openTechnical} />

@@ -1,0 +1,537 @@
+import React, { useState, useEffect, useMemo } from "react";
+import { crosswalkApi, VERDICT, VERDICT_ORDER, LANE_C } from "./seiCrosswalkApi.js";
+
+// =====================================================================
+// CrosswalkDashboard — mapping, analysis and divergence for one warehouse.
+//
+// WHERE IT MOUNTS. LineageHome renders a placeholder when scope === "sei"
+// ("SEI lineage — arriving with the SWP program"). That reserved, empty slot
+// is this. Nothing else in LineageHome changes.
+//
+// WHY IT SELF-HIDES. summary() falls back to zeros when a warehouse has no
+// crosswalk loaded, and this component renders its own empty state in that
+// case. PBDW therefore looks exactly as it does today until a PBDW crosswalk
+// is ingested — no flag, no per-warehouse branch, just the data deciding.
+//
+// FOUR LEVELS, one at a time:
+//   overview   KPIs, the flow, the evidence bars, the six divergence shapes
+//   list       every column behind whatever was clicked, filtered
+//   column     one final column: chain, contract, SEI datapoints, findings
+//   readiness  per-table gate
+//
+// The drill is a stack, so Back always returns to where the click came from
+// rather than to a fixed home.
+// =====================================================================
+
+const F = "Roboto, 'Helvetica Neue', Arial, sans-serif";
+const MONO = "'Roboto Mono', ui-monospace, Menlo, monospace";
+
+const pct = (n, d) => (d ? Math.round((n / d) * 100) : 0);
+const g = (o, ...k) => k.reduce((a, x) => (a != null ? a : o?.[x] ?? o?.[x?.toUpperCase?.()] ?? o?.[x?.toLowerCase?.()]), null);
+
+function Pill({ v }) {
+  const d = VERDICT[v] || VERDICT.UNKNOWN;
+  return (
+    <span style={{ display: "inline-block", fontSize: 9, fontWeight: 700,
+      letterSpacing: 0.4, padding: "2px 8px", borderRadius: 999,
+      background: d.bg, color: d.c, whiteSpace: "nowrap" }}>{d.t}</span>);
+}
+
+function LaneTag({ lane }) {
+  if (!lane) return null;
+  const c = LANE_C[String(lane).toUpperCase()] || "#5f87a7";
+  return (
+    <span style={{ display: "inline-block", fontSize: 9, fontWeight: 700,
+      letterSpacing: 0.4, padding: "2px 7px", borderRadius: 2,
+      background: `${c}1a`, color: c, whiteSpace: "nowrap" }}>{lane}</span>);
+}
+
+function Stack({ verdicts, h = 8, onPick }) {
+  const total = (verdicts || []).reduce((a, v) => a + (v.n || 0), 0) || 1;
+  return (
+    <span style={{ display: "flex", height: h, borderRadius: 3,
+      overflow: "hidden", background: "#e8edf2" }}>
+      {(verdicts || []).map((v) => (
+        <i key={v.verdict} title={`${VERDICT[v.verdict]?.t || v.verdict} ${v.n}`}
+          onClick={onPick ? () => onPick(v.verdict) : undefined}
+          style={{ display: "block", width: `${(v.n / total) * 100}%`,
+            background: (VERDICT[v.verdict] || VERDICT.UNKNOWN).c,
+            cursor: onPick ? "pointer" : "default" }} />))}
+    </span>);
+}
+
+function Kpi({ t, v, of, sub, c, meter, onClick }) {
+  return (
+    <div onClick={onClick} style={{ background: t.panel || "#fff",
+      border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderTop: `3px solid ${c}`,
+      borderRadius: 3, padding: "12px 14px", cursor: onClick ? "pointer" : "default" }}>
+      <div style={{ fontSize: 26, fontWeight: 500, lineHeight: 1, color: c,
+        fontVariantNumeric: "tabular-nums" }}>
+        {v}{of ? <span style={{ fontSize: 12, color: t.muted || "#999",
+          fontWeight: 400, marginLeft: 4 }}>{of}</span> : null}
+      </div>
+      <div style={{ fontSize: 11.5, marginTop: 7, fontWeight: 500 }}>{sub[0]}</div>
+      <div style={{ fontSize: 10, color: t.muted || "#999", marginTop: 3,
+        lineHeight: 1.4 }}>{sub[1]}</div>
+      {meter != null && (
+        <div style={{ height: 4, background: "#e8edf2", borderRadius: 2, marginTop: 9 }}>
+          <i style={{ display: "block", height: "100%", width: `${meter}%`,
+            background: c, borderRadius: 2 }} /></div>)}
+    </div>);
+}
+
+// The six divergence shapes, drawn. The diagram is the shape of the problem:
+// collapse fans out, dual source converges, bypass arcs over a hollow node.
+function Shape({ kind, c }) {
+  const dot = (x, y, r = 3.5, fill = c) =>
+    <circle key={`${x}-${y}`} cx={x} cy={y} r={r} fill={fill} />;
+  const ln = (x1, y1, x2, y2, dash) =>
+    <path key={`${x1}${y1}${x2}${y2}`} fill="none" stroke={c} strokeWidth="1.6"
+      strokeDasharray={dash ? "3 3" : undefined}
+      d={`M ${x1} ${y1} C ${x1 + 11} ${y1}, ${x2 - 11} ${y2}, ${x2} ${y2}`} />;
+  const body = {
+    collapse: [ln(8, 15, 58, 6), ln(8, 15, 58, 15), ln(8, 15, 58, 24),
+               dot(8, 15, 4), dot(58, 6), dot(58, 15), dot(58, 24)],
+    dual_source: [ln(8, 7, 58, 15), ln(8, 23, 58, 15),
+                  dot(8, 7, 3.5, LANE_C.STAR), dot(8, 23, 3.5, LANE_C.UAF), dot(58, 15, 4)],
+    bypass: [<circle key="h" cx="33" cy="15" r="5" fill="none" stroke={c}
+               strokeWidth="1.2" strokeDasharray="2 2" />,
+             <path key="a" fill="none" stroke={c} strokeWidth="1.6" strokeDasharray="3 3"
+               d="M 8 15 C 18 2, 48 2, 58 15" />, dot(8, 15), dot(58, 15)],
+    decode: [ln(8, 15, 26, 15), ln(40, 15, 58, 15), dot(8, 15), dot(58, 15),
+             <text key="t" x="33" y="20" textAnchor="middle" fontSize="14" fill={c}>≠</text>],
+    feed_dependency: [ln(8, 7, 58, 15), ln(8, 23, 58, 15, true),
+                      dot(8, 7), dot(8, 23), dot(58, 15, 4)],
+    no_source: [<path key="s" fill="none" stroke={c} strokeWidth="1.6" strokeDasharray="4 3"
+                  d="M 8 15 L 42 15" />, dot(8, 15),
+                <circle key="o" cx="50" cy="15" r="4" fill="none" stroke={c} strokeWidth="1.4" />],
+  }[kind] || [];
+  return <svg width="66" height="30" viewBox="0 0 66 30" style={{ flexShrink: 0 }}>{body}</svg>;
+}
+
+export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
+  const ds = (dataSource || "IMDS").toUpperCase();
+  const [sum, setSum] = useState(null);
+  const [div, setDiv] = useState({ shapes: [], collapse: [], dual_source: [] });
+  const [lanes, setLanes] = useState([]);
+  const [ready, setReady] = useState([]);
+  const [exc, setExc] = useState({ exceptions: [], by_owner: [] });
+  const [busy, setBusy] = useState(true);
+
+  // the drill stack — [{kind:"list", filter, title}, {kind:"column", ...}]
+  const [stack, setStack] = useState([]);
+  const [list, setList] = useState(null);
+  const [detail, setDetail] = useState(null);
+
+  useEffect(() => {
+    let live = true;
+    setBusy(true);
+    Promise.all([
+      crosswalkApi.summary(ds), crosswalkApi.divergence(ds),
+      crosswalkApi.lanes(ds), crosswalkApi.readiness(ds), crosswalkApi.exceptions(ds),
+    ]).then(([s, d, l, r, e]) => {
+      if (!live) return;
+      setSum(s); setDiv(d); setLanes(l.lanes || []);
+      setReady(r.tables || []); setExc(e); setBusy(false);
+    });
+    return () => { live = false; };
+  }, [ds]);
+
+  const top = stack[stack.length - 1] || null;
+
+  useEffect(() => {
+    if (!top || top.kind !== "list") return;
+    let live = true;
+    crosswalkApi.columns({ data_source: ds, ...top.filter })
+      .then((r) => { if (live) setList(r.columns || []); });
+    return () => { live = false; };
+  }, [ds, top]);
+
+  useEffect(() => {
+    if (!top || top.kind !== "column") return;
+    let live = true;
+    crosswalkApi.column(top.table, top.column, ds)
+      .then((r) => { if (live) setDetail(r); });
+    return () => { live = false; };
+  }, [ds, top]);
+
+  const push = (s) => setStack((x) => [...x, s]);
+  const back = () => setStack((x) => x.slice(0, -1));
+  const drill = (filter, title) => { setList(null); push({ kind: "list", filter, title }); };
+  const openCol = (table, column) => { setDetail(null); push({ kind: "column", table, column }); };
+
+  const card = { background: t.panel || "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+                 borderRadius: 8, overflow: "hidden", marginBottom: 16 };
+  const head = { display: "flex", alignItems: "baseline", gap: 11, padding: "12px 17px",
+                 background: "linear-gradient(to right,#eef3f8,#f7fafc)", flexWrap: "wrap" };
+  const h2 = { fontSize: 14.5, fontWeight: 700, margin: 0, color: t.navy || "#10193b" };
+  const note = { fontSize: 10.5, color: t.muted || "#999" };
+  const body = { padding: "16px 17px" };
+
+  if (busy) return <div style={{ padding: 40, textAlign: "center", color: t.muted || "#999",
+    fontFamily: F, fontSize: 13 }}>Loading the crosswalk…</div>;
+
+  // Nothing loaded for this warehouse: say so plainly and stop. This is the
+  // branch PBDW takes, and why PBDW's screen is unchanged.
+  if (!sum || !sum.total_columns) {
+    return (
+      <div style={{ ...card, marginBottom: 0 }}>
+        <div style={body}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 6 }}>
+            No SEI crosswalk loaded for {ds}</div>
+          <div style={{ fontSize: 12, color: t.sub || "#666", lineHeight: 1.6, maxWidth: "70ch" }}>
+            The lineage screens are unaffected. To populate this view, ingest the
+            crosswalk workbook for this warehouse:{" "}
+            <code style={{ fontFamily: MONO, fontSize: 11.5 }}>
+              CP_SEI_DATA_SOURCE={ds} python -m ingestion.run sei_crosswalk</code>
+          </div>
+        </div>
+      </div>);
+  }
+
+  /* ------------------------------------------------ drill: one column --- */
+  if (top && top.kind === "column") {
+    const d = detail;
+    return (
+      <div style={{ fontFamily: F }}>
+        <Crumbs t={t} stack={stack} onBack={back} onHome={() => setStack([])} />
+        {!d ? <div style={{ padding: 30, color: t.muted || "#999" }}>Loading…</div> : (
+          <>
+            <div style={card}>
+              <div style={head}>
+                <h2 style={{ ...h2, fontFamily: MONO, fontSize: 14 }}>
+                  {top.table}.{top.column}</h2>
+                {(d.verdicts || []).map((v, i) => (
+                  <span key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <LaneTag lane={g(v, "lane_id", "LANE_ID")} />
+                    <Pill v={g(v, "match_verdict", "MATCH_VERDICT")} /></span>))}
+              </div>
+              <div style={body}>
+                {(d.verdicts || []).map((v, i) => {
+                  const reason = g(v, "verdict_reason", "VERDICT_REASON");
+                  const clear = g(v, "what_would_clear_it", "WHAT_WOULD_CLEAR_IT");
+                  const fc = g(v, "failed_checks", "FAILED_CHECKS");
+                  return (
+                    <div key={i} style={{ marginBottom: 12 }}>
+                      {reason && <p style={{ margin: "0 0 6px", fontSize: 12,
+                        color: t.sub || "#666", lineHeight: 1.6 }}>{reason}</p>}
+                      {fc && <div style={{ fontSize: 10.5, color: t.muted || "#999" }}>
+                        Failed checks: <span style={{ fontFamily: MONO }}>{fc}</span></div>}
+                      {clear && <div style={{ fontSize: 11.5, marginTop: 6 }}>
+                        <b>Clears when:</b> {clear}</div>}
+                    </div>);
+                })}
+              </div>
+            </div>
+
+            <Panel t={t} title="Lineage chain" note="one row per lane that writes this column">
+              {(d.chain || []).map((c, i) => <ChainRow key={i} t={t} row={c} />)}
+              {!(d.chain || []).length && <Empty t={t} s="No lineage row found." />}
+            </Panel>
+
+            <Panel t={t} title="SEI datapoints proposed"
+              note={`${(d.maps || []).length} for this contract field`}>
+              {(d.maps || []).length ? (
+                <Table t={t} cols={["SEI feed", "Datapoint", "Kind", "Type", "Rule"]}
+                  rows={(d.maps || []).map((m) => [
+                    g(m, "sei_feed", "SEI_FEED") || "—",
+                    <span style={{ fontFamily: MONO }}>{g(m, "sei_datapoint", "SEI_DATAPOINT") || "—"}</span>,
+                    g(m, "map_kind", "MAP_KIND"),
+                    g(m, "sei_type", "SEI_TYPE") || "UNKNOWN",
+                    <span style={{ fontSize: 11, color: t.sub || "#666" }}>
+                      {g(m, "map_rule", "MAP_RULE") || "—"}</span>])} />
+              ) : <Empty t={t} s="No SEI datapoint proposed — this column has no source after cutover." />}
+            </Panel>
+
+            {(d.collapse || []).length > 1 && (
+              <Callout t={t} c="#c1113a" title="One SEI datapoint, several contract fields">
+                The incumbent kept these apart on the same record. If they ever hold
+                different values, collapsing them loses that difference silently — the
+                load succeeds and the number is wrong.
+                <ul style={{ margin: "7px 0 0", paddingLeft: 18, fontFamily: MONO, fontSize: 11 }}>
+                  {(d.collapse || []).map((x, i) => (
+                    <li key={i}>{g(x, "sei_datapoint", "SEI_DATAPOINT")} → {g(x, "other_field", "OTHER_FIELD")}</li>))}
+                </ul>
+              </Callout>)}
+
+            {(d.dual_source || []).length > 0 && (
+              <Callout t={t} c="#7c3aed" title="Two lanes write this column, and nothing says which wins">
+                Lanes: {g(d.dual_source[0], "lanes", "LANES")}. Precedence rule:{" "}
+                <b>{g(d.dual_source[0], "precedence_rule", "PRECEDENCE_RULE") || "UNKNOWN"}</b>.
+                There is no error when they disagree — the value depends on load order.
+              </Callout>)}
+
+            {(d.disposition || []).length > 0 && (
+              <Callout t={t} c="#b45309" title={`Disposition: ${g(d.disposition[0], "disposition", "DISPOSITION")}`}>
+                {g(d.disposition[0], "disposition_detail", "DISPOSITION_DETAIL") ||
+                 "No disposition recorded. Needs default, derive, drop or block, approved by the data owner."}
+              </Callout>)}
+
+            {onOpenTechnical && (
+              <button onClick={() => onOpenTechnical({ table: top.table, column: top.column })}
+                style={btn(t)}>Open in Technical view →</button>)}
+          </>)}
+      </div>);
+  }
+
+  /* --------------------------------------------------- drill: the list --- */
+  if (top && top.kind === "list") {
+    return (
+      <div style={{ fontFamily: F }}>
+        <Crumbs t={t} stack={stack} onBack={back} onHome={() => setStack([])} />
+        <div style={card}>
+          <div style={head}><h2 style={h2}>{top.title}</h2>
+            <span style={note}>{list ? `${list.length} columns` : "loading…"}</span></div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12, minWidth: 720 }}>
+              <thead><tr>{["Warehouse column", "Lane", "Contract field", "SEI datapoints",
+                "Verdict", "Analysis"].map((h) => <th key={h} style={th(t)}>{h}</th>)}</tr></thead>
+              <tbody>
+                {(list || []).map((r, i) => (
+                  <tr key={i} onClick={() => openCol(g(r, "dwh_target_table", "DWH_TARGET_TABLE"),
+                                                     g(r, "dwh_target_column", "DWH_TARGET_COLUMN"))}
+                    style={{ cursor: "pointer", borderTop: `1px solid ${t.panel2 || "#dfe6e9"}` }}>
+                    <td style={td}>
+                      <span style={{ fontFamily: MONO, fontWeight: 500 }}>
+                        {g(r, "dwh_target_column", "DWH_TARGET_COLUMN")}</span>
+                      <span style={sub(t)}>{g(r, "dwh_target_table", "DWH_TARGET_TABLE")}</span></td>
+                    <td style={td}><LaneTag lane={g(r, "lane_id", "LANE_ID")} /></td>
+                    <td style={{ ...td, fontFamily: MONO, fontSize: 11 }}>
+                      {g(r, "contract_field", "CONTRACT_FIELD") || "—"}</td>
+                    <td style={{ ...td, fontFamily: MONO, fontSize: 11 }}>
+                      {g(r, "sei_datapoints", "SEI_DATAPOINTS") || "—"}</td>
+                    <td style={td}><Pill v={g(r, "match_verdict", "MATCH_VERDICT")} /></td>
+                    <td style={{ ...td, fontSize: 10.5, color: t.muted || "#999" }}>
+                      {g(r, "failed_checks", "FAILED_CHECKS") || "—"}</td>
+                  </tr>))}
+                {list && !list.length && (
+                  <tr><td colSpan={6} style={{ ...td, textAlign: "center", color: t.muted || "#999" }}>
+                    Nothing matches this filter.</td></tr>)}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>);
+  }
+
+  /* ------------------------------------------------------- the overview --- */
+  const v = sum.verdicts || [];
+  return (
+    <div style={{ fontFamily: F }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(168px,1fr))",
+        gap: 11, marginBottom: 16 }}>
+        <Kpi t={t} v={sum.in_denominator} of={`of ${sum.total_columns}`} c={t.accent || "#0f4775"}
+          meter={pct(sum.in_denominator, sum.total_columns)}
+          sub={["Columns in the SEI denominator", `${sum.out_of_scope} out of scope — lineage, not readiness`]}
+          onClick={() => drill({}, "Every final column")} />
+        <Kpi t={t} v={sum.mapped} of={`of ${sum.in_denominator}`} c="#0091bf"
+          meter={pct(sum.mapped, sum.in_denominator)}
+          sub={["Have a SEI datapoint", "proposed, none of it verified yet"]} />
+        <Kpi t={t} v={sum.proven} c="#159943" meter={pct(sum.proven, sum.mapped)}
+          sub={["Proven matches", sum.ceiling?.blocked ? "ceiling is 0 until live DDL lands" : "both sides from live metadata"]}
+          onClick={() => drill({ verdict: "PROVEN_MATCH" }, "Proven matches")} />
+        <Kpi t={t} v={sum.no_source} c="#c1113a" meter={pct(sum.no_source, sum.in_denominator)}
+          sub={["No SEI source", `${sum.undecided_dispositions} dispositions still undecided`]}
+          onClick={() => drill({ verdict: "NO_SOURCE" }, "Columns with no SEI source")} />
+        <Kpi t={t} v={sum.dual_source} c="#7c3aed"
+          sub={["Dual-source columns", "two lanes, no precedence rule"]} />
+        <Kpi t={t} v={sum.open_exceptions} c="#e67e22"
+          sub={["Open exceptions", "each names who can answer it"]} />
+      </div>
+
+      {sum.ceiling?.blocked && (
+        <Callout t={t} c="#e67e22" title="No verdict can reach PROVEN yet">
+          {sum.ceiling.reason} {sum.ceiling.live_ddl != null &&
+            `${sum.ceiling.live_ddl} of ${sum.ceiling.of} columns have live-DDL evidence on the target side.`}
+        </Callout>)}
+
+      <Panel t={t} title="Verdict spread" note="click a band to drill into it">
+        <Stack verdicts={v} h={18} onPick={(x) => drill({ verdict: x },
+          `${VERDICT[x]?.t || x} columns`)} />
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 13, marginTop: 11 }}>
+          {v.map((x) => (
+            <span key={x.verdict} onClick={() => drill({ verdict: x.verdict },
+              `${VERDICT[x.verdict]?.t || x.verdict} columns`)}
+              style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10.5,
+                color: t.sub || "#666", cursor: "pointer" }}>
+              <i style={{ width: 11, height: 11, borderRadius: 2,
+                background: (VERDICT[x.verdict] || VERDICT.UNKNOWN).c }} />
+              {VERDICT[x.verdict]?.t || x.verdict} <b>{x.n}</b></span>))}
+        </div>
+      </Panel>
+
+      <Panel t={t} title="Divergence — six shapes, and what each one costs"
+        note="the diagram is the shape of the problem">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(255px,1fr))", gap: 12 }}>
+          {(div.shapes || []).map((s) => {
+            const c = { collapse: "#c1113a", dual_source: "#7c3aed", bypass: "#b45309",
+                        decode: "#7c3aed", feed_dependency: "#e67e22", no_source: "#c1113a" }[s.key] || "#5f87a7";
+            const f = { collapse: { }, dual_source: { }, bypass: { },
+                        decode: { verdict: "DECODE_NEEDED" }, feed_dependency: { },
+                        no_source: { verdict: "NO_SOURCE" } }[s.key] || {};
+            return (
+              <div key={s.key} onClick={() => drill(f, `${s.label} — ${s.n} columns`)}
+                style={{ border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderLeft: `3px solid ${c}`,
+                  borderRadius: 6, padding: "12px 14px", cursor: "pointer" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 23, fontWeight: 500, color: c, lineHeight: 1,
+                    fontVariantNumeric: "tabular-nums" }}>{s.n}</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 700 }}>{s.label}</span>
+                  <span style={{ marginLeft: "auto" }}><Shape kind={s.key} c={c} /></span>
+                </div>
+                <div style={{ marginTop: 8, paddingTop: 7,
+                  borderTop: `1px dashed ${t.panel2 || "#dfe6e9"}`, fontSize: 10,
+                  color: t.muted || "#999" }}><b>Owner</b> {s.owner}</div>
+              </div>);
+          })}
+        </div>
+      </Panel>
+
+      {(div.collapse || []).length > 0 && (
+        <Panel t={t} title="One datapoint standing in for several contract fields"
+          note="the incumbent kept these apart">
+          <Table t={t} cols={["SEI datapoint", "Feed", "Fields", "Which"]}
+            rows={div.collapse.map((c) => [
+              <span style={{ fontFamily: MONO }}>{g(c, "sei_datapoint", "SEI_DATAPOINT")}</span>,
+              g(c, "sei_feed", "SEI_FEED"),
+              <b>{g(c, "fields", "FIELDS")}</b>,
+              <span style={{ fontFamily: MONO, fontSize: 11 }}>{g(c, "field_list", "FIELD_LIST")}</span>])} />
+        </Panel>)}
+
+      <Panel t={t} title="Readiness by warehouse table" note="click a table to drill in">
+        <Table t={t} cols={["Table", "Lanes", "Columns", "Verdict spread", "Gate"]}
+          rows={(ready || []).map((r) => [
+            <span style={{ fontFamily: MONO, fontWeight: 500 }}>{r.table}</span>,
+            <span style={{ display: "flex", gap: 4 }}>{(r.lanes || []).map((l) =>
+              <LaneTag key={l} lane={l} />)}</span>,
+            <span style={{ fontVariantNumeric: "tabular-nums" }}>{r.columns}</span>,
+            <Stack verdicts={r.verdicts} />,
+            <Pill v={r.gate === "OUT_OF_SCOPE" ? "OUT_OF_SCOPE"
+                   : r.gate === "READY" ? "PROVEN_MATCH" : "NO_SOURCE"} />])}
+          onRow={(i) => drill({ table: ready[i].table }, ready[i].table)} />
+      </Panel>
+
+      {(exc.by_owner || []).length > 0 && (
+        <Panel t={t} title="Open questions, by who can answer them"
+          note={`${exc.exceptions.length} in total`}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            {exc.by_owner.map((o) => (
+              <span key={o.owner} style={{ border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+                borderRadius: 3, padding: "7px 12px", fontSize: 11.5 }}>
+                <b style={{ fontVariantNumeric: "tabular-nums" }}>{o.n}</b>{" "}
+                <span style={{ color: t.sub || "#666" }}>{o.owner}</span></span>))}
+          </div>
+        </Panel>)}
+
+      {(lanes || []).length > 0 && (
+        <Panel t={t} title="Lane register" note="which pairings exist, and which are replaced">
+          <Table t={t} cols={["Lane", "State", "Contract", "Columns", "Spread"]}
+            rows={lanes.map((l) => [
+              <span><LaneTag lane={g(l, "source_system", "SOURCE_SYSTEM")} />{" "}
+                <span style={{ fontFamily: MONO, fontSize: 11 }}>{g(l, "lane_id", "LANE_ID")}</span></span>,
+              g(l, "replacement_state", "REPLACEMENT_STATE"),
+              g(l, "contract_name", "CONTRACT_NAME") || "—",
+              <span style={{ fontVariantNumeric: "tabular-nums" }}>{l.columns || 0}</span>,
+              <Stack verdicts={l.verdicts} />])} />
+        </Panel>)}
+    </div>);
+}
+
+/* ------------------------------------------------------------ bits ----- */
+const th = (t) => ({ textAlign: "left", padding: "8px 12px", fontSize: 9.5, fontWeight: 700,
+  letterSpacing: 0.5, color: t.muted || "#999", textTransform: "uppercase",
+  borderBottom: `1px solid ${t.panel2 || "#dfe6e9"}`, whiteSpace: "nowrap",
+  background: t.bg || "#f5f8f8" });
+const td = { padding: "9px 12px", verticalAlign: "top" };
+const sub = (t) => ({ display: "block", fontSize: 10, color: t.muted || "#999", marginTop: 2 });
+const btn = (t) => ({ fontSize: 11.5, fontWeight: 700, padding: "7px 14px", cursor: "pointer",
+  fontFamily: F, borderRadius: 3, border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+  background: t.panel || "#fff", color: t.accent || "#0f4775" });
+
+function Panel({ t, title, note, children }) {
+  return (
+    <div style={{ background: t.panel || "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+      borderRadius: 8, overflow: "hidden", marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 11, padding: "12px 17px",
+        background: "linear-gradient(to right,#eef3f8,#f7fafc)", flexWrap: "wrap" }}>
+        <h2 style={{ fontSize: 14.5, fontWeight: 700, margin: 0, color: t.navy || "#10193b" }}>{title}</h2>
+        {note && <span style={{ fontSize: 10.5, color: t.muted || "#999" }}>{note}</span>}
+      </div>
+      <div style={{ padding: "16px 17px" }}>{children}</div>
+    </div>);
+}
+
+function Table({ t, cols, rows, onRow }) {
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12, minWidth: 620 }}>
+        <thead><tr>{cols.map((c) => <th key={c} style={th(t)}>{c}</th>)}</tr></thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i} onClick={onRow ? () => onRow(i) : undefined}
+              style={{ borderTop: `1px solid ${t.panel2 || "#dfe6e9"}`,
+                cursor: onRow ? "pointer" : "default" }}>
+              {r.map((c, j) => <td key={j} style={td}>{c}</td>)}
+            </tr>))}
+        </tbody>
+      </table>
+    </div>);
+}
+
+function Callout({ t, c, title, children }) {
+  return (
+    <div style={{ border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderLeft: `3px solid ${c}`,
+      borderRadius: 3, padding: "11px 14px", marginBottom: 16, background: t.panel || "#fff" }}>
+      <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 5 }}>{title}</div>
+      <div style={{ fontSize: 11.5, color: t.sub || "#666", lineHeight: 1.6 }}>{children}</div>
+    </div>);
+}
+
+function Empty({ t, s }) {
+  return <div style={{ fontSize: 11.5, color: t.muted || "#999", padding: "6px 0" }}>{s}</div>;
+}
+
+function ChainRow({ t, row }) {
+  const node = (stage, val, note, c) => (
+    <div style={{ flex: "1 1 110px", minWidth: 0, border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+      borderLeft: `3px solid ${c}`, borderRadius: 3, padding: "7px 9px" }}>
+      <div style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: 0.4, color: c }}>{stage}</div>
+      <div style={{ fontSize: 11, marginTop: 3, fontFamily: MONO, wordBreak: "break-word" }}>{val || "—"}</div>
+      {note && <div style={{ fontSize: 9.5, color: t.muted || "#999", marginTop: 2 }}>{note}</div>}
+    </div>);
+  const arrow = <div style={{ width: 18, display: "flex", alignItems: "center",
+    justifyContent: "center", color: t.muted || "#999" }}>›</div>;
+  const parts = [
+    node("SRC · CONTRACT", g(row, "src_source_column", "SRC_SOURCE_COLUMN"),
+         g(row, "src_source_table", "SRC_SOURCE_TABLE"), "#7c3aed"),
+    node("STG1", g(row, "stg1_source_column", "STG1_SOURCE_COLUMN") || "N/A", null, "#00a3a3"),
+    node("STG2", g(row, "stg2_source_column", "STG2_SOURCE_COLUMN") || "N/A", null, "#0091bf"),
+    node("DWH", g(row, "dwh_target_column", "DWH_TARGET_COLUMN"),
+         g(row, "dwh_type", "DWH_TYPE"), "#0f4775"),
+  ];
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, marginBottom: 6 }}>
+        <LaneTag lane={g(row, "lane_id", "LANE_ID")} /></div>
+      <div style={{ display: "flex", alignItems: "stretch", flexWrap: "wrap" }}>
+        {parts.map((p, i) => <React.Fragment key={i}>{p}{i < parts.length - 1 ? arrow : null}</React.Fragment>)}
+      </div>
+    </div>);
+}
+
+function Crumbs({ t, stack, onBack, onHome }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+      padding: "0 0 11px", marginBottom: 13, borderBottom: `1px solid ${t.panel2 || "#dfe6e9"}` }}>
+      <button onClick={onBack} style={btn(t)}>← Back</button>
+      <span onClick={onHome} style={{ fontSize: 11.5, color: t.accent || "#0f4775",
+        cursor: "pointer", fontWeight: 600 }}>Mapping &amp; divergence</span>
+      {stack.map((s, i) => (
+        <React.Fragment key={i}>
+          <span style={{ color: t.muted || "#999" }}>›</span>
+          <span style={{ fontSize: 11.5, color: t.sub || "#666",
+            fontFamily: s.kind === "column" ? MONO : F }}>
+            {s.kind === "column" ? `${s.table}.${s.column}` : s.title}</span>
+        </React.Fragment>))}
+    </div>);
+}
