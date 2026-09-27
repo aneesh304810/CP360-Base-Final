@@ -140,6 +140,89 @@ SELECT data_source, COUNT(*) FROM legacy_lineage GROUP BY data_source;
 
 ---
 
+## 3a. Where IMDS lineage should come from — read before choosing a mode
+
+There are two ways IMDS lineage can reach `legacy_lineage`, and only one of
+them should ever be used on a given install.
+
+### Preferred: the existing multi-warehouse path
+
+`legacy_dictionary_conn.py` v3 already supports one mapping workbook per
+warehouse, and writes `legacy_lineage` rows with the same
+`{ds}:{tgt}:{col}:{srchash}` id format:
+
+```bash
+export CP_LEGACY_SOURCES="PBDW=/data/pbdw.xlsx;IMDS=/data/imds.xlsx"
+python -m ingestion.run legacy_dictionary
+```
+
+Each workbook may carry a dictionary sheet (`ALL`), a rich 24-column lineage
+sheet, and/or the 4-column `DWH ALL` sheet; rich rows win and 4-column rows
+supplement them. This is the route PBDW's own 1,180 rows came from.
+
+**If an IMDS mapping workbook exists, use this.** Then run the crosswalk in
+`attach` mode, exactly as for PBDW. Both warehouses then behave identically
+and the crosswalk owns no lineage anywhere — which is the arrangement least
+likely to go wrong later.
+
+### Fallback: the crosswalk workbook supplies the baseline
+
+`CP_SEI_LINEAGE_MODE=load` is only correct when **no IMDS mapping workbook
+exists** and the crosswalk workbook is the only source of the baseline.
+
+Be clear-eyed about what that means. The baseline then consists of whatever
+the crosswalk workbook's `LANE_LINEAGE` sheet holds — in the first generated
+version, 108 columns across three of the seven known STAR feed families
+(`ACDDIFI1`, `PEDDIFI1`, `TBMEIFI7`), derived by a language model from a
+lineage document rather than taken from an authoritative mapping workbook.
+`TJDDIFI1`, `ODDDIFI1`, `ORDDIFI1` and `SMDDIFI1` are absent entirely.
+
+That is a usable provisional baseline. It is not a complete one, and the
+screens will report coverage against it as though it were. Record it as
+provisional and replace it via the preferred path when the real IMDS mapping
+workbook arrives.
+
+### Never load IMDS lineage from both
+
+Both connectors build `lineage_id` the same way, so a row described
+identically by both workbooks upserts harmlessly. A row whose chain columns
+differ by so much as a space hashes differently and becomes **a second row for
+the same warehouse column** — and every coverage percentage is then wrong.
+
+The rule is simply: **load the baseline once, from one source, before
+attaching the crosswalk.** Order matters in one direction only —
+`CP_SEI_LINEAGE_MODE=auto` sees existing rows and attaches, but nothing stops
+a `load`-mode crosswalk run being followed later by a `legacy_dictionary` run
+that does not know about it.
+
+Check for it after any change of route:
+
+```sql
+-- warehouse columns carrying more than one lineage row per source chain.
+-- Fan-in across lanes is legitimate; the same lane twice is not.
+SELECT dwh_target_table, dwh_target_column, COUNT(*) AS rows_,
+       COUNT(DISTINCT NVL(src_source_table,'~') || '|' ||
+                      NVL(src_source_column,'~')) AS distinct_chains
+FROM   legacy_lineage
+WHERE  data_source = 'IMDS'
+GROUP  BY dwh_target_table, dwh_target_column
+HAVING COUNT(*) > COUNT(DISTINCT NVL(src_source_table,'~') || '|' ||
+                                 NVL(src_source_column,'~'))
+ORDER  BY rows_ DESC;
+-- any row returned is a duplicate baseline, not a fan-in
+```
+
+If that returns rows, one of the two loaders has to be backed out:
+
+```sql
+DELETE FROM legacy_lineage WHERE data_source = 'IMDS';
+COMMIT;
+```
+
+then reload from the single chosen source.
+
+---
+
 ## 3b. Attaching the PBDW crosswalk to a baseline that already exists
 
 PBDW is the opposite case to IMDS and must be run differently.
