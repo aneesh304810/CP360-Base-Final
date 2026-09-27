@@ -1,0 +1,1226 @@
+<title>Lineage 360 Crosswalk</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;800&family=Roboto+Mono:wght@400;500&display=swap">
+<style>
+  /* Tokens lifted from ui/src/bbhTheme.js — tLight, then tDark. */
+  :root{
+    color-scheme: light;
+    --bg:#f5f8f8; --panel:#ffffff; --panel2:#dfe6e9; --border:#b5b6b6;
+    --text:#333333; --sub:#666666; --muted:#999999;
+    --navy:#10193b; --accent:#0f4775; --mutedBlue:#5f87a7; --tint:#cae3ee;
+    --pop:#31bced; --hover:#0091bf; --hoverBg:#eeeeee;
+    --success:#159943; --successBg:#d0ebd9;
+    --danger:#c1113a;  --dangerBg:#f3d2d7;
+    --warning:#e67e22; --warningBg:#fae5d3;
+    --info:#0091bf;    --infoBg:#e0f5fd;
+    --bronze:#b45309;  --bronzeBg:#f7e9d6;
+    --purple:#7c3aed;  --purpleBg:#efe6fb;
+    --star:#b5651d; --starBg:#f6ecdf;
+    --uaf:#0b7d7d;  --uafBg:#e6f6f6;
+    --sei:#0091bf;  --seiBg:#e0f5fd;
+    --srcC:#7c3aed; --stg1C:#00a3a3; --stg2C:#0091bf; --dwhC:#0f4775;
+    --groupGrad: linear-gradient(to right,#eef3f8,#f7fafc);
+    --trk:#e8edf2; --bizInk:#7b8894; --bizRule:#c9d4dc;
+    --popShadow:0 12px 34px rgba(16,25,59,.16);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --bg:#0b1220; --panel:#0f172a; --panel2:#111c34; --border:#1e293b;
+      --text:#e2e8f0; --sub:#94a3b8; --muted:#64748b;
+      --navy:#0a0f24; --accent:#5aa0dc; --mutedBlue:#7f9dba; --hoverBg:#111c34;
+      --success:#4ecb7c; --successBg:#12301f;
+      --danger:#ff7f8f;  --dangerBg:#3a1119;
+      --warning:#f0a05a; --warningBg:#33230f;
+      --info:#4cc0ec;    --infoBg:#0d2a38;
+      --bronze:#d9944a;  --bronzeBg:#2e2110;
+      --purple:#b295f0;  --purpleBg:#231a3b;
+      --star:#dda061; --starBg:#2f2313;
+      --uaf:#4fc4c4;  --uafBg:#0d2b2b;
+      --sei:#4cc0ec;  --seiBg:#0d2a38;
+      --srcC:#a98cf5; --stg1C:#3fc7c7; --stg2C:#4cc0ec; --dwhC:#6aa9dd;
+      --groupGrad: linear-gradient(to right,#16223c,#111a30);
+      --trk:#1b2740; --bizInk:#8fa3b5; --bizRule:#243049;
+      --popShadow:0 12px 34px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --bg:#0b1220; --panel:#0f172a; --panel2:#111c34; --border:#1e293b;
+    --text:#e2e8f0; --sub:#94a3b8; --muted:#64748b;
+    --navy:#0a0f24; --accent:#5aa0dc; --mutedBlue:#7f9dba; --hoverBg:#111c34;
+    --success:#4ecb7c; --successBg:#12301f;
+    --danger:#ff7f8f;  --dangerBg:#3a1119;
+    --warning:#f0a05a; --warningBg:#33230f;
+    --info:#4cc0ec;    --infoBg:#0d2a38;
+    --bronze:#d9944a;  --bronzeBg:#2e2110;
+    --purple:#b295f0;  --purpleBg:#231a3b;
+    --star:#dda061; --starBg:#2f2313;
+    --uaf:#4fc4c4;  --uafBg:#0d2b2b;
+    --sei:#4cc0ec;  --seiBg:#0d2a38;
+    --srcC:#a98cf5; --stg1C:#3fc7c7; --stg2C:#4cc0ec; --dwhC:#6aa9dd;
+    --groupGrad: linear-gradient(to right,#16223c,#111a30);
+    --trk:#1b2740; --bizInk:#8fa3b5; --bizRule:#243049;
+    --popShadow:0 12px 34px rgba(0,0,0,.5);
+  }
+
+  body{ margin:0; background:var(--bg); color:var(--text);
+    font-family:Roboto,"Helvetica Neue",Arial,sans-serif; font-size:14px; line-height:1.45 }
+  *{box-sizing:border-box}
+  .mono{font-family:"Roboto Mono",ui-monospace,Menlo,monospace}
+  .num{font-variant-numeric:tabular-nums}
+  button,input{font-family:inherit}
+  :focus-visible{outline:2px solid var(--pop); outline-offset:1px}
+  .page{ padding:26px 24px 60px; max-width:1560px; margin:0 auto }
+  @media (max-width:640px){ .page{padding:18px 16px 48px} }
+
+  h1.sh{ font-size:24px; font-weight:500; color:var(--accent);
+    border-bottom:2px solid var(--accent); padding-bottom:15px; margin:0 0 18px }
+  .strap{ font-size:12px; color:var(--sub); margin:-8px 0 16px }
+
+  /* door pill + scope chip — LineageHome */
+  .doorbar{ display:flex; align-items:center; gap:12px; margin:10px 0 16px; flex-wrap:wrap }
+  .doors{ display:inline-flex; background:var(--navy); border-radius:999px; padding:2px }
+  .doors button{ font-size:11px; padding:4px 14px; border-radius:999px; border:none;
+    background:transparent; color:#8fb4dd; cursor:pointer }
+  .doors button[aria-pressed="true"]{ background:var(--pop); color:var(--navy); font-weight:700 }
+  .scopeWrap{ position:relative }
+  .scopeChip{ display:inline-flex; align-items:center; gap:7px; font-size:11px; font-weight:700;
+    border-radius:999px; padding:5px 13px; cursor:pointer; background:var(--panel);
+    border:1.5px solid var(--panel2); color:var(--navy) }
+  :root[data-theme="dark"] .scopeChip{ color:var(--text) }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .scopeChip{ color:var(--text) } }
+  .scopeChip[aria-expanded="true"]{ border-color:var(--accent) }
+  .scopeChip .d{ width:7px; height:7px; border-radius:50%; background:#0b7d9e }
+  .scopeChip .inb{ font-size:8px; font-weight:700; border-radius:999px; padding:1px 6px;
+    background:var(--warning); color:#fff }
+  .scopeChip .car{ font-size:9px; color:var(--muted) }
+  .catch{ position:fixed; inset:0; z-index:30 }
+  .pop{ position:absolute; top:calc(100% + 7px); left:0; z-index:31; min-width:390px;
+    background:var(--panel); border:1px solid var(--panel2); border-radius:8px;
+    box-shadow:var(--popShadow); overflow:hidden }
+  .popRow{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; padding:9px 13px }
+  .popRow + .popRow{ border-top:1px solid var(--panel2) }
+  .popLbl{ font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:.5px;
+    color:var(--muted); width:76px; flex:0 0 auto }
+  .popBtn{ font-size:11px; font-weight:700; padding:4px 11px; border-radius:999px; cursor:pointer;
+    border:1.5px solid var(--panel2); background:var(--panel); color:var(--sub) }
+  .popBtn[aria-pressed="true"]{ background:var(--accent); border-color:var(--accent); color:#fff }
+  .laneBtn{ display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700;
+    padding:4px 11px; border-radius:999px; cursor:pointer; background:var(--panel);
+    border:1.5px solid var(--panel2); color:var(--sub) }
+  .laneBtn i{ width:7px; height:7px; border-radius:50%; background:var(--lc); display:inline-block }
+  .laneBtn[aria-pressed="true"]{ background:var(--lc); border-color:var(--lc); color:#fff }
+  .laneBtn[aria-pressed="true"] i{ background:#fff }
+  .popBack{ padding:9px 13px; cursor:pointer; font-size:11px; font-weight:600; color:var(--accent);
+    background:var(--bg); border-top:1px solid var(--panel2) }
+
+  /* tabs + segmented — LegacyLineage */
+  .tabrow{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 0 14px;
+    border-bottom:1px solid var(--panel2) }
+  .tab{ font-size:12.5px; font-weight:600; padding:9px 16px; cursor:pointer; color:var(--sub);
+    margin-bottom:-1px; border:none; background:none; border-bottom:2px solid transparent }
+  .tab[aria-selected="true"]{ color:var(--accent); border-bottom-color:var(--accent) }
+  .tabright{ margin-left:auto; display:flex; align-items:center; gap:8px; padding-bottom:6px; flex-wrap:wrap }
+  .seg{ display:inline-flex }
+  .seg button{ font-size:11.5px; font-weight:700; padding:7px 16px; cursor:pointer;
+    border-style:solid; border-color:var(--panel2); border-width:1px 1px 1px 0;
+    background:var(--panel); color:var(--sub) }
+  .seg button:first-child{ border-left-width:1px; border-radius:3px 0 0 3px }
+  .seg button:last-child{ border-radius:0 3px 3px 0 }
+  .seg button[aria-pressed="true"]{ background:var(--accent); border-color:var(--accent); color:#fff }
+  .srch{ height:30px; border:1px solid var(--panel2); border-radius:3px; padding:0 10px; font-size:12px;
+    width:190px; background:var(--panel); color:var(--text) }
+
+  /* fgShell */
+  .grp{ background:var(--panel); border:1px solid var(--panel2); border-radius:8px;
+    margin-bottom:12px; overflow:hidden }
+  .grpH{ display:flex; align-items:center; gap:11px; padding:12px 17px; cursor:pointer;
+    background:var(--groupGrad); flex-wrap:wrap }
+  .grpH .car{ font-size:10px; color:var(--muted) }
+  .grpH .nm{ font-size:14.5px; font-weight:700; color:var(--navy) }
+  :root[data-theme="dark"] .grpH .nm{ color:var(--text) }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .grpH .nm{ color:var(--text) } }
+  .grpH .gsrc{ font-size:8.5px; font-weight:700; letter-spacing:.4px; padding:2px 7px; border-radius:2px;
+    background:var(--infoBg); color:var(--info) }
+  .grpH .stat{ margin-left:auto; font-size:10.5px; color:var(--muted) }
+  .grpH .trk{ height:5px; width:100px; background:var(--trk); border-radius:3px; overflow:hidden; display:flex; flex-shrink:0 }
+  .grpB{ padding:14px 17px }
+  .bar{ display:flex; height:100%; width:100% }
+  .bar i{ display:block; height:100% }
+
+  /* tables */
+  .tw{ overflow-x:auto; border:1px solid var(--panel2); border-radius:3px; background:var(--panel) }
+  table{ border-collapse:collapse; width:100%; font-size:12px; min-width:680px }
+  thead th{ background:var(--bg); text-align:left; padding:8px 12px; font-size:9.5px; font-weight:700;
+    letter-spacing:.5px; color:var(--muted); text-transform:uppercase; white-space:nowrap;
+    border-bottom:1px solid var(--panel2) }
+  tbody td{ padding:8px 12px; border-top:1px solid var(--panel2); vertical-align:top }
+  tbody tr.click{ cursor:pointer } tbody tr.click:hover{ background:var(--hoverBg) }
+  tbody tr.on{ background:var(--infoBg) }
+  td .sub{ display:block; font-size:10px; color:var(--muted); margin-top:2px }
+
+  .pill{ display:inline-block; font-size:9px; font-weight:700; letter-spacing:.4px;
+    padding:2px 8px; border-radius:999px; white-space:nowrap }
+  .flag{ display:inline-block; font-size:8.5px; font-weight:500; padding:1px 6px; border-radius:2px;
+    border:1px solid currentColor; margin:2px 3px 0 0; white-space:nowrap }
+  .sysTag{ display:inline-block; font-size:9px; font-weight:700; letter-spacing:.4px;
+    padding:2px 7px; border-radius:2px; white-space:nowrap }
+
+  /* chain nodes */
+  .chain{ display:flex; align-items:stretch; flex-wrap:wrap }
+  .node{ flex:1 1 105px; min-width:0; border:1px solid var(--panel2); border-left:3px solid var(--nc);
+    border-radius:3px; padding:7px 9px; background:var(--panel) }
+  .node b{ display:block; font-size:8.5px; font-weight:700; letter-spacing:.4px; color:var(--nc) }
+  .node span{ display:block; font-size:11px; color:var(--text); margin-top:3px; word-break:break-word }
+  .node em{ display:block; font-size:9.5px; color:var(--muted); font-style:normal; margin-top:2px }
+  .arw{ width:18px; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:12px; flex-shrink:0 }
+
+  /* business / source grammar — copied from BizLineage via SourceLineage */
+  .bizH{ font-size:19px; font-weight:500; color:var(--text); margin:0 0 4px }
+  .bizSub{ font-size:12.5px; color:var(--bizInk); margin:0 0 16px }
+  .bizGrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:14px }
+  .bizCard{ border:1px solid var(--bizRule); border-radius:3px; padding:15px 16px; background:var(--panel); cursor:pointer }
+  .bizCard:hover{ border-color:var(--accent) }
+  .ring{ width:56px; height:56px; border-radius:50%; display:grid; place-items:center; flex-shrink:0 }
+  .ring .inner{ width:44px; height:44px; border-radius:50%; background:var(--panel);
+    display:grid; place-items:center; font-size:20px }
+  .circ{ width:54px; height:54px; border-radius:50%; background:var(--panel); display:grid;
+    place-items:center; font-size:22px; flex-shrink:0; border:2.5px solid var(--cc) }
+  .circSm{ width:32px; height:32px; border-radius:50%; background:var(--panel); display:grid;
+    place-items:center; font-size:13px; flex-shrink:0; border:2.5px solid var(--cc) }
+  .stgRow{ display:flex; align-items:center; gap:0; flex-wrap:wrap; margin-top:12px }
+  .stgRow .lnk{ flex:1 1 20px; height:2px; background:var(--bizRule); min-width:14px }
+  .stgLbl{ font-size:11px; color:var(--bizInk); text-align:center; margin-top:5px }
+  .crumbs{ display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--bizInk); margin-bottom:12px; flex-wrap:wrap }
+  .crumbs button{ border:none; background:none; color:var(--accent); font-size:11.5px; cursor:pointer; padding:0; font-weight:600 }
+
+  .clsRow{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--bizRule); cursor:pointer }
+  .clsRow:hover{ background:var(--hoverBg) }
+  .clsDot{ width:10px; height:10px; border-radius:50%; flex-shrink:0 }
+
+  .legend{ display:flex; flex-wrap:wrap; gap:13px; margin-top:10px }
+  .legend span{ display:flex; align-items:center; gap:6px; font-size:10.5px; color:var(--sub) }
+  .legend i{ width:12px; height:3px; border-radius:2px; display:inline-block }
+  .legend i.sq{ width:11px; height:11px; border-radius:2px }
+
+  .note{ background:var(--warningBg); border:1px solid var(--panel2); border-left:3px solid var(--warning);
+    border-radius:3px; padding:11px 14px; margin-top:16px; font-size:11.5px; color:var(--sub); line-height:1.55 }
+  .note b{ color:var(--text) }
+  .callout{ border:1px solid var(--panel2); border-left:3px solid var(--cc); border-radius:3px;
+    padding:11px 14px; margin-top:11px; background:var(--panel) }
+  .callout h4{ margin:0 0 5px; font-size:12.5px; font-weight:700; color:var(--navy) }
+  :root[data-theme="dark"] .callout h4{ color:var(--text) }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .callout h4{ color:var(--text) } }
+  .callout p{ margin:0; font-size:11.5px; color:var(--sub); line-height:1.6 }
+  .meta{ display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; font-size:10px; color:var(--muted) }
+  .meta b{ color:var(--sub); font-weight:700 }
+
+  .kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-bottom:14px }
+  .kpi{ background:var(--panel); border:1px solid var(--panel2); border-top:3px solid var(--kc);
+    border-radius:3px; padding:11px 13px }
+  .kpi .v{ font-size:24px; font-weight:500; line-height:1; color:var(--kc) }
+  .kpi .k{ font-size:11px; margin-top:6px; color:var(--text) }
+  .kpi .s{ font-size:10px; color:var(--muted); margin-top:2px; line-height:1.4 }
+  .empty{ padding:36px 20px; text-align:center; color:var(--muted); font-size:12.5px;
+    background:var(--panel); border:1px solid var(--panel2); border-radius:8px }
+  .mapWrap{ overflow-x:auto }
+  .mapHd{ font-size:9px; font-weight:700; letter-spacing:.5px; color:var(--muted); text-transform:uppercase }
+  .mcard{ position:absolute; box-sizing:border-box; border:1px solid var(--panel2);
+    border-left:3px solid var(--mc); border-radius:3px; background:var(--panel);
+    padding:5px 8px; display:flex; flex-direction:column; justify-content:center; overflow:hidden }
+  .mcard .t{ font-size:10.5px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+  .mcard .s{ font-size:9px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px }
+</style><style>
+  /* --- landing: LineageHome warehouse cards --- */
+  .lead{ font-size:12.5px; color:var(--bizInk); text-align:center; margin:8px 0 22px }
+  .whCards{ display:grid; grid-template-columns:1fr 1fr; gap:22px; max-width:760px; margin:0 auto }
+  @media (max-width:700px){ .whCards{ grid-template-columns:1fr } }
+  .whCard{ background:var(--panel); border:1.5px solid var(--bizRule); border-radius:14px;
+    padding:26px 24px; text-align:center }
+  .whCard .ico{ font-size:40px; margin-bottom:8px }
+  .whCard h2{ font-size:17px; font-weight:500; margin:0 0 3px }
+  .whCard .inb{ margin-left:8px; font-size:8.5px; font-weight:700; letter-spacing:.05em;
+    border-radius:999px; padding:2px 8px; background:var(--warning); color:#fff; vertical-align:3px }
+  .whCard small{ font-size:11.5px; color:var(--bizInk); display:block; line-height:1.6 }
+  .doorGrid{ display:flex; gap:10px; margin-top:16px; flex-wrap:wrap }
+  .door{ flex:1 1 30%; padding:11px 8px; border-radius:9px; cursor:pointer; text-align:center;
+    border:1.5px solid var(--accent); background:var(--panel); color:var(--accent) }
+  .door.fill{ background:var(--accent); color:#fff }
+  .door .e{ font-size:16px } .door b{ font-size:12px; display:block }
+  .door .c{ font-size:9.5px; opacity:.85 }
+  .whStats{ display:flex; justify-content:center; gap:18px; margin-top:14px; font-size:11px; color:var(--bizInk) }
+  .whStats b{ display:block; font-size:16px; color:var(--text); font-weight:500; text-align:center }
+
+  /* --- field focus: renderFieldFocus --- */
+  .fcBar{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:0 0 11px;
+    margin-bottom:13px; border-bottom:1px solid var(--panel2) }
+  .fcBack{ font-size:11.5px; font-weight:700; padding:6px 13px; cursor:pointer; border-radius:3px;
+    border:1px solid var(--panel2); background:var(--panel); color:var(--accent) }
+  .fcCrumb{ font-size:11.5px; color:var(--sub) }
+  .fcCol{ font-family:"Roboto Mono",monospace; font-size:13px; font-weight:700; color:var(--navy) }
+  :root[data-theme="dark"] .fcCol{ color:var(--text) }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .fcCol{ color:var(--text) } }
+  .fcHint{ margin-left:auto; font-size:10.5px; color:var(--muted) }
+  .fcWrap{ display:flex; align-items:flex-start; gap:16px }
+  @media (max-width:860px){ .fcWrap{ flex-direction:column } }
+  .fcRail{ flex:0 0 244px; max-width:244px; align-self:stretch; border:1px solid var(--panel2);
+    border-radius:8px; background:var(--panel); overflow:hidden }
+  @media (max-width:860px){ .fcRail{ flex:1 1 auto; max-width:none; width:100% } }
+  .fcRailH{ padding:9px 12px; font-size:9px; font-weight:800; text-transform:uppercase;
+    letter-spacing:.4px; color:var(--muted); background:var(--bg); border-bottom:1px solid var(--panel2) }
+  .fcRailH input{ display:block; width:100%; margin-top:6px; height:26px; box-sizing:border-box;
+    border:1px solid var(--panel2); border-radius:3px; padding:0 8px; font-size:11; font-weight:400;
+    text-transform:none; letter-spacing:0; background:var(--panel); color:var(--text) }
+  .fcItem{ display:flex; align-items:center; gap:7px; padding:7px 12px; cursor:pointer;
+    border-bottom:1px solid var(--panel2); font-size:11.5px }
+  .fcItem:hover{ background:var(--hoverBg) }
+  .fcItem[aria-current="true"]{ background:var(--infoBg) }
+  .fcItem .dot{ width:7px; height:7px; border-radius:50%; flex-shrink:0 }
+  .fcBody{ flex:1 1 auto; min-width:0 }
+  .fcPanel{ border:1px solid var(--panel2); border-radius:8px; background:var(--panel);
+    padding:15px 17px; margin-bottom:12px }
+  .fcPanel h3{ margin:0 0 10px; font-size:13px; font-weight:700 }
+  .dl{ display:grid; grid-template-columns:auto 1fr; gap:6px 16px; font-size:11.5px; margin:0 }
+  .dl dt{ color:var(--muted) } .dl dd{ margin:0 }
+
+  /* --- what's new marking --- */
+  body[data-new="on"] .nu{ outline:1.5px dashed var(--info); outline-offset:3px; border-radius:3px }
+  .newSwitch{ display:inline-flex; align-items:center; gap:7px; font-size:11px; color:var(--sub);
+    border:1px solid var(--panel2); background:var(--panel); border-radius:999px; padding:4px 12px; cursor:pointer }
+  .newSwitch i{ width:14px; height:14px; border-radius:3px; border:1.5px dashed var(--info); display:inline-block }
+  .newSwitch[aria-pressed="true"]{ border-color:var(--info); color:var(--info); font-weight:700 }
+
+  /* --- dependency sub-modes --- */
+  .lanes3{ display:flex; flex-direction:column; gap:10px }
+  .swim{ display:flex; align-items:center; gap:0; border:1px solid var(--panel2); border-radius:3px;
+    padding:9px 11px; background:var(--panel) }
+  .swimL{ flex:0 0 200px; font-size:11.5px }
+  .swimBar{ flex:1 1 auto; height:8px; background:var(--trk); border-radius:3px; overflow:hidden; display:flex }
+  .swimN{ flex:0 0 46px; text-align:right; font-size:11.5px; font-weight:700 }
+  .expl{ display:grid; grid-template-columns:1fr auto 1fr; gap:14px; align-items:center }
+  @media (max-width:860px){ .expl{ grid-template-columns:1fr } }
+  .explCol{ border:1px solid var(--panel2); border-radius:3px; background:var(--panel); padding:11px 13px }
+  .explCol h4{ margin:0 0 8px; font-size:9.5px; font-weight:700; letter-spacing:.5px;
+    text-transform:uppercase; color:var(--muted) }
+  .explRow{ display:flex; gap:8px; align-items:center; font-size:11.5px; padding:5px 0;
+    border-bottom:1px solid var(--panel2) }
+  .explRow:last-child{ border-bottom:none }
+  .explHub{ text-align:center; border:2px solid var(--accent); border-radius:3px; padding:13px 15px;
+    background:var(--panel) }
+  .reviewBar{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; background:var(--infoBg);
+    border:1px solid var(--panel2); border-left:3px solid var(--info); border-radius:3px;
+    padding:9px 13px; margin-bottom:16px; font-size:11.5px; color:var(--sub) }
+</style>
+
+<div class="page">
+  <h1 class="sh">Lineage</h1>
+  <div id="strap" class="strap"></div>
+
+  <div class="reviewBar">
+    <b style="color:var(--text)">Mockup for review</b>
+    <span>Every screen the build will produce. Example rows, real structure.</span>
+    <button class="newSwitch nuSwitch" id="newSw" aria-pressed="true"><i></i>Outline what is new</button>
+  </div>
+
+  <div class="doorbar" id="doorbar" hidden>
+    <span class="doors" id="doors"></span>
+    <span class="scopeWrap">
+      <button class="scopeChip" id="scopeChip" aria-expanded="false"></button>
+      <span id="popHost"></span>
+    </span>
+  </div>
+
+  <div id="body"></div>
+</div>
+<script>
+(function(){
+  "use strict";
+  var LANE = {
+    STAR:{label:"STAR", full:"STAR → IMDS", state:"REPLACED", contract:"STAR-compatible",
+      c:"var(--star)", bg:"var(--starBg)", icon:"📄", feedWord:"nightly extract"},
+    UAF: {label:"UAF", full:"UAF → IMDS", state:"NOT_REPLACED", contract:null,
+      c:"var(--uaf)", bg:"var(--uafBg)", icon:"📨", feedWord:"MQ message"},
+    SEI: {label:"SEI", full:"SEI → IMDS", state:"PROPOSED", contract:"via STAR-compatible",
+      c:"var(--sei)", bg:"var(--seiBg)", icon:"☁️", feedWord:"EOD file"}
+  };
+  var V = {
+    PROVEN_MATCH:  {t:"PROVEN",       c:"var(--success)", b:"var(--successBg)", bar:"#159943"},
+    UNKNOWN:       {t:"UNKNOWN",      c:"var(--muted)",   b:"var(--hoverBg)",   bar:"#b8c3cc"},
+    DECODE_NEEDED: {t:"DECODE",       c:"var(--purple)",  b:"var(--purpleBg)",  bar:"#7c3aed"},
+    NOT_COMPARABLE:{t:"COMPOSITE",    c:"var(--warning)", b:"var(--warningBg)", bar:"#e67e22"},
+    NO_SOURCE:     {t:"NO SOURCE",    c:"var(--danger)",  b:"var(--dangerBg)",  bar:"#c1113a"},
+    NO_BASELINE:   {t:"NO BASELINE",  c:"var(--bronze)",  b:"var(--bronzeBg)",  bar:"#b45309"},
+    OUT_OF_SCOPE:  {t:"OUT OF SCOPE", c:"var(--mutedBlue)",b:"var(--tint)",     bar:"#9dbdd0"}
+  };
+  var VORDER=["PROVEN_MATCH","UNKNOWN","DECODE_NEEDED","NOT_COMPARABLE","NO_SOURCE","NO_BASELINE","OUT_OF_SCOPE"];
+  var FLAG={
+    COLLAPSE_RISK:{t:"collapse risk",c:"var(--danger)",d:"One SEI datapoint proposed for contract fields the incumbent kept distinct."},
+    DUAL_SOURCE:{t:"dual source",c:"var(--purple)",d:"More than one lane writes this column. No precedence rule is stated."},
+    BYPASSES_CONTRACT:{t:"bypasses contract",c:"var(--bronze)",d:"SEI proposed directly with no incumbent field behind it."},
+    NO_TYPES_SUPPLIED:{t:"no types",c:"var(--muted)",d:"SEI publishes the datapoint name but not its type."},
+    CODE_SET:{t:"code set",c:"var(--purple)",d:"A decode is required and the crosswalk is absent."},
+    FEED_DEPENDENCY:{t:"feed dependency",c:"var(--warning)",d:"Assembled from feeds that can arrive separately."},
+    GL_BLOCK:{t:"GL block",c:"var(--danger)",d:"Part of the general-ledger group that has no SEI datapoints at all."}
+  };
+  // functional_group — the app resolves this through a chain and records which
+  // resolver answered (api/app/_legacy_groups.py). The workbook is the first
+  // chance to populate resolver 1 directly.
+  var GROUPS={
+    nav:   {name:"Fund Accounting & NAV",       src:"FUNCTIONAL_GROUP"},
+    entity:{name:"Entity & SMA Account Master", src:"FUNCTIONAL_GROUP"},
+    pos:   {name:"Positions & Holdings",        src:"FUNCTIONAL_GROUP"},
+    party: {name:"Party & Relationships",       src:"MASTER_NAME"}
+  };
+  function R(lane,tbl,feed,subj,a){
+    return {lane:lane,tbl:tbl,feed:feed,subj:subj,col:a[0],type:a[1],field:a[2],
+            seiFeed:a[3],seiDp:a[4],kind:a[5],verdict:a[6],flags:a[7]||[]};
+  }
+  var NAV="BBHRPTDBO.BBH_STAR_NAV_TB", ENT="RULESDBO.ENTITY", EH="RULESDBO.ENTITY_HIST",
+      POS="HOLDINGDBO.POSITION", IP="RULESDBO.BBH_INTERESTED_PARTIES",
+      UAFM="UAF account message", UAFA="UAF address message";  var ROWS=[];
+  [ ["acctg_bas_des","VARCHAR2(255)","Accounting_Basis",null,null,"UNAVAILABLE","NO_SOURCE"],
+    ["acctg_dte","DATE","Accounting_Date","End of Day Positions","AS_OF_DATE","DIRECT","UNKNOWN",["NO_TYPES_SUPPLIED"]],
+    ["bse_crncy_cde","VARCHAR2(255)","Base_Currency_Code","Account","ACCOUNT_BASE_CURRENCY","LOOKUP","DECODE_NEEDED",["CODE_SET"]],
+    ["clas_id","VARCHAR2(255)","Class_Identifier",null,null,"UNAVAILABLE","NO_SOURCE"],
+    ["cls_evnt_id","VARCHAR2(255)","Close_Event_ID",null,null,"UNAVAILABLE","NO_SOURCE"],
+    ["cr_amt","NUMBER","Credit_Amount",null,null,"UNAVAILABLE","NO_SOURCE"],
+    ["cstdy_hd_acct_num","VARCHAR2(255)","Custody_Head_Account_Number","Account","ACCOUNT_NUMBER","DIRECT","UNKNOWN",["NO_TYPES_SUPPLIED","COLLAPSE_RISK"]],
+    ["db_amt","NUMBER","Debit_Amount",null,null,"UNAVAILABLE","NO_SOURCE"],
+    ["drvd_cost_amt","NUMBER","Derived_Cost","End of Day Positions","VALUATION_COST","DIRECT","UNKNOWN",["NO_TYPES_SUPPLIED"]],
+    ["drvd_mval_amt","NUMBER","Derived_Market_Value","Taxlot","MARKET_VALUE","DIRECT","UNKNOWN",["NO_TYPES_SUPPLIED","COLLAPSE_RISK"]],
+    ["enty_nam","VARCHAR2(255)","Entity_Name","Account","ACCOUNT_DISPLAY_NAME","DIRECT","UNKNOWN",["NO_TYPES_SUPPLIED"]],
+    ["star_entity_id","VARCHAR2(255)","Entity_Number","Account","ACCOUNT_NUMBER","DIRECT","UNKNOWN",["NO_TYPES_SUPPLIED","COLLAPSE_RISK"]],
+    ["fscl_yr_end_dte","VARCHAR2(255)","Fiscal_Year_End",null,null,"UNAVAILABLE","NO_SOURCE"],
+    ["gl_acct_cat_nam","VARCHAR2(255)","GL_Account_Category",null,null,"UNAVAILABLE","NO_SOURCE",["GL_BLOCK"]],
+    ["gl_acct_num","NUMBER","GL_Account_Number",null,null,"UNAVAILABLE","NO_SOURCE",["GL_BLOCK"]],
+    ["gl_acct_nam","VARCHAR2(255)","GL_Account_Name",null,null,"UNAVAILABLE","NO_SOURCE",["GL_BLOCK"]],
+    ["gl_acct_typ_cde","VARCHAR2(255)","GL_Account_Type",null,null,"UNAVAILABLE","NO_SOURCE",["GL_BLOCK"]],
+    ["gl_bal_amt","NUMBER","GL_Balance",null,null,"UNAVAILABLE","NO_SOURCE",["GL_BLOCK"]],
+    ["mval_amt","NUMBER","Market_Value","Taxlot","MARKET_VALUE","DIRECT","UNKNOWN",["NO_TYPES_SUPPLIED","COLLAPSE_RISK"]],
+    ["mth_avg_nav_amt","NUMBER","Monthly_Average_NAV",null,null,"UNAVAILABLE","NO_SOURCE"],
+    ["prev_nav_amt","NUMBER","Previous_NAV",null,null,"UNAVAILABLE","NO_SOURCE"],
+    ["qlfy_des","VARCHAR2(255)","Qualifier_Description",null,null,"UNAVAILABLE","NO_SOURCE"],
+    ["rpt_typ_nam","VARCHAR2(255)","Report_Type",null,null,"UNAVAILABLE","NO_SOURCE"]
+  ].forEach(function(a){ ROWS.push(R("STAR",NAV,"TBMEIFI7","nav",a)); });
+
+  var entStar=[
+    ["entity_id","CHAR(8)","STAR_ENTITY_ID_1","Account","ACCOUNT_NUMBER","DIRECT","UNKNOWN",["NO_TYPES_SUPPLIED","COLLAPSE_RISK","DUAL_SOURCE"]],
+    ["base_currency","CHAR(3)","FK_BSE_CRNCY_CDE_4",null,null,"UNAVAILABLE","NO_SOURCE",["DUAL_SOURCE"]],
+    ["orig_accnt_number","VARCHAR2(50)","CSTDY_HD_ACCT_NUM_8",null,null,"UNAVAILABLE","NO_SOURCE",["DUAL_SOURCE"]],
+    ["upd_user","CHAR(30)",null,"Account","ACCOUNT_LAST_UPDATE_USER","DIRECT","NO_BASELINE",["BYPASSES_CONTRACT","DUAL_SOURCE"]],
+    ["upd_date","DATE",null,null,null,"UNAVAILABLE","NO_BASELINE",["DUAL_SOURCE"]],
+    ["active_status","VARCHAR2(3)","v_termination_date",null,null,"UNAVAILABLE","NO_SOURCE",["DUAL_SOURCE"]]
+  ];
+  entStar.forEach(function(a){ ROWS.push(R("STAR",ENT,"ACDDIFI1","entity",a)); });
+  entStar.concat([
+    ["effective_date","DATE",null,null,null,"UNAVAILABLE","NO_BASELINE",["DUAL_SOURCE"]],
+    ["src_intfc_inst","NUMBER",null,null,null,"UNAVAILABLE","NO_BASELINE",["DUAL_SOURCE"]]
+  ]).forEach(function(a){ ROWS.push(R("STAR",EH,"ACDDIFI1","entity",a)); });
+
+  [ ["effective_date","DATE","Accounting_Date_2","End of Day Positions","AS_OF_DATE","DIRECT","UNKNOWN",["NO_TYPES_SUPPLIED"]],
+    ["update_date","DATE",null,null,null,"UNAVAILABLE","NO_BASELINE"],
+    ["update_source","CHAR(8)",null,null,null,"UNAVAILABLE","NO_BASELINE"],
+    ["pos_flag","CHAR(2)","Position_Flag",null,null,"UNAVAILABLE","NO_SOURCE"],
+    ["src_intfc_inst","NUMBER",null,null,null,"UNAVAILABLE","NO_BASELINE"],
+    ["base_currency","VARCHAR2(3)","base_currency_code_8","Account","ACCOUNT_BASE_CURRENCY","LOOKUP","DECODE_NEEDED",["CODE_SET"]],
+    ["amortized_cost","NUMBER","Base_Amortized_Cost_7_Trade_Date","End of Day Positions","3 datapoints","COMPOSITE","NOT_COMPARABLE",["FEED_DEPENDENCY"]]
+  ].forEach(function(a){ ROWS.push(R("STAR",POS,"PEDDIFI1","pos",a)); });
+
+  var entUaf=[
+    ["entity_id","CHAR(8)","ACCT_ID",null,null,"DIRECT","OUT_OF_SCOPE",["DUAL_SOURCE"]],
+    ["base_currency","CHAR(3)","BASE_CCY",null,null,"DIRECT","OUT_OF_SCOPE",["DUAL_SOURCE"]],
+    ["orig_accnt_number","VARCHAR2(50)","ACCT_NO",null,null,"DIRECT","OUT_OF_SCOPE",["DUAL_SOURCE"]],
+    ["upd_user","CHAR(30)","UPDATE_USER",null,null,"DIRECT","OUT_OF_SCOPE",["DUAL_SOURCE"]],
+    ["upd_date","DATE","UPDATE_TS",null,null,"DIRECT","OUT_OF_SCOPE",["DUAL_SOURCE"]],
+    ["active_status","VARCHAR2(3)","ACCT_STATUS_CD",null,null,"LOOKUP","OUT_OF_SCOPE",["DUAL_SOURCE"]]
+  ];
+  entUaf.forEach(function(a){ ROWS.push(R("UAF",ENT,UAFM,"entity",a)); });
+  entUaf.concat([
+    ["effective_date","DATE","EFF_DT",null,null,"DIRECT","OUT_OF_SCOPE",["DUAL_SOURCE"]],
+    ["src_intfc_inst","NUMBER","SRC_SYS_ID",null,null,"DIRECT","OUT_OF_SCOPE",["DUAL_SOURCE"]]
+  ]).forEach(function(a){ ROWS.push(R("UAF",EH,UAFM,"entity",a)); });
+
+  [ ["party_id","VARCHAR2(20)","PARTY_ID",null,null,"DIRECT","OUT_OF_SCOPE"],
+    ["party_name","VARCHAR2(120)","PARTY_NAME",null,null,"DIRECT","OUT_OF_SCOPE"],
+    ["address_line_1","VARCHAR2(80)","ADDR_LINE_1",null,null,"DIRECT","OUT_OF_SCOPE"],
+    ["address_line_2","VARCHAR2(80)","ADDR_LINE_2",null,null,"DIRECT","OUT_OF_SCOPE"],
+    ["city","VARCHAR2(60)","CITY",null,null,"DIRECT","OUT_OF_SCOPE"],
+    ["postal_code","VARCHAR2(16)","POSTAL_CD",null,null,"DIRECT","OUT_OF_SCOPE"],
+    ["country_code","CHAR(2)","CTRY_CD",null,null,"LOOKUP","OUT_OF_SCOPE"],
+    ["effective_date","DATE","EFF_DT",null,null,"DIRECT","OUT_OF_SCOPE"]
+  ].forEach(function(a){ ROWS.push(R("UAF",IP,UAFA,"party",a)); });
+
+  ROWS.forEach(function(r,i){ r.id=i; });
+
+  var S={ ds:null, door:"technical", lanes:{STAR:true,UAF:true,SEI:true}, scope:"compare",
+          tab:"fg", mode:"table", netMode:"matrix", q:"", fq:"", pop:false, whatsNew:true,
+          open:{nav:true,entity:true,pos:false,party:false}, col:null, focus:null,
+          lvl:0, feed:null, cls:null };
+  var $=function(s){return document.querySelector(s);};
+  var esc=function(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});};
+
+  function anyLane(){ return S.lanes.STAR||S.lanes.UAF||S.lanes.SEI; }
+  function seiOn(){ return S.lanes.SEI && S.scope!=="legacy"; }
+  function inLane(r){
+    if(S.lanes[r.lane]) return true;
+    if(S.lanes.SEI && LANE[r.lane].state==="REPLACED") return true;
+    return false;
+  }
+  function visible(){
+    return ROWS.filter(function(r){
+      if(!inLane(r)) return false;
+      if(S.q && (r.tbl+" "+r.col+" "+(r.field||"")+" "+r.feed).toLowerCase().indexOf(S.q.toLowerCase())<0) return false;
+      return true;
+    });
+  }
+  function byGroup(rows){ var m={}; rows.forEach(function(r){ (m[r.subj]=m[r.subj]||[]).push(r); }); return m; }
+  function countBy(rows,k){ var m={}; rows.forEach(function(r){ m[r[k]]=(m[r[k]]||0)+1; }); return m; }
+  function pill(v){ var d=V[v]; return '<span class="pill" style="background:'+d.b+';color:'+d.c+'">'+d.t+'</span>'; }
+  function sysTag(l){ return '<span class="sysTag" style="background:'+LANE[l].bg+';color:'+LANE[l].c+'">'+l+'</span>'; }
+  function flags(fs){
+    if(!fs||!fs.length) return '<span style="color:var(--muted)">—</span>';
+    return fs.map(function(f){ var d=FLAG[f]; return '<span class="flag" style="color:'+d.c+'" title="'+esc(d.d)+'">'+d.t+'</span>'; }).join("");
+  }
+  function stack(rows){
+    var m=countBy(rows,"verdict"), n=rows.length||1, h="";
+    VORDER.forEach(function(v){ if(!m[v]) return;
+      h+='<i style="width:'+((m[v]/n)*100).toFixed(2)+'%;background:'+V[v].bar+'" title="'+V[v].t+' '+m[v]+'"></i>'; });
+    return h;
+  }
+  function conic(rows){
+    var m=countBy(rows,"verdict"), n=rows.length||1, acc=0, parts=[];
+    VORDER.forEach(function(v){ if(!m[v]) return;
+      var to=acc+(m[v]/n)*100; parts.push(V[v].bar+" "+acc.toFixed(2)+"% "+to.toFixed(2)+"%"); acc=to; });
+    return "conic-gradient(from -90deg,"+(parts.length?parts.join(","):"var(--trk) 0 100%")+")";
+  }
+
+  /* ---------- chrome ---------- */
+  var DOORS=[["business","Business view"],["technical","Technical view"],["source","Source view"]];
+  function drawChrome(){
+    $("#doors").innerHTML=DOORS.map(function(d){
+      return '<button data-d="'+d[0]+'" aria-pressed="'+(S.door===d[0])+'">'+d[1]+'</button>'; }).join("");
+    Array.prototype.forEach.call($("#doors").children,function(b){
+      b.onclick=function(){ S.door=b.getAttribute("data-d"); S.col=null; S.lvl=0; S.feed=null; S.cls=null; draw(); };
+    });
+
+    var lanes=["STAR","UAF","SEI"].filter(function(k){return S.lanes[k];});
+    var scopeWord = S.scope==="legacy"?"Legacy" : S.scope==="sei"?"SEI" : "SEI + Legacy";
+    var chip=$("#scopeChip");
+    chip.innerHTML='<span class="d"></span>IMDS · '+scopeWord+(lanes.length?' · '+lanes.join(", "):"")+
+      '<span class="inb">IN BUILD</span><span class="car">▾</span>';
+    chip.setAttribute("aria-expanded",S.pop?"true":"false");
+    chip.onclick=function(){ S.pop=!S.pop; drawChrome(); };
+
+    var host=$("#popHost");
+    if(!S.pop){ host.innerHTML=""; return; }
+    var scopes=[["legacy","Legacy"],["sei","SEI"],["compare","Compare"]];
+    host.innerHTML='<span class="catch" id="catch"></span><div class="pop">'+
+      '<div class="popRow"><span class="popLbl">Warehouse</span>'+
+        '<button class="popBtn">PBDW</button>'+
+        '<button class="popBtn" aria-pressed="true">IMDS <span style="font-size:8px;opacity:.85">IN BUILD</span></button></div>'+
+      '<div class="popRow"><span class="popLbl">Scope</span>'+
+        scopes.map(function(s){ return '<button class="popBtn" data-s="'+s[0]+'" aria-pressed="'+(S.scope===s[0])+'">'+s[1]+'</button>'; }).join("")+
+      '</div>'+
+      '<div class="popRow"><span class="popLbl">Lanes</span>'+
+        ["STAR","UAF","SEI"].map(function(k){
+          return '<button class="laneBtn" data-l="'+k+'" aria-pressed="'+(!!S.lanes[k])+'" style="--lc:'+LANE[k].c+'"><i></i>'+LANE[k].full+'</button>';
+        }).join("")+
+      '</div>'+
+      '<div class="popRow" style="padding-top:2px"><span class="popLbl"></span>'+
+        '<span style="font-size:10.5px;color:var(--muted);line-height:1.5;flex:1 1 220px">'+esc(scopeHint())+'</span></div>'+
+      '<div class="popBack">← All warehouses</div></div>';
+    $("#catch").onclick=function(){ S.pop=false; drawChrome(); };
+    Array.prototype.forEach.call(host.querySelectorAll("[data-s]"),function(b){
+      b.onclick=function(){ S.scope=b.getAttribute("data-s");
+        if(S.scope==="legacy") S.lanes.SEI=false; if(S.scope==="sei") S.lanes.SEI=true;
+        S.col=null; draw(); };
+    });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-l]"),function(b){
+      b.onclick=function(){ var k=b.getAttribute("data-l"); S.lanes[k]=!S.lanes[k]; S.col=null; draw(); };
+    });
+  }
+  function scopeHint(){
+    if(!anyLane()) return "No lanes selected.";
+    if(S.lanes.SEI&&!S.lanes.STAR&&!S.lanes.UAF) return "SEI reaches IMDS through the STAR contract, so it is shown against the lane it replaces.";
+    if(S.lanes.STAR&&S.lanes.UAF&&S.lanes.SEI) return "Full estate. 14 columns are written by two lanes.";
+    if(S.lanes.STAR&&S.lanes.UAF) return "Both incumbents. The overlap on RULESDBO.ENTITY is the thing to read.";
+    if(S.lanes.UAF&&S.lanes.SEI) return "UAF has no SEI successor, so the SEI layer adds nothing here.";
+    return "";
+  }
+
+  /* ---------- fgShell ---------- */
+  function grp(key,rows,inner){
+    var open=!!S.open[key]||!!S.q, G=GROUPS[key];
+    var tabs=new Set(rows.map(function(r){return r.tbl;})).size;
+    var m=countBy(rows,"verdict");
+    var scope=rows.filter(function(r){return LANE[r.lane].state==="REPLACED";}).length;
+    var pct=scope?Math.round(((m.PROVEN_MATCH||0)/scope)*100):0;
+    return '<div class="grp"><div class="grpH" data-g="'+key+'">'+
+      '<span class="car">'+(open?"▾":"▶")+'</span>'+
+      '<span class="nm">'+esc(G.name)+'</span>'+
+      '<span class="gsrc" title="which resolver produced this group">via '+esc(G.src)+'</span>'+
+      '<span class="stat">'+tabs+' table'+(tabs!==1?"s":"")+' · '+rows.length+' columns · '+pct+'% proven</span>'+
+      '<span class="trk"><span class="bar">'+stack(rows)+'</span></span></div>'+
+      (open?'<div class="grpB">'+inner(rows)+'</div>':'')+'</div>';
+  }
+
+  /* ---------- chain + analysis ---------- */
+  function node(stage,val,sub,c){
+    return '<div class="node" style="--nc:'+c+'"><b>'+esc(stage)+'</b><span class="mono">'+esc(val)+'</span>'+
+      (sub?'<em>'+esc(sub)+'</em>':'')+'</div>';
+  }
+  function drill(r){
+    var peers=ROWS.filter(function(x){return x.tbl===r.tbl&&x.col===r.col&&inLane(x);});
+    var h="";
+    peers.forEach(function(p){
+      var parts=[];
+      if(p.lane==="UAF"){
+        parts.push(node("MQ FIELD",p.field||"—",p.feed,"var(--srcC)"));
+        parts.push(node("JOB","PDPA009_IntraDay_UAFtoPACE_CMD","command job","var(--stg1C)"));
+      } else {
+        if(seiOn()&&p.seiDp){
+          parts.push(node("SEI DATAPOINT",p.seiDp,p.seiFeed,"var(--sei)"));
+          parts.push(node("SEI CANONICAL","SEI_"+(p.subj==="pos"?"POSITION":"ACCOUNT"),"conformed keys","var(--sei)"));
+        }
+        parts.push(node("SRC · CONTRACT",p.field||"none",p.feed,"var(--srcC)"));
+        parts.push(node("STG1","N/A","no persisted staging","var(--stg1C)"));
+        parts.push(node("STG2","N/A","no persisted staging","var(--stg2C)"));
+      }
+      parts.push(node("DWH",p.col,p.tbl,"var(--dwhC)"));
+      h+='<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;letter-spacing:.5px;color:'+
+        LANE[p.lane].c+';margin-bottom:6px">'+esc(LANE[p.lane].full)+'</div><div class="chain">'+
+        parts.map(function(n,i){ return n+(i<parts.length-1?'<div class="arw">›</div>':""); }).join("")+'</div></div>';
+    });
+    return h+analysis(r,peers);
+  }
+  function analysis(r,peers){
+    var h="", fan=r.seiDp?ROWS.filter(function(x){return x.seiDp===r.seiDp&&x.seiFeed===r.seiFeed;}):[];
+    var fields=Array.from(new Set(fan.map(function(x){return x.feed+" · "+x.field;})));
+    if(peers.length>1) h+='<div class="callout" style="--cc:var(--purple)"><h4>Two lanes write this column, and nothing says which wins</h4>'+
+      '<p>'+peers.map(function(p){return LANE[p.lane].full;}).join(" and ")+' both populate it. There is no error when they '+
+      'disagree — the value simply depends on load order. A precedence rule is needed before cutover.</p>'+
+      '<div class="meta"><span><b>Owner</b> IMDS data owner</span></div></div>';
+    if(r.seiDp&&fields.length>1) h+='<div class="callout" style="--cc:var(--danger)"><h4>One SEI datapoint, '+fields.length+' contract fields</h4>'+
+      '<p><span class="mono">'+esc(r.seiFeed)+'.'+esc(r.seiDp)+'</span> is proposed for '+
+      fields.map(function(f){return '<span class="mono">'+esc(f)+'</span>';}).join(", ")+'. The incumbent kept these apart on the '+
+      'same record. If they ever hold different values, collapsing them loses that difference silently — the load succeeds and '+
+      'the number is wrong.</p><div class="meta"><span><b>Owner</b> SEI design team + BBH mapping</span>'+
+      '<span><b>Clears when</b> SEI names which datapoint is the derived one</span></div></div>';
+    if(r.verdict==="NO_SOURCE") h+='<div class="callout" style="--cc:var(--danger)"><h4>No SEI datapoint behind it</h4>'+
+      '<p>Contract field <span class="mono">'+esc(r.field||"—")+'</span> is delivered today and has nothing behind it after '+
+      'cutover. Needs one of four dispositions — default, derive, drop or block — approved by the IMDS data owner.</p>'+
+      '<div class="meta"><span><b>Disposition</b> UNDECIDED</span></div></div>';
+    if(r.verdict==="NO_BASELINE") h+='<div class="callout" style="--cc:var(--bronze)"><h4>No contract field to join on</h4>'+
+      '<p>No incumbent field feeds this column today, so nothing exists for a SEI mapping to attach to.'+
+      (r.seiDp?' SEI datapoints are nonetheless proposed, which means a direct route around the contract — possibly right for an '+
+               'operational column, but an architecture decision rather than a join result.':'')+'</p>'+
+      '<div class="meta"><span><b>Owner</b> existing lineage backlog, not SEI</span></div></div>';
+    if(r.verdict==="OUT_OF_SCOPE") h+='<div class="callout" style="--cc:var(--mutedBlue)"><h4>Out of scope, not a gap</h4>'+
+      '<p>This column sits on the UAF lane, which SEI does not replace. Having no SEI datapoint is the correct state — counted '+
+      'as lineage, excluded from the cutover denominator.</p></div>';
+    if(r.flags.indexOf("FEED_DEPENDENCY")>=0) h+='<div class="callout" style="--cc:var(--warning)"><h4>Assembled from feeds that arrive separately</h4>'+
+      '<p>Nothing stops the position feed loading without its rates. The result is a wrong value, not a missing one — the harder '+
+      'failure to detect, and the reason a composite cannot clear on types.</p></div>';
+    return h;
+  }
+
+  /* ---------- TECHNICAL · mode table ---------- */
+  function modeTable(rows){
+    var sei=seiOn();
+    var h='<div class="tw"><table><thead><tr><th>Warehouse column</th><th>Lane</th><th>Type</th>'+
+      '<th>Contract field</th>'+(sei?'<th>SEI datapoint</th>':'')+'<th>Verdict</th><th>Analysis</th></tr></thead><tbody>';
+    rows.forEach(function(r){
+      var open=S.col===r.id, rep=LANE[r.lane].state==="REPLACED";
+      h+='<tr class="click'+(open?" on":"")+'" data-c="'+r.id+'">'+
+        '<td><span class="mono" style="font-weight:500">'+esc(r.col)+'</span><span class="sub mono">'+esc(r.tbl)+'</span></td>'+
+        '<td>'+sysTag(r.lane)+'</td>'+
+        '<td><span class="mono" style="font-size:11px">'+esc(r.type)+'</span><span class="sub">length UNKNOWN</span></td>'+
+        '<td>'+(r.field?'<span class="mono" style="font-size:11px">'+esc(r.field)+'</span><span class="sub">'+esc(r.feed)+'</span>'
+                       :'<span style="color:var(--bronze)">no contract field</span>')+'</td>'+
+        (sei?'<td>'+(!rep?'<span style="color:var(--muted)">n/a</span>'
+              :r.seiDp?'<span class="mono" style="font-size:11px">'+esc(r.seiDp)+'</span><span class="sub">'+esc(r.seiFeed)+'</span>'
+              :'<span style="color:var(--danger)">none proposed</span>')+'</td>':'')+
+        '<td>'+pill(r.verdict)+'</td><td>'+flags(r.flags)+'</td></tr>';
+      if(open) h+='<tr><td colspan="'+(sei?7:6)+'" style="background:var(--bg);padding:14px 12px">'+drill(r)+'</td></tr>';
+    });
+    return h+'</tbody></table></div>';
+  }
+
+  /* ---------- TECHNICAL · mode map ---------- */
+  function modeMap(rows){
+    var sei=seiOn(), W=sei?4:3, CW=195, GAP=74, PITCH=42, CH=34;
+    var width=W*CW+(W-1)*GAP;
+    var colDwh=rows.slice(0,12), colField=[], seenF={}, colSei=[], seenS={};
+    colDwh.forEach(function(r){
+      var f=r.field?(r.feed+"|"+r.field):null;
+      if(f&&seenF[f]==null){ seenF[f]=colField.length; colField.push({t:r.field,s:r.feed}); }
+      if(sei&&r.seiDp){ var k=r.seiFeed+"|"+r.seiDp;
+        if(seenS[k]==null){ seenS[k]=colSei.length; colSei.push({t:r.seiDp,s:r.seiFeed}); } }
+    });
+    var colLin=colDwh.map(function(r){ return {t:r.field?"maps":"unmapped",s:r.tbl.split(".")[1]}; });
+    var cols=[colDwh.map(function(r){return {t:r.col,s:r.tbl};}),colLin,colField];
+    if(sei) cols.push(colSei);
+    var H=Math.max.apply(null,cols.map(function(c){return c.length;}))*PITCH+8;
+    function top(n,i){ return ((H-((n-1)*PITCH+CH))/2)+i*PITCH; }
+    function x(i){ return i*(CW+GAP); }
+    function mid(ci,i){ return top(cols[ci].length,i)+CH/2; }
+    function path(x1,y1,x2,y2){ var d=Math.max(30,(x2-x1)*.45);
+      return "M "+x1+" "+y1+" C "+(x1+d)+" "+y1+", "+(x2-d)+" "+y2+", "+x2+" "+y2; }
+
+    var wires="",stubs="";
+    colDwh.forEach(function(r,i){
+      wires+='<path d="'+path(x(1),mid(1,i),x(0)+CW,mid(0,i))+'" stroke="#9fb2c0" stroke-width="1.4" fill="none"/>';
+      var f=r.field?(r.feed+"|"+r.field):null;
+      if(f!=null&&seenF[f]!=null)
+        wires+='<path d="'+path(x(2),mid(2,seenF[f]),x(1)+CW,mid(1,i))+'" stroke="#9fb2c0" stroke-width="1.4" fill="none"/>';
+    });
+    if(sei) colDwh.forEach(function(r){
+      var f=r.field?(r.feed+"|"+r.field):null; if(f==null||seenF[f]==null) return;
+      if(r.seiDp){ var k=r.seiFeed+"|"+r.seiDp;
+        wires+='<path d="'+path(x(3),mid(3,seenS[k]),x(2)+CW,mid(2,seenF[f]))+'" stroke="'+V[r.verdict].bar+'" stroke-width="2.2" fill="none"/>';
+      } else { var y=mid(2,seenF[f]);
+        stubs+='<path d="M '+(x(2)+CW)+' '+y+' L '+(x(2)+CW+58)+' '+y+'" stroke="#c1113a" stroke-width="2.2" stroke-dasharray="5 4" fill="none"/>'+
+               '<circle cx="'+(x(2)+CW+58)+'" cy="'+y+'" r="3.5" fill="#c1113a"/>'; }
+    });
+    var accents=["var(--dwhC)","var(--stg2C)","var(--srcC)","var(--sei)"], cards="";
+    cols.forEach(function(c,ci){ c.forEach(function(o,i){
+      cards+='<div class="mcard" style="--mc:'+accents[ci]+';left:'+x(ci)+'px;top:'+top(c.length,i)+'px;width:'+CW+'px;height:'+CH+'px">'+
+        '<span class="t mono">'+esc(o.t)+'</span><span class="s">'+esc(o.s)+'</span></div>';
+    });});
+    var heads=["1 · Warehouse column","2 · Lineage row","3 · Contract field","4 · SEI datapoint"].slice(0,W);
+    return '<div class="mapWrap"><div style="width:'+(width+70)+'px">'+
+      '<div class="mapHd" style="position:relative;height:16px">'+heads.map(function(t,i){
+        return '<div style="position:absolute;left:'+x(i)+'px;width:'+CW+'px">'+esc(t)+'</div>';}).join("")+'</div>'+
+      '<div style="position:relative;width:'+(width+70)+'px;height:'+H+'px">'+
+      '<svg width="'+(width+70)+'" height="'+H+'" style="position:absolute;left:0;top:0;pointer-events:none">'+wires+stubs+'</svg>'+
+      cards+'</div></div><div class="legend"><span><i style="background:#9fb2c0"></i>existing chain</span>'+
+      (sei?VORDER.filter(function(v){return rows.some(function(r){return r.verdict===v&&r.seiDp;});}).map(function(v){
+        return '<span><i style="background:'+V[v].bar+'"></i>'+V[v].t+'</span>';}).join("")+
+        '<span><i class="sq" style="background:#c1113a"></i>wire ends in nothing — no SEI source</span>':"")+'</div>'+
+      (rows.length>12?'<div style="font-size:10.5px;color:var(--muted);margin-top:8px">showing the first 12 of '+rows.length+
+        ' columns — Table mode lists them all</div>':"")+'</div>';
+  }
+
+  /* ---------- passports (Business door, and Technical mode 3) ---------- */
+  function story(r){
+    if(r.verdict==="OUT_OF_SCOPE") return "Arrives from "+r.feed+" as "+r.field+" and lands here unchanged. UAF is not being replaced, so nothing about this field changes at cutover.";
+    if(r.verdict==="NO_SOURCE") return "Comes from "+r.feed+" today as "+r.field+". After cutover there is nothing behind it — SEI publishes no equivalent, so someone has to decide whether to default it, derive it, drop it, or stop the cutover.";
+    if(r.verdict==="NO_BASELINE") return "Nothing feeds this column in the recorded lineage today. It looks pipeline-managed, which would make it fine — but that has never been written down.";
+    if(r.verdict==="NOT_COMPARABLE") return "Built from three SEI fields across two feeds. There is no single source field to compare against, so this one can only be proven by running it and reconciling the output.";
+    if(r.verdict==="DECODE_NEEDED") return "SEI sends a code and the target expects the code STAR used. The domain is named on the SEI side, the values are not published, and no STAR code set was supplied — so the translation cannot be written yet.";
+    return "SEI proposes "+r.seiFeed+"."+r.seiDp+" for this. The names line up. Nothing has been checked, because neither side has published a type.";
+  }
+  function modeBiz(rows){
+    return '<div class="bizGrid">'+rows.map(function(r){
+      return '<div class="bizCard" data-c="'+r.id+'"><div style="display:flex;align-items:baseline;gap:8px">'+
+        '<span class="mono" style="font-size:12.5px;font-weight:700">'+esc(r.col)+'</span>'+
+        '<span style="margin-left:auto">'+pill(r.verdict)+'</span></div>'+
+        '<div style="font-size:11px;color:var(--bizInk);margin-top:4px">'+sysTag(r.lane)+' <span class="mono">'+esc(r.tbl)+'</span></div>'+
+        '<p style="margin:9px 0 0;font-size:11.5px;color:var(--bizInk);line-height:1.6">'+esc(story(r))+'</p>'+
+        (r.flags.length?'<div style="margin-top:8px">'+flags(r.flags)+'</div>':"")+'</div>';
+    }).join("")+'</div>';
+  }
+
+  /* ---------- SOURCE door — L0 → L3, source-first ---------- */
+  function feedsOf(rows){
+    var m={};
+    rows.forEach(function(r){
+      var useSei = seiOn() && LANE[r.lane].state==="REPLACED" && r.seiDp;
+      var key = useSei ? ("SEI|"+r.seiFeed) : (r.lane+"|"+r.feed);
+      (m[key]=m[key]||[]).push(r);
+    });
+    return m;
+  }
+  var CLS={
+    mapped: {t:"Mapped to SEI",   c:"#159943", d:"A SEI datapoint is proposed and the names line up."},
+    decode: {t:"Needs a decode",  c:"#7c3aed", d:"A code set has to be translated before the value means the same thing."},
+    comp:   {t:"Composite",       c:"#e67e22", d:"Several SEI fields combine into one. No field-level check applies."},
+    none:   {t:"No SEI source",   c:"#c1113a", d:"Delivered today, nothing behind it after cutover."},
+    base:   {t:"No baseline",     c:"#b45309", d:"Nothing feeds it today either — a pre-existing hole."},
+    oos:    {t:"Not replaced",    c:"#9dbdd0", d:"UAF. Lineage only, excluded from SEI readiness."}
+  };
+  function clsOf(r){
+    if(r.verdict==="OUT_OF_SCOPE") return "oos";
+    if(r.verdict==="NO_BASELINE") return "base";
+    if(r.verdict==="NO_SOURCE") return "none";
+    if(r.verdict==="NOT_COMPARABLE") return "comp";
+    if(r.verdict==="DECODE_NEEDED") return "decode";
+    return "mapped";
+  }
+  function circ(icon,c,big){ return '<span class="'+(big?"circ":"circSm")+'" style="--cc:'+c+'">'+icon+'</span>'; }
+
+  function sourceView(){
+    var v=visible();
+    if(!v.length) return '<div class="empty">No columns in view.</div>';
+    var fm=feedsOf(v);
+
+    /* L0 — the feeds that carry the data */
+    if(S.lvl===0){
+      var byLane={};
+      Object.keys(fm).forEach(function(k){ var l=k.split("|")[0]; (byLane[l]=byLane[l]||[]).push(k); });
+      var h='<div class="bizH">Where does the data come from?</div>'+
+        '<p class="bizSub">One card per feed. The ring is what happens to its fields once SEI takes over — '+
+        'green only where a mapping exists and both sides agree.</p>';
+      ["SEI","STAR","UAF"].forEach(function(l){
+        if(!byLane[l]) return;
+        h+='<div style="margin-bottom:22px"><div style="display:flex;align-items:center;gap:9px;margin-bottom:11px">'+
+          '<span style="font-size:13.5px;font-weight:700;color:'+LANE[l].c+'">'+esc(LANE[l].full)+'</span>'+
+          '<span style="font-size:11px;color:var(--bizInk)">'+esc(LANE[l].state.toLowerCase().replace("_"," "))+'</span></div>'+
+          '<div class="bizGrid">'+byLane[l].map(function(k){
+            var rs=fm[k], nm=k.split("|")[1];
+            var tbls=new Set(rs.map(function(r){return r.tbl;})).size;
+            return '<div class="bizCard" data-f="'+esc(k)+'"><div style="display:flex;gap:13px;align-items:center">'+
+              '<span class="ring" style="background:'+conic(rs)+'"><span class="inner">'+LANE[l].icon+'</span></span>'+
+              '<span style="min-width:0"><span style="display:block;font-size:13.5px;font-weight:700" class="mono">'+esc(nm)+'</span>'+
+              '<span style="display:block;font-size:11px;color:var(--bizInk);margin-top:3px">'+esc(LANE[l].feedWord)+
+              ' · '+rs.length+' fields · '+tbls+' table'+(tbls!==1?"s":"")+'</span></span></div></div>';
+          }).join("")+'</div></div>';
+      });
+      return h+clsLegend();
+    }
+
+    var rs=fm[S.feed]||[];
+    var lane=S.feed.split("|")[0], fname=S.feed.split("|")[1];
+    var crumb='<div class="crumbs"><button data-lvl="0">All feeds</button><span>›</span>'+
+      '<span class="mono">'+esc(fname)+'</span>'+
+      (S.lvl>=2&&S.cls?'<span>›</span><span>'+esc(CLS[S.cls].t)+'</span>':"")+
+      (S.lvl>=3&&S.col!=null?'<span>›</span><span class="mono">'+esc((ROWS[S.col]||{}).col||"")+'</span>':"")+'</div>';
+
+    /* L1 — one feed end to end */
+    if(S.lvl===1){
+      var tabs={}; rs.forEach(function(r){ (tabs[r.tbl]=tabs[r.tbl]||[]).push(r); });
+      var stages = lane==="UAF"
+        ? [[LANE.UAF.icon,"UAF","MQ message","var(--srcC)"],["⚙️","Job","PDPA009 / PDBA016","var(--stg1C)"],["🏪","IMDS","RULESDBO","var(--dwhC)"]]
+        : lane==="SEI"
+        ? [["☁️","SEI","EOD feed","var(--sei)"],["🧬","Canonical","conformed keys","var(--sei)"],["📄","Contract","STAR-compatible","var(--srcC)"],["🏪","IMDS","warehouse","var(--dwhC)"]]
+        : [["📄","STAR","nightly extract","var(--srcC)"],["🧼","ETL","STAR → IMDS","var(--stg2C)"],["🏪","IMDS","warehouse","var(--dwhC)"]];
+      var h=crumb+'<div class="bizH mono">'+esc(fname)+'</div>'+
+        '<p class="bizSub">'+rs.length+' fields reaching '+Object.keys(tabs).length+' warehouse table'+
+        (Object.keys(tabs).length!==1?"s":"")+'. '+
+        (lane==="SEI"?"SEI lands in the STAR-compatible shape; everything from there is the existing pipeline."
+         :lane==="UAF"?"Not part of the SEI replacement — this path is unchanged."
+         :"Today's path. SEI prepends two hops on the left and leaves the rest alone.")+'</p>'+
+        '<div class="stgRow">'+stages.map(function(s,i){
+          return '<span style="text-align:center">'+circ(s[0],s[3],true)+
+            '<span class="stgLbl" style="display:block"><b style="display:block;font-size:12.5px;color:var(--text)">'+esc(s[1])+
+            '</b>'+esc(s[2])+'</span></span>'+(i<stages.length-1?'<span class="lnk"></span>':"");
+        }).join("")+'</div>';
+      h+='<div style="margin-top:20px"><div style="font-size:12.5px;font-weight:700;margin-bottom:9px">Warehouse tables it reaches</div>'+
+        '<div class="tw"><table style="min-width:520px"><thead><tr><th>Table</th><th style="text-align:right">Columns</th>'+
+        '<th style="width:180px">Verdict spread</th></tr></thead><tbody>'+
+        Object.keys(tabs).sort().map(function(t){
+          return '<tr><td class="mono">'+esc(t)+'</td><td style="text-align:right" class="num">'+tabs[t].length+'</td>'+
+            '<td><span style="display:flex;height:8px;border-radius:3px;overflow:hidden;background:var(--trk)">'+stack(tabs[t])+'</span></td></tr>';
+        }).join("")+'</tbody></table></div></div>';
+      h+='<div style="margin-top:20px"><div style="font-size:12.5px;font-weight:700;margin-bottom:4px">What happens to its fields</div>'+
+        '<p style="font-size:11.5px;color:var(--bizInk);margin:0 0 8px">Read which bucket is biggest — that is the story of this feed.</p>';
+      Object.keys(CLS).forEach(function(k){
+        var n=rs.filter(function(r){return clsOf(r)===k;}).length; if(!n) return;
+        h+='<div class="clsRow" data-cls="'+k+'"><span class="clsDot" style="background:'+CLS[k].c+'"></span>'+
+          '<span style="font-size:12.5px;font-weight:500;width:140px">'+esc(CLS[k].t)+'</span>'+
+          '<span style="font-size:11.5px;color:var(--bizInk);flex:1 1 200px">'+esc(CLS[k].d)+'</span>'+
+          '<span class="num" style="font-size:13.5px;font-weight:700;color:'+CLS[k].c+'">'+n+'</span></div>';
+      });
+      return h+'</div>';
+    }
+
+    /* L2 — the fields in one bucket */
+    if(S.lvl===2){
+      var fs=rs.filter(function(r){return clsOf(r)===S.cls;});
+      return crumb+'<div class="bizH">'+esc(CLS[S.cls].t)+'</div>'+
+        '<p class="bizSub">'+esc(CLS[S.cls].d)+' · '+fs.length+' field'+(fs.length!==1?"s":"")+' on <span class="mono">'+esc(fname)+'</span></p>'+
+        modeBiz(fs);
+    }
+
+    /* L3 — one field */
+    var r=ROWS[S.col];
+    return crumb+'<div class="bizH mono">'+esc(r.tbl)+'.'+esc(r.col)+'</div>'+
+      '<p class="bizSub">'+esc(story(r))+'</p>'+drill(r);
+  }
+  function clsLegend(){
+    return '<div class="legend" style="margin-top:6px">'+Object.keys(CLS).map(function(k){
+      return '<span><i class="sq" style="background:'+CLS[k].c+'"></i>'+CLS[k].t+'</span>';}).join("")+'</div>';
+  }
+
+  /* ---------- TECHNICAL · dependency view ---------- */
+  function tabNet(){
+    var v=visible(), pairs={};
+    v.forEach(function(r){ pairs[r.lane+"|"+r.feed+"|"+r.tbl]=(pairs[r.lane+"|"+r.feed+"|"+r.tbl]||0)+1; });
+    var feeds=Array.from(new Set(v.map(function(r){return r.lane+"|"+r.feed;})));
+    var tabs=Array.from(new Set(v.map(function(r){return r.tbl;}))).sort();
+    var h='<div class="grp"><div class="grpH" style="cursor:default"><span class="nm">Source → warehouse table</span>'+
+      '<span class="stat">the cell is how many warehouse columns flow on that link</span></div><div class="grpB">'+
+      '<div class="tw"><table><thead><tr><th>Source feed</th>'+
+      tabs.map(function(t){return '<th style="text-align:center">'+esc(t.split(".")[1])+'</th>';}).join("")+
+      '</tr></thead><tbody>';
+    feeds.forEach(function(f){
+      var p=f.split("|");
+      h+='<tr><td>'+sysTag(p[0])+' <span class="mono" style="font-size:11px">'+esc(p[1])+'</span></td>'+
+        tabs.map(function(t){ var n=pairs[f+"|"+t];
+          return '<td style="text-align:center">'+(n?'<span class="num" style="font-weight:700;color:'+LANE[p[0]].c+'">'+n+'</span>'
+            :'<span style="color:var(--panel2)">·</span>')+'</td>';}).join("")+'</tr>';
+    });
+    h+='</tbody></table></div>';
+    var dual=tabs.filter(function(t){
+      return new Set(v.filter(function(r){return r.tbl===t;}).map(function(r){return r.lane;})).size>1;});
+    if(dual.length) h+='<div class="callout" style="--cc:var(--purple);margin-top:12px"><h4>'+dual.length+' table'+
+      (dual.length!==1?"s are":" is")+' fed by two lanes</h4><p>'+
+      dual.map(function(t){return '<span class="mono">'+esc(t)+'</span>';}).join(", ")+
+      '. Two rows above both carry a count in the same column — that is the overlap, and no precedence rule exists for it.</p></div>';
+    return h+'</div></div>';
+  }
+
+  var FIND=[
+    {sev:"danger",need:["STAR"],t:"The general-ledger block has no successor",
+     p:"Five GL columns on BBH_STAR_NAV_TB plus ten more NAV columns come back NO SOURCE. Not scattered misses — SEI publishes no general-ledger datapoints in any attached feed. Either NAV's GL reporting is out of scope for SEI, or a GL feed exists and was not supplied.",
+     owner:"SEI design team + IMDS data owner", clears:"A yes/no on whether SEI carries general ledger at all",
+     n:function(v){return v.filter(function(r){return r.verdict==="NO_SOURCE"&&r.subj==="nav";}).length;}, u:"NAV columns"},
+    {sev:"danger",need:["STAR","SEI"],t:"One SEI datapoint standing in for fields STAR kept apart",
+     p:"Taxlot.MARKET_VALUE is proposed for both Derived_Market_Value and Market_Value; Account.ACCOUNT_NUMBER for Custody_Head_Account_Number, Entity_Number and STAR_ENTITY_ID_1. A derived value and an as-supplied value are not the same number, and a custody head account is not an entity number.",
+     owner:"SEI design team + BBH mapping", clears:"SEI names which datapoint is derived, and which identifier is the custody head",
+     n:function(v){return v.filter(function(r){return r.flags.indexOf("COLLAPSE_RISK")>=0;}).length;}, u:"columns affected"},
+    {sev:"danger",need:["STAR","UAF"],t:"Two lanes write the same columns with no precedence rule",
+     p:"RULESDBO.ENTITY and ENTITY_HIST are populated by both the STAR lane and UAF. Nothing states which wins. This is the quietest risk here: no error, the value just depends on load order.",
+     owner:"IMDS data owner", clears:"A stated precedence rule — last write, source priority, or a record-type split",
+     n:function(v){return new Set(v.filter(function(r){return r.flags.indexOf("DUAL_SOURCE")>=0;}).map(function(r){return r.tbl+"."+r.col;})).size;}, u:"columns"},
+    {sev:"warning",need:["STAR","UAF","SEI"],t:"The workbook's SUBJECT_AREA is not the app's FUNCTIONAL_GROUP",
+     p:"Grouping here resolves through a chain — FUNCTIONAL_GROUP, then TABLE_TYPE, then the dictionary's MASTER_NAME and BUSINESS_FUNCTION — and records which resolver answered. The workbook introduced SUBJECT_AREA, which feeds none of them, and FUNCTIONAL_GROUP is empty in the current load. Ingest as-is and every group header reads Unassigned.",
+     owner:"BBH mapping", clears:"SUBJECT_AREA loads into FUNCTIONAL_GROUP, with GROUP_SOURCE recorded alongside it",
+     n:function(){return 4;}, u:"resolvers that would find nothing"},
+    {sev:"warning",need:["SEI"],t:"No verdict can reach PROVEN until live DDL replaces the dictionary",
+     p:"Target types were read from IMDS_data_dictionary.xlsx, which makes the target-side evidence DOCUMENT, and the rule forbids a proven match on document evidence. However good the SEI workbook gets, this stays at zero. One ALL_TAB_COLUMNS extract lifts the ceiling for every mapped column at once.",
+     owner:"IMDS DBA", clears:"An ALL_TAB_COLUMNS and primary-key extract for the four owners",
+     n:function(v){return v.filter(function(r){return r.verdict==="UNKNOWN";}).length;}, u:"columns waiting on it"},
+    {sev:"warning",need:["SEI"],t:"Code sets are named on the SEI side and absent on the STAR side",
+     p:"The reference workbook lists 197 domains — ACCT_STATUS, PORTFOLIO_TYPE, COUNTRY — without their member values, and no STAR equivalent was supplied at all. Every decode is blocked at both ends, not one.",
+     owner:"SEI design team + STAR owner", clears:"Permitted values per domain from SEI, and the STAR code sets to map them to",
+     n:function(v){return v.filter(function(r){return r.verdict==="DECODE_NEEDED";}).length;}, u:"columns needing a decode"},
+    {sev:"warning",need:["STAR"],t:"Three of seven STAR feed families are in the baseline",
+     p:"ACDDIFI1, PEDDIFI1 and TBMEIFI7 were documented. TJDDIFI1 (trades), ODDDIFI1 (dividends), ORDDIFI1 (accrued interest) and SMDDIFI1 (security master) are absent entirely. The lineage documents have to come from the STAR owner, or those feeds have to be confirmed out of scope.",
+     owner:"STAR owner", clears:"Lineage documents for the four missing feed families",
+     n:function(){return 4;}, u:"feed families missing"},
+    {sev:"info",need:["STAR"],t:"Nine columns have no incumbent field at all",
+     p:"upd_user, upd_date, effective_date, src_intfc_inst and update_source are unmapped in the existing lineage, before SEI enters. Most look pipeline-managed. They belong to the existing backlog and must not inflate the SEI blocker count — but upd_user has SEI datapoints attached, which is a route around the contract nobody has agreed.",
+     owner:"Existing lineage backlog", clears:"Confirmation that these are populated by the load and need no source",
+     n:function(v){return v.filter(function(r){return r.verdict==="NO_BASELINE";}).length;}, u:"columns"}
+  ];
+  function kpi(v,k,s,c){
+    return '<div class="kpi" style="--kc:'+c+'"><div class="v num">'+v+'</div><div class="k">'+esc(k)+
+      '</div><div class="s">'+esc(s)+'</div></div>';
+  }
+  function tabXw(){
+    var v=visible(), m=countBy(v,"verdict");
+    var scope=v.filter(function(r){return LANE[r.lane].state==="REPLACED";});
+    var dual=new Set(v.filter(function(r){return r.flags.indexOf("DUAL_SOURCE")>=0;}).map(function(r){return r.tbl+"."+r.col;})).size;
+    var h='<div class="kpis">'+
+      kpi(v.length,"Final columns","across "+new Set(v.map(function(r){return r.tbl;})).size+" warehouse tables","var(--accent)")+
+      kpi(scope.length,"In the SEI denominator","the rest is UAF — lineage, not readiness","var(--sei)")+
+      kpi(m.PROVEN_MATCH||0,"Proven matches","target types came from a dictionary","var(--success)")+
+      kpi(m.NO_SOURCE||0,"No SEI source","each needs a named disposition","var(--danger)")+
+      kpi(dual,"Dual-source columns","two lanes, no precedence rule","var(--purple)")+
+      kpi(m.OUT_OF_SCOPE||0,"Out of scope","UAF — correctly unscored","var(--mutedBlue)")+'</div>';
+    var tbls={}; v.forEach(function(r){ (tbls[r.tbl]=tbls[r.tbl]||[]).push(r); });
+    h+='<div class="grp"><div class="grpH" style="cursor:default"><span class="nm">Readiness by warehouse table</span>'+
+      '<span class="stat">a table fed by two lanes appears once, with both</span></div><div class="grpB">'+
+      '<div class="tw"><table><thead><tr><th>Table</th><th>Lanes</th><th style="text-align:right">Cols</th>'+
+      '<th style="width:180px">Verdict spread</th><th>Gate</th></tr></thead><tbody>';
+    Object.keys(tbls).sort().forEach(function(t){
+      var rs=tbls[t], lanes=Array.from(new Set(rs.map(function(r){return r.lane;})));
+      var allOos=rs.every(function(r){return r.verdict==="OUT_OF_SCOPE";});
+      var g=allOos?["OUT OF SCOPE","var(--tint)","var(--mutedBlue)"]:["BLOCKED","var(--dangerBg)","var(--danger)"];
+      h+='<tr><td><span class="mono" style="font-weight:500">'+esc(t)+'</span></td><td>'+lanes.map(sysTag).join(" ")+'</td>'+
+        '<td style="text-align:right" class="num">'+rs.length+'</td>'+
+        '<td><span style="display:flex;height:8px;border-radius:3px;overflow:hidden;background:var(--trk)">'+stack(rs)+'</span></td>'+
+        '<td><span class="pill" style="background:'+g[1]+';color:'+g[2]+'">'+g[0]+'</span></td></tr>';
+    });
+    h+='</tbody></table></div></div></div>';
+    var fs=FIND.filter(function(f){return f.need.some(function(l){return S.lanes[l];});});
+    h+='<div class="grp"><div class="grpH" style="cursor:default"><span class="nm">Crosswalk findings</span>'+
+      '<span class="stat">'+fs.length+' open · filtered to the lanes in view</span></div><div class="grpB">';
+    fs.forEach(function(f){
+      var c=f.sev==="danger"?"var(--danger)":f.sev==="warning"?"var(--warning)":"var(--mutedBlue)";
+      h+='<div class="callout" style="--cc:'+c+'"><h4>'+esc(f.t)+'</h4><p>'+esc(f.p)+'</p>'+
+        '<div class="meta"><span><b class="num">'+f.n(v)+'</b> '+esc(f.u)+'</span><span><b>Owner</b> '+esc(f.owner)+
+        '</span><span><b>Clears when</b> '+esc(f.clears)+'</span></div></div>';
+    });
+    return h+'</div></div>';
+  }
+
+
+  /* ---------- LANDING — LineageHome warehouse cards ---------- */
+  function landing(){
+    var all=ROWS.length, tbls=new Set(ROWS.map(function(r){return r.tbl;})).size;
+    var grps=new Set(ROWS.map(function(r){return r.subj;})).size;
+    var mapped=ROWS.filter(function(r){return r.seiDp;}).length;
+    var WH=[
+      {id:"PBDW", icon:"🏪", name:"PB Data Warehouse", sub:"private banking · statements, billing, client reporting",
+       inb:false, stats:[["groups",17],["tables",64],["fields","1,180"],["mapped","100%"]], live:false},
+      {id:"IMDS", icon:"📈", name:"IM Data Warehouse", sub:"investment management · portfolios, performance, holdings",
+       inb:true, stats:[["groups",grps],["tables",tbls],["fields",all],["SEI proven","0%"]], live:true}
+    ];
+    return '<div class="lead">pick a warehouse and a door — Business for the pictorial drill, '+
+      'Technical for the full developer screen, Source to start at the feed</div>'+
+      '<div class="whCards">'+WH.map(function(w){
+        return '<div class="whCard"><div class="ico">'+w.icon+'</div>'+
+          '<h2>'+w.id+(w.inb?'<span class="inb">IN BUILD</span>':"")+'</h2>'+
+          '<small>'+esc(w.name)+'<br>'+esc(w.sub)+'</small>'+
+          '<div class="doorGrid">'+
+            '<span class="door fill" data-wh="'+w.id+'" data-door="business"><span class="e">📖</span>'+
+              '<b>Business</b><span class="c">anyone can read it</span></span>'+
+            '<span class="door" data-wh="'+w.id+'" data-door="technical"><span class="e">🛠</span>'+
+              '<b>Technical</b><span class="c">chains · proof</span></span>'+
+            '<span class="door nu" data-wh="'+w.id+'" data-door="source"><span class="e">📄</span>'+
+              '<b>Source</b><span class="c">start at the feed</span></span>'+
+          '</div>'+
+          '<div class="whStats">'+w.stats.map(function(kv){
+            return '<span><b>'+kv[1]+'</b>'+kv[0]+'</span>';}).join("")+'</div>'+
+          (w.live?'':'<div style="font-size:10.5px;color:var(--muted);margin-top:10px">'+
+            'AddVantage lane · unchanged by the SEI work</div>')+'</div>';
+      }).join("")+'</div>'+
+      '<div class="callout nu" style="--cc:var(--info);max-width:760px;margin:22px auto 0">'+
+      '<h4>Three doors, not two</h4><p>The landing offers Business and Technical today, while the in-page '+
+      'switch already has a third — Source view. A door that exists inside but not at the entrance is only '+
+      'reachable by entering through a different one first. This adds it here.</p></div>';
+  }
+
+  /* ---------- FIELD FOCUS — renderFieldFocus takeover ---------- */
+  function fieldFocus(){
+    var r=ROWS[S.focus]; if(!r){ S.focus=null; return technical(); }
+    var sibs=ROWS.filter(function(x){return x.tbl===r.tbl && inLane(x);});
+    var shown=S.fq?sibs.filter(function(x){return x.col.toLowerCase().indexOf(S.fq.toLowerCase())>=0;}):sibs;
+    var peers=ROWS.filter(function(x){return x.tbl===r.tbl&&x.col===r.col&&inLane(x);});
+    var h='<div class="fcBar"><button class="fcBack" id="fcBack" title="Back to the table list (Esc)">← Back</button>'+
+      '<span class="fcCrumb">'+esc(GROUPS[r.subj].name)+'</span><span style="color:var(--muted)">›</span>'+
+      '<span class="fcCrumb mono">'+esc(r.tbl)+'</span><span style="color:var(--muted)">›</span>'+
+      '<span class="fcCol">'+esc(r.col)+'</span>'+
+      '<span style="margin-left:8px">'+pill(r.verdict)+'</span>'+
+      '<span class="fcHint">↑ ↓ to walk the list · Esc to go back</span></div>'+
+      '<div class="fcWrap"><aside class="fcRail"><div class="fcRailH">'+
+      (shown.length===sibs.length?sibs.length+' fields in '+esc(r.tbl.split(".")[1])
+        :shown.length+' of '+sibs.length+' in '+esc(r.tbl.split(".")[1]))+
+      '<input id="fqIn" placeholder="Filter fields…" value="'+esc(S.fq)+'"></div>'+
+      shown.map(function(x){
+        return '<div class="fcItem" data-focus="'+x.id+'" aria-current="'+(x.id===r.id)+'">'+
+          '<span class="dot" style="background:'+V[x.verdict].bar+'"></span>'+
+          '<span class="mono" style="flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis">'+esc(x.col)+'</span>'+
+          '<span style="font-size:8.5px;color:'+LANE[x.lane].c+';font-weight:700">'+x.lane+'</span></div>';
+      }).join("")+'</aside><div class="fcBody">';
+
+    h+='<div class="fcPanel"><h3>What this column is</h3><dl class="dl">'+
+      '<dt>Warehouse</dt><dd class="mono">'+esc(r.tbl)+'.'+esc(r.col)+'</dd>'+
+      '<dt>Target type</dt><dd class="mono">'+esc(r.type)+' · length UNKNOWN · nullable UNKNOWN</dd>'+
+      '<dt>Functional group</dt><dd>'+esc(GROUPS[r.subj].name)+' <span class="gsrc nu">via '+esc(GROUPS[r.subj].src)+'</span></dd>'+
+      '<dt>Lanes writing it</dt><dd>'+peers.map(function(p){return sysTag(p.lane);}).join(" ")+'</dd>'+
+      '<dt>Evidence</dt><dd>target from IMDS data dictionary — <b>document, not live DDL</b></dd></dl>'+
+      '<p style="margin:11px 0 0;font-size:11.5px;color:var(--sub);line-height:1.6">'+esc(story(r))+'</p></div>';
+
+    h+='<div class="fcPanel"><h3>Lineage chain</h3>'+drill(r)+'</div>';
+
+    h+='<div class="fcPanel nu"><h3>Format validation</h3>'+checksTable(r)+'</div>';
+
+    h+='<div class="fcPanel"><h3>Where used downstream</h3>'+
+      '<p style="margin:0;font-size:11.5px;color:var(--sub);line-height:1.6">'+
+      (r.subj==="nav"?"Fund accounting and NAV reporting."
+       :r.subj==="pos"?"Valuation and client reporting."
+       :r.subj==="party"?"Client correspondence and statements."
+       :"Account master — read by every downstream subject area.")+
+      ' Downstream detail comes from the table-level dependency sheet and is unchanged by the crosswalk.</p></div>';
+    return h+'</div></div>';
+  }
+  function checksTable(r){
+    var U=["var(--muted)","var(--hoverBg)","UNPROVEN"], F=["var(--danger)","var(--dangerBg)","FAIL"],
+        NA=["var(--mutedBlue)","var(--tint)","N/A"], W=["var(--warning)","var(--warningBg)","NOT COMPARABLE"];
+    var rows;
+    if(!r.seiDp){
+      rows=[["Datatype family","—",r.type.replace(/\(.*/,""),NA],
+            ["Precision & scale","—","UNKNOWN",NA],
+            ["Nullability","—","UNKNOWN",NA],
+            ["Single left side","no SEI datapoint","1 column",NA]];
+    } else {
+      var money=/mval|cost|amt/.test(r.col);
+      rows=[["Datatype family","UNKNOWN",r.type.replace(/\(.*/,""),U],
+            ["Precision & scale","UNKNOWN",r.type.indexOf("(")>0?r.type:"UNKNOWN",U],
+            ["Nullability","UNKNOWN","UNKNOWN",U],
+            ["Unit of measure","UNKNOWN","UNKNOWN",U],
+            ["Currency basis",money?"asset (assumed)":"n/a",money?"UNKNOWN":"n/a",money?F:NA]];
+      if(r.flags.indexOf("CODE_SET")>=0) rows.push(["Code set crosswalk","domain named, values not published","no STAR side supplied",F]);
+      if(r.kind==="COMPOSITE") rows.push(["Single left side","3 datapoints, 2 feeds","1 column",W]);
+      if(r.flags.indexOf("COLLAPSE_RISK")>=0) rows.push(["Datapoint exclusivity","shared with other fields","field is distinct in STAR",F]);
+    }
+    return '<div class="tw"><table style="min-width:480px"><thead><tr><th>Check</th><th>SEI side</th>'+
+      '<th>Target contract</th><th>Result</th></tr></thead><tbody>'+rows.map(function(c){
+        return '<tr><td style="font-weight:500">'+esc(c[0])+'</td><td class="mono" style="font-size:11px">'+esc(c[1])+
+          '</td><td class="mono" style="font-size:11px">'+esc(c[2])+'</td>'+
+          '<td><span class="pill" style="background:'+c[3][1]+';color:'+c[3][0]+'">'+c[3][2]+'</span></td></tr>';
+      }).join("")+'</tbody></table></div>';
+  }
+
+  /* ---------- DEPENDENCY VIEW — matrix / swimlanes / table explorer ---------- */
+  function tabNetShell(){
+    var modes=[["matrix","Matrix"],["lanes","Swimlanes"],["explore","Table Explorer"]];
+    var h='<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;font-size:11px;color:var(--sub)">'+
+      '<span class="seg">'+modes.map(function(m){
+        return '<button data-nm="'+m[0]+'" aria-pressed="'+(S.netMode===m[0])+'">'+m[1]+'</button>';}).join("")+'</span>'+
+      '<span>'+(S.netMode==="matrix"?"source feed × warehouse table — the cell is how many columns flow on that link"
+        :S.netMode==="lanes"?"which feed carries how much of each table"
+        :"one table in focus, upstream and downstream")+'</span></div>';
+    return h+(S.netMode==="matrix"?tabNet():S.netMode==="lanes"?netLanes():netExplore());
+  }
+  function netLanes(){
+    var v=visible(), by={};
+    v.forEach(function(r){ var k=r.lane+"|"+r.feed; (by[k]=by[k]||[]).push(r); });
+    var max=Math.max.apply(null,Object.keys(by).map(function(k){return by[k].length;}));
+    return '<div class="grp"><div class="grpH" style="cursor:default"><span class="nm">Swimlanes</span>'+
+      '<span class="stat">unchanged by the crosswalk — lane colour is the only addition</span></div><div class="grpB">'+
+      '<div class="lanes3">'+Object.keys(by).sort().map(function(k){
+        var p=k.split("|"), rs=by[k];
+        return '<div class="swim"><span class="swimL">'+sysTag(p[0])+' <span class="mono" style="font-size:11px">'+
+          esc(p[1])+'</span></span><span class="swimBar" style="max-width:'+((rs.length/max)*100).toFixed(0)+'%">'+
+          stack(rs)+'</span><span class="swimN num" style="color:'+LANE[p[0]].c+'">'+rs.length+'</span></div>';
+      }).join("")+'</div></div></div>';
+  }
+  function netExplore(){
+    var v=visible(), t="RULESDBO.ENTITY";
+    var rs=v.filter(function(x){return x.tbl===t;});
+    var ups=Array.from(new Set(rs.map(function(r){return r.lane+"|"+r.feed;})));
+    return '<div class="grp"><div class="grpH" style="cursor:default"><span class="nm">Table Explorer</span>'+
+      '<span class="stat">'+esc(t)+' in focus</span></div><div class="grpB"><div class="expl">'+
+      '<div class="explCol"><h4>Upstream</h4>'+ups.map(function(u){
+        var p=u.split("|"), n=rs.filter(function(r){return r.lane===p[0]&&r.feed===p[1];}).length;
+        return '<div class="explRow">'+sysTag(p[0])+'<span class="mono" style="flex:1 1 auto;min-width:0">'+esc(p[1])+
+          '</span><span class="num" style="font-weight:700;color:'+LANE[p[0]].c+'">'+n+'</span></div>';
+      }).join("")+'</div>'+
+      '<div class="explHub"><div class="mono" style="font-size:12.5px;font-weight:700">'+esc(t)+'</div>'+
+      '<div style="font-size:10.5px;color:var(--muted);margin-top:4px">'+rs.length+' columns · '+ups.length+' sources</div>'+
+      '<div style="margin-top:8px"><span style="display:flex;height:8px;border-radius:3px;overflow:hidden;background:var(--trk)">'+
+      stack(rs)+'</span></div></div>'+
+      '<div class="explCol"><h4>Downstream</h4>'+
+      ['RULESDBO.ENTITY_HIST','IMDS reporting views','Client statements'].map(function(d){
+        return '<div class="explRow"><span style="flex:1 1 auto" class="mono">'+esc(d)+'</span></div>';}).join("")+
+      '<p style="margin:8px 0 0;font-size:10.5px;color:var(--muted);line-height:1.5">From the table-level dependency '+
+      'sheet. Unchanged by the crosswalk.</p></div></div>'+
+      (ups.length>1?'<div class="callout nu" style="--cc:var(--purple);margin-top:12px"><h4>Two upstreams, no precedence rule</h4>'+
+        '<p>Both lanes appear on the left. Nothing states which wins when both supply a value for the same column.</p></div>':"")+
+      '</div></div>';
+  }
+
+  /* ---------- doors ---------- */
+  var TABS=[["fg","Lineage by Functional Group"],["net","Dependency View"],["xw","Crosswalk Readiness"]];
+  function technical(){
+    var h='<div class="tabrow">'+TABS.map(function(t){
+      return '<button class="tab'+(t[0]==="xw"?" nu":"")+'" data-t="'+t[0]+'" aria-selected="'+(S.tab===t[0])+'">'+t[1]+'</button>';}).join("");
+    if(S.tab==="fg") h+='<span class="tabright"><span class="seg" id="modeSeg">'+
+      [["table","Table","field drill — the developer view"],["map","Map","DWH → contract → SEI"],
+       ["biz","Passports","one card per field"]].map(function(m){
+        return '<button data-m="'+m[0]+'" title="'+m[2]+'" aria-pressed="'+(S.mode===m[0])+'">'+m[1]+'</button>';}).join("")+
+      '</span><input class="srch" id="srch" placeholder="Search column…" value="'+esc(S.q)+'"></span>';
+    h+='</div>';
+    if(S.tab==="net") return h+tabNetShell();
+    if(S.tab==="xw") return h+tabXw();
+    var v=visible();
+    if(!v.length) return h+'<div class="empty">No columns match “'+esc(S.q)+'”.</div>';
+    var g=byGroup(v);
+    ["nav","entity","pos","party"].forEach(function(k){
+      if(g[k]) h+=grp(k,g[k], S.mode==="table"?modeTable : S.mode==="map"?modeMap : modeBiz);
+    });
+    return h;
+  }
+  function business(){
+    var v=visible();
+    if(!v.length) return '<div class="empty">No columns in view.</div>';
+    var g=byGroup(v);
+    var h='<div class="bizH">What happens to each field after cutover</div>'+
+      '<p class="bizSub">Plain language, one card per field, grouped the way the warehouse groups them.</p>';
+    ["nav","entity","pos","party"].forEach(function(k){ if(g[k]) h+=grp(k,g[k],modeBiz); });
+    return h;
+  }
+
+  /* ---------- render ---------- */
+  function draw(){
+    document.body.setAttribute("data-new", S.whatsNew?"on":"off");
+    var sw=document.getElementById("newSw");
+    if(sw){ sw.setAttribute("aria-pressed",S.whatsNew?"true":"false");
+      sw.onclick=function(){ S.whatsNew=!S.whatsNew; draw(); }; }
+    var bar=document.getElementById("doorbar");
+    var strap=document.getElementById("strap");
+    var out=$("#body"), h="";
+
+    if(!S.ds){
+      bar.hidden=true;
+      strap.textContent="End-to-end lineage — SRC → STG1 → STG2 → DWH with business definitions, proof values, and dependency views";
+      out.innerHTML=landing();
+      Array.prototype.forEach.call(out.querySelectorAll(".door"),function(e){
+        e.onclick=function(){ S.ds=e.getAttribute("data-wh"); S.door=e.getAttribute("data-door");
+          S.focus=null; S.lvl=0; S.feed=null; draw(); };
+      });
+      return;
+    }
+
+    bar.hidden=false;
+    strap.textContent="End-to-end lineage — source → contract → warehouse, with the SEI crosswalk layered on the lanes it replaces";
+    drawChrome();
+
+    if(!anyLane()) h='<div class="empty">No lanes selected. Open the scope chip above and pick STAR, UAF or SEI.</div>';
+    else if(S.focus!=null) h=fieldFocus();
+    else if(S.door==="source") h=sourceView();
+    else if(S.door==="business") h=business();
+    else h=technical();
+
+    h+='<div class="note"><b>Example data.</b> These rows are the shape the ingested workbook produces, drawn from the columns '+
+      'and mappings it actually returned. No verdict has been earned: target types came from a data dictionary and SEI publishes '+
+      'datapoint names without types, so every match stays unproven until both sides are read from live metadata.</div>';
+    out.innerHTML=h;
+    wire(out);
+  }
+
+  function wire(out){
+    Array.prototype.forEach.call(out.querySelectorAll(".tab"),function(b){
+      b.onclick=function(){ S.tab=b.getAttribute("data-t"); S.col=null; S.focus=null; draw(); };});
+    var ms=out.querySelector("#modeSeg");
+    if(ms) Array.prototype.forEach.call(ms.children,function(b){
+      b.onclick=function(){ S.mode=b.getAttribute("data-m"); draw(); };});
+    Array.prototype.forEach.call(out.querySelectorAll("[data-nm]"),function(b){
+      b.onclick=function(){ S.netMode=b.getAttribute("data-nm"); draw(); };});
+    var si=out.querySelector("#srch");
+    if(si) si.oninput=function(){ S.q=si.value; draw(); refocus("srch"); };
+    var fq=out.querySelector("#fqIn");
+    if(fq) fq.oninput=function(){ S.fq=fq.value; draw(); refocus("fqIn"); };
+    var bk=out.querySelector("#fcBack");
+    if(bk) bk.onclick=function(){ S.focus=null; S.fq=""; draw(); };
+    Array.prototype.forEach.call(out.querySelectorAll(".grpH[data-g]"),function(e){
+      e.onclick=function(){ var k=e.getAttribute("data-g"); S.open[k]=!S.open[k]; draw(); };});
+    Array.prototype.forEach.call(out.querySelectorAll("tr[data-c]"),function(tr){
+      tr.onclick=function(){ S.focus=+tr.getAttribute("data-c"); S.fq=""; draw();
+        window.scrollTo({top:0,behavior:"smooth"}); };});
+    Array.prototype.forEach.call(out.querySelectorAll("[data-focus]"),function(e){
+      e.onclick=function(){ S.focus=+e.getAttribute("data-focus"); draw(); };});
+    Array.prototype.forEach.call(out.querySelectorAll(".bizCard[data-c]"),function(e){
+      e.onclick=function(){ var id=+e.getAttribute("data-c");
+        if(S.door==="source"){ S.col=id; S.lvl=3; } else { S.focus=id; S.fq=""; }
+        draw(); window.scrollTo({top:0,behavior:"smooth"}); };});
+    Array.prototype.forEach.call(out.querySelectorAll(".bizCard[data-f]"),function(e){
+      e.onclick=function(){ S.feed=e.getAttribute("data-f"); S.lvl=1; draw(); };});
+    Array.prototype.forEach.call(out.querySelectorAll("[data-lvl]"),function(e){
+      e.onclick=function(){ S.lvl=+e.getAttribute("data-lvl"); S.cls=null; S.col=null; draw(); };});
+    Array.prototype.forEach.call(out.querySelectorAll("[data-cls]"),function(e){
+      e.onclick=function(){ S.cls=e.getAttribute("data-cls"); S.lvl=2; draw(); };});
+  }
+  function refocus(id){
+    var n=document.getElementById(id);
+    if(n){ n.focus(); try{ n.setSelectionRange(n.value.length,n.value.length); }catch(e){} }
+  }
+  document.addEventListener("keydown", function(e){
+    if(e.key==="Escape"){ if(S.focus!=null){ S.focus=null; draw(); } else if(S.pop){ S.pop=false; draw(); } }
+    if((e.key==="ArrowDown"||e.key==="ArrowUp") && S.focus!=null){
+      var r=ROWS[S.focus]; if(!r) return;
+      var sibs=ROWS.filter(function(x){return x.tbl===r.tbl && inLane(x);});
+      var i=sibs.findIndex(function(x){return x.id===S.focus;});
+      var j=e.key==="ArrowDown"?Math.min(i+1,sibs.length-1):Math.max(i-1,0);
+      if(j!==i){ e.preventDefault(); S.focus=sibs[j].id; draw(); }
+    }
+  });
+  draw();
+})();
+</script>
