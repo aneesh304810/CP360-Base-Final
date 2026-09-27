@@ -1,0 +1,1683 @@
+<title>Integration360</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --paper:#f6f8f9; --surface:#ffffff; --surface-2:#eef1f3; --sunk:#e7ebee;
+  --ink:#11161d; --ink-2:#414b57; --ink-3:#6b7682; --line:#d4dbe0; --line-2:#c0cad1;
+  --accent:#0e7c8b; --accent-ink:#095e6a; --accent-wash:#e3f1f3;
+  --ok:#1f7a4d; --ok-wash:#e2f2ea;
+  --warn:#8a5a00; --warn-wash:#fbeed6;
+  --stop:#a8271d; --stop-wash:#fbe5e3;
+  --ext:#5c4b8a; --ext-wash:#ece8f6;
+  --radius:7px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#0e1116; --surface:#151a21; --surface-2:#1c222b; --sunk:#11161d;
+    --ink:#e8edf1; --ink-2:#aab6c1; --ink-3:#7d8894; --line:#2b333d; --line-2:#3a444f;
+    --accent:#3fb3c4; --accent-ink:#7fd3e0; --accent-wash:#12323a;
+    --ok:#5cc08d; --ok-wash:#123326;
+    --warn:#d9a13a; --warn-wash:#33260d;
+    --stop:#e4796e; --stop-wash:#3a1a16;
+    --ext:#a795dd; --ext-wash:#241d3a;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0e1116; --surface:#151a21; --surface-2:#1c222b; --sunk:#11161d;
+  --ink:#e8edf1; --ink-2:#aab6c1; --ink-3:#7d8894; --line:#2b333d; --line-2:#3a444f;
+  --accent:#3fb3c4; --accent-ink:#7fd3e0; --accent-wash:#12323a;
+  --ok:#5cc08d; --ok-wash:#123326;
+  --warn:#d9a13a; --warn-wash:#33260d;
+  --stop:#e4796e; --stop-wash:#3a1a16;
+  --ext:#a795dd; --ext-wash:#241d3a;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:14px; line-height:1.55; -webkit-font-smoothing:antialiased;
+}
+code,.mono,kbd{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+
+/* ---- shell ---- */
+.shell{display:grid; grid-template-columns:238px minmax(0,1fr); min-height:100%}
+.rail{
+  background:var(--surface); border-right:1px solid var(--line);
+  padding-block:18px 28px; padding-inline:0;
+  position:sticky; top:env(safe-area-inset-top,0px); align-self:start; min-height:100vh; max-height:100vh; overflow-y:auto;
+}
+.brand{padding:0 18px 14px; border-bottom:1px solid var(--line); margin-bottom:12px}
+.brand-mark{display:flex; align-items:center; gap:8px}
+.brand-dot{width:9px;height:9px;border-radius:2px;background:var(--accent);flex:none}
+.brand-name{font-weight:700; letter-spacing:-.01em; font-size:15px}
+.brand-sub{font-family:"IBM Plex Mono",monospace; font-size:10.5px; color:var(--ink-3); letter-spacing:.04em; text-transform:uppercase; margin-top:3px}
+.navgrp{padding:10px 18px 4px; font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.09em; text-transform:uppercase; color:var(--ink-3)}
+.navbtn{
+  display:flex; align-items:baseline; gap:9px; width:100%; text-align:left;
+  background:none; border:0; border-left:2px solid transparent;
+  padding:6px 18px; color:var(--ink-2); cursor:pointer; font:inherit; font-size:13.5px;
+}
+.navbtn:hover{background:var(--surface-2); color:var(--ink)}
+.navbtn[aria-current="true"]{border-left-color:var(--accent); color:var(--ink); font-weight:600; background:var(--accent-wash)}
+.navbtn .lv{font-family:"IBM Plex Mono",monospace; font-size:10.5px; color:var(--ink-3); flex:none; width:22px}
+.navbtn[aria-current="true"] .lv{color:var(--accent-ink)}
+.rail-foot{padding:16px 18px 0; margin-top:14px; border-top:1px solid var(--line); font-size:11.5px; color:var(--ink-3)}
+.themebtn{margin-top:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:4px 9px;font:inherit;font-size:11.5px;color:var(--ink-2);cursor:pointer}
+.themebtn:hover{border-color:var(--line-2);color:var(--ink)}
+
+.main{min-width:0; padding-block:0 64px}
+.wrap{max-width:1000px; padding-inline:28px; padding-block:26px 0; margin:0 auto}
+
+/* ---- headings ---- */
+h1{font-size:25px; line-height:1.2; letter-spacing:-.02em; margin:0 0 6px; text-wrap:balance}
+h2{font-size:17.5px; letter-spacing:-.01em; margin:34px 0 10px; text-wrap:balance}
+h3{font-size:14.5px; margin:22px 0 8px; letter-spacing:-.005em}
+.eyebrow{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--accent-ink); margin-bottom:9px}
+.lede{font-size:15px; color:var(--ink-2); max-width:66ch; margin:0 0 4px}
+p{max-width:72ch}
+hr.rule{border:0; border-top:1px solid var(--line); margin:28px 0}
+
+/* ---- primitives ---- */
+.pill{display:inline-flex;align-items:center;gap:5px;font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding:2px 7px;border-radius:20px;border:1px solid transparent;white-space:nowrap}
+.p-ok{background:var(--ok-wash);color:var(--ok);border-color:color-mix(in srgb,var(--ok) 30%,transparent)}
+.p-warn{background:var(--warn-wash);color:var(--warn);border-color:color-mix(in srgb,var(--warn) 30%,transparent)}
+.p-stop{background:var(--stop-wash);color:var(--stop);border-color:color-mix(in srgb,var(--stop) 30%,transparent)}
+.p-ext{background:var(--ext-wash);color:var(--ext);border-color:color-mix(in srgb,var(--ext) 30%,transparent)}
+.p-acc{background:var(--accent-wash);color:var(--accent-ink);border-color:color-mix(in srgb,var(--accent) 30%,transparent)}
+
+.note{border-left:2px solid var(--accent);background:var(--surface);padding:12px 15px;margin:16px 0;border-radius:0 var(--radius) var(--radius) 0}
+.note.warn{border-left-color:var(--warn)}
+.note.stop{border-left-color:var(--stop)}
+.note p{margin:0; max-width:70ch}
+.note p + p{margin-top:8px}
+.note-h{font-size:12px;font-weight:600;letter-spacing:.01em;margin-bottom:4px;display:block}
+
+table{border-collapse:collapse; width:100%; font-size:13px; margin:14px 0}
+th{text-align:left; font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--ink-3); font-weight:500; padding:7px 11px 7px 0; border-bottom:1px solid var(--line-2); vertical-align:bottom}
+td{padding:9px 11px 9px 0; border-bottom:1px solid var(--line); vertical-align:top; color:var(--ink-2)}
+td:first-child,th:first-child{padding-left:0}
+td strong{color:var(--ink); font-weight:600}
+td code{font-size:12px; color:var(--ink)}
+.tscroll{overflow-x:auto; margin:14px 0}
+.tscroll table{margin:0; min-width:560px}
+.num{font-variant-numeric:tabular-nums}
+
+figure{margin:20px 0}
+figure svg{max-width:100%; height:auto; display:block; color:var(--ink-2)}
+figcaption{font-size:12px; color:var(--ink-3); margin-top:9px; max-width:70ch}
+
+.grid2{display:grid; grid-template-columns:repeat(auto-fit,minmax(255px,1fr)); gap:13px; margin:16px 0}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:14px 15px}
+.card h4{margin:0 0 5px; font-size:13.5px}
+.card p{margin:0; font-size:12.5px; color:var(--ink-2); max-width:none}
+
+/* ---- plane groups (echoes the CP hub page) ---- */
+.planes{display:flex; flex-direction:column; gap:14px; margin:18px 0}
+.plane{border:1px dashed var(--line-2); border-radius:9px; padding:13px 14px 14px; background:var(--surface)}
+.plane-hd{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:11px}
+.plane-t{font-weight:600; font-size:13.5px; display:flex; align-items:center; gap:7px}
+.plane-t .glyph{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none}
+.plane-meta{font-family:"IBM Plex Mono",monospace; font-size:10.5px; color:var(--ink-3); margin-left:auto}
+.comps{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:8px}
+.comp{
+  width:100%; text-align:left; background:var(--surface-2); border:1px solid var(--line);
+  border-radius:5px; padding:9px 11px; cursor:pointer; font:inherit; color:var(--ink);
+  display:flex; align-items:center; gap:8px;
+}
+.comp:hover{border-color:var(--accent); background:var(--accent-wash)}
+.comp[aria-expanded="true"]{border-color:var(--accent); background:var(--accent-wash)}
+.comp-n{font-family:"IBM Plex Mono",monospace; font-size:12px; font-weight:500; line-height:1.3}
+.comp-dot{width:6px;height:6px;border-radius:50%;flex:none}
+.d-ok{background:var(--ok)} .d-warn{background:var(--warn)} .d-stop{background:var(--stop)} .d-ext{background:var(--ext)}
+.detail{
+  grid-column:1/-1; background:var(--sunk); border:1px solid var(--line);
+  border-radius:6px; padding:13px 15px; margin-top:2px;
+}
+.detail h5{margin:0 0 3px; font-size:13px; font-family:"IBM Plex Mono",monospace; font-weight:600}
+.detail .dmeta{font-size:11.5px; color:var(--ink-3); margin-bottom:8px; display:flex; gap:9px; flex-wrap:wrap; align-items:center}
+.detail p{margin:0 0 8px; font-size:12.5px; color:var(--ink-2); max-width:70ch}
+.detail dl{display:grid; grid-template-columns:auto 1fr; gap:4px 13px; margin:8px 0 0; font-size:12.5px}
+.detail dt{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3); padding-top:2px}
+.detail dd{margin:0; color:var(--ink-2)}
+.detail ul{margin:6px 0 0; padding-left:17px; font-size:12.5px; color:var(--ink-2)}
+.detail li{margin-bottom:3px}
+
+.legend{display:flex; gap:15px; flex-wrap:wrap; font-size:11.5px; color:var(--ink-3); margin:12px 0 0; align-items:center}
+.legend span{display:inline-flex; align-items:center; gap:6px}
+
+.steps{counter-reset:s; list-style:none; padding:0; margin:14px 0}
+.steps li{counter-increment:s; position:relative; padding-left:31px; margin-bottom:11px; font-size:13px; color:var(--ink-2); max-width:70ch}
+.steps li::before{content:counter(s); position:absolute; left:0; top:1px; width:21px; height:21px; border-radius:50%; background:var(--accent-wash); color:var(--accent-ink); font-family:"IBM Plex Mono",monospace; font-size:11px; display:grid; place-items:center; font-weight:600}
+.steps li strong{color:var(--ink)}
+
+.view[hidden]{display:none!important}
+
+@media (max-width:820px){
+  .shell{grid-template-columns:1fr}
+  .rail{position:static; max-height:none; border-right:0; border-bottom:1px solid var(--line); padding-bottom:14px}
+  .rail-nav{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:2px}
+  .wrap{padding-inline:16px}
+}
+@media (prefers-reduced-motion:no-preference){
+  .comp,.navbtn{transition:background .12s ease,border-color .12s ease}
+}
+/* ---- operational status (reference palette, mode-invariant) ---- */
+:root{ --st-good:#0ca30c; --st-warn:#fab219; --st-serious:#ec835a; --st-crit:#d03b3b; }
+.screen{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:16px 0}
+.screen-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:11px 16px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+.screen-t{font-weight:600;font-size:13px}
+.screen-sub{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--ink-3)}
+.screen-body{padding:15px 16px}
+.mockchip{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);border:1px dashed var(--line-2);border-radius:20px;padding:2px 9px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:10px;margin-bottom:15px}
+.tile{border:1px solid var(--line);border-radius:7px;padding:10px 12px}
+.tile-v{font-size:21px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+.tile-l{font-size:10.5px;color:var(--ink-3);margin-top:2px}
+.sgrid{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:2px;font-size:11px}
+.sgrid th:first-child,.sgrid .rowlab{width:156px}
+.sgrid th{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.05em;color:var(--ink-3);font-weight:500;text-align:center;padding:0 0 3px;border:0}
+.sgrid td{padding:0;border:0}
+.sgrid .rowlab{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--ink-2);text-align:left;padding-right:9px;white-space:nowrap}
+.cell{display:flex;align-items:center;justify-content:center;height:26px;border-radius:4px;font-size:11px;font-weight:600}
+.c-good{background:color-mix(in srgb,var(--st-good) 16%,transparent);color:var(--st-good)}
+.c-warn{background:color-mix(in srgb,var(--st-warn) 26%,transparent);color:#7a5400}
+.c-crit{background:color-mix(in srgb,var(--st-crit) 18%,transparent);color:var(--st-crit)}
+.c-none{background:var(--sunk);color:var(--ink-3)}
+:root:not([data-theme="light"]) .c-warn{color:var(--st-warn)}
+:root[data-theme="dark"] .c-warn{color:var(--st-warn)}
+.lagrow{display:grid;grid-template-columns:104px 1fr 62px;gap:10px;align-items:center;font-size:11px;padding:3px 0}
+.lagtrack{display:block;height:7px;background:var(--sunk);border-radius:4px;overflow:hidden}
+.lagfill{display:block;height:100%;border-radius:4px}
+.lagv{font-family:"IBM Plex Mono",monospace;font-size:10.5px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.stat{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.chain{display:flex;gap:2px;flex-wrap:wrap;margin-top:4px}
+.step{font-family:"IBM Plex Mono",monospace;font-size:10px;padding:4px 9px;border-radius:4px;background:var(--sunk);color:var(--ink-2);white-space:nowrap}
+.funnel-row{display:grid;grid-template-columns:118px 1fr 84px;gap:12px;align-items:center;padding:6px 0}
+.ftrack{display:flex;height:22px;background:var(--sunk);border-radius:4px;overflow:hidden}
+.fkept{height:100%;background:color-mix(in srgb,var(--accent) 55%,transparent)}
+.fgap{width:2px;flex:none}
+.flost{height:100%;background:color-mix(in srgb,var(--st-serious) 55%,transparent)}
+.fval{font-family:"IBM Plex Mono",monospace;font-size:11.5px;text-align:right;font-variant-numeric:tabular-nums}
+.fded{font-size:10.5px;color:var(--ink-3);padding-left:130px;margin-top:-2px}
+@media (max-width:640px){
+  .lagrow{grid-template-columns:82px 1fr 54px}
+  .funnel-row{grid-template-columns:96px 1fr 70px}
+  .fded{padding-left:0}
+}
+
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:3px}
+</style>
+
+<div class="shell">
+<nav class="rail" aria-label="Design sections">
+  <div class="brand">
+    <div class="brand-mark"><span class="brand-dot"></span><span class="brand-name">Integration360</span></div>
+    <div class="brand-sub">CP360 · nav entry</div>
+  </div>
+  <div class="rail-nav">
+    <div class="navgrp">Design</div>
+    <button class="navbtn" data-view="overview" aria-current="true"><span class="lv">00</span>Overview &amp; scope</button>
+    <button class="navbtn" data-view="context"><span class="lv">C1</span>System context</button>
+    <button class="navbtn" data-view="containers"><span class="lv">C2</span>Containers</button>
+    <button class="navbtn" data-view="components"><span class="lv">C3</span>Components</button>
+    <div class="navgrp">Detail</div>
+    <button class="navbtn" data-view="data"><span class="lv">D</span>Data model</button>
+    <button class="navbtn" data-view="channels"><span class="lv">CH</span>Four channels</button>
+    <button class="navbtn" data-view="observe"><span class="lv">OBS</span>Observation model</button>
+    <button class="navbtn" data-view="screens"><span class="lv">SC</span>Screens</button>
+    <button class="navbtn" data-view="api"><span class="lv">API</span>API &amp; taxonomy</button>
+    <button class="navbtn" data-view="runtime"><span class="lv">RT</span>Runtime flows</button>
+    <button class="navbtn" data-view="open"><span class="lv">!</span>Assumptions</button>
+  </div>
+  <div class="rail-foot">
+    Companion to <strong>CP Integration Hub</strong>. The Hub moves data; this observes it.
+    <button class="themebtn" id="themebtn" type="button">Switch theme</button>
+  </div>
+</nav>
+
+<main class="main">
+
+<!-- ============ OVERVIEW ============ -->
+<section class="view" id="v-overview">
+<div class="wrap">
+  <div class="eyebrow">Design document · v0.1 draft</div>
+  <h1>Integration360</h1>
+  <p class="lede">A read-only observability layer over every integration between BBH and the SEI Wealth Platform. It answers one question, for one business date, across four channels: <strong>did everything integrate correctly?</strong></p>
+
+  <div class="note">
+    <span class="note-h">The scope in one line</span>
+    <p>Integration360 observes. It never moves data, never remediates, never writes to a pipeline table. The CP Integration Hub owns quarantine, error handling and retry; Integration360 shows what the Hub is holding and why.</p>
+  </div>
+
+  <h2>The three questions</h2>
+  <p>Every screen answers one of three questions, for a given channel and business date. This is the organising spine of the whole design — if a view doesn't answer one of them, it doesn't belong.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h4>Completeness</h4>
+      <p>Did everything that should have arrived, arrive — and everything that should have gone, go? Measured against an expectation, not against yesterday.</p>
+    </div>
+    <div class="card">
+      <h4>Timeliness</h4>
+      <p>Did it happen inside the window? Requires knowing what was <em>due</em>, which today no channel records. See <a href="#open" data-jump="open">Assumptions</a>.</p>
+    </div>
+    <div class="card">
+      <h4>Correctness</h4>
+      <p>Do the counts reconcile at every boundary, and what is held in exception? Reconciliation is derived here, not read.</p>
+    </div>
+  </div>
+
+  <h2>What it does and does not do</h2>
+  <div class="tscroll"><table>
+    <thead><tr><th style="width:50%">In scope</th><th>Out of scope — and who owns it</th></tr></thead>
+    <tbody>
+      <tr><td>Show state of every channel per business date</td><td>Moving or transforming data — <strong>Airflow + dbt</strong></td></tr>
+      <tr><td>Show exceptions: what failed, why, with what code</td><td>Resolving, waiving, retrying an exception — <strong>Integration Hub</strong></td></tr>
+      <tr><td>Derive SLA and reconciliation verdicts, with history</td><td>Quarantine and correction handling — <strong>Integration Hub</strong></td></tr>
+      <tr><td>Observe the outbound loop: SEI's pushed status, and the Hub's backstop poll of SEI</td><td>Submitting to SEI, generating payloads — <strong>Integration Hub</strong></td></tr>
+      <tr><td>Reconcile the standby file against the event stream</td><td>Alerting on pipeline-owned failures — <strong>Splunk</strong></td></tr>
+      <tr><td>Correlate across Oracle, Airflow, the Hub and the inbox</td><td>Anything inside SEI beyond what SEI publishes</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Why it owns almost nothing</h2>
+  <p>Integration360's own schema is five tables, and none of them hold integration state. Everything it shows is read from the system that owns it. That is what makes the observability-only claim structural rather than aspirational — there is no table in this design that another system would need to read back.</p>
+
+  <div class="legend">
+    <span><span class="comp-dot d-ok"></span> Specified — enough information to build</span>
+    <span><span class="comp-dot d-warn"></span> Assumed — built on a stated assumption</span>
+    <span><span class="comp-dot d-stop"></span> Blocked — needs an answer first</span>
+    <span><span class="comp-dot d-ext"></span> Not owned — read or shared</span>
+  </div>
+  <p style="font-size:12.5px;color:var(--ink-3);margin-top:9px">Every component carries one of these states. Four are blocked — the Hub’s Foundation framework resolved three of the seven, by giving Integration360 a threshold store, an expectation store and an estate-wide error model to read.</p>
+</div>
+</section>
+
+<!-- ============ C1 CONTEXT ============ -->
+<section class="view" id="v-context" hidden>
+<div class="wrap">
+  <div class="eyebrow">C4 · Level 1</div>
+  <h1>System context</h1>
+  <p class="lede">Integration360 sits entirely inside BBH infrastructure. It reads four BBH-owned systems, receives one push from SEI, and serves one audience.</p>
+
+  <figure>
+  <svg viewBox="0 0 900 520" role="img" aria-label="Integration360 reads the Oracle control schema, Airflow metadata, the Integration Hub and a shared notification inbox; SEI pushes loader status into that inbox through the Apigee proxy; BBH Operations reads Integration360.">
+    <defs>
+      <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+      </marker>
+      <marker id="ara" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#0e7c8b"/>
+      </marker>
+    </defs>
+
+    <!-- SEI boundary -->
+    <rect x="8" y="150" width="176" height="150" rx="8" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="5 4" opacity=".55"/>
+    <text x="16" y="168" font-size="10.5" font-family="IBM Plex Mono, monospace" fill="currentColor" opacity=".7">SEI · OPAQUE</text>
+    <rect x="22" y="180" width="148" height="52" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <text x="96" y="201" font-size="12.5" text-anchor="middle" fill="currentColor" font-weight="600">PS-Orchestration</text>
+    <text x="96" y="217" font-size="10.5" text-anchor="middle" fill="currentColor" opacity=".7">Workflows · SWP</text>
+    <rect x="22" y="244" width="148" height="42" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <text x="96" y="262" font-size="12.5" text-anchor="middle" fill="currentColor" font-weight="600">SEI Data Cloud</text>
+    <text x="96" y="277" font-size="10.5" text-anchor="middle" fill="currentColor" opacity=".7">Event Hub · Snowflake</text>
+
+    <!-- BBH boundary -->
+    <rect x="212" y="18" width="676" height="484" rx="10" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="5 4" opacity=".55"/>
+    <text x="222" y="36" font-size="10.5" font-family="IBM Plex Mono, monospace" fill="currentColor" opacity=".7">BBH INFRASTRUCTURE</text>
+
+    <!-- sources column -->
+    <rect x="232" y="56" width="180" height="48" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <text x="322" y="76" font-size="12" text-anchor="middle" fill="currentColor" font-weight="600">Oracle control schema</text>
+    <text x="322" y="91" font-size="10" text-anchor="middle" fill="currentColor" opacity=".7">registries · DQ · recon</text>
+
+    <rect x="232" y="118" width="180" height="48" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <text x="322" y="138" font-size="12" text-anchor="middle" fill="currentColor" font-weight="600">Airflow metadata</text>
+    <text x="322" y="153" font-size="10" text-anchor="middle" fill="currentColor" opacity=".7">Postgres read replica</text>
+
+    <rect x="232" y="180" width="180" height="48" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <text x="322" y="200" font-size="12" text-anchor="middle" fill="currentColor" font-weight="600">CP Integration Hub</text>
+    <text x="322" y="215" font-size="10" text-anchor="middle" fill="currentColor" opacity=".7">quarantine · submissions</text>
+
+    <rect x="232" y="242" width="180" height="48" rx="6" fill="#0e7c8b" fill-opacity=".1" stroke="#0e7c8b" stroke-width="1.4"/>
+    <text x="322" y="262" font-size="12" text-anchor="middle" fill="currentColor" font-weight="600">Notification inbox</text>
+    <text x="322" y="277" font-size="10" text-anchor="middle" fill="currentColor" opacity=".7">shared · two consumers</text>
+
+    <rect x="232" y="304" width="180" height="48" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <text x="322" y="324" font-size="12" text-anchor="middle" fill="currentColor" font-weight="600">dbt run results</text>
+    <text x="322" y="339" font-size="10" text-anchor="middle" fill="currentColor" opacity=".7">persisted to Oracle</text>
+
+    <!-- Integration360 -->
+    <rect x="512" y="150" width="214" height="120" rx="8" fill="#0e7c8b" fill-opacity=".13" stroke="#0e7c8b" stroke-width="2"/>
+    <text x="619" y="180" font-size="15" text-anchor="middle" fill="currentColor" font-weight="700">Integration360</text>
+    <text x="619" y="199" font-size="11" text-anchor="middle" fill="currentColor" opacity=".8">read-only observability</text>
+    <line x1="530" y1="212" x2="708" y2="212" stroke="currentColor" stroke-width="1" opacity=".3"/>
+    <text x="619" y="230" font-size="10.5" text-anchor="middle" fill="currentColor" opacity=".75" font-family="IBM Plex Mono, monospace">completeness</text>
+    <text x="619" y="245" font-size="10.5" text-anchor="middle" fill="currentColor" opacity=".75" font-family="IBM Plex Mono, monospace">timeliness</text>
+    <text x="619" y="260" font-size="10.5" text-anchor="middle" fill="currentColor" opacity=".75" font-family="IBM Plex Mono, monospace">correctness</text>
+
+    <!-- user -->
+    <circle cx="806" cy="186" r="13" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <path d="M788,226 a18,18 0 0 1 36,0" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <text x="806" y="250" font-size="12" text-anchor="middle" fill="currentColor" font-weight="600">BBH Operations</text>
+    <text x="806" y="265" font-size="10" text-anchor="middle" fill="currentColor" opacity=".7">the only audience</text>
+
+    <!-- Splunk excluded -->
+    <rect x="512" y="410" width="214" height="46" rx="6" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 4" opacity=".45"/>
+    <text x="619" y="430" font-size="11.5" text-anchor="middle" fill="currentColor" opacity=".6" font-weight="600">Splunk</text>
+    <text x="619" y="445" font-size="10" text-anchor="middle" fill="currentColor" opacity=".6">write-only from the pipeline · never read</text>
+
+    <!-- edges into I360 -->
+    <path d="M412,80 L462,80 L462,180 L510,180" fill="none" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar)"/>
+    <path d="M412,142 L462,142 L462,196 L510,196" fill="none" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar)"/>
+    <path d="M412,204 L510,210" fill="none" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar)"/>
+    <path d="M412,266 L462,266 L462,228 L510,228" fill="none" stroke="#0e7c8b" stroke-width="1.6" marker-end="url(#ara)"/>
+    <path d="M412,328 L462,328 L462,246 L510,246" fill="none" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar)"/>
+    <text x="470" y="128" font-size="10" font-family="IBM Plex Mono, monospace" fill="currentColor" opacity=".72">reads</text>
+
+    <!-- SEI push -->
+    <path d="M184,206 L200,206 L200,266 L230,266" fill="none" stroke="#0e7c8b" stroke-width="1.6" marker-end="url(#ara)"/>
+    <text x="16" y="330" font-size="10" font-family="IBM Plex Mono, monospace" fill="#0e7c8b">pushes status via Apigee (12)</text>
+
+    <!-- SDC to hub (not to I360) -->
+    <path d="M184,266 L200,266 L200,204 L230,204" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#ar)"/>
+    <text x="16" y="348" font-size="10" font-family="IBM Plex Mono, monospace" fill="currentColor" opacity=".65">events → Event Listener (not read here)</text>
+
+    <!-- user edge -->
+    <path d="M728,206 L772,206" fill="none" stroke="currentColor" stroke-width="1.2" marker-end="url(#ar)"/>
+
+    <!-- deep link out -->
+    <path d="M619,272 L619,404" fill="none" stroke="currentColor" stroke-width="1.1" stroke-dasharray="3 3" opacity=".4"/>
+    <text x="628" y="340" font-size="10" font-family="IBM Plex Mono, monospace" fill="currentColor" opacity=".5">no read path</text>
+  </svg>
+  <figcaption>Integration360 never touches SEI directly. The one inbound path from SEI is a push into a shared inbox, which the Integration Hub also consumes — so Integration360 is never on the critical path for remediation.</figcaption>
+  </figure>
+
+  <h2>Actors and systems</h2>
+  <div class="tscroll"><table>
+    <thead><tr><th style="width:23%">Element</th><th style="width:13%">Owner</th><th>Relationship to Integration360</th></tr></thead>
+    <tbody>
+      <tr><td><strong>BBH Operations</strong></td><td>BBH</td><td>The only audience. Reads; cannot act from within the tool. <span class="pill p-stop">no user research yet</span></td></tr>
+      <tr><td><strong>Oracle control schema</strong></td><td>Airflow + dbt</td><td>Read. File registry, date control, micro-batch registry, DQ store, reconciliation results.</td></tr>
+      <tr><td><strong>Airflow metadata</strong></td><td>Platform</td><td>Read, <strong>replica only</strong>. Task-level state for failure attribution. Never the scheduler's primary.</td></tr>
+      <tr><td><strong>CP Integration Hub</strong></td><td>BBH</td><td>Read. Outbound submissions, quarantine, transport errors, remediation state.</td></tr>
+      <tr><td><strong>Notification inbox</strong></td><td>Shared platform</td><td>Read. Not Integration360's table — the Hub consumes it to act, Integration360 to display.</td></tr>
+      <tr><td><strong>dbt run results</strong></td><td>dbt</td><td>Read. Model-level outcomes and test results, persisted to Oracle by an <code>on-run-end</code> hook.</td></tr>
+      <tr><td><strong>SEI PS-Orchestration</strong></td><td>SEI</td><td>Pushes loader status and errors through the BBH Apigee proxy into the inbox.</td></tr>
+      <tr><td><strong>SEI Data Cloud</strong></td><td>SEI</td><td>No relationship. Events reach the Event Listener; Integration360 reads the listener's staging, never the Hub itself.</td></tr>
+      <tr><td><strong>Splunk</strong></td><td>Pipeline</td><td>Excluded. Write-only from the pipeline; Integration360 never queries it.</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note warn">
+    <span class="note-h">The consequence of excluding Splunk</span>
+    <p>The pipeline publishes its own SLA and reconciliation verdicts to Splunk. Integration360 derives its own from Oracle. Two independent computations of the same judgement will drift unless both read the same threshold — which is why every verdict this system stores also stores <strong>the threshold that was in force when it was computed</strong>.</p>
+  </div>
+</div>
+</section>
+
+<!-- ============ C2 CONTAINERS ============ -->
+<section class="view" id="v-containers" hidden>
+<div class="wrap">
+  <div class="eyebrow">C4 · Level 2</div>
+  <h1>Containers</h1>
+  <p class="lede">Five containers Integration360 owns, and one it shares. The split that matters: reads are synchronous and cheap, verdicts are computed on a schedule and stored, and the SEI push never touches the application.</p>
+
+  <figure>
+  <svg viewBox="0 0 900 420" role="img" aria-label="Six containers: the user reads the Web UI which calls the Read API; the Read API and the Observation Engine both read five external sources over a shared bus; the Observation Engine consumes the shared notification inbox, writes verdicts to the Integration360 store and sends findings to the Alert Dispatcher; the Read API reads the rollups back.">
+    <defs>
+      <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+      </marker>
+      <marker id="bt" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#0e7c8b"/>
+      </marker>
+    </defs>
+
+    <rect x="6" y="14" width="888" height="392" rx="10" fill="none" stroke="currentColor" stroke-dasharray="5 4" opacity=".45"/>
+    <text x="16" y="32" font-size="10.5" font-family="IBM Plex Mono, monospace" fill="currentColor" opacity=".7">INTEGRATION360 · BBH INFRASTRUCTURE</text>
+
+    <circle cx="48" cy="88" r="11" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <path d="M34,116 a14,14 0 0 1 28,0" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <text x="48" y="140" font-size="10" text-anchor="middle" fill="currentColor" opacity=".8">BBH Ops</text>
+
+    <rect x="96" y="58" width="156" height="62" rx="7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <text x="174" y="82" font-size="13" text-anchor="middle" fill="currentColor" font-weight="600">Web UI</text>
+    <text x="174" y="99" font-size="10" text-anchor="middle" fill="currentColor" opacity=".7" font-family="IBM Plex Mono, monospace">React SPA · CP360 nav</text>
+
+    <rect x="292" y="58" width="186" height="62" rx="7" fill="#0e7c8b" fill-opacity=".12" stroke="#0e7c8b" stroke-width="1.8"/>
+    <text x="385" y="82" font-size="13" text-anchor="middle" fill="currentColor" font-weight="600">Read API</text>
+    <text x="385" y="99" font-size="10" text-anchor="middle" fill="currentColor" opacity=".8" font-family="IBM Plex Mono, monospace">FastAPI · routers by name</text>
+
+    <rect x="96" y="172" width="156" height="62" rx="7" fill="none" stroke="#5c4b8a" stroke-width="1.6" stroke-dasharray="5 3"/>
+    <text x="174" y="196" font-size="13" text-anchor="middle" fill="currentColor" font-weight="600">Notification Inbox</text>
+    <text x="174" y="213" font-size="10" text-anchor="middle" fill="currentColor" opacity=".7" font-family="IBM Plex Mono, monospace">shared · not owned</text>
+
+    <rect x="292" y="172" width="186" height="62" rx="7" fill="#0e7c8b" fill-opacity=".12" stroke="#0e7c8b" stroke-width="1.8"/>
+    <text x="385" y="196" font-size="13" text-anchor="middle" fill="currentColor" font-weight="600">Observation Engine</text>
+    <text x="385" y="213" font-size="10" text-anchor="middle" fill="currentColor" opacity=".8" font-family="IBM Plex Mono, monospace">scheduled · Python</text>
+
+    <rect x="96" y="286" width="156" height="62" rx="7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <text x="174" y="310" font-size="13" text-anchor="middle" fill="currentColor" font-weight="600">Alert Dispatcher</text>
+    <text x="174" y="327" font-size="10" text-anchor="middle" fill="currentColor" opacity=".7" font-family="IBM Plex Mono, monospace">the only egress</text>
+
+    <rect x="292" y="286" width="186" height="62" rx="7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <text x="385" y="310" font-size="13" text-anchor="middle" fill="currentColor" font-weight="600">INT360 Store</text>
+    <text x="385" y="327" font-size="10" text-anchor="middle" fill="currentColor" opacity=".7" font-family="IBM Plex Mono, monospace">Oracle · 5 tables</text>
+
+    <rect x="596" y="48" width="196" height="40" rx="6" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".85"/>
+    <text x="694" y="73" font-size="11.5" text-anchor="middle" fill="currentColor">Oracle control schema</text>
+    <rect x="596" y="100" width="196" height="40" rx="6" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".85"/>
+    <text x="694" y="125" font-size="11.5" text-anchor="middle" fill="currentColor">Airflow Postgres (replica)</text>
+    <rect x="596" y="152" width="196" height="40" rx="6" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".85"/>
+    <text x="694" y="177" font-size="11.5" text-anchor="middle" fill="currentColor">Hub exception store</text>
+    <rect x="596" y="204" width="196" height="40" rx="6" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".85"/>
+    <text x="694" y="229" font-size="11.5" text-anchor="middle" fill="currentColor">dbt run results</text>
+    <rect x="596" y="256" width="196" height="40" rx="6" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".85"/>
+    <text x="694" y="281" font-size="11.5" text-anchor="middle" fill="currentColor">Landing zone (trailer only)</text>
+    <text x="694" y="316" font-size="10" text-anchor="middle" fill="currentColor" opacity=".62" font-family="IBM Plex Mono, monospace">five sources · no cross-database join</text>
+
+    <path d="M62,89 L92,89" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#b)"/>
+    <path d="M252,89 L288,89" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#b)"/>
+    <text x="270" y="80" font-size="9.5" text-anchor="middle" font-family="IBM Plex Mono, monospace" fill="currentColor" opacity=".72">JSON</text>
+
+    <path d="M252,203 L288,203" fill="none" stroke="#5c4b8a" stroke-width="1.5" marker-end="url(#b)"/>
+    <text x="270" y="194" font-size="9.5" text-anchor="middle" font-family="IBM Plex Mono, monospace" fill="currentColor" opacity=".72">reads</text>
+
+    <path d="M385,234 L385,282" fill="none" stroke="#0e7c8b" stroke-width="1.6" marker-end="url(#bt)"/>
+    <text x="394" y="262" font-size="9.5" font-family="IBM Plex Mono, monospace" fill="#0e7c8b">writes verdicts</text>
+
+    <path d="M292,312 L270,312 L270,102 L288,102" fill="none" stroke="currentColor" stroke-width="1.2" marker-end="url(#b)"/>
+    <text x="264" y="150" font-size="9.5" text-anchor="end" font-family="IBM Plex Mono, monospace" fill="currentColor" opacity=".72">reads rollups</text>
+
+    <path d="M330,234 L330,262 L230,262 L230,282" fill="none" stroke="currentColor" stroke-width="1.2" marker-end="url(#b)"/>
+    <text x="205" y="256" font-size="9.5" text-anchor="middle" font-family="IBM Plex Mono, monospace" fill="currentColor" opacity=".72">findings</text>
+
+    <path d="M478,82 L536,82" fill="none" stroke="currentColor" stroke-width="1.2"/>
+    <path d="M478,196 L536,196" fill="none" stroke="currentColor" stroke-width="1.2"/>
+    <path d="M536,68 L536,276" fill="none" stroke="currentColor" stroke-width="1.2"/>
+    <path d="M536,68 L592,68" fill="none" stroke="currentColor" stroke-width="1.2" marker-end="url(#b)"/>
+    <path d="M536,120 L592,120" fill="none" stroke="currentColor" stroke-width="1.2" marker-end="url(#b)"/>
+    <path d="M536,172 L592,172" fill="none" stroke="currentColor" stroke-width="1.2" marker-end="url(#b)"/>
+    <path d="M536,224 L592,224" fill="none" stroke="currentColor" stroke-width="1.2" marker-end="url(#b)"/>
+    <path d="M536,276 L592,276" fill="none" stroke="currentColor" stroke-width="1.2" marker-end="url(#b)"/>
+    <text x="540" y="44" font-size="9.5" font-family="IBM Plex Mono, monospace" fill="currentColor" opacity=".72">read only</text>
+
+    <text x="174" y="374" font-size="10" text-anchor="middle" font-family="IBM Plex Mono, monospace" fill="currentColor" opacity=".7">SEI writes · Hub and Integration360 both consume</text>
+  </svg>
+  <figcaption>Verdicts are written on a schedule and read back, rather than computed on page load — which is what makes "how often did this breach last quarter" answerable at all.</figcaption>
+  </figure>
+
+  <h2>Container responsibilities</h2>
+  <div class="tscroll"><table>
+    <thead><tr><th style="width:19%">Container</th><th style="width:15%">Technology</th><th>Responsibility</th><th style="width:11%">State</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Web UI</strong></td><td>React SPA, mounted as a CP360 nav entry</td><td>Renders the estate board, four channel views, the exception list, reconciliation and the business-date timeline. Deep-links out to Airflow and the CP360 catalogue rather than reproducing them.</td><td><span class="pill p-warn">assumed</span></td></tr>
+      <tr><td><strong>Read API</strong></td><td>FastAPI; routers mounted by name in <code>main.py</code></td><td>Synchronous reads. Owns the source adapters, the correlation layer that assembles across databases, status normalisation and redaction on read.</td><td><span class="pill p-ok">specified</span></td></tr>
+      <tr><td><strong>Observation Engine</strong></td><td>Python, scheduled</td><td>Computes verdicts with the threshold in force, builds rollups, runs the cross-channel reconciliation, detects gaps nothing else sees. The only writer to the store.</td><td><span class="pill p-ok">specified</span></td></tr>
+      <tr><td><strong>INT360 Store</strong></td><td>Oracle schema <code>INT360_*</code></td><td>Five tables: verdict snapshots, daily rollups, alert log, saved views, optional annotations. No integration state.</td><td><span class="pill p-ok">specified</span></td></tr>
+      <tr><td><strong>Alert Dispatcher</strong></td><td>TBD — email, Teams or ServiceNow</td><td>The only path from a finding to a human. Needed because the Hub alerts on what it manages and Splunk on what the pipeline emits; neither covers what Integration360 alone detects.</td><td><span class="pill p-stop">blocked</span></td></tr>
+      <tr><td><strong>Notification Inbox</strong></td><td>Oracle table, shared platform</td><td>Not owned. SEI writes through the Apigee proxy; the Hub consumes it to remediate, Integration360 to display. Each consumer tracks its own progress marker.</td><td><span class="pill p-ext">shared</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note">
+    <span class="note-h">Why the inbox is shared rather than owned</span>
+    <p>If SEI pushed to Integration360 and the Hub had to obtain the content from it, an observability tool would sit on the critical path for remediation. Placing the inbox behind the Apigee proxy and in front of both consumers keeps one endpoint for SEI while letting Integration360 restart, redeploy and fail over without anyone noticing.</p>
+  </div>
+
+  <h2>Deployment notes</h2>
+  <div class="grid2">
+    <div class="card"><h4>Network zone</h4><p>Integration360 runs in BBH infrastructure. It is reachable by BBH operations only; the SEI push terminates at the Apigee proxy and the inbox, never at this application.</p></div>
+    <div class="card"><h4>Database access</h4><p>A dedicated read-only account per source. Airflow is read from a <strong>replica</strong> — an analytical query against the scheduler's primary will degrade scheduling.</p></div>
+    <div class="card"><h4>Landing zone</h4><p>The cross-channel check parses a standby file's trailer. That requires a read mount, or an upstream component publishing the count. A deployment decision, not a detail.</p></div>
+    <div class="card"><h4>Airflow schema coupling</h4><p>The metadata schema is not a public API and changes between versions. All Airflow queries sit behind one adapter so an upgrade is a single-file change.</p></div>
+  </div>
+</div>
+</section>
+
+<!-- ============ C3 COMPONENTS ============ -->
+<section class="view" id="v-components" hidden>
+<div class="wrap">
+  <div class="eyebrow">C4 · Level 3</div>
+  <h1>Components</h1>
+  <p class="lede">Forty-four components across six planes. Click any one for its contract — what it reads, what it produces, and what it is waiting on.</p>
+
+  <div class="legend">
+    <span><span class="comp-dot d-ok"></span> specified</span>
+    <span><span class="comp-dot d-warn"></span> assumed</span>
+    <span><span class="comp-dot d-stop"></span> blocked</span>
+    <span><span class="comp-dot d-ext"></span> not owned</span>
+  </div>
+
+  <div class="planes" id="planes">
+
+  <!-- PLANE: UI -->
+  <div class="plane">
+    <div class="plane-hd">
+      <div class="plane-t"><span class="glyph"></span>Presentation · Web UI</div>
+      <div class="plane-meta">8 components · 2 blocked</div>
+    </div>
+    <div class="comps">
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-warn"></span><span class="comp-n">EstateBoard</span></button>
+      <div class="detail" hidden>
+        <h5>EstateBoard</h5>
+        <div class="dmeta"><span class="pill p-warn">assumed</span><span>the landing view</span></div>
+        <p>Four channels by three questions, for one business date. Twelve cells, each green, amber or red, each clicking through to the channel view beneath it. The whole product in one screen — if an operator cannot tell from this grid whether the night went well, nothing else matters.</p>
+        <dl>
+          <dt>Reads</dt><dd><code>GET /int360/estate?date=</code></dd>
+          <dt>Source</dt><dd>Rollups and verdict snapshots only — never live source tables</dd>
+          <dt>Assumption</dt><dd>That the morning question is "did last night work". Unverified — no user research exists.</dd>
+        </dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-warn"></span><span class="comp-n">EventChannelView</span></button>
+      <div class="detail" hidden>
+        <h5>EventChannelView</h5>
+        <div class="dmeta"><span class="pill p-warn">assumed</span><span>primary ingestion path</span></div>
+        <p>Micro-batches for the date, with consumer lag per partition, sequence gaps, marker arrival against expectation, and the pull-complete state that actually gates the business date.</p>
+        <dl>
+          <dt>Reads</dt><dd><code>GET /int360/event/{date}</code></dd>
+          <dt>Shows</dt><dd>micro-batch timeline · lag sparkline per partition · sequence gap list · marker grid by domain</dd>
+          <dt>Limit</dt><dd>Because the event carries no data and the pull re-reads current state, this view shows <strong>that</strong> a key changed, never what changed. Flow health, not lineage.</dd>
+        </dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-ok"></span><span class="comp-n">StandbyFileView</span></button>
+      <div class="detail" hidden>
+        <h5>StandbyFileView</h5>
+        <div class="dmeta"><span class="pill p-ok">specified</span><span>fallback readiness</span></div>
+        <p>Files arrive daily and are deliberately not loaded. This view answers a different question from the event view: not <em>did the data arrive</em>, but <em>is the parachute packed</em>. Three states per interface — absent, arrived-and-held, unavailable — plus the trailer count used for the cross-channel check.</p>
+        <dl>
+          <dt>Reads</dt><dd><code>GET /int360/file/{date}</code></dd>
+          <dt>Source</dt><dd><code>FILE_REGISTRY</code> plus the cross-channel reconciliation row</dd>
+          <dt>Watch</dt><dd>The seven-state lifecycle has no terminal value meaning "available and deliberately unused". Until one exists, standby files look either missing or falsely complete.</dd>
+        </dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-ok"></span><span class="comp-n">OutboundView</span></button>
+      <div class="detail" hidden>
+        <h5>OutboundView</h5>
+        <div class="dmeta"><span class="pill p-ok">specified</span><span>two status sources on one row</span></div>
+        <p>The submission lifecycle per loader type — generated, submitted, notified, terminal — carrying submitted, accepted and rejected counts. Never a boolean, because partial acceptance is the norm and Unified Cash and Free Movement carry record-level approval. Every status transition shows whether it arrived by push or by poll.</p>
+        <dl>
+          <dt>Unblocked by</dt><dd>The mechanism is settled: SEI pushes a notification, BBH polls SEI for reject detail and as a backstop. A terminal state found only by the poller — with no notification — is displayed as such, and is the running measure of the push channel's own health.</dd>
+          <dt>Still open</dt><dd>The grain of the reject detail SEI returns on the poll. Record level gives an exception workbench; file level gives a status table. The screens are drawn at record level.</dd>
+          <dt>Also needs</dt><dd>An outbound expectation model. Nothing today records which loaders were <em>due</em>, so this view can show absence but never lateness.</dd>
+        </dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-ok"></span><span class="comp-n">ExceptionList</span></button>
+      <div class="detail" hidden>
+        <h5>ExceptionList</h5>
+        <div class="dmeta"><span class="pill p-ok">specified</span><span>read-only</span></div>
+        <p>One list over three sources with different vocabularies: row-level business DQ from <code>DQ_VALIDATION_FAILURE</code>, structural test failures from dbt, and quarantine and transport errors from the Hub. Presented as one classification; each row keeps its source's own value verbatim.</p>
+        <dl>
+          <dt>Cannot</dt><dd>Resolve, waive, retry or acknowledge. The Hub owns the lifecycle; this shows its state.</dd>
+          <dt>Sorts by</dt><dd>Days to expiry first — an OPEN reprocess-eligible row approaching the INT retention edge is a transaction about to be lost permanently.</dd>
+          <dt>Naming</dt><dd>The SEI diagram labels this capability "Exception Management". It is exception <em>visibility</em>. Worth aligning the words before someone plans against the label.</dd>
+        </dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-stop"></span><span class="comp-n">LiveFlowBoard</span></button>
+      <div class="detail" hidden>
+        <h5>LiveFlowBoard</h5>
+        <div class="dmeta"><span class="pill p-stop">blocked</span><span>the intraday clock</span></div>
+        <p>Micro-batch by partition as a grid, with consumer lag per partition, the last batch received per topic, and current backlog. Localises a stall to a partition immediately — the difference between "the event channel is behind" and "partition 2 stopped at 04:12".</p>
+        <dl>
+          <dt>Reads</dt><dd><code>GET /int360/event/live</code></dd>
+          <dt>Refreshes</dt><dd>Continuously. This view has no notion of completeness — only flowing or falling behind.</dd>
+          <dt>Blocked on</dt><dd>Partition count per domain topic. Without a denominator, "all partitions reported" cannot be distinguished from "the ones I happened to see".</dd>
+        </dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-ok"></span><span class="comp-n">StageFunnel</span></button>
+      <div class="detail" hidden>
+        <h5>StageFunnel</h5>
+        <div class="dmeta"><span class="pill p-ok">specified</span><span>the correctness view</span></div>
+        <p>Six numbers for one business date that must tie: events received → distinct keys → rows pulled → Stage 1 rows → INT rows → Gold rows, with the explained deduction at each step — duplicates collapsed, not-found keys, source-DQ filtered, missing-dimension held.</p>
+        <dl>
+          <dt>Reads</dt><dd><code>GET /int360/funnel/{date}</code></dd>
+          <dt>Why it matters</dt><dd>Anything unexplained is the number worth looking at. It joins the four event-side boundaries onto the medallion's existing four so the chain reads as one funnel rather than two disconnected halves.</dd>
+        </dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-ok"></span><span class="comp-n">BusinessDateTimeline</span></button>
+      <div class="detail" hidden>
+        <h5>BusinessDateTimeline</h5>
+        <div class="dmeta"><span class="pill p-ok">specified</span><span>the drill path</span></div>
+        <p>One date expanded: intraday cycles, the micro-batches inside each, the gate transition, then the transformation tasks. The level of detail is "the transformation failed at <code>build_dim</code>, attempt 2, at 04:12" — then a deep link into the Airflow UI for the log.</p>
+        <dl>
+          <dt>Boundary</dt><dd>Deliberately does not reproduce Airflow's task view. That UI exists, it is good, and it is one tab away.</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <!-- PLANE: ROUTERS -->
+  <div class="plane">
+    <div class="plane-hd">
+      <div class="plane-t"><span class="glyph"></span>Read API · Routers</div>
+      <div class="plane-meta">6 components · mounted by name</div>
+    </div>
+    <div class="comps">
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-ok"></span><span class="comp-n">estate_router</span></button>
+      <div class="detail" hidden>
+        <h5>estate_router</h5>
+        <div class="dmeta"><span class="pill p-ok">specified</span></div>
+        <p>The twelve-cell summary. Serves entirely from <code>int360_rollup_daily</code> and <code>int360_verdict_snapshot</code> so the landing page never scans a source table.</p>
+        <dl><dt>Routes</dt><dd><code>GET /estate</code> · <code>GET /estate/history</code></dd></dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-warn"></span><span class="comp-n">event_router</span></button>
+      <div class="detail" hidden>
+        <h5>event_router</h5>
+        <div class="dmeta"><span class="pill p-warn">assumed</span></div>
+        <p>Micro-batch state, lag, sequence gaps, marker coverage. Lag is computed from broker enqueue metadata, because the four-field event envelope carries no timestamp of its own.</p>
+        <dl>
+          <dt>Routes</dt><dd><code>GET /event/{date}</code> · <code>/event/{date}/microbatch/{id}</code> · <code>/event/lag</code></dd>
+          <dt>Requires</dt><dd>The staging store to capture <code>(topic, partition, offset, enqueued_ts, sequence_number)</code> at receipt. Without those five, lag and gap detection are not computable at all.</dd>
+        </dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-ok"></span><span class="comp-n">file_router</span></button>
+      <div class="detail" hidden>
+        <h5>file_router</h5>
+        <div class="dmeta"><span class="pill p-ok">specified</span></div>
+        <p>Standby arrivals and their cross-channel reconciliation. Distinguishes the three states the completeness gate collapses into two: absent, committed-but-not-released, released.</p>
+        <dl><dt>Routes</dt><dd><code>GET /file/{date}</code> · <code>/file/{date}/interface/{name}</code></dd></dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-ok"></span><span class="comp-n">loader_router</span></button>
+      <div class="detail" hidden>
+        <h5>loader_router</h5>
+        <div class="dmeta"><span class="pill p-stop">blocked</span></div>
+        <p>Submissions joined to their status history, carrying the counts, the template version in force at generation, and the source of every transition. Reject detail is served from what the Hub already fetched and stored — Integration360 never calls SEI.</p>
+        <dl>
+          <dt>Routes</dt><dd><code>GET /loader/{date}</code> · <code>/loader/submission/{id}</code> · <code>/loader/submission/{id}/errors</code></dd>
+          <dt>Still depends on</dt><dd>The Hub recording a submission at send time. Without the send record there is no first half of sent-versus-accepted, and silence is indistinguishable from success. Settling the callback contract did not remove that dependency.</dd>
+        </dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-ok"></span><span class="comp-n">exception_router</span></button>
+      <div class="detail" hidden>
+        <h5>exception_router</h5>
+        <div class="dmeta"><span class="pill p-ok">specified</span></div>
+        <p>The unified list across the DQ store, dbt test results and the Hub's quarantine store. Filters by grain so row-level and model-level failures are visible together without being merged.</p>
+        <dl><dt>Routes</dt><dd><code>GET /exceptions</code> · <code>/exceptions/{source}/{id}</code></dd></dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-warn"></span><span class="comp-n">recon_router</span></button>
+      <div class="detail" hidden>
+        <h5>recon_router</h5>
+        <div class="dmeta"><span class="pill p-warn">assumed</span></div>
+        <p>All reconciliation boundaries — the pipeline's four, the event channel's four, the outbound six, and the cross-channel file-versus-event check that only exists here.</p>
+        <dl>
+          <dt>Routes</dt><dd><code>GET /recon/{date}</code> · <code>/recon/{date}/boundary/{name}</code></dd>
+          <dt>Assumption</dt><dd>That <code>RECON_RESULT</code> gains a <code>MODEL_NAME</code> column. Without it, account, client and transaction results collide on the same key and per-model drill-down is impossible.</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <!-- PLANE: ADAPTERS -->
+  <div class="plane">
+    <div class="plane-hd">
+      <div class="plane-t"><span class="glyph"></span>Read API · Source adapters</div>
+      <div class="plane-meta">6 components · one per source</div>
+    </div>
+    <div class="comps">
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-ok"></span><span class="comp-n">oracle_control_reader</span></button>
+      <div class="detail" hidden>
+        <h5>oracle_control_reader</h5>
+        <div class="dmeta"><span class="pill p-ok">specified</span><span>largest adapter</span></div>
+        <p>Reads the pipeline's control schema: file registry, date control, micro-batch registry, staged IDs, intraday cycles, the DQ store and reconciliation results.</p>
+        <dl>
+          <dt>Grant</dt><dd>Dedicated read-only account. Does not exist yet — unrequested rather than refused.</dd>
+          <dt>Defends against</dt><dd>Status values outside the documented state machine. <code>FILE_REGISTRY.STATUS</code> has no check constraint, so drift is possible and would otherwise under-report silently.</dd>
+        </dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-stop"></span><span class="comp-n">airflow_reader</span></button>
+      <div class="detail" hidden>
+        <h5>airflow_reader</h5>
+        <div class="dmeta"><span class="pill p-stop">blocked</span><span>replica required</span></div>
+        <p>Task-level state from <code>dag_run</code>, <code>task_instance</code> and <code>task_fail</code>. Set-based queries give in one statement what the REST API gives in many, and make historical trends trivial.</p>
+        <dl>
+          <dt>Hard rule</dt><dd><strong>Replica only.</strong> The scheduler polls its metadata database continuously and uses <code>SELECT FOR UPDATE</code> in its loop; an analytical scan against the primary degrades scheduling.</dd>
+          <dt>Correction</dt><dd>Postgres does not hold task logs. The <code>log</code> table holds audit events. Log text lives wherever remote logging points — link to it, never index it.</dd>
+          <dt>Blocked on</dt><dd>Whether a replica exists and how the API authenticates. Without either, failure attribution stops at "the date is stuck".</dd>
+        </dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-stop"></span><span class="comp-n">hub_reader</span></button>
+      <div class="detail" hidden>
+        <h5>hub_reader</h5>
+        <div class="dmeta"><span class="pill p-stop">blocked</span></div>
+        <p>Quarantine state, transport errors, remediation history and outbound submissions from the Integration Hub.</p>
+        <dl><dt>Blocked on</dt><dd>Where the Hub's store lives. It is an OpenShift application, so its own persistence is likely rather than the shared Oracle control schema — which makes this a fifth access path with its own grant.</dd></dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-ext"></span><span class="comp-n">inbox_reader</span></button>
+      <div class="detail" hidden>
+        <h5>inbox_reader</h5>
+        <div class="dmeta"><span class="pill p-ext">not owned</span></div>
+        <p>Consumes the shared notification inbox, tracking its own progress marker independently of the Hub's. The inbox holds notifications, not reject payloads — detail is fetched separately on the poll leg. Unmasks nothing; rows are stored encrypted and masked on read.</p>
+        <dl><dt>Contract note</dt><dd>Dedupe must key on a SEI-supplied message identifier stable across retries, not on a timestamp. BBH defines the callback contract, so this can be required rather than hoped for.</dd></dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-warn"></span><span class="comp-n">loader_status_reader</span></button>
+      <div class="detail" hidden>
+        <h5>loader_status_reader</h5>
+        <div class="dmeta"><span class="pill p-warn">assumed</span><span>the outbound state the Hub keeps</span></div>
+        <p><code>LOADER_SUBMISSION</code>, <code>LOADER_STATUS_HISTORY</code> and <code>LOADER_ERROR</code> — the state the Hub maintains from both the push and the poll.</p>
+        <dl>
+          <dt>Requires</dt><dd><code>LOADER_STATUS_HISTORY</code> carries a <code>SOURCE</code> column separating <code>CALLBACK</code> from <code>POLL</code>. Without it the two channels cannot be told apart, and divergence — the one finding that only exists because there are two sources — is unmeasurable.</dd>
+          <dt>Assumes</dt><dd>Reject detail is persisted when fetched rather than re-read from SEI on demand. If SEI purges detail after a retention window, a missed fetch is permanent loss and the persisted copy is all that survives.</dd>
+        </dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-warn"></span><span class="comp-n">dbt_results_reader</span></button>
+      <div class="detail" hidden>
+        <h5>dbt_results_reader</h5>
+        <div class="dmeta"><span class="pill p-warn">assumed</span></div>
+        <p>Per-model status, execution time, rows affected and every test outcome — read from a table, not from <code>run_results.json</code> on disk.</p>
+        <dl>
+          <dt>Requires</dt><dd>dbt persisting run results to Oracle via an <code>on-run-end</code> hook or the <code>dbt_artifacts</code> package. A small pipeline-side change, free while nothing is deployed.</dd>
+          <dt>Why not the log</dt><dd>Parsing <code>dbt.log</code> is the wrong artefact. <code>run_results.json</code> is structured and carries exactly this; persisting it removes the filesystem coupling entirely.</dd>
+        </dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-stop"></span><span class="comp-n">landing_trailer_reader</span></button>
+      <div class="detail" hidden>
+        <h5>landing_trailer_reader</h5>
+        <div class="dmeta"><span class="pill p-stop">blocked</span><span>deployment consequence</span></div>
+        <p>Reads two lines of a standby file — the header and the trailer — to obtain the declared row count. Never loads the file.</p>
+        <dl>
+          <dt>Blocked on</dt><dd>Whether Integration360 gets a landing-zone read mount, or an upstream component publishes the count instead. This was scoped as a database and API reader; a filesystem mount changes its deployment.</dd>
+          <dt>Why it matters</dt><dd>It is the left-hand side of the only independent check on the primary ingestion path.</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <!-- PLANE: SHARED SERVICES -->
+  <div class="plane">
+    <div class="plane-hd">
+      <div class="plane-t"><span class="glyph"></span>Read API · Shared services</div>
+      <div class="plane-meta">3 components</div>
+    </div>
+    <div class="comps">
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-ok"></span><span class="comp-n">correlation_service</span></button>
+      <div class="detail" hidden>
+        <h5>correlation_service</h5>
+        <div class="dmeta"><span class="pill p-ok">specified</span><span>load-bearing</span></div>
+        <p>Assembles a single answer across sources that live in different databases. <strong>No SQL join spans Oracle and the Airflow replica</strong>, so any statement like "the ACCOUNT file loaded, <code>build_dim</code> failed at 04:12, and 1,400 transactions are held" is composed here or precomputed into a rollup.</p>
+        <dl>
+          <dt>Keys on</dt><dd>business date, then correlation ID where one survives, then entity key</dd>
+          <dt>Consequence</dt><dd>This is why the rollup tables are structural rather than a performance nicety.</dd>
+        </dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-ok"></span><span class="comp-n">status_normalizer</span></button>
+      <div class="detail" hidden>
+        <h5>status_normalizer</h5>
+        <div class="dmeta"><span class="pill p-ok">specified</span></div>
+        <p>Maps each source's own vocabulary onto one canonical set, keeping the native value verbatim alongside it. Mapping is configuration, never code.</p>
+        <dl>
+          <dt>Rule</dt><dd>An unknown native value populates <code>status_reason</code> and raises an alert. It is never silently mapped to the nearest neighbour.</dd>
+          <dt>Rule</dt><dd>Terminal status never regresses. A late callback cannot move a completed submission backwards.</dd>
+        </dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-ok"></span><span class="comp-n">status_precedence</span></button>
+      <div class="detail" hidden>
+        <h5>status_precedence</h5>
+        <div class="dmeta"><span class="pill p-ok">specified</span><span>two writers, one status</span></div>
+        <p>The outbound status field has two writers — the pushed notification and the backstop poll. This resolves them by a written rule rather than by arrival order.</p>
+        <dl>
+          <dt>Rule</dt><dd><strong>The poll wins.</strong> A poll is a read of SEI's current state; a notification is a point-in-time event that can arrive late, out of order, or twice.</dd>
+          <dt>Derivation</dt><dd>History keeps every row from both sources with its <code>SOURCE</code>. The current status is the latest <code>POLL</code> at or after the newest <code>CALLBACK</code>, otherwise the highest terminal state reached. Terminal never regresses.</dd>
+          <dt>Why it matters</dt><dd>Without the rule, a retried <code>PROCESSING</code> notification landing after a <code>COMPLETED</code> poll walks the status backwards and raises a false exception. Two writers into one field with no precedence is how a status board loses its audience.</dd>
+        </dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-warn"></span><span class="comp-n">redactor</span></button>
+      <div class="detail" hidden>
+        <h5>redactor</h5>
+        <div class="dmeta"><span class="pill p-warn">assumed</span></div>
+        <p>Masks account numbers and other business keys on the way out, against a configurable field allow-list. Applied on read rather than at rest, so a wrong mask can be corrected without having destroyed the original.</p>
+        <dl><dt>Open</dt><dd>786 PII fields are in SDC scope and the masking policy is unapproved. Default to hashing business keys until it is signed off.</dd></dl>
+      </div>
+    </div>
+  </div>
+
+  <!-- PLANE: OBSERVATION ENGINE -->
+  <div class="plane">
+    <div class="plane-hd">
+      <div class="plane-t"><span class="glyph"></span>Observation Engine · scheduled</div>
+      <div class="plane-meta">7 components · only writer to the store</div>
+    </div>
+    <div class="comps">
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-stop"></span><span class="comp-n">verdict_computer</span></button>
+      <div class="detail" hidden>
+        <h5>verdict_computer</h5>
+        <div class="dmeta"><span class="pill p-stop">blocked</span><span>needs thresholds</span></div>
+        <p>Derives SLA state and reconciliation verdict per channel per date, and writes each with <strong>the threshold that was in force at computation time</strong>.</p>
+        <dl>
+          <dt>Why store the threshold</dt><dd>The verdict itself stays derived, per the pipeline's own principle. Storing the input makes it reproducible three weeks later and stops this system quietly disagreeing with Splunk about the same date.</dd>
+          <dt>Blocked on</dt><dd>Where the reconciliation tolerance and SLA warning percentage live in configuration. Neither is persisted anywhere today.</dd>
+          <dt>Implements</dt><dd>The SLA decision from the ingestion design and the boundary arithmetic from the transformation design — the same logic, not a reimplementation.</dd>
+        </dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-stop"></span><span class="comp-n">expectation_evaluator</span></button>
+      <div class="detail" hidden>
+        <h5>expectation_evaluator</h5>
+        <div class="dmeta"><span class="pill p-stop">blocked</span><span>the timeliness gap</span></div>
+        <p>Compares what was due against what happened. Without it Integration360 reports presence and absence but never lateness — and lateness is what operations actually needs.</p>
+        <dl>
+          <dt>Blocked on</dt><dd>No channel has an expectation model. Inbound feeds have no calendar, the 24-loader catalogue has no cadence column, and events have no expectation definable without a marker schedule.</dd>
+          <dt>Recommendation</dt><dd>One table, pipeline-owned, answering "for this date, what was due and was it required" across all channels. The marker turns events into the same shape as files, so one model covers both.</dd>
+        </dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-warn"></span><span class="comp-n">cross_channel_reconciler</span></button>
+      <div class="detail" hidden>
+        <h5>cross_channel_reconciler</h5>
+        <div class="dmeta"><span class="pill p-warn">assumed</span><span>the flagship check</span></div>
+        <p>Under standby, both paths deliver the same data every day. This compares three numbers that must agree: the file trailer's declared count, the events received for that domain and date, and the count declared by the marker.</p>
+        <dl>
+          <dt>Why it matters</dt><dd>A missing file is obvious. A stream that quietly dropped three percent of ACCOUNT events is not. Nothing else in the estate can detect it.</dd>
+          <dt>Assumption</dt><dd>That the marker carries a declared count. If it does not, the check degrades to two numbers and loses its strongest leg.</dd>
+          <dt>Also depends on</dt><dd>Which side is authoritative when they disagree — that decides whether a mismatch is an event defect or a file defect.</dd>
+        </dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-ok"></span><span class="comp-n">gap_detector</span></button>
+      <div class="detail" hidden>
+        <h5>gap_detector</h5>
+        <div class="dmeta"><span class="pill p-ok">specified</span><span>finds what nothing else sees</span></div>
+        <p>Four checks that have no owner anywhere else in the estate:</p>
+        <ul>
+          <li><strong>Sequence gaps</strong> — Event Hub sequence numbers are monotonic per partition, so a gap is a lost event. This is a real completeness check, stronger than anything the file channel has.</li>
+          <li><strong>Marker never arrived</strong> — data received, no boundary signal. Indistinguishable from "still arriving" without an expected time.</li>
+          <li><strong>Stale in-progress</strong> — a registry row at <code>LOADING</code> older than the timeout is a stuck load; no row at all is a late file. The gate cannot tell these apart; this can.</li>
+          <li><strong>Callback never returned</strong> — a submission with no status after its window. Silence looks exactly like success.</li>
+        </ul>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-ok"></span><span class="comp-n">divergence_detector</span></button>
+      <div class="detail" hidden>
+        <h5>divergence_detector</h5>
+        <div class="dmeta"><span class="pill p-ok">specified</span><span>where push and poll disagree</span></div>
+        <p>Three findings that exist only because the outbound channel has two status sources:</p>
+        <ul>
+          <li><strong>Silent notification</strong> — a terminal state found by the poller that no push ever announced. This is a direct measurement of whether SEI's push channel is healthy, and it costs nothing once <code>SOURCE</code> is recorded.</li>
+          <li><strong>Contradiction</strong> — a notification the next poll disagrees with. Resolved by <code>status_precedence</code>, but recorded, because a pattern of them is a contract problem rather than a data problem.</li>
+          <li><strong>Unresolved</strong> — a submission still non-terminal past its max age, which becomes <code>STATUS_UNRESOLVED</code> rather than sitting at <code>SUBMITTED</code> for ever.</li>
+        </ul>
+        <p>It is the outbound counterpart of the event channel's sequence-gap check: both turn an absence into a provable one.</p>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-ok"></span><span class="comp-n">cadence_baseline</span></button>
+      <div class="detail" hidden>
+        <h5>cadence_baseline</h5>
+        <div class="dmeta"><span class="pill p-ok">specified</span><span>lateness without a calendar</span></div>
+        <p>Maintains a rolling baseline of the interval between micro-batches, per topic. Turns "MB 1049 has not arrived" into "MB 1049 is 40 minutes overdue against a 6-minute norm".</p>
+        <dl>
+          <dt>Why it exists</dt><dd>For the event channel, lateness is derivable from the stream’s own rhythm — micro-batch IDs are sequential and arrive at a characteristic interval. No expectation table needed.</dd>
+          <dt>Does not cover EOD</dt><dd>There is one EOD marker a day and no rhythm to baseline against, so its expected arrival time still has to be stated.</dd>
+        </dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-ok"></span><span class="comp-n">rollup_builder</span></button>
+      <div class="detail" hidden>
+        <h5>rollup_builder</h5>
+        <div class="dmeta"><span class="pill p-ok">specified</span></div>
+        <p>Daily aggregates per channel, so a ninety-day trend does not scan the file registry and the micro-batch registry live — and so cross-source correlation is precomputed rather than assembled on every page load.</p>
+        <dl><dt>Writes</dt><dd><code>int360_rollup_daily</code></dd></dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-stop"></span><span class="comp-n">alert_evaluator</span></button>
+      <div class="detail" hidden>
+        <h5>alert_evaluator</h5>
+        <div class="dmeta"><span class="pill p-stop">blocked</span></div>
+        <p>Decides which findings are worth telling a human, and records that they were told so the same finding does not fire twice.</p>
+        <dl>
+          <dt>Scope</dt><dd>Only findings no other system covers. The Hub alerts on what it manages; Splunk on what the pipeline emits. This covers the gaps between them.</dd>
+          <dt>Blocked on</dt><dd>No egress exists. Splunk is out of scope by decision, and no email, Teams or ServiceNow path has an owner.</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <!-- PLANE: STORE -->
+  <div class="plane">
+    <div class="plane-hd">
+      <div class="plane-t"><span class="glyph"></span>INT360 Store · owned state</div>
+      <div class="plane-meta">5 tables · no integration state</div>
+    </div>
+    <div class="comps">
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-ok"></span><span class="comp-n">int360_verdict_snapshot</span></button>
+      <div class="detail" hidden>
+        <h5>int360_verdict_snapshot</h5>
+        <div class="dmeta"><span class="pill p-ok">specified</span></div>
+        <p>One row per channel per business date per verdict type, with the computed value, the threshold in force, and the inputs it was computed from.</p>
+        <dl><dt>Makes possible</dt><dd>"How often did this breach last quarter" — unanswerable if verdicts are computed on page load and never kept.</dd></dl>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-ok"></span><span class="comp-n">int360_rollup_daily</span></button>
+      <div class="detail" hidden>
+        <h5>int360_rollup_daily</h5>
+        <div class="dmeta"><span class="pill p-ok">specified</span></div>
+        <p>Per channel per date: counts, durations, exception totals, reconciliation differences. The estate board and every trend read from here.</p>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-ok"></span><span class="comp-n">int360_alert_log</span></button>
+      <div class="detail" hidden>
+        <h5>int360_alert_log</h5>
+        <div class="dmeta"><span class="pill p-ok">specified</span></div>
+        <p>What fired, to whom, when, and whether acknowledged. Exists only so the same finding does not alert repeatedly.</p>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-ok"></span><span class="comp-n">int360_saved_view</span></button>
+      <div class="detail" hidden>
+        <h5>int360_saved_view</h5>
+        <div class="dmeta"><span class="pill p-ok">specified</span></div>
+        <p>Per-user filters and layouts. The only table whose loss would inconvenience rather than damage.</p>
+      </div>
+
+      <button class="comp" aria-expanded="false"><span class="comp-dot d-warn"></span><span class="comp-n">int360_annotation</span></button>
+      <div class="detail" hidden>
+        <h5>int360_annotation</h5>
+        <div class="dmeta"><span class="pill p-warn">optional</span></div>
+        <p>"Known issue, SEI ticket 4471." Strict observability says no. Every operations team eventually asks for it, and it is far cheaper to design in than to retrofit — it is the one write path this scope might legitimately grow.</p>
+        <dl><dt>If included</dt><dd>Annotations attach to an observation, never to a pipeline record, so nothing this system writes can affect what another system reads.</dd></dl>
+      </div>
+    </div>
+  </div>
+
+  </div>
+</div>
+</section>
+
+<!-- ============ DATA ============ -->
+<section class="view" id="v-data" hidden>
+<div class="wrap">
+  <div class="eyebrow">Detail</div>
+  <h1>Data model</h1>
+  <p class="lede">Integration360 owns five tables. Everything else it shows belongs to the system that produced it, and is read where it lives.</p>
+
+  <div class="note">
+    <span class="note-h">The test</span>
+    <p>If Integration360's schema grows beyond derived state, something has leaked across the boundary. No table here would ever need to be read back by the pipeline, the Hub or SEI.</p>
+  </div>
+
+  <h2>Owned</h2>
+  <div class="tscroll"><table>
+    <thead><tr><th style="width:24%">Table</th><th style="width:30%">Key</th><th>Holds</th></tr></thead>
+    <tbody>
+      <tr><td><code>int360_verdict_snapshot</code></td><td><code>(channel, business_date, verdict_type)</code></td><td>Derived value, threshold in force, inputs, computed timestamp. The threshold is the column that stops this system disagreeing with Splunk.</td></tr>
+      <tr><td><code>int360_rollup_daily</code></td><td><code>(channel, business_date)</code></td><td>Counts, durations, exception totals, reconciliation differences. Also the precomputed cross-source correlation, since no SQL join spans the sources.</td></tr>
+      <tr><td><code>int360_alert_log</code></td><td><code>(finding_key, fired_ts)</code></td><td>What was dispatched, to whom, acknowledged or not.</td></tr>
+      <tr><td><code>int360_saved_view</code></td><td><code>(user_id, view_name)</code></td><td>Filters and layout per user.</td></tr>
+      <tr><td><code>int360_annotation</code> <span class="pill p-warn">optional</span></td><td><code>(observation_ref, created_ts)</code></td><td>Operator notes attached to an observation, never to a pipeline record.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Read, not owned</h2>
+  <div class="tscroll"><table>
+    <thead><tr><th style="width:20%">Source</th><th style="width:34%">Objects</th><th>Answers</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Oracle control</strong><br><span style="font-size:11.5px;color:var(--ink-3)">Airflow + dbt</span></td><td><code>FILE_SCHEMA_CONFIG</code>, <code>FILE_REGISTRY</code>, <code>DATE_CONTROL</code>, <code>SDC_VIEW_CONFIG</code>, <code>SDC_EVENT_CONFIG</code>, <code>SDC_STAGED_ID</code>, <code>SDC_MICROBATCH_REGISTRY</code>, <code>SDC_INTRADAY_CYCLE</code>, <code>DQ_VALIDATION_FAILURE</code>, <code>RECON_RESULT</code></td><td>Completeness and correctness for both inbound channels; the exception backlog; every reconciliation boundary the pipeline computes.</td></tr>
+      <tr><td><strong>Airflow</strong><br><span style="font-size:11.5px;color:var(--ink-3)">Postgres replica</span></td><td><code>dag_run</code>, <code>task_instance</code>, <code>task_fail</code></td><td>Which task failed, on which attempt, at what time. Not log text — that lives wherever remote logging points.</td></tr>
+      <tr><td><strong>Integration Hub</strong></td><td>Quarantine, transport errors, outbound submissions <span class="pill p-stop">location unknown</span></td><td>What the Hub is holding, what it retried, what it sent.</td></tr>
+      <tr><td><strong>Notification inbox</strong><br><span style="font-size:11.5px;color:var(--ink-3)">shared</span></td><td>Pushed SEI notifications with a per-consumer progress marker</td><td>Loader status transitions and error summaries. Reject detail is not here — it arrives on the poll leg and is stored against the submission.</td></tr>
+      <tr><td><strong>dbt</strong></td><td>Run results persisted by <code>on-run-end</code></td><td>Model-level status and test outcomes — how a reconciliation break gets explained.</td></tr>
+      <tr><td><strong>Landing zone</strong></td><td>Standby file header and trailer only <span class="pill p-stop">mount unresolved</span></td><td>The declared row count, for the cross-channel check.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Two kinds of data quality, kept apart</h2>
+  <div class="grid2">
+    <div class="card"><h4>Row-level business DQ</h4><p><code>DQ_VALIDATION_FAILURE</code>. This account has an unmapped status code. Grain: one failing record.</p></div>
+    <div class="card"><h4>Model-level structural DQ</h4><p>dbt test results. Uniqueness, not-null, referential integrity, one open row per natural key. Grain: one assertion over a model.</p></div>
+  </div>
+  <p>An operator wants both on one screen. Merging them into one list makes both harder to read — so they are presented together and classified separately, the same discipline as keeping native status beside normalised status.</p>
+</div>
+</section>
+
+<!-- ============ CHANNELS ============ -->
+<section class="view" id="v-channels" hidden>
+<div class="wrap">
+  <div class="eyebrow">Detail</div>
+  <h1>Four channels</h1>
+  <p class="lede">The channels are at very different maturities, and the design reflects that rather than pretending they are symmetrical.</p>
+
+  <div class="tscroll"><table>
+    <thead><tr><th style="width:14%">Channel</th><th style="width:11%">Direction</th><th style="width:16%">Status</th><th>What Integration360 can answer</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Event</strong></td><td>SEI → BBH</td><td><span class="pill p-acc">primary ingestion</span></td>
+        <td>Micro-batch completeness, consumer lag per partition, sequence gaps, marker coverage, pull-complete gating. <em>Cannot</em> say what changed — the envelope carries no data and the pull re-reads current state.</td>
+      </tr>
+      <tr>
+        <td><strong>File</strong></td><td>SEI → BBH</td><td><span class="pill p-ok">daily standby</span></td>
+        <td>Arrival and readiness of the fallback, plus the trailer count for the cross-channel check. Answers "is the parachute packed", not "did the data arrive".</td>
+      </tr>
+      <tr>
+        <td><strong>Loader</strong></td><td>BBH → SEI</td><td><span class="pill p-warn">push + poll</span></td>
+        <td>Submission lifecycle, accepted and rejected counts, reject detail, the template version in force, and whether each status arrived by push or by poll. Still depends on the Hub recording the send.</td>
+      </tr>
+      <tr>
+        <td><strong>API</strong></td><td>both</td><td><span class="pill p-ext">not Day 1</span></td>
+        <td>Nothing yet. Day 1 is file and event based; no API traffic exists to observe. Its first production member is the loader callback endpoint itself.</td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <h2>The taxonomy is two dimensions, not one</h2>
+  <p>FILE, API and EVENT are <strong>transports</strong>. LOADER is a <strong>business flow</strong> — and it travels over the API transport. Treating channel as a single top-level partition forces every loader record to misrepresent one of them.</p>
+  <p>There is a third dimension too. Some events carry data; markers, file-ready signals and the 51 technical events carry <strong>control</strong>. That axis decides whether an event is something to ingest or something to display, so it belongs in the model rather than in a comment.</p>
+
+  <div class="grid2">
+    <div class="card"><h4>Transport</h4><p>FILE · API · EVENT — how the bytes moved.</p></div>
+    <div class="card"><h4>Flow</h4><p>Inbound feed · loader submission · status callback — what the message is for.</p></div>
+    <div class="card"><h4>Plane</h4><p>Data or control — whether it is ingested or merely observed.</p></div>
+    <div class="card"><h4>Cost of getting it wrong</h4><p>One column now. A migration across every observation record later.</p></div>
+  </div>
+
+  <h2>Completeness works differently per channel</h2>
+  <div class="tscroll"><table>
+    <thead><tr><th style="width:16%">Channel</th><th style="width:34%">Completeness signal</th><th>Strength</th></tr></thead>
+    <tbody>
+      <tr><td>Event</td><td>Every in-scope domain markered, every micro-batch <code>LOADED</code>, every batch reconciled, no unexplained not-found keys</td><td>Strong — sequence numbers are monotonic per partition, so a gap is a provably lost event</td></tr>
+      <tr><td>File</td><td>Expected interfaces minus those in the released state</td><td>Strong, but the readiness state is an archive move outside the load transaction — a storage blip looks like missing data</td></tr>
+      <tr><td>Loader</td><td>Submitted set versus terminal set, from notification or poll, whichever arrives</td><td>Moderate — the poll closes the silence gap a pure push leaves, but it still requires the Hub to record the send</td></tr>
+      <tr><td>API</td><td>None</td><td>No traffic</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note warn">
+    <span class="note-h">The marker is not the gate</span>
+    <p>A marker means SEI finished publishing. It says nothing about BBH finishing consuming. The gate opens on <strong>pull complete</strong> — markers received, every micro-batch loaded, every batch reconciled. Gating on the marker alone would look like a control and be a comfort.</p>
+  </div>
+</div>
+</section>
+
+<!-- ============ OBSERVATION MODEL ============ -->
+<section class="view" id="v-observe" hidden>
+<div class="wrap">
+  <div class="eyebrow">Detail</div>
+  <h1>Observation model</h1>
+  <p class="lede">All intraday and EOD data now arrives as SDC events and moves through one pipeline to Stage&nbsp;1, Stage&nbsp;2 and Gold. Monitoring it needs two clocks, not one.</p>
+
+  <div class="note">
+    <span class="note-h">Two clocks</span>
+    <p><strong>Intraday is continuous.</strong> There is no "complete" — only flowing at an acceptable rate, or falling behind. Health is lag, boxing continuity and Stage 1 load success over a rolling window.</p>
+    <p><strong>EOD is a gate.</strong> Completeness is binary: EOD marker received, every micro-batch for the date <code>LOADED</code>, transformation run, reconciliation clean, <code>DATE_CONTROL</code> at <code>COMPLETE</code>.</p>
+    <p>On one clock the screen is either permanently amber, because intraday is never finished, or blind to an EOD running two hours late.</p>
+  </div>
+
+  <figure>
+  <svg viewBox="0 0 900 300" role="img" aria-label="Six hops from SEI publication to date close. The intraday clock covers listener receipt through Stage 1; the EOD clock covers Stage 1 through date close; they overlap at Stage 1.">
+    <defs>
+      <marker id="oh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+    </defs>
+
+    <rect x="164" y="34" width="424" height="26" rx="13" fill="#0e7c8b" fill-opacity=".14" stroke="#0e7c8b" stroke-width="1.2"/>
+    <text x="376" y="51" font-size="11" text-anchor="middle" fill="currentColor" font-weight="600">intraday clock — lag, boxing, load</text>
+    <rect x="460" y="68" width="424" height="26" rx="13" fill="currentColor" fill-opacity=".08" stroke="currentColor" stroke-width="1.2"/>
+    <text x="672" y="85" font-size="11" text-anchor="middle" fill="currentColor" font-weight="600">EOD clock — the gate</text>
+
+    <g font-size="11" text-anchor="middle">
+      <rect x="16" y="118" width="128" height="46" rx="6" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 4" opacity=".5"/>
+      <text x="80" y="140" fill="currentColor" opacity=".6" font-weight="600">SEI publishes</text>
+      <text x="80" y="155" font-size="9.5" fill="currentColor" opacity=".55">not observable</text>
+
+      <rect x="164" y="118" width="128" height="46" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+      <text x="228" y="140" fill="currentColor" font-weight="600">Receive + box</text>
+      <text x="228" y="155" font-size="9.5" fill="currentColor" opacity=".7">listener</text>
+
+      <rect x="312" y="118" width="128" height="46" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+      <text x="376" y="140" fill="currentColor" font-weight="600">Collapse + pull</text>
+      <text x="376" y="155" font-size="9.5" fill="currentColor" opacity=".7">key set → JDBC</text>
+
+      <rect x="460" y="118" width="128" height="46" rx="6" fill="#0e7c8b" fill-opacity=".12" stroke="#0e7c8b" stroke-width="1.8"/>
+      <text x="524" y="140" fill="currentColor" font-weight="600">Stage 1</text>
+      <text x="524" y="155" font-size="9.5" fill="currentColor" opacity=".7">the handoff</text>
+
+      <rect x="608" y="118" width="128" height="46" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+      <text x="672" y="140" fill="currentColor" font-weight="600">STG → INT → Gold</text>
+      <text x="672" y="155" font-size="9.5" fill="currentColor" opacity=".7">dbt, once per date</text>
+
+      <rect x="756" y="118" width="128" height="46" rx="6" fill="none" stroke="currentColor" stroke-width="1.4"/>
+      <text x="820" y="140" fill="currentColor" font-weight="600">Date close</text>
+      <text x="820" y="155" font-size="9.5" fill="currentColor" opacity=".7">DATE_CONTROL</text>
+    </g>
+
+    <g stroke="currentColor" stroke-width="1.2" fill="none" marker-end="url(#oh)">
+      <path d="M146,141 L160,141"/><path d="M294,141 L308,141"/>
+      <path d="M442,141 L456,141"/><path d="M590,141 L604,141"/>
+      <path d="M738,141 L752,141"/>
+    </g>
+
+    <g font-size="9.5" text-anchor="middle" fill="currentColor" opacity=".72" font-family="IBM Plex Mono, monospace">
+      <text x="80" y="200">—</text>
+      <text x="228" y="200">SDC_STAGED_ID</text>
+      <text x="228" y="214">MB boxing</text>
+      <text x="376" y="200">micro-batch</text>
+      <text x="376" y="214">registry</text>
+      <text x="524" y="200">registry +</text>
+      <text x="524" y="214">Airflow task</text>
+      <text x="672" y="200">Airflow +</text>
+      <text x="672" y="214">dbt results</text>
+      <text x="820" y="200">DATE_CONTROL</text>
+      <text x="820" y="214">RECON_RESULT</text>
+    </g>
+    <text x="450" y="254" font-size="10.5" text-anchor="middle" fill="currentColor" opacity=".8">
+      end-to-end latency BBH controls: broker <tspan font-family="IBM Plex Mono, monospace">enqueued_ts</tspan> → <tspan font-family="IBM Plex Mono, monospace">stage1_load_ts</tspan>
+    </text>
+    <text x="450" y="274" font-size="10" text-anchor="middle" fill="currentColor" opacity=".6">
+      everything before the broker is SEI’s, and invisible
+    </text>
+  </svg>
+  <figcaption>The two clocks overlap at Stage 1 — it is the last thing intraday is responsible for and the first thing the EOD gate counts.</figcaption>
+  </figure>
+
+  <h2>Where each hop is observed</h2>
+  <div class="tscroll"><table>
+    <thead><tr><th style="width:18%">Hop</th><th style="width:26%">Observed from</th><th style="width:12%">Unit</th><th>What failure looks like</th></tr></thead>
+    <tbody>
+      <tr><td><strong>SEI publishes</strong></td><td><em>Not observable</em></td><td>—</td><td>Inferred only from a gap in micro-batch IDs</td></tr>
+      <tr><td><strong>Listener receives</strong></td><td><code>SDC_STAGED_ID</code> — offset, <code>enqueued_ts</code></td><td>event</td><td>Offset gap inside a box; consumer lag climbing</td></tr>
+      <tr><td><strong>Micro-batch boxed</strong></td><td>MB Start/End per partition, offset continuity</td><td>(mb, partition)</td><td>Start with no End; one partition stalled while others move</td></tr>
+      <tr><td><strong>Keys collapsed</strong></td><td>distinct keys per view per micro-batch</td><td>micro-batch</td><td>—</td></tr>
+      <tr><td><strong>JDBC pull</strong></td><td>rows returned, not-found keys</td><td>micro-batch</td><td>Micro-batch <code>FAILED</code>; not-found count above the delete rate</td></tr>
+      <tr><td><strong>Stage 1 load</strong></td><td>Stage 1 row count, Airflow task</td><td>micro-batch</td><td>Micro-batch <code>FAILED</code>, rolled back</td></tr>
+      <tr><td><strong>STG → INT → Gold</strong></td><td>Airflow <code>task_instance</code> + dbt run results</td><td>business date</td><td>Task failed; date stuck at <code>TRIGGER</code></td></tr>
+      <tr><td><strong>DQ and recon</strong></td><td><code>DQ_VALIDATION_FAILURE</code>, <code>RECON_RESULT</code></td><td>row / boundary</td><td>Held rows; unexplained boundary difference</td></tr>
+      <tr><td><strong>Date advance</strong></td><td><code>DATE_CONTROL</code></td><td>business date</td><td>Never reaches <code>COMPLETE</code></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>The funnel</h2>
+  <p>Six numbers for one business date that must tie, each with its explained deduction. Anything unexplained is the number worth looking at.</p>
+  <div class="tscroll"><table>
+    <thead><tr><th style="width:26%">Stage</th><th style="width:34%">Explained deduction</th><th>Source</th></tr></thead>
+    <tbody>
+      <tr><td>Events received</td><td>—</td><td><code>SDC_STAGED_ID</code></td></tr>
+      <tr><td>Distinct keys</td><td>duplicates collapsed</td><td>micro-batch registry</td></tr>
+      <tr><td>Rows pulled</td><td>not-found keys</td><td>micro-batch registry</td></tr>
+      <tr><td>Stage 1 rows</td><td>— must equal rows pulled</td><td>micro-batch registry</td></tr>
+      <tr><td>INT rows</td><td>source-DQ filtered</td><td><code>RECON_RESULT</code></td></tr>
+      <tr><td>Gold rows</td><td>missing-dimension held</td><td><code>RECON_RESULT</code> + DQ store</td></tr>
+    </tbody>
+  </table></div>
+  <p>This puts the four event-side boundaries in front of the medallion’s existing four, so the chain reads as one funnel rather than two disconnected halves.</p>
+
+  <h2>Timeliness without an expectation table</h2>
+  <p>For the event channel, lateness is derivable from the stream’s own rhythm. Micro-batch IDs are sequential and arrive at a characteristic interval, so a rolling baseline per topic turns <em>"MB 1049 has not arrived"</em> into <em>"MB 1049 is 40 minutes overdue against a 6-minute norm"</em>. That is <code>cadence_baseline</code>, and it needs nothing from SEI.</p>
+  <p><strong>EOD is the exception.</strong> There is one marker a day and no rhythm to baseline against, so its expected arrival time still has to be stated — the one place the expectation model is unavoidable on this channel.</p>
+
+  <div class="note warn">
+    <span class="note-h">The failure mode this architecture creates</span>
+    <p>Intraday micro-batches load into Stage 1 all day while <code>DATE_CONTROL</code> sits at <code>PENDING</code>, and the transformation runs once at EOD over whatever accumulated. So a micro-batch that failed at 11am and went unnoticed means the EOD transformation runs on <strong>incomplete Stage 1</strong> — and the reconciliation boundaries will not necessarily catch it, because STG→INT ties perfectly against a Stage 1 that is itself short.</p>
+    <p>Two consequences. Intraday needs its own alerting rather than only feeding the EOD gate. And the gate must require every micro-batch for the date to be <code>LOADED</code>, not merely that the EOD marker arrived.</p>
+  </div>
+
+  <h2>What this cannot show</h2>
+  <p>The event carries no data and the pull re-reads current state, so multiple intraday changes to one key collapse into one observation. Integration360 can say a key was touched in micro-batch 1047 and again in 1051; it cannot say what changed, and cannot reconstruct the intermediate state.</p>
+  <p>Lineage runs <strong>Gold row → micro-batch → key</strong>, never Gold row → the specific change that caused it. Worth stating plainly, because "near-real-time event streaming" sets an expectation of change-level traceability this pattern deliberately does not provide.</p>
+
+  <h2>The four screens</h2>
+  <div class="grid2">
+    <div class="card"><h4>Live flow — the intraday clock</h4><p>Micro-batch by partition as a grid, lag per partition, last batch per topic, current backlog. Localises a stall to a partition. <code>LiveFlowBoard</code></p></div>
+    <div class="card"><h4>Business date — the EOD clock</h4><p>EOD marker, micro-batch tally, transformation task chain, reconciliation, DQ, <code>DATE_CONTROL</code> state. <code>BusinessDateTimeline</code></p></div>
+    <div class="card"><h4>Funnel</h4><p>The six numbers and their explained deductions for one date. <code>StageFunnel</code></p></div>
+    <div class="card"><h4>Exceptions</h4><p>DQ holds, not-found keys, failed micro-batches — days-to-expiry first. <code>ExceptionList</code></p></div>
+  </div>
+
+  <div class="note">
+    <span class="note-h">One model change this requires</span>
+    <p>The micro-batch now has two levels, because MB Start and End are written to <em>every partition of every domain topic</em>. A partition-level record holds the boxing; a parent record holds the logical batch and is what the gate aggregates against. The existing registry keyed on <code>(topic, partition, mb_id)</code> is the partition level — the parent is missing and needs adding.</p>
+  </div>
+</div>
+</section>
+
+<!-- ============ SCREENS ============ -->
+<section class="view" id="v-screens" hidden>
+<div class="wrap">
+  <div class="eyebrow">Detail</div>
+  <h1>Screens</h1>
+  <p class="lede">Four screens carry the observation model. Every one answers completeness, timeliness or correctness for one channel and one business date — nothing else earns a place.</p>
+
+  <div class="note">
+    <span class="note-h">About the figures below</span>
+    <p>Example data, drawn to show layout and encoding. Operational status uses a reserved palette — healthy, late, failed — kept deliberately distinct from the component-state colours used elsewhere in this document, because "blocked in design" and "failed last night" must not look alike. Every status cell carries a glyph as well as a colour, so colour never carries meaning on its own.</p>
+  </div>
+
+  <h2>1 · Live flow — the intraday clock</h2>
+  <p>Micro-batch by partition. The grid is the screen: a stall localises to a row immediately, which is the difference between <em>the event channel is behind</em> and <em>ACCOUNT partition 2 stopped at 04:12</em>.</p>
+
+  <div class="screen">
+    <div class="screen-bar">
+      <span class="screen-t">Live flow</span>
+      <span class="screen-sub">last 8 micro-batches · refreshing</span>
+      <span class="mockchip">example data</span>
+    </div>
+    <div class="screen-body">
+      <div class="tiles">
+        <div class="tile"><div class="tile-v">4m 12s</div><div class="tile-l">worst partition lag</div></div>
+        <div class="tile"><div class="tile-v">9</div><div class="tile-l">batches last hour</div></div>
+        <div class="tile"><div class="tile-v" style="color:var(--st-crit)">1</div><div class="tile-l">partition stalled</div></div>
+        <div class="tile"><div class="tile-v">1&nbsp;049</div><div class="tile-l">latest micro-batch</div></div>
+      </div>
+
+      <div class="tscroll">
+      <table class="sgrid">
+        <thead><tr><th style="text-align:left">topic · partition</th>
+          <th>1042</th><th>1043</th><th>1044</th><th>1045</th><th>1046</th><th>1047</th><th>1048</th><th>1049</th></tr></thead>
+        <tbody>
+<tr><td class="rowlab">ACCOUNT · P0</td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td></tr>
+<tr><td class="rowlab">ACCOUNT · P1</td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-warn">⧖</span></td></tr>
+<tr><td class="rowlab">ACCOUNT · P2</td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-crit">✕</span></td><td><span class="cell c-none">–</span></td><td><span class="cell c-none">–</span></td></tr>
+<tr><td class="rowlab">ACCOUNT · P3</td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td></tr>
+<tr><td class="rowlab">TRANSACTION · P0</td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td></tr>
+<tr><td class="rowlab">TRANSACTION · P1</td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-warn">⧖</span></td></tr>
+<tr><td class="rowlab">CLIENT · P0</td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td><td><span class="cell c-good">✓</span></td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin:13px 0 15px;font-size:11px;color:var(--ink-3)">
+        <span class="stat"><span class="dot" style="background:var(--st-good)"></span>✓ boxed &amp; loaded</span>
+        <span class="stat"><span class="dot" style="background:var(--st-warn)"></span>⧖ open — start, no end</span>
+        <span class="stat"><span class="dot" style="background:var(--st-crit)"></span>✕ failed</span>
+        <span class="stat"><span class="dot" style="background:var(--line-2)"></span>– not received</span>
+      </div>
+
+      <div style="font-size:11.5px;font-weight:600;margin-bottom:6px">Consumer lag by partition</div>
+      <div class="lagrow"><span class="rowlab" style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink-2)">ACCOUNT · P0</span><span class="lagtrack"><span class="lagfill" style="width:14%;background:var(--st-good)"></span></span><span class="lagv">0m 38s</span></div>
+      <div class="lagrow"><span class="rowlab" style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink-2)">ACCOUNT · P1</span><span class="lagtrack"><span class="lagfill" style="width:22%;background:var(--st-good)"></span></span><span class="lagv">1m 04s</span></div>
+      <div class="lagrow"><span class="rowlab" style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink-2)">ACCOUNT · P2</span><span class="lagtrack"><span class="lagfill" style="width:100%;background:var(--st-crit)"></span></span><span class="lagv">4m 12s</span></div>
+      <div class="lagrow"><span class="rowlab" style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink-2)">ACCOUNT · P3</span><span class="lagtrack"><span class="lagfill" style="width:16%;background:var(--st-good)"></span></span><span class="lagv">0m 44s</span></div>
+      <div class="lagrow"><span class="rowlab" style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink-2)">TRANSACTION · P0</span><span class="lagtrack"><span class="lagfill" style="width:19%;background:var(--st-good)"></span></span><span class="lagv">0m 52s</span></div>
+      <div class="lagrow"><span class="rowlab" style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink-2)">TRANSACTION · P1</span><span class="lagtrack"><span class="lagfill" style="width:41%;background:var(--st-warn)"></span></span><span class="lagv">1m 51s</span></div>
+    </div>
+  </div>
+
+  <p><strong>What it can say that nothing else can.</strong> ACCOUNT P2 failed at micro-batch 1047 and has received nothing since. Every other partition is current. Without the grid this reads as a single amber "event channel degraded" and an operator starts from scratch.</p>
+
+  <h2>2 · Business date — the EOD clock</h2>
+  <p>Binary, unlike the screen above. The gate opens only when every marker is in <em>and</em> every micro-batch for the date is loaded — marker received is not the gate.</p>
+
+  <div class="screen">
+    <div class="screen-bar">
+      <span class="screen-t">Business date · 2026-09-24</span>
+      <span class="screen-sub">DATE_CONTROL · TRIGGER</span>
+      <span class="mockchip">example data</span>
+    </div>
+    <div class="screen-body">
+      <div class="tiles">
+        <div class="tile"><div class="tile-v">1&nbsp;284<span style="font-size:13px;color:var(--ink-3)"> / 1&nbsp;284</span></div><div class="tile-l">micro-batches loaded</div></div>
+        <div class="tile"><div class="tile-v">4 / 4</div><div class="tile-l">EOD markers received</div></div>
+        <div class="tile"><div class="tile-v" style="color:var(--st-warn)">02:41</div><div class="tile-l">elapsed since trigger</div></div>
+        <div class="tile"><div class="tile-v">21:58</div><div class="tile-l">SLA cutoff</div></div>
+      </div>
+
+      <div style="font-size:11.5px;font-weight:600;margin-bottom:5px">EOD marker by domain</div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px">
+        <span class="step" style="background:color-mix(in srgb,var(--st-good) 16%,transparent);color:var(--st-good)">✓ ACCOUNT 21:04</span>
+        <span class="step" style="background:color-mix(in srgb,var(--st-good) 16%,transparent);color:var(--st-good)">✓ TRANSACTION 21:06</span>
+        <span class="step" style="background:color-mix(in srgb,var(--st-good) 16%,transparent);color:var(--st-good)">✓ CLIENT 21:02</span>
+        <span class="step" style="background:color-mix(in srgb,var(--st-good) 16%,transparent);color:var(--st-good)">✓ ASSETS 21:09</span>
+      </div>
+
+      <div style="font-size:11.5px;font-weight:600;margin-bottom:5px">Transformation</div>
+      <div class="chain">
+        <span class="step" style="color:var(--st-good)">✓ build_stg</span>
+        <span class="step" style="color:var(--st-good)">✓ test_stg</span>
+        <span class="step" style="color:var(--st-good)">✓ build_int</span>
+        <span class="step" style="color:var(--st-good)">✓ test_int</span>
+        <span class="step" style="color:var(--st-good)">✓ build_dim</span>
+        <span class="step" style="color:var(--st-good)">✓ test_dim</span>
+        <span class="step" style="background:color-mix(in srgb,var(--st-warn) 26%,transparent);color:#7a5400">⧖ build_fact · running 34m</span>
+        <span class="step">test_fact</span>
+        <span class="step">mark_replayed_dq</span>
+        <span class="step">persist_recon</span>
+        <span class="step">advance_date_control</span>
+      </div>
+
+      <div style="font-size:11.5px;font-weight:600;margin:14px 0 5px">Reconciliation</div>
+      <div class="tscroll"><table style="margin:0">
+        <thead><tr><th style="width:24%">Boundary</th><th style="width:15%">Left</th><th style="width:15%">Right</th><th style="width:17%">Explained</th><th>Difference</th></tr></thead>
+        <tbody>
+          <tr><td><code>EVENT_TO_STAGED</code></td><td class="num">418&nbsp;902</td><td class="num">418&nbsp;902</td><td class="num">—</td><td><span class="stat"><span class="dot" style="background:var(--st-good)"></span>0 · pass</span></td></tr>
+          <tr><td><code>STAGED_TO_PULLED</code></td><td class="num">96&nbsp;114</td><td class="num">96&nbsp;092</td><td class="num">22 not found</td><td><span class="stat"><span class="dot" style="background:var(--st-good)"></span>0 · pass</span></td></tr>
+          <tr><td><code>STG_TO_INT</code></td><td class="num">96&nbsp;092</td><td class="num">95&nbsp;876</td><td class="num">216 source DQ</td><td><span class="stat"><span class="dot" style="background:var(--st-good)"></span>0 · pass</span></td></tr>
+          <tr><td><code>INT_TO_FACT</code></td><td class="num">61&nbsp;430</td><td class="num">61&nbsp;018</td><td class="num">404 held</td><td><span class="stat"><span class="dot" style="background:var(--st-warn)"></span>8 · warning</span></td></tr>
+        </tbody>
+      </table></div>
+      <p style="font-size:11px;color:var(--ink-3);margin:8px 0 0">Tolerance in force: 0 rows. Stored with the verdict, so this reads the same in three weeks.</p>
+    </div>
+  </div>
+
+  <h2>3 · Funnel — where rows go</h2>
+  <p>Six numbers for one date, each with its explained deduction. Anything unexplained is the number worth looking at.</p>
+
+  <div class="screen">
+    <div class="screen-bar">
+      <span class="screen-t">Funnel · 2026-09-24 · TRANSACTION</span>
+      <span class="screen-sub">events → Gold</span>
+      <span class="mockchip">example data</span>
+    </div>
+    <div class="screen-body">
+      <div class="funnel-row"><span style="font-size:11.5px">Events received</span><span class="ftrack"><span class="fkept" style="width:100%"></span></span><span class="fval">418&nbsp;902</span></div>
+      <div class="fded">↓ 322&nbsp;788 duplicate keys collapsed</div>
+      <div class="funnel-row"><span style="font-size:11.5px">Distinct keys</span><span class="ftrack"><span class="fkept" style="width:22.9%"></span></span><span class="fval">96&nbsp;114</span></div>
+      <div class="fded">↓ 22 not-found keys — deletes</div>
+      <div class="funnel-row"><span style="font-size:11.5px">Rows pulled</span><span class="ftrack"><span class="fkept" style="width:22.9%"></span></span><span class="fval">96&nbsp;092</span></div>
+      <div class="fded">→ must equal rows pulled</div>
+      <div class="funnel-row"><span style="font-size:11.5px">Stage 1 rows</span><span class="ftrack"><span class="fkept" style="width:22.9%"></span></span><span class="fval">96&nbsp;092</span></div>
+      <div class="fded">↓ 216 source-DQ filtered</div>
+      <div class="funnel-row"><span style="font-size:11.5px">INT rows</span><span class="ftrack"><span class="fkept" style="width:22.8%"></span></span><span class="fval">95&nbsp;876</span></div>
+      <div class="fded">↓ 404 held · missing dimension &nbsp;·&nbsp; <span style="color:var(--st-warn)">8 unexplained</span></div>
+      <div class="funnel-row"><span style="font-size:11.5px">Gold rows</span><span class="ftrack"><span class="fkept" style="width:14.6%"></span><span class="fgap"></span><span class="flost" style="width:0.1%"></span></span><span class="fval">61&nbsp;018</span></div>
+      <p style="font-size:11px;color:var(--ink-3);margin:12px 0 0">The four event-side boundaries sit in front of the medallion’s existing four, so the chain reads as one funnel rather than two disconnected halves.</p>
+    </div>
+  </div>
+
+  <h2>4 · Exceptions</h2>
+  <p>One list over three sources with different vocabularies, sorted by days to expiry — because an OPEN reprocess-eligible row approaching the INT retention edge is a transaction about to be lost permanently.</p>
+
+  <div class="screen">
+    <div class="screen-bar">
+      <span class="screen-t">Exceptions</span>
+      <span class="screen-sub">open · all sources</span>
+      <span class="mockchip">example data</span>
+    </div>
+    <div class="screen-body">
+      <div class="tscroll"><table style="margin:0">
+        <thead><tr><th style="width:11%">Expires</th><th style="width:17%">Source</th><th style="width:22%">Reason</th><th style="width:12%">Rows</th><th>Owner</th></tr></thead>
+        <tbody>
+          <tr><td><span class="stat"><span class="dot" style="background:var(--st-crit)"></span>1 day</span></td><td><code>DQ · INT_TRANSACTIONS</code></td><td>MISSING_DIMENSION_KEY</td><td class="num">37</td><td>Pipeline · replays on arrival</td></tr>
+          <tr><td><span class="stat"><span class="dot" style="background:var(--st-serious)"></span>3 days</span></td><td><code>DQ · INT_TRANSACTIONS</code></td><td>MISSING_DIMENSION_KEY</td><td class="num">212</td><td>Pipeline · replays on arrival</td></tr>
+          <tr><td><span class="stat"><span class="dot" style="background:var(--st-warn)"></span>5 days</span></td><td><code>DQ · STG_ACCOUNT</code></td><td>INCORRECT ACCOUNT_STATUS_CODE</td><td class="num">18</td><td>SWP source · needs reload</td></tr>
+          <tr><td><span class="stat"><span class="dot" style="background:var(--line-2)"></span>—</span></td><td><code>Hub · quarantine</code></td><td>Trailer count mismatch</td><td class="num">1 file</td><td>Hub · awaiting correction</td></tr>
+          <tr><td><span class="stat"><span class="dot" style="background:var(--line-2)"></span>—</span></td><td><code>dbt · test_dim</code></td><td>Two ACTIVE_IND=1 rows for one key</td><td class="num">2</td><td>Transformation · code fix</td></tr>
+          <tr><td><span class="stat"><span class="dot" style="background:var(--line-2)"></span>—</span></td><td><code>Loader · UNIFIED_CASH</code></td><td>REFERENCE_DATA · unknown fund</td><td class="num">1&nbsp;500</td><td>Hub · correct and resubmit</td></tr>
+        </tbody>
+      </table></div>
+      <p style="font-size:11px;color:var(--ink-3);margin:9px 0 0">Read-only. The Hub owns every lifecycle here; this shows its state and nothing more.</p>
+    </div>
+  </div>
+
+  <div class="note">
+    <span class="note-h">The fifth screen — outbound submissions</span>
+    <p>The mechanism is settled, so the screen has a shape: a submission lifecycle with its status history, every row tagged <em>push</em> or <em>poll</em>, and reject detail paginated beneath it. Two columns earn their place only because there are two sources — <em>found by</em>, and <em>notified at</em> against <em>polled at</em>. A terminal state with no notification is the running measure of SEI’s push channel.</p>
+    <p>What is still open is the grain of the reject detail SEI returns on the poll. Record level gives an exception workbench; file level gives a status table. The loader row above is drawn at record level on the assumption that it is per record.</p>
+  </div>
+</div>
+</section>
+
+
+<!-- ============ API ============ -->
+<section class="view" id="v-api" hidden>
+<div class="wrap">
+  <div class="eyebrow">Detail</div>
+  <h1>API surface and the error taxonomy</h1>
+  <p class="lede">Twenty-two operations. Twenty-one are reads; the twenty-second is the endpoint SEI calls. The full contract is <code>integration360-openapi.yaml</code>.</p>
+
+  <h2>Error taxonomy — three classes, three owners</h2>
+  <p>The axis that decides who is woken up, and whether a retry is legitimate at all. Without it the exception list is one undifferentiated pile that nobody owns.</p>
+  <div class="tscroll"><table>
+    <thead><tr><th style="width:13%">Class</th><th style="width:19%">Owner</th><th>What it means</th><th style="width:26%">Retry</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill p-warn">BUSINESS</span></td><td>Operations and the source</td><td>The data is wrong — a missing mandatory attribute, a code outside its domain, an unresolved reference, a control total that does not tie.</td><td><strong>Never.</strong> Retrying produces the same rejection and spends the attempt budget.</td></tr>
+      <tr><td><span class="pill p-ext">TECHNICAL</span></td><td>Engineering</td><td>The pipeline is wrong — a transformation failed, a model test failed, a schema mismatch, an unparseable envelope.</td><td>Only after a fix. An unchanged retry is an unchanged failure.</td></tr>
+      <tr><td><span class="pill p-ok">SYSTEM</span></td><td>Platform</td><td>The platform is wrong — a timeout, a lost connection, a pod eviction, a broker rebalance, a rate limit.</td><td>The only class where blind retry is legitimate, and the only one with a circuit breaker behind it.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note">
+    <span class="note-h">Why the class matters more than the count</span>
+    <p>A day that is ninety percent SYSTEM is a platform incident. A day that is ninety percent BUSINESS is a source data problem. The same total means opposite things. <code>/errors/summary</code> exists to make that shape visible in one call, and <code>top_codes[].delta_vs_baseline_pct</code> is there because a code that normally fires twice and fired two hundred times is the signal — the absolute count is not.</p>
+  </div>
+
+  <h2>Operations</h2>
+  <div class="tscroll"><table>
+    <thead><tr><th style="width:8%">Verb</th><th style="width:30%">Path</th><th>What it answers</th></tr></thead>
+    <tbody>
+      <tr><td colspan="3" style="background:var(--sunk);font-size:10.5px;font-weight:800;letter-spacing:.3px;color:#0e8f7e">STATUS MONITORING</td></tr>
+      <tr><td><span class="pill" style="background:#0e8f7e1f;color:#0e8f7e">GET</span></td><td><code>/estate</code></td><td>Four channels against three questions, served from stored verdicts only — the landing page never scans a source table.</td></tr>
+      <tr><td><span class="pill" style="background:#0e8f7e1f;color:#0e8f7e">GET</span></td><td><code>/estate/history</code></td><td>The same twelve cells across a date range.</td></tr>
+      <tr><td><span class="pill" style="background:#0e8f7e1f;color:#0e8f7e">GET</span></td><td><code>/status/{domain}/{id}</code></td><td>Current status and every transition, for any state machine in the estate. <code>current</code> is derived, never stored twice.</td></tr>
+      <tr><td colspan="3" style="background:var(--sunk);font-size:10.5px;font-weight:800;letter-spacing:.3px;color:#0b5e83">PROCESS TRACKING</td></tr>
+      <tr><td><span class="pill" style="background:#0b5e831f;color:#0b5e83">GET</span></td><td><code>/process/dates/{date}</code></td><td>The date lifecycle and what is holding its gate. <code>gate.satisfied</code> is true only when every micro-batch is LOADED <em>and</em> the marker arrived.</td></tr>
+      <tr><td><span class="pill" style="background:#0b5e831f;color:#0b5e83">GET</span></td><td><code>/process/microbatches</code></td><td>Boxes for a date with their state.</td></tr>
+      <tr><td><span class="pill" style="background:#0b5e831f;color:#0b5e83">GET</span></td><td><code>/process/microbatches/{id}</code></td><td>One box per partition, with the funnel beneath it and every deduction named. <code>partitions_expected</code> returns null rather than a guess.</td></tr>
+      <tr><td><span class="pill" style="background:#0b5e831f;color:#0b5e83">GET</span></td><td><code>/process/lag</code></td><td>Consumer lag per partition, against the rolling inter-micro-batch baseline rather than a fixed schedule.</td></tr>
+      <tr><td><span class="pill" style="background:#0b5e831f;color:#0b5e83">GET</span></td><td><code>/process/runs/{id}</code></td><td>The Airflow run and the dbt models under it, from a read replica.</td></tr>
+      <tr><td colspan="3" style="background:var(--sunk);font-size:10.5px;font-weight:800;letter-spacing:.3px;color:#cc3344">ERROR MANAGEMENT</td></tr>
+      <tr><td><span class="pill" style="background:#cc33441f;color:#cc3344">GET</span></td><td><code>/errors/taxonomy</code></td><td>The catalogue: code, class, disposition, owner, retry budget.</td></tr>
+      <tr><td><span class="pill" style="background:#cc33441f;color:#cc3344">GET</span></td><td><code>/errors</code></td><td>Occurrences across every domain in one shape. Default sort is <code>days_to_expiry</code> ascending.</td></tr>
+      <tr><td><span class="pill" style="background:#cc33441f;color:#cc3344">GET</span></td><td><code>/errors/{id}</code></td><td>One occurrence with its correlation trail.</td></tr>
+      <tr><td><span class="pill" style="background:#cc33441f;color:#cc3344">GET</span></td><td><code>/errors/summary</code></td><td>Counts by class and domain — the shape of the day's failure, not just its size.</td></tr>
+      <tr><td colspan="3" style="background:var(--sunk);font-size:10.5px;font-weight:800;letter-spacing:.3px;color:#a8560f">LOADER · OUTBOUND</td></tr>
+      <tr><td><span class="pill" style="background:#a8560f1f;color:#a8560f">GET</span></td><td><code>/loaders</code></td><td>Loader types with the day's submission funnel.</td></tr>
+      <tr><td><span class="pill" style="background:#a8560f1f;color:#a8560f">GET</span></td><td><code>/loaders/submissions</code></td><td>Filterable by state and by <code>found_by</code> — whether push or the backstop poll learned it.</td></tr>
+      <tr><td><span class="pill" style="background:#a8560f1f;color:#a8560f">GET</span></td><td><code>/loaders/submissions/{id}</code></td><td>Lifecycle, counts, both status sources, and the divergence flags.</td></tr>
+      <tr><td><span class="pill" style="background:#a8560f1f;color:#a8560f">GET</span></td><td><code>/loaders/submissions/{id}/records</code></td><td>Bad records with <code>error_source</code> separating what G6 refused to send from what SEI refused to accept.</td></tr>
+      <tr><td colspan="3" style="background:var(--sunk);font-size:10.5px;font-weight:800;letter-spacing:.3px;color:#6d3ac0">DATA QUALITY</td></tr>
+      <tr><td><span class="pill" style="background:#6d3ac01f;color:#6d3ac0">GET</span></td><td><code>/dq/rules</code></td><td>The rule registry — gate, scope, blocking per rule, cost class.</td></tr>
+      <tr><td><span class="pill" style="background:#6d3ac01f;color:#6d3ac0">GET</span></td><td><code>/dq/results</code></td><td>Evidence a rule ran, including when it found nothing. <code>NOT_RUN</code> is a real verdict.</td></tr>
+      <tr><td><span class="pill" style="background:#6d3ac01f;color:#6d3ac0">GET</span></td><td><code>/dq/failures</code></td><td>Failing records with <code>days_to_expiry</code>.</td></tr>
+      <tr><td colspan="3" style="background:var(--sunk);font-size:10.5px;font-weight:800;letter-spacing:.3px;color:#159943">RECONCILIATION</td></tr>
+      <tr><td><span class="pill" style="background:#1599431f;color:#159943">GET</span></td><td><code>/reconciliation/{date}</code></td><td>All twelve boundaries with the tolerance in force alongside each verdict.</td></tr>
+      <tr><td><span class="pill" style="background:#1599431f;color:#159943">GET</span></td><td><code>/reconciliation/{date}/{boundary}</code></td><td>One boundary, both legs, every deduction named.</td></tr>
+      <tr><td colspan="3" style="background:var(--sunk);font-size:10.5px;font-weight:800;letter-spacing:.3px;color:#10193b">INBOUND · THE ONLY WRITE</td></tr>
+      <tr><td><span class="pill" style="background:#10193b;color:#fff">POST</span></td><td><code>/sei/notifications</code></td><td>SEI pushes a status transition or an error summary. 202 on durable write, never on successful processing.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Rules that hold across every path</h2>
+  <div class="grid3">
+    <div class="card"><h4>Read-only, one exception</h4><p>Every path is a GET except <code>POST /sei/notifications</code>, and that write lands in an inbox the Hub owns. Integration360 is a second consumer and is never on the remediation path.</p></div>
+    <div class="card"><h4>Redaction on read</h4><p>Business keys are masked on the way out, not at rest, so a wrong mask can be corrected without having destroyed the original. Unmasking needs <code>int360.pii.read</code>.</p></div>
+    <div class="card"><h4>Cursor paging only</h4><p>No offsets. The underlying tables grow while a caller pages, and an offset silently skips rows when they do.</p></div>
+    <div class="card"><h4>UNKNOWN is never GOOD</h4><p>When an input is unavailable the verdict is <code>UNKNOWN</code>. A missing Airflow replica returns 503 for that path rather than a green estate board.</p></div>
+    <div class="card"><h4>Thresholds travel with verdicts</h4><p>Every verdict carries <code>threshold_in_force</code> or <code>tolerance_in_force</code>, so it stays reproducible after the threshold moves and cannot silently diverge from Splunk.</p></div>
+    <div class="card"><h4>Native codes survive</h4><p>SEI's code is kept verbatim beside the normalised one. An unmapped value raises rather than being mapped to its nearest neighbour.</p></div>
+  </div>
+
+  <h2>The one write, in detail</h2>
+  <ol class="steps">
+    <li><strong>Acknowledge on durable write.</strong> Authenticate, validate the envelope shape, store the raw body plus receipt metadata, return 202. Parsing, correlation and status derivation all happen downstream. A 500 because a lookup failed would tie SEI's retry behaviour to BBH's internal bugs.</li>
+    <li><strong>Generic by design.</strong> <code>message_type</code> is an open string and <code>payload</code> is unconstrained, so a new status or counter needs no contract change. An unrecognised type is stored and alerted, never rejected.</li>
+    <li><strong>Deduplication keys on <code>message_id</code></strong>, which must be stable across SEI's own retries. An HTTP callback has no equivalent of the event side's <code>(topic, partition, offset)</code>. Without it, a retried "50 records rejected" becomes 100 in the exception count.</li>
+    <li><strong>Thin.</strong> A status transition and an error <em>summary</em> travel here. Reject detail does not — it is fetched on the poll leg, paginated and stored.</li>
+    <li><strong>409 is idempotent.</strong> A duplicate <code>message_id</code> returns the original receipt and writes nothing twice.</li>
+  </ol>
+</div>
+</section>
+
+<!-- ============ RUNTIME ============ -->
+<section class="view" id="v-runtime" hidden>
+<div class="wrap">
+  <div class="eyebrow">Detail</div>
+  <h1>Runtime flows</h1>
+  <p class="lede">Three sequences carry most of the design's behaviour. Everything else is a read.</p>
+
+  <h2>1 · The outbound loader loop — submit, notify, poll</h2>
+  <p>Three legs, all owned by the Integration Hub. <strong>Push notifies; poll fetches detail and backstops a notification that never arrives.</strong> The important property is that Integration360 is nowhere in the acknowledgement path and never calls SEI. It can be down, mid-deploy or failing over and neither SEI nor the Hub notices.</p>
+
+  <h3 style="font-size:14px;margin:18px 0 6px">Leg 1 — BBH submits</h3>
+  <ol class="steps">
+    <li>The Hub generates the loader file to SEI's template and submits it through the Apigee proxy.</li>
+    <li>The submission identifier returned here is the correlation key every later leg hangs off. <em>The Hub must record the submission at send time</em> — without that row, a submission that never reached SEI is indistinguishable from one that succeeded.</li>
+  </ol>
+
+  <h3 style="font-size:14px;margin:18px 0 6px">Leg 2 — SEI notifies (push)</h3>
+  <ol class="steps">
+    <li><strong>SEI Workflows</strong> posts a status transition and an error summary to the BBH Apigee proxy (node 12). Thin and event-shaped — reject detail does not travel here.</li>
+    <li>The proxy authenticates, enforces rate limits, and passes it on. It rejects only for authentication or a malformed envelope — never for a business reason.</li>
+    <li>The message is written to the <strong>notification inbox</strong>, encrypted at rest, and acknowledged with 202. <em>Acknowledge on durable write, not on successful processing</em> — parsing, correlation and status derivation all happen downstream of that write. A 500 because a correlation lookup failed ties SEI's retry behaviour to BBH's internal bugs.</li>
+    <li>Dedupe keys on a SEI-supplied message identifier stable across retries. Anything unparseable becomes a dead-letter row with an alert; nothing is dropped.</li>
+    <li>The <strong>Integration Hub</strong> consumes the inbox to remediate, tracking its own progress marker. <strong>Integration360</strong> consumes it independently to display, tracking a separate marker. Neither consumer blocks the other.</li>
+  </ol>
+
+  <h3 style="font-size:14px;margin:18px 0 6px">Leg 3 — BBH polls (backstop and detail)</h3>
+  <ol class="steps">
+    <li>The Hub's monitoring worker selects <strong>non-terminal submissions only</strong>. A submission that reached a terminal state by either source drops out of the poll set, so call volume tracks work in flight rather than history.</li>
+    <li>Cadence is tiered: tight for the first interval after submission, backing off after. A loader SEI processes in four minutes is not polled every five minutes until midnight.</li>
+    <li>On reaching a terminal-with-errors state, reject detail is fetched <strong>once</strong>, paginated, and stored. Fetching errors on every poll would pull the same rejected records repeatedly.</li>
+    <li>A submission still non-terminal past its max age becomes <code>STATUS_UNRESOLVED</code> — the outbound equivalent of a business date that never reaches <code>COMPLETE</code>.</li>
+  </ol>
+
+  <div class="note">
+    <span class="note-h">When the two sources disagree, the poll wins</span>
+    <p>A poll is a read of SEI's current state; a notification is a point-in-time event that can arrive late, out of order, or twice. History keeps every row from both with its <code>SOURCE</code>; the current status is derived by <code>status_precedence</code>, and terminal never regresses.</p>
+    <p>The pairing also closes the hole a pure push model leaves. Under push alone, a submission whose notification never arrives sits at <code>SUBMITTED</code> and the failure is invisible unless something holds an expectation of it. The poller makes that a detected condition — and the gap between the two sources becomes the running measure of the push channel's own health.</p>
+  </div>
+
+  <h2>2 · Nightly verdict computation</h2>
+  <p>Verdicts are computed once, stored with their inputs, and read back — rather than recomputed on every page load and never kept.</p>
+  <ol class="steps">
+    <li>The Observation Engine reads the closed business date from <code>DATE_CONTROL</code>.</li>
+    <li><code>expectation_evaluator</code> establishes what was due for that date, per channel. <span class="pill p-stop">blocked — no expectation model exists</span></li>
+    <li><code>verdict_computer</code> derives SLA state against the cutoff, and reconciliation verdicts from the boundary counts, applying the tolerance <strong>read from shared configuration</strong>.</li>
+    <li>Each verdict is written to <code>int360_verdict_snapshot</code> <strong>with the threshold that was in force</strong>, so it can be reproduced and defended later.</li>
+    <li><code>rollup_builder</code> writes the daily aggregate, including cross-source correlations that no SQL join could produce.</li>
+    <li><code>alert_evaluator</code> compares findings against <code>int360_alert_log</code> and dispatches only what is new.</li>
+  </ol>
+
+  <h2>3 · Cross-channel reconciliation</h2>
+  <p>The check that only exists because both paths deliver the same data every day. It costs two lines of a file.</p>
+  <ol class="steps">
+    <li><code>landing_trailer_reader</code> parses the header and trailer of the standby file for an interface and date. The file is never loaded.</li>
+    <li>The declared trailer count is compared against the events received for the matching domain and date, and against the count declared by the marker.</li>
+    <li>Three numbers that must agree. Any difference is written as a reconciliation row with all three legs visible.</li>
+    <li>A difference means opposite things depending on which side is authoritative — an event defect or a file defect. <span class="pill p-stop">blocked — authority unresolved</span></li>
+  </ol>
+
+  <div class="note">
+    <span class="note-h">Why this is the flagship</span>
+    <p>A missing file is obvious. A stream that quietly dropped three percent of ACCOUNT events is not, and no other control in the estate would catch it. Under the standby arrangement the second dataset is already arriving; this check is nearly free, and it is the only independent proof that the primary ingestion path is complete.</p>
+    <p>It also has a shelf life. If standby file generation sunsets once events stabilise, this capability goes with it — so it should not be the spine of the product unless standby is permanent.</p>
+  </div>
+</div>
+</section>
+
+<!-- ============ OPEN ============ -->
+<section class="view" id="v-open" hidden>
+<div class="wrap">
+  <div class="eyebrow">Detail</div>
+  <h1>Assumptions and blockers</h1>
+  <p class="lede">Four components are blocked, down from seven. The Hub’s Foundation framework closed three of them. Three of the four that remain resolve with a written answer rather than engineering — which makes this dependency management, not a technical problem.</p>
+
+  <h2>Blocks the design</h2>
+  <div class="tscroll"><table>
+    <thead><tr><th style="width:26%">Open item</th><th style="width:17%">Blocks</th><th>What changes on the answer</th></tr></thead>
+    <tbody>
+      <tr><td><strong>SEI's status API contract</strong> — the poll leg</td><td><code>loader_status_reader</code>, and the Hub's monitoring worker</td><td>Endpoint and auth through Apigee, whether reject detail is the same endpoint or separate, pagination shape, rate limits, and whether a mid-processing poll returns partial errors. Settles the poller's budget and its cadence.</td></tr>
+      <tr><td><strong>Reject detail retention at SEI</strong> — how long after terminal it stays retrievable</td><td><code>loader_status_reader</code></td><td>If detail is purged after a window, the fetch has a deadline and a missed fetch is permanent loss. That turns the persisted copy from a convenience into the system of record for outbound exceptions.</td></tr>
+      <tr><td><strong>The expectation model</strong> — what was due today, on any channel</td><td><code>expectation_evaluator</code></td><td>Without it nothing can be late, only absent. One table covering inbound feeds, loaders and markers closes all three at once, because the marker gives events the same shape as files.</td></tr>
+      <tr><td><strong>Threshold configuration</strong> — where recon tolerance and the SLA warning percentage live</td><td><code>verdict_computer</code></td><td>Verdicts can be shown but not coloured, and this system may contradict Splunk on the same date with no way to adjudicate.</td></tr>
+      <tr><td><strong>Who uses this</strong></td><td>Every UI component</td><td>No user research exists. Competent default screens are achievable; the right ones are not. This is internal, costs one conversation, and nobody has scheduled it.</td></tr>
+      <tr><td><strong>Airflow replica and API auth</strong></td><td><code>airflow_reader</code></td><td>Without it, failure attribution stops at "the business date is stuck" and never reaches "<code>build_dim</code> failed on attempt 2".</td></tr>
+      <tr><td><strong>The staging store specification</strong></td><td><code>event_router</code></td><td>Entirely BBH-owned and nobody is writing it. If it ships without <code>(topic, partition, offset, enqueued_ts, sequence_number)</code>, lag and gap detection are not computable at all.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Waiting on SEI</h2>
+  <div class="tscroll"><table>
+    <thead><tr><th style="width:34%">Question</th><th>Consequence for this design</th></tr></thead>
+    <tbody>
+      <tr><td>Does the marker carry a declared record count?</td><td>With a count, the cross-channel check has three legs and the gate is safe against cross-partition ordering. Without, it degrades to two and relies on an ordering guarantee Event Hub does not give.</td></tr>
+      <tr><td>Marker grain — per view, per domain, or per date?</td><td>Sets how many signals the gate waits on. Twelve source tables and twelve marker events suggests one per table, but that is inference from matching counts, not something stated.</td></tr>
+      <tr><td>Names and meanings of the 51 Technical events</td><td>The largest category in the catalogue. If they report SEI-side processing state they are monitoring signal rather than data, and the only window past the boundary.</td></tr>
+      <tr><td>Which side is authoritative — file or event?</td><td>Decides whether a cross-channel difference is an event defect or a file defect. Opposite operational responses.</td></tr>
+      <tr><td>Event Hub retention and partition count</td><td>Retention is the recovery window and therefore the RTO. Partition count is the throughput ceiling and the shape of the lag display.</td></tr>
+      <tr><td>A message identifier stable across redelivery</td><td>At-least-once on the event side is handled by <code>(topic, partition, offset)</code>; an HTTP notification has no equivalent. Either SEI supplies a <code>message_id</code> that survives its own retry, or it guarantees byte-identical redelivery so the body can be hashed. Without one, a retried "50 records rejected" becomes 100 rejected records in the exception count.</td></tr>
+      <tr><td>Endpoint scope — loader callbacks only, or SDC platform events too?</td><td>Decides whether the generic envelope BBH defines carries one message family or two. Cheaper to answer now than to version the contract later.</td></tr>
+      <tr><td>Callback retry behaviour on 5xx</td><td>Sets BBH's availability obligation. With the durable inbox in place this stops being existential, which is most of why the inbox is worth building.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Assumptions this design rests on</h2>
+  <div class="tscroll"><table>
+    <thead><tr><th style="width:34%">Assumption</th><th>If wrong</th></tr></thead>
+    <tbody>
+      <tr><td><code>RECON_RESULT</code> gains a <code>MODEL_NAME</code> column</td><td>Account, client and transaction results collide on one key. No per-model reconciliation drill-down is possible.</td></tr>
+      <tr><td>dbt persists run results to Oracle</td><td>Model-level outcomes and test results become a filesystem dependency, or are lost. A reconciliation break gets much harder to explain.</td></tr>
+      <tr><td><code>FILE_REGISTRY</code> gains a state meaning "available and deliberately unused"</td><td>Standby files look either permanently missing or falsely satisfy a completeness gate that should not be running.</td></tr>
+      <tr><td><code>DATE_CONTROL</code> records which path satisfied the date</td><td>The provenance of a date's data is unrecoverable, and a discrepancy three weeks later cannot be explained.</td></tr>
+      <tr><td>Integration360 gets a landing-zone read mount</td><td>The cross-channel check needs an upstream component to publish the trailer count instead — a different deployment and a different owner.</td></tr>
+      <tr><td>The Hub records a submission at send time</td><td>Half the sent-versus-accepted reconciliation does not exist, and a submission that never reached SEI is indistinguishable from one that succeeded.</td></tr>
+    </tbody>
+  </table></div>
+
+  <hr class="rule">
+  <p style="color:var(--ink-3);font-size:12.5px">Every schema change named above is free while nothing is deployed, and becomes a change request afterwards. That is the argument for settling them now rather than in build.</p>
+</div>
+</section>
+
+</main>
+</div>
+
+<script>
+(function(){
+  var views = {}, btns = [].slice.call(document.querySelectorAll('.navbtn'));
+  [].forEach.call(document.querySelectorAll('.view'), function(v){ views[v.id.slice(2)] = v; });
+
+  function show(name, push){
+    if(!views[name]) name = 'overview';
+    for(var k in views) views[k].hidden = (k !== name);
+    btns.forEach(function(b){ b.setAttribute('aria-current', b.dataset.view === name ? 'true' : 'false'); });
+    if(push !== false){ try{ history.replaceState(null,'','#'+name); }catch(e){} }
+    window.scrollTo(0,0);
+  }
+
+  btns.forEach(function(b){ b.addEventListener('click', function(){ show(b.dataset.view); }); });
+
+  [].forEach.call(document.querySelectorAll('[data-jump]'), function(a){
+    a.addEventListener('click', function(e){ e.preventDefault(); show(a.dataset.jump); });
+  });
+
+  // component expand/collapse
+  [].forEach.call(document.querySelectorAll('.comp'), function(btn){
+    var panel = btn.nextElementSibling;
+    if(!panel || !panel.classList.contains('detail')) return;
+    btn.setAttribute('aria-expanded','false');
+    btn.addEventListener('click', function(){
+      var open = btn.getAttribute('aria-expanded') === 'true';
+      // close siblings within the same plane
+      var plane = btn.closest('.plane');
+      [].forEach.call(plane.querySelectorAll('.comp'), function(o){
+        o.setAttribute('aria-expanded','false');
+        if(o.nextElementSibling && o.nextElementSibling.classList.contains('detail')) o.nextElementSibling.hidden = true;
+      });
+      if(!open){ btn.setAttribute('aria-expanded','true'); panel.hidden = false; }
+    });
+  });
+
+  // theme toggle
+  var tb = document.getElementById('themebtn');
+  function current(){
+    var a = document.documentElement.getAttribute('data-theme');
+    if(a) return a;
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  tb.addEventListener('click', function(){
+    document.documentElement.setAttribute('data-theme', current() === 'dark' ? 'light' : 'dark');
+  });
+
+  var h = (location.hash || '').replace('#','');
+  show(h || 'overview', false);
+})();
+</script>

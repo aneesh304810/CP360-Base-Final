@@ -1,0 +1,1594 @@
+openapi: 3.1.0
+
+info:
+  title: Integration360 API
+  version: 1.0.0
+  summary: Read-only observability over BBH ↔ SEI integration, plus the one endpoint SEI calls.
+  description: |
+    Integration360 observes. It owns no integration state, moves no data, and
+    triggers nothing. Every path below is a `GET` with one exception —
+    `POST /sei/notifications`, the endpoint BBH exposes for SEI to push loader
+    status into. That write lands in a durable inbox the Integration Hub owns;
+    Integration360 is a second consumer of it and is never on the remediation
+    path.
+
+    **What it reads.** The Oracle control schema (`DATE_CONTROL`,
+    `FILE_REGISTRY`, `RECON_RESULT`, `DQ_VALIDATION_FAILURE`), the Foundation
+    framework tables (`ERROR_CATALOG`, `ERROR_EVENT`, `STATUS_HISTORY`,
+    `DQ_RULE`, `DQ_RUN_RESULT`, `GUARDRAIL_POLICY`), the event-path stores
+    (`SDC_EVENT_STAGE`, `SDC_MICROBATCH`, `EVENT_DEAD_LETTER`), the outbound
+    stores (`LOADER_SUBMISSION`, `LOADER_STATUS_HISTORY`, `OUTBOUND_ERROR`),
+    and an Airflow metadata **read replica**.
+
+    **Redaction.** Business keys are masked on read, not at rest, so a wrong
+    mask can be corrected without having destroyed the original. Any field
+    documented as masked returns a stable hash unless the caller holds the
+    `int360.pii.read` scope.
+
+    **Two clocks.** Intraday is continuous — lag, boxing continuity, Stage 1
+    load over a rolling window, with no notion of "complete". EOD is a binary
+    gate. They overlap at Stage 1, and the gate is pull-complete, never
+    marker-received.
+
+  contact:
+    name: BBH Integration Architecture
+  license:
+    name: Internal — BBH
+    identifier: LicenseRef-BBH-Internal
+
+servers:
+  - url: https://api.bbh.example/integration360/v1
+    description: Production, fronted by Apigee
+  - url: https://api-uat.bbh.example/integration360/v1
+    description: UAT
+
+security:
+  - oauth2: [int360.read]
+
+tags:
+  - name: status
+    description: Status monitoring — where every channel stands for a business date.
+  - name: process
+    description: Process tracking — the date, the micro-batch, the run, the task.
+  - name: errors
+    description: Error management and the taxonomy behind it.
+  - name: loaders
+    description: Outbound loader submissions, their status and their rejected records.
+  - name: dq
+    description: Data quality rules, results and failing records.
+  - name: reconciliation
+    description: All twelve boundaries — four event, three pipeline, five outbound.
+  - name: inbound
+    description: The single write path. SEI calls this; nothing else does.
+
+paths:
+
+  # ------------------------------------------------------------------ #
+  # STATUS MONITORING                                                    #
+  # ------------------------------------------------------------------ #
+  /estate:
+    get:
+      tags: [status]
+      operationId: getEstate
+      summary: The estate board — four channels against three questions.
+      description: |
+        Twelve cells for one business date: EVENT, FILE, LOADER and API against
+        completeness, timeliness and correctness. Served entirely from stored
+        verdict snapshots and daily rollups, never by scanning a source table,
+        so the landing page cannot become a load problem for the pipeline's own
+        Oracle.
+      parameters:
+        - $ref: '#/components/parameters/BusinessDate'
+      responses:
+        '200':
+          description: One row per channel, three verdicts each.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EstateBoard' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /estate/history:
+    get:
+      tags: [status]
+      operationId: getEstateHistory
+      summary: The same twelve cells across a date range.
+      parameters:
+        - $ref: '#/components/parameters/DateFrom'
+        - $ref: '#/components/parameters/DateTo'
+        - name: channel
+          in: query
+          schema: { $ref: '#/components/schemas/Channel' }
+      responses:
+        '200':
+          description: Verdict history, oldest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/EstateBoard' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /status/{domain}/{subjectId}:
+    get:
+      tags: [status]
+      operationId: getSubjectStatus
+      summary: Current status and full history for anything that has a state machine.
+      description: |
+        One shape for every domain. `current` is **derived, never stored twice**:
+        the latest `POLL` at or after the newest `CALLBACK`, otherwise the
+        highest `sort_order` reached. Terminal never regresses.
+
+        `history[].source` is what makes the outbound push-and-poll model work.
+        A retried `PROCESSING` notification arriving after a `COMPLETED` poll is
+        recorded, and ignored for the derivation.
+      parameters:
+        - name: domain
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/StatusDomain' }
+        - name: subjectId
+          in: path
+          required: true
+          schema: { type: string, maxLength: 200 }
+      responses:
+        '200':
+          description: Derived current status plus every transition.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubjectStatus' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  # ------------------------------------------------------------------ #
+  # PROCESS TRACKING                                                     #
+  # ------------------------------------------------------------------ #
+  /process/dates/{businessDate}:
+    get:
+      tags: [process]
+      operationId: getBusinessDate
+      summary: The business date lifecycle and what is holding it.
+      description: |
+        `DATE_CONTROL` state plus the gate's inputs. `gate.satisfied` is true
+        only when **every micro-batch is LOADED and the EOD marker has been
+        received** — never on the marker alone. Marker-only gating lets the
+        transformation run on short Stage 1, and `STG_TO_INT` still reconciles
+        because it ties against a Stage 1 that is itself short.
+      parameters:
+        - name: businessDate
+          in: path
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BusinessDateProcess' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /process/microbatches:
+    get:
+      tags: [process]
+      operationId: listMicroBatches
+      summary: Micro-batches for a date, with their box state.
+      parameters:
+        - $ref: '#/components/parameters/BusinessDate'
+        - name: topic
+          in: query
+          schema: { type: string }
+        - name: state
+          in: query
+          schema: { $ref: '#/components/schemas/MicroBatchState' }
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MicroBatchPage' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /process/microbatches/{microBatchId}:
+    get:
+      tags: [process]
+      operationId: getMicroBatch
+      summary: One box, per partition, with the funnel beneath it.
+      description: |
+        Boxing is **per partition**, so a micro-batch is complete only when every
+        partition of every domain topic has reported both MB Start (1000) and
+        MB End (1001). `partitions_expected` comes from the topic's declared
+        partition count — without that denominator, "all partitions reported"
+        cannot be distinguished from "the ones we happened to see", and the
+        field is returned `null` rather than guessed.
+
+        The funnel carries each deduction explicitly: duplicates collapsed,
+        keys not found on pull, rows filtered by source DQ.
+      parameters:
+        - name: microBatchId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MicroBatchDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /process/lag:
+    get:
+      tags: [process]
+      operationId: getConsumerLag
+      summary: Consumer lag per topic partition — the only intraday health signal.
+      description: |
+        Lag is computed from broker enqueue metadata captured at receipt. The
+        four-field SDC envelope carries no timestamp of its own, so if
+        `enqueued_ts` is not captured into the staging store at receipt, lag is
+        not computable at all — not harder, not computable.
+
+        `overdue_by_seconds` is measured against the rolling inter-micro-batch
+        baseline for that topic, not against a fixed schedule. Lateness on a
+        continuous stream comes from the stream's own rhythm.
+      parameters:
+        - name: topic
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PartitionLag' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /process/runs/{dagRunId}:
+    get:
+      tags: [process]
+      operationId: getDagRun
+      summary: An Airflow run, its task instances and the dbt models beneath it.
+      description: |
+        Read from an Airflow metadata **replica**. The scheduler polls its
+        primary continuously with `SELECT FOR UPDATE`; an analytical scan
+        against the primary degrades scheduling for everyone.
+
+        Postgres does not hold task logs — the log table holds audit events — so
+        `log_url` deep-links to the Airflow UI rather than reproducing its task
+        view.
+      parameters:
+        - name: dagRunId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DagRun' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503':
+          description: The Airflow replica is unavailable. Pipeline state is unaffected.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  # ------------------------------------------------------------------ #
+  # ERRORS AND THE TAXONOMY                                              #
+  # ------------------------------------------------------------------ #
+  /errors/taxonomy:
+    get:
+      tags: [errors]
+      operationId: getErrorTaxonomy
+      summary: The error catalogue — every code, its class, disposition and owner.
+      description: |
+        The taxonomy is reference data, not string literals at call sites. Four
+        vocabularies exist in the estate today (`FILE_REGISTRY.STATUS`,
+        `dq_reason`, Airflow `task_fail`, the Splunk event name) with no mapping
+        between them; this is the mapping.
+
+        **`error_class` is the axis that decides who is woken up:**
+
+        | class | what it means | who owns it |
+        |---|---|---|
+        | `BUSINESS` | the data is wrong — missing mandatory attribute, code outside its domain, unresolved reference, control total mismatch | operations and the source |
+        | `TECHNICAL` | the pipeline is wrong — transformation failed, model test failed, schema mismatch, unparseable envelope | engineering |
+        | `SYSTEM` | the platform is wrong — timeout, connection loss, pod eviction, broker rebalance, rate limit | platform |
+
+        A `SYSTEM` error is a candidate for retry. A `BUSINESS` error never is —
+        retrying it produces the same rejection and consumes the attempt budget.
+        Mis-classifying the two is the most common way a retry loop becomes a
+        denial of service against your own dependency.
+      parameters:
+        - name: error_class
+          in: query
+          schema: { $ref: '#/components/schemas/ErrorClass' }
+        - name: error_domain
+          in: query
+          schema: { $ref: '#/components/schemas/ErrorDomain' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ErrorCatalogEntry' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /errors:
+    get:
+      tags: [errors]
+      operationId: listErrors
+      summary: Error occurrences across every domain, in one shape.
+      description: |
+        One list over what are currently four separate stores. Sorted by
+        `days_to_expiry` ascending by default, because a held row past the INT
+        retention window is silently gone from FACT for ever and that is the
+        most time-critical number in the estate.
+      parameters:
+        - $ref: '#/components/parameters/BusinessDate'
+        - name: error_class
+          in: query
+          schema: { $ref: '#/components/schemas/ErrorClass' }
+        - name: error_domain
+          in: query
+          schema: { $ref: '#/components/schemas/ErrorDomain' }
+        - name: severity
+          in: query
+          schema: { $ref: '#/components/schemas/Severity' }
+        - name: resolution_status
+          in: query
+          schema: { $ref: '#/components/schemas/ResolutionStatus' }
+        - name: subject_type
+          in: query
+          schema: { $ref: '#/components/schemas/SubjectType' }
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [days_to_expiry, occurred_ts, severity]
+            default: days_to_expiry
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorPage' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /errors/{errorEventId}:
+    get:
+      tags: [errors]
+      operationId: getError
+      summary: One occurrence, with its correlation trail.
+      parameters:
+        - name: errorEventId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEvent' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /errors/summary:
+    get:
+      tags: [errors]
+      operationId: getErrorSummary
+      summary: Counts by class and domain — the shape of today's failure.
+      description: |
+        A day that is 90% `SYSTEM` is a platform incident. A day that is 90%
+        `BUSINESS` is a source data problem. The same total count means opposite
+        things, which is the whole argument for the class dimension.
+      parameters:
+        - $ref: '#/components/parameters/BusinessDate'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorSummary' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  # ------------------------------------------------------------------ #
+  # LOADERS — OUTBOUND                                                   #
+  # ------------------------------------------------------------------ #
+  /loaders:
+    get:
+      tags: [loaders]
+      operationId: listLoaderTypes
+      summary: Loader types with the day's submission funnel.
+      parameters:
+        - $ref: '#/components/parameters/BusinessDate'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/LoaderTypeStatus' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /loaders/submissions:
+    get:
+      tags: [loaders]
+      operationId: listSubmissions
+      summary: Submissions, filterable by state and by how their state was learned.
+      parameters:
+        - $ref: '#/components/parameters/BusinessDate'
+        - name: loader_type
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/SubmissionStatus' }
+        - name: found_by
+          in: query
+          description: |
+            Restrict to submissions whose terminal state was learned by push
+            (`CALLBACK`) or by the backstop poll (`POLL`). Filtering on `POLL`
+            gives the running measure of SEI's push channel: a terminal state
+            the poller found that no notification announced.
+          schema: { $ref: '#/components/schemas/StatusSource' }
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubmissionPage' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /loaders/submissions/{submissionId}:
+    get:
+      tags: [loaders]
+      operationId: getSubmission
+      summary: One submission — lifecycle, counts, and both status sources.
+      description: |
+        `template_version` is the version in force **at generation**, pinned onto
+        the submission. An error SEI returns next week can only be read against
+        the template that produced the payload, and the catalogue already shows
+        v1.24, v1.21 and v9 live together.
+
+        `payload_hash` is written before the send, not after. A payload recorded
+        only on success cannot explain a send that failed halfway.
+      parameters:
+        - $ref: '#/components/parameters/SubmissionId'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubmissionDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /loaders/submissions/{submissionId}/records:
+    get:
+      tags: [loaders]
+      operationId: getRejectedRecords
+      summary: Bad records for a submission — business, technical and system, separated.
+      description: |
+        `error_source` separates a record **BBH blocked before sending** (G6
+        outbound validation) from one **SEI rejected**. They are different
+        failures with different owners, and collapsing them makes the
+        sent-versus-accepted reconciliation unreadable.
+
+        Detail is fetched from SEI once on reaching a terminal-with-errors state
+        and stored; it is not re-fetched per poll. If SEI purges reject detail
+        after a retention window, this stored copy is the system of record — see
+        `detail_retention_note` on the parent submission.
+
+        Business keys are masked unless the caller holds `int360.pii.read`.
+      parameters:
+        - $ref: '#/components/parameters/SubmissionId'
+        - name: error_class
+          in: query
+          schema: { $ref: '#/components/schemas/ErrorClass' }
+        - name: error_source
+          in: query
+          schema: { $ref: '#/components/schemas/ErrorSource' }
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RejectedRecordPage' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  # ------------------------------------------------------------------ #
+  # DATA QUALITY                                                         #
+  # ------------------------------------------------------------------ #
+  /dq/rules:
+    get:
+      tags: [dq]
+      operationId: listDqRules
+      summary: The rule registry — which gate, what scope, blocking or advisory.
+      description: |
+        `is_blocking` is per rule, not per gate. That settles "are the DQ gates
+        blocking or advisory" one rule at a time instead of as a single
+        estate-wide argument.
+
+        `cost_class` decides cadence: `ROW` rules run per micro-batch because
+        they are cheap; `SET` rules run at the EOD gate because a set-level
+        aggregate per micro-batch is 288 full passes a day.
+      parameters:
+        - name: gate
+          in: query
+          schema: { $ref: '#/components/schemas/Gate' }
+        - name: is_blocking
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DqRule' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /dq/results:
+    get:
+      tags: [dq]
+      operationId: listDqResults
+      summary: Evidence that a rule ran — including when it found nothing.
+      description: |
+        `NOT_RUN` is a real verdict and is written, never inferred from absence.
+        Recording failures alone makes zero rows ambiguous: either every rule
+        passed, or no rule ran. Those are opposite facts, and a gate that
+        silently did not execute would otherwise look exactly like a clean night.
+
+        `threshold_in_force` is the value applied at run time, copied onto the
+        row. Changing a threshold never rewrites history, and a verdict stays
+        defensible three months later.
+      parameters:
+        - $ref: '#/components/parameters/BusinessDate'
+        - name: gate
+          in: query
+          schema: { $ref: '#/components/schemas/Gate' }
+        - name: verdict
+          in: query
+          schema: { $ref: '#/components/schemas/DqVerdict' }
+        - name: microbatch_id
+          in: query
+          schema: { type: string }
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DqResultPage' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /dq/failures:
+    get:
+      tags: [dq]
+      operationId: listDqFailures
+      summary: Failing records, with how long is left before they expire.
+      description: |
+        `days_to_expiry` is derived from the business date and the INT retention
+        window. Past zero, a held transaction is gone from FACT permanently and
+        no later arrival of its dimension will bring it back. Default sort is
+        ascending on that column for exactly that reason.
+      parameters:
+        - $ref: '#/components/parameters/BusinessDate'
+        - name: dq_reason
+          in: query
+          schema: { type: string }
+        - name: reprocess_eligible
+          in: query
+          schema: { type: boolean }
+        - name: resolution_status
+          in: query
+          schema: { $ref: '#/components/schemas/ResolutionStatus' }
+        - name: expiring_within_days
+          in: query
+          schema: { type: integer, minimum: 0, maximum: 14 }
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DqFailurePage' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  # ------------------------------------------------------------------ #
+  # RECONCILIATION                                                       #
+  # ------------------------------------------------------------------ #
+  /reconciliation/{businessDate}:
+    get:
+      tags: [reconciliation]
+      operationId: getReconciliation
+      summary: All twelve boundaries for a business date.
+      description: |
+        The SEI pack specifies three boundaries, all downstream of Stage 1 and
+        all inbound. Four more sit upstream of them on the event path and five
+        more on the outbound path. Without the upstream four, **event loss is
+        undetectable by construction** — `STG_TO_INT` reconciles perfectly
+        against a Stage 1 that is itself short.
+
+        | group | boundaries |
+        |---|---|
+        | event | `EVENTS_TO_KEYS`, `KEYS_TO_PULLED`, `PULLED_TO_STAGE1`, `STAGE1_TO_MICROBATCH` |
+        | pipeline | `STG_TO_INT`, `INT_TO_DIM`, `INT_TO_FACT` |
+        | outbound | `GENERATED_TO_VALIDATED`, `VALIDATED_TO_SUBMITTED`, `SUBMITTED_TO_ACKED`, `ACKED_TO_ACCEPTED`, `ACCEPTED_TO_REJECTED` |
+
+        `verdict` is derived here, not read — the pack stores no status on
+        `RECON_RESULT` by deliberate choice. `tolerance_in_force` is returned
+        alongside it so this system and Splunk cannot silently disagree about
+        the same date.
+      parameters:
+        - name: businessDate
+          in: path
+          required: true
+          schema: { type: string, format: date }
+        - name: group
+          in: query
+          schema:
+            type: string
+            enum: [event, pipeline, outbound]
+        - name: model_name
+          in: query
+          description: |
+            Requires `RECON_RESULT.MODEL_NAME`, currently a proposal. Without it
+            account, client and transaction results collide on
+            `(business_date, boundary)` and this filter returns `501`.
+          schema: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReconciliationReport' }
+        '501':
+          description: Per-model reconciliation is not available — `MODEL_NAME` is not deployed.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /reconciliation/{businessDate}/{boundary}:
+    get:
+      tags: [reconciliation]
+      operationId: getReconciliationBoundary
+      summary: One boundary, with both legs and every deduction named.
+      parameters:
+        - name: businessDate
+          in: path
+          required: true
+          schema: { type: string, format: date }
+        - name: boundary
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/Boundary' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReconBoundaryResult' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  # ------------------------------------------------------------------ #
+  # INBOUND — THE ONLY WRITE                                             #
+  # ------------------------------------------------------------------ #
+  /sei/notifications:
+    post:
+      tags: [inbound]
+      operationId: postSeiNotification
+      summary: SEI pushes a loader status transition or an error summary.
+      security:
+        - oauth2: [sei.notify]
+      description: |
+        **Acknowledge on durable write, never on successful processing.** This
+        handler authenticates, validates the envelope shape, writes the raw body
+        plus receipt metadata, and returns `202`. Parsing, correlation to
+        `LOADER_SUBMISSION`, status derivation and exception raising all happen
+        downstream of that write. Returning `500` because a correlation lookup
+        failed would tie SEI's retry behaviour to BBH's internal bugs.
+
+        **The envelope is deliberately generic** so future message types need no
+        contract change: `message_type` is an open string, `payload` is
+        unconstrained, and unknown types are stored and surfaced as an
+        unrecognised-type alert rather than rejected.
+
+        **Deduplication** keys on `message_id`, which must be stable across
+        SEI's own retries. Without it a retried "50 records rejected" becomes
+        100 rejected records in the exception count. If `message_id` cannot be
+        guaranteed, the fallback is a hash of the canonicalised body, which
+        requires SEI to guarantee byte-identical redelivery.
+
+        Thin by design: a status transition and an error **summary** travel
+        here. Reject detail does not — it is fetched on the poll leg, paginated
+        and stored.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SeiNotification' }
+            examples:
+              completedWithRejects:
+                summary: Terminal with partial acceptance
+                value:
+                  message_id: "9f2c4a10-3b77-4a1e-8f0d-2c5b9e1a7c44"
+                  message_type: "LOADER_STATUS"
+                  sent_ts: "2026-09-25T04:12:07Z"
+                  submission_id: "BBH-UNIFIED_CASH-20260924-001"
+                  status: "COMPLETED_WITH_ERRORS"
+                  status_ts: "2026-09-25T04:12:05Z"
+                  payload:
+                    records_submitted: 41220
+                    records_accepted: 39720
+                    records_rejected: 1500
+                    detail_available: true
+              platformEvent:
+                summary: An unrecognised type — stored, alerted, never rejected
+                value:
+                  message_id: "1a0b77de-55c2-4f31-9a84-7e6d0b2f1c93"
+                  message_type: "SDC_PLATFORM_HEALTH"
+                  sent_ts: "2026-09-25T04:15:00Z"
+                  payload:
+                    topic: "ACCOUNT"
+                    condition: "PRODUCER_DEGRADED"
+      responses:
+        '202':
+          description: |
+            Written durably and acknowledged. Not a statement that the message
+            was understood — only that it will not be lost.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationAck' }
+        '400':
+          description: |
+            Malformed envelope. The only business-free rejection: missing
+            `message_id`, unparseable JSON, or a body over the size limit.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: |
+            Duplicate `message_id` already stored. Idempotent — the original
+            receipt is returned and nothing is written twice.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationAck' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        default: { $ref: '#/components/responses/Problem' }
+
+# ==================================================================== #
+components:
+
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      description: Client credentials through Apigee. mTLS additionally required for `sei.notify`.
+      flows:
+        clientCredentials:
+          tokenUrl: https://api.bbh.example/oauth2/token
+          scopes:
+            int360.read: Read every observation endpoint.
+            int360.pii.read: Unmasked business keys. Granted narrowly.
+            sei.notify: Post to the notification endpoint. SEI only.
+
+  parameters:
+    BusinessDate:
+      name: business_date
+      in: query
+      required: true
+      schema: { type: string, format: date }
+      example: "2026-09-24"
+    DateFrom:
+      name: from
+      in: query
+      required: true
+      schema: { type: string, format: date }
+    DateTo:
+      name: to
+      in: query
+      required: true
+      schema: { type: string, format: date }
+    SubmissionId:
+      name: submissionId
+      in: path
+      required: true
+      schema: { type: string, maxLength: 60 }
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque continuation token from `page.next_cursor`. Offsets are not supported — the underlying tables grow while you page.
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+
+  responses:
+    NotFound:
+      description: No such resource for that key and business date.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Unauthorized:
+      description: Missing, expired or insufficiently scoped token.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    RateLimited:
+      description: Apigee quota exceeded. `Retry-After` is always present.
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Problem:
+      description: RFC 9457 problem detail.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+
+    # ---------------- shared vocabulary ---------------- #
+    Channel:
+      type: string
+      enum: [EVENT, FILE, LOADER, API]
+      description: EVENT is primary ingestion. FILE is a daily standby, generated and held. LOADER is outbound. API is not Day 1.
+
+    ErrorClass:
+      type: string
+      enum: [BUSINESS, TECHNICAL, SYSTEM]
+      description: |
+        BUSINESS — the data is wrong; operations and the source own it; never retry.
+        TECHNICAL — the pipeline is wrong; engineering owns it; retry only after a fix.
+        SYSTEM — the platform is wrong; platform owns it; the only class where blind retry is legitimate.
+
+    ErrorDomain:
+      type: string
+      enum: [EVENT, FILE, TRANSFORM, OUTBOUND, PLATFORM]
+
+    Severity:
+      type: string
+      enum: [FATAL, ERROR, WARN]
+
+    Disposition:
+      type: string
+      enum: [QUARANTINE, DEAD_LETTER, HOLD_REPLAY, RETRY, FAIL_BATCH, LOG_ONLY]
+
+    ResolutionStatus:
+      type: string
+      enum: [OPEN, RESOLVED, WAIVED, EXPIRED]
+      description: EXPIRED means the retention window closed before the record was reprocessed. It is terminal and it is a data loss.
+
+    ErrorSource:
+      type: string
+      enum: [BBH_VALIDATION, SEI_REJECT]
+      description: BBH_VALIDATION is a record G6 refused to send. SEI_REJECT is a record SEI refused to accept.
+
+    SubjectType:
+      type: string
+      enum: [ENVELOPE, MICROBATCH, FILE, MODEL, SUBMISSION, TASK]
+
+    StatusDomain:
+      type: string
+      enum: [FILE, DATE, MICROBATCH, SUBMISSION, DQ_FAILURE]
+
+    StatusSource:
+      type: string
+      enum: [SYSTEM, CALLBACK, POLL, MANUAL]
+
+    NormalizedStatus:
+      type: string
+      enum: [PENDING, IN_PROGRESS, COMPLETE, FAILED, HELD, TERMINAL_ERROR]
+
+    SubmissionStatus:
+      type: string
+      enum: [GENERATED, VALIDATED, VALIDATION_FAILED, SUBMITTED, ACKNOWLEDGED, PROCESSING, COMPLETED, COMPLETED_WITH_ERRORS, REJECTED, STATUS_UNRESOLVED]
+      description: STATUS_UNRESOLVED is set by the poller when a submission passes its max age without reaching a terminal state. It is the outbound equivalent of a business date that never reaches COMPLETE.
+
+    MicroBatchState:
+      type: string
+      enum: [OPEN, BOXED, COLLAPSED, PULLED, LOADED, FAILED, PARTIAL]
+
+    Gate:
+      type: string
+      enum: [G0, G1, G2, G3, G4, G5, G6]
+      description: G0 envelope, G1 file structural, G2 RAW profiling, G3 dbt tests, G4 tie-out, G5 post-publish recon, G6 outbound validation.
+
+    DqVerdict:
+      type: string
+      enum: [PASS, WARN, FAIL, NOT_RUN]
+
+    Verdict:
+      type: string
+      enum: [GOOD, WARNING, SERIOUS, CRITICAL, UNKNOWN]
+      description: UNKNOWN is returned when an input is unavailable — it is never silently rendered as GOOD.
+
+    Boundary:
+      type: string
+      enum:
+        - EVENTS_TO_KEYS
+        - KEYS_TO_PULLED
+        - PULLED_TO_STAGE1
+        - STAGE1_TO_MICROBATCH
+        - STG_TO_INT
+        - INT_TO_DIM
+        - INT_TO_FACT
+        - GENERATED_TO_VALIDATED
+        - VALIDATED_TO_SUBMITTED
+        - SUBMITTED_TO_ACKED
+        - ACKED_TO_ACCEPTED
+        - ACCEPTED_TO_REJECTED
+
+    Page:
+      type: object
+      required: [returned]
+      properties:
+        returned: { type: integer }
+        next_cursor:
+          type: string
+          nullable: true
+          description: Absent or null when the page is the last one.
+
+    Problem:
+      type: object
+      description: RFC 9457.
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        trace_id: { type: string }
+
+    # ---------------- status ---------------- #
+    EstateBoard:
+      type: object
+      required: [business_date, computed_ts, channels]
+      properties:
+        business_date: { type: string, format: date }
+        computed_ts: { type: string, format: date-time }
+        channels:
+          type: array
+          items:
+            type: object
+            required: [channel, completeness, timeliness, correctness]
+            properties:
+              channel: { $ref: '#/components/schemas/Channel' }
+              completeness: { $ref: '#/components/schemas/VerdictCell' }
+              timeliness: { $ref: '#/components/schemas/VerdictCell' }
+              correctness: { $ref: '#/components/schemas/VerdictCell' }
+
+    VerdictCell:
+      type: object
+      required: [verdict]
+      properties:
+        verdict: { $ref: '#/components/schemas/Verdict' }
+        reason: { type: string }
+        threshold_in_force:
+          type: number
+          nullable: true
+          description: The value applied when the verdict was computed. Stored with the verdict so it can be reproduced after the threshold moves.
+        inputs:
+          type: object
+          additionalProperties: true
+          description: The counts the verdict was derived from.
+
+    SubjectStatus:
+      type: object
+      required: [domain, subject_id, current, history]
+      properties:
+        domain: { $ref: '#/components/schemas/StatusDomain' }
+        subject_id: { type: string }
+        business_date: { type: string, format: date }
+        current:
+          type: object
+          required: [native_status, normalized_status, is_terminal, derived_from]
+          properties:
+            native_status: { type: string }
+            normalized_status: { $ref: '#/components/schemas/NormalizedStatus' }
+            is_terminal: { type: boolean }
+            sort_order: { type: integer }
+            derived_from:
+              $ref: '#/components/schemas/StatusSource'
+              description: Which source won. The poll wins over a callback at or before it.
+        history:
+          type: array
+          items:
+            type: object
+            required: [to_status, source, changed_ts]
+            properties:
+              from_status: { type: string, nullable: true }
+              to_status: { type: string }
+              source: { $ref: '#/components/schemas/StatusSource' }
+              changed_ts: { type: string, format: date-time }
+              changed_by: { type: string, nullable: true }
+              superseded:
+                type: boolean
+                description: True for a transition recorded but excluded from the derivation, such as a late duplicate notification.
+
+    # ---------------- process ---------------- #
+    BusinessDateProcess:
+      type: object
+      required: [business_date, date_control_status, gate]
+      properties:
+        business_date: { type: string, format: date }
+        date_control_status:
+          type: string
+          enum: [PENDING, TRIGGER, COMPLETE]
+        sla_cutoff_ts: { type: string, format: date-time }
+        gate:
+          type: object
+          required: [satisfied, marker_received, microbatches_total, microbatches_loaded]
+          properties:
+            satisfied:
+              type: boolean
+              description: True only when the marker has arrived AND every micro-batch is LOADED.
+            marker_received: { type: boolean }
+            marker_declared_count:
+              type: integer
+              nullable: true
+              description: Null when the marker carries no count, in which case the cross-channel check has two legs rather than three.
+            microbatches_total: { type: integer }
+            microbatches_loaded: { type: integer }
+            microbatches_failed: { type: integer }
+            blocking_reason: { type: string, nullable: true }
+        transformation:
+          type: object
+          properties:
+            dag_run_id: { type: string, nullable: true }
+            status: { type: string, nullable: true }
+            started_ts: { type: string, format: date-time, nullable: true }
+        standby_file:
+          type: object
+          description: Readiness of the fallback, not its contents. The file is never loaded.
+          properties:
+            interfaces_expected: { type: integer }
+            interfaces_archived: { type: integer }
+            declared_trailer_total: { type: integer, nullable: true }
+
+    MicroBatchPage:
+      type: object
+      properties:
+        page: { $ref: '#/components/schemas/Page' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/MicroBatchSummary' }
+
+    MicroBatchSummary:
+      type: object
+      required: [microbatch_id, topic, state]
+      properties:
+        microbatch_id: { type: string }
+        topic: { type: string }
+        business_date: { type: string, format: date }
+        state: { $ref: '#/components/schemas/MicroBatchState' }
+        opened_ts: { type: string, format: date-time }
+        closed_ts: { type: string, format: date-time, nullable: true }
+        partitions_reported: { type: integer }
+        partitions_expected:
+          type: integer
+          nullable: true
+          description: Null when the topic's partition count is unknown. Completeness cannot be asserted against a null denominator, and is not guessed.
+
+    MicroBatchDetail:
+      allOf:
+        - $ref: '#/components/schemas/MicroBatchSummary'
+        - type: object
+          properties:
+            partitions:
+              type: array
+              items:
+                type: object
+                properties:
+                  partition: { type: integer }
+                  start_seen: { type: boolean }
+                  end_seen: { type: boolean }
+                  first_offset: { type: integer, format: int64 }
+                  last_offset: { type: integer, format: int64 }
+                  sequence_gaps:
+                    type: integer
+                    description: Event Hub sequence numbers are monotonic per partition, so a gap is a provably lost event — a stronger completeness check than the file channel has.
+            funnel:
+              type: object
+              description: Each number with its deduction named, so a shortfall is attributable rather than merely visible.
+              properties:
+                events_received: { type: integer }
+                duplicates_collapsed: { type: integer }
+                distinct_keys: { type: integer }
+                keys_not_found_on_pull: { type: integer }
+                not_found_rate_pct: { type: number }
+                not_found_threshold_pct:
+                  type: number
+                  description: Below the observed delete rate this is normal; above it is a defect. A binary rule is wrong in both directions.
+                rows_pulled: { type: integer }
+                rows_filtered_source_dq: { type: integer }
+                rows_loaded_stage1: { type: integer }
+            errors:
+              type: array
+              items: { $ref: '#/components/schemas/ErrorRef' }
+
+    PartitionLag:
+      type: object
+      properties:
+        topic: { type: string }
+        partition: { type: integer }
+        last_offset_consumed: { type: integer, format: int64 }
+        lag_messages: { type: integer }
+        lag_seconds:
+          type: number
+          description: From broker enqueue metadata. Not computable if enqueued_ts is not captured at receipt.
+        baseline_interval_seconds:
+          type: number
+          nullable: true
+          description: Rolling inter-micro-batch norm for this topic.
+        overdue_by_seconds:
+          type: number
+          nullable: true
+          description: Against the baseline, not a fixed schedule.
+        verdict: { $ref: '#/components/schemas/Verdict' }
+
+    DagRun:
+      type: object
+      properties:
+        dag_run_id: { type: string }
+        dag_id: { type: string }
+        business_date: { type: string, format: date }
+        state: { type: string }
+        started_ts: { type: string, format: date-time }
+        ended_ts: { type: string, format: date-time, nullable: true }
+        log_url:
+          type: string
+          format: uri
+          description: Deep link to the Airflow UI. This API deliberately does not reproduce Airflow's task view.
+        tasks:
+          type: array
+          items:
+            type: object
+            properties:
+              task_id: { type: string }
+              map_index: { type: integer, nullable: true }
+              try_number: { type: integer }
+              state: { type: string }
+              duration_ms: { type: integer }
+        dbt_models:
+          type: array
+          items:
+            type: object
+            properties:
+              model_name: { type: string }
+              status: { type: string }
+              rows_affected: { type: integer, nullable: true }
+              execution_ms: { type: integer }
+
+    # ---------------- errors ---------------- #
+    ErrorCatalogEntry:
+      type: object
+      required: [error_code, error_class, error_domain, severity, disposition]
+      properties:
+        error_code: { type: string }
+        error_class: { $ref: '#/components/schemas/ErrorClass' }
+        error_domain: { $ref: '#/components/schemas/ErrorDomain' }
+        severity: { $ref: '#/components/schemas/Severity' }
+        disposition: { $ref: '#/components/schemas/Disposition' }
+        is_blocking: { type: boolean }
+        max_attempts:
+          type: integer
+          nullable: true
+          description: Null for classes that are never retried. A BUSINESS error with a retry budget is a configuration mistake.
+        owner_team: { type: string }
+        description: { type: string }
+        effective_from: { type: string, format: date }
+        effective_to: { type: string, format: date, nullable: true }
+
+    ErrorRef:
+      type: object
+      properties:
+        error_event_id: { type: integer, format: int64 }
+        error_code: { type: string }
+        error_class: { $ref: '#/components/schemas/ErrorClass' }
+        severity: { $ref: '#/components/schemas/Severity' }
+
+    ErrorEvent:
+      type: object
+      required: [error_event_id, error_code, error_class, occurred_ts, resolution_status]
+      properties:
+        error_event_id: { type: integer, format: int64 }
+        error_code: { type: string }
+        error_class: { $ref: '#/components/schemas/ErrorClass' }
+        error_domain: { $ref: '#/components/schemas/ErrorDomain' }
+        severity: { $ref: '#/components/schemas/Severity' }
+        disposition: { $ref: '#/components/schemas/Disposition' }
+        business_date: { type: string, format: date }
+        subject_type: { $ref: '#/components/schemas/SubjectType' }
+        subject_id:
+          type: string
+          description: Masked when it is a business key, unless the caller holds int360.pii.read.
+        correlation_id:
+          type: string
+          nullable: true
+          description: Micro-batch id, dag_run_id or submission id — whichever ties this error to its run.
+        attempt_no: { type: integer }
+        max_attempts: { type: integer, nullable: true }
+        occurred_ts: { type: string, format: date-time }
+        detail: { type: string, description: Redacted on write. }
+        resolution_status: { $ref: '#/components/schemas/ResolutionStatus' }
+        days_to_expiry:
+          type: integer
+          nullable: true
+          description: For held, reprocess-eligible records only. Past zero the record is permanently absent from FACT.
+        owner_team: { type: string }
+        remediated_by:
+          type: string
+          nullable: true
+          description: Informational. Remediation belongs to the Integration Hub; this API never triggers it.
+
+    ErrorPage:
+      type: object
+      properties:
+        page: { $ref: '#/components/schemas/Page' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ErrorEvent' }
+
+    ErrorSummary:
+      type: object
+      properties:
+        business_date: { type: string, format: date }
+        total: { type: integer }
+        by_class:
+          type: object
+          properties:
+            BUSINESS: { type: integer }
+            TECHNICAL: { type: integer }
+            SYSTEM: { type: integer }
+        by_domain:
+          type: object
+          additionalProperties: { type: integer }
+        top_codes:
+          type: array
+          items:
+            type: object
+            properties:
+              error_code: { type: string }
+              error_class: { $ref: '#/components/schemas/ErrorClass' }
+              count: { type: integer }
+              delta_vs_baseline_pct:
+                type: number
+                nullable: true
+                description: Against the trailing rolling average. A code that normally fires twice and fired two hundred times is the signal, not the absolute count.
+
+    # ---------------- loaders ---------------- #
+    LoaderTypeStatus:
+      type: object
+      properties:
+        loader_type: { type: string }
+        template_version_in_force: { type: string }
+        group:
+          type: integer
+          nullable: true
+          description: If groups are a sequencing constraint, a failure in a lower group blocks everything behind it. Unconfirmed with SEI.
+        submissions_generated: { type: integer }
+        submissions_submitted: { type: integer }
+        submissions_terminal: { type: integer }
+        records_accepted: { type: integer }
+        records_rejected: { type: integer }
+        verdict: { $ref: '#/components/schemas/Verdict' }
+
+    SubmissionPage:
+      type: object
+      properties:
+        page: { $ref: '#/components/schemas/Page' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SubmissionSummary' }
+
+    SubmissionSummary:
+      type: object
+      required: [submission_id, loader_type, status]
+      properties:
+        submission_id: { type: string }
+        loader_type: { type: string }
+        business_date: { type: string, format: date }
+        status: { $ref: '#/components/schemas/SubmissionStatus' }
+        found_by:
+          $ref: '#/components/schemas/StatusSource'
+          description: How the current status was learned. A terminal state found only by POLL means the push channel did not announce it.
+        generated_ts: { type: string, format: date-time }
+        submitted_ts: { type: string, format: date-time, nullable: true }
+        terminal_ts: { type: string, format: date-time, nullable: true }
+        records_submitted: { type: integer }
+        records_accepted: { type: integer, nullable: true }
+        records_rejected: { type: integer, nullable: true }
+
+    SubmissionDetail:
+      allOf:
+        - $ref: '#/components/schemas/SubmissionSummary'
+        - type: object
+          properties:
+            template_version:
+              type: string
+              description: In force at generation, pinned onto the submission.
+            payload_hash:
+              type: string
+              description: Content hash written before the send, not after.
+            payload_bytes: { type: integer }
+            corrects_submission_id:
+              type: string
+              nullable: true
+              description: Present when this is a correction. A retry reuses the original submission id; a correction is a new submission that references it.
+            retry_count: { type: integer }
+            age_minutes: { type: integer }
+            max_age_minutes:
+              type: integer
+              description: Past this the poller sets STATUS_UNRESOLVED rather than leaving the submission at SUBMITTED indefinitely.
+            detail_retention_note:
+              type: string
+              nullable: true
+              description: Present when SEI's reject detail retention window has passed and the stored copy is now the only record.
+            divergence:
+              type: object
+              description: The finding that exists only because there are two status sources.
+              properties:
+                silent_callback:
+                  type: boolean
+                  description: A terminal state the poll found that no notification announced.
+                contradiction:
+                  type: boolean
+                  description: A notification a later poll disagreed with.
+                unresolved:
+                  type: boolean
+            status_history:
+              type: array
+              items:
+                type: object
+                properties:
+                  status: { $ref: '#/components/schemas/SubmissionStatus' }
+                  source: { $ref: '#/components/schemas/StatusSource' }
+                  recorded_ts: { type: string, format: date-time }
+                  status_ts: { type: string, format: date-time }
+                  superseded: { type: boolean }
+
+    RejectedRecordPage:
+      type: object
+      properties:
+        page: { $ref: '#/components/schemas/Page' }
+        summary:
+          type: object
+          properties:
+            total: { type: integer }
+            by_class:
+              type: object
+              properties:
+                BUSINESS: { type: integer }
+                TECHNICAL: { type: integer }
+                SYSTEM: { type: integer }
+            by_source:
+              type: object
+              properties:
+                BBH_VALIDATION: { type: integer }
+                SEI_REJECT: { type: integer }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/RejectedRecord' }
+
+    RejectedRecord:
+      type: object
+      required: [record_key, error_source, error_class]
+      properties:
+        record_key:
+          type: string
+          description: Masked unless the caller holds int360.pii.read.
+        attribute_name:
+          type: string
+          nullable: true
+          description: Null for a whole-record rejection.
+        error_source: { $ref: '#/components/schemas/ErrorSource' }
+        error_class: { $ref: '#/components/schemas/ErrorClass' }
+        native_code:
+          type: string
+          description: SEI's code, verbatim. Never overwritten by the normalised value.
+        error_code:
+          type: string
+          nullable: true
+          description: The normalised code. Null when the native value is not in the catalogue — such a value raises an alert and is never silently mapped to its nearest neighbour.
+        message: { type: string }
+        template_version: { type: string }
+        fetched_ts: { type: string, format: date-time }
+
+    # ---------------- data quality ---------------- #
+    DqRule:
+      type: object
+      properties:
+        dq_rule_id: { type: integer }
+        rule_code: { type: string }
+        gate: { $ref: '#/components/schemas/Gate' }
+        scope:
+          type: string
+          enum: [ENVELOPE, FILE, ROW, MODEL, BATCH, SUBMISSION]
+        target_object: { type: string }
+        rule_type:
+          type: string
+          enum: [NOT_NULL, DOMAIN, REFERENTIAL, CONTROL_TOTAL, PROFILE, CUSTOM_SQL]
+        is_blocking: { type: boolean }
+        threshold_pct: { type: number, nullable: true }
+        cost_class:
+          type: string
+          enum: [ROW, SET]
+          description: ROW runs per micro-batch. SET runs at the EOD gate — per micro-batch it would be 288 full passes a day.
+        error_class: { $ref: '#/components/schemas/ErrorClass' }
+        effective_from: { type: string, format: date }
+
+    DqResultPage:
+      type: object
+      properties:
+        page: { $ref: '#/components/schemas/Page' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/DqRunResult' }
+
+    DqRunResult:
+      type: object
+      required: [dq_rule_id, verdict, run_ts]
+      properties:
+        dq_run_id: { type: integer, format: int64 }
+        dq_rule_id: { type: integer }
+        rule_code: { type: string }
+        gate: { $ref: '#/components/schemas/Gate' }
+        business_date: { type: string, format: date }
+        microbatch_id: { type: string, nullable: true }
+        run_ts: { type: string, format: date-time }
+        duration_ms: { type: integer }
+        rows_evaluated: { type: integer }
+        rows_passed: { type: integer }
+        rows_failed: { type: integer }
+        verdict: { $ref: '#/components/schemas/DqVerdict' }
+        threshold_in_force: { type: number, nullable: true }
+
+    DqFailurePage:
+      type: object
+      properties:
+        page: { $ref: '#/components/schemas/Page' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/DqFailure' }
+
+    DqFailure:
+      type: object
+      properties:
+        dq_failure_id: { type: integer, format: int64 }
+        dq_rule_id: { type: integer, nullable: true }
+        business_date: { type: string, format: date }
+        microbatch_id: { type: string, nullable: true }
+        target_table: { type: string }
+        record_key:
+          type: string
+          description: Masked unless the caller holds int360.pii.read.
+        dq_reason: { type: string }
+        error_class: { $ref: '#/components/schemas/ErrorClass' }
+        resolution_status: { $ref: '#/components/schemas/ResolutionStatus' }
+        reprocess_eligible: { type: boolean }
+        days_to_expiry:
+          type: integer
+          description: Derived from business_date and the INT retention window. Past zero the transaction is gone from FACT permanently.
+
+    # ---------------- reconciliation ---------------- #
+    ReconciliationReport:
+      type: object
+      properties:
+        business_date: { type: string, format: date }
+        computed_ts: { type: string, format: date-time }
+        overall_verdict: { $ref: '#/components/schemas/Verdict' }
+        boundaries:
+          type: array
+          items: { $ref: '#/components/schemas/ReconBoundaryResult' }
+        cross_channel:
+          type: object
+          description: |
+            The check that exists only because both paths deliver the same data
+            every day, and the only independent proof that event ingestion is
+            complete. It has a shelf life — if standby file generation sunsets,
+            this capability goes with it.
+          properties:
+            file_trailer_count: { type: integer, nullable: true }
+            events_received: { type: integer }
+            marker_declared_count: { type: integer, nullable: true }
+            agree: { type: boolean, nullable: true }
+            authority:
+              type: string
+              nullable: true
+              enum: [FILE, EVENT, null]
+              description: Which side is authoritative is unresolved with SEI. Until it is, a difference cannot be attributed and this field is null.
+
+    ReconBoundaryResult:
+      type: object
+      required: [boundary, left_count, right_count, difference, verdict]
+      properties:
+        boundary: { $ref: '#/components/schemas/Boundary' }
+        group:
+          type: string
+          enum: [event, pipeline, outbound]
+        model_name:
+          type: string
+          nullable: true
+          description: Requires RECON_RESULT.MODEL_NAME. Null while that column is a proposal, and results for account, client and transaction then collide.
+        left_count: { type: integer }
+        right_count: { type: integer }
+        source_dq_filtered_count: { type: integer, nullable: true }
+        held_count: { type: integer, nullable: true }
+        held_pct: { type: number, nullable: true }
+        difference: { type: integer }
+        tolerance_in_force:
+          type: number
+          nullable: true
+          description: |
+            The threshold applied. Returned so this system and Splunk cannot
+            disagree about the same date without it being visible. Null means no
+            tolerance is configured, and the verdict is UNKNOWN rather than GOOD.
+        verdict: { $ref: '#/components/schemas/Verdict' }
+        explanation:
+          type: string
+          description: Every deduction named, so a difference is attributable rather than merely present.
+
+    # ---------------- inbound ---------------- #
+    SeiNotification:
+      type: object
+      required: [message_id, message_type, sent_ts]
+      description: |
+        Deliberately generic. BBH defines this contract, so the required fields
+        are the ones BBH needs to be safe — an identity that survives retry, a
+        type, and a send time — and everything else is open.
+      properties:
+        message_id:
+          type: string
+          maxLength: 100
+          description: |
+            Must be stable across SEI's own retries. This is the only
+            deduplication key available: an HTTP callback has no equivalent of
+            the event side's (topic, partition, offset).
+        message_type:
+          type: string
+          maxLength: 60
+          description: Open string. An unrecognised value is stored and alerted, never rejected.
+        sent_ts: { type: string, format: date-time }
+        submission_id:
+          type: string
+          nullable: true
+          description: Present for loader messages. Absent for platform events.
+        status:
+          $ref: '#/components/schemas/SubmissionStatus'
+          nullable: true
+        status_ts:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the status changed at SEI, which may be well before sent_ts on a retry.
+        payload:
+          type: object
+          additionalProperties: true
+          description: |
+            Unconstrained by design so a new status or counter needs no contract
+            change. Error **summaries** belong here; reject detail does not — it
+            is fetched on the poll leg.
+
+    NotificationAck:
+      type: object
+      required: [message_id, received_ts, status]
+      properties:
+        message_id: { type: string }
+        received_ts: { type: string, format: date-time }
+        status:
+          type: string
+          enum: [ACCEPTED, DUPLICATE]
+          description: ACCEPTED means durably written. It is not a statement that the message was understood.
+        receipt_id: { type: string }
