@@ -9,6 +9,14 @@ produce the workbook this repo's lineage loader ingests.
 lane-shaped, covers IMDS as the target with STAR, UAF and SEI as sources.
 Produces `IMDS_STAR_UAF_SEI_Data_Lineage.xlsx`, 13 sheets.
 
+## For PBDW, when its mapping arrives
+
+**`PROMPT_PBDW_ADDVANTAGE_SEI_crosswalk.md`** — the attach case. PBDW's
+lineage already exists, so that workbook carries only the SEI side: eleven
+sheets, no lineage sheet. It requires two SQL extracts as inputs, and the rule
+that decides whether the load joins at all is that every
+`TARGET_CONTRACT_FIELD` must be copied verbatim from the contract inventory.
+
 ## Superseded — kept for history, do not run
 
 - `PROMPT_star_sei_workbook.md` — the first generation prompt. Scoped the
