@@ -120,27 +120,51 @@ def _ceiling(ds):
 
 @router.get("/lane-systems")
 def lane_systems(data_source: str | None = None):
-    """Which source systems actually feed THIS warehouse.
+    """Which source systems actually have lineage rows in THIS warehouse.
 
-    LineageHome's system badges come from /legacy-lineage/systems, which takes
-    no data_source and so returns the same three for every warehouse. That is
-    why IMDS — fed by STAR and UAF — offered AddVantage, and defaulted to it.
+    LineageHome's badges came from /legacy-lineage/systems, which takes no
+    data_source and returns the same three everywhere — which is why IMDS
+    offered AddVantage and defaulted to it.
 
-    legacy_source_file already carries source_system per warehouse, so the
-    answer is a group-by. Added here rather than to routers_legacy_lineage.py,
-    which _legacy_compat records as one of the files a stale edit has broken
-    before.
+    The test here is empirical rather than declarative: a system is offered
+    only if legacy_lineage actually holds rows whose source feed belongs to
+    it. A lane seeded in the register with no evidence behind it (an
+    ADDVANTAGE_IMDS row, say) therefore does not appear, which is the whole
+    point.
+
+    `resolved` distinguishes "asked and the answer is none" from "could not
+    ask". The caller must not treat an empty list as permission to show
+    everything; that is exactly the bug this replaces.
     """
     ds = _ds(data_source)
     rows = _safe("""
-        SELECT NVL(f.source_system,'UNKNOWN') AS source_system,
-               COUNT(DISTINCT f.src_file)     AS feeds
-        FROM   legacy_source_file f
-        WHERE  f.data_source = :ds
-        GROUP  BY NVL(f.source_system,'UNKNOWN')
+        SELECT NVL(f.source_system, '?') AS source_system,
+               COUNT(DISTINCT l.dwh_target_table || '.' || l.dwh_target_column) AS columns_
+        FROM   legacy_lineage l
+        LEFT JOIN legacy_source_file f
+               ON f.data_source  = l.data_source
+              AND f.src_file_key = REGEXP_REPLACE(UPPER(TRIM('_' FROM
+                    REGEXP_REPLACE(l.src_source_table,'[[:space:]/.-]+','_'))),'_{2,}','_')
+        WHERE  l.data_source = :ds
+        GROUP  BY NVL(f.source_system, '?')
         ORDER  BY 2 DESC""", {"ds": ds})
-    return {"data_source": ds,
-            "systems": [r for r in rows if (r.get("source_system") or "") != "UNKNOWN"]}
+    known = [r for r in rows if (r.get("source_system") or "?") != "?"]
+    unresolved = sum(int(r.get("columns_") or 0)
+                     for r in rows if (r.get("source_system") or "?") == "?")
+    total = sum(int(r.get("columns_") or 0) for r in rows)
+    return {
+        "data_source": ds,
+        "systems": known,
+        "unresolved_columns": unresolved,
+        "total_columns": total,
+        # resolved=False means the join told us nothing — no lineage at all, or
+        # every feed missing a source_system. The UI falls back to the global
+        # list only in that case, and says why.
+        "resolved": bool(known),
+        "hint": ("legacy_source_file.source_system is empty for this warehouse; "
+                 "re-run the crosswalk load so feeds are tagged with their lane"
+                 if total and not known else None),
+    }
 
 
 @router.get("/lanes")

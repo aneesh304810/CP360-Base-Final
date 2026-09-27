@@ -62,9 +62,10 @@ export default function LineageHome({ t, focus }) {
    if (!live) return;
    const names = (r.systems || []).map((x) => (x.source_system || x.SOURCE_SYSTEM || "").toUpperCase())
                                   .filter(Boolean);
-   setDsSystems(names);
-   // Do not leave a system selected that does not feed this warehouse.
-   if (names.length && !names.includes(curSys)) setCurSys(names[0]);
+   // resolved=false means the question could not be answered, not that the
+   // answer is none. Only then do we fall back to the global list.
+   setDsSystems(r.resolved ? names : null);
+   if (r.resolved && names.length && !names.includes(curSys)) setCurSys(names[0]);
   });
   return () => { live = false; };
  }, [ds]);
@@ -312,7 +313,7 @@ export default function LineageHome({ t, focus }) {
          <div style={{ ...popRow, borderTop: `1px solid ${t.panel2 || "#dfe6e9"}` }}>
           <span style={popLbl}>System</span>
           {Object.entries(SYS_META)
-           .filter(([k]) => !dsSystems || !dsSystems.length || dsSystems.includes(k))
+           .filter(([k]) => dsSystems === null || dsSystems.includes(k))
            .map(([k, m]) => {
            const present = (dsSystems && dsSystems.includes(k))
             || systems.find((x) => x.source_system === k);

@@ -208,19 +208,22 @@ class SeiCrosswalkConnector:
         wb = load_workbook(self.xlsx_path, data_only=True, read_only=True)
         by_key = {_hkey(n): n for n in wb.sheetnames}
         sheets = {}
+        self.matched = {}
         for role, names in self.SHEETS.items():
             for want in names:
                 real = by_key.get(_hkey(want))
                 if real:
                     sheets[role] = Sheet(wb[real])
+                    self.matched[role] = want.upper()
                     break
         missing = [r for r in self.SHEETS if r not in sheets]
         if missing:
             log.warning("sei_crosswalk: sheets not found: %s", ", ".join(sorted(missing)))
 
+        lanes = self._lanes(sheets.get("lane"))
         out = {
-            "lane":    self._lanes(sheets.get("lane")),
-            "feed":    self._feeds(sheets.get("feed")),
+            "lane":    lanes,
+            "feed":    self._feeds(sheets.get("feed"), lanes),
             "lineage": [], "srccol": [],
             "map":     self._map(sheets.get("map")),
             "code":    self._code(sheets.get("code")),
@@ -255,12 +258,40 @@ class SeiCrosswalkConnector:
             })
         return out
 
-    def _feeds(self, sh):
+    def _feeds(self, sh, lanes=None):
         """Incumbent feeds -> legacy_source_file, tagged with their lane's
         source_system. This is what makes the lane resolvable without a new
-        column on legacy_lineage."""
+        column on legacy_lineage.
+
+        THE FALLBACK MATTERS. Workbooks generated before LANE_ID existed have
+        a SOURCE_FEED sheet with no lane column at all, and source_system then
+        landed NULL — which left the warehouse's system list empty, which the
+        UI read as "show every system", which is how IMDS came to offer
+        AddVantage. Two fallbacks, in order of how much they assume:
+
+          1. the sheet's own name. A sheet matched as STAR_FEED is STAR's by
+             declaration; nothing else can be in it.
+          2. the lane register, when the warehouse has exactly ONE incumbent
+             lane. With one candidate there is nothing to guess between.
+
+        If neither resolves, source_system stays NULL and the row is loaded
+        anyway — but the endpoint reports it as unresolved rather than letting
+        the UI fall back to showing everything."""
         if not sh:
             return []
+        hint = None
+        alias = (getattr(self, "matched", {}) or {}).get("feed", "")
+        if alias.endswith("_FEED") and alias != "SOURCE_FEED":
+            hint = alias[:-len("_FEED")]          # STAR_FEED -> STAR
+        if not hint:
+            incumbents = sorted({(l.get("source_system") or "").upper()
+                                 for l in (lanes or [])
+                                 if (l.get("source_system") or "").upper()
+                                 not in ("", "SEI")})
+            if len(incumbents) == 1:
+                hint = incumbents[0]
+        if hint:
+            log.info("feed sheet has no LANE_ID; source_system resolved to %s", hint)
         out, seen = [], set()
         for row in sh.rows():
             feed = sh.get(row, "FEED_NAME")
@@ -272,7 +303,7 @@ class SeiCrosswalkConnector:
                 "src_file": feed,
                 "src_file_key": _file_key(feed),
                 "dataset": sh.get(row, "DATASET") or sh.get(row, "SUBJECT_AREA"),
-                "source_system": lane.split("_")[0] if lane else None,
+                "source_system": (lane.split("_")[0] if lane else hint),
                 "data_source": self.data_source,
             })
         return out
