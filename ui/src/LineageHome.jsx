@@ -5,6 +5,7 @@ import BizLineage from "./BizLineage.jsx";
 import LegacyLineage from "./LegacyLineage.jsx";
 import SourceLineage from "./SourceLineage.jsx";
 import CrosswalkDashboard from "./CrosswalkDashboard.jsx";
+import { crosswalkApi } from "./seiCrosswalkApi.js";
 
 // =====================================================================
 // LineageHome — the Lineage shell, superseding the old Lineage.jsx
@@ -24,8 +25,11 @@ import CrosswalkDashboard from "./CrosswalkDashboard.jsx";
 
 const SYS_META = {
  ADDVANTAGE: { label: "AddVantage", c: "#6d3ac0", bg: "#efe6fb" },
- CRD: { label: "CRD", c: "#0b7d7d", bg: "#e6f6f6" },
+ CRD: { label: "CRD", c: "#2563eb", bg: "#e4edfd" },
  STAR: { label: "STAR", c: "#b5651d", bg: "#f6ecdf" },
+ // UAF feeds IMDS through PDPA009/PDBA016 and was missing from this list
+ // entirely, so IMDS's second incumbent could not be selected at all.
+ UAF: { label: "UAF", c: "#0b7d7d", bg: "#e6f6f6" },
 };
 const SOURCES = [
  { id: "PBDW", icon: "🏪", name: "PB Data Warehouse",
@@ -41,11 +45,29 @@ export default function LineageHome({ t, focus }) {
  const [scope, setScope] = useState("nonsei");
  const [curSys, setCurSys] = useState("ADDVANTAGE");
  const [systems, setSystems] = useState([]);
+ // Which systems feed THIS warehouse. /legacy-lineage/systems takes no
+ // data_source, so it returned the same three everywhere — which is why IMDS
+ // offered AddVantage and defaulted to it.
+ const [dsSystems, setDsSystems] = useState(null);
  const [techFocus, setTechFocus] = useState(null);
  const [scopeOpen, setScopeOpen] = useState(false);
  const [stats, setStats] = useState({});
  const [dsCounts, setDsCounts] = useState({});
  const enter = (d, v) => { setDs(d); setView(v); };
+
+ useEffect(() => {
+  if (!ds) { setDsSystems(null); return; }
+  let live = true;
+  crosswalkApi.laneSystems(ds).then((r) => {
+   if (!live) return;
+   const names = (r.systems || []).map((x) => (x.source_system || x.SOURCE_SYSTEM || "").toUpperCase())
+                                  .filter(Boolean);
+   setDsSystems(names);
+   // Do not leave a system selected that does not feed this warehouse.
+   if (names.length && !names.includes(curSys)) setCurSys(names[0]);
+  });
+  return () => { live = false; };
+ }, [ds]);
 
  // landing stats + systems + data-source counts (one fetch each, cached)
  useEffect(() => {
@@ -289,8 +311,11 @@ export default function LineageHome({ t, focus }) {
         {scope === "nonsei" && (
          <div style={{ ...popRow, borderTop: `1px solid ${t.panel2 || "#dfe6e9"}` }}>
           <span style={popLbl}>System</span>
-          {Object.entries(SYS_META).map(([k, m]) => {
-           const present = systems.find((x) => x.source_system === k);
+          {Object.entries(SYS_META)
+           .filter(([k]) => !dsSystems || !dsSystems.length || dsSystems.includes(k))
+           .map(([k, m]) => {
+           const present = (dsSystems && dsSystems.includes(k))
+            || systems.find((x) => x.source_system === k);
            const on = curSys === k;
            return (
             <span key={k}

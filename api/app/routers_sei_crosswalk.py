@@ -118,6 +118,31 @@ def _ceiling(ds):
     }
 
 
+@router.get("/lane-systems")
+def lane_systems(data_source: str | None = None):
+    """Which source systems actually feed THIS warehouse.
+
+    LineageHome's system badges come from /legacy-lineage/systems, which takes
+    no data_source and so returns the same three for every warehouse. That is
+    why IMDS — fed by STAR and UAF — offered AddVantage, and defaulted to it.
+
+    legacy_source_file already carries source_system per warehouse, so the
+    answer is a group-by. Added here rather than to routers_legacy_lineage.py,
+    which _legacy_compat records as one of the files a stale edit has broken
+    before.
+    """
+    ds = _ds(data_source)
+    rows = _safe("""
+        SELECT NVL(f.source_system,'UNKNOWN') AS source_system,
+               COUNT(DISTINCT f.src_file)     AS feeds
+        FROM   legacy_source_file f
+        WHERE  f.data_source = :ds
+        GROUP  BY NVL(f.source_system,'UNKNOWN')
+        ORDER  BY 2 DESC""", {"ds": ds})
+    return {"data_source": ds,
+            "systems": [r for r in rows if (r.get("source_system") or "") != "UNKNOWN"]}
+
+
 @router.get("/lanes")
 def lanes(data_source: str | None = None):
     ds = _ds(data_source)

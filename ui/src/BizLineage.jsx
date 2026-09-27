@@ -1,3 +1,4 @@
+import { stageMeta } from "./laneMeta.js";
 import React, { useState, useEffect, useCallback } from "react";
 import { api } from "./api.js";
 
@@ -12,12 +13,8 @@ import { api } from "./api.js";
 //        · onDataSource(ds, loc)
 // =====================================================================
 
-const STG_META = [
-  ["🏦", "AddVantage", "nightly file", "#7c3aed"],
-  ["📥", "Landed", "staging 1", "#00a3a3"],
-  ["🧼", "Cleaned", "staging 2", "#0091bf"],
-  ["🏪", "Warehouse", "", "#0f4775"],
-];
+// STG_META was hardcoded to AddVantage. IMDS is fed by STAR and UAF, so
+// the first two stages come from laneMeta now — see ui/src/laneMeta.js.
 const isNA = (v) => /not applicable|^n\/a$/i.test(String(v || "").trim());
 const has = (xf) => xf && !isNA(xf);
 const canon = (c) =>
@@ -52,8 +49,8 @@ const KIND_META = {
 
 /* ---------------- shared atoms ---------------- */
 
-function Circ({ i, big, dashed }) {
-  const m = STG_META[i];
+function Circ({ i, big, dashed, meta }) {
+  const m = (meta || stageMeta(null))[i];
   return (
     <div style={{ width: big ? 54 : 32, height: big ? 54 : 32, borderRadius: "50%",
       background: "#fff", display: "grid", placeItems: "center",
@@ -64,11 +61,12 @@ function Circ({ i, big, dashed }) {
     </div>);
 }
 
-function Spine({ ds, vals, okFrom, hopLabels }) {
+function Spine({ ds, vals, okFrom, hopLabels, system }) {
+  const stg = stageMeta(system);
   return (
     <div style={{ display: "flex", alignItems: "flex-start",
       justifyContent: "center", margin: "6px 0 26px" }}>
-      {STG_META.map((m, i) => (
+      {stg.map((m, i) => (
         <React.Fragment key={m[1]}>
           {i > 0 && (
             <div style={{ flex: 1, maxWidth: 150, height: 2.5, background: "#c9d4dc",
@@ -85,7 +83,7 @@ function Spine({ ds, vals, okFrom, hopLabels }) {
             </div>)}
           <div style={{ display: "flex", flexDirection: "column",
             alignItems: "center", gap: 7, minWidth: 150, maxWidth: 210 }}>
-            <Circ i={i} big />
+            <Circ i={i} big meta={stg} />
             <b style={{ fontSize: 13, fontWeight: 500 }}>{m[1]}</b>
             <small style={{ fontSize: 10.5, color: "#7b8894" }}>
               {i === 3 ? ds : m[2]}</small>
@@ -141,7 +139,7 @@ function Dots({ f }) {
 
 /* ---------------- the drill ---------------- */
 
-export default function BizLineage({ t, system = "ADDVANTAGE", dataSource = "PBDW",
+export default function BizLineage({ t, system, dataSource = "PBDW",
   onTechnical, onDataSource }) {
   const ds = (dataSource || "PBDW").toUpperCase();
   const [tables, setTables] = useState(null);
@@ -228,7 +226,7 @@ export default function BizLineage({ t, system = "ADDVANTAGE", dataSource = "PBD
       <div style={{ maxWidth: 1000, margin: "0 auto" }}>{crumb}
         <H1>Where {ds} data comes from</H1>
         <Sub>one journey, every field — click an area to zoom in</Sub>
-        <Spine ds={ds} />
+        <Spine system={system} ds={ds} />
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)",
           gap: 16 }}>
           {names.map((g) => {
@@ -547,7 +545,7 @@ function ColumnPage({ t, f, tbl, ds, system, rows, onWalk, onTechnical,
         marginBottom: 22 }}>
         {kind === "ud" ? "a user-defined attribute — traced like any native field"
           : "the full journey of one field, with a real value riding along"}</div>
-      <Spine ds={ds} vals={vals} okFrom={okFrom} hopLabels={hopLabels} />
+      <Spine system={system} ds={ds} vals={vals} okFrom={okFrom} hopLabels={hopLabels} />
 
       <div style={{ maxWidth: 660, margin: "0 auto", background: "#fff",
         border: "1px solid #c9d4dc", borderRadius: 10, padding: "16px 22px",

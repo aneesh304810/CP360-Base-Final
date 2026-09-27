@@ -40,6 +40,10 @@ export const crosswalkApi = {
                divergent: 0, undecided_dispositions: 0, open_exceptions: 0,
                verdicts: [], ceiling: { blocked: false, reason: "" } })),
 
+  laneSystems: (data_source) =>
+    _get(`/sei-crosswalk/lane-systems${_qs({ data_source })}`,
+      () => ({ data_source, systems: [] })),
+
   lanes: (data_source) =>
     _get(`/sei-crosswalk/lanes${_qs({ data_source })}`, () => ({ lanes: [] })),
 

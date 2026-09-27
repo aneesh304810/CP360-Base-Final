@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { lineageApi } from "./lineage_api_additions.js";
 import LineageGraph from "./LineageGraph.jsx";
+import { stageMeta } from "./laneMeta.js";
 
 // =====================================================================
 // SourceLineage — the source-first drill.
@@ -61,15 +62,12 @@ const pct = (n, d) => (d ? Math.round((n / d) * 100) : 0);
 // palette it hardcodes (#7b8894 text, #c9d4dc rule). If BizLineage's
 // grammar changes, these move with it.
 // ---------------------------------------------------------------------
-const STG_META = [
-  ["🏦", "AddVantage", "nightly file", "#7c3aed"],
-  ["📥", "Landed", "staging 1", "#00a3a3"],
-  ["🧼", "Cleaned", "staging 2", "#0091bf"],
-  ["🏪", "Warehouse", "", "#0f4775"],
-];
+// STG_META was a hardcoded [AddVantage, Landed, Cleaned, Warehouse]. The
+// first two stages depend on which system feeds this warehouse, so they
+// come from laneMeta now — see ui/src/laneMeta.js.
 
-function Circ({ i, big }) {
-  const m = STG_META[i];
+function Circ({ i, big, meta }) {
+  const m = (meta || stageMeta(null))[i];
   return (
     <div style={{ width: big ? 54 : 32, height: big ? 54 : 32, borderRadius: "50%",
       background: "#fff", display: "grid", placeItems: "center",
@@ -78,11 +76,12 @@ function Circ({ i, big }) {
       boxShadow: "0 2px 6px rgba(20,40,60,.08)" }}>{m[0]}</div>);
 }
 
-function Spine({ ds }) {
+function Spine({ ds, system }) {
+  const stg = stageMeta(system);
   return (
     <div style={{ display: "flex", alignItems: "flex-start",
       justifyContent: "center", margin: "6px 0 26px" }}>
-      {STG_META.map((m, i) => (
+      {stg.map((m, i) => (
         <React.Fragment key={m[1]}>
           {i > 0 && (
             <div style={{ flex: 1, maxWidth: 150, height: 2.5, background: "#c9d4dc",
@@ -93,7 +92,7 @@ function Spine({ ds }) {
             </div>)}
           <div style={{ display: "flex", flexDirection: "column",
             alignItems: "center", gap: 7, minWidth: 150, maxWidth: 210 }}>
-            <Circ i={i} big />
+            <Circ i={i} big meta={stg} />
             <b style={{ fontSize: 13, fontWeight: 500 }}>{m[1]}</b>
             <small style={{ fontSize: 10.5, color: "#7b8894" }}>
               {i === 3 ? ds : m[2]}</small>
@@ -121,7 +120,7 @@ const Sub = ({ children }) => (
   <div style={{ fontSize: 12.5, color: "#7b8894", textAlign: "center",
     marginBottom: 22 }}>{children}</div>);
 
-export default function SourceLineage({ t, system = "ADDVANTAGE",
+export default function SourceLineage({ t, system,
                                         dataSource = "PBDW", tech = false,
                                         onOpenTechnical }) {
   const ds = (dataSource || "PBDW").toUpperCase();
@@ -318,7 +317,7 @@ export default function SourceLineage({ t, system = "ADDVANTAGE",
           <H1>Where {ds} data comes from</H1>
           <Sub>{T.files} extract files · {T.field_count} fields ·
             {" "}{T.mapped} mapped</Sub>
-          <Spine ds={ds} />
+          <Spine ds={ds} system={system} />
 
           {/* What this door IS. Business view and Source view show the same
               pipeline from opposite ends, and nothing on either screen said
