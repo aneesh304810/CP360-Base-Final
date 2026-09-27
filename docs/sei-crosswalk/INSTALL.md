@@ -19,6 +19,7 @@ ingested. That is a property of the data, not a feature flag.
 | File | What it is |
 |---|---|
 | `sql/51_sei_crosswalk.sql` | DDL: 9 new tables, indexes, the lane seed |
+| `sql/52_sei_crosswalk_attach.sql` | Canonical field-code columns, for attaching to an existing baseline |
 | `ingestion/lane_lineage_conn.py` | The workbook connector |
 | `api/app/routers_sei_crosswalk.py` | 8 read-only endpoints under `/sei-crosswalk` |
 | `ui/src/seiCrosswalkApi.js` | API client + the verdict vocabulary |
@@ -135,6 +136,86 @@ AND NOT EXISTS (SELECT 1 FROM legacy_src_column c
 
 -- PBDW is untouched
 SELECT data_source, COUNT(*) FROM legacy_lineage GROUP BY data_source;
+```
+
+---
+
+## 3b. Attaching the PBDW crosswalk to a baseline that already exists
+
+PBDW is the opposite case to IMDS and must be run differently.
+
+IMDS had no STAR lineage in `legacy_lineage`, so the workbook supplied the
+baseline **and** the SEI mapping. PBDW already has 1,180 rows, loaded from the
+AddVantage mapping workbook by `legacy_lineage_conn.py`. For PBDW the crosswalk
+workbook supplies **only the SEI side** and attaches to what is there.
+
+### Run it
+
+```bash
+export CP_SEI_XLSX=/path/to/PBDW_ADDVANTAGE_SEI_Crosswalk.xlsx
+export CP_SEI_DATA_SOURCE=PBDW
+export CP_SEI_LINEAGE_MODE=attach        # explicit is better than auto here
+python -m ingestion.run sei_crosswalk
+```
+
+`CP_SEI_LINEAGE_MODE` takes `load`, `attach` or `auto` (the default). `auto`
+counts existing `legacy_lineage` rows for the warehouse and attaches when it
+finds any. Set it explicitly for PBDW anyway — the cost of being wrong is
+asymmetric, and an explicit value cannot be surprised by an empty database.
+
+In attach mode the connector:
+
+- **does not write** `legacy_lineage` or `legacy_source_file`, and logs how
+  many workbook rows it skipped for that reason
+- **does not purge** them either, even with `CP_SEI_RELOAD=1`
+- writes only its own tables: the lane register, the SEI mapping, the
+  verdicts, code sets, dispositions, dual-source and exceptions
+
+### The workbook is not quite the same either
+
+Two differences from the IMDS workbook:
+
+- `LANE_LINEAGE` is not needed. If present it is parsed and then skipped, with
+  a warning naming the row count. Leaving it out is cleaner.
+- `TARGET_CONTRACT_FIELD` must hold the **AddVantage field code exactly as
+  `legacy_lineage.src_source_column` holds it** — `BI/1-1`, `BI/2-1`. Not the
+  business name, not the DWH column name.
+
+### Why field codes need care
+
+The same AddVantage field appears as `BI/2-1` on one sheet and `BI_2_L1` on
+another. That is why `_norm_code` and `_legacy_groups._CANON` exist. Both sides
+are therefore stored and joined canonically: the loader writes `src_col_norm`
+and the API joins on it, so either spelling resolves.
+
+Run `sql/52_sei_crosswalk_attach.sql` before the first attach — it adds
+`src_col_norm` to the crosswalk's own tables. Additive, and only to tables
+`sql/51` created.
+
+```bash
+sqlplus $CP_DB_USER/$CP_DB_PASS@$CP_DB_DSN @sql/52_sei_crosswalk_attach.sql
+```
+
+### The one number that says whether it worked
+
+Attach mode ends with a join health check and logs one of:
+
+```
+attach: all N SEI mappings resolved to an existing lineage row
+attach: K of N SEI mappings point at a contract field no existing lineage
+        row consumes...
+```
+
+A non-zero `K` matters more than the row count. It means either net-new scope,
+or a field code the canon rule cannot reconcile — and those look identical in a
+spreadsheet while being very different problems. The commented query at the
+foot of `sql/52` lists them.
+
+### Verify PBDW's baseline survived
+
+```sql
+SELECT data_source, COUNT(*) FROM legacy_lineage GROUP BY data_source;
+-- PBDW must be unchanged from before the run
 ```
 
 ---

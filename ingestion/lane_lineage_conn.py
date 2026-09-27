@@ -83,6 +83,22 @@ except Exception:                                              # pragma: no cove
         return re.sub(r"_{2,}", "_", s)
 
 
+# The canonical field code. BI/2-1 and BI_2_L1 must both become BI_2_1 or the
+# join to an existing PBDW baseline matches nothing — the same rule
+# _norm_code and _legacy_groups._CANON apply, reimplemented here because the
+# ingestion package cannot import from the API package.
+#
+# The r"" on the replacement is load-bearing: in a plain string Python turns
+# \1 into chr(1) and BI_2_L1 silently stops collapsing. _legacy_groups.py
+# carries the same warning about the same backreference.
+def _norm_code(code):
+    if not code:
+        return ""
+    c = re.sub(r"[\s/.\-]+", "_", str(code).strip())
+    c = re.sub(r"_{2,}", "_", c).strip("_").upper()
+    return re.sub(r"_L(\d+)", r"_\1", c)
+
+
 def _hkey(h):
     """Fold a header to a comparison key. DWH_Target_Table, DWH_TARGET_TABLE
     and 'dwh target table' all become DWHTARGETTABLE."""
@@ -166,17 +182,23 @@ class SeiCrosswalkConnector:
         "exc":     ("EXCEPTIONS",),
     }
 
-    def __init__(self, xlsx_path=None, data_source=None, reload_scope=False):
+    def __init__(self, xlsx_path=None, data_source=None, reload_scope=False,
+                 lineage_mode=None):
         self.xlsx_path = xlsx_path or os.environ.get("CP_SEI_XLSX", DEFAULT_XLSX)
         self.data_source = (data_source or DEFAULT_DATA_SOURCE).upper()
         self.reload_scope = reload_scope
+        # load   — this workbook supplies the baseline (the IMDS case)
+        # attach — a baseline already exists; load the SEI side only (PBDW)
+        # auto   — decide by looking, and refuse rather than guess wrong
+        self.lineage_mode = (lineage_mode or "auto").lower()
         self.counts = {}
 
     @classmethod
     def from_env(cls):
         return cls(os.environ.get("CP_SEI_XLSX"),
                    os.environ.get("CP_SEI_DATA_SOURCE"),
-                   os.environ.get("CP_SEI_RELOAD") == "1")
+                   os.environ.get("CP_SEI_RELOAD") == "1",
+                   os.environ.get("CP_SEI_LINEAGE_MODE"))
 
     # ------------------------------------------------------------ parse ----
     def parse(self):
@@ -312,6 +334,7 @@ class SeiCrosswalkConnector:
                     cols.append({
                         "src_col_id": cid, "data_source": ds,
                         "src_file_key": fk, "src_source_column": src_c,
+                        "src_col_norm": _norm_code(src_c),
                         "src_type": _nz(sh.get(row, "SRC_TYPE")),
                         "src_length": _nz(sh.get(row, "SRC_LENGTH")),
                         "src_precision": _nz(sh.get(row, "SRC_PRECISION")),
@@ -350,6 +373,7 @@ class SeiCrosswalkConnector:
                 "map_id": mid, "lane_id": (sh.get(row, "LANE_ID") or "").upper() or None,
                 "data_source": self.data_source,
                 "src_file_key": fk, "src_source_column": fld,
+                "src_col_norm": _norm_code(fld),
                 "sei_feed": _nz(sh.get(row, "SEI_FEED")),
                 "sei_entity": _nz(sh.get(row, "SEI_ENTITY")),
                 "sei_datapoint": _nz(sh.get(row, "SEI_DATAPOINT")),
@@ -537,13 +561,58 @@ class SeiCrosswalkConnector:
         ("exc",     "sei_exception",       ("exc_id",)),
     ]
 
+    # legacy_lineage and legacy_source_file are SHARED with whatever loaded the
+    # warehouse's baseline. They are written only in "load" mode, and purged
+    # only in "load" mode. In "attach" mode this connector owns nothing in
+    # them and must not touch either.
+    _OWNED_IN_LOAD_MODE = ("lineage", "feed")
+
+    def resolve_mode(self, loader):
+        """Decide whether this workbook supplies the baseline or attaches to one.
+
+        Getting this wrong is destructive in one direction: purging in load
+        mode against a warehouse that already has a baseline deletes it. So
+        "auto" looks, and where looking is inconclusive it refuses.
+        """
+        if self.lineage_mode in ("load", "attach"):
+            return self.lineage_mode
+        existing = 0
+        try:
+            cur = loader.conn.cursor()
+            cur.execute("SELECT COUNT(*) FROM legacy_lineage WHERE data_source = :ds",
+                        {"ds": self.data_source})
+            existing = int((cur.fetchone() or [0])[0] or 0)
+            cur.close()
+        except Exception as e:                                  # noqa: BLE001
+            log.warning("could not count existing lineage rows (%s); "
+                        "assuming attach, which writes nothing to legacy_lineage", e)
+            return "attach"
+        if existing == 0:
+            log.info("lineage mode: LOAD — %s has no baseline, this workbook supplies it",
+                     self.data_source)
+            return "load"
+        log.info("lineage mode: ATTACH — %s already has %d lineage rows, so the "
+                 "SEI side is loaded and the baseline is left to its own loader",
+                 self.data_source, existing)
+        return "attach"
+
     def load(self, loader, parsed):
         if not parsed:
             return 0
+        mode = self.resolve_mode(loader)
+        skip = set(self._OWNED_IN_LOAD_MODE) if mode == "attach" else set()
+        if skip:
+            n_skipped = sum(len(parsed.get(k, [])) for k in skip)
+            if n_skipped:
+                log.warning("attach mode: %d lineage/feed rows in the workbook are "
+                            "NOT loaded — %s's baseline belongs to its own loader",
+                            n_skipped, self.data_source)
         if self.reload_scope:
-            self._purge(loader, parsed)
+            self._purge(loader, parsed, mode)
         n = 0
         for key, table, pk in self._TARGETS:
+            if key in skip:
+                continue
             for rec in parsed.get(key, []):
                 try:
                     loader._merge(table, pk, rec)
@@ -551,11 +620,51 @@ class SeiCrosswalkConnector:
                 except Exception as e:                          # noqa: BLE001
                     log.warning("%s: row skipped (%s)", table, e)
         loader.commit()
-        log.info("sei_crosswalk: merged %d rows across %d tables",
-                 n, len(self._TARGETS))
+        log.info("sei_crosswalk[%s/%s]: merged %d rows", self.data_source, mode, n)
+        if mode == "attach":
+            self._report_join(loader)
         return n
 
-    def _purge(self, loader, parsed):
+    def _report_join(self, loader):
+        """In attach mode the whole load hinges on one thing: do the workbook's
+        contract fields match the field codes already in legacy_lineage?
+
+        For PBDW those are AddVantage codes, spelled BI/2-1 in one sheet and
+        BI_2_L1 in another, so both sides are compared canonically. A non-zero
+        count here is the finding, and it is worth more than the row count.
+        """
+        sql = """
+            SELECT COUNT(*) FROM sei_source_map m
+            WHERE  m.data_source = :ds
+              AND  m.src_col_norm IS NOT NULL
+              AND NOT EXISTS (
+                    SELECT 1 FROM legacy_lineage l
+                    WHERE  l.data_source = m.data_source
+                      AND  REGEXP_REPLACE(UPPER(TRIM('_' FROM
+                             REGEXP_REPLACE(l.src_source_column,
+                               '[[:space:]/.-]+', '_'))),
+                             '_L([0-9]+)', '_\\1') = m.src_col_norm)"""
+        try:
+            cur = loader.conn.cursor()
+            cur.execute(sql, {"ds": self.data_source})
+            orphans = int((cur.fetchone() or [0])[0] or 0)
+            cur.execute("SELECT COUNT(*) FROM sei_source_map WHERE data_source = :ds",
+                        {"ds": self.data_source})
+            total = int((cur.fetchone() or [0])[0] or 0)
+            cur.close()
+        except Exception as e:                                  # noqa: BLE001
+            log.warning("join health check skipped (%s)", e)
+            return
+        if orphans:
+            log.warning("attach: %d of %d SEI mappings point at a contract field no "
+                        "existing lineage row consumes. Either net-new scope or a "
+                        "field code the canon rule does not reconcile — run the "
+                        "health-check query in sql/52 to see which.", orphans, total)
+        else:
+            log.info("attach: all %d SEI mappings resolved to an existing lineage row",
+                     total)
+
+    def _purge(self, loader, parsed, mode="load"):
         """Delete this lane's own rows before loading.
 
         loader exposes only _merge and commit, and _merge never deletes — which
@@ -568,6 +677,10 @@ class SeiCrosswalkConnector:
         systems = sorted({(l.get("source_system") or "").upper()
                           for l in parsed.get("lane", [])} - {""})
         cur = loader.conn.cursor()
+        # In attach mode legacy_lineage and legacy_source_file are somebody
+        # else's rows. Deleting them here would wipe the warehouse's baseline —
+        # for PBDW, every row the AddVantage workbook loaded.
+        shared = {"legacy_lineage", "legacy_source_file"}
         scoped = [
             ("sei_source_map", "data_source = :ds"),
             ("sei_verify", "data_source = :ds"),
@@ -578,13 +691,17 @@ class SeiCrosswalkConnector:
             ("legacy_lineage", "data_source = :ds"),
         ]
         for table, where in scoped:
+            if mode == "attach" and table in shared:
+                log.info("purge %s: skipped — attach mode does not own these rows", table)
+                continue
             try:
                 cur.execute(f"DELETE FROM {table} WHERE {where}", {"ds": self.data_source})
                 log.info("purge %s: %d rows", table, cur.rowcount)
             except Exception as e:                              # noqa: BLE001
                 log.warning("purge %s skipped (%s)", table, e)
-        # legacy_source_file is shared with PBDW, so it is scoped by system too.
-        for sysname in systems:
+        # legacy_source_file is shared, so it is scoped by system as well as
+        # warehouse — and skipped entirely when attaching.
+        for sysname in ([] if mode == "attach" else systems):
             try:
                 cur.execute(
                     "DELETE FROM legacy_source_file "

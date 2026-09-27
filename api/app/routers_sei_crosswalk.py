@@ -29,6 +29,15 @@ router = APIRouter(prefix="/sei-crosswalk", tags=["sei-crosswalk"])
 
 _DS = "IMDS"
 
+# The canonical field code, in SQL. Must agree byte for byte with
+# ingestion.lane_lineage_conn._norm_code and _legacy_groups._CANON, because a
+# PBDW contract field is an AddVantage code spelled BI/2-1 on one sheet and
+# BI_2_L1 on another. A literal join matches nothing and says so silently.
+def _canon(col):
+    return (f"REGEXP_REPLACE(UPPER(TRIM('_' FROM "
+            f"REGEXP_REPLACE({col}, '[[:space:]/.-]+', '_'))), '_L([0-9]+)', '_\\1')")
+
+
 
 def _ds(v):
     return (v or _DS).upper()
@@ -144,12 +153,12 @@ def flow(data_source: str | None = None):
         FROM   sei_verify v
         LEFT JOIN sei_source_map m
                ON m.data_source = v.data_source
-              AND m.src_source_column = v.contract_field
+              AND NVL(m.src_col_norm, m.src_source_column) = {CANON_CF}
         WHERE  v.data_source = :ds
           AND  v.lane_id IN (SELECT lane_id FROM legacy_lane
                              WHERE data_source = :ds AND replacement_state = 'REPLACED')
         GROUP BY NVL(m.sei_feed, 'no SEI source'), NVL(v.contract_feed, 'unmapped')
-    """, {"ds": ds})
+    """.replace("{CANON_CF}", _canon("v.contract_field")), {"ds": ds})
     right = _safe("""
         SELECT NVL(contract_feed, 'unmapped') AS mid, dwh_target_table AS tgt,
                COUNT(DISTINCT dwh_target_column) AS n
@@ -218,18 +227,20 @@ def column(table: str, column: str, data_source: str | None = None):
     contract = _safe("""
         SELECT c.* FROM legacy_src_column c
         WHERE  c.data_source = :ds
-          AND  c.src_source_column IN (
-                 SELECT contract_field FROM sei_verify
+          AND  NVL(c.src_col_norm, c.src_source_column) IN (
+                 SELECT {CANON_CF} FROM sei_verify
                  WHERE data_source = :ds AND dwh_target_table = :t
-                   AND dwh_target_column = :c)""", p)
+                   AND dwh_target_column = :c)""".replace(
+        "{CANON_CF}", _canon("contract_field")), p)
     maps = _safe("""
         SELECT m.* FROM sei_source_map m
         WHERE  m.data_source = :ds
-          AND  m.src_source_column IN (
-                 SELECT contract_field FROM sei_verify
+          AND  NVL(m.src_col_norm, m.src_source_column) IN (
+                 SELECT {CANON_CF} FROM sei_verify
                  WHERE data_source = :ds AND dwh_target_table = :t
                    AND dwh_target_column = :c)
-        ORDER BY m.composite_group NULLS FIRST, m.sei_datapoint""", p)
+        ORDER BY m.composite_group NULLS FIRST, m.sei_datapoint""".replace(
+        "{CANON_CF}", _canon("contract_field")), p)
     # Collapse: the same SEI datapoint standing in for other contract fields.
     collapse = _safe("""
         SELECT DISTINCT m2.sei_feed, m2.sei_datapoint, m2.src_source_column AS other_field
@@ -237,11 +248,13 @@ def column(table: str, column: str, data_source: str | None = None):
         WHERE  m2.data_source = :ds
           AND (m2.sei_feed, m2.sei_datapoint) IN (
                  SELECT m.sei_feed, m.sei_datapoint FROM sei_source_map m
-                 WHERE m.data_source = :ds AND m.src_source_column IN (
-                     SELECT contract_field FROM sei_verify
+                 WHERE m.data_source = :ds
+                   AND NVL(m.src_col_norm, m.src_source_column) IN (
+                     SELECT {CANON_CF} FROM sei_verify
                      WHERE data_source = :ds AND dwh_target_table = :t
                        AND dwh_target_column = :c))
-        ORDER BY m2.sei_datapoint, m2.src_source_column""", p)
+        ORDER BY m2.sei_datapoint, m2.src_source_column""".replace(
+        "{CANON_CF}", _canon("contract_field")), p)
     dual = _safe("""
         SELECT * FROM sei_dual_source
         WHERE data_source = :ds AND dwh_target_table = :t AND dwh_target_column = :c""", p)
