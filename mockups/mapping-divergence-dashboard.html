@@ -1,0 +1,453 @@
+<title>Mapping &amp; Divergence</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    color-scheme: light;
+    --bg:#f5f8f8; --panel:#ffffff; --panel2:#dfe6e9; --border:#b5b6b6;
+    --text:#333333; --sub:#666666; --muted:#999999;
+    --navy:#10193b; --accent:#0f4775; --mutedBlue:#5f87a7; --tint:#cae3ee;
+    --pop:#31bced; --hover:#0091bf;
+    --success:#159943; --successBg:#d0ebd9;
+    --danger:#c1113a;  --dangerBg:#f3d2d7;
+    --warning:#e67e22; --warningBg:#fae5d3;
+    --info:#0091bf;    --infoBg:#e0f5fd;
+    --bronze:#b45309;  --bronzeBg:#f7e9d6;
+    --purple:#7c3aed;  --purpleBg:#efe6fb;
+    --star:#b5651d; --uaf:#0b7d7d; --sei:#0091bf;
+    --trk:#e8edf2; --bizInk:#7b8894; --bizRule:#c9d4dc;
+    --grid:#eef2f5;
+    --groupGrad: linear-gradient(to right,#eef3f8,#f7fafc);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --bg:#0b1220; --panel:#0f172a; --panel2:#111c34; --border:#1e293b;
+      --text:#e2e8f0; --sub:#94a3b8; --muted:#64748b;
+      --navy:#0a0f24; --accent:#5aa0dc; --mutedBlue:#7f9dba; --tint:#16304a;
+      --success:#4ecb7c; --successBg:#12301f;
+      --danger:#ff7f8f;  --dangerBg:#3a1119;
+      --warning:#f0a05a; --warningBg:#33230f;
+      --info:#4cc0ec;    --infoBg:#0d2a38;
+      --bronze:#d9944a;  --bronzeBg:#2e2110;
+      --purple:#b295f0;  --purpleBg:#231a3b;
+      --star:#dda061; --uaf:#4fc4c4; --sei:#4cc0ec;
+      --trk:#1b2740; --bizInk:#8fa3b5; --bizRule:#243049; --grid:#18233c;
+      --groupGrad: linear-gradient(to right,#16223c,#111a30);
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --bg:#0b1220; --panel:#0f172a; --panel2:#111c34; --border:#1e293b;
+    --text:#e2e8f0; --sub:#94a3b8; --muted:#64748b;
+    --navy:#0a0f24; --accent:#5aa0dc; --mutedBlue:#7f9dba; --tint:#16304a;
+    --success:#4ecb7c; --successBg:#12301f;
+    --danger:#ff7f8f;  --dangerBg:#3a1119;
+    --warning:#f0a05a; --warningBg:#33230f;
+    --info:#4cc0ec;    --infoBg:#0d2a38;
+    --bronze:#d9944a;  --bronzeBg:#2e2110;
+    --purple:#b295f0;  --purpleBg:#231a3b;
+    --star:#dda061; --uaf:#4fc4c4; --sei:#4cc0ec;
+    --trk:#1b2740; --bizInk:#8fa3b5; --bizRule:#243049; --grid:#18233c;
+    --groupGrad: linear-gradient(to right,#16223c,#111a30);
+  }
+  body{ margin:0; background:var(--bg); color:var(--text);
+    font-family:Roboto,"Helvetica Neue",Arial,sans-serif; font-size:14px; line-height:1.45 }
+  *{box-sizing:border-box}
+  .mono{font-family:"Roboto Mono",ui-monospace,Menlo,monospace}
+  .num{font-variant-numeric:tabular-nums}
+  .page{ padding:26px 24px 60px; max-width:1500px; margin:0 auto }
+  @media (max-width:640px){ .page{padding:18px 16px 48px} }
+  h1.sh{ font-size:24px; font-weight:500; color:var(--accent);
+    border-bottom:2px solid var(--accent); padding-bottom:15px; margin:0 0 8px }
+  .strap{ font-size:12px; color:var(--sub); margin:0 0 20px }
+
+  .panel{ background:var(--panel); border:1px solid var(--panel2); border-radius:8px; overflow:hidden }
+  .pH{ display:flex; align-items:baseline; gap:11px; padding:12px 17px; background:var(--groupGrad); flex-wrap:wrap }
+  .pH h2{ font-size:14.5px; font-weight:700; margin:0; color:var(--navy) }
+  :root[data-theme="dark"] .pH h2{ color:var(--text) }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .pH h2{ color:var(--text) } }
+  .pH .note{ font-size:10.5px; color:var(--muted) }
+  .pH .right{ margin-left:auto; font-size:10.5px; color:var(--muted) }
+  .pB{ padding:16px 17px }
+
+  .kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(168px,1fr)); gap:11px; margin-bottom:16px }
+  .kpi{ background:var(--panel); border:1px solid var(--panel2); border-top:3px solid var(--kc);
+    border-radius:8px; padding:13px 15px }
+  .kpi .v{ font-size:28px; font-weight:500; line-height:1; color:var(--kc) }
+  .kpi .of{ font-size:12px; color:var(--muted); font-weight:400; margin-left:4px }
+  .kpi .k{ font-size:11.5px; margin-top:7px; color:var(--text); font-weight:500 }
+  .kpi .s{ font-size:10px; color:var(--muted); margin-top:3px; line-height:1.4 }
+  .kpi .meter{ height:4px; background:var(--trk); border-radius:2px; margin-top:9px; overflow:hidden }
+  .kpi .meter i{ display:block; height:100%; background:var(--kc) }
+
+  .grid2{ display:grid; grid-template-columns:minmax(0,1.62fr) minmax(0,1fr); gap:16px; margin-bottom:16px; align-items:start }
+  @media (max-width:1040px){ .grid2{ grid-template-columns:1fr } }
+
+  .flowWrap{ overflow-x:auto }
+  .fLbl{ font-size:9px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; fill:var(--muted) }
+  .fNode{ font-size:10.5px; fill:var(--text) }
+  .fNum{ font-size:10px; fill:var(--muted) }
+
+  .ev{ display:flex; flex-direction:column; gap:14px }
+  .evRow .t{ display:flex; align-items:baseline; gap:8px; font-size:11.5px }
+  .evRow .t b{ margin-left:auto; font-family:"Roboto Mono",monospace; font-size:10.5px; color:var(--ec) }
+  .evBar{ height:9px; border-radius:3px; background:var(--trk); margin-top:6px; overflow:hidden; display:flex }
+  .evBar i{ display:block; height:100% }
+  .evRow p{ margin:5px 0 0; font-size:10.5px; color:var(--muted); line-height:1.5 }
+
+  .waffle{ display:flex; flex-wrap:wrap; gap:18px }
+  .wGroup .wT{ font-size:10px; font-weight:700; letter-spacing:.3px; color:var(--sub); margin-bottom:6px }
+  .wT span{ font-weight:400; color:var(--muted) }
+  .wCells{ display:grid; grid-auto-flow:row; gap:3px }
+  .wCell{ width:15px; height:15px; border-radius:2px; cursor:default }
+  .wCell.oos{ opacity:.45 }
+
+  .dvGrid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(255px,1fr)); gap:12px }
+  .dv{ border:1px solid var(--panel2); border-left:3px solid var(--dc); border-radius:6px;
+    padding:12px 14px; background:var(--panel) }
+  .dv .top{ display:flex; align-items:center; gap:10px }
+  .dv .n{ font-size:23px; font-weight:500; color:var(--dc); line-height:1 }
+  .dv .nm{ font-size:12.5px; font-weight:700 }
+  .dv .sh{ margin-left:auto; flex-shrink:0 }
+  .dv p{ margin:8px 0 0; font-size:11px; color:var(--sub); line-height:1.55 }
+  .dv .ow{ margin-top:8px; padding-top:7px; border-top:1px dashed var(--panel2); font-size:10px; color:var(--muted) }
+  .dv .ow b{ color:var(--sub) }
+
+  table{ border-collapse:collapse; width:100%; font-size:12px; min-width:640px }
+  .tw{ overflow-x:auto }
+  thead th{ text-align:left; padding:8px 12px; font-size:9.5px; font-weight:700; letter-spacing:.5px;
+    color:var(--muted); text-transform:uppercase; border-bottom:1px solid var(--panel2); white-space:nowrap }
+  tbody td{ padding:9px 12px; border-top:1px solid var(--panel2); vertical-align:top }
+  td .sub{ display:block; font-size:10px; color:var(--muted); margin-top:2px }
+  .pill{ display:inline-block; font-size:9px; font-weight:700; letter-spacing:.4px; padding:2px 8px;
+    border-radius:999px; white-space:nowrap }
+
+  .legend{ display:flex; flex-wrap:wrap; gap:12px; margin-top:12px }
+  .legend span{ display:flex; align-items:center; gap:6px; font-size:10.5px; color:var(--sub) }
+  .legend i{ width:11px; height:11px; border-radius:2px; display:inline-block }
+
+  .cardDemo{ max-width:430px; border:1px solid var(--panel2); border-radius:8px; background:var(--panel); overflow:hidden }
+  .cardDemo .ch{ padding:11px 14px; background:var(--groupGrad); display:flex; align-items:baseline; gap:8px }
+  .cardDemo .ch b{ font-size:12.5px } .cardDemo .ch span{ font-size:10px; color:var(--muted); margin-left:auto }
+  .cardDemo .cb{ padding:13px 14px }
+  .miniRow{ display:flex; align-items:center; gap:8px; font-size:11px; padding:4px 0 }
+  .miniRow .mn{ flex:1 1 auto; min-width:0 } .miniRow .mv{ font-weight:700; font-variant-numeric:tabular-nums }
+
+  .note{ background:var(--warningBg); border:1px solid var(--panel2); border-left:3px solid var(--warning);
+    border-radius:3px; padding:11px 14px; margin-top:18px; font-size:11.5px; color:var(--sub); line-height:1.55 }
+  .note b{ color:var(--text) }
+</style>
+
+<div class="page">
+  <h1 class="sh">Mapping &amp; Divergence</h1>
+  <div class="strap">IMDS · STAR lane · 44 final columns in the SEI denominator · 22 UAF columns excluded · example data</div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid2">
+    <section class="panel">
+      <div class="pH"><h2>Where every column's value comes from</h2>
+        <span class="note">ribbon width is columns · a ribbon that starts nowhere has no SEI source</span></div>
+      <div class="pB"><div class="flowWrap" id="flow"></div>
+        <div class="legend" id="flowLegend"></div></div>
+    </section>
+
+    <section class="panel">
+      <div class="pH"><h2>Why nothing is proven</h2>
+        <span class="note">a match needs both sides from live metadata</span></div>
+      <div class="pB"><div class="ev" id="evidence"></div></div>
+    </section>
+  </div>
+
+  <section class="panel" style="margin-bottom:16px">
+    <div class="pH"><h2>Every final column, one cell</h2>
+      <span class="note">grouped by warehouse table, in table order</span>
+      <span class="right">66 cells · 0 green</span></div>
+    <div class="pB"><div class="waffle" id="waffle"></div>
+      <div class="legend" id="wLegend"></div>
+      <p style="font-size:11.5px;color:var(--sub);line-height:1.6;margin:14px 0 0;max-width:72ch">
+        The unbroken red run through the middle of <span class="mono">BBH_STAR_NAV_TB</span> is the
+        general-ledger block. Fifteen of its twenty-three columns have no SEI datapoint behind them, and they
+        are contiguous because they are one coherent gap, not fifteen separate misses.</p></div>
+  </section>
+
+  <section class="panel" style="margin-bottom:16px">
+    <div class="pH"><h2>Divergence — six shapes, and what each one costs</h2>
+      <span class="note">the diagram is the shape of the problem, not decoration</span></div>
+    <div class="pB"><div class="dvGrid" id="divergence"></div></div>
+  </section>
+
+  <section class="panel" style="margin-bottom:16px">
+    <div class="pH"><h2>The specific divergences</h2>
+      <span class="note">named, with an owner and the one thing that clears each</span></div>
+    <div class="pB"><div class="tw"><table id="dvTable"></table></div></div>
+  </section>
+
+  <section class="panel">
+    <div class="pH"><h2>As a card on the Lineage landing</h2>
+      <span class="note">the same numbers, compressed to a glance</span></div>
+    <div class="pB"><div class="cardDemo" id="cardDemo"></div></div>
+  </section>
+
+  <div class="note"><b>Example data.</b> Counts come from the 44 STAR-lane columns the ingested workbook
+    returned. No verdict has been earned: target types came from a data dictionary and SEI publishes datapoint
+    names without types, so the green segment is zero by construction rather than by measurement.</div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var $=function(s){return document.querySelector(s);};
+  var esc=function(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});};
+
+  var C={ proven:"#159943", unknown:"#b8c3cc", decode:"#7c3aed", composite:"#e67e22",
+          nosource:"#c1113a", nobaseline:"#b45309", oos:"#9dbdd0" };
+
+  /* ---------- KPIs ---------- */
+  var KPI=[
+    {v:44, of:"of 66", k:"Columns in the SEI denominator", s:"22 UAF columns are lineage, not readiness",
+     c:"var(--accent)", pct:67},
+    {v:15, of:"of 44", k:"Have a SEI datapoint proposed", s:"34% mapped — none of it verified yet",
+     c:"var(--sei)", pct:34},
+    {v:0, of:"of 15", k:"Proven matches", s:"both sides must come from live metadata",
+     c:"var(--success)", pct:0},
+    {v:22, of:"", k:"No SEI source", s:"each needs a named disposition", c:"var(--danger)", pct:50},
+    {v:23, of:"", k:"Columns carrying a divergence", s:"collapse, dual source or a contract bypass",
+     c:"var(--purple)", pct:52},
+    {v:6, of:"", k:"Distinct divergence shapes", s:"each with a different owner", c:"var(--warning)", pct:100}
+  ];
+  $("#kpis").innerHTML=KPI.map(function(k){
+    return '<div class="kpi" style="--kc:'+k.c+'"><div class="v num">'+k.v+
+      (k.of?'<span class="of num">'+k.of+'</span>':"")+'</div>'+
+      '<div class="k">'+esc(k.k)+'</div><div class="s">'+esc(k.s)+'</div>'+
+      '<div class="meter"><i style="width:'+k.pct+'%"></i></div></div>';
+  }).join("");
+
+  /* ---------- flow ---------- */
+  var L=[ {id:"acct", t:"Account", n:9,  c:C.unknown},
+          {id:"eod",  t:"End of Day Positions", n:4, c:C.unknown},
+          {id:"tax",  t:"Taxlot", n:2, c:C.unknown},
+          {id:"none", t:"no SEI source", n:29, c:C.nosource} ];
+  var M=[ {id:"tbm", t:"TBMEIFI7", n:23}, {id:"acd", t:"ACDDIFI1", n:14}, {id:"ped", t:"PEDDIFI1", n:7} ];
+  var R=[ {id:"nav", t:"BBH_STAR_NAV_TB", n:23}, {id:"ent", t:"RULESDBO.ENTITY", n:6},
+          {id:"eh",  t:"RULESDBO.ENTITY_HIST", n:8}, {id:"pos", t:"HOLDINGDBO.POSITION", n:7} ];
+  var F1=[ ["acct","tbm",4,C.unknown], ["acct","acd",2,C.unknown], ["acct","ped",1,C.decode],
+           ["eod","tbm",2,C.unknown], ["eod","ped",2,C.composite], ["tax","tbm",2,C.unknown],
+           ["none","tbm",15,C.nosource], ["none","acd",10,C.nosource], ["none","ped",4,C.nosource] ];
+  var F2=[ ["tbm","nav",23], ["acd","ent",6], ["acd","eh",8], ["ped","pos",7] ];
+  var BYPASS=2;
+
+  function drawFlow(){
+    var W=760, H=330, CW=132, x0=0, x1=(W-CW)/2, x2=W-CW, top=34, avail=H-top-16;
+    var total=44, unit=avail/total, gap=9;
+    function lay(list,x){
+      var span=list.reduce(function(a,b){return a+b.n;},0)*unit+(list.length-1)*gap;
+      var y=top+(avail-span)/2, out={};
+      list.forEach(function(o){ var h=Math.max(14,o.n*unit); out[o.id]={y:y,h:h,o:o,x:x}; y+=h+gap; });
+      return out;
+    }
+    var pl=lay(L,x0), pm=lay(M,x1), pr=lay(R,x2);
+    var offL={}, offM={}, offMr={}, offR={};
+    function ribbon(a,b,n,col,dash){
+      var h=Math.max(1.5,n*unit);
+      var ay=a.y+(offL[a.o.id]=(offL[a.o.id]||0))+h/2; offL[a.o.id]+=h;
+      var by=b.y+(offM[b.o.id]=(offM[b.o.id]||0))+h/2; offM[b.o.id]+=h;
+      var x1a=a.x+CW, x2a=b.x, d=(x2a-x1a)*.5;
+      return '<path d="M '+x1a+' '+ay+' C '+(x1a+d)+' '+ay+', '+(x2a-d)+' '+by+', '+x2a+' '+by+
+        '" stroke="'+col+'" stroke-width="'+h+'" fill="none" opacity=".5"'+
+        (dash?' stroke-dasharray="6 4"':"")+'></path>';
+    }
+    function ribbon2(a,b,n,col){
+      var h=Math.max(1.5,n*unit);
+      var ay=a.y+(offMr[a.o.id]=(offMr[a.o.id]||0))+h/2; offMr[a.o.id]+=h;
+      var by=b.y+(offR[b.o.id]=(offR[b.o.id]||0))+h/2; offR[b.o.id]+=h;
+      var x1a=a.x+CW, x2a=b.x, d=(x2a-x1a)*.5;
+      return '<path d="M '+x1a+' '+ay+' C '+(x1a+d)+' '+ay+', '+(x2a-d)+' '+by+', '+x2a+' '+by+
+        '" stroke="'+col+'" stroke-width="'+h+'" fill="none" opacity=".38"></path>';
+    }
+    var rib="";
+    F1.forEach(function(f){ rib+=ribbon(pl[f[0]],pm[f[1]],f[2],f[3]); });
+    F2.forEach(function(f){ rib+=ribbon2(pm[f[0]],pr[f[1]],f[2],"#5f87a7"); });
+    // the contract bypass — Account straight past the middle column
+    var ay=pl.acct.y+offL.acct+ (BYPASS*unit)/2;
+    rib+='<path d="M '+(x0+CW)+' '+ay+' C '+(x1)+' '+(ay-38)+', '+(x2-40)+' '+(pr.ent.y-14)+', '+x2+' '+
+      (pr.ent.y+4)+'" stroke="'+C.nobaseline+'" stroke-width="'+Math.max(2,BYPASS*unit)+
+      '" fill="none" stroke-dasharray="6 4" opacity=".85"></path>';
+
+    function boxes(p,anchor){
+      return Object.keys(p).map(function(k){
+        var b=p[k];
+        return '<rect x="'+b.x+'" y="'+b.y+'" width="'+CW+'" height="'+b.h+'" rx="2" fill="var(--panel)" '+
+          'stroke="var(--panel2)"></rect>'+
+          '<rect x="'+b.x+'" y="'+b.y+'" width="3" height="'+b.h+'" fill="'+(b.o.c||"#5f87a7")+'"></rect>'+
+          '<text class="fNode" x="'+(b.x+9)+'" y="'+(b.y+b.h/2-1)+'">'+esc(b.o.t)+'</text>'+
+          '<text class="fNum" x="'+(b.x+9)+'" y="'+(b.y+b.h/2+12)+'">'+b.o.n+' columns</text>';
+      }).join("");
+    }
+    var heads='<text class="fLbl" x="0" y="14">SEI datapoint source</text>'+
+      '<text class="fLbl" x="'+x1+'" y="14">Contract feed (STAR)</text>'+
+      '<text class="fLbl" x="'+x2+'" y="14">Warehouse table</text>';
+    $("#flow").innerHTML='<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+
+      '" style="min-width:'+W+'px">'+heads+rib+boxes(pl)+boxes(pm)+boxes(pr)+'</svg>';
+
+    $("#flowLegend").innerHTML=[
+      ["#c1113a","no SEI source — 29 of 44"],["#b8c3cc","mapped, unproven"],
+      ["#7c3aed","decode required"],["#e67e22","composite"],
+      ["#b45309","bypasses the contract (dashed)"]
+    ].map(function(l){ return '<span><i style="background:'+l[0]+'"></i>'+l[1]+'</span>'; }).join("");
+  }
+  drawFlow();
+
+  /* ---------- evidence ---------- */
+  var EV=[
+    {t:"Warehouse target", pct:0, c:"var(--danger)", have:"0 of 66 from live DDL",
+     p:"Types came from IMDS_data_dictionary.xlsx. A dictionary is a document, so no row can be called proven until an ALL_TAB_COLUMNS extract replaces it."},
+    {t:"Contract field (STAR)", pct:0, c:"var(--danger)", have:"0 of 7 copybooks",
+     p:"No STAR layout was supplied. Every contract-side type is inferred from the target column it feeds — the single assumption the whole check rests on."},
+    {t:"SEI datapoint", pct:0, c:"var(--danger)", have:"0 of 53 feeds carry types",
+     p:"The feed workbook names datapoints and omits their type, length and scale."},
+    {t:"Code sets", pct:0, c:"var(--danger)", have:"197 domains, 0 values",
+     p:"The reference workbook lists domain names without member values, and no STAR code set was supplied at all — so decodes are blocked at both ends."},
+    {t:"Identifier crosswalk", pct:15, c:"var(--warning)", have:"named, not specified",
+     p:"Instrument can be matched on INSTRUMENT_ID, ISIN, CUSIP or SEDOL. Which takes precedence, and in what context, is undocumented."}
+  ];
+  $("#evidence").innerHTML=EV.map(function(e){
+    return '<div class="evRow" style="--ec:'+e.c+'"><div class="t"><span style="font-weight:500">'+esc(e.t)+
+      '</span><b>'+esc(e.have)+'</b></div><div class="evBar"><i style="width:'+e.pct+'%;background:'+e.c+'"></i></div>'+
+      '<p>'+esc(e.p)+'</p></div>';
+  }).join("");
+
+  /* ---------- waffle ---------- */
+  var V={ u:C.unknown, d:C.decode, c:C.composite, n:C.nosource, b:C.nobaseline, o:C.oos };
+  var TBL=[
+    {t:"BBH_STAR_NAV_TB", lane:"STAR", cells:"nudnnnunuuuunnnnnnunnnn"},
+    {t:"RULESDBO.ENTITY", lane:"STAR", cells:"unnbbn"},
+    {t:"RULESDBO.ENTITY_HIST", lane:"STAR", cells:"unnbbnbb"},
+    {t:"HOLDINGDBO.POSITION", lane:"STAR", cells:"ubbnbdc"},
+    {t:"RULESDBO.ENTITY", lane:"UAF", cells:"oooooo"},
+    {t:"RULESDBO.ENTITY_HIST", lane:"UAF", cells:"oooooooo"},
+    {t:"RULESDBO.BBH_INTERESTED_PARTIES", lane:"UAF", cells:"oooooooo"}
+  ];
+  var LC={STAR:"var(--star)",UAF:"var(--uaf)"};
+  $("#waffle").innerHTML=TBL.map(function(g){
+    var cells=g.cells.split("").map(function(ch){
+      return '<span class="wCell'+(ch==="o"?" oos":"")+'" style="background:'+V[ch]+'"></span>'; }).join("");
+    var cols=Math.min(8,Math.ceil(Math.sqrt(g.cells.length*1.6)));
+    return '<div class="wGroup"><div class="wT"><span style="color:'+LC[g.lane]+'">'+g.lane+'</span> · '+
+      esc(g.t.split(".").pop())+' <span>'+g.cells.length+'</span></div>'+
+      '<div class="wCells" style="grid-template-columns:repeat('+cols+',15px)">'+cells+'</div></div>';
+  }).join("");
+  $("#wLegend").innerHTML=[
+    [C.proven,"proven (0)"],[C.unknown,"mapped, unproven (10)"],[C.decode,"decode needed (2)"],
+    [C.composite,"composite (1)"],[C.nosource,"no SEI source (22)"],[C.nobaseline,"no baseline (9)"],
+    [C.oos,"out of scope — UAF (22)"]
+  ].map(function(l){ return '<span><i style="background:'+l[0]+'"></i>'+l[1]+'</span>'; }).join("");
+
+  /* ---------- divergence shapes ---------- */
+  function svg(inner){ return '<svg class="sh" width="66" height="30" viewBox="0 0 66 30">'+inner+'</svg>'; }
+  var dot=function(x,y,c,r){ return '<circle cx="'+x+'" cy="'+y+'" r="'+(r||3.5)+'" fill="'+c+'"/>'; };
+  var line=function(x1,y1,x2,y2,c,dash){
+    return '<path d="M '+x1+' '+y1+' C '+(x1+11)+' '+y1+', '+(x2-11)+' '+y2+', '+x2+' '+y2+
+      '" stroke="'+c+'" stroke-width="1.6" fill="none"'+(dash?' stroke-dasharray="3 3"':"")+'/>'; };
+
+  var DV=[
+    {n:6, t:"Collapse", c:"var(--danger)", col:"#c1113a",
+     sh:svg(line(8,15,58,6,"#c1113a")+line(8,15,58,15,"#c1113a")+line(8,15,58,24,"#c1113a")+
+            dot(8,15,"#c1113a",4)+dot(58,6,"#c1113a")+dot(58,15,"#c1113a")+dot(58,24,"#c1113a")),
+     p:"One SEI datapoint proposed for contract fields the incumbent kept distinct. Where they hold different values today, the collapse is silent — the load succeeds and the number is wrong.",
+     ow:"SEI design team + BBH mapping"},
+    {n:14, t:"Dual source", c:"var(--purple)", col:"#7c3aed",
+     sh:svg(line(8,7,58,15,"#7c3aed")+line(8,23,58,15,"#7c3aed")+
+            dot(8,7,"#b5651d")+dot(8,23,"#0b7d7d")+dot(58,15,"#7c3aed",4)),
+     p:"Two lanes write the same warehouse column and nothing states which wins. No error is raised when they disagree — the value depends on load order.",
+     ow:"IMDS data owner"},
+    {n:2, t:"Contract bypass", c:"var(--bronze)", col:"#b45309",
+     sh:svg('<circle cx="33" cy="15" r="5" fill="none" stroke="#b45309" stroke-width="1.2" stroke-dasharray="2 2"/>'+
+            '<path d="M 8 15 C 18 2, 48 2, 58 15" stroke="#b45309" stroke-width="1.6" fill="none" stroke-dasharray="3 3"/>'+
+            dot(8,15,"#b45309")+dot(58,15,"#b45309")),
+     p:"SEI datapoints attached to a column with no incumbent field behind it — a direct route to the warehouse that skips the compatibility contract. Possibly right for an operational column, never right as a side effect.",
+     ow:"Architecture — unassigned"},
+    {n:2, t:"Decode gap", c:"var(--purple)", col:"#7c3aed",
+     sh:svg(line(8,15,26,15,"#7c3aed")+line(40,15,58,15,"#7c3aed")+dot(8,15,"#7c3aed")+dot(58,15,"#7c3aed")+
+            '<text x="33" y="20" text-anchor="middle" font-size="14" fill="#7c3aed">≠</text>'),
+     p:"A code set must be translated and neither side is complete: SEI publishes domain names without values, and no STAR code set was supplied. Blocked at both ends.",
+     ow:"SEI design team + STAR owner"},
+    {n:1, t:"Feed dependency", c:"var(--warning)", col:"#e67e22",
+     sh:svg(line(8,7,58,15,"#e67e22")+line(8,23,58,15,"#e67e22",true)+
+            dot(8,7,"#e67e22")+dot(8,23,"#e67e22")+dot(58,15,"#e67e22",4)),
+     p:"Assembled from feeds that can arrive separately. Nothing stops the position feed loading without its rates, and the result is a wrong value rather than a missing one — the harder failure to detect.",
+     ow:"BBH mapping"},
+    {n:22, t:"No source", c:"var(--danger)", col:"#c1113a",
+     sh:svg('<path d="M 8 15 L 42 15" stroke="#c1113a" stroke-width="1.6" stroke-dasharray="4 3" fill="none"/>'+
+            dot(8,15,"#c1113a")+
+            '<circle cx="50" cy="15" r="4" fill="none" stroke="#c1113a" stroke-width="1.4"/>'),
+     p:"Delivered to the warehouse today with nothing behind it after cutover. Needs one of four dispositions — default, derive, drop or block — approved by the data owner.",
+     ow:"IMDS data owner"}
+  ];
+  $("#divergence").innerHTML=DV.map(function(d){
+    return '<div class="dv" style="--dc:'+d.c+'"><div class="top"><span class="n num">'+d.n+'</span>'+
+      '<span class="nm">'+esc(d.t)+'</span>'+d.sh+'</div><p>'+esc(d.p)+'</p>'+
+      '<div class="ow"><b>Owner</b> '+esc(d.ow)+'</div></div>';
+  }).join("");
+
+  /* ---------- the specific divergences ---------- */
+  var ROWS=[
+    {w:"Taxlot.MARKET_VALUE", k:"Collapse", c:"var(--danger)", cb:"var(--dangerBg)",
+     d:"Proposed for both Derived_Market_Value and Market_Value on TBMEIFI7 — a derived value and an as-supplied value, kept apart on the same STAR record.",
+     n:2, o:"SEI design team", clr:"SEI names which of its datapoints is the derived one"},
+    {w:"Account.ACCOUNT_NUMBER", k:"Collapse", c:"var(--danger)", cb:"var(--dangerBg)",
+     d:"Proposed for Custody_Head_Account_Number, Entity_Number and STAR_ENTITY_ID_1. A custody head account is not an entity number in a custody model.",
+     n:4, o:"BBH mapping", clr:"Confirmation of which identifier is the custody head"},
+    {w:"RULESDBO.ENTITY", k:"Dual source", c:"var(--purple)", cb:"var(--purpleBg)",
+     d:"Written by both the STAR lane and UAF. No precedence rule exists in any attached document.",
+     n:6, o:"IMDS data owner", clr:"A stated rule — last write, source priority, or a record-type split"},
+    {w:"RULESDBO.ENTITY_HIST", k:"Dual source", c:"var(--purple)", cb:"var(--purpleBg)",
+     d:"Same overlap as ENTITY, plus effective_date and src_intfc_inst.",
+     n:8, o:"IMDS data owner", clr:"The same precedence rule, applied to history"},
+    {w:"upd_user", k:"Contract bypass", c:"var(--bronze)", cb:"var(--bronzeBg)",
+     d:"Two SEI datapoints attached to a column with no STAR field behind it, on both ENTITY and ENTITY_HIST.",
+     n:2, o:"Architecture", clr:"A decision on whether operational columns may bypass the contract"},
+    {w:"Base_Currency_Code", k:"Decode gap", c:"var(--purple)", cb:"var(--purpleBg)",
+     d:"CURRENCY is named as a SEI domain with no published values, and no STAR currency code set was supplied.",
+     n:2, o:"SEI + STAR owner", clr:"Member values from SEI and the STAR code set to map them to"},
+    {w:"Base_Amortized_Cost_7_Trade_Date", k:"Feed dependency", c:"var(--warning)", cb:"var(--warningBg)",
+     d:"Three SEI datapoints across two feeds, with no stated day-count basis and no gate on arrival order.",
+     n:1, o:"BBH mapping", clr:"A parallel-run reconciliation with a stated tolerance"},
+    {w:"GL_* block", k:"No source", c:"var(--danger)", cb:"var(--dangerBg)",
+     d:"Five general-ledger columns plus ten more NAV columns. SEI publishes no general-ledger datapoints in any attached feed — one coherent gap, not fifteen misses.",
+     n:15, o:"SEI + IMDS data owner", clr:"A yes/no on whether SEI carries general ledger at all"}
+  ];
+  $("#dvTable").innerHTML='<thead><tr><th>Where</th><th>Shape</th><th style="text-align:right">Columns</th>'+
+    '<th>Owner</th><th>What clears it</th></tr></thead><tbody>'+
+    ROWS.map(function(r){
+      return '<tr><td><span class="mono" style="font-weight:500">'+esc(r.w)+'</span><span class="sub">'+esc(r.d)+'</span></td>'+
+        '<td><span class="pill" style="background:'+r.cb+';color:'+r.c+'">'+esc(r.k.toUpperCase())+'</span></td>'+
+        '<td style="text-align:right" class="num" style="font-weight:700">'+r.n+'</td>'+
+        '<td>'+esc(r.o)+'</td><td>'+esc(r.clr)+'</td></tr>';
+    }).join("")+'</tbody>';
+
+  /* ---------- landing card ---------- */
+  var MINI=[["Mapped to SEI",15,C.unknown],["No SEI source",22,C.nosource],
+            ["No baseline",9,C.nobaseline],["Carrying a divergence",23,C.decode]];
+  $("#cardDemo").innerHTML='<div class="ch"><b>Mapping &amp; divergence</b><span>IMDS · STAR lane</span></div>'+
+    '<div class="cb"><div style="display:flex;align-items:baseline;gap:9px">'+
+    '<span style="font-size:30px;font-weight:500;color:var(--success);line-height:1" class="num">0</span>'+
+    '<span style="font-size:11.5px;color:var(--sub);line-height:1.4">proven matches of 44 columns<br>'+
+    '<span style="color:var(--muted);font-size:10.5px">ceiling is 0 until live DDL lands</span></span></div>'+
+    '<div style="display:flex;height:9px;border-radius:3px;overflow:hidden;background:var(--trk);margin:12px 0 10px">'+
+    '<i style="display:block;width:22.7%;background:'+C.unknown+'"></i>'+
+    '<i style="display:block;width:4.6%;background:'+C.decode+'"></i>'+
+    '<i style="display:block;width:2.3%;background:'+C.composite+'"></i>'+
+    '<i style="display:block;width:50.0%;background:'+C.nosource+'"></i>'+
+    '<i style="display:block;width:20.4%;background:'+C.nobaseline+'"></i></div>'+
+    MINI.map(function(m){
+      return '<div class="miniRow"><span style="width:9px;height:9px;border-radius:2px;background:'+m[2]+
+        ';display:inline-block;flex-shrink:0"></span><span class="mn">'+esc(m[0])+
+        '</span><span class="mv">'+m[1]+'</span></div>';
+    }).join("")+
+    '<div style="margin-top:11px;padding-top:9px;border-top:1px dashed var(--panel2);font-size:10.5px;color:var(--muted)">'+
+    'Biggest single gap: the general-ledger block, 15 columns</div></div>';
+})();
+</script>
