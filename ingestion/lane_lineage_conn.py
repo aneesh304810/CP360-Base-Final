@@ -168,9 +168,17 @@ class Sheet:
 class SeiCrosswalkConnector:
     name = "sei_crosswalk"
 
+    # Feeds arrive on ONE SHEET PER SYSTEM — STAR_FEED, UAF_FEED — not on a
+    # single SOURCE_FEED. Matching only the first meant UAF_FEED was dropped
+    # whole, so UAF never reached legacy_source_file, so the warehouse's
+    # system list never knew UAF fed IMDS. Every one of these that exists is
+    # read, and the sheet's own name supplies the system.
+    FEED_SHEETS = (("SOURCE_FEED", None), ("STAR_FEED", "STAR"),
+                   ("UAF_FEED", "UAF"), ("ADDVANTAGE_FEED", "ADDVANTAGE"),
+                   ("CRD_FEED", "CRD"))
+
     SHEETS = {
         "lane":    ("LANE_REGISTER", "LANEREGISTER"),
-        "feed":    ("SOURCE_FEED", "STAR_FEED"),
         "lineage": ("LANE_LINEAGE", "STAR_TO_IMDS"),
         "seifeed": ("SEI_FEED",),
         "map":     ("SEI_TO_CONTRACT", "SEI_TO_STAR"),
@@ -180,6 +188,9 @@ class SeiCrosswalkConnector:
         "disp":    ("DISPOSITION",),
         "dual":    ("DUAL_SOURCE",),
         "exc":     ("EXCEPTIONS",),
+        "seiinput": ("SEI_INPUT_LINEAGE",),
+        "seicat":   ("SEI_CATALOG_VERIFY",),
+        "uafschema": ("UAF_FIELD_SCHEMA",),
     }
 
     def __init__(self, xlsx_path=None, data_source=None, reload_scope=False,
@@ -221,9 +232,14 @@ class SeiCrosswalkConnector:
             log.warning("sei_crosswalk: sheets not found: %s", ", ".join(sorted(missing)))
 
         lanes = self._lanes(sheets.get("lane"))
+        feeds = []
+        for want, sysname in self.FEED_SHEETS:
+            real = by_key.get(_hkey(want))
+            if real:
+                feeds += self._feeds(Sheet(wb[real]), lanes, sysname, want)
         out = {
             "lane":    lanes,
-            "feed":    self._feeds(sheets.get("feed"), lanes),
+            "feed":    feeds,
             "lineage": [], "srccol": [],
             "map":     self._map(sheets.get("map")),
             "code":    self._code(sheets.get("code")),
@@ -232,6 +248,10 @@ class SeiCrosswalkConnector:
             "disp":    self._disp(sheets.get("disp")),
             "dual":    self._dual(sheets.get("dual")),
             "exc":     self._exc(sheets.get("exc")),
+            "seifeed":  self._seifeed(sheets.get("seifeed")),
+            "seiinput": self._seiinput(sheets.get("seiinput")),
+            "seicat":   self._seicat(sheets.get("seicat")),
+            "uafschema": self._uafschema(sheets.get("uafschema")),
         }
         out["lineage"], out["srccol"] = self._lineage(sheets.get("lineage"))
         self.counts = {k: len(v) for k, v in out.items()}
@@ -258,7 +278,7 @@ class SeiCrosswalkConnector:
             })
         return out
 
-    def _feeds(self, sh, lanes=None):
+    def _feeds(self, sh, lanes=None, sysname=None, sheet_name=None):
         """Incumbent feeds -> legacy_source_file, tagged with their lane's
         source_system. This is what makes the lane resolvable without a new
         column on legacy_lineage.
@@ -279,10 +299,7 @@ class SeiCrosswalkConnector:
         the UI fall back to showing everything."""
         if not sh:
             return []
-        hint = None
-        alias = (getattr(self, "matched", {}) or {}).get("feed", "")
-        if alias.endswith("_FEED") and alias != "SOURCE_FEED":
-            hint = alias[:-len("_FEED")]          # STAR_FEED -> STAR
+        hint = sysname                            # the sheet's own system
         if not hint:
             incumbents = sorted({(l.get("source_system") or "").upper()
                                  for l in (lanes or [])
@@ -291,7 +308,8 @@ class SeiCrosswalkConnector:
             if len(incumbents) == 1:
                 hint = incumbents[0]
         if hint:
-            log.info("feed sheet has no LANE_ID; source_system resolved to %s", hint)
+            log.info("%s: %d feeds tagged source_system=%s",
+                     sheet_name or "feed sheet", 0, hint)
         out, seen = [], set()
         for row in sh.rows():
             feed = sh.get(row, "FEED_NAME")
@@ -577,6 +595,139 @@ class SeiCrosswalkConnector:
             })
         return out
 
+
+    # ---- SEI_FEED: the outbound inventory (was parsed and thrown away) ----
+    def _seifeed(self, sh):
+        if not sh:
+            return []
+        out = []
+        for row in sh.rows():
+            feed = sh.get(row, "SEI_FEED")
+            if not feed:
+                continue
+            ent = sh.get(row, "SEI_ENTITY") or feed
+            out.append({
+                "feed_id": f"{self.data_source}:{feed}:{ent}",
+                "data_source": self.data_source,
+                "sei_feed": feed, "sei_entity": ent,
+                "subject_area": sh.get(row, "SUBJECT_AREA"),
+                "delivery_mode": _nz(sh.get(row, "DELIVERY_MODE")),
+                "frequency": _nz(sh.get(row, "FREQUENCY")),
+                "grain": sh.get(row, "GRAIN"),
+                "key_fields": sh.get(row, "KEY_FIELDS"),
+                "load_behaviour": _nz(sh.get(row, "LOAD_BEHAVIOUR")),
+                "types_published": _nz(sh.get(row, "TYPES_PUBLISHED")),
+                "evidence": sh.get(row, "EVIDENCE"),
+                "source_doc": sh.get(row, "SOURCE_DOC"),
+                "notes": sh.get(row, "NOTES"),
+            })
+        return out
+
+    # ---- SEI_INPUT_LINEAGE: what is loaded INTO SEI (inbound) ----
+    def _seiinput(self, sh):
+        """The inbound direction. Deliberately NOT joined into the format
+        verdict: an inbound field existing does not establish that it is
+        exposed through the outbound interface the contract needs. The
+        workbook says so itself, and the distinction is the point."""
+        if not sh:
+            return []
+        out = []
+        for i, row in enumerate(sh.rows(), 1):
+            fld = sh.get(row, "SEI_FIELD")
+            if not fld:
+                continue
+            tgt = sh.get(row, "SEI_TARGET_FILE", "TARGET_FILE")
+            out.append({
+                "input_id": f"{self.data_source}:{tgt or 'NA'}:{fld}:{i}",
+                "data_source": self.data_source,
+                "direction": (sh.get(row, "DIRECTION") or "INBOUND").upper(),
+                "functional_group": sh.get(row, "FUNCTIONAL_GROUP", "SUBJECT_AREA"),
+                "sei_target_file": tgt,
+                "sei_field_ordinal": _nz(sh.get(row, "SEI_FIELD_ORDINAL", "ORDINAL")),
+                "sei_field": fld,
+                "sei_field_norm": _norm_code(fld),
+                "published_type": _nz(sh.get(row, "PUBLISHED_TYPE", "SEI_TYPE")),
+                "published_length": _nz(sh.get(row, "PUBLISHED_LENGTH", "SEI_LENGTH")),
+                "published_scale": _nz(sh.get(row, "PUBLISHED_SCALE", "SEI_SCALE")),
+                "record_scope": sh.get(row, "RECORD_SCOPE"),
+                "validation_rule": sh.get(row, "VALIDATION_RULE"),
+                "field_definition": sh.get(row, "FIELD_DEFINITION"),
+                "code_set_name": _nz(sh.get(row, "CODE_SET_NAME")),
+                "mapping_status": _nz(sh.get(row, "MAPPING_STATUS")),
+                "source_mapping_rule": sh.get(row, "SOURCE_MAPPING_RULE"),
+                "upstream_object": sh.get(row, "UPSTREAM_SOURCE_OBJECT", "UPSTREAM_OBJECT"),
+                "upstream_field": sh.get(row, "UPSTREAM_SOURCE_FIELD", "UPSTREAM_FIELD"),
+                "origin_workbook": sh.get(row, "ORIGINAL_WORKBOOK", "ORIGIN_WORKBOOK"),
+                "origin_sheet": sh.get(row, "ORIGINAL_SHEET", "ORIGIN_SHEET"),
+                "evidence": sh.get(row, "EVIDENCE"),
+                "source_doc_locator": sh.get(row, "SOURCE_DOC_LOCATOR", "LOCATOR"),
+            })
+        return out
+
+    # ---- SEI_CATALOG_VERIFY: does the proposed datapoint exist at all? ----
+    def _seicat(self, sh):
+        if not sh:
+            return []
+        out = []
+        for i, row in enumerate(sh.rows(), 1):
+            dp = sh.get(row, "MAPPED_SEI_DATAPOINT", "SEI_DATAPOINT")
+            fld = sh.get(row, "TARGET_STAR_FIELD", "TARGET_CONTRACT_FIELD", "TARGET_FIELD")
+            if not dp and not fld:
+                continue
+            n = sh.get(row, "MATCH_COUNT")
+            try:
+                n = int(float(n))
+            except (TypeError, ValueError):
+                n = 0
+            out.append({
+                "cat_id": f"{self.data_source}:{fld or 'NA'}:{dp or 'NA'}:{i}",
+                "data_source": self.data_source,
+                "lane_id": (sh.get(row, "LANE_ID") or "").upper() or None,
+                "target_feed": sh.get(row, "TARGET_STAR_FEED", "TARGET_CONTRACT_FEED", "TARGET_FEED"),
+                "target_field": fld,
+                "mapped_sei_datapoint": dp,
+                "matched_file": sh.get(row, "MATCHED_FILE"),
+                "matched_row": _nz(sh.get(row, "MATCHED_CATALOG_ROW", "CATALOG_ROW", "MATCHED_ROW")),
+                "match_count": n,
+                "published_type": _nz(sh.get(row, "PUBLISHED_TYPE")),
+                "published_length": _nz(sh.get(row, "PUBLISHED_LENGTH")),
+                "published_scale": _nz(sh.get(row, "PUBLISHED_SCALE")),
+                "direction_note": sh.get(row, "DIRECTION_COMPATIBILITY", "DIRECTION_NOTE"),
+                "verify_result": (sh.get(row, "VERIFICATION_RESULT", "VERIFY_RESULT", "RESULT")
+                                  or "UNKNOWN").upper(),
+                "notes": sh.get(row, "NOTES"),
+            })
+        return out
+
+    # ---- UAF_FIELD_SCHEMA: UAF has no AddVantage-style dictionary ----
+    def _uafschema(self, sh):
+        if not sh:
+            return []
+        out = []
+        for i, row in enumerate(sh.rows(), 1):
+            fld = sh.get(row, "SOURCE_FIELD", "UAF_FIELD", "FIELD")
+            if not fld:
+                continue
+            feed = sh.get(row, "UAF_FEED", "FEED")
+            out.append({
+                "uaf_id": f"{self.data_source}:{feed or 'NA'}:{fld}:{i}",
+                "data_source": self.data_source,
+                "uaf_feed": feed,
+                "record_type": _nz(sh.get(row, "RECORD_TYPE")),
+                "ordinal": _nz(sh.get(row, "ORDINAL")),
+                "source_field": fld,
+                "source_field_norm": _norm_code(fld),
+                "published_type": _nz(sh.get(row, "PUBLISHED_DATATYPE", "PUBLISHED_TYPE", "DATATYPE")),
+                "published_length": _nz(sh.get(row, "PUBLISHED_LENGTH", "LENGTH")),
+                "repeating_group": _nz(sh.get(row, "REPEATING_GROUP")),
+                "uaf_procedure": sh.get(row, "UAF_PROCEDURE", "PROCEDURE"),
+                "imds_target": sh.get(row, "DOCUMENTED_IMDS_TARGET", "IMDS_TARGET", "TARGET_OR_USE"),
+                "transformation": sh.get(row, "TRANSFORMATION"),
+                "evidence": sh.get(row, "EVIDENCE"),
+                "notes": sh.get(row, "NOTES"),
+            })
+        return out
+
     # ------------------------------------------------------------- load ----
     _TARGETS = [
         ("lane",    "legacy_lane",         ("lane_id",)),
@@ -590,6 +741,10 @@ class SeiCrosswalkConnector:
         ("disp",    "sei_disposition",     ("disp_id",)),
         ("dual",    "sei_dual_source",     ("dual_id",)),
         ("exc",     "sei_exception",       ("exc_id",)),
+        ("seifeed",  "sei_feed",           ("feed_id",)),
+        ("seiinput", "sei_input_lineage",  ("input_id",)),
+        ("seicat",   "sei_catalog_verify", ("cat_id",)),
+        ("uafschema", "uaf_field_schema",  ("uaf_id",)),
     ]
 
     # legacy_lineage and legacy_source_file are SHARED with whatever loaded the
@@ -718,6 +873,10 @@ class SeiCrosswalkConnector:
             ("sei_disposition", "lane_id IN (SELECT lane_id FROM legacy_lane WHERE data_source = :ds)"),
             ("sei_dual_source", "data_source = :ds"),
             ("sei_exception", "data_source = :ds"),
+            ("sei_feed", "data_source = :ds"),
+            ("sei_input_lineage", "data_source = :ds"),
+            ("sei_catalog_verify", "data_source = :ds"),
+            ("uaf_field_schema", "data_source = :ds"),
             ("legacy_src_column", "data_source = :ds"),
             ("legacy_lineage", "data_source = :ds"),
         ]

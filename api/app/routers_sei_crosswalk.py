@@ -369,6 +369,55 @@ def divergence(data_source: str | None = None):
     return {"shapes": shapes, "collapse": collapse, "dual_source": dual}
 
 
+@router.get("/catalog")
+def catalog(data_source: str | None = None, limit: int = 200):
+    """Does the proposed OUTBOUND datapoint appear in SEI's own INBOUND catalog?
+
+    This is a separate signal from the format verdict, deliberately. A field
+    loaded into SEI is not thereby exposed on the outbound interface the
+    contract needs — the workbook is explicit about that — so a name match
+    here is evidence, never proof.
+
+    It is nonetheless the cheapest finding available: a datapoint absent from
+    SEI's own catalog may not exist at all, which is worth knowing long before
+    anyone compares its type to anything.
+    """
+    ds = _ds(data_source)
+    by = _safe("""
+        SELECT NVL(verify_result,'UNKNOWN') AS verify_result, COUNT(*) AS n
+        FROM   sei_catalog_verify WHERE data_source = :ds
+        GROUP  BY NVL(verify_result,'UNKNOWN') ORDER BY 2 DESC""", {"ds": ds})
+    absent = _safe(f"""
+        SELECT target_feed, target_field, mapped_sei_datapoint, verify_result, notes
+        FROM   sei_catalog_verify
+        WHERE  data_source = :ds
+          AND (NVL(match_count,0) = 0 OR UPPER(NVL(verify_result,'')) LIKE '%ABSENT%'
+               OR UPPER(NVL(verify_result,'')) LIKE '%NOT%FOUND%')
+        ORDER  BY target_feed, target_field
+        FETCH FIRST {int(limit)} ROWS ONLY""", {"ds": ds})
+    ambiguous = _safe("""
+        SELECT COUNT(*) AS n FROM sei_catalog_verify
+        WHERE data_source = :ds AND NVL(match_count,0) > 1""", {"ds": ds})
+    inbound = _safe("""
+        SELECT COUNT(*) AS n FROM sei_input_lineage WHERE data_source = :ds""", {"ds": ds})
+    total = _safe("""
+        SELECT COUNT(*) AS n FROM sei_catalog_verify WHERE data_source = :ds""", {"ds": ds})
+
+    def one(r):
+        return int((r[0].get("n") if r else 0) or 0)
+
+    return {"data_source": ds,
+            "checked": one(total),
+            "inbound_fields": one(inbound),
+            "absent_count": len(absent),
+            "ambiguous_count": one(ambiguous),
+            "by_result": by,
+            "absent": absent,
+            "caveat": ("A name match between the inbound catalog and a proposed "
+                       "outbound datapoint is evidence, not proof: an inbound field "
+                       "is not thereby exposed on the outbound interface.")}
+
+
 @router.get("/readiness")
 def readiness(data_source: str | None = None):
     ds = _ds(data_source)

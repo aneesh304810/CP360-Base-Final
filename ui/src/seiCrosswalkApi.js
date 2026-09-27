@@ -62,6 +62,11 @@ export const crosswalkApi = {
     _get(`/sei-crosswalk/divergence${_qs({ data_source })}`,
       () => ({ shapes: [], collapse: [], dual_source: [] })),
 
+  catalog: (data_source) =>
+    _get(`/sei-crosswalk/catalog${_qs({ data_source })}`,
+      () => ({ checked: 0, inbound_fields: 0, absent_count: 0, ambiguous_count: 0,
+               by_result: [], absent: [], caveat: "" })),
+
   readiness: (data_source) =>
     _get(`/sei-crosswalk/readiness${_qs({ data_source })}`, () => ({ tables: [] })),
 

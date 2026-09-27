@@ -116,6 +116,7 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
   const [lanes, setLanes] = useState([]);
   const [ready, setReady] = useState([]);
   const [exc, setExc] = useState({ exceptions: [], by_owner: [] });
+  const [cat, setCat] = useState(null);
   const [busy, setBusy] = useState(true);
 
   // the drill stack — [{kind:"list", filter, title}, {kind:"column", ...}]
@@ -129,10 +130,11 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
     Promise.all([
       crosswalkApi.summary(ds), crosswalkApi.divergence(ds),
       crosswalkApi.lanes(ds), crosswalkApi.readiness(ds), crosswalkApi.exceptions(ds),
-    ]).then(([s, d, l, r, e]) => {
+      crosswalkApi.catalog(ds),
+    ]).then(([s, d, l, r, e, c]) => {
       if (!live) return;
       setSum(s); setDiv(d); setLanes(l.lanes || []);
-      setReady(r.tables || []); setExc(e); setBusy(false);
+      setReady(r.tables || []); setExc(e); setCat(c); setBusy(false);
     });
     return () => { live = false; };
   }, [ds]);
@@ -386,6 +388,31 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
           })}
         </div>
       </Panel>
+
+      {cat && cat.checked > 0 && (
+        <Panel t={t} title="Does the datapoint exist in SEI at all?"
+          note={`${cat.inbound_fields} inbound fields catalogued · evidence, not proof`}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 11 }}>
+            <Kpi t={t} v={cat.absent_count} c="#c1113a"
+              sub={["Not in SEI's input catalog", "may not exist on any interface"]}
+              onClick={cat.absent_count ? () => drill({}, "Columns whose datapoint is not catalogued") : undefined} />
+            <Kpi t={t} v={cat.ambiguous_count} c="#e67e22"
+              sub={["Matched more than once", "which field is meant is undecided"]} />
+            <Kpi t={t} v={cat.checked} c="#0091bf"
+              sub={["Datapoints checked", "against SEI's own inbound catalog"]} />
+          </div>
+          <Callout t={t} c="#5f87a7" title="Read this as a different question from the format verdict">
+            {cat.caveat}
+          </Callout>
+          {(cat.absent || []).length > 0 && (
+            <Table t={t} cols={["Contract field", "Feed", "Proposed datapoint", "Result"]}
+              rows={cat.absent.slice(0, 25).map((r) => [
+                <span style={{ fontFamily: MONO }}>{g(r, "target_field", "TARGET_FIELD")}</span>,
+                g(r, "target_feed", "TARGET_FEED"),
+                <span style={{ fontFamily: MONO }}>{g(r, "mapped_sei_datapoint", "MAPPED_SEI_DATAPOINT") || "—"}</span>,
+                <span style={{ color: "#c1113a", fontSize: 11 }}>
+                  {g(r, "verify_result", "VERIFY_RESULT")}</span>])} />)}
+        </Panel>)}
 
       {(div.collapse || []).length > 0 && (
         <Panel t={t} title="One datapoint standing in for several contract fields"
