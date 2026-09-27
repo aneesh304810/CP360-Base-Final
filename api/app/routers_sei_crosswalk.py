@@ -126,70 +126,113 @@ def lane_systems(data_source: str | None = None):
     data_source and returns the same three everywhere — which is why IMDS
     offered AddVantage and defaulted to it.
 
-    TWO ROUTES, and the order matters.
+    FOUR SIGNALS, UNIONED, not a fallback chain. Each one can be silently
+    absent for a system that genuinely feeds the warehouse, and the first two
+    versions of this endpoint each trusted one of them alone:
 
-    The first asks the workbook directly: SEI_VERIFY carries LANE_ID on every
-    row, and LEGACY_LANE maps a lane to its source system. UAF_IMDS -> UAF, no
-    inference involved.
+      A. the declared lane. SEI_VERIFY carries LANE_ID on every row and
+         LEGACY_LANE maps a lane to its source system, so UAF_IMDS -> UAF
+         with no inference. But VERIFY only lists columns someone verified;
+         a lane that is entirely out of SEI scope may have no rows there at
+         all, and UAF is exactly that lane.
 
-    The second, used where no crosswalk is loaded, joins LEGACY_LINEAGE to
-    LEGACY_SOURCE_FILE through the normalised feed key. That route is what the
-    first version used alone, and it is why UAF went missing after AddVantage
-    was fixed: a UAF message named one way in LANE_LINEAGE and another way in
-    UAF_FEED does not normalise to the same key, so its rows landed in the
-    unattributed bucket and the system never appeared. A declared lane cannot
-    fail that way.
+      B. the feed key. LEGACY_LINEAGE joined to LEGACY_SOURCE_FILE through
+         the normalised source-table name. This carries column counts for
+         warehouses with no crosswalk loaded (PBDW), but it only survives if
+         a message is named identically in LANE_LINEAGE and in its feed
+         sheet. A UAF message named two ways lands in the unattributed
+         bucket, and STAR resolving fine made that miss invisible.
 
-    SEI is excluded: it is the scope, not one of the incumbent systems the
-    badge row selects between.
+      C. the feed register itself. A feed row loaded for this warehouse and
+         tagged with a source system means that system feeds it, whatever
+         the lineage rows are called. No column count, but presence is the
+         question the badge row asks.
+
+      D. the lane register on its own, for a warehouse whose lanes are
+         declared before any feed or verify row has arrived.
+
+    A system appears if ANY signal finds it; its column count is the largest
+    any signal can prove. SEI is excluded throughout: it is the scope, not
+    one of the incumbent systems the badges select between.
 
     `resolved` distinguishes "asked and the answer is none" from "could not
     ask". An empty list is never permission to show everything.
     """
     ds = _ds(data_source)
+    found: dict[str, int] = {}
+    unresolved = 0
+    total = 0
+    routes: list[str] = []
 
-    # 1. the lane the workbook declared
-    rows = _safe("""
+    def take(rows, route, count_unattributed=False):
+        nonlocal unresolved, total
+        hit = False
+        for r in rows:
+            sysname = (r.get("source_system") or "?").strip().upper()
+            n = int(r.get("columns_") or 0)
+            if count_unattributed:
+                total += n
+            if sysname in ("", "?"):
+                if count_unattributed:
+                    unresolved += n
+                continue
+            if sysname == "SEI":
+                continue
+            found[sysname] = max(found.get(sysname, 0), n)
+            hit = True
+        if hit:
+            routes.append(route)
+
+    # A. the lane the workbook declared
+    take(_safe("""
         SELECT n.source_system AS source_system,
                COUNT(DISTINCT v.dwh_target_table || '.' || v.dwh_target_column) AS columns_
         FROM   sei_verify v
         JOIN   legacy_lane n ON n.lane_id = v.lane_id
         WHERE  v.data_source = :ds
           AND  n.source_system IS NOT NULL
-          AND  UPPER(n.source_system) <> 'SEI'
-        GROUP  BY n.source_system
-        ORDER  BY 2 DESC""", {"ds": ds})
-    route = "lane_register"
+        GROUP  BY n.source_system""", {"ds": ds}), "lane_register")
 
-    # 2. fall back to the feed key where no crosswalk is loaded (PBDW today)
-    if not rows:
-        route = "feed_key"
-        rows = _safe("""
-            SELECT NVL(f.source_system, '?') AS source_system,
-                   COUNT(DISTINCT l.dwh_target_table || '.' || l.dwh_target_column) AS columns_
-            FROM   legacy_lineage l
-            LEFT JOIN legacy_source_file f
-                   ON f.data_source  = l.data_source
-                  AND f.src_file_key = REGEXP_REPLACE(UPPER(TRIM('_' FROM
-                        REGEXP_REPLACE(l.src_source_table,'[[:space:]/.-]+','_'))),'_{2,}','_')
-            WHERE  l.data_source = :ds
-            GROUP  BY NVL(f.source_system, '?')
-            ORDER  BY 2 DESC""", {"ds": ds})
+    # B. the feed key round trip — the only route that counts lineage columns
+    take(_safe("""
+        SELECT NVL(f.source_system, '?') AS source_system,
+               COUNT(DISTINCT l.dwh_target_table || '.' || l.dwh_target_column) AS columns_
+        FROM   legacy_lineage l
+        LEFT JOIN legacy_source_file f
+               ON f.data_source  = l.data_source
+              AND f.src_file_key = REGEXP_REPLACE(UPPER(TRIM('_' FROM
+                    REGEXP_REPLACE(l.src_source_table,'[[:space:]/.-]+','_'))),'_{2,}','_')
+        WHERE  l.data_source = :ds
+        GROUP  BY NVL(f.source_system, '?')""", {"ds": ds}),
+        "feed_key", count_unattributed=True)
 
-    known = [r for r in rows if (r.get("source_system") or "?") != "?"]
-    unresolved = sum(int(r.get("columns_") or 0)
-                     for r in rows if (r.get("source_system") or "?") == "?")
-    total = sum(int(r.get("columns_") or 0) for r in rows)
+    # C. the feed register — presence without a count
+    take(_safe("""
+        SELECT source_system AS source_system, 0 AS columns_
+        FROM   legacy_source_file
+        WHERE  data_source = :ds AND source_system IS NOT NULL
+        GROUP  BY source_system""", {"ds": ds}), "feed_register")
+
+    # D. the lane register itself, for a warehouse whose lanes are declared
+    #    but whose feeds and verify rows are both still to come
+    take(_safe("""
+        SELECT source_system AS source_system, 0 AS columns_
+        FROM   legacy_lane
+        WHERE  data_source = :ds AND source_system IS NOT NULL""",
+        {"ds": ds}), "lane_declared")
+
+    systems = [{"source_system": k, "columns_": v}
+               for k, v in sorted(found.items(), key=lambda kv: (-kv[1], kv[0]))]
     return {
         "data_source": ds,
-        "systems": known,
-        "route": route,
+        "systems": systems,
+        "route": "+".join(routes) or "none",
         "unresolved_columns": unresolved,
         "total_columns": total,
-        "resolved": bool(known),
+        "resolved": bool(systems),
         "hint": ("no lane could be attributed to a source system; check "
                  "LANE_REGISTER.SOURCE_SYSTEM and legacy_source_file"
-                 if total and not known else None),
+                 if total and not systems else None),
     }
 
 
