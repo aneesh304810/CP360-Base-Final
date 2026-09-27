@@ -254,6 +254,20 @@ class SeiCrosswalkConnector:
             "uafschema": self._uafschema(sheets.get("uafschema")),
         }
         out["lineage"], out["srccol"] = self._lineage(sheets.get("lineage"))
+        # A sheet that parsed to zero rows is the quietest failure there is:
+        # the headers did not match and nothing says so. Print what was
+        # actually in the header row, so the next run diagnoses itself.
+        role_of_key = {"seiinput": "seiinput", "uafschema": "uafschema",
+                       "seicat": "seicat", "seifeed": "seifeed",
+                       "map": "map", "lineage": "lineage", "verify": "verify",
+                       "code": "code", "disp": "disp", "xwalk": "xwalk",
+                       "exc": "exc", "lane": "lane"}
+        for key, role in role_of_key.items():
+            sheet = sheets.get(role)
+            if sheet is not None and not out.get(key):
+                log.warning("%s parsed 0 rows. Its header row is: %s",
+                            role, ", ".join(sorted(sheet.idx.keys())) or "(empty)")
+
         self.counts = {k: len(v) for k, v in out.items()}
         log.info("sei_crosswalk[%s]: %s", self.data_source,
                  ", ".join(f"{k}={v}" for k, v in sorted(self.counts.items())))
@@ -307,12 +321,11 @@ class SeiCrosswalkConnector:
                                  not in ("", "SEI")})
             if len(incumbents) == 1:
                 hint = incumbents[0]
-        if hint:
-            log.info("%s: %d feeds tagged source_system=%s",
-                     sheet_name or "feed sheet", 0, hint)
+
         out, seen = [], set()
         for row in sh.rows():
-            feed = sh.get(row, "FEED_NAME")
+            feed = sh.get(row, "FEED_NAME", "FEED", "STAR_FEED", "UAF_FEED",
+                          "SOURCE_FEED", "FEED_FAMILY")
             if not feed or feed in seen:
                 continue
             seen.add(feed)
@@ -324,6 +337,9 @@ class SeiCrosswalkConnector:
                 "source_system": (lane.split("_")[0] if lane else hint),
                 "data_source": self.data_source,
             })
+        if hint:
+            log.info("%s: %d feeds tagged source_system=%s",
+                     sheet_name or "feed sheet", len(out), hint)
         return out
 
     def _lineage(self, sh):
@@ -633,10 +649,12 @@ class SeiCrosswalkConnector:
             return []
         out = []
         for i, row in enumerate(sh.rows(), 1):
-            fld = sh.get(row, "SEI_FIELD")
+            fld = sh.get(row, "SEI_FIELD", "SEI_INPUT_FIELD", "INPUT_FIELD",
+                         "FIELD_NAME", "FIELD")
             if not fld:
                 continue
-            tgt = sh.get(row, "SEI_TARGET_FILE", "TARGET_FILE")
+            tgt = sh.get(row, "SEI_TARGET_FILE", "TARGET_FILE", "SEI_DAT_FILE",
+                         "DAT_FILE", "TARGET_DAT_FILE", "SEI_FILE")
             out.append({
                 "input_id": f"{self.data_source}:{tgt or 'NA'}:{fld}:{i}",
                 "data_source": self.data_source,
@@ -705,10 +723,11 @@ class SeiCrosswalkConnector:
             return []
         out = []
         for i, row in enumerate(sh.rows(), 1):
-            fld = sh.get(row, "SOURCE_FIELD", "UAF_FIELD", "FIELD")
+            fld = sh.get(row, "SOURCE_FIELD", "UAF_FIELD", "UAF_SOURCE_FIELD",
+                         "FIELD_NAME", "FIELD")
             if not fld:
                 continue
-            feed = sh.get(row, "UAF_FEED", "FEED")
+            feed = sh.get(row, "UAF_FEED", "FEED", "FEED_NAME", "UAF_INTERFACE")
             out.append({
                 "uaf_id": f"{self.data_source}:{feed or 'NA'}:{fld}:{i}",
                 "data_source": self.data_source,
@@ -799,12 +818,30 @@ class SeiCrosswalkConnector:
         for key, table, pk in self._TARGETS:
             if key in skip:
                 continue
-            for rec in parsed.get(key, []):
+            rows = parsed.get(key, [])
+            bad = 0
+            first_err = None
+            for rec in rows:
                 try:
                     loader._merge(table, pk, rec)
                     n += 1
                 except Exception as e:                          # noqa: BLE001
-                    log.warning("%s: row skipped (%s)", table, e)
+                    msg = str(e)
+                    # ORA-00942 is the same answer for every row: the table is
+                    # not there. Say it once and move on rather than emitting
+                    # a thousand identical lines and burying the real errors.
+                    if "ORA-00942" in msg:
+                        log.error("%s: table does not exist — skipping all %d "
+                                  "rows. Run the DDL (sql/51, 53) first.",
+                                  table, len(rows))
+                        bad = len(rows)
+                        break
+                    bad += 1
+                    if first_err is None:
+                        first_err = msg.splitlines()[0]
+            if bad and first_err:
+                log.warning("%s: %d of %d rows rejected. First: %s",
+                            table, bad, len(rows), first_err)
         loader.commit()
         log.info("sei_crosswalk[%s/%s]: merged %d rows", self.data_source, mode, n)
         if mode == "attach":
