@@ -1,0 +1,809 @@
+<title>IMDS Lineage Crosswalk</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    color-scheme: light;
+    --bg:#eef2f4; --surface:#ffffff; --surface2:#f6f9fa; --surface3:#eaf0f3;
+    --ink:#10193b; --ink2:#3c4d5c; --ink3:#6b8296; --rule:#d3dde3; --rule2:#e6edf1;
+    --navy:#10193b; --navy2:#1b2851; --onNavy:#ffffff; --onNavy2:#93aecb;
+    --accent:#0f4775; --pop:#31bced;
+    --ok:#0e6b30; --okBg:#e6f5ec;
+    --warn:#a8560f; --warnBg:#fdf2e5;
+    --crit:#b3261e; --critBg:#fdeceb;
+    --deep:#8c1d16; --deepBg:#fbe7e5;
+    --decode:#6d3ac0; --decodeBg:#f1ebfb;
+    --comp:#a8560f; --compBg:#fdf2e5;
+    --oos:#5c7c94; --oosBg:#eef2f5;
+    --unk:#5c7c94; --unkBg:#eef2f5;
+    --star:#b5651d; --uaf:#0b7d7d; --sei:#0b5e83;
+    --shadow:0 1px 2px rgba(16,25,59,.06), 0 1px 8px rgba(16,25,59,.04);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --bg:#0b1020; --surface:#141c33; --surface2:#1a2340; --surface3:#202c4d;
+      --ink:#e8eef6; --ink2:#b7c6d8; --ink3:#8599b0; --rule:#2b3a5c; --rule2:#222e4c;
+      --navy:#070c18; --navy2:#16203c; --onNavy:#ffffff; --onNavy2:#93aecb;
+      --accent:#4a97d8; --pop:#31bced;
+      --ok:#5fd18c; --okBg:#123024;
+      --warn:#e8a860; --warnBg:#33240f;
+      --crit:#ff8e83; --critBg:#3a1512;
+      --deep:#ff9d92; --deepBg:#43120e;
+      --decode:#bb9af5; --decodeBg:#241a3d;
+      --comp:#e8a860; --compBg:#33240f;
+      --oos:#8fa6bb; --oosBg:#1b2437;
+      --unk:#8fa6bb; --unkBg:#1b2437;
+      --star:#e0a061; --uaf:#5cc7c7; --sei:#6cb6e0;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 1px 10px rgba(0,0,0,.25);
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --bg:#0b1020; --surface:#141c33; --surface2:#1a2340; --surface3:#202c4d;
+    --ink:#e8eef6; --ink2:#b7c6d8; --ink3:#8599b0; --rule:#2b3a5c; --rule2:#222e4c;
+    --navy:#070c18; --navy2:#16203c; --onNavy:#ffffff; --onNavy2:#93aecb;
+    --accent:#4a97d8; --pop:#31bced;
+    --ok:#5fd18c; --okBg:#123024;
+    --warn:#e8a860; --warnBg:#33240f;
+    --crit:#ff8e83; --critBg:#3a1512;
+    --deep:#ff9d92; --deepBg:#43120e;
+    --decode:#bb9af5; --decodeBg:#241a3d;
+    --comp:#e8a860; --compBg:#33240f;
+    --oos:#8fa6bb; --oosBg:#1b2437;
+    --unk:#8fa6bb; --unkBg:#1b2437;
+    --star:#e0a061; --uaf:#5cc7c7; --sei:#6cb6e0;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 1px 10px rgba(0,0,0,.25);
+  }
+
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:"IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    font-size:14px; line-height:1.5; margin:0;
+  }
+  *{box-sizing:border-box}
+  .mono{font-family:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace}
+  .num{font-variant-numeric:tabular-nums}
+  button{font-family:inherit; font-size:inherit; cursor:pointer}
+  :focus-visible{outline:2px solid var(--pop); outline-offset:2px; border-radius:4px}
+
+  /* chrome */
+  .chrome{background:var(--navy); color:var(--onNavy); padding:14px 20px;
+    padding-top:calc(14px + env(safe-area-inset-top, 0px));
+    display:flex; align-items:center; gap:16px; flex-wrap:wrap}
+  .chrome h1{font-size:17px; font-weight:600; margin:0; letter-spacing:-.2px}
+  .chrome .sub{font-size:12px; color:var(--onNavy2); margin-top:2px}
+  .ingest{margin-left:auto; display:flex; align-items:center; gap:8px;
+    background:var(--navy2); border-radius:999px; padding:6px 14px; font-size:11.5px; color:var(--onNavy2)}
+  .dot{width:7px; height:7px; border-radius:50%; background:#3ddc84; display:inline-block; flex-shrink:0}
+
+  .wrap{padding:0 20px 40px; max-width:1680px; margin:0 auto}
+  .cols{display:grid; grid-template-columns:262px minmax(0,1fr); gap:18px; padding-top:18px; align-items:start}
+  @media (max-width:980px){ .cols{grid-template-columns:1fr} }
+
+  .panel{background:var(--surface); border:1px solid var(--rule); border-radius:10px; box-shadow:var(--shadow)}
+  .rail{padding:16px 15px; position:sticky; top:14px}
+  @media (max-width:980px){ .rail{position:static} }
+  .eyebrow{font-size:9.5px; font-weight:700; letter-spacing:.7px; color:var(--ink3); text-transform:uppercase}
+
+  .laneBtn{display:flex; gap:10px; align-items:flex-start; width:100%; text-align:left;
+    padding:9px 10px; border-radius:8px; border:1px solid var(--rule); background:var(--surface);
+    color:var(--ink); margin-top:7px; transition:border-color .12s, background .12s}
+  .laneBtn:hover{border-color:var(--ink3)}
+  .laneBtn[aria-pressed="true"]{background:var(--surface3); border-color:currentColor}
+  .laneBtn .sw{width:4px; align-self:stretch; border-radius:3px; flex-shrink:0; background:currentColor}
+  .laneBtn .nm{display:block; font-size:12.5px; font-weight:600; color:var(--ink)}
+  .laneBtn .ds{display:block; font-size:10.5px; color:var(--ink3); margin-top:2px; line-height:1.4}
+  .laneBtn[data-l="STAR"]{color:var(--star)} .laneBtn[data-l="UAF"]{color:var(--uaf)} .laneBtn[data-l="SEI"]{color:var(--sei)}
+  .laneBtn .tick{margin-left:auto; font-size:12px; font-weight:700; color:currentColor; opacity:0}
+  .laneBtn[aria-pressed="true"] .tick{opacity:1}
+
+  .hr{height:1px; background:var(--rule2); margin:16px 0}
+
+  .chipRow{display:flex; flex-wrap:wrap; gap:6px; margin-top:9px}
+  .chip{font-size:11px; padding:4px 10px; border-radius:999px; border:1px solid var(--rule);
+    background:var(--surface); color:var(--ink2)}
+  .chip[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600}
+
+  .tabs{display:flex; gap:4px; flex-wrap:wrap; background:var(--surface); border:1px solid var(--rule);
+    border-radius:10px; padding:5px; box-shadow:var(--shadow)}
+  .tab{padding:8px 15px; border-radius:7px; border:none; background:transparent; color:var(--ink2); font-size:13px}
+  .tab[aria-selected="true"]{background:var(--accent); color:#fff; font-weight:600}
+  .tab .n{font-size:10px; opacity:.7; margin-left:6px}
+
+  .tiles{display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:12px; margin-top:16px}
+  .tile{background:var(--surface); border:1px solid var(--rule); border-top:3px solid var(--tc,var(--accent));
+    border-radius:10px; padding:13px 15px; box-shadow:var(--shadow)}
+  .tile .v{font-size:27px; font-weight:600; line-height:1; color:var(--tc,var(--accent))}
+  .tile .k{font-size:11.5px; font-weight:500; margin-top:7px; color:var(--ink)}
+  .tile .s{font-size:10.5px; color:var(--ink3); margin-top:3px; line-height:1.4}
+
+  .sec{margin-top:16px; padding:16px 18px}
+  .secH{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap}
+  .secH h2{font-size:14.5px; font-weight:600; margin:0}
+  .secH .note{font-size:11.5px; color:var(--ink3)}
+
+  .lanes{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; margin-top:13px}
+  .laneCard{border:1px solid var(--rule); border-left:3px solid var(--lc); border-radius:9px; padding:11px 13px; background:var(--surface2)}
+  .laneCard .t{font-size:9.5px; font-weight:700; letter-spacing:.5px; color:var(--lc)}
+  .hops{display:flex; align-items:stretch; gap:0; margin-top:9px; flex-wrap:wrap}
+  .hop{flex:1 1 90px; min-width:0; border:1px solid var(--rule); background:var(--surface); border-radius:6px; padding:7px 8px}
+  .hop b{display:block; font-size:8.5px; font-weight:700; letter-spacing:.4px; color:var(--ink3)}
+  .hop span{display:block; font-size:10.5px; color:var(--ink); margin-top:3px; word-break:break-word}
+  .arrow{width:18px; display:flex; align-items:center; justify-content:center; color:var(--ink3); font-size:13px; flex-shrink:0}
+
+  .bar{display:flex; height:16px; border-radius:4px; overflow:hidden; background:var(--surface3)}
+  .bar.sm{height:8px; border-radius:4px}
+  .bar i{display:block}
+  .legend{display:flex; flex-wrap:wrap; gap:13px; margin-top:10px}
+  .legend span{display:flex; align-items:center; gap:6px; font-size:10.5px; color:var(--ink2)}
+  .legend i{width:11px; height:11px; border-radius:3px; display:inline-block}
+
+  .tblWrap{overflow-x:auto; margin-top:12px; border:1px solid var(--rule); border-radius:9px; background:var(--surface)}
+  table{border-collapse:collapse; width:100%; font-size:12px; min-width:660px}
+  thead th{position:sticky; top:0; background:var(--surface2); text-align:left; padding:9px 13px;
+    font-size:9.5px; font-weight:700; letter-spacing:.5px; color:var(--ink3); white-space:nowrap;
+    border-bottom:1px solid var(--rule)}
+  tbody td{padding:9px 13px; border-top:1px solid var(--rule2); vertical-align:top}
+  tbody tr.click{cursor:pointer}
+  tbody tr.click:hover{background:var(--surface2)}
+  tbody tr.on{background:var(--surface3)}
+  td .sub{display:block; font-size:10px; color:var(--ink3); margin-top:2px}
+
+  .pill{display:inline-block; font-size:9px; font-weight:700; letter-spacing:.4px; padding:2px 8px;
+    border-radius:999px; white-space:nowrap}
+  .flag{display:inline-block; font-size:8.5px; font-weight:600; letter-spacing:.3px; padding:1px 6px;
+    border-radius:4px; border:1px solid currentColor; margin:2px 3px 0 0; white-space:nowrap}
+  .lanePill{display:inline-block; font-size:9px; font-weight:700; letter-spacing:.4px; padding:2px 7px;
+    border-radius:4px; color:#fff; white-space:nowrap}
+
+  .two{display:grid; grid-template-columns:minmax(0,1.45fr) minmax(0,1fr); gap:16px; margin-top:16px; align-items:start}
+  @media (max-width:1100px){ .two{grid-template-columns:1fr} }
+
+  .find{border-left:3px solid var(--fc); padding:12px 14px; border-radius:0 8px 8px 0; background:var(--surface2); margin-top:10px}
+  .find h3{font-size:13px; margin:0 0 5px; font-weight:600}
+  .find p{margin:0 0 6px; font-size:11.5px; color:var(--ink2); line-height:1.55}
+  .find .meta{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; font-size:10px; color:var(--ink3)}
+  .find .meta b{color:var(--ink2); font-weight:600}
+
+  .kv{display:grid; grid-template-columns:auto 1fr; gap:5px 14px; font-size:11.5px; margin-top:10px}
+  .kv dt{color:var(--ink3)} .kv dd{margin:0; color:var(--ink)}
+
+  .banner{display:flex; gap:10px; align-items:flex-start; background:var(--warnBg); border:1px solid var(--rule);
+    border-left:3px solid var(--warn); border-radius:8px; padding:11px 14px; margin-top:16px; font-size:11.5px; color:var(--ink2); line-height:1.55}
+  .banner b{color:var(--ink)}
+  .empty{padding:40px 20px; text-align:center; color:var(--ink3); font-size:13px}
+</style>
+
+<div class="chrome">
+  <div>
+    <h1>Lineage 360 — IMDS crosswalk</h1>
+    <div class="sub">Warehouse <b style="color:var(--onNavy)">IMDS</b> · pick the lanes, then drill from coverage to a single column</div>
+  </div>
+  <div class="ingest"><span class="dot"></span> Workbook ingested 27 Sep 2026 · 66 final columns · 3 lanes</div>
+</div>
+
+<div class="wrap">
+  <div class="cols">
+
+    <aside class="panel rail">
+      <div class="eyebrow">Lanes in view</div>
+      <div id="laneBtns"></div>
+      <p id="laneHint" style="font-size:10.5px; color:var(--ink3); line-height:1.5; margin:10px 0 0"></p>
+
+      <div class="hr"></div>
+      <div class="eyebrow">Subject area</div>
+      <div class="chipRow" id="subjChips"></div>
+
+      <div class="hr"></div>
+      <div class="eyebrow">Verdict</div>
+      <div class="chipRow" id="verdChips"></div>
+
+      <div class="hr"></div>
+      <div class="eyebrow">Analysis flags</div>
+      <div class="chipRow" id="flagChips"></div>
+    </aside>
+
+    <main>
+      <div class="tabs" id="tabs"></div>
+      <div id="view"></div>
+    </main>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var LANE = {
+    STAR:{id:"STAR", label:"STAR → IMDS", state:"REPLACED", contract:"STAR-compatible",
+      desc:"Being replaced by SEI. Its layout stays as the IMDS contract.", c:"var(--star)"},
+    UAF:{id:"UAF", label:"UAF → IMDS", state:"NOT_REPLACED", contract:null,
+      desc:"Not replaced. Counted as lineage, excluded from SEI coverage.", c:"var(--uaf)"},
+    SEI:{id:"SEI", label:"SEI → IMDS", state:"PROPOSED", contract:"via STAR-compatible",
+      desc:"Reaches IMDS through the STAR contract. Layers onto replaced lanes.", c:"var(--sei)"}
+  };
+
+  var V = {
+    PROVEN_MATCH:{t:"PROVEN",     c:"var(--ok)",     b:"var(--okBg)",     bar:"#159943"},
+    UNKNOWN:     {t:"UNKNOWN",    c:"var(--unk)",    b:"var(--unkBg)",    bar:"#9fb2c0"},
+    DECODE_NEEDED:{t:"DECODE",    c:"var(--decode)", b:"var(--decodeBg)", bar:"#6d3ac0"},
+    PRECISION_RISK:{t:"PRECISION",c:"var(--crit)",   b:"var(--critBg)",   bar:"#cc3344"},
+    TYPE_SHIFT:  {t:"TYPE SHIFT", c:"var(--crit)",   b:"var(--critBg)",   bar:"#cc3344"},
+    NOT_COMPARABLE:{t:"COMPOSITE",c:"var(--comp)",   b:"var(--compBg)",   bar:"#d98c2b"},
+    NO_SOURCE:   {t:"NO SOURCE",  c:"var(--deep)",   b:"var(--deepBg)",   bar:"#8c1d16"},
+    NO_BASELINE: {t:"NO BASELINE",c:"var(--warn)",   b:"var(--warnBg)",   bar:"#c98a3e"},
+    OUT_OF_SCOPE:{t:"OUT OF SCOPE",c:"var(--oos)",   b:"var(--oosBg)",    bar:"#b6c4cf"}
+  };
+  var VORDER = ["PROVEN_MATCH","UNKNOWN","DECODE_NEEDED","NOT_COMPARABLE","NO_SOURCE","NO_BASELINE","OUT_OF_SCOPE"];
+
+  var FLAG = {
+    COLLAPSE_RISK:{t:"collapse risk", c:"var(--crit)",
+      d:"One SEI datapoint proposed for contract fields the incumbent kept distinct."},
+    DUAL_SOURCE:{t:"dual source", c:"var(--decode)",
+      d:"More than one lane writes this column. No precedence rule is stated."},
+    BYPASSES_CONTRACT:{t:"bypasses contract", c:"var(--warn)",
+      d:"SEI proposed directly with no incumbent field behind it."},
+    NO_TYPES_SUPPLIED:{t:"no types", c:"var(--unk)",
+      d:"SEI publishes the datapoint name but not its type."},
+    CODE_SET:{t:"code set", c:"var(--decode)",
+      d:"A decode is required and the crosswalk is absent."},
+    FEED_DEPENDENCY:{t:"feed dependency", c:"var(--comp)",
+      d:"Assembled from feeds that can arrive separately — produces a wrong value, not a missing one."},
+    GL_BLOCK:{t:"GL block", c:"var(--deep)",
+      d:"Part of the general-ledger group that has no SEI datapoints at all."}
+  };
+
+  var SUBJ = {
+    nav:"Fund Accounting & NAV", entity:"Entity & SMA Account Master",
+    pos:"Positions & Holdings", party:"Party & Relationships"
+  };
+
+  // --- ingested rows: lane, table, column, type, contract feed/field, SEI feed/datapoint ---
+  function R(lane,tbl,feed,subj,a){
+    return {lane:lane, tbl:tbl, feed:feed, subj:subj, col:a[0], type:a[1], field:a[2],
+            seiFeed:a[3], seiDp:a[4], kind:a[5], verdict:a[6], flags:a[7]||[]};
+  }
+  var NAV="BBHRPTDBO.BBH_STAR_NAV_TB", ENT="RULESDBO.ENTITY", EH="RULESDBO.ENTITY_HIST",
+      POS="HOLDINGDBO.POSITION", IP="RULESDBO.BBH_INTERESTED_PARTIES";
+  var UAFM="UAF account message", UAFA="UAF address message";
+
+  var ROWS = [];
+  [ ["acctg_bas_des","VARCHAR2(255)","Accounting_Basis",null,null,"UNAVAILABLE","NO_SOURCE"],
+    ["acctg_dte","DATE","Accounting_Date","End of Day Positions","AS_OF_DATE","DIRECT","UNKNOWN",["NO_TYPES_SUPPLIED"]],
+    ["bse_crncy_cde","VARCHAR2(255)","Base_Currency_Code","Account","ACCOUNT_BASE_CURRENCY","LOOKUP","DECODE_NEEDED",["CODE_SET"]],
+    ["clas_id","VARCHAR2(255)","Class_Identifier",null,null,"UNAVAILABLE","NO_SOURCE"],
+    ["cls_evnt_id","VARCHAR2(255)","Close_Event_ID",null,null,"UNAVAILABLE","NO_SOURCE"],
+    ["cr_amt","NUMBER","Credit_Amount",null,null,"UNAVAILABLE","NO_SOURCE"],
+    ["cstdy_hd_acct_num","VARCHAR2(255)","Custody_Head_Account_Number","Account","ACCOUNT_NUMBER","DIRECT","UNKNOWN",["NO_TYPES_SUPPLIED","COLLAPSE_RISK"]],
+    ["db_amt","NUMBER","Debit_Amount",null,null,"UNAVAILABLE","NO_SOURCE"],
+    ["drvd_cost_amt","NUMBER","Derived_Cost","End of Day Positions","VALUATION_COST","DIRECT","UNKNOWN",["NO_TYPES_SUPPLIED"]],
+    ["drvd_mval_amt","NUMBER","Derived_Market_Value","Taxlot","MARKET_VALUE","DIRECT","UNKNOWN",["NO_TYPES_SUPPLIED","COLLAPSE_RISK"]],
+    ["enty_nam","VARCHAR2(255)","Entity_Name","Account","ACCOUNT_DISPLAY_NAME","DIRECT","UNKNOWN",["NO_TYPES_SUPPLIED"]],
+    ["star_entity_id","VARCHAR2(255)","Entity_Number","Account","ACCOUNT_NUMBER","DIRECT","UNKNOWN",["NO_TYPES_SUPPLIED","COLLAPSE_RISK"]],
+    ["fscl_yr_end_dte","VARCHAR2(255)","Fiscal_Year_End",null,null,"UNAVAILABLE","NO_SOURCE"],
+    ["gl_acct_cat_nam","VARCHAR2(255)","GL_Account_Category",null,null,"UNAVAILABLE","NO_SOURCE",["GL_BLOCK"]],
+    ["gl_acct_num","NUMBER","GL_Account_Number",null,null,"UNAVAILABLE","NO_SOURCE",["GL_BLOCK"]],
+    ["gl_acct_nam","VARCHAR2(255)","GL_Account_Name",null,null,"UNAVAILABLE","NO_SOURCE",["GL_BLOCK"]],
+    ["gl_acct_typ_cde","VARCHAR2(255)","GL_Account_Type",null,null,"UNAVAILABLE","NO_SOURCE",["GL_BLOCK"]],
+    ["gl_bal_amt","NUMBER","GL_Balance",null,null,"UNAVAILABLE","NO_SOURCE",["GL_BLOCK"]],
+    ["mval_amt","NUMBER","Market_Value","Taxlot","MARKET_VALUE","DIRECT","UNKNOWN",["NO_TYPES_SUPPLIED","COLLAPSE_RISK"]],
+    ["mth_avg_nav_amt","NUMBER","Monthly_Average_NAV",null,null,"UNAVAILABLE","NO_SOURCE"],
+    ["prev_nav_amt","NUMBER","Previous_NAV",null,null,"UNAVAILABLE","NO_SOURCE"],
+    ["qlfy_des","VARCHAR2(255)","Qualifier_Description",null,null,"UNAVAILABLE","NO_SOURCE"],
+    ["rpt_typ_nam","VARCHAR2(255)","Report_Type",null,null,"UNAVAILABLE","NO_SOURCE"]
+  ].forEach(function(a){ ROWS.push(R("STAR",NAV,"TBMEIFI7","nav",a)); });
+
+  var entStar = [
+    ["entity_id","CHAR(8)","STAR_ENTITY_ID_1","Account","ACCOUNT_NUMBER","DIRECT","UNKNOWN",["NO_TYPES_SUPPLIED","COLLAPSE_RISK","DUAL_SOURCE"]],
+    ["base_currency","CHAR(3)","FK_BSE_CRNCY_CDE_4",null,null,"UNAVAILABLE","NO_SOURCE",["DUAL_SOURCE"]],
+    ["orig_accnt_number","VARCHAR2(50)","CSTDY_HD_ACCT_NUM_8",null,null,"UNAVAILABLE","NO_SOURCE",["DUAL_SOURCE"]],
+    ["upd_user","CHAR(30)",null,"Account","ACCOUNT_LAST_UPDATE_USER","DIRECT","NO_BASELINE",["BYPASSES_CONTRACT","DUAL_SOURCE"]],
+    ["upd_date","DATE",null,null,null,"UNAVAILABLE","NO_BASELINE",["DUAL_SOURCE"]],
+    ["active_status","VARCHAR2(3)","v_termination_date",null,null,"UNAVAILABLE","NO_SOURCE",["DUAL_SOURCE"]]
+  ];
+  entStar.forEach(function(a){ ROWS.push(R("STAR",ENT,"ACDDIFI1","entity",a)); });
+  entStar.concat([
+    ["effective_date","DATE",null,null,null,"UNAVAILABLE","NO_BASELINE",["DUAL_SOURCE"]],
+    ["src_intfc_inst","NUMBER",null,null,null,"UNAVAILABLE","NO_BASELINE",["DUAL_SOURCE"]]
+  ]).forEach(function(a){ ROWS.push(R("STAR",EH,"ACDDIFI1","entity",a)); });
+
+  [ ["effective_date","DATE","Accounting_Date_2","End of Day Positions","AS_OF_DATE","DIRECT","UNKNOWN",["NO_TYPES_SUPPLIED"]],
+    ["update_date","DATE",null,null,null,"UNAVAILABLE","NO_BASELINE"],
+    ["update_source","CHAR(8)",null,null,null,"UNAVAILABLE","NO_BASELINE"],
+    ["pos_flag","CHAR(2)","Position_Flag",null,null,"UNAVAILABLE","NO_SOURCE"],
+    ["src_intfc_inst","NUMBER",null,null,null,"UNAVAILABLE","NO_BASELINE"],
+    ["base_currency","VARCHAR2(3)","base_currency_code_8","Account","ACCOUNT_BASE_CURRENCY","LOOKUP","DECODE_NEEDED",["CODE_SET"]],
+    ["amortized_cost","NUMBER","Base_Amortized_Cost_7_Trade_Date","End of Day Positions","3 datapoints","COMPOSITE","NOT_COMPARABLE",["FEED_DEPENDENCY"]]
+  ].forEach(function(a){ ROWS.push(R("STAR",POS,"PEDDIFI1","pos",a)); });
+
+  var entUaf = [
+    ["entity_id","CHAR(8)","ACCT_ID",null,null,"DIRECT","OUT_OF_SCOPE",["DUAL_SOURCE"]],
+    ["base_currency","CHAR(3)","BASE_CCY",null,null,"DIRECT","OUT_OF_SCOPE",["DUAL_SOURCE"]],
+    ["orig_accnt_number","VARCHAR2(50)","ACCT_NO",null,null,"DIRECT","OUT_OF_SCOPE",["DUAL_SOURCE"]],
+    ["upd_user","CHAR(30)","UPDATE_USER",null,null,"DIRECT","OUT_OF_SCOPE",["DUAL_SOURCE"]],
+    ["upd_date","DATE","UPDATE_TS",null,null,"DIRECT","OUT_OF_SCOPE",["DUAL_SOURCE"]],
+    ["active_status","VARCHAR2(3)","ACCT_STATUS_CD",null,null,"LOOKUP","OUT_OF_SCOPE",["DUAL_SOURCE"]]
+  ];
+  entUaf.forEach(function(a){ ROWS.push(R("UAF",ENT,UAFM,"entity",a)); });
+  entUaf.concat([
+    ["effective_date","DATE","EFF_DT",null,null,"DIRECT","OUT_OF_SCOPE",["DUAL_SOURCE"]],
+    ["src_intfc_inst","NUMBER","SRC_SYS_ID",null,null,"DIRECT","OUT_OF_SCOPE",["DUAL_SOURCE"]]
+  ]).forEach(function(a){ ROWS.push(R("UAF",EH,UAFM,"entity",a)); });
+
+  [ ["party_id","VARCHAR2(20)","PARTY_ID",null,null,"DIRECT","OUT_OF_SCOPE"],
+    ["party_name","VARCHAR2(120)","PARTY_NAME",null,null,"DIRECT","OUT_OF_SCOPE"],
+    ["address_line_1","VARCHAR2(80)","ADDR_LINE_1",null,null,"DIRECT","OUT_OF_SCOPE"],
+    ["address_line_2","VARCHAR2(80)","ADDR_LINE_2",null,null,"DIRECT","OUT_OF_SCOPE"],
+    ["city","VARCHAR2(60)","CITY",null,null,"DIRECT","OUT_OF_SCOPE"],
+    ["postal_code","VARCHAR2(16)","POSTAL_CD",null,null,"DIRECT","OUT_OF_SCOPE"],
+    ["country_code","CHAR(2)","CTRY_CD",null,null,"LOOKUP","OUT_OF_SCOPE"],
+    ["effective_date","DATE","EFF_DT",null,null,"DIRECT","OUT_OF_SCOPE"]
+  ].forEach(function(a){ ROWS.push(R("UAF",IP,UAFA,"party",a)); });
+
+  ROWS.forEach(function(r,i){ r.id = i; });
+
+  // --- state ---
+  var S = { lanes:{STAR:true, UAF:true, SEI:true}, tab:"overview",
+            subj:"all", verd:"all", flag:"all", table:null, col:null };
+
+  var $ = function(s){ return document.querySelector(s); };
+  var el = function(t,a,h){ var e=document.createElement(t);
+    if(a) for(var k in a){ if(k==="class") e.className=a[k]; else e.setAttribute(k,a[k]); }
+    if(h!=null) e.innerHTML=h; return e; };
+  var esc = function(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); };
+
+  function anyLane(){ return S.lanes.STAR || S.lanes.UAF || S.lanes.SEI; }
+  function seiOn(){ return S.lanes.SEI; }
+
+  // A row is in view if its own lane is selected, or SEI is selected and the
+  // row sits on a lane SEI replaces.
+  function inLane(r){
+    if(S.lanes[r.lane]) return true;
+    if(S.lanes.SEI && LANE[r.lane] && LANE[r.lane].state === "REPLACED") return true;
+    return false;
+  }
+  function visible(){
+    return ROWS.filter(function(r){
+      if(!inLane(r)) return false;
+      if(S.subj!=="all" && r.subj!==S.subj) return false;
+      if(S.verd!=="all" && r.verdict!==S.verd) return false;
+      if(S.flag!=="all" && r.flags.indexOf(S.flag)<0) return false;
+      return true;
+    });
+  }
+  function laneScope(){ // rows in lane scope only, ignoring the filters
+    return ROWS.filter(inLane);
+  }
+
+  function countBy(rows, key){
+    var m={}; rows.forEach(function(r){ m[r[key]]=(m[r[key]]||0)+1; }); return m;
+  }
+  function pill(v){
+    var d=V[v]; return '<span class="pill" style="background:'+d.b+';color:'+d.c+'">'+d.t+'</span>';
+  }
+  function lanePill(l){
+    return '<span class="lanePill" style="background:'+LANE[l].c+'">'+l+'</span>';
+  }
+  function flags(fs){
+    if(!fs || !fs.length) return '<span style="color:var(--ink3)">—</span>';
+    return fs.map(function(f){ var d=FLAG[f]||{t:f,c:"var(--ink3)"};
+      return '<span class="flag" style="color:'+d.c+'" title="'+esc(d.d||"")+'">'+d.t+'</span>'; }).join("");
+  }
+  function stack(rows){
+    var m=countBy(rows,"verdict"), n=rows.length||1, h="";
+    VORDER.forEach(function(v){ if(!m[v]) return;
+      h += '<i style="width:'+((m[v]/n)*100).toFixed(2)+'%;background:'+V[v].bar+'" title="'+V[v].t+' '+m[v]+'"></i>'; });
+    return h;
+  }
+
+  // ---------- rail ----------
+  function drawRail(){
+    var box=$("#laneBtns"); box.innerHTML="";
+    ["STAR","UAF","SEI"].forEach(function(k){
+      var L=LANE[k], on=S.lanes[k];
+      var b=el("button",{class:"laneBtn","data-l":k,"aria-pressed":on?"true":"false"},
+        '<span class="sw"></span><span style="min-width:0"><span class="nm">'+L.label+'</span>'+
+        '<span class="ds">'+L.desc+'</span></span><span class="tick">✓</span>');
+      b.onclick=function(){ S.lanes[k]=!S.lanes[k]; S.col=null; draw(); };
+      box.appendChild(b);
+    });
+    var h;
+    if(!anyLane()) h="Nothing selected. Pick at least one lane.";
+    else if(S.lanes.SEI && !S.lanes.STAR && !S.lanes.UAF)
+      h="SEI only. Shown against the lanes it replaces, because SEI reaches IMDS through the incumbent's contract rather than a lineage of its own.";
+    else if(S.lanes.STAR && S.lanes.UAF && S.lanes.SEI)
+      h="Full estate. Columns written by two lanes carry a dual-source flag.";
+    else if(S.lanes.STAR && S.lanes.SEI) h="Today against after-cutover, on the same columns.";
+    else if(S.lanes.UAF && S.lanes.SEI) h="UAF has no SEI successor, so the SEI layer adds nothing here.";
+    else if(S.lanes.STAR && S.lanes.UAF) h="Both incumbents. Overlap on RULESDBO.ENTITY is the thing to look at.";
+    else h="One lane, lineage only.";
+    $("#laneHint").textContent=h;
+
+    chips("#subjChips","subj",[["all","All"]].concat(Object.keys(SUBJ).map(function(k){return [k,SUBJ[k]];})));
+    var vs=[["all","All"]].concat(VORDER.filter(function(v){
+      return laneScope().some(function(r){ return r.verdict===v; }); }).map(function(v){return [v,V[v].t];}));
+    chips("#verdChips","verd",vs);
+    var fsPresent={}; laneScope().forEach(function(r){ r.flags.forEach(function(f){ fsPresent[f]=1; }); });
+    chips("#flagChips","flag",[["all","All"]].concat(Object.keys(fsPresent).map(function(f){return [f,FLAG[f].t];})));
+  }
+  function chips(sel,key,items){
+    var box=$(sel); box.innerHTML="";
+    items.forEach(function(it){
+      var b=el("button",{class:"chip","aria-pressed":S[key]===it[0]?"true":"false"},esc(it[1]));
+      b.onclick=function(){ S[key]=it[0]; S.col=null; draw(); };
+      box.appendChild(b);
+    });
+  }
+
+  // ---------- tabs ----------
+  var TABS=[["overview","Overview"],["tables","Tables"],["columns","Columns"],
+            ["crosswalk","Crosswalk"],["findings","Findings"]];
+  function drawTabs(){
+    var box=$("#tabs"); box.innerHTML="";
+    var v=visible();
+    TABS.forEach(function(t){
+      var n = t[0]==="tables" ? new Set(v.map(function(r){return r.tbl;})).size
+            : t[0]==="columns" ? v.length
+            : t[0]==="findings" ? FINDINGS.filter(applies).length : null;
+      var b=el("button",{class:"tab",role:"tab","aria-selected":S.tab===t[0]?"true":"false"},
+        esc(t[1])+(n!=null?'<span class="n num">'+n+'</span>':""));
+      b.onclick=function(){ S.tab=t[0]; draw(); };
+      box.appendChild(b);
+    });
+  }
+
+  // ---------- views ----------
+  function overview(){
+    var v=visible(), m=countBy(v,"verdict");
+    var seiScope = v.filter(function(r){ return LANE[r.lane].state==="REPLACED"; });
+    var dual = new Set(v.filter(function(r){ return r.flags.indexOf("DUAL_SOURCE")>=0; })
+                        .map(function(r){ return r.tbl+"."+r.col; })).size;
+    var collapse = v.filter(function(r){ return r.flags.indexOf("COLLAPSE_RISK")>=0; }).length;
+    var h="";
+
+    h+='<div class="tiles">';
+    h+=tile(v.length,"Final columns in view","across "+new Set(v.map(function(r){return r.tbl;})).size+" IMDS tables","var(--accent)");
+    h+=tile(m.PROVEN_MATCH||0,"Proven matches","target types came from a dictionary, not DDL","var(--ok)");
+    h+=tile(m.NO_SOURCE||0,"No SEI source","each needs a named disposition","var(--deep)");
+    h+=tile(dual,"Dual-source columns","two lanes write them, no precedence rule","var(--decode)");
+    h+=tile(collapse,"Collapse risks","one SEI datapoint for fields STAR kept apart","var(--crit)");
+    h+=tile(m.OUT_OF_SCOPE||0,"Out of scope","UAF — lineage only, correctly unscored","var(--oos)");
+    h+='</div>';
+
+    h+='<section class="panel sec"><div class="secH"><h2>Lanes in view</h2>'+
+       '<span class="note">SEI prepends two hops onto the incumbent chain; it never runs beside it</span></div><div class="lanes">';
+    ["STAR","UAF","SEI"].forEach(function(k){ if(!S.lanes[k]) return; h+=laneCard(k); });
+    h+='</div></section>';
+
+    h+='<section class="panel sec"><div class="secH"><h2>Verdict spread</h2>'+
+       '<span class="note">'+v.length+' columns · green is a proven match</span></div>'+
+       '<div class="bar" style="margin-top:12px">'+stack(v)+'</div><div class="legend">'+
+       VORDER.filter(function(x){return m[x];}).map(function(x){
+         return '<span><i style="background:'+V[x].bar+'"></i>'+V[x].t+' <b class="num">'+m[x]+'</b></span>'; }).join("")+
+       '</div>';
+    if(seiScope.length){
+      h+='<p style="font-size:11.5px;color:var(--ink2);line-height:1.6;margin:13px 0 0">'+
+         '<b>'+seiScope.length+'</b> of these sit on a lane SEI replaces and count toward cutover readiness. '+
+         'The remaining <b>'+(v.length-seiScope.length)+'</b> are UAF: real lineage, excluded from the denominator. '+
+         'Score them and UAF reads as the worst area in the estate on a lane nobody is touching.</p>';
+    }
+    h+='</section>';
+
+    h+='<section class="panel sec"><div class="secH"><h2>What to look at first</h2>'+
+       '<span class="note">full list on the Findings tab</span></div>';
+    FINDINGS.filter(applies).slice(0,3).forEach(function(f){ h+=findHtml(f); });
+    h+='</section>';
+
+    h+=banner();
+    return h;
+  }
+  function tile(v,k,s,c){
+    return '<div class="tile" style="--tc:'+c+'"><div class="v num">'+v+'</div>'+
+           '<div class="k">'+esc(k)+'</div><div class="s">'+esc(s)+'</div></div>';
+  }
+  function laneCard(k){
+    var L=LANE[k], hops;
+    if(k==="STAR") hops=[["STAR FEED","ACDDIFI1 / PEDDIFI1 / TBMEIFI7"],["CONTRACT","STAR field"],["IMDS","table.column"]];
+    else if(k==="UAF") hops=[["MQ MESSAGE","UAF account / address"],["JOB","PDPA009 · PDBA016"],["IMDS","RULESDBO.*"]];
+    else hops=[["SEI FEED","Account · EOD Positions · Taxlot"],["CANONICAL","SEI_ACCOUNT"],["CONTRACT","STAR-compatible"],["IMDS","table.column"]];
+    var inner=hops.map(function(x,i){
+      return '<div class="hop"><b>'+esc(x[0])+'</b><span class="mono">'+esc(x[1])+'</span></div>'+
+             (i<hops.length-1?'<div class="arrow">›</div>':""); }).join("");
+    var n=ROWS.filter(function(r){ return k==="SEI" ? (LANE[r.lane].state==="REPLACED" && r.seiDp) : r.lane===k; }).length;
+    return '<div class="laneCard" style="--lc:'+L.c+'"><div class="t">'+esc(L.label)+
+      ' &nbsp;·&nbsp; '+esc(L.state)+'</div><div class="hops">'+inner+'</div>'+
+      '<div style="font-size:10.5px;color:var(--ink3);margin-top:8px">'+
+      (k==="SEI" ? n+" contract fields have a proposed SEI datapoint" : n+" final columns in the ingested baseline")+
+      (L.contract?' · contract <span class="mono">'+esc(L.contract)+'</span>':"")+'</div></div>';
+  }
+
+  function tables(){
+    var v=visible();
+    if(!v.length) return emptyMsg();
+    var by={};
+    v.forEach(function(r){ (by[r.tbl]=by[r.tbl]||[]).push(r); });
+    var h='<section class="panel sec"><div class="secH"><h2>IMDS tables</h2>'+
+      '<span class="note">a table fed by two lanes appears once, with both</span></div><div class="tblWrap"><table>'+
+      '<thead><tr><th>Table</th><th>Lanes</th><th style="text-align:right">Columns</th>'+
+      '<th style="width:200px">Verdict spread</th><th>Flags</th></tr></thead><tbody>';
+    Object.keys(by).sort().forEach(function(t){
+      var rs=by[t], lanes=Array.from(new Set(rs.map(function(r){return r.lane;})));
+      var fset={}; rs.forEach(function(r){ r.flags.forEach(function(f){ fset[f]=1; }); });
+      var dual=lanes.length>1;
+      h+='<tr class="click" data-t="'+esc(t)+'"><td><span class="mono" style="font-weight:500">'+esc(t)+'</span>'+
+        '<span class="sub">'+esc(SUBJ[rs[0].subj])+'</span></td>'+
+        '<td>'+lanes.map(lanePill).join(" ")+(dual?'<span class="sub" style="color:var(--decode)">written by both</span>':"")+'</td>'+
+        '<td style="text-align:right" class="num">'+rs.length+'</td>'+
+        '<td><div class="bar sm">'+stack(rs)+'</div></td>'+
+        '<td>'+flags(Object.keys(fset))+'</td></tr>';
+    });
+    h+='</tbody></table></div></section>'+banner();
+    return h;
+  }
+
+  function columns(){
+    var v=visible();
+    if(!v.length) return emptyMsg();
+    var sei=seiOn();
+    var h='<section class="panel sec"><div class="secH"><h2>Final columns</h2>'+
+      '<span class="note">'+v.length+' rows · click one to open its crosswalk</span></div>'+
+      '<div class="tblWrap"><table><thead><tr>'+
+      '<th>IMDS column</th><th>Lane</th><th>Target type</th><th>Contract field</th>'+
+      (sei?'<th>SEI datapoint</th>':'')+'<th>Verdict</th><th>Analysis</th></tr></thead><tbody>';
+    v.forEach(function(r){
+      var isSei = LANE[r.lane].state==="REPLACED";
+      h+='<tr class="click" data-c="'+r.id+'"><td><span class="mono" style="font-weight:500">'+esc(r.col)+'</span>'+
+        '<span class="sub mono">'+esc(r.tbl)+'</span></td>'+
+        '<td>'+lanePill(r.lane)+'</td>'+
+        '<td><span class="mono" style="font-size:11px">'+esc(r.type)+'</span><span class="sub">length UNKNOWN</span></td>'+
+        '<td>'+(r.field?'<span class="mono" style="font-size:11px">'+esc(r.field)+'</span><span class="sub">'+esc(r.feed)+'</span>'
+                       :'<span style="color:var(--warn)">no contract field</span>')+'</td>'+
+        (sei?'<td>'+(!isSei?'<span style="color:var(--ink3)">n/a — lane not replaced</span>'
+              : r.seiDp?'<span class="mono" style="font-size:11px">'+esc(r.seiDp)+'</span><span class="sub">'+esc(r.seiFeed)+'</span>'
+              :'<span style="color:var(--deep)">none proposed</span>')+'</td>':'')+
+        '<td>'+pill(r.verdict)+'</td><td>'+flags(r.flags)+'</td></tr>';
+    });
+    h+='</tbody></table></div></section>'+banner();
+    return h;
+  }
+
+  function crosswalk(){
+    var v=visible();
+    if(!v.length) return emptyMsg();
+    var r = v.filter(function(x){ return x.id===S.col; })[0];
+    if(!r) r = v.filter(function(x){ return x.flags.indexOf("COLLAPSE_RISK")>=0; })[0] || v[0];
+
+    // every lane writing this same target column
+    var peers = ROWS.filter(function(x){ return x.tbl===r.tbl && x.col===r.col && inLane(x); });
+    // every contract field this SEI datapoint is proposed for
+    var fanout = r.seiDp ? ROWS.filter(function(x){
+      return x.seiDp===r.seiDp && x.seiFeed===r.seiFeed; }) : [];
+    var fanFields = Array.from(new Set(fanout.map(function(x){ return x.feed+" · "+x.field; })));
+
+    var h='<section class="panel sec"><div class="secH">'+
+      '<h2><span class="mono">'+esc(r.tbl)+'.'+esc(r.col)+'</span></h2>'+
+      '<span class="note">'+esc(SUBJ[r.subj])+'</span>'+
+      '<span style="margin-left:auto">'+pill(r.verdict)+'</span></div>'+
+      '<div style="margin-top:6px">'+flags(r.flags)+'</div>';
+
+    peers.forEach(function(p){
+      var L=LANE[p.lane], hops;
+      if(p.lane==="UAF") hops=[["MQ FIELD",p.field||"—"],["MESSAGE",p.feed],["JOB","PDPA009_IntraDay_UAFtoPACE_CMD"],["IMDS",p.tbl+"."+p.col]];
+      else if(seiOn() && p.seiDp) hops=[["SEI DATAPOINT",p.seiDp],["SEI FEED",p.seiFeed],["CONTRACT",(p.field||"none")+" · "+p.feed],["IMDS",p.tbl+"."+p.col]];
+      else hops=[["STAR FIELD",p.field||"none"],["STAR FEED",p.feed],["IMDS",p.tbl+"."+p.col]];
+      h+='<div class="laneCard" style="--lc:'+L.c+';margin-top:12px"><div class="t">'+esc(L.label)+'</div>'+
+         '<div class="hops">'+hops.map(function(x,i){
+            return '<div class="hop"><b>'+esc(x[0])+'</b><span class="mono">'+esc(x[1])+'</span></div>'+
+                   (i<hops.length-1?'<div class="arrow">›</div>':""); }).join("")+'</div></div>';
+    });
+
+    if(peers.length>1){
+      h+='<div class="banner" style="background:var(--decodeBg);border-left-color:var(--decode)">'+
+        '<span><b>Two lanes write this column and nothing says which wins.</b> '+
+        peers.map(function(p){return LANE[p.lane].label;}).join(" and ")+
+        ' both populate it. There is no error when they disagree — the value simply depends on load order. '+
+        'A precedence rule is needed from the IMDS data owner before cutover.</span></div>';
+    }
+    h+='</section>';
+
+    h+='<div class="two">';
+
+    // checks
+    h+='<section class="panel sec" style="margin-top:0"><div class="secH"><h2>Format validation</h2>'+
+       '<span class="note">'+(r.seiDp?"SEI against the contract field":"no SEI side to compare")+'</span></div>'+
+       '<div class="tblWrap"><table style="min-width:520px"><thead><tr>'+
+       '<th>Check</th><th>SEI side</th><th>Target contract</th><th>Result</th></tr></thead><tbody>';
+    checksFor(r).forEach(function(c){
+      h+='<tr><td style="font-weight:500">'+esc(c[0])+'</td><td class="mono" style="font-size:11px">'+esc(c[1])+
+         '</td><td class="mono" style="font-size:11px">'+esc(c[2])+'</td><td>'+
+         '<span class="pill" style="background:'+c[4]+';color:'+c[3]+'">'+esc(c[5])+'</span></td></tr>';
+    });
+    h+='</tbody></table></div></section>';
+
+    // crosswalk analysis
+    h+='<section class="panel sec" style="margin-top:0"><div class="secH"><h2>Crosswalk analysis</h2></div>';
+    if(r.seiDp && fanFields.length>1){
+      h+='<div class="find" style="--fc:var(--crit)"><h3>One SEI datapoint, '+fanFields.length+' contract fields</h3>'+
+         '<p><span class="mono">'+esc(r.seiFeed)+'.'+esc(r.seiDp)+'</span> is proposed for every one of these:</p>'+
+         '<ul style="margin:6px 0 0;padding-left:18px;font-size:11.5px;color:var(--ink2);line-height:1.7">'+
+         fanFields.map(function(f){ return '<li class="mono">'+esc(f)+'</li>'; }).join("")+'</ul>'+
+         '<p style="margin-top:8px">The incumbent kept these apart on the same record. If they ever hold different values in STAR, '+
+         'collapsing them to one SEI datapoint loses that difference silently — the load succeeds and the number is wrong.</p>'+
+         '<div class="meta"><span><b>Owner</b> SEI design team + BBH mapping</span>'+
+         '<span><b>Clears when</b> SEI names which datapoint is the derived one</span></div></div>';
+    } else if(r.seiDp){
+      h+='<div class="find" style="--fc:var(--sei)"><h3>One-to-one mapping</h3>'+
+         '<p><span class="mono">'+esc(r.seiFeed)+'.'+esc(r.seiDp)+'</span> is proposed for this contract field and no other. '+
+         'Nothing to disambiguate — the verdict rests on types alone.</p></div>';
+    } else if(r.verdict==="NO_SOURCE"){
+      h+='<div class="find" style="--fc:var(--deep)"><h3>No SEI datapoint behind it</h3>'+
+         '<p>The contract field <span class="mono">'+esc(r.field||"—")+'</span> is delivered today and has nothing behind it after cutover. '+
+         'It needs one of four dispositions — default, derive, drop or block — approved by the IMDS data owner.</p>'+
+         '<div class="meta"><span><b>Disposition</b> UNDECIDED</span><span><b>Owner</b> IMDS data owner</span></div></div>';
+    } else if(r.verdict==="OUT_OF_SCOPE"){
+      h+='<div class="find" style="--fc:var(--oos)"><h3>Out of scope, not a gap</h3>'+
+         '<p>This column is on the UAF lane, which SEI does not replace. Having no SEI datapoint is the correct state. '+
+         'It is counted as lineage and excluded from the cutover denominator.</p></div>';
+    } else if(r.verdict==="NO_BASELINE"){
+      h+='<div class="find" style="--fc:var(--warn)"><h3>No contract field to join on</h3>'+
+         '<p>No incumbent field feeds this column today, so there is nothing for a SEI mapping to attach to.'+
+         (r.seiDp?' SEI datapoints are nonetheless proposed, which means a direct SEI → IMDS route that bypasses the contract. '+
+                  'That may be right for an operational column, but it is an architecture decision, not a join result.':'')+'</p>'+
+         '<div class="meta"><span><b>Owner</b> existing lineage backlog — not a SEI finding</span></div></div>';
+    }
+    if(r.flags.indexOf("FEED_DEPENDENCY")>=0){
+      h+='<div class="find" style="--fc:var(--comp)"><h3>Assembled from feeds that arrive separately</h3>'+
+         '<p>Nothing stops the position feed loading without its rates. The result is a wrong value, not a missing one — '+
+         'which is the harder failure to detect and the reason a composite cannot clear on types.</p></div>';
+    }
+    h+='</section></div>';
+
+    h+='<section class="panel sec"><div class="secH"><h2>Other columns in '+esc(r.tbl)+'</h2>'+
+      '<span class="note">click to switch</span></div><div class="tblWrap"><table style="min-width:520px">'+
+      '<thead><tr><th>Column</th><th>Lane</th><th>Contract field</th><th>Verdict</th></tr></thead><tbody>';
+    v.filter(function(x){ return x.tbl===r.tbl; }).forEach(function(x){
+      h+='<tr class="click'+(x.id===r.id?" on":"")+'" data-c="'+x.id+'">'+
+         '<td class="mono">'+esc(x.col)+'</td><td>'+lanePill(x.lane)+'</td>'+
+         '<td class="mono" style="font-size:11px">'+esc(x.field||"—")+'</td><td>'+pill(x.verdict)+'</td></tr>';
+    });
+    h+='</tbody></table></div></section>'+banner();
+    return h;
+  }
+
+  function checksFor(r){
+    var U=["var(--unk)","var(--unkBg)","UNPROVEN"], F=["var(--crit)","var(--critBg)","FAIL"],
+        NA=["var(--oos)","var(--oosBg)","N/A"], W=["var(--comp)","var(--compBg)","NOT COMPARABLE"];
+    function row(n,l,rt,s){ return [n,l,rt,s[0],s[1],s[2]]; }
+    if(!r.seiDp){
+      return [row("Datatype family","—",r.type.replace(/\(.*/,""),NA),
+              row("Precision & scale","—","UNKNOWN",NA),
+              row("Nullability","—","UNKNOWN",NA),
+              row("Code set","—",r.flags.indexOf("CODE_SET")>=0?"required":"n/a",NA)];
+    }
+    var out=[
+      row("Datatype family", "UNKNOWN", r.type.replace(/\(.*/,""), U),
+      row("Precision & scale","UNKNOWN", r.type.indexOf("(")>0?r.type:"UNKNOWN", U),
+      row("Nullability","UNKNOWN","UNKNOWN", U),
+      row("Unit of measure","UNKNOWN","UNKNOWN", U),
+      row("Currency basis", r.col.indexOf("mval")>=0||r.col.indexOf("cost")>=0?"asset (assumed)":"n/a",
+          r.col.indexOf("mval")>=0||r.col.indexOf("cost")>=0?"UNKNOWN":"n/a",
+          r.col.indexOf("mval")>=0||r.col.indexOf("cost")>=0?F:NA)
+    ];
+    if(r.flags.indexOf("CODE_SET")>=0) out.push(row("Code set crosswalk","domain named, values not published","no STAR side supplied",F));
+    if(r.kind==="COMPOSITE") out.push(row("Single left side","3 datapoints, 2 feeds","1 column",W));
+    if(r.flags.indexOf("COLLAPSE_RISK")>=0) out.push(row("Datapoint exclusivity","shared with other fields","field is distinct in STAR",F));
+    return out;
+  }
+
+  // ---------- findings ----------
+  var FINDINGS=[
+    {id:"gl", sev:"crit", need:["STAR"],
+     t:"The general-ledger block has no successor",
+     p:"Five GL columns on BBH_STAR_NAV_TB plus ten more NAV columns come back NO_SOURCE. This is not scattered misses — SEI publishes no general-ledger datapoints in any attached feed. Either NAV's GL reporting is out of scope for SEI, or a GL feed exists and was not supplied.",
+     owner:"SEI design team + IMDS data owner", clears:"A yes/no on whether SEI carries general ledger at all",
+     count:function(v){ return v.filter(function(r){return r.verdict==="NO_SOURCE" && r.subj==="nav";}).length; },
+     unit:"NAV columns"},
+    {id:"collapse", sev:"crit", need:["STAR","SEI"],
+     t:"One SEI datapoint standing in for fields STAR kept apart",
+     p:"Taxlot.MARKET_VALUE is proposed for both Derived_Market_Value and Market_Value; Account.ACCOUNT_NUMBER for Custody_Head_Account_Number, Entity_Number and STAR_ENTITY_ID_1. A derived value and an as-supplied value are not the same number, and a custody head account is not an entity number. Where they differ in STAR, the collapse is silent — the load succeeds.",
+     owner:"SEI design team + BBH mapping", clears:"SEI names which datapoint is derived, and which identifier is the custody head",
+     count:function(v){ return v.filter(function(r){return r.flags.indexOf("COLLAPSE_RISK")>=0;}).length; },
+     unit:"columns affected"},
+    {id:"dual", sev:"crit", need:["STAR","UAF"],
+     t:"Two lanes write the same columns with no precedence rule",
+     p:"RULESDBO.ENTITY and ENTITY_HIST are populated by both the STAR lane and UAF. Nothing in the attached documents says which wins when both supply a value. This is the quietest risk on the board: there is no error, the value just depends on load order.",
+     owner:"IMDS data owner", clears:"A stated precedence rule — last write, source priority, or a record-type split",
+     count:function(v){ return new Set(v.filter(function(r){return r.flags.indexOf("DUAL_SOURCE")>=0;})
+                                        .map(function(r){return r.tbl+"."+r.col;})).size; },
+     unit:"columns"},
+    {id:"ddl", sev:"warn", need:["SEI"],
+     t:"No verdict can reach PROVEN until live DDL replaces the dictionary",
+     p:"Target types were read from IMDS_data_dictionary.xlsx. That makes the target-side evidence DOCUMENT, and the rule forbids a proven match on document evidence. However good the SEI workbook gets, this stays at zero. One ALL_TAB_COLUMNS extract lifts the ceiling for every mapped column at once.",
+     owner:"IMDS DBA", clears:"An ALL_TAB_COLUMNS + primary-key extract for the four owners",
+     count:function(v){ return v.filter(function(r){return r.verdict==="UNKNOWN";}).length; },
+     unit:"columns waiting on it"},
+    {id:"codes", sev:"warn", need:["SEI"],
+     t:"Code sets are named on the SEI side and absent on the STAR side",
+     p:"The reference workbook lists 197 domains — ACCT_STATUS, PORTFOLIO_TYPE, COUNTRY — but not their member values, and no STAR equivalent was supplied at all. Every decode is therefore blocked at both ends, not one.",
+     owner:"SEI design team + STAR owner", clears:"Permitted values per domain from SEI, and the STAR code sets to map them to",
+     count:function(v){ return v.filter(function(r){return r.verdict==="DECODE_NEEDED";}).length; },
+     unit:"columns needing a decode"},
+    {id:"baseline", sev:"info", need:["STAR"],
+     t:"Nine columns have no incumbent field at all",
+     p:"upd_user, upd_date, effective_date, src_intfc_inst and update_source are unmapped in the existing lineage, before SEI enters. Most look pipeline-managed. They belong to the existing lineage backlog and must not inflate the SEI blocker count — but upd_user has SEI datapoints attached, which means a direct route around the contract that nobody has agreed.",
+     owner:"Existing lineage backlog", clears:"Confirmation that these are populated by the load and need no source",
+     count:function(v){ return v.filter(function(r){return r.verdict==="NO_BASELINE";}).length; },
+     unit:"columns"},
+    {id:"feeds", sev:"warn", need:["STAR"],
+     t:"Three of seven STAR feed families are in the baseline",
+     p:"ACDDIFI1, PEDDIFI1 and TBMEIFI7 were documented. TJDDIFI1 (trades), ODDDIFI1 (dividends), ORDDIFI1 (accrued interest) and SMDDIFI1 (security master) are absent entirely. No prompt fixes this — the lineage documents have to come from the STAR owner, or those feeds have to be confirmed out of scope.",
+     owner:"STAR owner", clears:"Lineage documents for the four missing feed families",
+     count:function(){ return 4; }, unit:"feed families missing"}
+  ];
+  function applies(f){ return f.need.some(function(l){ return S.lanes[l]; }); }
+  function findHtml(f){
+    var c = f.sev==="crit"?"var(--crit)" : f.sev==="warn"?"var(--warn)" : "var(--oos)";
+    var n = f.count(visible());
+    return '<div class="find" style="--fc:'+c+'"><h3>'+esc(f.t)+'</h3><p>'+esc(f.p)+'</p>'+
+      '<div class="meta"><span><b class="num">'+n+'</b> '+esc(f.unit)+'</span>'+
+      '<span><b>Owner</b> '+esc(f.owner)+'</span>'+
+      '<span><b>Clears when</b> '+esc(f.clears)+'</span></div></div>';
+  }
+  function findings(){
+    var fs=FINDINGS.filter(applies);
+    if(!fs.length) return emptyMsg();
+    var h='<section class="panel sec"><div class="secH"><h2>Crosswalk findings</h2>'+
+      '<span class="note">'+fs.length+' open · filtered to the lanes in view</span></div>';
+    fs.forEach(function(f){ h+=findHtml(f); });
+    h+='</section>';
+    h+='<section class="panel sec"><div class="secH"><h2>Cutover gate</h2>'+
+      '<span class="note">a table turns green only when all four hold</span></div>'+
+      '<ol style="margin:11px 0 0;padding-left:20px;font-size:11.5px;color:var(--ink2);line-height:1.75">'+
+      '<li>Zero UNKNOWN — every column checked against live metadata on both sides, not against a document.</li>'+
+      '<li>Every NO SOURCE column carries an approved disposition with a named owner and a date.</li>'+
+      '<li>Every composite has a parallel-run reconciliation against the incumbent, with a stated tolerance.</li>'+
+      '<li>Every dual-source column has a precedence rule, and every collapse risk has been confirmed or split.</li>'+
+      '</ol><p style="font-size:11.5px;color:var(--ink2);line-height:1.6;margin:11px 0 0">'+
+      'Lanes marked NOT REPLACED are excluded from the denominator, never scored zero.</p></section>';
+    return h+banner();
+  }
+
+  function banner(){
+    return '<div class="banner"><span><b>Example data.</b> These rows are the shape the ingested workbook produces, '+
+      'drawn from the columns and mappings it actually returned. No verdict here has been earned: target types came from a '+
+      'data dictionary and SEI publishes datapoint names without types, so every match stays UNPROVEN until both sides '+
+      'are read from live metadata.</span></div>';
+  }
+  function emptyMsg(){
+    return '<section class="panel sec"><div class="empty">'+
+      (anyLane()?"No columns match these filters. Clear a filter in the rail."
+               :"No lanes selected. Pick STAR, UAF or SEI in the rail.")+'</div></section>';
+  }
+
+  // ---------- render ----------
+  function draw(){
+    drawRail(); drawTabs();
+    var v=$("#view");
+    v.innerHTML = !anyLane() ? emptyMsg()
+      : S.tab==="overview" ? overview()
+      : S.tab==="tables"   ? tables()
+      : S.tab==="columns"  ? columns()
+      : S.tab==="crosswalk"? crosswalk()
+      : findings();
+    Array.prototype.forEach.call(v.querySelectorAll("tr[data-c]"), function(tr){
+      tr.onclick=function(){ S.col=+tr.getAttribute("data-c"); S.tab="crosswalk"; draw();
+        window.scrollTo({top:0,behavior:"smooth"}); };
+    });
+    Array.prototype.forEach.call(v.querySelectorAll("tr[data-t]"), function(tr){
+      tr.onclick=function(){
+        var t=tr.getAttribute("data-t");
+        var first=visible().filter(function(r){ return r.tbl===t; })[0];
+        if(first){ S.col=first.id; S.tab="crosswalk"; draw(); window.scrollTo({top:0,behavior:"smooth"}); }
+      };
+    });
+  }
+  draw();
+})();
+</script>
