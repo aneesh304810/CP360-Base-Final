@@ -120,34 +120,62 @@ def _ceiling(ds):
 
 @router.get("/lane-systems")
 def lane_systems(data_source: str | None = None):
-    """Which source systems actually have lineage rows in THIS warehouse.
+    """Which source systems actually feed THIS warehouse.
 
     LineageHome's badges came from /legacy-lineage/systems, which takes no
     data_source and returns the same three everywhere — which is why IMDS
     offered AddVantage and defaulted to it.
 
-    The test here is empirical rather than declarative: a system is offered
-    only if legacy_lineage actually holds rows whose source feed belongs to
-    it. A lane seeded in the register with no evidence behind it (an
-    ADDVANTAGE_IMDS row, say) therefore does not appear, which is the whole
-    point.
+    TWO ROUTES, and the order matters.
+
+    The first asks the workbook directly: SEI_VERIFY carries LANE_ID on every
+    row, and LEGACY_LANE maps a lane to its source system. UAF_IMDS -> UAF, no
+    inference involved.
+
+    The second, used where no crosswalk is loaded, joins LEGACY_LINEAGE to
+    LEGACY_SOURCE_FILE through the normalised feed key. That route is what the
+    first version used alone, and it is why UAF went missing after AddVantage
+    was fixed: a UAF message named one way in LANE_LINEAGE and another way in
+    UAF_FEED does not normalise to the same key, so its rows landed in the
+    unattributed bucket and the system never appeared. A declared lane cannot
+    fail that way.
+
+    SEI is excluded: it is the scope, not one of the incumbent systems the
+    badge row selects between.
 
     `resolved` distinguishes "asked and the answer is none" from "could not
-    ask". The caller must not treat an empty list as permission to show
-    everything; that is exactly the bug this replaces.
+    ask". An empty list is never permission to show everything.
     """
     ds = _ds(data_source)
+
+    # 1. the lane the workbook declared
     rows = _safe("""
-        SELECT NVL(f.source_system, '?') AS source_system,
-               COUNT(DISTINCT l.dwh_target_table || '.' || l.dwh_target_column) AS columns_
-        FROM   legacy_lineage l
-        LEFT JOIN legacy_source_file f
-               ON f.data_source  = l.data_source
-              AND f.src_file_key = REGEXP_REPLACE(UPPER(TRIM('_' FROM
-                    REGEXP_REPLACE(l.src_source_table,'[[:space:]/.-]+','_'))),'_{2,}','_')
-        WHERE  l.data_source = :ds
-        GROUP  BY NVL(f.source_system, '?')
+        SELECT n.source_system AS source_system,
+               COUNT(DISTINCT v.dwh_target_table || '.' || v.dwh_target_column) AS columns_
+        FROM   sei_verify v
+        JOIN   legacy_lane n ON n.lane_id = v.lane_id
+        WHERE  v.data_source = :ds
+          AND  n.source_system IS NOT NULL
+          AND  UPPER(n.source_system) <> 'SEI'
+        GROUP  BY n.source_system
         ORDER  BY 2 DESC""", {"ds": ds})
+    route = "lane_register"
+
+    # 2. fall back to the feed key where no crosswalk is loaded (PBDW today)
+    if not rows:
+        route = "feed_key"
+        rows = _safe("""
+            SELECT NVL(f.source_system, '?') AS source_system,
+                   COUNT(DISTINCT l.dwh_target_table || '.' || l.dwh_target_column) AS columns_
+            FROM   legacy_lineage l
+            LEFT JOIN legacy_source_file f
+                   ON f.data_source  = l.data_source
+                  AND f.src_file_key = REGEXP_REPLACE(UPPER(TRIM('_' FROM
+                        REGEXP_REPLACE(l.src_source_table,'[[:space:]/.-]+','_'))),'_{2,}','_')
+            WHERE  l.data_source = :ds
+            GROUP  BY NVL(f.source_system, '?')
+            ORDER  BY 2 DESC""", {"ds": ds})
+
     known = [r for r in rows if (r.get("source_system") or "?") != "?"]
     unresolved = sum(int(r.get("columns_") or 0)
                      for r in rows if (r.get("source_system") or "?") == "?")
@@ -155,218 +183,14 @@ def lane_systems(data_source: str | None = None):
     return {
         "data_source": ds,
         "systems": known,
+        "route": route,
         "unresolved_columns": unresolved,
         "total_columns": total,
-        # resolved=False means the join told us nothing — no lineage at all, or
-        # every feed missing a source_system. The UI falls back to the global
-        # list only in that case, and says why.
         "resolved": bool(known),
-        "hint": ("legacy_source_file.source_system is empty for this warehouse; "
-                 "re-run the crosswalk load so feeds are tagged with their lane"
+        "hint": ("no lane could be attributed to a source system; check "
+                 "LANE_REGISTER.SOURCE_SYSTEM and legacy_source_file"
                  if total and not known else None),
     }
-
-
-@router.get("/lanes")
-def lanes(data_source: str | None = None):
-    ds = _ds(data_source)
-    regs = _safe("""
-        SELECT lane_id, source_system, data_source, replacement_state,
-               successor_system, contract_name, notes
-        FROM   legacy_lane WHERE data_source = :ds ORDER BY lane_id""", {"ds": ds})
-    counts = _safe("""
-        SELECT lane_id, match_verdict AS v, COUNT(*) AS n
-        FROM   sei_verify WHERE data_source = :ds
-        GROUP BY lane_id, match_verdict""", {"ds": ds})
-    by = {}
-    for c in counts:
-        by.setdefault(c.get("lane_id"), {})[c.get("v")] = int(c.get("n") or 0)
-    for r in regs:
-        v = by.get(r.get("lane_id"), {})
-        r["verdicts"] = [{"verdict": k, "n": v[k]} for k in VERDICT_ORDER if k in v]
-        r["columns"] = sum(v.values())
-    return {"lanes": regs}
-
-
-@router.get("/flow")
-def flow(data_source: str | None = None):
-    """Nodes and links for the mapping flow: SEI source -> contract feed ->
-    warehouse table. Link weight is COUNT(DISTINCT target column), never row
-    count — legacy_lineage's grain is (target column x source), so counting
-    rows double-counts a fan-in."""
-    ds = _ds(data_source)
-    left = _safe("""
-        SELECT NVL(m.sei_feed, 'no SEI source') AS src,
-               NVL(v.contract_feed, 'unmapped')  AS mid,
-               COUNT(DISTINCT v.dwh_target_table || '.' || v.dwh_target_column) AS n
-        FROM   sei_verify v
-        LEFT JOIN sei_source_map m
-               ON m.data_source = v.data_source
-              AND NVL(m.src_col_norm, m.src_source_column) = {CANON_CF}
-        WHERE  v.data_source = :ds
-          AND  v.lane_id IN (SELECT lane_id FROM legacy_lane
-                             WHERE data_source = :ds AND replacement_state = 'REPLACED')
-        GROUP BY NVL(m.sei_feed, 'no SEI source'), NVL(v.contract_feed, 'unmapped')
-    """.replace("{CANON_CF}", _canon("v.contract_field")), {"ds": ds})
-    right = _safe("""
-        SELECT NVL(contract_feed, 'unmapped') AS mid, dwh_target_table AS tgt,
-               COUNT(DISTINCT dwh_target_column) AS n
-        FROM   sei_verify
-        WHERE  data_source = :ds
-          AND  lane_id IN (SELECT lane_id FROM legacy_lane
-                           WHERE data_source = :ds AND replacement_state = 'REPLACED')
-        GROUP BY NVL(contract_feed, 'unmapped'), dwh_target_table
-    """, {"ds": ds})
-    return {"left": left, "right": right}
-
-
-@router.get("/columns")
-def columns(data_source: str | None = None, verdict: str | None = None,
-            lane: str | None = None, group: str | None = None,
-            table: str | None = None, limit: int = 500):
-    """The drill list. Every filter the dashboard can hand down."""
-    ds = _ds(data_source)
-    where = ["data_source = :ds"]
-    p = {"ds": ds}
-    if verdict:
-        where.append("match_verdict = :v"); p["v"] = verdict.upper()
-    if lane:
-        where.append("lane_id = :l"); p["l"] = lane.upper()
-    if group:
-        where.append("functional_group = :g"); p["g"] = group
-    if table:
-        where.append("dwh_target_table = :t"); p["t"] = table
-    rows = _safe(f"""
-        SELECT lane_id, dwh_target_table, dwh_target_column, functional_group,
-               contract_feed, contract_field, sei_datapoint_count, sei_datapoints,
-               map_kind, match_verdict, failed_checks, blocks_cutover,
-               verdict_reason, what_would_clear_it
-        FROM   sei_verify WHERE {' AND '.join(where)}
-        ORDER  BY dwh_target_table, dwh_target_column
-        FETCH FIRST {int(limit)} ROWS ONLY""", p)
-    return {"columns": rows, "count": len(rows)}
-
-
-@router.get("/column")
-def column(table: str, column: str, data_source: str | None = None):
-    """One final column, everything known about it — the bottom of the drill.
-
-    Returns every lane that writes it (that is the dual-source finding), the
-    SEI datapoints proposed for its contract field, every OTHER contract field
-    those same datapoints are proposed for (that is the collapse finding), and
-    the disposition if it has no source.
-    """
-    ds = _ds(data_source)
-    p = {"ds": ds, "t": table, "c": column}
-    verdicts = _safe("""
-        SELECT * FROM sei_verify
-        WHERE data_source = :ds AND dwh_target_table = :t AND dwh_target_column = :c
-        ORDER BY lane_id""", p)
-    chain = _safe("""
-        SELECT l.lane_id_resolved AS lane_id, l.* FROM (
-          SELECT f.source_system AS lane_id_resolved, ll.*
-          FROM   legacy_lineage ll
-          LEFT JOIN legacy_source_file f
-                 ON f.data_source = ll.data_source
-                AND f.src_file_key = REGEXP_REPLACE(UPPER(TRIM(BOTH '_' FROM
-                      REGEXP_REPLACE(ll.src_source_table,'[[:space:]/.-]+','_'))),'_{2,}','_')
-          WHERE  ll.data_source = :ds AND ll.dwh_target_table = :t
-            AND  ll.dwh_target_column = :c
-        ) l""", p)
-    contract = _safe("""
-        SELECT c.* FROM legacy_src_column c
-        WHERE  c.data_source = :ds
-          AND  NVL(c.src_col_norm, c.src_source_column) IN (
-                 SELECT {CANON_CF} FROM sei_verify
-                 WHERE data_source = :ds AND dwh_target_table = :t
-                   AND dwh_target_column = :c)""".replace(
-        "{CANON_CF}", _canon("contract_field")), p)
-    maps = _safe("""
-        SELECT m.* FROM sei_source_map m
-        WHERE  m.data_source = :ds
-          AND  NVL(m.src_col_norm, m.src_source_column) IN (
-                 SELECT {CANON_CF} FROM sei_verify
-                 WHERE data_source = :ds AND dwh_target_table = :t
-                   AND dwh_target_column = :c)
-        ORDER BY m.composite_group NULLS FIRST, m.sei_datapoint""".replace(
-        "{CANON_CF}", _canon("contract_field")), p)
-    # Collapse: the same SEI datapoint standing in for other contract fields.
-    collapse = _safe("""
-        SELECT DISTINCT m2.sei_feed, m2.sei_datapoint, m2.src_source_column AS other_field
-        FROM   sei_source_map m2
-        WHERE  m2.data_source = :ds
-          AND (m2.sei_feed, m2.sei_datapoint) IN (
-                 SELECT m.sei_feed, m.sei_datapoint FROM sei_source_map m
-                 WHERE m.data_source = :ds
-                   AND NVL(m.src_col_norm, m.src_source_column) IN (
-                     SELECT {CANON_CF} FROM sei_verify
-                     WHERE data_source = :ds AND dwh_target_table = :t
-                       AND dwh_target_column = :c))
-        ORDER BY m2.sei_datapoint, m2.src_source_column""".replace(
-        "{CANON_CF}", _canon("contract_field")), p)
-    dual = _safe("""
-        SELECT * FROM sei_dual_source
-        WHERE data_source = :ds AND dwh_target_table = :t AND dwh_target_column = :c""", p)
-    disp = _safe("""
-        SELECT * FROM sei_disposition
-        WHERE dwh_target_table = :t AND dwh_target_column = :c""",
-        {"t": table, "c": column})
-    return {"table": table, "column": column, "data_source": ds,
-            "verdicts": verdicts, "chain": chain, "contract": contract,
-            "maps": maps, "collapse": collapse, "dual_source": dual,
-            "disposition": disp}
-
-
-@router.get("/divergence")
-def divergence(data_source: str | None = None):
-    """The six shapes, with their counts, plus the named instances."""
-    ds = _ds(data_source)
-
-    def n(sql, extra=None):
-        r = _safe(sql, {"ds": ds, **(extra or {})})
-        return int((r[0].get("n") if r else 0) or 0)
-
-    shapes = [
-        {"key": "collapse", "label": "Collapse",
-         "n": n("""SELECT COUNT(*) AS n FROM sei_verify
-                   WHERE data_source = :ds AND failed_checks LIKE '%COLLAPSE%'"""),
-         "owner": "SEI design team + BBH mapping"},
-        {"key": "dual_source", "label": "Dual source",
-         "n": n("SELECT COUNT(*) AS n FROM sei_dual_source WHERE data_source = :ds"),
-         "owner": "IMDS data owner"},
-        {"key": "bypass", "label": "Contract bypass",
-         "n": n("""SELECT COUNT(*) AS n FROM sei_verify
-                   WHERE data_source = :ds AND failed_checks LIKE '%BYPASSES_CONTRACT%'"""),
-         "owner": "Architecture"},
-        {"key": "decode", "label": "Decode gap",
-         "n": n("""SELECT COUNT(*) AS n FROM sei_verify
-                   WHERE data_source = :ds AND match_verdict = 'DECODE_NEEDED'"""),
-         "owner": "SEI design team + STAR owner"},
-        {"key": "feed_dependency", "label": "Feed dependency",
-         "n": n("""SELECT COUNT(*) AS n FROM sei_verify
-                   WHERE data_source = :ds AND failed_checks LIKE '%FEED_DEPENDENCY%'"""),
-         "owner": "BBH mapping"},
-        {"key": "no_source", "label": "No source",
-         "n": n("""SELECT COUNT(*) AS n FROM sei_verify
-                   WHERE data_source = :ds AND match_verdict = 'NO_SOURCE'"""),
-         "owner": "IMDS data owner"},
-    ]
-
-    # Named collapse instances: one SEI datapoint, several contract fields.
-    collapse = _safe("""
-        SELECT sei_feed, sei_datapoint, COUNT(DISTINCT src_source_column) AS fields,
-               LISTAGG(DISTINCT src_source_column, ' | ')
-                 WITHIN GROUP (ORDER BY src_source_column) AS field_list
-        FROM   sei_source_map
-        WHERE  data_source = :ds AND sei_datapoint IS NOT NULL
-        GROUP BY sei_feed, sei_datapoint
-        HAVING COUNT(DISTINCT src_source_column) > 1
-        ORDER BY fields DESC""", {"ds": ds})
-    dual = _safe("""
-        SELECT dwh_target_table, dwh_target_column, lanes, precedence_rule, owner
-        FROM   sei_dual_source WHERE data_source = :ds
-        ORDER  BY dwh_target_table, dwh_target_column""", {"ds": ds})
-    return {"shapes": shapes, "collapse": collapse, "dual_source": dual}
 
 
 @router.get("/catalog")
