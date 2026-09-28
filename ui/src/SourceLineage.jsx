@@ -3,6 +3,7 @@ import { lineageApi } from "./lineage_api_additions.js";
 import LineageGraph from "./LineageGraph.jsx";
 import { stageMeta, laneMeta } from "./laneMeta.js";
 import { crosswalkApi } from "./seiCrosswalkApi.js";
+import { useFeedNames, feedName } from "./feedNames.js";
 
 // =====================================================================
 // SourceLineage — the source-first drill.
@@ -136,6 +137,9 @@ export default function SourceLineage({ t, system, dictSystem,
   // What the selected lane contains. Null until asked; resolved:false means
   // the question could not be answered and the view stays unfiltered.
   const [lane, setLane] = useState(null);
+  // What each feed IS. Three cards reading "STAR outbound dataset" over
+  // three different codes told nobody anything.
+  const feedMap = useFeedNames(ds);
   const [flow, setFlow] = useState(null);
   const [fields, setFields] = useState(null);
   const [bucket, setBucket] = useState(null);
@@ -464,7 +468,8 @@ export default function SourceLineage({ t, system, dictSystem,
     // filename is Addv-ACCT-CHK-REG_..., which is the whole point of having
     // the business name
     const files = q
-      ? b.files.filter((f) => `${f.dataset || ""} ${f.src_source_table || ""}`
+      ? b.files.filter((f) => `${feedName(feedMap, f.src_source_table) || ""} `
+                              + `${f.dataset || ""} ${f.src_source_table || ""}`
           .toLowerCase().includes(q.toLowerCase()))
       : b.files;
     return (
@@ -495,18 +500,31 @@ export default function SourceLineage({ t, system, dictSystem,
                   Addv-ACCT-CHK-REG_BBH-TRP_YYYYMMDDHHMMSS.dat is how it
                   arrives. Where there is none the filename leads, as before. */}
               <span style={{ minWidth: 0 }}>
-                <span style={{ fontSize: 12.5, display: "block", overflow: "hidden",
-                  textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  fontFamily: f.dataset ? "inherit" : mono,
-                  fontWeight: f.dataset ? 500 : 400 }}>
-                  {f.dataset || f.src_source_table}</span>
-                <small style={{ fontSize: 11, color: "#7b8894", display: "block",
-                  overflow: "hidden", textOverflow: "ellipsis",
-                  whiteSpace: "nowrap" }}>
-                  {f.dataset && (
-                    <span style={{ fontFamily: mono }}>{f.src_source_table} · </span>)}
-                  lands in {f.target_tables} table{f.target_tables === 1 ? "" : "s"} ·
-                  {" "}{f.target_columns} columns</small>
+                {/* The business name leads where there is one. `dataset`
+                    used to lead, and on the STAR feeds it holds a
+                    classification — "STAR outbound dataset" over every
+                    card — so three different feeds had one heading and
+                    the code was doing all the work in 11px grey. */}
+                {(() => {
+                  const bn = feedName(feedMap, f.src_source_table);
+                  const head = bn || f.dataset || f.src_source_table;
+                  const named = Boolean(bn || f.dataset);
+                  return (<>
+                    <span style={{ fontSize: 12.5, display: "block", overflow: "hidden",
+                      textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      fontFamily: named ? "inherit" : mono,
+                      fontWeight: named ? 500 : 400 }}>{head}</span>
+                    <small style={{ fontSize: 11, color: "#7b8894", display: "block",
+                      overflow: "hidden", textOverflow: "ellipsis",
+                      whiteSpace: "nowrap" }}>
+                      {named && (
+                        <span style={{ fontFamily: mono }}>{f.src_source_table} · </span>)}
+                      {bn && f.dataset && bn !== f.dataset && (
+                        <span>{f.dataset} · </span>)}
+                      lands in {f.target_tables} table{f.target_tables === 1 ? "" : "s"} ·
+                      {" "}{f.target_columns} columns</small>
+                  </>);
+                })()}
               </span>
               <small style={{ fontSize: 11, color: "#7b8894", textAlign: "right" }}>
                 {f.field_count} fields</small>
@@ -529,7 +547,8 @@ export default function SourceLineage({ t, system, dictSystem,
         <h1 style={{ fontSize: 19, fontWeight: 400, textAlign: "center",
                      margin: "0 0 4px" }}>
           {tech ? flow.src_table
-                : (flow.dataset || flow.master || flow.functional_group
+                : (feedName(feedMap, flow.src_table) || flow.dataset
+                   || flow.master || flow.functional_group
                    || flow.src_table)}</h1>
         <p style={{ fontSize: 12.5, color: "#7b8894", textAlign: "center",
                     margin: "0 auto 22px", maxWidth: "74ch" }}>
@@ -537,7 +556,7 @@ export default function SourceLineage({ t, system, dictSystem,
             ? <>Lands in <span style={{ fontFamily: mono }}>{st.stg1_source_table}</span>,
                 conforms to <span style={{ fontFamily: mono }}>{st.stg2_source_table}</span>,
                 then {flow.target_count} warehouse table{flow.target_count === 1 ? "" : "s"}.</>
-            : <>{flow.dataset && (
+            : <>{(feedName(feedMap, flow.src_table) || flow.dataset) && (
                   <span style={{ fontFamily: mono, display: "block",
                                  marginBottom: 4 }}>{flow.src_table}</span>)}
                 This extract carries {st.field_count} fields. {st.reach_stg2 || 0}{" "}

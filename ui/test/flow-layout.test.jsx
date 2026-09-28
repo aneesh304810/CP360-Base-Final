@@ -130,4 +130,25 @@ ok(buildFlowModel(flow, { width: 200 }).W >= 720, "a silly width floors, not bre
   ok(rib.length === 0, `height ${h}: no ribbon outside the canvas`, rib.length);
 });
 
+// ---- business names -----------------------------------------------------
+// A node must lead with what the feed IS and keep the code beside it.
+// Leading with the code was the bug; dropping the code would be the next
+// one, because people search on PEDDIFI1 and talk about portfolio valuation.
+const names = { PEDDIFI1: "Portfolio Valuation", TBMEIFI7: "Trial Balance" };
+const named = buildFlowModel(flow, { width: 1600,
+  nameOf: (c) => names[c] || null });
+const pe = named.nodes.find((n) => n.id === "PEDDIFI1");
+const un = named.nodes.find((n) => n.id === "unmapped");
+ok(pe.short === "Portfolio Valuation", "a named node leads with the name", pe.short);
+ok(pe.code === "PEDDIFI1", "and keeps its code for the second line", pe.code);
+ok(pe.label.includes("PEDDIFI1") && pe.label.includes("Portfolio Valuation"),
+   "the tooltip carries both", pe.label);
+ok(un.short === "unmapped" && un.code === null,
+   "an unnamed node is unchanged and gets no duplicate code line", un);
+const plain = buildFlowModel(flow, { width: 1600 });
+ok(plain.nodes.every((n) => n.code === null),
+   "with no resolver nothing claims a name");
+ok(buildFlowModel(flow, { width: 1600, nameOf: "not a function" }) !== null,
+   "a bad resolver is ignored rather than thrown on");
+
 console.log(bad ? `\n${bad} assertion(s) failed` : "\nall layout assertions pass");

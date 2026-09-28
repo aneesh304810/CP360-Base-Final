@@ -878,6 +878,81 @@ def controls(data_source: str | None = None):
             "blocked": blocked[:20], "blocked_count": len(blocked)}
 
 
+@router.get("/feed-names")
+def feed_names(data_source: str | None = None):
+    """Feed code -> what the feed actually is.
+
+    Three screens list feeds by an eight-character code with an identical
+    heading above each — "STAR outbound dataset" three times, over
+    PEDDIFI1, TBMEIFI7 and ACDDIFI1. Only someone who already knows the
+    estate can tell those apart, which makes the screen useless to exactly
+    the people it was built for.
+
+    Resolution order, strongest first:
+
+      1. FEED_ALIAS.BUSINESS_NAME — the register, seeded from the delivery
+         folder the feeds are published from.
+      2. LEGACY_SOURCE_FILE.DATASET, but only when it is a name rather than
+         a classification. "STAR outbound dataset" repeated across every
+         feed is a category, and showing it as a name is what produced the
+         three identical headings.
+      3. nothing — the caller shows the code alone, which is honest.
+
+    `unnamed` lists the loaded feeds with no name at all, so the gap is a
+    number on a screen rather than something you notice by squinting at a
+    list. `orphans` is the reverse: names registered for a feed that never
+    arrived, which usually means the workbook is missing a feed the
+    business publishes.
+    """
+    ds = _ds(data_source)
+    # A dataset value shared by several feeds is a classification, not a
+    # name. Two is enough to establish that: one feed legitimately has one
+    # dataset, and the same string over two feeds names neither.
+    generic = {
+        (r.get("dataset") or "").strip().upper()
+        for r in _safe("""
+            SELECT dataset, COUNT(*) AS n FROM legacy_source_file
+            WHERE data_source = :ds AND dataset IS NOT NULL
+            GROUP BY dataset HAVING COUNT(*) > 1""", {"ds": ds})
+    } - {""}
+
+    rows = _safe("""
+        SELECT f.src_file, f.src_file_key, f.dataset, f.source_system,
+               a.business_name, a.source AS name_source, a.notes
+        FROM   legacy_source_file f
+        LEFT   JOIN feed_alias a
+               ON a.data_source = f.data_source AND a.feed_key = f.src_file_key
+        WHERE  f.data_source = :ds
+        ORDER  BY f.src_file""", {"ds": ds})
+
+    out, unnamed = [], []
+    for r in rows:
+        code = r.get("src_file")
+        ds_val = (r.get("dataset") or "").strip()
+        name = r.get("business_name")
+        src = r.get("name_source")
+        if not name and ds_val and ds_val.upper() not in generic:
+            name, src = ds_val, "DATASET"
+        if not name:
+            unnamed.append(code)
+        out.append({"code": code, "key": r.get("src_file_key"),
+                    "name": name, "name_source": src,
+                    "source_system": r.get("source_system"),
+                    "notes": r.get("notes")})
+
+    orphans = _safe("""
+        SELECT a.feed_code, a.business_name, a.notes
+        FROM   feed_alias a
+        LEFT   JOIN legacy_source_file f
+               ON f.data_source = a.data_source AND f.src_file_key = a.feed_key
+        WHERE  a.data_source = :ds AND f.src_file IS NULL""", {"ds": ds})
+
+    return {"data_source": ds, "feeds": out, "count": len(out),
+            "unnamed": unnamed, "unnamed_count": len(unnamed),
+            "orphans": orphans,
+            "generic_datasets": sorted(generic)}
+
+
 @router.get("/catalog")
 def catalog(data_source: str | None = None, limit: int = 200):
     """Does the proposed OUTBOUND datapoint appear in SEI's own INBOUND catalog?

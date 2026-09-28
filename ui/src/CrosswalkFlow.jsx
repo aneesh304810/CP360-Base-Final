@@ -30,7 +30,8 @@ const vc = (v) => (VERDICT[v] || VERDICT.UNKNOWN).c;
 // Second, ribbons are coloured by verdict, so one link into a contract feed
 // splits into bands. Colour by node and the diagram says mappings exist;
 // colour by verdict and it says how many of them are worth anything.
-export function FlowDiagram({ t, flow, onPickVerdict, onDrill, onOpenTable }) {
+export function FlowDiagram({ t, flow, onPickVerdict, onDrill, onOpenTable,
+                              nameOf }) {
   const [sel, setSel] = useState(null);
   const [full, setFull] = useState(false);
   const box = useRef(null);
@@ -73,7 +74,8 @@ export function FlowDiagram({ t, flow, onPickVerdict, onDrill, onOpenTable }) {
     // selection bar. Inline it keeps sizing itself from the data, because a
     // panel that grows to 900px tall pushes everything below it off-screen.
     height: full ? Math.max(360, vh - 190) : undefined,
-  }), [flow, wide, full, vh]);
+    nameOf,
+  }), [flow, wide, full, vh, nameOf]);
   const focus = useMemo(() => resolveFocus(model, sel), [model, sel]);
   const muted = t.muted || "#999";
   if (!model) return <div ref={box} />;
@@ -147,8 +149,14 @@ export function FlowDiagram({ t, flow, onPickVerdict, onDrill, onOpenTable }) {
                 <text x={n.x + 9} y={n.y + n.h / 2 - 1} fontSize="11"
                   fontWeight={on ? 700 : 500} fill={t.navy || "#10193b"}>{n.short}
                   <title>{n.label}</title></text>
+                {/* The code keeps its place under the name rather than
+                    replacing it — people search on PEDDIFI1 and talk
+                    about the portfolio valuation, and the screen has to
+                    carry both or it breaks one of those habits. */}
                 <text x={n.x + 9} y={n.y + n.h / 2 + 12} fontSize="9.5"
-                  fill={muted}>{n.n} column{n.n === 1 ? "" : "s"}</text>
+                  fill={muted}>
+                  {n.code ? <tspan fontFamily={MONO}>{n.code} · </tspan> : null}
+                  {n.n} column{n.n === 1 ? "" : "s"}</text>
               </g>);
           })}
         </svg>
@@ -451,6 +459,7 @@ export function buildFlowModel(flow, opt = {}) {
   // position of the nodes it connects to, sweeping right then left a few
   // times. Size order is only the starting point.
   const order = uncross(L, M, R, left, right, G, num);
+  const nameOf = typeof opt.nameOf === "function" ? opt.nameOf : null;
 
   const lay = (m, x, col, ids) => {
     let y = top + Math.max(0, (tallest - measure(m)) / 2);
@@ -460,8 +469,15 @@ export function buildFlowModel(flow, opt = {}) {
       const h = Math.max(minH, n * unit);
       const inN = Min.get(id), outN = Mout.get(id);
       const mismatch = col === "M" && inN != null && outN != null && inN !== outN;
-      out.set(id, { id, x, y, h, n, short: trunc(id, chars), col,
-        label: mismatch ? `${id} — ${inN} columns arrive, ${outN} leave` : id,
+      // The business name leads where there is one. A middle column of
+      // PEDDIFI1 / TBMEIFI7 / ACDDIFI1 is unreadable to anyone who does
+      // not already know the estate — which is most of the people this
+      // diagram exists for.
+      const bn = nameOf ? nameOf(id) : null;
+      out.set(id, { id, x, y, h, n, col, code: bn ? id : null,
+        short: trunc(bn || id, chars),
+        label: (bn ? `${bn} · ${id}` : id)
+               + (mismatch ? ` — ${inN} columns arrive, ${outN} leave` : ""),
         c: id === "no SEI source" ? vc("NO_SOURCE") : "#5f87a7" });
       y += h + gap;
     });

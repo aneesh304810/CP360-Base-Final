@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { crosswalkApi, VERDICT, VERDICT_ORDER, LANE_C } from "./seiCrosswalkApi.js";
 import { GLOSSARY_SECTIONS, VERDICT_INFO, SHAPE_INFO, verdictShort }
   from "./crosswalkGlossary.js";
 import { FlowDiagram, EvidencePanel, Waffle, TransformationPanel, LogicCompare }
   from "./CrosswalkFlow.jsx";
+import { useFeedNames, feedName } from "./feedNames.js";
 
 // =====================================================================
 // CrosswalkDashboard — mapping, analysis and divergence for one warehouse.
@@ -144,6 +145,10 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
   const [ev, setEv] = useState(null);
   const [waf, setWaf] = useState(null);
   const [xf, setXf] = useState(null);
+  const feedMap = useFeedNames(ds);
+  // Stable across renders so the diagram's useMemo does not rebuild its
+  // whole layout on every parent render.
+  const nameOf = useCallback((code) => feedName(feedMap, code), [feedMap]);
   const [busy, setBusy] = useState(true);
 
   // the drill stack — [{kind:"list", filter, title}, {kind:"column", ...}]
@@ -553,7 +558,8 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
             onDrill={(filter, title) => drill(filter, title)}
             onOpenTable={onOpenTechnical
               ? (tbl) => onOpenTechnical({ table: tbl, column: null })
-              : undefined} />
+              : undefined}
+            nameOf={nameOf} />
         </Panel>)}
 
       {/* The ceiling, taken apart. One number made this look like one task;

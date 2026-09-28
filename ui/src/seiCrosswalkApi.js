@@ -81,6 +81,13 @@ export const crosswalkApi = {
     _get(`/sei-crosswalk/controls${_qs({ data_source })}`,
       () => ({ sheets: {}, count: 0, blocked: [], blocked_count: 0 })),
 
+  // Feed code -> what the feed actually is. PEDDIFI1 is the portfolio
+  // valuation; three cards reading "STAR outbound dataset" said nothing.
+  feedNames: (data_source) =>
+    _get(`/sei-crosswalk/feed-names${_qs({ data_source })}`,
+      () => ({ feeds: [], count: 0, unnamed: [], unnamed_count: 0,
+               orphans: [] })),
+
   lanes: (data_source) =>
     _get(`/sei-crosswalk/lanes${_qs({ data_source })}`, () => ({ lanes: [] })),
 
