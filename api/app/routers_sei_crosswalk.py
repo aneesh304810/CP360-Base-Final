@@ -20,6 +20,7 @@ touching, which is the fastest way to have the whole report dismissed.
 """
 from __future__ import annotations
 import logging
+import re
 from fastapi import APIRouter
 
 from pydantic import BaseModel
@@ -1299,6 +1300,80 @@ def xform_reviews(data_source: str | None = None):
     return {"data_source": ds, "by_verdict": by, "rows": rows,
             "count": len(rows), "disagreements": disagree,
             "disagreement_count": len(disagree)}
+
+
+@router.get("/resolve-tokens")
+def resolve_tokens(tokens: str, data_source: str | None = None):
+    """Turn the identifiers inside a transformation rule back into fields.
+
+    THE NUMERIC SUFFIX IS AN ORDINAL. `Base_Market_Value_10` is field 10
+    of the STAR layout, and STAR_LAYOUT_DETAIL carries both ORDINAL and
+    FIELD_NAME — so the token is resolvable, and an expression stops being
+    an opaque string and becomes navigable.
+
+    THREE CONFIDENCES, AND THE DIFFERENCE MATTERS. When the name matches a
+    published field AND that field's ordinal equals the suffix, the
+    resolution is confirmed by two independent facts and can be trusted.
+    Name alone is likely. Ordinal alone is a guess worth showing and not
+    worth relying on — field 10 of the wrong feed is still field 10. The
+    UI renders the three differently rather than presenting all of them as
+    "resolved", because a confident wrong answer about which field an
+    expression reads is worse than no answer.
+
+    `tokens` is comma-separated; the caller sends what its parser found.
+    """
+    ds = _ds(data_source)
+    want = [t.strip() for t in (tokens or "").split(",") if t.strip()][:200]
+    if not want:
+        return {"data_source": ds, "tokens": [], "resolved": 0}
+
+    rows = _safe("""
+        SELECT feed_family, ordinal, field_name, field_norm, published_type,
+               published_length, description
+        FROM   star_layout_field WHERE data_source = :ds""", {"ds": ds})
+    by_norm: dict[str, list] = {}
+    by_ord: dict[int, list] = {}
+    for r in rows:
+        n = (r.get("field_norm") or "").upper()
+        if n:
+            by_norm.setdefault(n, []).append(r)
+        try:
+            by_ord.setdefault(int(str(r.get("ordinal")).strip()), []).append(r)
+        except (TypeError, ValueError):
+            pass
+
+    out = []
+    for raw in want:
+        m = re.match(r"^(.*?)_(\d{1,4})$", raw)
+        base, ordv = (m.group(1), int(m.group(2))) if m else (raw, None)
+        cand_n = by_norm.get(_norm_code(base), [])
+        cand_o = by_ord.get(ordv, []) if ordv is not None else []
+        hit, conf = None, "none"
+        both = [r for r in cand_n
+                if str(r.get("ordinal")).strip() == str(ordv)] if ordv is not None else []
+        if both:
+            hit, conf = both[0], "name+ordinal"
+        elif cand_n:
+            hit, conf = cand_n[0], "name"
+        elif cand_o:
+            hit, conf = cand_o[0], "ordinal"
+        out.append({
+            "token": raw, "base": base, "ordinal": ordv, "confidence": conf,
+            "field": ({"feed_family": hit.get("feed_family"),
+                       "ordinal": hit.get("ordinal"),
+                       "field_name": hit.get("field_name"),
+                       "type": hit.get("published_type"),
+                       "length": hit.get("published_length"),
+                       "description": hit.get("description")} if hit else None),
+            # a name matching several feeds is itself worth knowing: the
+            # expression does not say which feed it reads from
+            "ambiguous": len(cand_n) > 1 and conf in ("name", "name+ordinal"),
+            "candidates": len(cand_n),
+        })
+    return {"data_source": ds, "tokens": out,
+            "resolved": sum(1 for t in out if t["confidence"] != "none"),
+            "confirmed": sum(1 for t in out if t["confidence"] == "name+ordinal"),
+            "layout_rows": len(rows)}
 
 
 @router.get("/catalog")

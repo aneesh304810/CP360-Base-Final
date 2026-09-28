@@ -65,12 +65,13 @@ ui/src/laneMeta.js
 ui/src/crosswalkGlossary.js
 ui/src/feedNames.js
 ui/src/ChainRules.jsx
+ui/src/ruleParse.js
 docs/sei-crosswalk/MERGE-AND-INGEST.md
 docs/sei-crosswalk/TAG-REFERENCE.md
 docs/sei-crosswalk/gen-tag-reference.mjs
 docs/sei-crosswalk/validate-crosswalk.sql
 docs/ingestion-prompts/PROMPT_VALIDATE_INGESTED_CROSSWALK.md
-ui/test/  (run.mjs + four .test.jsx — `npm test` in ui/)
+ui/test/  (run.mjs + six .test.jsx — `npm test` in ui/)
 ingestion/test/test_lane_lineage_parse.py
 docs/ingestion-prompts/PROMPT_IMDS_STAR_UAF_SEI_data_lineage.md
 docs/ingestion-prompts/PROMPT_PBDW_ADDVANTAGE_SEI_crosswalk.md

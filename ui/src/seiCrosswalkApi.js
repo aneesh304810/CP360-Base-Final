@@ -123,6 +123,13 @@ export const crosswalkApi = {
     }
   },
 
+  // Identifiers inside a rule -> the STAR fields they name. The numeric
+  // suffix is an ordinal, so a token can be confirmed by two facts.
+  resolveTokens: (tokens, data_source) =>
+    _get(`/sei-crosswalk/resolve-tokens${_qs({
+          tokens: (tokens || []).join(","), data_source })}`,
+      () => ({ tokens: [], resolved: 0, confirmed: 0, layout_rows: 0 })),
+
   lanes: (data_source) =>
     _get(`/sei-crosswalk/lanes${_qs({ data_source })}`, () => ({ lanes: [] })),
 
