@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { lineageApi } from "./lineage_api_additions.js";
 import LineageGraph from "./LineageGraph.jsx";
-import { stageMeta } from "./laneMeta.js";
+import { stageMeta, laneMeta } from "./laneMeta.js";
+import { crosswalkApi } from "./seiCrosswalkApi.js";
 
 // =====================================================================
 // SourceLineage — the source-first drill.
@@ -120,7 +121,7 @@ const Sub = ({ children }) => (
   <div style={{ fontSize: 12.5, color: "#7b8894", textAlign: "center",
     marginBottom: 22 }}>{children}</div>);
 
-export default function SourceLineage({ t, system,
+export default function SourceLineage({ t, system, dictSystem,
                                         dataSource = "PBDW", tech = false,
                                         onOpenTechnical }) {
   const ds = (dataSource || "PBDW").toUpperCase();
@@ -131,7 +132,10 @@ export default function SourceLineage({ t, system,
   const [famKey, setFamKey] = useState(null);   // family + member at L3
   const [member, setMember] = useState(null);
 
-  const [srcs, setSrcs] = useState(null);
+  const [srcsRaw, setSrcsRaw] = useState(null);
+  // What the selected lane contains. Null until asked; resolved:false means
+  // the question could not be answered and the view stays unfiltered.
+  const [lane, setLane] = useState(null);
   const [flow, setFlow] = useState(null);
   const [fields, setFields] = useState(null);
   const [bucket, setBucket] = useState(null);
@@ -143,11 +147,71 @@ export default function SourceLineage({ t, system,
   // ---- fetches, one per level -------------------------------------------
   useEffect(() => {
     let dead = false;
-    setSrcs(null); setLevel(0); setFile(null); setTarget(null);
+    setSrcsRaw(null); setLevel(0); setFile(null); setTarget(null);
     setGroup(null); setQ("");
-    lineageApi.lineageSources(ds).then((d) => { if (!dead) setSrcs(d); });
+    lineageApi.lineageSources(ds).then((d) => { if (!dead) setSrcsRaw(d); });
     return () => { dead = true; };
   }, [ds]);
+
+  // Which files belong to the selected system. Without this the badge only
+  // relabelled the spine: STAR and UAF listed the same files, with the same
+  // counts, which is what switching between them looked like — nothing.
+  useEffect(() => {
+    if (!system) { setLane(null); return; }
+    let dead = false;
+    setLane(null);
+    crosswalkApi.laneScope(system, ds).then((d) => { if (!dead) setLane(d); });
+    return () => { dead = true; };
+  }, [system, ds]);
+
+  const srcs = useMemo(() => {
+    if (!srcsRaw) return null;
+    // resolved:false is "could not answer". Filtering to nothing on a join
+    // that failed is worse than not filtering, so the whole warehouse shows.
+    if (!lane || !lane.resolved) return srcsRaw;
+    const keep = new Set(lane.src_tables || []);
+    const files = (srcsRaw.sources || []).filter((f) =>
+      keep.has(f.src_source_table));
+    // A filter that removes everything is a failed join, not an answer. The
+    // names came from two queries over the same column, so a zero here means
+    // they disagree — show the warehouse rather than an empty screen.
+    if (!files.length) return srcsRaw;
+    // rebuild the buckets from the files that survived, or their counts keep
+    // describing the whole warehouse while the list shows one lane
+    const by = new Map();
+    files.forEach((f) => {
+      const k = f.functional_group || "Unassigned";
+      const b = by.get(k) || { ...( (srcsRaw.groups || []).find((g) => g.key === k)
+                                    || { key: k, label: k, master: k, sources: [] } ),
+                               files: [], field_count: 0, mapped: 0,
+                               unmapped: 0, target_tables: 0 };
+      b.files = b.files.concat([f]);
+      b.field_count += f.field_count || 0;
+      b.mapped += f.mapped || 0;
+      b.unmapped += f.unmapped || 0;
+      b.target_tables = Math.max(b.target_tables, f.target_tables || 0);
+      by.set(k, b);
+    });
+    const groups = [...by.values()].sort((a, b) => b.field_count - a.field_count);
+    const tf = groups.reduce((n, b) => n + b.field_count, 0);
+    const tm = groups.reduce((n, b) => n + b.mapped, 0);
+    return { ...srcsRaw, groups, masters: groups, sources: files,
+             lane_filtered: true,
+             totals: { ...(srcsRaw.totals || {}), files: files.length,
+                       groups: groups.length, masters: groups.length,
+                       field_count: tf, mapped: tm, unmapped: tf - tm } };
+  }, [srcsRaw, lane]);
+
+  // Switching system while inside a file that the new lane does not contain
+  // leaves the breadcrumb showing one lane and the content another. Step back
+  // to the file list rather than show a STAR file under the UAF badge.
+  useEffect(() => {
+    if (!lane || !lane.resolved || !file) return;
+    if (!(lane.src_tables || []).includes(file)) {
+      setFile(null); setTarget(null); setFamKey(null); setMember(null);
+      setLevel(0);
+    }
+  }, [lane]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!file) { setFlow(null); return; }
@@ -161,10 +225,13 @@ export default function SourceLineage({ t, system,
     if (!file || level < 2) { return; }
     let dead = false;
     setFields(null);
-    lineageApi.lineageSourceFields(file, ds, target, system)
+    // dictSystem, NOT system. This parameter narrows the dictionary join,
+    // and UAF has no dictionary — passing the lane's system here is what
+    // emptied every business term when you switched to UAF.
+    lineageApi.lineageSourceFields(file, ds, target, dictSystem || undefined)
       .then((d) => { if (!dead) setFields(d); });
     return () => { dead = true; };
-  }, [file, ds, target, level, system]);
+  }, [file, ds, target, level, dictSystem]);
 
   // ---------------------------------------------------------------- chrome
   // Source sits beside Business as the other pictorial door, so it takes
@@ -257,7 +324,8 @@ export default function SourceLineage({ t, system,
     const st = (flow && flow.stages) || {};
     const steps = [
       ["SRC",  "Source file", file || `${(srcs && srcs.totals.files) || "—"} files`,
-       file ? (flow ? `${st.field_count || 0} fields` : "…") : "AddVantage"],
+       file ? (flow ? `${st.field_count || 0} fields` : "…")
+            : laneMeta(system).label],
       ["STG1", "Landing", st.stg1_source_table || "STG1_*",
        file ? `${st.stg1_count || 0} table${st.stg1_count === 1 ? "" : "s"}` : "raw"],
       ["STG2", "Conformed", st.stg2_source_table || "STG2_*",

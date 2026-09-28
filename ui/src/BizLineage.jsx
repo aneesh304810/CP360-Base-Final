@@ -1,6 +1,7 @@
 import { stageMeta } from "./laneMeta.js";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { api } from "./api.js";
+import { crosswalkApi } from "./seiCrosswalkApi.js";
 
 // =====================================================================
 // BizLineage — the pictorial Business view of legacy lineage.
@@ -139,10 +140,14 @@ function Dots({ f }) {
 
 /* ---------------- the drill ---------------- */
 
-export default function BizLineage({ t, system, dataSource = "PBDW",
+export default function BizLineage({ t, system, dictSystem, dataSource = "PBDW",
   onTechnical, onDataSource }) {
   const ds = (dataSource || "PBDW").toUpperCase();
-  const [tables, setTables] = useState(null);
+  const [tablesRaw, setTablesRaw] = useState(null);
+  // Which warehouse tables the selected system actually feeds. Before this
+  // the badge changed the spine's labels and nothing else, so STAR and UAF
+  // showed an identical estate.
+  const [lane, setLane] = useState(null);
   const [fieldsBy, setFieldsBy] = useState({});
   const [nav, setNav] = useState({ level: 0, group: null, table: null, col: null });
   const [flt, setFlt] = useState("");
@@ -150,11 +155,40 @@ export default function BizLineage({ t, system, dataSource = "PBDW",
 
   useEffect(() => {
     let dead = false;
-    setTables(null); setFieldsBy({});
+    setTablesRaw(null); setFieldsBy({});
     setNav({ level: 0, group: null, table: null, col: null });
-    api.legacyLineageTables(ds).then((d) => !dead && setTables(d.tables || []));
+    api.legacyLineageTables(ds).then((d) => !dead && setTablesRaw(d.tables || []));
     return () => { dead = true; };
   }, [ds]);
+
+  useEffect(() => {
+    if (!system) { setLane(null); return; }
+    let dead = false;
+    setLane(null);
+    crosswalkApi.laneScope(system, ds).then((d) => { if (!dead) setLane(d); });
+    return () => { dead = true; };
+  }, [system, ds]);
+
+  // resolved:false means the lane could not be resolved, not that it is
+  // empty. An unanswerable question shows the whole estate, never a blank one.
+  const tables = useMemo(() => {
+    if (!tablesRaw) return null;
+    if (!lane || !lane.resolved) return tablesRaw;
+    const keep = new Set(lane.target_tables || []);
+    const kept = tablesRaw.filter((tb) =>
+      keep.has(tb.dwh_target_table || tb.table_name || tb.table));
+    // Same rule as the Source view: filtering to nothing means the two
+    // queries disagree about table names, not that the lane is empty.
+    return kept.length ? kept : tablesRaw;
+  }, [tablesRaw, lane]);
+
+  // Standing on a table the new lane does not feed is the same confusion the
+  // Source view had: the breadcrumb says UAF, the content is STAR's.
+  useEffect(() => {
+    if (!lane || !lane.resolved || !nav.table) return;
+    if (!(lane.target_tables || []).includes(nav.table))
+      setNav({ level: 0, group: null, table: null, col: null });
+  }, [lane]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const ensureFields = useCallback((tbl) => {
     setFieldsBy((m) => {
@@ -395,6 +429,7 @@ export default function BizLineage({ t, system, dataSource = "PBDW",
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto" }}>{crumb}
       {f ? <ColumnPage t={t} f={f} tbl={nav.table} ds={ds} system={system}
+        dictSystem={dictSystem}
         rows={rows}
         onWalk={(nf) => goto(3, { col: nf.dwh_target_column, field: nf })}
         onTechnical={onTechnical} onDataSource={onDataSource} />
@@ -404,7 +439,7 @@ export default function BizLineage({ t, system, dataSource = "PBDW",
 
 /* ---------------- level 3 renderer ---------------- */
 
-function ColumnPage({ t, f, tbl, ds, system, rows, onWalk, onTechnical,
+function ColumnPage({ t, f, tbl, ds, system, dictSystem, rows, onWalk, onTechnical,
   onDataSource }) {
   const [def, setDef] = useState(undefined);   // undefined=loading, null=none
   const [proof, setProof] = useState(null);
@@ -414,7 +449,10 @@ function ColumnPage({ t, f, tbl, ds, system, rows, onWalk, onTechnical,
     let dead = false;
     setDef(undefined); setProof(null);
     if (f.src_source_column)
-      api.legacyBusinessDef(f.src_source_column, system,
+      // dictSystem, not system: legacy_dictionary has no UAF rows, so asking
+      // it for source_system='UAF' returned nothing and the whole definition
+      // panel emptied. Null asks across systems instead.
+      api.legacyBusinessDef(f.src_source_column, dictSystem || undefined,
         { srcTable: f.src_source_table || f.stg1_source_table, dwhTable: tbl })
         .then((d) => !dead && setDef(d.definition || null))
         .catch(() => !dead && setDef(null));
@@ -423,7 +461,7 @@ function ColumnPage({ t, f, tbl, ds, system, rows, onWalk, onTechnical,
       .then((p) => !dead && setProof((p && p.stages) || []))
       .catch(() => !dead && setProof([]));
     return () => { dead = true; };
-  }, [f, tbl, system]);
+  }, [f, tbl, dictSystem]);
 
   const idx = rows.indexOf(f);
   const nav2 = (

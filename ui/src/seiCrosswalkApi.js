@@ -44,6 +44,14 @@ export const crosswalkApi = {
     _get(`/sei-crosswalk/lane-systems${_qs({ data_source })}`,
       () => ({ data_source, systems: [] })),
 
+  // What one lane actually contains, so the badge can filter rather than
+  // relabel. resolved:false means "could not answer" — show everything, not
+  // nothing. The safe fallback below says exactly that.
+  laneScope: (system, data_source) =>
+    _get(`/sei-crosswalk/lane-scope${_qs({ system, data_source })}`,
+      () => ({ data_source, source_system: system, resolved: false,
+               route: "none", src_tables: [], target_tables: [], columns: 0 })),
+
   lanes: (data_source) =>
     _get(`/sei-crosswalk/lanes${_qs({ data_source })}`, () => ({ lanes: [] })),
 

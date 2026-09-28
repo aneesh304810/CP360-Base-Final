@@ -43,19 +43,35 @@ outright if they do.
 
 ### Path C — manual, if the patch conflicts
 
-**Copy these nine whole. No file of these names exists in your repo, so there
-is nothing to lose.**
+**Copy these whole. No file of these names exists in your repo, so there is
+nothing to lose.**
 
 ```
 sql/51_sei_crosswalk.sql
 sql/52_sei_crosswalk_attach.sql
+sql/53_sei_catalog.sql
+sql/54_sei_widen.sql
+sql/55_lineage_lane.sql
 ingestion/lane_lineage_conn.py
 api/app/routers_sei_crosswalk.py
 ui/src/seiCrosswalkApi.js
 ui/src/CrosswalkDashboard.jsx
+ui/src/laneMeta.js
 docs/sei-crosswalk/MERGE-AND-INGEST.md
 docs/ingestion-prompts/PROMPT_IMDS_STAR_UAF_SEI_data_lineage.md
 docs/ingestion-prompts/PROMPT_PBDW_ADDVANTAGE_SEI_crosswalk.md
+```
+
+**Hand-apply the edits in these. They already exist in your repo and a whole-
+file copy would clobber work that is not mine.**
+
+```
+api/app/main.py             one entry in the router mount tuple
+ingestion/run.py            one STEPS entry + one dispatch branch
+ui/src/LineageHome.jsx      CrosswalkDashboard, UAF in SYS_META, dsSystems, dictSys
+ui/src/SourceLineage.jsx    stageMeta, lane filter, dictSystem
+ui/src/BizLineage.jsx       stageMeta, lane filter, dictSystem
+api/app/routers_legacy_source.py   /source-fields `system` made optional
 ```
 
 **Do NOT copy these three — hand-apply the edit.** Your copies are likely
@@ -126,10 +142,23 @@ changes stashed.)
 ```bash
 sqlplus $CP_DB_USER/$CP_DB_PASS@$CP_DB_DSN @sql/51_sei_crosswalk.sql
 sqlplus $CP_DB_USER/$CP_DB_PASS@$CP_DB_DSN @sql/52_sei_crosswalk_attach.sql
+sqlplus $CP_DB_USER/$CP_DB_PASS@$CP_DB_DSN @sql/53_sei_catalog.sql
+sqlplus $CP_DB_USER/$CP_DB_PASS@$CP_DB_DSN @sql/54_sei_widen.sql
+sqlplus $CP_DB_USER/$CP_DB_PASS@$CP_DB_DSN @sql/55_lineage_lane.sql
 ```
 
-`51` first. Both idempotent — `CREATE` swallows ORA-955, `ALTER` swallows
-ORA-1430. **Nine new tables; no existing table is altered.**
+Run them in order. All idempotent — `CREATE` swallows ORA-955, `ALTER`
+swallows ORA-1430, and `54` swallows ORA-942/904/1441 per column. **Fourteen
+new tables; no existing table is altered.**
+
+- `53` adds the four tables the SEI catalogue sheets need. Skipping it is
+  what produced the ORA-00942 storm on the first real load.
+- `54` widens 19 columns whose real values overflowed the first guess
+  (ORA-12899). It truncates nothing.
+- `55` adds `LEGACY_LINEAGE_LANE`. **Without it the STAR/UAF badge filters
+  nothing** — both lanes live in `LEGACY_LINEAGE` under one `DATA_SOURCE`
+  with no column telling them apart, so selecting UAF relabelled the spine
+  and left the same files on screen. It needs a re-ingest to populate.
 
 ```sql
 SELECT COUNT(*) FROM user_tables WHERE table_name IN

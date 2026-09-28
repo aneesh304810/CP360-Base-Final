@@ -240,7 +240,7 @@ class SeiCrosswalkConnector:
         out = {
             "lane":    lanes,
             "feed":    feeds,
-            "lineage": [], "srccol": [],
+            "lineage": [], "srccol": [], "linelane": [],
             "map":     self._map(sheets.get("map")),
             "code":    self._code(sheets.get("code")),
             "xwalk":   self._xwalk(sheets.get("xwalk")),
@@ -253,7 +253,8 @@ class SeiCrosswalkConnector:
             "seicat":   self._seicat(sheets.get("seicat")),
             "uafschema": self._uafschema(sheets.get("uafschema")),
         }
-        out["lineage"], out["srccol"] = self._lineage(sheets.get("lineage"))
+        out["lineage"], out["srccol"], out["linelane"] = \
+            self._lineage(sheets.get("lineage"), lanes)
         # A sheet that parsed to zero rows is the quietest failure there is:
         # the headers did not match and nothing says so. Print what was
         # actually in the header row, so the next run diagnoses itself.
@@ -342,12 +343,31 @@ class SeiCrosswalkConnector:
                      sheet_name or "feed sheet", len(out), hint)
         return out
 
-    def _lineage(self, sh):
+    def _lineage(self, sh, lanes=None):
         """One row per (lane, target table, target column) -> legacy_lineage,
-        plus the contract field's own metadata -> legacy_src_column."""
+        plus the contract field's own metadata -> legacy_src_column, plus the
+        row's lane -> legacy_lineage_lane.
+
+        THE LANE IS THE THIRD RETURN AND IT IS THE POINT. LEGACY_LINEAGE is
+        shared, so it cannot gain a lane column; without one, STAR and UAF
+        rows sit in the same table under the same DATA_SOURCE and nothing can
+        tell them apart. That is why selecting UAF in the badge row filtered
+        nothing — there was nothing to filter on. LANE_LINEAGE has carried
+        LANE_ID on every row all along; this reads it.
+
+        Where a row has no LANE_ID, the same two fallbacks _feeds uses apply,
+        in the same order: the warehouse's single incumbent lane if it has
+        exactly one, else nothing. An unattributed row stays in the baseline
+        and is reported, never dropped and never guessed at."""
         if not sh:
-            return [], []
-        lin, cols, seen_col = [], [], set()
+            return [], [], []
+        # lane_id -> source_system, from the register the workbook declared
+        lane_sys = {(l.get("lane_id") or "").upper(): (l.get("source_system") or "").upper()
+                    for l in (lanes or []) if l.get("lane_id")}
+        incumbents = sorted({v for v in lane_sys.values() if v and v != "SEI"})
+        solo = incumbents[0] if len(incumbents) == 1 else None
+        solo_lane = next((k for k, v in lane_sys.items() if v == solo), None) if solo else None
+        lin, cols, lanerows, seen_col = [], [], [], set()
         for row in sh.rows():
             tgt = sh.get(row, "DWH_TARGET_TABLE")
             col = sh.get(row, "DWH_TARGET_COLUMN")
@@ -391,6 +411,21 @@ class SeiCrosswalkConnector:
             rec["lineage_id"] = f"{ds}:{tgt}:{col}:{_chain_hash(rec)}"
             lin.append(rec)
 
+            lane = (sh.get(row, "LANE_ID") or "").upper()
+            sysname = lane_sys.get(lane) or (lane.split("_")[0] if lane else None)
+            if not lane and solo:
+                lane, sysname = solo_lane, solo
+            lanerows.append({
+                "lineage_id": rec["lineage_id"],
+                "lane_id": lane or None,
+                "source_system": sysname or None,
+                "data_source": ds,
+                "dwh_target_table": tgt,
+                "dwh_target_column": col,
+                "src_source_table": src_t,
+                "src_file_key": _file_key(src_t) if src_t else None,
+            })
+
             if src_t and src_c:
                 fk = _file_key(src_t)
                 cid = f"{ds}:{fk}:{src_c}"
@@ -419,7 +454,18 @@ class SeiCrosswalkConnector:
             log.info("sei_crosswalk: %d of %d rows share a target column with "
                      "another row (fan-in across lanes) — kept as separate rows",
                      fan, len(lin))
-        return lin, cols
+        by_sys: dict[str, int] = {}
+        for r in lanerows:
+            by_sys[r["source_system"] or "(unattributed)"] = \
+                by_sys.get(r["source_system"] or "(unattributed)", 0) + 1
+        log.info("sei_crosswalk: lineage rows by lane: %s",
+                 ", ".join(f"{k}={v}" for k, v in sorted(by_sys.items())))
+        if by_sys.get("(unattributed)"):
+            log.warning("%d lineage rows carry no LANE_ID and the warehouse has "
+                        "more than one incumbent lane — the source-system filter "
+                        "will not see them. Add LANE_ID to LANE_LINEAGE.",
+                        by_sys["(unattributed)"])
+        return lin, cols, lanerows
 
     def _map(self, sh):
         if not sh:
@@ -752,6 +798,7 @@ class SeiCrosswalkConnector:
         ("lane",    "legacy_lane",         ("lane_id",)),
         ("feed",    "legacy_source_file",  ("src_file",)),
         ("lineage", "legacy_lineage",      ("lineage_id",)),
+        ("linelane", "legacy_lineage_lane", ("lineage_id",)),
         ("srccol",  "legacy_src_column",   ("src_col_id",)),
         ("map",     "sei_source_map",      ("map_id",)),
         ("verify",  "sei_verify",          ("verify_id",)),
@@ -770,7 +817,7 @@ class SeiCrosswalkConnector:
     # warehouse's baseline. They are written only in "load" mode, and purged
     # only in "load" mode. In "attach" mode this connector owns nothing in
     # them and must not touch either.
-    _OWNED_IN_LOAD_MODE = ("lineage", "feed")
+    _OWNED_IN_LOAD_MODE = ("lineage", "feed", "linelane")
 
     def resolve_mode(self, loader):
         """Decide whether this workbook supplies the baseline or attaches to one.
@@ -903,7 +950,9 @@ class SeiCrosswalkConnector:
         # In attach mode legacy_lineage and legacy_source_file are somebody
         # else's rows. Deleting them here would wipe the warehouse's baseline —
         # for PBDW, every row the AddVantage workbook loaded.
-        shared = {"legacy_lineage", "legacy_source_file"}
+        # legacy_lineage_lane is ours, but it describes legacy_lineage rows we
+        # did not write when attaching, so it is skipped for the same reason.
+        shared = {"legacy_lineage", "legacy_source_file", "legacy_lineage_lane"}
         scoped = [
             ("sei_source_map", "data_source = :ds"),
             ("sei_verify", "data_source = :ds"),
@@ -916,6 +965,7 @@ class SeiCrosswalkConnector:
             ("uaf_field_schema", "data_source = :ds"),
             ("legacy_src_column", "data_source = :ds"),
             ("legacy_lineage", "data_source = :ds"),
+            ("legacy_lineage_lane", "data_source = :ds"),
         ]
         for table, where in scoped:
             if mode == "attach" and table in shared:

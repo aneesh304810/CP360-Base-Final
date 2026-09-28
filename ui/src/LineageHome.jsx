@@ -70,6 +70,16 @@ export default function LineageHome({ t, focus }) {
   return () => { live = false; };
  }, [ds]);
 
+ // The lane's system and the DICTIONARY's system are not the same question.
+ // legacy_dictionary holds ADDVANTAGE, CRD and STAR; it has no UAF rows at
+ // all. Passing "UAF" into a dictionary lookup therefore matched nothing and
+ // every business term and description on the screen blanked out — which is
+ // what switching between STAR and UAF looked like. Where the selected
+ // system has no dictionary, ask for no system rather than an empty one.
+ const dictSys = systems.some(
+  (x) => (x.source_system || "").toUpperCase() === (curSys || "").toUpperCase())
+  ? curSys : null;
+
  // landing stats + systems + data-source counts (one fetch each, cached)
  useEffect(() => {
   api.legacySystems().then((d) => {
@@ -360,10 +370,10 @@ export default function LineageHome({ t, focus }) {
    {scope === "sei" ? (
     <CrosswalkDashboard t={t} dataSource={ds} onOpenTechnical={openTechnical} />
    ) : view === "source" ? (
-    <SourceLineage t={t} system={curSys} dataSource={ds} tech={false}
-     onOpenTechnical={openTechnical} />
+    <SourceLineage t={t} system={curSys} dictSystem={dictSys} dataSource={ds}
+     tech={false} onOpenTechnical={openTechnical} />
    ) : view === "business" ? (
-    <BizLineage t={t} system={curSys} dataSource={ds}
+    <BizLineage t={t} system={curSys} dictSystem={dictSys} dataSource={ds}
      onTechnical={openTechnical} onDataSource={switchWarehouse} />
    ) : (
     <LegacyLineage t={t} system={curSys} dataSource={ds}

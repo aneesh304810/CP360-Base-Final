@@ -338,7 +338,7 @@ def source_flow(src_table: str, data_source: str | None = None):
 
 @router.get("/source-fields")
 def source_fields(src_table: str, data_source: str | None = None,
-                  target: str | None = None, system: str = "ADDVANTAGE"):
+                  target: str | None = None, system: str | None = None):
     """The file's fields, collapsed into families, each with its hop class and
     (where the dictionary has one) its business term.
 
@@ -347,7 +347,18 @@ def source_fields(src_table: str, data_source: str | None = None,
     row per source code, with every landing it reaches listed under it — the
     fan-out a flat list cannot show.
     """
-    params = {"s": src_table, "sys": system.upper()}
+    # `system` narrows the DICTIONARY join, never the lineage rows. It used
+    # to default to ADDVANTAGE and be required, which broke the moment the
+    # badge row started passing the lane's system: UAF has no dictionary, so
+    # source_system = 'UAF' matched nothing and every business term, function
+    # and description on the screen went blank. Omitted now means "any
+    # system" — thin, but a term from the wrong system is still a term, and a
+    # blank column is not.
+    params = {"s": src_table}
+    sys_clause = ""
+    if system:
+        sys_clause = " WHERE source_system = :sys "
+        params["sys"] = system.upper()
     tgt_clause = ""
     if target:
         tgt_clause = " AND dwh_target_table = :t "
@@ -374,7 +385,7 @@ def source_fields(src_table: str, data_source: str | None = None,
                    MAX(is_pii)            AS is_pii,
                    MAX(is_required)       AS is_required
             FROM legacy_dictionary
-            WHERE source_system = :sys
+            {sys_clause}
             GROUP BY field_code_norm
         )
         SELECT l.*, d.business_term, d.business_function, d.short_desc,

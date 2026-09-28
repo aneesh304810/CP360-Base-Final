@@ -236,6 +236,77 @@ def lane_systems(data_source: str | None = None):
     }
 
 
+@router.get("/lane-scope")
+def lane_scope(system: str, data_source: str | None = None):
+    """What belongs to ONE lane: its source files and its warehouse tables.
+
+    This is what makes the STAR/UAF badge do something. Before it, selecting
+    a system changed the spine's first two labels and nothing else — the file
+    list, the table list and every count stayed whole-warehouse, so STAR and
+    UAF showed the same 137 files and switching between them looked broken
+    because it was.
+
+    Two routes, best first, and the second is why the first exists:
+
+      1. LEGACY_LINEAGE_LANE, written from LANE_LINEAGE.LANE_ID at ingest.
+         Exact, because the workbook declared it.
+      2. the feed-key round trip, for a warehouse loaded before sql/55. It
+         normalises SRC_SOURCE_TABLE and joins LEGACY_SOURCE_FILE, which
+         holds for STAR and breaks for UAF whenever the same message is
+         named two ways.
+
+    `resolved` is the contract with the UI: false means this question could
+    not be answered for this lane, and the caller must show the unfiltered
+    view rather than an empty one. Filtering a screen down to nothing on the
+    strength of a join that failed is worse than not filtering at all.
+    """
+    ds = _ds(data_source)
+    sysname = (system or "").strip().upper()
+    if not sysname:
+        return {"data_source": ds, "source_system": None, "resolved": False,
+                "route": "none", "src_tables": [], "target_tables": [],
+                "columns": 0, "hint": "no system given"}
+
+    route = "lineage_lane"
+    rows = _safe("""
+        SELECT src_source_table, dwh_target_table,
+               COUNT(DISTINCT dwh_target_table || '.' || dwh_target_column) AS columns_
+        FROM   legacy_lineage_lane
+        WHERE  data_source = :ds AND UPPER(source_system) = :sys
+        GROUP  BY src_source_table, dwh_target_table""",
+        {"ds": ds, "sys": sysname})
+
+    if not rows:
+        route = "feed_key"
+        rows = _safe("""
+            SELECT l.src_source_table, l.dwh_target_table,
+                   COUNT(DISTINCT l.dwh_target_table || '.' || l.dwh_target_column) AS columns_
+            FROM   legacy_lineage l
+            JOIN   legacy_source_file f
+                   ON f.data_source  = l.data_source
+                  AND f.src_file_key = REGEXP_REPLACE(UPPER(TRIM('_' FROM
+                        REGEXP_REPLACE(l.src_source_table,'[[:space:]/.-]+','_'))),'_{2,}','_')
+            WHERE  l.data_source = :ds AND UPPER(f.source_system) = :sys
+            GROUP  BY l.src_source_table, l.dwh_target_table""",
+            {"ds": ds, "sys": sysname})
+
+    src = sorted({(r.get("src_source_table") or "") for r in rows} - {""})
+    tgt = sorted({(r.get("dwh_target_table") or "") for r in rows} - {""})
+    cols = sum(int(r.get("columns_") or 0) for r in rows)
+    return {
+        "data_source": ds,
+        "source_system": sysname,
+        "resolved": bool(src or tgt),
+        "route": route if (src or tgt) else "none",
+        "src_tables": src,
+        "target_tables": tgt,
+        "columns": cols,
+        "hint": (f"no lineage row could be attributed to {sysname}; run "
+                 f"sql/55_lineage_lane.sql and re-ingest so LANE_ID is recorded"
+                 if not (src or tgt) else None),
+    }
+
+
 @router.get("/catalog")
 def catalog(data_source: str | None = None, limit: int = 200):
     """Does the proposed OUTBOUND datapoint appear in SEI's own INBOUND catalog?
