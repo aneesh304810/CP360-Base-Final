@@ -81,6 +81,9 @@ api/test/test_graph_chain.py
 api/test/test_source_canvas_scope.py
 api/test/test_lane_scope_filter.py
 ingestion/test/test_table_catalog.py
+api/app/routers_business_catalog.py
+ui/src/businessCatalog.js
+ui/test/business-catalog.test.jsx
 ingestion/test/test_lane_lineage_parse.py
 docs/ingestion-prompts/PROMPT_IMDS_STAR_UAF_SEI_data_lineage.md
 docs/ingestion-prompts/PROMPT_PBDW_ADDVANTAGE_SEI_crosswalk.md
@@ -90,7 +93,8 @@ docs/ingestion-prompts/PROMPT_PBDW_ADDVANTAGE_SEI_crosswalk.md
 file copy would clobber work that is not mine.**
 
 ```
-api/app/main.py             one entry in the router mount tuple
+api/app/main.py             two entries in the router mount tuple
+ui/src/BizLineage.jsx       business names on the table list, header and crumb
 ingestion/run.py            one STEPS entry + one dispatch branch
 ui/src/LineageHome.jsx      CrosswalkDashboard, UAF in SYS_META, dsSystems, dictSys
 ui/src/LineageGraph.jsx     dim floors, empty-lane collapse, stage colour on nodes

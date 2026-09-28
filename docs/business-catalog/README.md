@@ -19,6 +19,24 @@ currently blocked.* That sentence is what this supplies, 176 times.
 the lineage shows flowing into them. It is a starting point for the people who own these
 tables, not an authority, and `review_status` stays `DRAFT` until someone signs it off.
 
+## Checking it landed
+
+```
+GET /api/business-catalog/health?data_source=PBDW
+```
+
+Three states an empty screen cannot tell apart, and this names which:
+
+| it says | it means |
+|---|---|
+| `table_exists: false` | **`sql/60` never ran.** It creates the table; 61 and 62 do nothing without it. |
+| `rows: 0` | the table is there and empty — the `TABLE CATALOG` sheet was not found, or 61 ran before 60 and every MERGE failed |
+| `ok: false` with rows | the names do not line up with `LEGACY_LINEAGE.DWH_TARGET_TABLE`; `unmatched_sample` shows which |
+| `ok: true` | loaded, with `coverage_pct` against the warehouse |
+
+The ingest also logs it: look for `table descriptions` in the
+`legacy_dictionary` line.
+
 ## How it loads
 
 It rides the workbook you already maintain. One more sheet, same file, same

@@ -2,6 +2,7 @@ import { stageMeta } from "./laneMeta.js";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { api } from "./api.js";
 import { crosswalkApi } from "./seiCrosswalkApi.js";
+import { useBusinessCatalog, bizName, bizEntry } from "./businessCatalog.js";
 
 // =====================================================================
 // BizLineage — the pictorial Business view of legacy lineage.
@@ -151,6 +152,10 @@ export default function BizLineage({ t, system, dictSystem, dataSource = "PBDW",
   const [fieldsBy, setFieldsBy] = useState({});
   const [nav, setNav] = useState({ level: 0, group: null, table: null, col: null });
   const [flt, setFlt] = useState("");
+  // The business name for each warehouse table. Empty until loaded, and
+  // empty for good on a warehouse with no catalogue — bizName falls back to
+  // the physical name, which is what this screen showed before.
+  const { by: cat, health: catHealth } = useBusinessCatalog(ds);
   const [pills, setPills] = useState({ pass: true, xf: true, ud: true, gap: true });
 
   useEffect(() => {
@@ -245,7 +250,7 @@ export default function BizLineage({ t, system, dictSystem, dataSource = "PBDW",
       {nav.level >= 2 && (
         <span><span style={{ margin: "0 7px", color: "#c2ccd4" }}>›</span>
           <span style={nav.level === 2 ? { color: "#233240" } : crumbA}
-            onClick={() => goto(2)}>{nav.table}</span></span>)}
+            onClick={() => goto(2)}>{bizName(cat, nav.table)}</span></span>)}
       {nav.level === 3 && (
         <span><span style={{ margin: "0 7px", color: "#c2ccd4" }}>›</span>
           <span style={{ color: "#233240" }}>{nav.col}</span></span>)}
@@ -297,6 +302,10 @@ export default function BizLineage({ t, system, dictSystem, dataSource = "PBDW",
       <div style={{ maxWidth: 1000, margin: "0 auto" }}>{crumb}
         <H1>{nav.group}</H1>
         <Sub>{tm} of {tbs.length} tables mapped · one row per table — click a table</Sub>
+        {catHealth && catHealth.table_exists === false && (
+          <div style={{ fontSize: 11.5, color: "#b45309", background: "#fdf3e4",
+            border: "1px solid #f0d5ae", borderRadius: 4, padding: "7px 10px",
+            marginBottom: 12, lineHeight: 1.55 }}>{catHealth.reason}</div>)}
         {tbs.map((tb) => {
           const pct = tb.field_count
             ? Math.round(((tb.mapped || 0) / tb.field_count) * 100) : 0;
@@ -314,13 +323,33 @@ export default function BizLineage({ t, system, dictSystem, dataSource = "PBDW",
               <Circ i={2} />
               <span style={{ width: 46, height: 2, background: "#c9d4dc" }} />
               <Circ i={3} />
-              <div style={{ marginLeft: 16, flex: 1 }}>
-                <b style={{ fontSize: 14, fontWeight: 500,
-                  fontFamily: "Roboto Mono, monospace" }}>{tb.table_name}</b>
+              <div style={{ marginLeft: 16, flex: 1, minWidth: 0 }}>
+                {/* The business name leads and the physical name follows it,
+                    rather than the other way round. A reader who needs
+                    DIM_ACCOUNT still has it; a reader who does not is no
+                    longer asked to learn it first. With no catalogue loaded
+                    bizName returns the physical name, so this row looks
+                    exactly as it did before. */}
+                <b style={{ fontSize: 14, fontWeight: 500 }}>
+                  {bizName(cat, tb.table_name)}</b>
+                {bizEntry(cat, tb.table_name)?.business_name && (
+                  <span style={{ fontSize: 11, color: "#7b8894", marginLeft: 8,
+                    fontFamily: "Roboto Mono, monospace" }}>{tb.table_name}</span>)}
+                {bizEntry(cat, tb.table_name)?.is_staging === "Y" && (
+                  <span style={{ fontSize: 9.5, fontWeight: 700, marginLeft: 7,
+                    padding: "1px 7px", borderRadius: 999, color: "#b45309",
+                    background: "#f7e9d6" }}>staging — do not report from this</span>)}
+                {bizEntry(cat, tb.table_name)?.business_description && (
+                  <small style={{ display: "block", fontSize: 11.5, color: "#4a5a68",
+                    marginTop: 2, overflow: "hidden", textOverflow: "ellipsis",
+                    whiteSpace: "nowrap" }}>
+                    {bizEntry(cat, tb.table_name).business_description}</small>)}
                 <small style={{ display: "block", fontSize: 11, color: "#7b8894",
                   marginTop: 1 }}>
                   {(tb.table_type || "table").toLowerCase()} · {tb.field_count} fields
                   {tb.ud_count ? ` · ${tb.ud_count} UD` : ""}
+                  {bizEntry(cat, tb.table_name)?.grain
+                    ? ` · ${bizEntry(cat, tb.table_name).grain}` : ""}
                   {src ? "" : " · source not yet mapped"}</small>
               </div>
               <div style={{ width: 140, height: 7, borderRadius: 5,
@@ -356,8 +385,31 @@ export default function BizLineage({ t, system, dictSystem, dataSource = "PBDW",
       (f.dwh_target_column || "").toLowerCase().includes(flt.toLowerCase()));
     return (
       <div style={{ maxWidth: 1000, margin: "0 auto" }}>{crumb}
-        <H1>{nav.table}</H1>
-        <Sub>every field’s journey in four dots — the whole story at a glance</Sub>
+        <H1>{bizName(cat, nav.table)}</H1>
+        <Sub>
+          {bizEntry(cat, nav.table)?.business_description
+            || "every field’s journey in four dots — the whole story at a glance"}
+        </Sub>
+        {bizEntry(cat, nav.table) && (
+          <div style={{ display: "flex", gap: 8, alignItems: "center",
+            flexWrap: "wrap", justifyContent: "center", margin: "6px 0 14px",
+            fontSize: 11, color: "#7b8894" }}>
+            <span style={{ fontFamily: "Roboto Mono, monospace" }}>{nav.table}</span>
+            {bizEntry(cat, nav.table).grain && (
+              <span>· {bizEntry(cat, nav.table).grain}</span>)}
+            {/* A generated sentence must never read as the business's own
+                word for it. Anything still DRAFT says so, in the place
+                someone would otherwise quote it from. */}
+            {String(bizEntry(cat, nav.table).review_status || "DRAFT")
+              .toUpperCase() === "DRAFT" && (
+              <span style={{ padding: "1px 8px", borderRadius: 999,
+                background: "#eef2f5", color: "#6b7c8a" }}>
+                draft description — not yet reviewed</span>)}
+            {bizEntry(cat, nav.table).confidence === "low" && (
+              <span style={{ padding: "1px 8px", borderRadius: 999,
+                background: "#f7e9d6", color: "#b45309" }}>
+                name unconfirmed</span>)}
+          </div>)}
         <div style={{ display: "flex", gap: 8, alignItems: "center",
           marginBottom: 14, flexWrap: "wrap" }}>
           <input value={flt} onChange={(e) => setFlt(e.target.value)}
