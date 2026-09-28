@@ -619,7 +619,50 @@ def column(table: str, column: str, data_source: str | None = None):
     return {"table": table, "column": column, "data_source": ds,
             "verdicts": verdicts, "chain": chain, "contract": contract,
             "maps": maps, "collapse": collapse, "dual_source": dual,
-            "disposition": disp}
+            "disposition": disp,
+            # The logic, beside the shape. A column can pass every format
+            # check and still compute a different number.
+            "transformation": _safe("""
+                SELECT x.legacy_transformation_id, x.sei_transformation_id,
+                       x.transformation_equivalence, x.transformation_approval,
+                       x.transformation_evidence, x.sei_source_objects,
+                       x.sei_source_fields, x.dwh_nullable, x.dwh_pk_flag,
+                       lg.transformation_logic AS legacy_logic,
+                       lg.transformation_type  AS legacy_kind,
+                       lg.null_handling        AS legacy_null_handling,
+                       se.transformation_logic AS sei_logic,
+                       se.transformation_type  AS sei_kind,
+                       se.status               AS sei_status
+                FROM   legacy_lineage_xform x
+                LEFT   JOIN sei_transformation lg
+                       ON lg.transformation_id = x.legacy_transformation_id
+                LEFT   JOIN sei_transformation se
+                       ON se.transformation_id = x.sei_transformation_id
+                WHERE  x.data_source = :ds
+                  AND  x.dwh_target_table = :t AND x.dwh_target_column = :c""",
+                {"ds": ds, "t": table, "c": column}),
+            "compare": _safe("""
+                SELECT comparison_id, equivalence, evidence_completeness,
+                       approval_status, review_note, imds_logic, sei_logic,
+                       sei_source_objects, sei_source_fields
+                FROM   sei_transformation_compare
+                WHERE  data_source = :ds AND target_object = :t
+                  AND  target_attribute = :c""",
+                {"ds": ds, "t": table, "c": column}),
+            # The published STAR layout for the contract field, if one
+            # arrived. This is what lifts a row off ASSUMED evidence.
+            "star_layout": _safe(f"""
+                SELECT s.feed_family, s.field_name, s.published_type,
+                       s.published_length, s.published_format, s.description,
+                       s.evidence_status, s.source_document
+                FROM   star_layout_field s
+                WHERE  s.data_source = :ds
+                  AND  s.field_norm IN (
+                        SELECT {_canon('v.contract_field')} FROM sei_verify v
+                        WHERE v.data_source = :ds
+                          AND v.dwh_target_table = :t
+                          AND v.dwh_target_column = :c)""",
+                {"ds": ds, "t": table, "c": column})}
 
 
 @router.get("/divergence")
@@ -743,6 +786,96 @@ def lane_scope(system: str, data_source: str | None = None):
                  f"sql/55_lineage_lane.sql and re-ingest so LANE_ID is recorded"
                  if not (src or tgt) else None),
     }
+
+
+@router.get("/transformations")
+def transformations(data_source: str | None = None, limit: int = 200):
+    """Does the SEI rule COMPUTE the same value the legacy rule computes?
+
+    A different question from every other endpoint here, and a later one. A
+    column can pass the format check completely — same type, same length,
+    same scale, both sides from live DDL — and still be wrong, because the
+    legacy rule sums at lot grain and the proposed rule sums at position
+    grain. That is a wrong number rather than a missing one, and none of the
+    nine verdicts can say it: they compare shapes.
+
+    TWO AXES, KEPT APART ON PURPOSE. Equivalence is a finding about the
+    logic; approval is a finding about who has looked at it. An EXACT_TEXT
+    match that is still DRAFT_REVIEW_REQUIRED is not ready to ship, and a
+    single "transformation status" column would have said it was.
+    """
+    ds = _ds(data_source)
+    equiv = _safe("""
+        SELECT NVL(equivalence,'(not classified)') AS equivalence, COUNT(*) AS n
+        FROM   sei_transformation_compare WHERE data_source = :ds
+        GROUP  BY equivalence ORDER BY 2 DESC""", {"ds": ds})
+    appr = _safe("""
+        SELECT NVL(approval_status,'(none)') AS approval_status, COUNT(*) AS n
+        FROM   sei_transformation_compare WHERE data_source = :ds
+        GROUP  BY approval_status ORDER BY 2 DESC""", {"ds": ds})
+    layers = _safe("""
+        SELECT NVL(transformation_layer,'(none)') AS layer,
+               NVL(transformation_type,'(none)')  AS kind, COUNT(*) AS n
+        FROM   sei_transformation WHERE data_source = :ds
+        GROUP  BY transformation_layer, transformation_type ORDER BY 3 DESC""",
+        {"ds": ds})
+    rows = _safe(f"""
+        SELECT comparison_id, target_object, target_attribute, target_type,
+               legacy_transformation_id, sei_transformation_id,
+               equivalence, evidence_completeness, approval_status,
+               review_note, sei_source_objects, sei_source_fields
+        FROM   sei_transformation_compare WHERE data_source = :ds
+        ORDER  BY CASE NVL(equivalence,'ZZ')
+                    WHEN 'NO_SEI_SOURCE' THEN 1
+                    WHEN 'REQUIRES_BUSINESS_DECISION' THEN 2
+                    WHEN 'LEGACY_LOGIC_NOT_DOCUMENTED' THEN 3
+                    WHEN 'SEI_SOURCE_IDENTIFIED_LOGIC_INCOMPLETE' THEN 4
+                    WHEN 'UNVERIFIED_COMPARISON' THEN 5
+                    WHEN 'EXACT_TEXT' THEN 6 ELSE 7 END,
+                 target_object, target_attribute
+        FETCH FIRST {int(limit)} ROWS ONLY""", {"ds": ds})
+
+    def one(sql):
+        r = _safe(sql, {"ds": ds})
+        return int((r[0] or {}).get("n") or 0) if r else 0
+
+    total = one("SELECT COUNT(*) AS n FROM sei_transformation_compare WHERE data_source = :ds")
+    approved = one("""SELECT COUNT(*) AS n FROM sei_transformation_compare
+                      WHERE data_source = :ds
+                        AND UPPER(NVL(approval_status,'')) LIKE 'APPROVED%'""")
+    exact = one("""SELECT COUNT(*) AS n FROM sei_transformation_compare
+                   WHERE data_source = :ds AND equivalence = 'EXACT_TEXT'""")
+    nosrc = one("""SELECT COUNT(*) AS n FROM sei_transformation_compare
+                   WHERE data_source = :ds AND equivalence = 'NO_SEI_SOURCE'""")
+    return {"data_source": ds, "total": total, "approved": approved,
+            "exact_text": exact, "no_sei_source": nosrc,
+            "equivalence": equiv, "approval": appr, "layers": layers,
+            "rows": rows,
+            "headline": (f"{approved} of {total} transformations approved."
+                         if total else "No transformation comparison loaded.")}
+
+
+@router.get("/controls")
+def controls(data_source: str | None = None):
+    """_MANIFEST, FINAL_VERIFICATION and TRANSFORMATION_SUMMARY — the
+    workbook's own account of what it does and does not establish.
+
+    Worth surfacing rather than recomputing: these are the author's stated
+    limitations, and a screen that silently recomputes past them presents
+    inferences as findings.
+    """
+    ds = _ds(data_source)
+    rows = _safe("""
+        SELECT source_sheet, control_name, result, status, detail, seq
+        FROM   sei_control WHERE data_source = :ds
+        ORDER  BY source_sheet, seq""", {"ds": ds})
+    out: dict[str, list] = {}
+    for r in rows:
+        out.setdefault(r.get("source_sheet") or "?", []).append(r)
+    blocked = [r for r in rows
+               if str(r.get("status") or "").upper() in ("BLOCKED", "PARTIAL", "DRAFT")]
+    return {"data_source": ds, "sheets": out, "count": len(rows),
+            "blocked": blocked[:20], "blocked_count": len(blocked)}
 
 
 @router.get("/catalog")

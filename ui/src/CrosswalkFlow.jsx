@@ -670,3 +670,173 @@ export function Waffle({ t, waffle, onPickColumn }) {
 }
 
 export default FlowDiagram;
+
+// =========================================================== transformation
+// Does the SEI rule COMPUTE the same value?
+//
+// A LATER QUESTION THAN EVERY OTHER PANEL ASKS, and the one that survives
+// all of them. A column can pass the format check completely — same type,
+// same length, same scale, both sides from live DDL — and still be wrong,
+// because the legacy rule sums at lot grain and the proposed rule sums at
+// position grain. That is a wrong number rather than a missing one, and
+// none of the nine verdicts can express it: they compare shapes.
+//
+// Equivalence and approval are two axes, never merged. Equivalence is a
+// finding about the logic; approval is a finding about who has looked at
+// it. An EXACT_TEXT match still marked DRAFT_REVIEW_REQUIRED is not ready
+// to ship, and one combined status column would have said it was.
+const EQ_C = {
+  EXACT_TEXT: "#159943",
+  UNVERIFIED_COMPARISON: "#6b7c8a",
+  SEI_SOURCE_IDENTIFIED_LOGIC_INCOMPLETE: "#e67e22",
+  LEGACY_LOGIC_NOT_DOCUMENTED: "#b45309",
+  REQUIRES_BUSINESS_DECISION: "#7c3aed",
+  NO_SEI_SOURCE: "#c1113a",
+};
+export const EQ_MEANING = {
+  EXACT_TEXT: "The two expressions are character-for-character the same. The "
+    + "strongest signal available, and still not an approval.",
+  UNVERIFIED_COMPARISON: "Both sides are documented and nobody has compared "
+    + "them. Not a disagreement — an unexamined pair.",
+  SEI_SOURCE_IDENTIFIED_LOGIC_INCOMPLETE: "The SEI source objects and fields "
+    + "are known; the rule that turns them into the value is not written down.",
+  LEGACY_LOGIC_NOT_DOCUMENTED: "Nothing records what the incumbent does "
+    + "today, so there is no baseline to compare against.",
+  REQUIRES_BUSINESS_DECISION: "The two rules differ in a way only the "
+    + "business can settle — a grain, a basis, a convention.",
+  NO_SEI_SOURCE: "No SEI logic is proposed at all. The column computes "
+    + "nothing on the new side.",
+};
+const eqc = (k) => EQ_C[k] || "#5f87a7";
+
+export function TransformationPanel({ t, xf, onOpenColumn }) {
+  if (!xf || !xf.total) return null;
+  const muted = t.muted || "#999";
+  const sum = (a) => a.reduce((n, x) => n + (x.n || 0), 0) || 1;
+  const eqTotal = sum(xf.equivalence || []);
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 22, flexWrap: "wrap",
+        marginBottom: 13, alignItems: "baseline" }}>
+        <span><b style={{ fontSize: 22, color: xf.approved ? "#159943" : "#c1113a",
+          fontVariantNumeric: "tabular-nums" }}>{xf.approved}</b>
+          <span style={{ fontSize: 11.5, color: muted }}> of {xf.total} approved</span></span>
+        <span><b style={{ fontSize: 16, color: "#159943" }}>{xf.exact_text}</b>
+          <span style={{ fontSize: 11, color: muted }}> exact text</span></span>
+        <span><b style={{ fontSize: 16, color: "#c1113a" }}>{xf.no_sei_source}</b>
+          <span style={{ fontSize: 11, color: muted }}> with no SEI logic</span></span>
+      </div>
+
+      <span style={{ display: "flex", height: 16, borderRadius: 3,
+        overflow: "hidden", background: "#e8edf2" }}>
+        {(xf.equivalence || []).map((e) => (
+          <i key={e.equivalence} title={`${e.equivalence} — ${e.n}`}
+            style={{ display: "block", width: `${(e.n / eqTotal) * 100}%`,
+              background: eqc(e.equivalence) }} />))}
+      </span>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 13, marginTop: 10 }}>
+        {(xf.equivalence || []).map((e) => (
+          <span key={e.equivalence} title={EQ_MEANING[e.equivalence] || ""}
+            style={{ display: "flex", alignItems: "center", gap: 6,
+              fontSize: 10.5, color: t.sub || "#666" }}>
+            <i style={{ width: 11, height: 11, borderRadius: 2,
+              background: eqc(e.equivalence) }} />
+            {String(e.equivalence).replace(/_/g, " ").toLowerCase()} <b>{e.n}</b></span>))}
+      </div>
+
+      {/* Approval is its own row, never folded into the bar above. */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 13, marginTop: 11,
+        paddingTop: 10, borderTop: `1px dashed ${t.panel2 || "#dfe6e9"}` }}>
+        <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4,
+          textTransform: "uppercase", color: muted }}>Approval</span>
+        {(xf.approval || []).map((a) => (
+          <span key={a.approval_status} style={{ fontSize: 10.5,
+            color: t.sub || "#666" }}>
+            {String(a.approval_status).replace(/_/g, " ").toLowerCase()} <b>{a.n}</b></span>))}
+      </div>
+
+      {(xf.rows || []).length > 0 && (
+        <div style={{ marginTop: 13, maxHeight: 320, overflowY: "auto",
+          border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderRadius: 4 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse",
+            fontSize: 11 }}>
+            <tbody>
+              {xf.rows.map((r) => (
+                <tr key={r.comparison_id}
+                  onClick={onOpenColumn
+                    ? () => onOpenColumn(r.target_object, r.target_attribute)
+                    : undefined}
+                  style={{ borderTop: `1px solid ${t.panel2 || "#dfe6e9"}`,
+                    cursor: onOpenColumn ? "pointer" : "default" }}>
+                  <td style={{ padding: "6px 10px", fontFamily: MONO,
+                    whiteSpace: "nowrap" }}>{r.target_attribute}</td>
+                  <td style={{ padding: "6px 10px", color: muted,
+                    fontSize: 10, whiteSpace: "nowrap" }}>{r.target_object}</td>
+                  <td style={{ padding: "6px 10px" }}>
+                    <span title={EQ_MEANING[r.equivalence] || ""}
+                      style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0.3,
+                        padding: "2px 7px", borderRadius: 999,
+                        whiteSpace: "nowrap",
+                        background: `${eqc(r.equivalence)}22`,
+                        color: eqc(r.equivalence) }}>
+                      {String(r.equivalence || "?").replace(/_/g, " ")}</span></td>
+                  <td style={{ padding: "6px 10px", color: t.sub || "#666",
+                    fontSize: 10.5 }}>{r.review_note || ""}</td>
+                </tr>))}
+            </tbody>
+          </table>
+        </div>)}
+    </div>);
+}
+
+// The two expressions side by side on a column page. Not a text diff — the
+// point is not which characters changed but whether the same value comes
+// out, and a character diff of two differently-written equivalent rules is
+// noise dressed as a finding.
+export function LogicCompare({ t, xf, cmp }) {
+  const a = (xf && xf[0]) || {};
+  const c = (cmp && cmp[0]) || {};
+  const legacy = a.legacy_logic || c.imds_logic;
+  const sei = a.sei_logic || c.sei_logic;
+  if (!legacy && !sei) return null;
+  const eq = a.transformation_equivalence || c.equivalence;
+  const appr = a.transformation_approval || c.approval_status;
+  const cell = (label, body, kind, side) => (
+    <div style={{ flex: 1, minWidth: 230 }}>
+      <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: 0.4,
+        textTransform: "uppercase", color: t.muted || "#999", marginBottom: 5 }}>
+        {label}{kind ? ` · ${String(kind).replace(/_/g, " ").toLowerCase()}` : ""}</div>
+      <pre style={{ margin: 0, fontFamily: MONO, fontSize: 10.5,
+        lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word",
+        background: side === "sei" ? "#eef6fb" : "#f5f7f8",
+        border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderRadius: 3,
+        padding: "8px 10px", color: t.navy || "#10193b" }}>
+        {body || "— not documented —"}</pre>
+    </div>);
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "baseline",
+        flexWrap: "wrap", marginBottom: 8 }}>
+        <span style={{ fontSize: 11.5, fontWeight: 700 }}>Transformation</span>
+        {eq && <span title={EQ_MEANING[eq] || ""}
+          style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0.3,
+            padding: "2px 8px", borderRadius: 999,
+            background: `${eqc(eq)}22`, color: eqc(eq) }}>
+          {String(eq).replace(/_/g, " ")}</span>}
+        {appr && <span style={{ fontSize: 10, color: t.muted || "#999" }}>
+          {String(appr).replace(/_/g, " ").toLowerCase()}</span>}
+      </div>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        {cell("Legacy · STAR → IMDS", legacy, a.legacy_kind, "legacy")}
+        {cell("Proposed · SEI → IMDS", sei, a.sei_kind, "sei")}
+      </div>
+      {(c.review_note || a.sei_source_objects) && (
+        <div style={{ fontSize: 10.5, color: t.sub || "#666", marginTop: 7,
+          lineHeight: 1.6 }}>
+          {c.review_note && <div><b>Difference</b> {c.review_note}</div>}
+          {a.sei_source_objects && <div style={{ color: t.muted || "#999" }}>
+            SEI source {a.sei_source_objects}
+            {a.sei_source_fields ? ` · ${a.sei_source_fields}` : ""}</div>}
+        </div>)}
+    </div>);
+}

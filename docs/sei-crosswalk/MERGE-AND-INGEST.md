@@ -52,6 +52,7 @@ sql/52_sei_crosswalk_attach.sql
 sql/53_sei_catalog.sql
 sql/54_sei_widen.sql
 sql/55_lineage_lane.sql
+sql/56_transformations.sql
 ingestion/lane_lineage_conn.py
 api/app/routers_sei_crosswalk.py
 ui/src/seiCrosswalkApi.js
@@ -64,7 +65,8 @@ docs/sei-crosswalk/TAG-REFERENCE.md
 docs/sei-crosswalk/gen-tag-reference.mjs
 docs/sei-crosswalk/validate-crosswalk.sql
 docs/ingestion-prompts/PROMPT_VALIDATE_INGESTED_CROSSWALK.md
-ui/test/  (run.mjs + three .test.jsx — `npm test` in ui/)
+ui/test/  (run.mjs + four .test.jsx — `npm test` in ui/)
+ingestion/test/test_lane_lineage_parse.py
 docs/ingestion-prompts/PROMPT_IMDS_STAR_UAF_SEI_data_lineage.md
 docs/ingestion-prompts/PROMPT_PBDW_ADDVANTAGE_SEI_crosswalk.md
 ```
@@ -152,6 +154,7 @@ sqlplus $CP_DB_USER/$CP_DB_PASS@$CP_DB_DSN @sql/52_sei_crosswalk_attach.sql
 sqlplus $CP_DB_USER/$CP_DB_PASS@$CP_DB_DSN @sql/53_sei_catalog.sql
 sqlplus $CP_DB_USER/$CP_DB_PASS@$CP_DB_DSN @sql/54_sei_widen.sql
 sqlplus $CP_DB_USER/$CP_DB_PASS@$CP_DB_DSN @sql/55_lineage_lane.sql
+sql/56_transformations.sql
 ```
 
 Run them in order. All idempotent — `CREATE` swallows ORA-955, `ALTER`
@@ -162,6 +165,12 @@ new tables; no existing table is altered.**
   what produced the ORA-00942 storm on the first real load.
 - `54` widens 19 columns whose real values overflowed the first guess
   (ORA-12899). It truncates nothing.
+- `56` adds the nine tables the 24-sheet "With-Transformations" workbook
+  needs, and gives `SEI_DISPOSITION` a `DATA_SOURCE` column — that sheet
+  lost its `LANE_ID`, and every disposition query scoped by lane, so
+  without it the undecided count reads zero. It also drops the disposition
+  check constraint, because the workbook now uses GENERATE, RETAIN and
+  DEFER as well as the original five.
 - `55` adds `LEGACY_LINEAGE_LANE`. **Without it the STAR/UAF badge filters
   nothing** — both lanes live in `LEGACY_LINEAGE` under one `DATA_SOURCE`
   with no column telling them apart, so selecting UAF relabelled the spine

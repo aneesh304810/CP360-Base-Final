@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from "react";
 import { crosswalkApi, VERDICT, VERDICT_ORDER, LANE_C } from "./seiCrosswalkApi.js";
 import { GLOSSARY_SECTIONS, VERDICT_INFO, SHAPE_INFO, verdictShort }
   from "./crosswalkGlossary.js";
-import { FlowDiagram, EvidencePanel, Waffle } from "./CrosswalkFlow.jsx";
+import { FlowDiagram, EvidencePanel, Waffle, TransformationPanel, LogicCompare }
+  from "./CrosswalkFlow.jsx";
 
 // =====================================================================
 // CrosswalkDashboard — mapping, analysis and divergence for one warehouse.
@@ -142,6 +143,7 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
   const [flow, setFlow] = useState(null);
   const [ev, setEv] = useState(null);
   const [waf, setWaf] = useState(null);
+  const [xf, setXf] = useState(null);
   const [busy, setBusy] = useState(true);
 
   // the drill stack — [{kind:"list", filter, title}, {kind:"column", ...}]
@@ -156,12 +158,12 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
       crosswalkApi.summary(ds), crosswalkApi.divergence(ds),
       crosswalkApi.lanes(ds), crosswalkApi.readiness(ds), crosswalkApi.exceptions(ds),
       crosswalkApi.catalog(ds), crosswalkApi.flow(ds), crosswalkApi.evidence(ds),
-      crosswalkApi.waffle(ds),
-    ]).then(([s, d, l, r, e, c, f, v, w]) => {
+      crosswalkApi.waffle(ds), crosswalkApi.transformations(ds),
+    ]).then(([s, d, l, r, e, c, f, v, w, x]) => {
       if (!live) return;
       setSum(s); setDiv(d); setLanes(l.lanes || []);
       setReady(r.tables || []); setExc(e); setCat(c);
-      setFlow(f); setEv(v); setWaf(w); setBusy(false);
+      setFlow(f); setEv(v); setWaf(w); setXf(x); setBusy(false);
     });
     return () => { live = false; };
   }, [ds]);
@@ -396,6 +398,26 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
                 There is no error when they disagree — the value depends on load order.
               </Callout>)}
 
+            {/* The logic, beside the shape. Everything above this compares
+                what the value LOOKS like; this is whether it is the same
+                number. */}
+            <LogicCompare t={t} xf={d.transformation} cmp={d.compare} />
+
+            {(d.star_layout || []).length > 0 && (
+              <div style={{ marginTop: 12, fontSize: 11, color: t.sub || "#666",
+                lineHeight: 1.6 }}>
+                <b>Published STAR layout</b>{" "}
+                {d.star_layout.map((x, i) => (
+                  <span key={i} style={{ fontFamily: MONO, fontSize: 10.5 }}>
+                    {x.feed_family}.{x.field_name} {x.published_type}
+                    {x.published_length ? `(${x.published_length})` : ""}
+                    {x.evidence_status ? ` · ${x.evidence_status}` : ""}
+                    {i < d.star_layout.length - 1 ? " · " : ""}</span>))}
+                <div style={{ fontSize: 10, color: t.muted || "#999" }}>
+                  A published layout replaces the inferred contract type this
+                  row's verdict was resting on.</div>
+              </div>)}
+
             {(d.disposition || []).length > 0 && (
               <Callout t={t} c="#b45309" title={`Disposition: ${g(d.disposition[0], "disposition", "DISPOSITION")}`}>
                 {g(d.disposition[0], "disposition_detail", "DISPOSITION_DETAIL") ||
@@ -541,6 +563,15 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
         <Panel t={t} title="Why nothing is proven"
           note={ev.headline || "a match needs both sides from live metadata"}>
           <EvidencePanel t={t} ev={ev} />
+        </Panel>)}
+
+      {/* Does the SEI rule COMPUTE the same value? The last question, and
+          the one that survives all the others: a column can pass every
+          format check and still be wrong because the grain differs. */}
+      {xf && xf.total > 0 && (
+        <Panel t={t} title="Does the new logic compute the same value?"
+          note={xf.headline || "equivalence is about the logic; approval is about who has looked at it"}>
+          <TransformationPanel t={t} xf={xf} onOpenColumn={openCol} />
         </Panel>)}
 
       {/* Every final column as one cell. The spread says how many; this says

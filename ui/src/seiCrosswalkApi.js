@@ -68,6 +68,19 @@ export const crosswalkApi = {
     _get(`/sei-crosswalk/waffle${_qs({ data_source })}`,
       () => ({ tables: [], table_count: 0, cells: 0 })),
 
+  // Does the SEI rule COMPUTE the same value? A later question than "is
+  // there a datapoint" and a different one from "does the type match".
+  transformations: (data_source) =>
+    _get(`/sei-crosswalk/transformations${_qs({ data_source })}`,
+      () => ({ total: 0, approved: 0, exact_text: 0, no_sei_source: 0,
+               equivalence: [], approval: [], layers: [], rows: [],
+               headline: "" })),
+
+  // The workbook's own account of what it does and does not establish.
+  controls: (data_source) =>
+    _get(`/sei-crosswalk/controls${_qs({ data_source })}`,
+      () => ({ sheets: {}, count: 0, blocked: [], blocked_count: 0 })),
+
   lanes: (data_source) =>
     _get(`/sei-crosswalk/lanes${_qs({ data_source })}`, () => ({ lanes: [] })),
 

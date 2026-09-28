@@ -191,7 +191,23 @@ class SeiCrosswalkConnector:
         "seiinput": ("SEI_INPUT_LINEAGE",),
         "seicat":   ("SEI_CATALOG_VERIFY",),
         "uafschema": ("UAF_FIELD_SCHEMA",),
+        # The eight sheets the "With-Transformations" workbook added.
+        "xform":    ("TRANSFORMATION_REGISTER",),
+        "xcompare": ("TRANSFORMATION_COMPARISON",),
+        "starfld":  ("STAR_LAYOUT_DETAIL",),
+        "uploader": ("STAR_UPLOADER_LINEAGE",),
+        "recon":    ("NEW_EVIDENCE_RECON",),
+        "enums":    ("ENUMS",),
+        "lotmap":   ("LOT_LEVEL_POSITION_MAP",),
     }
+
+    # Three sheets share one shape — (name, value, explanation) with a
+    # status — and land in SEI_CONTROL together, tagged with the sheet they
+    # came from. Three tables of a dozen rows would be three joins for one
+    # panel.
+    CONTROL_SHEETS = (("_MANIFEST", "MANIFEST"),
+                      ("FINAL_VERIFICATION", "FINAL_VERIFICATION"),
+                      ("TRANSFORMATION_SUMMARY", "TRANSFORMATION_SUMMARY"))
 
     def __init__(self, xlsx_path=None, data_source=None, reload_scope=False,
                  lineage_mode=None):
@@ -252,13 +268,36 @@ class SeiCrosswalkConnector:
             "seiinput": self._seiinput(sheets.get("seiinput")),
             "seicat":   self._seicat(sheets.get("seicat")),
             "uafschema": self._uafschema(sheets.get("uafschema")),
+            "xform":    self._xform(sheets.get("xform")),
+            "xcompare": self._xcompare(sheets.get("xcompare")),
+            "starfld":  self._starfld(sheets.get("starfld")),
+            "uploader": self._uploader(sheets.get("uploader")),
+            "recon":    self._recon(sheets.get("recon")),
+            "enums":    self._enums(sheets.get("enums")),
+            "lotmap":   self._lotmap(sheets.get("lotmap")),
+            "control":  [],
         }
-        out["lineage"], out["srccol"], out["linelane"] = \
+        # the three summary sheets, into one table, tagged by origin
+        for want, label in self.CONTROL_SHEETS:
+            real = by_key.get(_hkey(want))
+            if real:
+                out["control"] += self._control(Sheet(wb[real]), label)
+        out["lineage"], out["srccol"], out["linelane"], out["linexform"] = \
             self._lineage(sheets.get("lineage"), lanes)
+        # DISPOSITION lost its LANE_ID column in the new workbook — it is
+        # keyed on (table, column) alone now. Every query that scoped a
+        # disposition to a warehouse went through LANE_ID, so left as-is the
+        # undecided count reads zero and the purge deletes nothing. Resolve
+        # it from the VERIFY row for the same column, which always carries
+        # one, and stamp DATA_SOURCE either way.
+        self._fill_disposition_lane(out)
         # A sheet that parsed to zero rows is the quietest failure there is:
         # the headers did not match and nothing says so. Print what was
         # actually in the header row, so the next run diagnoses itself.
-        role_of_key = {"seiinput": "seiinput", "uafschema": "uafschema",
+        role_of_key = {"xform": "xform", "xcompare": "xcompare",
+                       "starfld": "starfld", "uploader": "uploader",
+                       "recon": "recon", "enums": "enums", "lotmap": "lotmap",
+                       "seiinput": "seiinput", "uafschema": "uafschema",
                        "seicat": "seicat", "seifeed": "seifeed",
                        "map": "map", "lineage": "lineage", "verify": "verify",
                        "code": "code", "disp": "disp", "xwalk": "xwalk",
@@ -360,14 +399,14 @@ class SeiCrosswalkConnector:
         exactly one, else nothing. An unattributed row stays in the baseline
         and is reported, never dropped and never guessed at."""
         if not sh:
-            return [], [], []
+            return [], [], [], []
         # lane_id -> source_system, from the register the workbook declared
         lane_sys = {(l.get("lane_id") or "").upper(): (l.get("source_system") or "").upper()
                     for l in (lanes or []) if l.get("lane_id")}
         incumbents = sorted({v for v in lane_sys.values() if v and v != "SEI"})
         solo = incumbents[0] if len(incumbents) == 1 else None
         solo_lane = next((k for k, v in lane_sys.items() if v == solo), None) if solo else None
-        lin, cols, lanerows, seen_col = [], [], [], set()
+        lin, cols, lanerows, xforms, seen_col = [], [], [], [], set()
         for row in sh.rows():
             tgt = sh.get(row, "DWH_TARGET_TABLE")
             col = sh.get(row, "DWH_TARGET_COLUMN")
@@ -415,6 +454,35 @@ class SeiCrosswalkConnector:
             sysname = lane_sys.get(lane) or (lane.split("_")[0] if lane else None)
             if not lane and solo:
                 lane, sysname = solo_lane, solo
+            # The ten columns LANE_LINEAGE gained, into their own side
+            # table: eight transformation columns plus DWH_NULLABLE and
+            # DWH_PK_FLAG, which are target facts legacy_lineage has nowhere
+            # to put either.
+            #
+            # A row is written when ANY of the ten is present, not only when
+            # a transformation is — a UAF row with a nullability and a key
+            # flag and no transformation is still worth keeping, and
+            # dropping it would lose a fact the workbook supplied. What must
+            # stay distinguishable is "no transformation recorded" from "row
+            # absent", and a null transformation_id inside a present row
+            # says the first cleanly.
+            xf = {
+                "legacy_transformation_id": _nz(sh.get(row, "LEGACY_TRANSFORMATION_ID")),
+                "sei_transformation_id": _nz(sh.get(row, "SEI_TRANSFORMATION_ID")),
+                "sei_equivalent_transformation": sh.get(row, "SEI_EQUIVALENT_TRANSFORMATION"),
+                "sei_source_objects": sh.get(row, "SEI_SOURCE_OBJECTS"),
+                "sei_source_fields": sh.get(row, "SEI_SOURCE_FIELDS"),
+                "transformation_equivalence": _nz(sh.get(row, "TRANSFORMATION_EQUIVALENCE")),
+                "transformation_approval": _nz(sh.get(row, "TRANSFORMATION_APPROVAL_STATUS")),
+                "transformation_evidence": sh.get(row, "TRANSFORMATION_EVIDENCE_SOURCE"),
+                "dwh_nullable": _nz(sh.get(row, "DWH_NULLABLE")),
+                "dwh_pk_flag": _nz(sh.get(row, "DWH_PK_FLAG")),
+            }
+            if any(v for v in xf.values()):
+                xforms.append({**xf, "lineage_id": rec["lineage_id"],
+                               "data_source": ds, "dwh_target_table": tgt,
+                               "dwh_target_column": col})
+
             lanerows.append({
                 "lineage_id": rec["lineage_id"],
                 "lane_id": lane or None,
@@ -465,7 +533,15 @@ class SeiCrosswalkConnector:
                         "more than one incumbent lane — the source-system filter "
                         "will not see them. Add LANE_ID to LANE_LINEAGE.",
                         by_sys["(unattributed)"])
-        return lin, cols, lanerows
+        if xforms:
+            eq = {}
+            for r in xforms:
+                k = r["transformation_equivalence"] or "(none recorded)"
+                eq[k] = eq.get(k, 0) + 1
+            log.info("sei_crosswalk: %d of %d lineage rows carry a transformation "
+                     "(%s)", len(xforms), len(lin),
+                     ", ".join(f"{k}={v}" for k, v in sorted(eq.items())))
+        return lin, cols, lanerows, xforms
 
     def _map(self, sh):
         if not sh:
@@ -695,8 +771,12 @@ class SeiCrosswalkConnector:
             return []
         out = []
         for i, row in enumerate(sh.rows(), 1):
-            fld = sh.get(row, "SEI_FIELD", "SEI_INPUT_FIELD", "INPUT_FIELD",
-                         "FIELD_NAME", "FIELD")
+            # SEI_TARGET_FIELD is what the sheet calls it. None of the five
+            # names guessed here before matched, so 950 rows parsed to zero
+            # and said nothing. Guessed aliases are kept behind the real one
+            # for older workbooks, but the real one leads.
+            fld = sh.get(row, "SEI_TARGET_FIELD", "SEI_FIELD", "SEI_INPUT_FIELD",
+                         "INPUT_FIELD", "FIELD_NAME", "FIELD")
             if not fld:
                 continue
             tgt = sh.get(row, "SEI_TARGET_FILE", "TARGET_FILE", "SEI_DAT_FILE",
@@ -707,7 +787,7 @@ class SeiCrosswalkConnector:
                 "direction": (sh.get(row, "DIRECTION") or "INBOUND").upper(),
                 "functional_group": sh.get(row, "FUNCTIONAL_GROUP", "SUBJECT_AREA"),
                 "sei_target_file": tgt,
-                "sei_field_ordinal": _nz(sh.get(row, "SEI_FIELD_ORDINAL", "ORDINAL")),
+                "sei_field_ordinal": _nz(sh.get(row, "TARGET_ORDINAL", "SEI_FIELD_ORDINAL", "ORDINAL")),
                 "sei_field": fld,
                 "sei_field_norm": _norm_code(fld),
                 "published_type": _nz(sh.get(row, "PUBLISHED_TYPE", "SEI_TYPE")),
@@ -716,13 +796,13 @@ class SeiCrosswalkConnector:
                 "record_scope": sh.get(row, "RECORD_SCOPE"),
                 "validation_rule": sh.get(row, "VALIDATION_RULE"),
                 "field_definition": sh.get(row, "FIELD_DEFINITION"),
-                "code_set_name": _nz(sh.get(row, "CODE_SET_NAME")),
+                "code_set_name": _nz(sh.get(row, "CODE_SET_NAME", "ACCEPTABLE_VALUES")),
                 "mapping_status": _nz(sh.get(row, "MAPPING_STATUS")),
-                "source_mapping_rule": sh.get(row, "SOURCE_MAPPING_RULE"),
-                "upstream_object": sh.get(row, "UPSTREAM_SOURCE_OBJECT", "UPSTREAM_OBJECT"),
-                "upstream_field": sh.get(row, "UPSTREAM_SOURCE_FIELD", "UPSTREAM_FIELD"),
-                "origin_workbook": sh.get(row, "ORIGINAL_WORKBOOK", "ORIGIN_WORKBOOK"),
-                "origin_sheet": sh.get(row, "ORIGINAL_SHEET", "ORIGIN_SHEET"),
+                "source_mapping_rule": sh.get(row, "MAPPING_LOGIC", "SOURCE_MAPPING_RULE"),
+                "upstream_object": sh.get(row, "SOURCE_OBJECT", "UPSTREAM_SOURCE_OBJECT", "UPSTREAM_OBJECT"),
+                "upstream_field": sh.get(row, "SOURCE_FIELD", "UPSTREAM_SOURCE_FIELD", "UPSTREAM_FIELD"),
+                "origin_workbook": sh.get(row, "SOURCE_WORKBOOK", "ORIGINAL_WORKBOOK", "ORIGIN_WORKBOOK"),
+                "origin_sheet": sh.get(row, "SOURCE_SHEET", "ORIGINAL_SHEET", "ORIGIN_SHEET"),
                 "evidence": sh.get(row, "EVIDENCE"),
                 "source_doc_locator": sh.get(row, "SOURCE_DOC_LOCATOR", "LOCATOR"),
             })
@@ -782,14 +862,329 @@ class SeiCrosswalkConnector:
                 "ordinal": _nz(sh.get(row, "ORDINAL")),
                 "source_field": fld,
                 "source_field_norm": _norm_code(fld),
-                "published_type": _nz(sh.get(row, "PUBLISHED_DATATYPE", "PUBLISHED_TYPE", "DATATYPE")),
-                "published_length": _nz(sh.get(row, "PUBLISHED_LENGTH", "LENGTH")),
-                "repeating_group": _nz(sh.get(row, "REPEATING_GROUP")),
-                "uaf_procedure": sh.get(row, "UAF_PROCEDURE", "PROCEDURE"),
-                "imds_target": sh.get(row, "DOCUMENTED_IMDS_TARGET", "IMDS_TARGET", "TARGET_OR_USE"),
-                "transformation": sh.get(row, "TRANSFORMATION"),
+                "published_type": _nz(sh.get(row, "NORMALIZED_TYPE", "PUBLISHED_DATATYPE",
+                                              "PUBLISHED_TYPE", "DATATYPE")),
+                "published_length": _nz(sh.get(row, "LENGTH_OR_PRECISION", "PUBLISHED_LENGTH", "LENGTH")),
+                "repeating_group": _nz(sh.get(row, "REPEAT_GROUP", "REPEATING_GROUP")),
+                "uaf_procedure": sh.get(row, "SOURCE_TO_STAGE", "UAF_PROCEDURE", "PROCEDURE"),
+                "imds_target": sh.get(row, "DOCUMENTED_TARGET_OR_USE", "DOCUMENTED_IMDS_TARGET",
+                                        "IMDS_TARGET", "TARGET_OR_USE"),
+                "transformation": sh.get(row, "TRANSFORMATION_OR_RULE", "TRANSFORMATION"),
                 "evidence": sh.get(row, "EVIDENCE"),
                 "notes": sh.get(row, "NOTES"),
+            })
+        return out
+
+    def _fill_disposition_lane(self, out):
+        """Give every DISPOSITION row a DATA_SOURCE, and a LANE_ID where one
+        can be established rather than guessed.
+
+        The new workbook keys DISPOSITION on (target table, target column)
+        alone. Both the purge and the undecided count scope by LANE_ID, so
+        rows without one are invisible to the first and uncountable by the
+        second — a silent zero, which is the failure mode this codebase has
+        already hit three times.
+
+        VERIFY carries a LANE_ID on every row for the same (table, column),
+        so the lane is looked up rather than inferred. Where the column has
+        no verify row the lane stays null and DATA_SOURCE alone makes the
+        row findable; the count of those is logged, because a disposition
+        for a column nothing verifies is itself worth knowing about."""
+        lane_of = {}
+        for v in out.get("verify", []):
+            k = (v.get("dwh_target_table"), v.get("dwh_target_column"))
+            if v.get("lane_id") and k not in lane_of:
+                lane_of[k] = v["lane_id"]
+        unresolved = 0
+        for d in out.get("disp", []):
+            d["data_source"] = self.data_source
+            if not d.get("lane_id"):
+                lane = lane_of.get((d.get("dwh_target_table"),
+                                    d.get("dwh_target_column")))
+                if lane:
+                    d["lane_id"] = lane
+                    d["disp_id"] = f"{lane}:{d['dwh_target_table']}:{d['dwh_target_column']}"
+                else:
+                    unresolved += 1
+        if unresolved:
+            log.warning("%d disposition rows name a column with no VERIFY row, "
+                        "so no lane could be established. They are loaded and "
+                        "scoped by data_source.", unresolved)
+
+    # ------------------------------------------- the transformation layer ----
+    # Everything below reads a sheet the "With-Transformations" workbook
+    # added. The layer answers a question the crosswalk could not ask before:
+    # not "does a SEI datapoint exist for this column" but "does it compute
+    # the same value". A field whose type, length and scale all agree and
+    # whose derivation differs produces a WRONG number, not a missing one,
+    # and no verdict in the nine could express that.
+
+    def _xform(self, sh):
+        """TRANSFORMATION_REGISTER — one row per distinct documented
+        transformation, legacy or SEI. TRANSFORMATION_LAYER is what keeps
+        the two eras apart in one table; a STAR_TO_IMDS rule and the
+        SEI_TO_IMDS rule proposed to replace it are otherwise duplicates."""
+        if not sh:
+            return []
+        out, seen = [], set()
+        for i, row in enumerate(sh.rows(), 1):
+            tid = sh.get(row, "TRANSFORMATION_ID")
+            if not tid:
+                continue
+            tid = str(tid).strip()
+            if tid in seen:
+                continue
+            seen.add(tid)
+            out.append({
+                "transformation_id": tid,
+                "data_source": self.data_source,
+                "transformation_layer": _nz(sh.get(row, "TRANSFORMATION_LAYER", "LAYER")),
+                "target_system": _nz(sh.get(row, "TARGET_SYSTEM")),
+                "target_object": _nz(sh.get(row, "TARGET_OBJECT")),
+                "target_attribute": _nz(sh.get(row, "TARGET_ATTRIBUTE")),
+                "transformation_type": _nz(sh.get(row, "TRANSFORMATION_TYPE")),
+                "input_objects": sh.get(row, "INPUT_OBJECTS"),
+                "input_fields": sh.get(row, "INPUT_FIELDS"),
+                "transformation_logic": sh.get(row, "TRANSFORMATION_LOGIC", "LOGIC"),
+                "null_handling": sh.get(row, "NULL_HANDLING_OBSERVED", "NULL_HANDLING"),
+                "conditional_logic": sh.get(row, "CONDITIONAL_LOGIC_OBSERVED",
+                                            "CONDITIONAL_LOGIC"),
+                "status": _nz(sh.get(row, "STATUS")),
+                "evidence_source": sh.get(row, "EVIDENCE_SOURCE"),
+                "remarks": sh.get(row, "REMARKS"),
+            })
+        return out
+
+    def _xcompare(self, sh):
+        """TRANSFORMATION_COMPARISON — legacy against proposed, per target
+        attribute.
+
+        EQUIVALENCE AND APPROVAL ARE KEPT APART. EXACT_TEXT is a finding
+        about the logic; DRAFT_REVIEW_REQUIRED is a finding about who has
+        looked at it. An exact text match nobody approved is not ready to
+        ship, and collapsing the two columns would say it was."""
+        if not sh:
+            return []
+        out, seen = [], set()
+        for i, row in enumerate(sh.rows(), 1):
+            obj = sh.get(row, "TARGET_OBJECT")
+            att = sh.get(row, "TARGET_ATTRIBUTE")
+            if not att:
+                continue
+            cid = sh.get(row, "COMPARISON_ID") or f"{self.data_source}:{obj or 'NA'}:{att}:{i}"
+            cid = str(cid).strip()
+            if cid in seen:
+                cid = f"{cid}:{i}"
+            seen.add(cid)
+            out.append({
+                "comparison_id": cid,
+                "data_source": self.data_source,
+                "target_system": _nz(sh.get(row, "TARGET_SYSTEM")),
+                "target_object": obj,
+                "target_attribute": att,
+                "target_type": _nz(sh.get(row, "TARGET_TYPE")),
+                "target_nullable": _nz(sh.get(row, "TARGET_NULLABLE", "NULLABLE")),
+                "legacy_transformation_id": _nz(sh.get(row, "LEGACY_TRANSFORMATION_ID")),
+                "sei_transformation_id": _nz(sh.get(row, "SEI_TRANSFORMATION_ID")),
+                "imds_logic": sh.get(row, "IMDS_TRANSFORMATION_LOGIC", "IMDS_LOGIC"),
+                "sei_logic": sh.get(row, "EQUIVALENT_SEI_TRANSFORMATION_LOGIC",
+                                    "SEI_TRANSFORMATION_LOGIC", "SEI_LOGIC"),
+                "sei_source_objects": sh.get(row, "SEI_SOURCE_OBJECTS"),
+                "sei_source_fields": sh.get(row, "SEI_SOURCE_FIELDS"),
+                "equivalence": _nz(sh.get(row, "TRANSFORMATION_EQUIVALENCE", "EQUIVALENCE")),
+                "evidence_completeness": _nz(sh.get(row, "EVIDENCE_COMPLETENESS")),
+                "review_note": sh.get(row, "DIFFERENCE_OR_REVIEW_NOTE", "REVIEW_NOTE"),
+                "approval_status": _nz(sh.get(row, "APPROVAL_STATUS")),
+                "evidence_source": sh.get(row, "EVIDENCE_SOURCE"),
+            })
+        return out
+
+    def _starfld(self, sh):
+        """STAR_LAYOUT_DETAIL — the published STAR field dictionary.
+
+        THIS IS THE ARTEFACT THE EVIDENCE PANEL KEEPS ASKING FOR. Its
+        contract-field row reads "0 of N from copybooks" because no STAR
+        layout had been supplied and every contract-side type was inferred
+        from the target column it feeds — the single assumption the whole
+        format check rested on. 434 published fields replace that inference
+        with a document.
+
+        field_norm carries the same canonicalisation the crosswalk join
+        uses, so a layout field can be matched to the contract field it
+        describes without another normalisation rule to keep in step."""
+        if not sh:
+            return []
+        out, seen = [], set()
+        for i, row in enumerate(sh.rows(), 1):
+            fld = sh.get(row, "FIELD_NAME", "STAR_FIELD", "FIELD")
+            if not fld:
+                continue
+            fam = sh.get(row, "FEED_FAMILY", "FEED_NAME", "FEED") or "NA"
+            sid = f"{self.data_source}:{_file_key(fam)}:{_norm_code(fld)}"
+            if sid in seen:
+                sid = f"{sid}:{i}"
+            seen.add(sid)
+            out.append({
+                "star_field_id": sid,
+                "data_source": self.data_source,
+                "feed_family": fam,
+                "ordinal": _nz(sh.get(row, "ORDINAL")),
+                "field_name": fld,
+                "field_norm": _norm_code(fld),
+                "published_type": _nz(sh.get(row, "PUBLISHED_TYPE", "STAR_TYPE", "TYPE")),
+                "published_length": _nz(sh.get(row, "PUBLISHED_LENGTH", "STAR_LENGTH", "LENGTH")),
+                "published_format": _nz(sh.get(row, "PUBLISHED_FORMAT", "FORMAT")),
+                "description": sh.get(row, "DESCRIPTION"),
+                "source_document": sh.get(row, "SOURCE_DOCUMENT", "SOURCE_DOC"),
+                "evidence_status": _nz(sh.get(row, "EVIDENCE_STATUS", "EVIDENCE")),
+            })
+        return out
+
+    def _uploader(self, sh):
+        """STAR_UPLOADER_LINEAGE — what the loader does between the file
+        landing and the row appearing. Duplicate checks, header and trailer
+        stripping, delete-and-reinsert: none of it is in the column
+        lineage, and all of it changes what arrives."""
+        if not sh:
+            return []
+        out = []
+        for i, row in enumerate(sh.rows(), 1):
+            job = sh.get(row, "JOB_NAME", "JOB")
+            if not job:
+                continue
+            out.append({
+                "job_id": f"{self.data_source}:{job}:{i}",
+                "data_source": self.data_source,
+                "job_name": job,
+                "duplicate_check": sh.get(row, "DUPLICATE_CHECK"),
+                "pre_process": sh.get(row, "PRE_PROCESS"),
+                "loaded_as_is": sh.get(row, "LOADED_AS_IS"),
+                "imds_load_mapping": sh.get(row, "IMDS_LOAD_MAPPING"),
+                "source_document": sh.get(row, "SOURCE_DOCUMENT", "SOURCE_DOC"),
+                "evidence_status": _nz(sh.get(row, "EVIDENCE_STATUS", "EVIDENCE")),
+            })
+        return out
+
+    def _recon(self, sh):
+        """NEW_EVIDENCE_RECON — exact normalised-name matches.
+
+        CANDIDATE EVIDENCE ONLY. A name match is the cheapest signal there
+        is and the easiest to mistake for a mapping; it lands in its own
+        table precisely so nothing reads it by accident as one."""
+        if not sh:
+            return []
+        out, seen = [], set()
+        for i, row in enumerate(sh.rows(), 1):
+            fld = sh.get(row, "STAR_FIELD", "FIELD_NAME", "FIELD")
+            if not fld:
+                continue
+            fam = sh.get(row, "FEED_FAMILY", "FEED_NAME") or "NA"
+            rid = f"{self.data_source}:{_file_key(fam)}:{_norm_code(fld)}"
+            if rid in seen:
+                rid = f"{rid}:{i}"
+            seen.add(rid)
+            n = sh.get(row, "SEI_EXACT_NAME_MATCH_COUNT", "MATCH_COUNT")
+            try:
+                n = int(float(n))
+            except (TypeError, ValueError):
+                n = 0
+            out.append({
+                "recon_id": rid,
+                "data_source": self.data_source,
+                "feed_family": fam,
+                "star_field": fld,
+                "star_field_norm": _norm_code(fld),
+                "star_type": _nz(sh.get(row, "STAR_TYPE", "PUBLISHED_TYPE")),
+                "star_length": _nz(sh.get(row, "STAR_LENGTH", "PUBLISHED_LENGTH")),
+                "match_count": n,
+                "matches": sh.get(row, "SEI_EXACT_NAME_MATCHES", "MATCHES"),
+                "evidence_class": _nz(sh.get(row, "EVIDENCE_CLASS")),
+                "verification_result": _nz(sh.get(row, "VERIFICATION_RESULT")),
+                "source_document": sh.get(row, "SOURCE_DOCUMENT", "SOURCE_DOC"),
+            })
+        return out
+
+    def _enums(self, sh):
+        """ENUMS — the workbook's own controlled vocabularies.
+
+        The UI ships a glossary of nine verdicts, six map kinds and so on.
+        Loading the workbook's list makes a value the workbook invented and
+        the glossary has never heard of a query away, instead of an
+        unexplained grey pill on screen."""
+        if not sh:
+            return []
+        out, seen = [], set()
+        for i, row in enumerate(sh.rows(), 1):
+            lst = sh.get(row, "LIST_NAME", "LIST")
+            val = sh.get(row, "VALUE")
+            if not lst or val is None or str(val).strip() == "":
+                continue
+            eid = f"{self.data_source}:{lst}:{val}"
+            if eid in seen:
+                continue
+            seen.add(eid)
+            out.append({
+                "enum_id": eid, "data_source": self.data_source,
+                "list_name": str(lst).strip(), "value": str(val).strip(),
+                "meaning": sh.get(row, "MEANING", "DESCRIPTION"),
+            })
+        return out
+
+    def _lotmap(self, sh):
+        """LOT_LEVEL_POSITION_MAP — the raw import behind the comparison.
+
+        Kept as delivered rather than folded into the comparison table: its
+        blank and literal "Null" cells are evidence of an absent mapping,
+        and normalising them away destroys the finding."""
+        if not sh:
+            return []
+        out = []
+        for i, row in enumerate(sh.rows(), 1):
+            col = sh.get(row, "TARGET_COLUMN")
+            if not col:
+                continue
+            out.append({
+                "map_row_id": f"{self.data_source}:{col}:{i}",
+                "data_source": self.data_source,
+                "target_column": col,
+                "target_type": _nz(sh.get(row, "TARGET_TYPE")),
+                "nullable": _nz(sh.get(row, "NULLABLE")),
+                "star_transformation": sh.get(row, "STAR_TRANSFORMATION"),
+                "sei_transformation": sh.get(row, "SEI_SWP_TRANSFORMATION",
+                                             "SEI_TRANSFORMATION"),
+                "sei_source_object": sh.get(row, "SEI_SOURCE_OBJECT"),
+                "sei_source_field": sh.get(row, "SEI_SOURCE_FIELD"),
+                "remarks": sh.get(row, "REMARKS"),
+                "source_document": sh.get(row, "SOURCE_DOCUMENT", "SOURCE_DOC"),
+            })
+        return out
+
+    def _control(self, sh, sheet_label):
+        """_MANIFEST, FINAL_VERIFICATION and TRANSFORMATION_SUMMARY.
+
+        All three are (name, value, explanation) with or without a status,
+        so they share one table tagged with the sheet they came from. Three
+        tables of a dozen rows each would be three joins for one panel.
+
+        `seq` preserves sheet order, which carries meaning in _MANIFEST:
+        the source-document register comes before the counts, and the
+        counts before the limitations."""
+        if not sh:
+            return []
+        out = []
+        for i, row in enumerate(sh.rows(), 1):
+            name = sh.get(row, "CONTROL", "ITEM", "METRIC")
+            if not name:
+                continue
+            out.append({
+                "control_id": f"{self.data_source}:{sheet_label}:{i}",
+                "data_source": self.data_source,
+                "source_sheet": sheet_label,
+                "control_name": str(name)[:400],
+                "result": sh.get(row, "RESULT", "VALUE"),
+                "status": _nz(sh.get(row, "STATUS")),
+                "detail": sh.get(row, "DETAIL", "NOTES", "INTERPRETATION"),
+                "seq": i,
             })
         return out
 
@@ -811,13 +1206,22 @@ class SeiCrosswalkConnector:
         ("seiinput", "sei_input_lineage",  ("input_id",)),
         ("seicat",   "sei_catalog_verify", ("cat_id",)),
         ("uafschema", "uaf_field_schema",  ("uaf_id",)),
+        ("linexform", "legacy_lineage_xform", ("lineage_id",)),
+        ("xform",     "sei_transformation", ("transformation_id",)),
+        ("xcompare",  "sei_transformation_compare", ("comparison_id",)),
+        ("starfld",   "star_layout_field",  ("star_field_id",)),
+        ("uploader",  "star_uploader_job",  ("job_id",)),
+        ("recon",     "sei_name_recon",     ("recon_id",)),
+        ("enums",     "sei_enum",           ("enum_id",)),
+        ("lotmap",    "lot_level_position_map", ("map_row_id",)),
+        ("control",   "sei_control",        ("control_id",)),
     ]
 
     # legacy_lineage and legacy_source_file are SHARED with whatever loaded the
     # warehouse's baseline. They are written only in "load" mode, and purged
     # only in "load" mode. In "attach" mode this connector owns nothing in
     # them and must not touch either.
-    _OWNED_IN_LOAD_MODE = ("lineage", "feed", "linelane")
+    _OWNED_IN_LOAD_MODE = ("lineage", "feed", "linelane", "linexform")
 
     def resolve_mode(self, loader):
         """Decide whether this workbook supplies the baseline or attaches to one.
@@ -952,7 +1356,8 @@ class SeiCrosswalkConnector:
         # for PBDW, every row the AddVantage workbook loaded.
         # legacy_lineage_lane is ours, but it describes legacy_lineage rows we
         # did not write when attaching, so it is skipped for the same reason.
-        shared = {"legacy_lineage", "legacy_source_file", "legacy_lineage_lane"}
+        shared = {"legacy_lineage", "legacy_source_file", "legacy_lineage_lane",
+                  "legacy_lineage_xform"}
         scoped = [
             ("sei_source_map", "data_source = :ds"),
             ("sei_verify", "data_source = :ds"),
@@ -966,6 +1371,15 @@ class SeiCrosswalkConnector:
             ("legacy_src_column", "data_source = :ds"),
             ("legacy_lineage", "data_source = :ds"),
             ("legacy_lineage_lane", "data_source = :ds"),
+            ("legacy_lineage_xform", "data_source = :ds"),
+            ("sei_transformation", "data_source = :ds"),
+            ("sei_transformation_compare", "data_source = :ds"),
+            ("star_layout_field", "data_source = :ds"),
+            ("star_uploader_job", "data_source = :ds"),
+            ("sei_name_recon", "data_source = :ds"),
+            ("sei_enum", "data_source = :ds"),
+            ("lot_level_position_map", "data_source = :ds"),
+            ("sei_control", "data_source = :ds"),
         ]
         for table, where in scoped:
             if mode == "attach" and table in shared:
