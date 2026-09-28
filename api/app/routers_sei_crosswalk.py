@@ -496,8 +496,22 @@ def waffle(data_source: str | None = None, limit_tables: int = 40):
 @router.get("/columns")
 def columns(data_source: str | None = None, verdict: str | None = None,
             lane: str | None = None, group: str | None = None,
-            table: str | None = None, limit: int = 500):
-    """The drill list. Every filter the dashboard can hand down."""
+            table: str | None = None, feed: str | None = None,
+            sei_feed: str | None = None, limit: int = 500):
+    """The drill list. Every filter the dashboard can hand down.
+
+    `feed` and `sei_feed` exist so a click on the ribbon diagram lands on
+    exactly the columns that ribbon is made of. Without them a selection
+    could only ever drill by verdict, which is a different and much coarser
+    set: "the 29 columns with no SEI source" against "the 20 of them that
+    land in STARACCT".
+
+    `sei_feed` is not a column on SEI_VERIFY — it lives on SEI_SOURCE_MAP,
+    reached through the canonicalised contract field, and the sentinel
+    'no SEI source' means the absence of a map row rather than a value. So
+    it is an EXISTS test, negated for the sentinel. That negation is the
+    whole reason the widest ribbon on the diagram is clickable at all.
+    """
     ds = _ds(data_source)
     where = ["data_source = :ds"]
     p = {"ds": ds}
@@ -509,6 +523,24 @@ def columns(data_source: str | None = None, verdict: str | None = None,
         where.append("functional_group = :g"); p["g"] = group
     if table:
         where.append("dwh_target_table = :t"); p["t"] = table
+    if feed:
+        # 'unmapped' is the flow diagram's label for a null contract feed
+        if feed.lower() == "unmapped":
+            where.append("contract_feed IS NULL")
+        else:
+            where.append("contract_feed = :f"); p["f"] = feed
+    if sei_feed:
+        exists = f"""EXISTS (
+            SELECT 1 FROM sei_source_map m
+            WHERE  m.data_source = sei_verify.data_source
+              AND  NVL(m.src_col_norm, {_canon('m.src_source_column')})
+                 = {_canon('sei_verify.contract_field')}
+              {{FEED}})"""
+        if sei_feed == "no SEI source":
+            where.append("NOT " + exists.replace("{FEED}", ""))
+        else:
+            where.append(exists.replace("{FEED}", "AND m.sei_feed = :sf"))
+            p["sf"] = sei_feed
     rows = _safe(f"""
         SELECT lane_id, dwh_target_table, dwh_target_column, functional_group,
                contract_feed, contract_field, sei_datapoint_count, sei_datapoints,

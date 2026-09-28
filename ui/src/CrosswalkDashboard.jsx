@@ -523,7 +523,15 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
           note="ribbon width is columns · a ribbon that starts at “no SEI source” has nothing behind it">
           <FlowDiagram t={t} flow={flow}
             onPickVerdict={(x) => drill({ verdict: x },
-              `${VERDICT[x]?.t || x} columns`)} />
+              `${VERDICT[x]?.t || x} columns`)}
+            // A selection on the diagram drills to exactly the columns that
+            // ribbon is made of, not to the verdict it happens to be. From
+            // there the column page carries the full chain, so the picture
+            // and the lineage are two clicks apart rather than two screens.
+            onDrill={(filter, title) => drill(filter, title)}
+            onOpenTable={onOpenTechnical
+              ? (tbl) => onOpenTechnical({ table: tbl, column: null })
+              : undefined} />
         </Panel>)}
 
       {/* The ceiling, taken apart. One number made this look like one task;
