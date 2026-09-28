@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { crosswalkApi, VERDICT, VERDICT_ORDER, LANE_C } from "./seiCrosswalkApi.js";
 import { GLOSSARY_SECTIONS, VERDICT_INFO, SHAPE_INFO, verdictShort }
   from "./crosswalkGlossary.js";
+import { FlowDiagram, EvidencePanel, Waffle } from "./CrosswalkFlow.jsx";
 
 // =====================================================================
 // CrosswalkDashboard — mapping, analysis and divergence for one warehouse.
@@ -138,6 +139,9 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
   const [ready, setReady] = useState([]);
   const [exc, setExc] = useState({ exceptions: [], by_owner: [] });
   const [cat, setCat] = useState(null);
+  const [flow, setFlow] = useState(null);
+  const [ev, setEv] = useState(null);
+  const [waf, setWaf] = useState(null);
   const [busy, setBusy] = useState(true);
 
   // the drill stack — [{kind:"list", filter, title}, {kind:"column", ...}]
@@ -151,11 +155,13 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
     Promise.all([
       crosswalkApi.summary(ds), crosswalkApi.divergence(ds),
       crosswalkApi.lanes(ds), crosswalkApi.readiness(ds), crosswalkApi.exceptions(ds),
-      crosswalkApi.catalog(ds),
-    ]).then(([s, d, l, r, e, c]) => {
+      crosswalkApi.catalog(ds), crosswalkApi.flow(ds), crosswalkApi.evidence(ds),
+      crosswalkApi.waffle(ds),
+    ]).then(([s, d, l, r, e, c, f, v, w]) => {
       if (!live) return;
       setSum(s); setDiv(d); setLanes(l.lanes || []);
-      setReady(r.tables || []); setExc(e); setCat(c); setBusy(false);
+      setReady(r.tables || []); setExc(e); setCat(c);
+      setFlow(f); setEv(v); setWaf(w); setBusy(false);
     });
     return () => { live = false; };
   }, [ds]);
@@ -508,6 +514,34 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
           incumbent fills today.
         </div>
       </Panel>
+
+      {/* Where every column comes from. "no SEI source" is a node here, not
+          an omission — it is usually the widest ribbon on the diagram, and
+          leaving it out would answer a question nobody asked. */}
+      {flow && ((flow.left || []).length > 0 || (flow.right || []).length > 0) && (
+        <Panel t={t} title="Where every column comes from"
+          note="ribbon width is columns · a ribbon that starts at “no SEI source” has nothing behind it">
+          <FlowDiagram t={t} flow={flow}
+            onPickVerdict={(x) => drill({ verdict: x },
+              `${VERDICT[x]?.t || x} columns`)} />
+        </Panel>)}
+
+      {/* The ceiling, taken apart. One number made this look like one task;
+          it is four artefacts held by four different teams, and they can be
+          chased in parallel. */}
+      {ev && (ev.rows || []).length > 0 && (
+        <Panel t={t} title="Why nothing is proven"
+          note={ev.headline || "a match needs both sides from live metadata"}>
+          <EvidencePanel t={t} ev={ev} />
+        </Panel>)}
+
+      {/* Every final column as one cell. The spread says how many; this says
+          where — and a contiguous run is one gap with one owner, not many. */}
+      {waf && (waf.tables || []).length > 0 && (
+        <Panel t={t} title="Every final column, one cell"
+          note={`${waf.cells} columns across ${waf.table_count} tables · in the table's own column order`}>
+          <Waffle t={t} waffle={waf} onPickColumn={openCol} />
+        </Panel>)}
 
       <Panel t={t} title="Divergence — six shapes, and what each one costs"
         note="the diagram is the shape of the problem">

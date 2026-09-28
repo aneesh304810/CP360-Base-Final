@@ -52,11 +52,24 @@ export const crosswalkApi = {
       () => ({ data_source, source_system: system, resolved: false,
                route: "none", src_tables: [], target_tables: [], columns: 0 })),
 
+  // The three-column ribbon diagram. `left` is grouped by verdict as well as
+  // by node, so a ribbon can be drawn as bands rather than as one grey mass.
+  flow: (data_source) =>
+    _get(`/sei-crosswalk/flow${_qs({ data_source })}`,
+      () => ({ left: [], right: [], bypass: [] })),
+
+  // Why nothing is proven — each side of the match, separately.
+  evidence: (data_source) =>
+    _get(`/sei-crosswalk/evidence${_qs({ data_source })}`,
+      () => ({ rows: [], blocked: 0, of: 0, headline: "" })),
+
+  // One cell per final column, in the table's own column order.
+  waffle: (data_source) =>
+    _get(`/sei-crosswalk/waffle${_qs({ data_source })}`,
+      () => ({ tables: [], table_count: 0, cells: 0 })),
+
   lanes: (data_source) =>
     _get(`/sei-crosswalk/lanes${_qs({ data_source })}`, () => ({ lanes: [] })),
-
-  flow: (data_source) =>
-    _get(`/sei-crosswalk/flow${_qs({ data_source })}`, () => ({ left: [], right: [] })),
 
   columns: (o = {}) =>
     _get(`/sei-crosswalk/columns${_qs(o)}`, () => ({ columns: [], count: 0 })),

@@ -262,31 +262,235 @@ def flow(data_source: str | None = None):
     """Nodes and links for the mapping flow: SEI source -> contract feed ->
     warehouse table. Link weight is COUNT(DISTINCT target column), never row
     count — legacy_lineage's grain is (target column x source), so counting
-    rows double-counts a fan-in."""
+    rows double-counts a fan-in.
+
+    THE VERDICT TRAVELS WITH THE LINK. A flow diagram that draws every ribbon
+    the same colour says only that mappings exist, which nobody doubted. The
+    left links are grouped by verdict as well, so the ribbon into a contract
+    feed splits into a proven band, an unknown band and a no-source band —
+    and "no SEI source" stops being one node among several and becomes the
+    width of the problem.
+
+    Bypass links come back separately because they are not part of the
+    three-column topology: they skip the contract feed entirely, so they
+    cannot be laid out between column one and column two. Drawn as a dashed
+    arc over the middle, which is what makes them findable.
+    """
     ds = _ds(data_source)
+    scoped = ("v.lane_id IN (SELECT lane_id FROM legacy_lane "
+              "WHERE data_source = :ds AND replacement_state = 'REPLACED')")
     left = _safe("""
         SELECT NVL(m.sei_feed, 'no SEI source') AS src,
                NVL(v.contract_feed, 'unmapped')  AS mid,
+               NVL(v.match_verdict, 'UNKNOWN')   AS verdict,
                COUNT(DISTINCT v.dwh_target_table || '.' || v.dwh_target_column) AS n
         FROM   sei_verify v
         LEFT JOIN sei_source_map m
                ON m.data_source = v.data_source
               AND NVL(m.src_col_norm, m.src_source_column) = {CANON_CF}
         WHERE  v.data_source = :ds
-          AND  v.lane_id IN (SELECT lane_id FROM legacy_lane
-                             WHERE data_source = :ds AND replacement_state = 'REPLACED')
-        GROUP BY NVL(m.sei_feed, 'no SEI source'), NVL(v.contract_feed, 'unmapped')
-    """.replace("{CANON_CF}", _canon("v.contract_field")), {"ds": ds})
+          AND  {SCOPED}
+        GROUP BY NVL(m.sei_feed, 'no SEI source'), NVL(v.contract_feed, 'unmapped'),
+                 NVL(v.match_verdict, 'UNKNOWN')
+    """.replace("{CANON_CF}", _canon("v.contract_field")).replace("{SCOPED}", scoped),
+        {"ds": ds})
     right = _safe("""
-        SELECT NVL(contract_feed, 'unmapped') AS mid, dwh_target_table AS tgt,
-               COUNT(DISTINCT dwh_target_column) AS n
-        FROM   sei_verify
-        WHERE  data_source = :ds
-          AND  lane_id IN (SELECT lane_id FROM legacy_lane
-                           WHERE data_source = :ds AND replacement_state = 'REPLACED')
-        GROUP BY NVL(contract_feed, 'unmapped'), dwh_target_table
-    """, {"ds": ds})
-    return {"left": left, "right": right}
+        SELECT NVL(v.contract_feed, 'unmapped') AS mid, v.dwh_target_table AS tgt,
+               COUNT(DISTINCT v.dwh_target_column) AS n
+        FROM   sei_verify v
+        WHERE  v.data_source = :ds
+          AND  {SCOPED}
+        GROUP BY NVL(v.contract_feed, 'unmapped'), v.dwh_target_table
+    """.replace("{SCOPED}", scoped), {"ds": ds})
+
+    # The contract bypass: SEI proposed straight into the warehouse column.
+    # FAILED_CHECKS is pipe-separated, so the test is a substring one.
+    bypass = _safe("""
+        SELECT NVL(m.sei_feed, 'SEI') AS src, v.dwh_target_table AS tgt,
+               COUNT(DISTINCT v.dwh_target_table || '.' || v.dwh_target_column) AS n
+        FROM   sei_verify v
+        LEFT JOIN sei_source_map m
+               ON m.data_source = v.data_source
+              AND NVL(m.src_col_norm, m.src_source_column) = {CANON_CF}
+        WHERE  v.data_source = :ds
+          AND  {SCOPED}
+          AND  INSTR(NVL(v.failed_checks, ' '), 'BYPASSES_CONTRACT') > 0
+        GROUP BY NVL(m.sei_feed, 'SEI'), v.dwh_target_table
+    """.replace("{CANON_CF}", _canon("v.contract_field")).replace("{SCOPED}", scoped),
+        {"ds": ds})
+    return {"left": left, "right": right, "bypass": bypass}
+
+
+@router.get("/evidence")
+def evidence(data_source: str | None = None):
+    """Why nothing is proven — read off the data rather than asserted.
+
+    A PROVEN_MATCH needs schema evidence on BOTH sides, and the summary's
+    single ceiling line only ever looked at one of them. This returns each
+    side separately, because they are cleared by different people holding
+    different artefacts: an ALL_TAB_COLUMNS extract from the warehouse DBA, a
+    copybook from the feed owner, a typed interface spec from SEI. Told as
+    one number, the work looks like one task; it is four, and they can run in
+    parallel.
+
+    Every figure here is a count from these tables. Nothing is prose about
+    the general case.
+    """
+    ds = _ds(data_source)
+    STRONG = "('LIVE_DDL','COPYBOOK','FEED_WORKBOOK')"
+
+    def one(sql, params=None):
+        # Bind :ds ONLY where the statement actually references it. Oracle
+        # rejects a bind the SQL does not use (ORA-01036), _safe swallows the
+        # failure and returns [], and the row would read zero rather than
+        # error — so the code-set and identifier rows, whose tables carry no
+        # data_source at all, would silently report nothing loaded.
+        p = dict(params or {})
+        if ":ds" in sql:
+            p["ds"] = ds
+        r = _safe(sql, p)
+        return int((r[0] or {}).get("n") or 0) if r else 0
+
+    def row(key, label, have_n, of_n, unit, detail, clears):
+        of_n, have_n = int(of_n or 0), int(have_n or 0)
+        return {"key": key, "label": label, "have": have_n, "of": of_n,
+                "pct": round((have_n / of_n) * 100) if of_n else 0,
+                "unit": unit, "detail": detail, "clears": clears,
+                "state": ("ok" if of_n and have_n == of_n
+                          else "partial" if have_n else "none")}
+
+    # 1. the warehouse target side
+    tgt_of = one("SELECT COUNT(*) AS n FROM sei_verify WHERE data_source = :ds")
+    tgt_ok = one(f"""SELECT COUNT(*) AS n FROM sei_verify
+                     WHERE data_source = :ds AND evidence_right IN {STRONG}""")
+    kinds = _safe("""SELECT DISTINCT evidence_right AS e FROM sei_verify
+                     WHERE data_source = :ds AND evidence_right IS NOT NULL""",
+                  {"ds": ds})
+    tgt_kinds = sorted({(r.get("e") or "").upper() for r in kinds} - {""})
+
+    # 2. the contract field side
+    cf_of = one("SELECT COUNT(*) AS n FROM legacy_src_column WHERE data_source = :ds")
+    cf_ok = one(f"""SELECT COUNT(*) AS n FROM legacy_src_column
+                    WHERE data_source = :ds AND evidence IN {STRONG}""")
+    cf_typed = one("""SELECT COUNT(*) AS n FROM legacy_src_column
+                      WHERE data_source = :ds AND src_type IS NOT NULL
+                        AND UPPER(src_type) <> 'UNKNOWN'""")
+
+    # 3. the SEI datapoint side
+    sei_of = one("SELECT COUNT(*) AS n FROM sei_source_map WHERE data_source = :ds")
+    sei_typed = one("""SELECT COUNT(*) AS n FROM sei_source_map
+                       WHERE data_source = :ds AND sei_type IS NOT NULL
+                         AND UPPER(sei_type) <> 'UNKNOWN'""")
+    sei_feeds = one("""SELECT COUNT(DISTINCT sei_feed) AS n FROM sei_source_map
+                       WHERE data_source = :ds AND sei_feed IS NOT NULL""")
+
+    # 4. code sets. SEI_CODE_SET has no data_source: it is global reference
+    #    data, so scoping it by warehouse would return nothing.
+    cs_domains = one("""SELECT COUNT(DISTINCT code_set_name) AS n
+                        FROM sei_code_set WHERE code_set_name IS NOT NULL""")
+    cs_values = one("""SELECT COUNT(*) AS n FROM sei_code_set
+                       WHERE code_value IS NOT NULL""")
+    cs_mapped = one("""SELECT COUNT(*) AS n FROM sei_code_set
+                       WHERE code_value IS NOT NULL AND maps_to_code IS NOT NULL""")
+    cs_needed = one("""SELECT COUNT(DISTINCT code_set_name) AS n
+                       FROM legacy_src_column
+                       WHERE data_source = :ds AND code_set_name IS NOT NULL""")
+
+    # 5. identifier crosswalk
+    id_of = one("SELECT COUNT(*) AS n FROM sei_identifier_xwalk")
+    id_ok = one("""SELECT COUNT(*) AS n FROM sei_identifier_xwalk
+                   WHERE resolution_rule IS NOT NULL
+                     AND authoritative_side IS NOT NULL""")
+
+    rows = [
+        row("target", "Warehouse target", tgt_ok, tgt_of, "columns",
+            ((f"Target types come from "
+              f"{', '.join(k.replace('_', ' ').lower() for k in tgt_kinds)}.")
+             if tgt_kinds else "No evidence is recorded on the target side.")
+            + (" A dictionary describes the schema; it is not the schema, so "
+               "no row can be called proven while it is the source."
+               if "DOCUMENT" in tgt_kinds else ""),
+            "One ALL_TAB_COLUMNS extract for the warehouse. It lifts the "
+            "ceiling for every mapped column at once."),
+        row("contract", "Contract field", cf_ok, cf_of, "fields",
+            f"{cf_typed} of {cf_of} contract fields carry a type at all."
+            + (" Where no layout was supplied the type is inferred from the "
+               "target column it feeds — the single assumption the whole "
+               "check rests on." if cf_ok < cf_of else ""),
+            "The feed's copybook or interface specification, from the team "
+            "that produces it."),
+        row("sei", "SEI datapoint", sei_typed, sei_of, "datapoints",
+            f"{sei_feeds} SEI feeds are mapped."
+            + (" The feed workbook names datapoints and omits their type, "
+               "length and scale, so the left-hand side of every comparison "
+               "is empty." if sei_of and not sei_typed else ""),
+            "A typed interface specification from SEI. A name on its own "
+            "cannot be compared to anything."),
+        row("codeset", "Code sets", cs_mapped, cs_values or cs_needed, "values",
+            f"{cs_domains} domains named, {cs_values} member values loaded, "
+            f"{cs_mapped} with an incumbent equivalent. {cs_needed} distinct "
+            f"code sets are referenced by contract fields in this warehouse."
+            + (" Domain names without member values decode nothing."
+               if cs_domains and not cs_values else ""),
+            "Both sides' member values, and an explicit decision for every "
+            "value with no equivalent."),
+        row("identifier", "Identifier crosswalk", id_ok, id_of, "entities",
+            f"{id_of} entities crosswalked, {id_ok} carrying both a "
+            "resolution rule and an authoritative side. An identifier that "
+            "can be matched several ways is undecided until precedence is "
+            "written down.",
+            "A precedence rule per entity, naming which identifier wins and "
+            "in what context."),
+    ]
+    short = [r for r in rows if r["state"] != "ok"]
+    return {"data_source": ds, "rows": rows,
+            "blocked": len(short), "of": len(rows),
+            "headline": (f"Both sides of a match need schema evidence. "
+                         f"{len(short)} of {len(rows)} are short."
+                         if short else "Every side has schema evidence.")}
+
+
+@router.get("/waffle")
+def waffle(data_source: str | None = None, limit_tables: int = 40):
+    """Every final column as one cell, grouped by warehouse table, in column
+    order.
+
+    The verdict spread says 29 columns have no source. The waffle says WHERE
+    they are — and an unbroken run through the middle of one table is a
+    different finding from 29 scattered misses. It is one coherent gap with
+    one owner, and only the arrangement shows it.
+
+    Column order is the table's own, so a run is real adjacency rather than
+    an artefact of sorting by verdict.
+    """
+    ds = _ds(data_source)
+    rows = _safe("""
+        SELECT v.dwh_target_table AS tbl, v.dwh_target_column AS col,
+               NVL(v.match_verdict, 'UNKNOWN') AS verdict,
+               NVL(n.source_system, '?') AS lane
+        FROM   sei_verify v
+        LEFT   JOIN legacy_lane n ON n.lane_id = v.lane_id
+        WHERE  v.data_source = :ds
+        ORDER  BY v.dwh_target_table, NVL(n.source_system, '?'),
+                  v.dwh_target_column""", {"ds": ds})
+    # Grouped by (table, lane), not by table. A table written by two lanes is
+    # two rows of cells, because that is the finding: the same table half
+    # replaced and half not reads very differently from one solid block.
+    out: list[dict] = []
+    seen: dict[tuple, dict] = {}
+    for r in rows:
+        tbl = r.get("tbl") or "(unnamed)"
+        lane = r.get("lane") or "?"
+        t = seen.get((tbl, lane))
+        if t is None:
+            t = {"table": tbl, "lane": lane, "cells": []}
+            seen[(tbl, lane)] = t
+            out.append(t)
+        t["cells"].append({"c": r.get("col"), "v": r.get("verdict")})
+    out.sort(key=lambda x: -len(x["cells"]))
+    return {"data_source": ds, "tables": out[:limit_tables],
+            "table_count": len(out),
+            "cells": sum(len(t["cells"]) for t in out)}
 
 
 @router.get("/columns")
