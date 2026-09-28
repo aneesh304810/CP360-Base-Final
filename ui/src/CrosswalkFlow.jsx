@@ -9,7 +9,7 @@
 // All three take data they are given and render nothing when it is empty.
 // That is what keeps a warehouse with no crosswalk — PBDW today — unchanged.
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { VERDICT, VERDICT_ORDER } from "./seiCrosswalkApi.js";
 import { verdictShort, VERDICT_INFO } from "./crosswalkGlossary.js";
 
@@ -31,12 +31,53 @@ const vc = (v) => (VERDICT[v] || VERDICT.UNKNOWN).c;
 // splits into bands. Colour by node and the diagram says mappings exist;
 // colour by verdict and it says how many of them are worth anything.
 export function FlowDiagram({ t, flow, onPickVerdict, onDrill, onOpenTable }) {
-  const model = useMemo(() => buildFlowModel(flow), [flow]);
   const [sel, setSel] = useState(null);
+  const [full, setFull] = useState(false);
+  const box = useRef(null);
+  const [wide, setWide] = useState(0);
+
+  // Measure the container rather than assume 760. A ResizeObserver catches
+  // the panel widening, the window resizing and the full-screen toggle with
+  // one mechanism; the initial read happens on mount because the observer
+  // fires after first paint and a one-frame 760px flash is visible.
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const read = () => setWide(Math.round(el.getBoundingClientRect().width));
+    read();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", read);
+      return () => window.removeEventListener("resize", read);
+    }
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [full]);
+
+  useEffect(() => {
+    if (!full) return;
+    const onKey = (e) => { if (e.key === "Escape") setFull(false); };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [full]);
+
+  const vh = typeof window !== "undefined" ? window.innerHeight : 900;
+  const model = useMemo(() => buildFlowModel(flow, {
+    width: wide ? wide - 2 : undefined,
+    // In full screen the drawing fills the viewport minus the header and the
+    // selection bar. Inline it keeps sizing itself from the data, because a
+    // panel that grows to 900px tall pushes everything below it off-screen.
+    height: full ? Math.max(360, vh - 190) : undefined,
+  }), [flow, wide, full, vh]);
   const focus = useMemo(() => resolveFocus(model, sel), [model, sel]);
-  if (!model) return null;
-  const { W, H, CW, nodes, ribbons, arcs, heads, verdicts } = model;
   const muted = t.muted || "#999";
+  if (!model) return <div ref={box} />;
+  const { W, H, CW, nodes, ribbons, arcs, heads, verdicts } = model;
 
   // A selected ribbon is the one you clicked. A selected NODE is not one
   // ribbon but a path: the links touching it, and then the links those
@@ -62,9 +103,18 @@ export function FlowDiagram({ t, flow, onPickVerdict, onDrill, onOpenTable }) {
   const same = (a, b) => a && b && JSON.stringify(a) === JSON.stringify(b);
   const toggle = (next) => setSel((cur) => (same(cur, next) ? null : next));
 
-  return (
-    <div>
-      <div style={{ overflowX: "auto", paddingBottom: 4 }}>
+  const inner = (
+    <>
+      {!full && (
+        <div style={{ display: "flex", justifyContent: "flex-end",
+          marginBottom: 6 }}>
+          <button type="button" onClick={() => setFull(true)} style={{
+            background: "none", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+            borderRadius: 3, padding: "3px 10px", font: "inherit",
+            fontSize: 10.5, cursor: "pointer",
+            color: t.accent || "#0f4775" }}>⤢ full screen</button>
+        </div>)}
+      <div ref={box} style={{ overflowX: "auto", paddingBottom: 4 }}>
         <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}
           style={{ minWidth: W, display: "block" }}>
           {heads.map((h) => (
@@ -127,6 +177,35 @@ export function FlowDiagram({ t, flow, onPickVerdict, onDrill, onOpenTable }) {
             <span style={{ marginLeft: "auto", fontSize: 10.5, color: muted }}>
               click any box or ribbon to trace its path</span>
           </div>)}
+    </>);
+
+  if (!full) return <div>{inner}</div>;
+
+  // Full screen is a fixed overlay rather than a route, so the selection,
+  // the measured width and everything else survive the toggle — you come
+  // back to the same picture you left, not a reset one.
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 9000,
+      background: t.bg || "#f5f8f8", display: "flex", flexDirection: "column",
+      padding: "14px 18px 16px", boxSizing: "border-box" }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 12,
+        marginBottom: 10, flexShrink: 0 }}>
+        <b style={{ fontSize: 14.5, color: t.navy || "#10193b" }}>
+          Where every column comes from</b>
+        <span style={{ fontSize: 10.5, color: muted }}>
+          ribbon width is columns · click any box or ribbon to trace its path</span>
+        <button type="button" onClick={() => setFull(false)} style={{
+          marginLeft: "auto", background: "none",
+          border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderRadius: 3,
+          padding: "3px 10px", font: "inherit", fontSize: 10.5,
+          cursor: "pointer", color: t.accent || "#0f4775" }}>
+          ✕ close  ·  Esc</button>
+      </div>
+      <div style={{ flex: 1, minHeight: 0, overflow: "auto",
+        background: t.panel || "#fff", borderRadius: 6,
+        border: `1px solid ${t.panel2 || "#dfe6e9"}`, padding: "10px 14px 14px" }}>
+        {inner}
+      </div>
     </div>);
 }
 
@@ -278,7 +357,7 @@ const linkBtn = (t) => ({ background: "none", border: "none", padding: 0,
 // verdict order so the bands read the same way everywhere.
 // Exported for the render harness: both are pure, and the selection
 // traversal is much easier to assert on directly than through a click.
-export function buildFlowModel(flow) {
+export function buildFlowModel(flow, opt = {}) {
   const left = (flow && flow.left) || [];
   const right = (flow && flow.right) || [];
   const bypass = (flow && flow.bypass) || [];
@@ -310,8 +389,20 @@ export function buildFlowModel(flow) {
   new Set([...Min.keys(), ...Mout.keys()]).forEach((k) =>
     M.set(k, Math.max(Min.get(k) || 0, Mout.get(k) || 0)));
 
-  const CW = 132, W = 760, x0 = 0, x1 = (W - CW) / 2, x2 = W - CW;
-  const top = 30, gap = 9, minH = 26;
+  // THE CANVAS TAKES THE WIDTH IT IS GIVEN. It was fixed at 760 with a
+  // 132px node box, which truncated "HOLDINGDBO.POSITION_HIST" to
+  // "HOLDINGDBO.POSIT..." on a 2000px screen with most of the panel empty.
+  // Width comes from a measurement of the container now, and the node box
+  // and its label length are derived from it rather than guessed.
+  const W = Math.max(720, Math.round(opt.width || 760));
+  const CW = Math.max(132, Math.min(260, Math.round(W * 0.19)));
+  const x0 = 0, x1 = (W - CW) / 2, x2 = W - CW;
+  const top = 30, gap = 9, minH = 28;
+  // 11px Roboto averages a shade over 6px a character; leave the 9px inset
+  // at both ends. Being one character conservative costs an ellipsis on a
+  // name that would just have fitted, which is cheaper than a name that
+  // overruns its box.
+  const chars = Math.max(12, Math.floor((CW - 20) / 6.2));
   const span = Math.max(...[L, M, R].map((m) =>
     [...m.values()].reduce((a, b) => a + b, 0)), 1);
 
@@ -323,31 +414,61 @@ export function buildFlowModel(flow) {
   // tallest column off both ends of the canvas, which a render test caught
   // on a four-node left column. So: choose the unit, lay all three out, then
   // let the tallest one decide how tall the drawing is.
-  const unit = Math.min(12, Math.max(3.5, 320 / span));
-  const measure = (m) => {
+  const measureWith = (m, u) => {
     const k = m.size || 1;
-    return [...m.values()].reduce((a, n) => a + Math.max(minH, n * unit), 0)
+    return [...m.values()].reduce((a, n) => a + Math.max(minH, n * u), 0)
       + (k - 1) * gap;
   };
-  const tallest = Math.max(240, measure(L), measure(M), measure(R));
+  const tallestWith = (u) => Math.max(measureWith(L, u), measureWith(M, u),
+                                      measureWith(R, u));
+  let unit;
+  if (opt.height) {
+    // Fill the space available. The relation between unit and laid-out
+    // height is monotonic but not linear — the minH floors flatten it — so
+    // bisect rather than solve. Thirty steps is exact to well under a pixel.
+    const target = opt.height - top - 16;
+    let lo = 1, hi = 60;
+    for (let i = 0; i < 30; i++) {
+      const mid = (lo + hi) / 2;
+      if (tallestWith(mid) <= target) lo = mid; else hi = mid;
+    }
+    unit = lo;
+  } else {
+    unit = Math.min(14, Math.max(4, 380 / span));
+  }
+  const measure = (m) => measureWith(m, unit);
+  const tallest = Math.max(240, tallestWith(unit));
   const H = top + tallest + 16;
 
-  const lay = (m, x, col) => {
-    const list = [...m.entries()].sort((a, b) => b[1] - a[1]);
+  // ORDER THE COLUMNS TO UNCROSS THE RIBBONS. Sorting every column by size
+  // descending is the worst case for a Sankey: the biggest source and the
+  // biggest target both sit at the top whether or not they are connected,
+  // so every link between a big node and a small one crosses the width of
+  // the picture. With eight sources and seven tables that is a hairball,
+  // and the screenshot of the real data was exactly that.
+  //
+  // The standard fix, and a cheap one: sort each column by the average
+  // position of the nodes it connects to, sweeping right then left a few
+  // times. Size order is only the starting point.
+  const order = uncross(L, M, R, left, right, G, num);
+
+  const lay = (m, x, col, ids) => {
     let y = top + Math.max(0, (tallest - measure(m)) / 2);
     const out = new Map();
-    list.forEach(([id, n]) => {
+    ids.forEach((id) => {
+      const n = m.get(id) || 0;
       const h = Math.max(minH, n * unit);
       const inN = Min.get(id), outN = Mout.get(id);
-      const mismatch = x === x1 && inN != null && outN != null && inN !== outN;
-      out.set(id, { id, x, y, h, n, short: trunc(id, 17), col,
+      const mismatch = col === "M" && inN != null && outN != null && inN !== outN;
+      out.set(id, { id, x, y, h, n, short: trunc(id, chars), col,
         label: mismatch ? `${id} — ${inN} columns arrive, ${outN} leave` : id,
         c: id === "no SEI source" ? vc("NO_SOURCE") : "#5f87a7" });
       y += h + gap;
     });
     return out;
   };
-  const pl = lay(L, x0, "L"), pm = lay(M, x1, "M"), pr = lay(R, x2, "R");
+  const pl = lay(L, x0, "L", order.L), pm = lay(M, x1, "M", order.M),
+        pr = lay(R, x2, "R", order.R);
 
   const offA = {}, offB = {}, offC = {}, offD = {};
   const curve = (ax, ay, bx, by) => {
@@ -418,6 +539,58 @@ export function buildFlowModel(flow) {
 }
 
 const trunc = (s, n) => (String(s).length > n ? String(s).slice(0, n - 1) + "…" : String(s));
+
+// Barycentre ordering — the standard Sankey de-tangler, four sweeps of it.
+//
+// Each node moves to the weighted average position of the nodes it connects
+// to in the column just settled, then that column is re-sorted. Sweep right,
+// sweep left, repeat. It is not optimal — minimising crossings exactly is
+// NP-hard — but two round trips take a hairball down to something readable,
+// and it is deterministic, so the picture does not reshuffle between loads.
+//
+// Size order seeds it, and a node with no links keeps its seeded position
+// rather than collapsing to zero and jumping to the top.
+export function uncross(L, M, R, left, right, G, num) {
+  const bySize = (m) => [...m.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k);
+  let oL = bySize(L), oM = bySize(M), oR = bySize(R);
+
+  const edges = (rows, from, to) => rows.map((r) => ({
+    a: G(r, from) || (from === "src" ? "no SEI source" : "unmapped"),
+    b: G(r, to) || (to === "tgt" ? "(none)" : "unmapped"),
+    w: num(G(r, "n")) || 1 }));
+  const lm = edges(left, "src", "mid");
+  const mr = edges(right, "mid", "tgt");
+
+  // move `target` to follow `anchor`, using edges keyed a=anchor side
+  const sweep = (targetOrder, anchorOrder, es, targetIsB) => {
+    const pos = new Map(anchorOrder.map((id, i) => [id, i]));
+    const acc = new Map();
+    es.forEach((e) => {
+      const tId = targetIsB ? e.b : e.a;
+      const aId = targetIsB ? e.a : e.b;
+      const p = pos.get(aId);
+      if (p == null) return;
+      const cur = acc.get(tId) || { s: 0, w: 0 };
+      cur.s += p * e.w; cur.w += e.w;
+      acc.set(tId, cur);
+    });
+    const seed = new Map(targetOrder.map((id, i) => [id, i]));
+    return [...targetOrder].sort((x, y) => {
+      const bx = acc.get(x), by = acc.get(y);
+      const kx = bx && bx.w ? bx.s / bx.w : seed.get(x);
+      const ky = by && by.w ? by.s / by.w : seed.get(y);
+      return kx - ky || seed.get(x) - seed.get(y);
+    });
+  };
+
+  for (let i = 0; i < 2; i++) {
+    oM = sweep(oM, oL, lm, true);    // M follows L
+    oR = sweep(oR, oM, mr, true);    // R follows M
+    oM = sweep(oM, oR, mr, false);   // M follows R
+    oL = sweep(oL, oM, lm, false);   // L follows M
+  }
+  return { L: oL, M: oM, R: oR };
+}
 
 // ================================================================== evidence
 // Why nothing is proven. Four or five rows, each a different artefact held by
