@@ -1,0 +1,708 @@
+<title>PBDW in Business Terms</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500;700&display=swap">
+<style>
+/* Layout: a three-step drill — the estate in business words, one entity's
+   terms, then one term's whole story. Tokens are Lineage 360's own, because
+   this is a screen inside the app and not a separate document. */
+:root{
+  --bg:#f5f8f8; --panel:#fff; --panel2:#dfe6e9; --line:#c9d4dc; --sunk:#eef3f5;
+  --ink:#10193b; --sub:#4a5a68; --muted:#7b8894;
+  --accent:#0f4775; --ok:#159943; --warn:#e67e22; --bad:#c1113a; --info:#0091bf;
+  --src:#6d3ac0; --dwh:#0f4775;
+  --o-direct:#7b8894; --o-trim:#00a3a3; --o-cast:#0091bf; --o-decode:#7c3aed;
+  --o-derived:#e67e22; --o-constant:#b45309; --o-none:#c1113a;
+  --f-ui:"Roboto","Helvetica Neue",Arial,sans-serif;
+  --f-mono:"Roboto Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1419; --panel:#161e26; --panel2:#24303a; --line:#2e3b47; --sunk:#111922;
+  --ink:#e8eef4; --sub:#a9b8c6; --muted:#7d8d9c;
+  --accent:#5aa8e0; --ok:#3ec27a; --warn:#f0993f; --bad:#ef6b7f; --info:#4fb8e8;
+  --src:#a684ea; --dwh:#5aa8e0;
+  --o-direct:#8b9aa8; --o-trim:#3ecfcf; --o-cast:#4fb8e8; --o-decode:#a684ea;
+  --o-derived:#f0993f; --o-constant:#d79a4a; --o-none:#ef6b7f;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1419; --panel:#161e26; --panel2:#24303a; --line:#2e3b47; --sunk:#111922;
+  --ink:#e8eef4; --sub:#a9b8c6; --muted:#7d8d9c;
+  --accent:#5aa8e0; --ok:#3ec27a; --warn:#f0993f; --bad:#ef6b7f; --info:#4fb8e8;
+  --src:#a684ea; --dwh:#5aa8e0;
+  --o-direct:#8b9aa8; --o-trim:#3ecfcf; --o-cast:#4fb8e8; --o-decode:#a684ea;
+  --o-derived:#f0993f; --o-constant:#d79a4a; --o-none:#ef6b7f;
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-ui);
+  font-size:13.5px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{padding-block:18px;padding-inline:16px;max-width:1500px;margin:0 auto}
+h1{font-size:20px;font-weight:500;margin:0;letter-spacing:-.01em;text-wrap:balance}
+h2{font-size:16px;font-weight:500;margin:0;text-wrap:balance}
+.eyebrow{font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted)}
+.mono{font-family:var(--f-mono)}
+.sub{color:var(--sub)} .mut{color:var(--muted)}
+.rule{height:1px;background:var(--panel2);border:0;margin:16px 0}
+
+/* chrome ------------------------------------------------------------- */
+.views{display:inline-flex;background:var(--ink);border-radius:999px;padding:3px;gap:2px}
+.views button{font:inherit;font-size:11.5px;padding:4px 14px;border-radius:999px;
+  border:0;background:none;color:#c7d3de;cursor:pointer}
+.views button[aria-pressed="true"]{background:#2b9fe0;color:#fff;font-weight:500}
+.views button:focus-visible{outline:2px solid #2b9fe0;outline-offset:2px}
+.badge{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--sub);
+  border:1px solid var(--panel2);background:var(--panel);border-radius:999px;
+  padding:4px 12px}
+.badge i{width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0 6px}
+.crumb{display:flex;gap:7px;align-items:center;flex-wrap:wrap;font-size:12px;
+  color:var(--muted);margin:10px 0 16px;min-width:0}
+.crumb button{font:inherit;font-size:12px;background:none;border:0;padding:0;
+  color:var(--accent);cursor:pointer}
+.crumb button:hover{text-decoration:underline}
+.ghost{font:inherit;font-size:11px;padding:4px 11px;border-radius:3px;cursor:pointer;
+  border:1px solid var(--panel2);background:var(--panel);color:var(--accent)}
+.ghost[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.ghost:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.srch{font:inherit;font-size:12px;padding:6px 11px;border-radius:4px;
+  border:1px solid var(--line);background:var(--panel);color:var(--ink);width:230px;
+  max-width:100%}
+
+/* tiles --------------------------------------------------------------- */
+.tiles{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+  margin-bottom:18px}
+.tile{background:var(--panel);border:1px solid var(--panel2);border-radius:5px;
+  padding:13px 15px}
+.tile .n{font-size:26px;font-weight:500;letter-spacing:-.02em;line-height:1.15;
+  font-variant-numeric:tabular-nums}
+.tile .k{font-size:11.5px;color:var(--sub);margin-top:2px}
+.tile .w{font-size:10.5px;color:var(--muted);margin-top:5px;line-height:1.45}
+
+/* entity cards -------------------------------------------------------- */
+.cards{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(310px,1fr))}
+.card{background:var(--panel);border:1px solid var(--panel2);border-radius:6px;
+  padding:15px 16px;text-align:left;font:inherit;color:inherit;cursor:pointer;
+  display:flex;gap:14px;align-items:flex-start;width:100%}
+.card:hover{border-color:var(--accent)}
+.card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.card.flat{cursor:default;border-style:dashed}
+.card.flat:hover{border-color:var(--panel2)}
+.arc{flex-shrink:0}
+.card h3{margin:0;font-size:14.5px;font-weight:500;line-height:1.3}
+.card .meta{font-size:11.5px;color:var(--sub);margin-top:4px}
+.card .meta b{font-weight:500;color:var(--ink)}
+.chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+.chip{font-size:10px;padding:2px 8px;border-radius:999px;border:1px solid transparent;
+  white-space:nowrap}
+.chip.pii{background:color-mix(in srgb,var(--bad) 13%,transparent);color:var(--bad)}
+.chip.ok{background:color-mix(in srgb,var(--ok) 15%,transparent);color:var(--ok)}
+.chip.warn{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.chip.info{background:color-mix(in srgb,var(--info) 15%,transparent);color:var(--info)}
+.chip.grey{background:var(--sunk);color:var(--muted)}
+
+/* term rows ----------------------------------------------------------- */
+.fngroup{margin-top:20px}
+.fnhead{display:flex;align-items:baseline;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.rows{display:flex;flex-direction:column;gap:6px}
+.row{display:flex;gap:14px;align-items:center;width:100%;text-align:left;font:inherit;
+  color:inherit;background:var(--panel);border:1px solid var(--panel2);border-radius:5px;
+  padding:11px 14px;cursor:pointer}
+.row:hover{border-color:var(--accent)}
+.row:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.row .nm{font-size:13.5px;font-weight:500}
+.row .cd{font-family:var(--f-mono);font-size:10.5px;color:var(--muted);margin-left:7px}
+.row .df{font-size:11.5px;color:var(--sub);margin-top:2px;overflow:hidden;
+  text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical}
+.grow{flex:1;min-width:0}
+.dots{display:flex;align-items:center;gap:0;flex-shrink:0}
+.dots i{width:8px;height:8px;border-radius:50%;background:var(--panel2);display:block}
+.dots i.on{background:var(--dwh)}
+.dots i.src{background:var(--src)}
+.dots s{width:14px;height:1px;background:var(--panel2);display:block;
+  text-decoration:none}
+
+/* level 2 ------------------------------------------------------------- */
+.story{display:grid;gap:16px;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);
+  align-items:start}
+@media (max-width:900px){.story{grid-template-columns:1fr}}
+.box{background:var(--panel);border:1px solid var(--panel2);border-radius:6px;
+  padding:16px 18px}
+.termhead .t{font-size:22px;font-weight:500;letter-spacing:-.015em;line-height:1.2;
+  text-wrap:balance}
+.termhead .c{font-family:var(--f-mono);font-size:12px;color:var(--muted);margin-top:3px}
+.termdef{font-size:13.5px;color:var(--sub);margin-top:10px;max-width:68ch}
+
+/* journey */
+.journey{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding-bottom:4px}
+.stop{flex:1;min-width:132px;display:flex;flex-direction:column;gap:3px}
+.stop .lbl{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--muted)}
+.stop .who{font-family:var(--f-mono);font-size:10.5px;color:var(--ink);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.stop .whr{font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.stopdot{display:flex;align-items:center;gap:0;margin:5px 0 4px}
+.stopdot b{width:13px;height:13px;border-radius:50%;flex-shrink:0;display:block}
+.stopdot s{flex:1;height:2px;display:block;text-decoration:none;background:var(--panel2)}
+.hop{font-size:9.5px;color:var(--o-derived);font-weight:500;margin-top:1px}
+
+/* plain-English steps */
+.steps{display:flex;flex-direction:column;gap:11px;margin-top:4px}
+.step{display:flex;gap:11px;align-items:flex-start}
+.step .num{flex-shrink:0;width:21px;height:21px;border-radius:50%;
+  background:var(--oc);color:#fff;font-size:10.5px;font-weight:700;display:flex;
+  align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.step .body{min-width:0}
+.step .kind{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--oc)}
+.step .what{font-size:13px;margin-top:1px}
+.watch{display:flex;gap:7px;margin-top:5px;font-size:11.5px;color:var(--sub);
+  background:color-mix(in srgb,var(--warn) 9%,transparent);
+  border-left:2px solid var(--warn);border-radius:0 3px 3px 0;padding:6px 10px;
+  line-height:1.5}
+.watch b{color:var(--warn);font-weight:700;flex-shrink:0;font-size:9.5px;
+  letter-spacing:.06em;text-transform:uppercase;padding-top:1px}
+pre.sql{margin:10px 0 0;font-family:var(--f-mono);font-size:11px;line-height:1.75;
+  white-space:pre-wrap;word-break:break-word;background:var(--sunk);
+  border:1px solid var(--panel2);border-left:3px solid var(--o-cast);border-radius:3px;
+  padding:10px 12px;overflow:auto;color:var(--ink)}
+
+/* right column */
+.kv{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:12.5px}
+.kv dt{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);padding-top:3px;white-space:nowrap}
+.kv dd{margin:0;color:var(--sub);min-width:0;overflow-wrap:anywhere}
+.lands{display:flex;flex-direction:column;gap:8px}
+.land{border:1px solid var(--panel2);border-radius:4px;padding:9px 11px;
+  background:var(--sunk)}
+.land .tn{font-family:var(--f-mono);font-size:11.5px;color:var(--ink);
+  overflow-wrap:anywhere}
+.land .ty{font-size:11px;color:var(--sub);margin-top:2px}
+.verdict{display:flex;gap:9px;align-items:flex-start;font-size:12px;padding:10px 12px;
+  border-radius:4px;line-height:1.5}
+.verdict.agree{background:color-mix(in srgb,var(--ok) 11%,transparent);color:var(--sub)}
+.verdict.differ{background:color-mix(in srgb,var(--bad) 10%,transparent);color:var(--sub)}
+.verdict span:first-child{font-weight:700;flex-shrink:0}
+.verdict.agree span:first-child{color:var(--ok)}
+.verdict.differ span:first-child{color:var(--bad)}
+
+.legend{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:10.5px;color:var(--sub);
+  margin-top:12px;align-items:center}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;
+  vertical-align:-1px}
+.foot{margin-top:22px;font-size:11px;color:var(--muted);line-height:1.65;max-width:92ch}
+.foot b{color:var(--sub)}
+@media (max-width:520px){.srch{width:100%}.views button{padding:4px 10px}}
+</style>
+
+<div class="wrap">
+  <h1>Where PBDW data comes from, in business terms</h1>
+  <p class="sub" style="font-size:12.5px;margin:6px 0 0;max-width:80ch">
+    Every figure in the warehouse starts life as something the business named and
+    defined. This view starts there — with the name, not the table — and follows
+    it through to where it lands, saying in plain words what happens on the way.</p>
+
+  <div class="bar">
+    <span class="views">
+      <button aria-pressed="true">Business view</button>
+      <button aria-pressed="false">Technical view</button>
+      <button aria-pressed="false">Source view</button>
+    </span>
+    <span class="badge"><i></i>PBDW · Non-SEI · AddVantage</span>
+    <span style="margin-left:auto;display:flex;gap:7px;align-items:center">
+      <input class="srch" id="q" type="search" placeholder="Search a business term…"
+             aria-label="Search a business term">
+      <button class="ghost" id="tech" aria-pressed="false">Show technical detail</button>
+    </span>
+  </div>
+
+  <nav class="crumb" id="crumb" aria-label="Breadcrumb"></nav>
+  <div id="view"></div>
+
+  <p class="foot"><b>Mockup.</b> The entities, business functions, field codes
+    (<span class="mono">BI/2-1</span> and its canonical form
+    <span class="mono">BI_2_1</span>), stage names and warehouse tables are the
+    real shapes this app already holds — <span class="mono">LEGACY_DICTIONARY</span>
+    supplies the business term, definition, master, function and privacy class, and
+    <span class="mono">LEGACY_LINEAGE</span> supplies the journey and the rules.
+    The plain-English sentences and the “watch for” notes are generated from the
+    same rule parser the Technical view’s operator graph already uses, so a chip
+    can never say one thing while the graph draws another. Figures here are
+    illustrative until the view is wired up.</p>
+</div>
+
+<script>
+"use strict";
+/* ------------------------------------------------------------------ data */
+/* Operation vocabulary. One parse, three renderings: the chip on a row, the
+   operator graph in Technical view, and the sentence here. A business
+   audience does not need the expression — it needs to know what changed and
+   what could go wrong. */
+const OP = {
+  direct:   {c:"var(--o-direct)",   k:"Copied as-is"},
+  trim:     {c:"var(--o-trim)",     k:"Tidied"},
+  cast:     {c:"var(--o-cast)",     k:"Stored as"},
+  decode:   {c:"var(--o-decode)",   k:"Translated"},
+  derived:  {c:"var(--o-derived)",  k:"Calculated"},
+  constant: {c:"var(--o-constant)", k:"Set by the system"},
+  none:     {c:"var(--o-none)",     k:"Not supplied"},
+};
+const STAGES = ["AddVantage file","Landed","Cleaned","PBDW"];
+
+const T = (o) => ({pii:false, required:false, status:"Active", steps:[], lands:[], ...o});
+
+const TERMS = [
+ T({code:"BI/2-1", norm:"BI_2_1", term:"Interested Party Number",
+   master:"Interested Party Master", fn:"Basic Information",
+   def:"The number BBH assigns to a person or organisation holding an interest in an account. It is the identifier every other interested-party record is filed under, and it never changes for the life of the party.",
+   required:true,
+   journey:[["Addv-MSTR-IPN","BI/2-1"],["STG1_FIS_INTERESTED_PARTY","IP_NUM"],
+            ["STG2_IP","IP_NUMBER"],["DIM_IP_REL_REMIT_BLOCKS","INTERESTED_PARTY_NUMBER"]],
+   hops:["tidied","",""],
+   steps:[{op:"trim", what:"Spaces before and after the number are removed.",
+           watch:null},
+          {op:"direct", what:"The number itself is carried through to the warehouse unchanged.",
+           watch:null}],
+   sql:"ltrim(rtrim(IP_NUM))",
+   lands:[["DIM_IP_REL_REMIT_BLOCKS","INTERESTED_PARTY_NUMBER","text, up to 20 characters"],
+          ["DIM_IP_REL_STMT_BLOCKS","INTERESTED_PARTY_NUMBER","text, up to 20 characters"]],
+   expects:"INTERESTED_PARTY_NUMBER", agrees:true}),
+
+ T({code:"BI/2-4", norm:"BI_2_4", term:"Registered Holder Name",
+   master:"Interested Party Master", fn:"Basic Information",
+   def:"The name of the party as it is registered with the transfer agent. This is the name that appears on statements and remittance advices, so it is the name a client sees.",
+   pii:true, required:true,
+   journey:[["Addv-MSTR-IPN","BI/2-4"],["STG1_FIS_INTERESTED_PARTY","IP_NAME"],
+            ["STG2_IP","IP_LONG_NAME"],["DIM_IP_REL_STMT_BLOCKS","HOLDER_NAME"]],
+   hops:["tidied","shortened",""],
+   steps:[{op:"trim", what:"Spaces before and after the name are removed.", watch:null},
+          {op:"cast", what:"Only the first 80 characters are kept.",
+           watch:"A registered name longer than 80 characters is cut short in the warehouse, and the cut version is what appears on a statement. AddVantage allows up to 120."}],
+   sql:"substr(ltrim(rtrim(IP_NAME)),1,80)",
+   lands:[["DIM_IP_REL_STMT_BLOCKS","HOLDER_NAME","text, up to 80 characters"]],
+   expects:"HOLDER_NAME", agrees:true}),
+
+ T({code:"TX/1-1", norm:"TX_1_1", term:"Tax Identification Number",
+   master:"Interested Party Master", fn:"Tax & Regulatory",
+   def:"The party's taxpayer identification number, used for withholding and for regulatory reporting.",
+   pii:true, required:true, status:"Active",
+   journey:[["Addv-MSTR-IPN","TX/1-1"],["STG1_FIS_INTERESTED_PARTY","TAX_ID"],
+            ["STG2_IP","TAX_ID"],[null,null]],
+   hops:["tidied","",""],
+   steps:[{op:"none", what:"This is defined and it arrives in the cleaned stage, but no warehouse column takes it.",
+           watch:"Anyone reporting from PBDW cannot get this figure today. It stops one step short of the warehouse, which is different from it not existing."}],
+   sql:"",
+   lands:[], expects:"TAX_IDENTIFIER", agrees:false,
+   note:"The dictionary records a PBDW field of TAX_IDENTIFIER, but no such column exists in the warehouse."}),
+
+ T({code:"RM/1-1", norm:"RM_1_1", term:"Remittance Block Indicator",
+   master:"Interested Party Master", fn:"Remittance",
+   def:"Whether payments to this party are currently blocked. A block stops a remittance from being released without stopping the underlying entitlement.",
+   required:true,
+   journey:[["Addv-MSTR-IPN","RM/1-1"],["STG1_FIS_IP_REMIT","BLOCK_IND"],
+            ["STG2_IP_REMIT","BLOCK_FLAG"],["DIM_IP_REL_REMIT_BLOCKS","ACTIVE_IND"]],
+   hops:["tidied","translated",""],
+   steps:[{op:"trim", what:"Spaces around the flag are removed.", watch:null},
+          {op:"decode", what:"The code is translated: “Y” becomes blocked, anything else becomes not blocked.",
+           watch:"Only “Y” is recognised. If AddVantage ever adds a second block reason code — a “P” for partial, say — it would be recorded as not blocked, and the figure would look valid while being wrong."}],
+   sql:"decode(BLOCK_IND,'Y','Y','N')",
+   lands:[["DIM_IP_REL_REMIT_BLOCKS","ACTIVE_IND","single character"]],
+   expects:"ACTIVE_IND", agrees:true}),
+
+ T({code:"RM/1-4", norm:"RM_1_4", term:"Block Number",
+   master:"Interested Party Master", fn:"Remittance",
+   def:"The sequence number of the block placed against this party, so that several blocks over time can be told apart.",
+   journey:[["Addv-MSTR-IPN","RM/1-4"],["STG1_FIS_IP_REMIT","BLOCK_SEQ"],
+            ["STG2_IP_REMIT","BLOCK_SEQ"],["DIM_IP_REL_REMIT_BLOCKS","BLOCK_NUMBER"]],
+   hops:["","stored as a number",""],
+   steps:[{op:"cast", what:"If the file supplies nothing, zero is used.",
+           watch:"A blank and a genuine zero cannot be told apart once in the warehouse. A report counting blocks would treat a missing sequence as block zero."},
+          {op:"cast", what:"The value is stored as a number rather than as text, so it sorts and totals correctly.",
+           watch:null}],
+   sql:"to_number(nvl(BLOCK_SEQ,0))",
+   lands:[["DIM_IP_REL_REMIT_BLOCKS","BLOCK_NUMBER","whole number"]],
+   expects:"BLOCK_NUMBER", agrees:true}),
+
+ T({code:"RM/2-1", norm:"RM_2_1", term:"Block Effective Date",
+   master:"Interested Party Master", fn:"Remittance",
+   def:"The date from which the block applies. Before this date the remittance is released normally.",
+   journey:[["Addv-MSTR-IPN","RM/2-1"],["STG1_FIS_IP_REMIT","BLOCK_DT"],
+            ["STG2_IP_REMIT","BLOCK_DATE"],["DIM_IP_REL_REMIT_BLOCKS","EFFECTIVE_DATE"]],
+   hops:["","read as a date",""],
+   steps:[{op:"cast", what:"The date is read in US order — month, then day, then year.",
+           watch:"If a file is ever written day-first, 03/04 would be read as 4 March instead of 3 April. Nothing would fail; the date would simply be wrong for eleven days of every month."}],
+   sql:"to_date(BLOCK_DT,'MM/DD/YYYY')",
+   lands:[["DIM_IP_REL_REMIT_BLOCKS","EFFECTIVE_DATE","date"]],
+   expects:"EFFECTIVE_DATE", agrees:true}),
+
+ T({code:"RL/1-1", norm:"RL_1_1", term:"Relationship Type",
+   master:"Interested Party Master", fn:"Relationships",
+   def:"How this party relates to the account — beneficial owner, authorised signatory, co-fiduciary, remittance recipient and so on.",
+   required:true,
+   journey:[["Addv-MSTR-IPN","RL/1-1"],["STG1_FIS_IP_REL","REL_CD"],
+            ["STG2_IP_REL","REL_TYPE"],["DIM_IP_REL_REMIT_BLOCKS","IP_RELATIONSHIP_KEY"]],
+   hops:["","looked up",""],
+   steps:[{op:"decode", what:"The two-letter relationship code is looked up and replaced by the key of the matching relationship type.",
+           watch:"A code with no matching entry produces no key at all, and the party then appears in the warehouse with no relationship to the account. 3 of the 14 codes in use have no entry today."}],
+   sql:"(SELECT r.ip_relationship_key FROM RULESDBO.IP_RELATIONSHIP r\n  WHERE r.rel_code = STG2_IP_REL.REL_TYPE)",
+   lands:[["DIM_IP_REL_REMIT_BLOCKS","IP_RELATIONSHIP_KEY","whole number"],
+          ["DIM_IP_REL_STMT_BLOCKS","IP_RELATIONSHIP_KEY","whole number"]],
+   expects:"IP_RELATIONSHIP_KEY", agrees:true}),
+
+ T({code:"SR/3-2", norm:"SR_3_2", term:"Statement Suppression Reason",
+   master:"Interested Party Master", fn:"Statements & Reporting",
+   def:"Why statements to this party are being withheld — a returned address, a legal hold, or a client instruction.",
+   journey:[["Addv-MSTR-IPN","SR/3-2"],["STG1_FIS_IP_STMT","SUPPRESS_RSN"],
+            [null,null],[null,null]],
+   hops:["","",""],
+   steps:[{op:"none", what:"This reaches the landed stage and goes no further. Nothing in the warehouse records it.",
+           watch:"The warehouse can tell you that statements are suppressed but not why. Any report needing the reason has to go back to AddVantage."}],
+   sql:"", lands:[], expects:null, agrees:null}),
+
+ T({code:"BI/1-1", norm:"BI_1_1", term:"Account Number",
+   master:"Account Master", fn:"Basic Information",
+   def:"The account the interested party relates to. This is the number used on every client-facing document and the join between almost every table in the warehouse.",
+   required:true,
+   journey:[["Addv-MSTR-ACC","BI/1-1"],["STG1_FIS_MASTER_ACCOUNT_EOD","ACCT_NO"],
+            ["STG2_ACCOUNT","ACCOUNT_NUMBER"],["DIM_IP_REL_REMIT_BLOCKS","ACCOUNT_NUMBER"]],
+   hops:["tidied","",""],
+   steps:[{op:"trim", what:"Spaces before and after the account number are removed.",
+           watch:null},
+          {op:"direct", what:"The number is carried through to the warehouse unchanged.",
+           watch:null}],
+   sql:"ltrim(rtrim(ACCT_NO))",
+   lands:[["DIM_IP_REL_REMIT_BLOCKS","ACCOUNT_NUMBER","text, up to 20 characters"],
+          ["DIM_IP_REL_STMT_BLOCKS","ACCOUNT_NUMBER","text, up to 20 characters"]],
+   expects:"ACCOUNT_NUMBER", agrees:true}),
+
+ T({code:"BI/1-9", norm:"BI_1_9", term:"Account Short Name",
+   master:"Account Master", fn:"Basic Information",
+   def:"The abbreviated account name used where the full registered name will not fit, such as on a remittance advice line.",
+   journey:[["Addv-MSTR-ACC","BI/1-9"],["STG1_FIS_MASTER_ACCOUNT_EOD","ACCT_SHORT_NM"],
+            ["STG2_ACCOUNT","ACCOUNT_SHORT_NAME"],[null,null]],
+   hops:["tidied","",""],
+   steps:[{op:"none", what:"Defined and cleaned, but no warehouse column takes it.", watch:null}],
+   sql:"", lands:[], expects:null, agrees:null}),
+];
+
+/* Entities, with the counts a business owner asks for rather than table counts. */
+const ENTITIES = [
+  {name:"Interested Party Master", defined:184, delivered:139, pii:26, changed:71,
+   blurb:"People and organisations with an interest in an account"},
+  {name:"Account Master", defined:412, delivered:287, pii:31, changed:134,
+   blurb:"The accounts themselves and how they are set up"},
+  {name:"Master Account Master", defined:96, delivered:74, pii:4, changed:22,
+   blurb:"Groupings of accounts under one relationship"},
+  {name:"Security Issue Master", defined:238, delivered:201, pii:0, changed:88,
+   blurb:"The instruments held in those accounts"},
+  {name:"Beneficiary Submaster", defined:57, delivered:31, pii:19, changed:12,
+   blurb:"Beneficiaries recorded against an account"},
+  {name:"Co-fiduciary Submaster", defined:43, delivered:18, pii:11, changed:7,
+   blurb:"Parties sharing fiduciary responsibility"},
+];
+const UNTERMED = 63;   // warehouse columns with no business definition
+
+/* ----------------------------------------------------------------- state */
+const el = (s) => document.querySelector(s);
+let level = 0, entity = null, term = null, q = "", tech = false;
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
+  (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const termsOf = (e) => TERMS.filter((t) => t.master === e);
+const matches = (t) => !q || `${t.term} ${t.code} ${t.fn} ${t.def}`
+  .toLowerCase().includes(q.toLowerCase());
+const state = (t) => !t.lands.length ? "none"
+  : (t.steps.some((s) => s.op !== "direct" && s.op !== "none") ? "changed" : "asis");
+
+/* --------------------------------------------------------------- pieces */
+function arc(pct, size) {
+  const r = (size - 6) / 2, c = 2 * Math.PI * r, on = (pct / 100) * c;
+  const col = pct >= 80 ? "var(--ok)" : pct >= 50 ? "var(--warn)" : "var(--bad)";
+  return `<svg class="arc" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"
+      role="img" aria-label="${pct}% delivered">
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="var(--panel2)"
+      stroke-width="4"></circle>
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${col}"
+      stroke-width="4" stroke-linecap="round" stroke-dasharray="${on.toFixed(1)} ${c.toFixed(1)}"
+      transform="rotate(-90 ${size/2} ${size/2})"></circle>
+    <text x="${size/2}" y="${size/2 + 4}" text-anchor="middle" font-family="var(--f-ui)"
+      font-size="${size > 50 ? 13 : 11}" font-weight="500" fill="var(--ink)"
+      >${pct}%</text></svg>`;
+}
+
+const dots = (t) => {
+  const j = t.journey;
+  return `<span class="dots" title="${esc(j.filter((x)=>x[0]).length)} of 4 stages">`
+    + j.map((x, i) => `${i ? '<s></s>' : ''}<i class="${
+        !x[0] ? "" : i === 0 ? "src" : "on"}"></i>`).join("") + `</span>`;
+};
+
+/* ------------------------------------------------------------ level 0 */
+function level0() {
+  const defined = ENTITIES.reduce((a, e) => a + e.defined, 0);
+  const delivered = ENTITIES.reduce((a, e) => a + e.delivered, 0);
+  const changed = ENTITIES.reduce((a, e) => a + e.changed, 0);
+  const pii = ENTITIES.reduce((a, e) => a + e.pii, 0);
+
+  const tiles = [
+    [defined, "things the business defines",
+     "Named and described in the AddVantage dictionary."],
+    [delivered, "of them reach PBDW",
+     `${defined - delivered} are defined but never arrive — the gap a warehouse-first view cannot show you.`],
+    [changed, "change on the way",
+     "Rounded, translated, shortened or calculated. The rest arrive exactly as sent."],
+    [pii, "hold personal data",
+     "Carried through to the warehouse and subject to the same handling rules there."],
+  ];
+
+  return `
+    <div class="tiles">${tiles.map(([n, k, w]) => `
+      <div class="tile"><div class="n">${n}</div><div class="k">${esc(k)}</div>
+        <div class="w">${esc(w)}</div></div>`).join("")}</div>
+
+    <h2>By business entity</h2>
+    <p class="mut" style="font-size:11.5px;margin:3px 0 12px">
+      Pick the thing you work with, not the table it happens to live in.</p>
+    <div class="cards">
+      ${ENTITIES.map((e) => {
+        const pct = Math.round((e.delivered / e.defined) * 100);
+        return `<button class="card" data-ent="${esc(e.name)}">
+          ${arc(pct, 56)}
+          <span class="grow">
+            <h3>${esc(e.name)}</h3>
+            <div class="meta">${esc(e.blurb)}</div>
+            <div class="meta"><b>${e.delivered}</b> of <b>${e.defined}</b> reach PBDW</div>
+            <div class="chips">
+              <span class="chip info">${e.changed} change on the way</span>
+              ${e.pii ? `<span class="chip pii">${e.pii} personal data</span>` : ""}
+              ${e.defined - e.delivered
+                ? `<span class="chip warn">${e.defined - e.delivered} not delivered</span>` : ""}
+            </div>
+          </span></button>`;
+      }).join("")}
+
+      <div class="card flat">
+        ${arc(0, 56)}
+        <span class="grow">
+          <h3>No business definition</h3>
+          <div class="meta">${UNTERMED} warehouse columns have no entry in the
+            dictionary, so they cannot appear above.</div>
+          <div class="meta mut" style="margin-top:6px">Most are housekeeping —
+            load dates, batch numbers, surrogate keys. Some are not. This card
+            stays here so the count is never hidden by the view that omits them.</div>
+        </span></div>
+    </div>`;
+}
+
+/* ------------------------------------------------------------ level 1 */
+function level1() {
+  const all = termsOf(entity), rows = all.filter(matches);
+  const e = ENTITIES.find((x) => x.name === entity) || {};
+  const byFn = {};
+  rows.forEach((t) => (byFn[t.fn] = byFn[t.fn] || []).push(t));
+
+  return `
+    <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;
+                margin-bottom:6px">
+      ${arc(e.defined ? Math.round((e.delivered / e.defined) * 100) : 0, 64)}
+      <div class="grow" style="min-width:240px">
+        <h2>${esc(entity)}</h2>
+        <p class="sub" style="font-size:12.5px;margin:4px 0 0">${esc(e.blurb || "")} ·
+          <b>${e.delivered}</b> of <b>${e.defined}</b> reach PBDW</p>
+      </div>
+    </div>
+    ${rows.length !== all.length
+      ? `<p class="mut" style="font-size:11.5px">${rows.length} of ${all.length}
+         match “${esc(q)}”.</p>` : ""}
+    ${!rows.length ? `<p class="sub">Nothing matches that search.</p>` : ""}
+    ${Object.keys(byFn).map((fn) => `
+      <div class="fngroup">
+        <div class="fnhead">
+          <span class="eyebrow">${esc(fn)}</span>
+          <span class="mut" style="font-size:11px">${byFn[fn].length} term${
+            byFn[fn].length === 1 ? "" : "s"}</span>
+        </div>
+        <div class="rows">${byFn[fn].map((t) => {
+          const st = state(t);
+          return `<button class="row" data-term="${esc(t.norm)}">
+            <span class="grow">
+              <span class="nm">${esc(t.term)}</span><span class="cd">${esc(t.code)}</span>
+              <div class="df">${esc(t.def)}</div>
+            </span>
+            <span class="chips" style="margin:0;flex-shrink:0">
+              ${t.pii ? `<span class="chip pii">personal data</span>` : ""}
+              ${st === "none" ? `<span class="chip warn">not delivered</span>`
+                : st === "changed" ? `<span class="chip info">changes on the way</span>`
+                : `<span class="chip ok">arrives as sent</span>`}
+            </span>
+            ${dots(t)}
+          </button>`;
+        }).join("")}</div>
+      </div>`).join("")}`;
+}
+
+/* ------------------------------------------------------------ level 2 */
+function level2() {
+  const t = TERMS.find((x) => x.norm === term);
+  if (!t) return "";
+  const COL = ["var(--src)", "var(--o-trim)", "var(--info)", "var(--dwh)"];
+
+  const journey = `
+    <div class="journey">${t.journey.map((stop, i) => {
+      const live = Boolean(stop[0]);
+      const hop = i < 3 ? (t.hops[i] || "") : "";
+      return `<div class="stop">
+        <div class="lbl">${esc(STAGES[i])}</div>
+        <div class="stopdot">
+          <b style="background:${live ? COL[i] : "var(--panel2)"}"></b>
+          ${i < 3 ? `<s style="background:${
+            t.journey[i+1][0] ? "var(--panel2)" : "transparent"}"></s>` : ""}
+        </div>
+        <div class="who">${live ? esc(stop[1]) : "—"}</div>
+        <div class="whr">${live ? esc(stop[0]) : "does not reach here"}</div>
+        ${hop ? `<div class="hop">${esc(hop)} →</div>` : ""}
+      </div>`;
+    }).join("")}</div>`;
+
+  const steps = `<div class="steps">` + t.steps.map((s, i) => `
+    <div class="step" style="--oc:${OP[s.op].c}">
+      <span class="num">${i + 1}</span>
+      <span class="body">
+        <div class="kind">${esc(OP[s.op].k)}</div>
+        <div class="what">${esc(s.what)}</div>
+        ${s.watch ? `<div class="watch"><b>Watch</b><span>${esc(s.watch)}</span></div>` : ""}
+      </span>
+    </div>`).join("") + `</div>`;
+
+  const verdict = t.agrees === null
+    ? `<div class="verdict differ"><span>No mapping</span><span>The dictionary does not
+        say where this should land, and nothing in the warehouse takes it.</span></div>`
+    : t.agrees
+    ? `<div class="verdict agree"><span>Agrees</span><span>The dictionary says this
+        becomes <span class="mono">${esc(t.expects)}</span>, and that is where the
+        lineage puts it.</span></div>`
+    : `<div class="verdict differ"><span>Disagrees</span><span>${esc(t.note || "")}</span></div>`;
+
+  return `
+    <div class="story">
+      <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+        <div class="box termhead">
+          <div class="t">${esc(t.term)}</div>
+          <div class="c">${esc(t.code)} · canonical ${esc(t.norm)} ·
+            ${esc(t.master)} · ${esc(t.fn)}</div>
+          <div class="chips" style="margin-top:9px">
+            ${t.pii ? `<span class="chip pii">personal data</span>` : ""}
+            ${t.required ? `<span class="chip grey">required</span>` : ""}
+            <span class="chip grey">${esc(t.status)}</span>
+            ${t.lands.length
+              ? `<span class="chip ok">reaches PBDW</span>`
+              : `<span class="chip warn">does not reach PBDW</span>`}
+          </div>
+          <p class="termdef">${esc(t.def)}</p>
+        </div>
+
+        <div class="box">
+          <div class="eyebrow" style="margin-bottom:11px">Its journey</div>
+          ${journey}
+        </div>
+
+        <div class="box">
+          <div class="eyebrow" style="margin-bottom:11px">What happens to it</div>
+          ${steps}
+          ${tech && t.sql
+            ? `<pre class="sql">${esc(t.sql)}</pre>`
+            : t.sql
+            ? `<p class="mut" style="font-size:11px;margin:11px 0 0">The rule behind
+               these sentences is written in SQL — turn on <b>Show technical
+               detail</b> to read it as the developer wrote it.</p>` : ""}
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+        <div class="box">
+          <div class="eyebrow" style="margin-bottom:10px">Where it ends up</div>
+          ${t.lands.length ? `<div class="lands">${t.lands.map(([tb, c, ty]) => `
+            <div class="land"><div class="tn">${esc(tb)}.${esc(c)}</div>
+              <div class="ty">${esc(ty)}</div></div>`).join("")}</div>`
+            : `<p class="sub" style="margin:0;font-size:12.5px">Nowhere. This term is
+               defined by the business and does not reach the warehouse, so no report
+               built on PBDW can show it.</p>`}
+        </div>
+
+        <div class="box">
+          <div class="eyebrow" style="margin-bottom:10px">Does the dictionary agree?</div>
+          ${verdict}
+        </div>
+
+        <div class="box">
+          <div class="eyebrow" style="margin-bottom:10px">Governance</div>
+          <dl class="kv">
+            <dt>Personal data</dt><dd>${t.pii ? "Yes — handle under the client data policy"
+              : "No"}</dd>
+            <dt>Required</dt><dd>${t.required ? "Yes — AddVantage will not accept a blank"
+              : "Optional in AddVantage"}</dd>
+            <dt>Status</dt><dd>${esc(t.status)}</dd>
+            <dt>Defined in</dt><dd>${esc(t.master)}, ${esc(t.fn)}</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend">
+      ${["trim","cast","decode","derived","direct","none"].map((k) =>
+        `<span><i style="background:${OP[k].c}"></i>${esc(OP[k].k)}</span>`).join("")}
+      <span style="margin-left:auto" class="mut">Every sentence above comes from the
+        same rule the Technical view draws as a graph.</span>
+    </div>`;
+}
+
+/* --------------------------------------------------------------- render */
+function crumb() {
+  const parts = [`<button data-go="0">PBDW</button>`];
+  if (level >= 1) parts.push(`<span>›</span>`,
+    level === 1 ? `<span>${esc(entity)}</span>`
+                : `<button data-go="1">${esc(entity)}</button>`);
+  if (level === 2) {
+    const t = TERMS.find((x) => x.norm === term);
+    parts.push(`<span>›</span><span>${esc(t ? t.term : "")}</span>`);
+  }
+  el("#crumb").innerHTML = parts.join(" ");
+}
+function draw() {
+  crumb();
+  el("#view").innerHTML = level === 0 ? level0() : level === 1 ? level1() : level2();
+}
+
+document.addEventListener("click", (e) => {
+  const g = e.target.closest("[data-go]");
+  if (g) { level = +g.dataset.go; if (level === 0) entity = null; term = null;
+           draw(); window.scrollTo({top:0, behavior:"smooth"}); return; }
+  const c = e.target.closest("[data-ent]");
+  if (c) { entity = c.dataset.ent; level = 1; q = ""; el("#q").value = "";
+           draw(); window.scrollTo({top:0, behavior:"smooth"}); return; }
+  const r = e.target.closest("[data-term]");
+  if (r) { term = r.dataset.term; level = 2;
+           draw(); window.scrollTo({top:0, behavior:"smooth"}); return; }
+});
+el("#q").addEventListener("input", (e) => {
+  q = e.target.value.trim();
+  // Searching from the entity list jumps into the entity that holds the match,
+  // because a business term is what people know and its master is not.
+  if (level === 0 && q) {
+    const hit = TERMS.find(matches);
+    if (hit) { entity = hit.master; level = 1; }
+  }
+  draw();
+});
+el("#tech").addEventListener("click", () => {
+  tech = !tech;
+  el("#tech").setAttribute("aria-pressed", String(tech));
+  el("#tech").textContent = tech ? "Hide technical detail" : "Show technical detail";
+  draw();
+});
+
+// Open on a term, not on an empty shell: the point of the screen is the story
+// a single term tells, and the estate view is one click back up the crumb.
+entity = "Interested Party Master"; term = "RM_1_1"; level = 2;
+draw();
+</script>
