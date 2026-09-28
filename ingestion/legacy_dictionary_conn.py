@@ -128,6 +128,39 @@ RICH_HEADERS = {
 }
 
 
+# TABLE CATALOG sheet — a business name and a sentence per WAREHOUSE TABLE.
+#
+# WHY A THIRD SHEET AND NOT MORE ROWS IN "ALL". legacy_dictionary's grain is
+# one row per SOURCE FIELD: dict_key is literally system:field_code_norm:master,
+# field_code_norm is NOT NULL and in the primary key, and source_system holds
+# ADDVANTAGE / CRD / STAR. A warehouse table has no field code and no legacy
+# source system, so putting one in that table means inventing both — and then
+# /systems reports PBDW as a legacy source with 176 assets, /masters and
+# /dictionary list tables among field definitions, /business-def looks them up
+# by a code they do not have, and the group resolvers count rows that can
+# never join. Same table, two meanings, six consumers disagreeing about which:
+# the exact shape of the bug that emptied the Business view this week.
+#
+# So the ROWS live in business_catalog, and the WORKBOOK stays one workbook.
+# Same file, same ingest step, same command — one more sheet.
+CATALOG_HEADERS = {
+    "table_name":   {"table", "table name", "dwh table", "warehouse table",
+                     "dwh target table", "target table", "physical table"},
+    "business_name": {"business name", "business term", "friendly name",
+                      "display name", "name"},
+    "description":  {"business description", "description", "what it holds",
+                     "definition"},
+    "grain":        {"grain", "one row per", "granularity"},
+    "group_name":   {"functional group", "group", "business group",
+                     "suggested group", "domain"},
+    "is_history":   {"is history", "history", "history flag"},
+    "is_staging":   {"is staging", "staging", "temp", "is temp"},
+    "confidence":   {"confidence", "certainty"},
+    "review_status": {"review status", "status", "reviewed"},
+    "reviewed_by":  {"reviewed by", "owner", "reviewer"},
+}
+
+
 def _s(v):
     if v is None:
         return None
@@ -192,12 +225,13 @@ class LegacyDictionaryConnector:
     name = "legacy_dictionary"
 
     def __init__(self, sources, dict_sheet=None, lineage_sheet=None, load_lineage=False,
-                 rich_sheet=None):
+                 rich_sheet=None, catalog_sheet=None):
         # sources: list of (source_system_or_None, xlsx_path, data_source)
         self.sources = [t if len(t) == 3 else (t[0], t[1], "PBDW") for t in sources]
         self.dict_sheet = dict_sheet or "ALL"
         self.lineage_sheet = lineage_sheet or "DWH ALL"
         self.rich_sheet = rich_sheet            # None -> auto-detect
+        self.catalog_sheet = catalog_sheet      # None -> auto-detect
         self.load_lineage = load_lineage
 
     @classmethod
@@ -233,23 +267,26 @@ class LegacyDictionaryConnector:
             lineage_sheet=os.environ.get("CP_LEGACY_LINEAGE_SHEET"),
             load_lineage=os.environ.get("CP_LEGACY_LINEAGE_FROM_XLSX", "0") == "1",
             rich_sheet=os.environ.get("CP_LEGACY_LINEAGE_SHEET_RICH"),
+            catalog_sheet=os.environ.get("CP_LEGACY_TABLE_CATALOG_SHEET"),
         )
 
     # ------------------------------------------------------------------ parse
     def parse(self):
-        dict_rows, lineage_rows = [], []
+        dict_rows, lineage_rows, catalog_rows = [], [], []
         for system, path, ds in self.sources:
-            d, l = self._parse_one(system, path, ds)
+            d, l, c = self._parse_one(system, path, ds)
             dict_rows.extend(d)
             lineage_rows.extend(l)
-        log.info("legacy_dictionary: %d definitions, %d lineage rows parsed from %d source(s)",
-                 len(dict_rows), len(lineage_rows), len(self.sources))
-        return {"dict": dict_rows, "lineage": lineage_rows}
+            catalog_rows.extend(c)
+        log.info("legacy_dictionary: %d definitions, %d lineage rows, %d table "
+                 "descriptions parsed from %d source(s)",
+                 len(dict_rows), len(lineage_rows), len(catalog_rows), len(self.sources))
+        return {"dict": dict_rows, "lineage": lineage_rows, "catalog": catalog_rows}
 
     def _parse_one(self, system, path, ds="PBDW"):
         if not os.path.exists(path):
             log.warning("legacy dictionary workbook not found: %s (skipping)", path)
-            return [], []
+            return [], [], []
         wb = load_workbook(path, data_only=True, read_only=True)
 
         # ---- dictionary sheet (default "ALL") — warehouse-agnostic; parsed
@@ -277,12 +314,93 @@ class LegacyDictionaryConnector:
             log.info("legacy_dictionary: %s [%s] -> %d lineage rows "
                      "(%d rich, %d from 4-col sheet)",
                      system, ds, len(lineage_rows), len(rich), len(simple))
-        return dict_rows, lineage_rows
+
+        # ---- table catalogue: optional third sheet, absent in older
+        # workbooks. Its absence is normal and silent; the Business view
+        # falls back to the physical name, which is what it shows today.
+        catalog_rows = []
+        cat_ws = self._find_catalog_sheet(wb)
+        if cat_ws is not None:
+            catalog_rows = self._parse_catalog_sheet(cat_ws, path, ds)
+        return dict_rows, lineage_rows, catalog_rows
+
+    def _find_catalog_sheet(self, wb):
+        """Named by CP_LEGACY_TABLE_CATALOG_SHEET, else the first sheet whose
+        header carries a business-name column beside a table column. The
+        lineage sheets are skipped explicitly: the rich sheet also has a
+        target-table column, and matching it here would load 2,700 lineage
+        rows as table descriptions."""
+        if self.catalog_sheet:
+            return wb[self.catalog_sheet] if self.catalog_sheet in wb.sheetnames else None
+        for name in wb.sheetnames:
+            if name in (self.lineage_sheet, self.dict_sheet, self.rich_sheet):
+                continue
+            ws = wb[name]
+            _, hdr = _find_header_row(ws, targets=CATALOG_HEADERS["table_name"])
+            hs = set(hdr)
+            if (hs & CATALOG_HEADERS["business_name"]) and (hs & CATALOG_HEADERS["table_name"]) \
+               and not (hs & {"dwh target column", "src source column"}):
+                return ws
+        return None
+
+    def _parse_catalog_sheet(self, ws, path, ds="PBDW"):
+        hdr_row, hdr = _find_header_row(ws, targets=CATALOG_HEADERS["table_name"])
+        idx = _resolve(hdr, CATALOG_HEADERS)
+        if "table_name" not in idx:
+            log.warning("table catalogue in %s: no table-name column (skipping)", path)
+            return []
+
+        def g(row, canon):
+            i = idx.get(canon)
+            return _s(row[i]) if i is not None and i < len(row) else None
+
+        def yn(v):
+            return "Y" if (v or "").strip().lower() in ("y", "yes", "true", "1") else "N"
+
+        out, seen = [], set()
+        for row in ws.iter_rows(min_row=hdr_row + 1, values_only=True):
+            if row is None or all(c is None for c in row):
+                continue
+            tbl = g(row, "table_name")
+            if not tbl:
+                continue
+            key = tbl.strip().upper()
+            if key in seen:      # a sheet edited by hand grows duplicates
+                continue
+            seen.add(key)
+            conf = (g(row, "confidence") or "med").strip().lower()
+            out.append({
+                "data_source": (ds or "PBDW").upper()[:30],
+                "table_name": key[:200],
+                "business_name": (g(row, "business_name") or "")[:200] or None,
+                "business_description": (g(row, "description") or "")[:1000] or None,
+                "grain": (g(row, "grain") or "")[:200] or None,
+                "suggested_group": (g(row, "group_name") or "")[:120] or None,
+                "is_history": yn(g(row, "is_history")),
+                "is_staging": yn(g(row, "is_staging")),
+                "confidence": (conf if conf in ("high", "med", "low") else "med")[:10],
+                # The workbook is the place people edit, so what it says is
+                # what the database holds. REVIEW_STATUS travels with the row
+                # rather than being inferred, so a reviewed line stays
+                # reviewed across reloads.
+                "review_status": (g(row, "review_status") or "DRAFT").strip().upper()[:20],
+                "reviewed_by": (g(row, "reviewed_by") or "")[:120] or None,
+                "source_of_text": "WORKBOOK",
+            })
+        log.info("legacy_dictionary: %s -> %d table descriptions from sheet '%s' "
+                 "(header row %d)", ds, len(out), ws.title, hdr_row)
+        return out
 
     def _find_rich_sheet(self, wb):
         """The rich sheet is identified by its header containing
         Functional_Group — name it via CP_LEGACY_LINEAGE_SHEET_RICH or let
-        this auto-detect (skipping the 4-col sheet)."""
+        this auto-detect (skipping the 4-col sheet).
+
+        A COLUMN NAME IS NOT ENOUGH. Functional Group alone also matches the
+        TABLE CATALOG sheet, which carries the group per table. Two
+        auto-detectors claiming one sheet is how a loader silently reads the
+        wrong thing, so this one also requires a target COLUMN — the grain
+        that makes a sheet lineage rather than a list of tables."""
         if self.rich_sheet:
             return wb[self.rich_sheet] if self.rich_sheet in wb.sheetnames else None
         for name in wb.sheetnames:
@@ -290,7 +408,10 @@ class LegacyDictionaryConnector:
                 continue
             ws = wb[name]
             _, hdr = _find_header_row(ws, targets={"dwh target table"})
-            if "functional group" in hdr:
+            hs = set(hdr)
+            if "functional group" in hs and (hs & {"dwh target column",
+                                                   "dwh_target_column",
+                                                   "target column"}):
                 return ws
         return None
 
@@ -481,6 +602,9 @@ class LegacyDictionaryConnector:
             loader._merge("legacy_dictionary", ("dict_key",), r)
         for r in bundle.get("lineage", []):
             loader._merge("legacy_lineage", ("lineage_id",), r)
+        for r in bundle.get("catalog", []):
+            loader._merge("business_catalog", ("data_source", "table_name"), r)
         loader.commit()
-        log.info("legacy_dictionary: %d definitions + %d lineage rows loaded",
-                 len(bundle["dict"]), len(bundle.get("lineage", [])))
+        log.info("legacy_dictionary: %d definitions + %d lineage rows + %d table "
+                 "descriptions loaded", len(bundle["dict"]),
+                 len(bundle.get("lineage", [])), len(bundle.get("catalog", [])))

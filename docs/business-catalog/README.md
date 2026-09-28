@@ -19,10 +19,51 @@ currently blocked.* That sentence is what this supplies, 176 times.
 the lineage shows flowing into them. It is a starting point for the people who own these
 tables, not an authority, and `review_status` stays `DRAFT` until someone signs it off.
 
+## How it loads
+
+It rides the workbook you already maintain. One more sheet, same file, same
+ingest step, same command:
+
+```
+python -m ingestion.run legacy_dictionary
+```
+
+The connector looks for a sheet whose header has a business-name column beside
+a table column — `TABLE CATALOG` by default, any name via
+`CP_LEGACY_TABLE_CATALOG_SHEET`, and it reads the wording people actually use
+(`Warehouse Table` / `Friendly Name` / `Definition` / `Granularity` all resolve).
+A workbook without the sheet loads exactly as it does today.
+
+**The sheet is the source of truth.** Correct a description there, re-run, and
+the database has it. `Review Status` and `Reviewed By` travel with the row, so a
+line someone has signed off stays signed off across reloads.
+
+`TABLE-CATALOG-sheet.csv` in this folder is that sheet, filled in and ready to
+paste.
+
+### Why not rows in LEGACY_DICTIONARY
+
+The ingestion, yes. The table, no — the grain is different.
+`legacy_dictionary` is one row per **source field**: `dict_key` is
+`system:field_code_norm:master`, `field_code_norm` is `NOT NULL` and in the
+primary key, and `source_system` holds ADDVANTAGE / CRD / STAR. A warehouse
+table has no field code and no legacy source system, so a row there means
+inventing both — and then `/systems` reports PBDW as a legacy source with 176
+assets, `/dictionary` lists tables among field definitions, `/business-def`
+looks them up by a code they do not have, and the group resolvers count rows
+that can never join. One table, two meanings, six consumers disagreeing about
+which — the same shape as the bug that emptied the Business view this week.
+
+Making `legacy_dictionary` polymorphic with an `entry_type` column is the other
+honest option. It costs a `WHERE entry_type = 'FIELD'` in each of those six
+consumers, and missing one gives a wrong number rather than an error. Say the
+word if you would rather have one table and take that on.
+
 ## Files
 
 | file | what it is |
 |---|---|
+| `TABLE-CATALOG-sheet.csv` | **paste this into the workbook** — the sheet, filled in |
 | `pbdw-business-catalog.csv` | the reviewable copy — open in Excel, correct the text, fill `reviewed_by` |
 | `../../sql/60_business_catalog.sql` | the table |
 | `../../sql/61_business_catalog_seed.sql` | the first pass, 176 `MERGE` statements |
