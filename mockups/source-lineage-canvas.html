@@ -3,14 +3,15 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500;700&display=swap">
 <style>
 /* Layout: lane and feed picker across the top, an expandable table-to-column
-   canvas filling the middle, and a drawer along the bottom that fills from the
-   selected link. Tokens are Lineage 360's own — a screen inside the app. */
+   canvas filling the middle, and a panel below that fills from the selected
+   wire. Tokens are Lineage 360's own — a screen inside the app. */
 :root{
   --bg:#f5f8f8; --panel:#fff; --panel2:#dfe6e9; --line:#c9d4dc;
   --ink:#10193b; --sub:#4a5a68; --muted:#7b8894;
   --accent:#0f4775; --ok:#159943; --warn:#e67e22; --bad:#c1113a;
   --src:#6d3ac0; --dwh:#0f4775; --star:#b5651d; --uaf:#0b7d7d;
-  --k-fn:#00a3a3; --k-branch:#e67e22; --k-const:#7b8894;
+  --o-direct:#7b8894; --o-trim:#00a3a3; --o-cast:#0091bf; --o-decode:#7c3aed;
+  --o-derived:#e67e22; --o-constant:#b45309; --o-unmapped:#c1113a;
   --f-ui:"Roboto","Helvetica Neue",Arial,sans-serif;
   --f-mono:"Roboto Mono",ui-monospace,Menlo,monospace;
 }
@@ -19,14 +20,16 @@
   --ink:#e8eef4; --sub:#a9b8c6; --muted:#7d8d9c;
   --accent:#5aa8e0; --ok:#3ec27a; --warn:#f0993f; --bad:#ef6b7f;
   --src:#a684ea; --dwh:#5aa8e0; --star:#d08a3f; --uaf:#3ecfcf;
-  --k-fn:#3ecfcf; --k-branch:#f0993f; --k-const:#8b9aa8;
+  --o-direct:#8b9aa8; --o-trim:#3ecfcf; --o-cast:#48b6e4; --o-decode:#b18cf5;
+  --o-derived:#f0993f; --o-constant:#d29040; --o-unmapped:#ef6b7f;
   color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0e1419; --panel:#161e26; --panel2:#24303a; --line:#2e3b47;
   --ink:#e8eef4; --sub:#a9b8c6; --muted:#7d8d9c;
   --accent:#5aa8e0; --ok:#3ec27a; --warn:#f0993f; --bad:#ef6b7f;
   --src:#a684ea; --dwh:#5aa8e0; --star:#d08a3f; --uaf:#3ecfcf;
-  --k-fn:#3ecfcf; --k-branch:#f0993f; --k-const:#8b9aa8;
+  --o-direct:#8b9aa8; --o-trim:#3ecfcf; --o-cast:#48b6e4; --o-decode:#b18cf5;
+  --o-derived:#f0993f; --o-constant:#d29040; --o-unmapped:#ef6b7f;
   color-scheme:dark}
 
 *{box-sizing:border-box}
@@ -34,101 +37,109 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-ui);
      font-size:13px;line-height:1.5}
 .wrap{padding-block:18px;padding-inline:16px;max-width:1500px;margin:0 auto}
 h1{font-size:19px;font-weight:500;margin:0;letter-spacing:-.01em;text-wrap:balance}
-.lede{font-size:12.5px;color:var(--sub);margin:5px 0 0;max-width:76ch}
-.eyebrow{font-size:9.5px;font-weight:700;letter-spacing:.09em;
+.lede{font-size:12.5px;color:var(--sub);margin:5px 0 0;max-width:78ch}
+.eyebrow{font-size:9px;font-weight:800;letter-spacing:.09em;
          text-transform:uppercase;color:var(--muted)}
 .mono{font-family:var(--f-mono)}
 
-.bar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:14px 0 10px}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:14px 0 10px}
 .pill{font:inherit;font-size:11px;padding:4px 12px;border-radius:999px;cursor:pointer;
       border:1px solid var(--line);background:var(--panel);color:var(--sub)}
 .pill[aria-pressed="true"]{color:#fff;font-weight:500}
 .pill.star[aria-pressed="true"]{background:var(--star);border-color:var(--star)}
 .pill.uaf[aria-pressed="true"]{background:var(--uaf);border-color:var(--uaf)}
-.pill:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.sel{font:inherit;font-size:11.5px;padding:5px 9px;border-radius:3px;
-     border:1px solid var(--line);background:var(--panel);color:var(--ink);
-     max-width:min(360px,60vw)}
-.srch{font:inherit;font-size:11.5px;padding:5px 10px;border-radius:3px;
-      border:1px solid var(--line);background:var(--panel);color:var(--ink);width:180px}
+.sel,.srch{font:inherit;font-size:11.5px;padding:5px 9px;border-radius:3px;
+     border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+.sel{max-width:min(340px,54vw)} .srch{width:160px}
 .ghost{font:inherit;font-size:10.5px;padding:4px 10px;border-radius:3px;cursor:pointer;
        border:1px solid var(--line);background:var(--panel);color:var(--accent)}
-.ghost:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ghost[aria-pressed="true"]{background:var(--warn);border-color:var(--warn);color:#fff}
+button:focus-visible,select:focus-visible,input:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px}
 
-.card{background:var(--panel);border:1px solid var(--panel2);border-radius:4px}
-.cv{position:relative;overflow:hidden;height:min(58vh,520px);min-height:340px;
+.cv{position:relative;overflow:hidden;height:min(54vh,470px);min-height:330px;
     background:var(--bg);border-radius:4px;border:1px solid var(--panel2);
     cursor:grab;touch-action:none}
 .cv.drag{cursor:grabbing}
 .stage{position:absolute;inset:0;transform-origin:0 0}
 .wires{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+.hit{pointer-events:stroke;cursor:pointer}
+.bub{pointer-events:all;cursor:pointer}
 
 .tnode{position:absolute;background:var(--panel);border:1px solid var(--panel2);
        border-top:3px solid var(--tc);border-radius:5px;overflow:hidden;
        box-shadow:0 1px 3px rgba(16,25,59,.07)}
-.tnode.on{border-color:var(--tc);box-shadow:0 0 0 2px var(--tc)}
-.thead{display:flex;gap:7px;align-items:center;padding:7px 9px;cursor:pointer;
+.thead{display:flex;gap:7px;align-items:center;padding:6px 9px;cursor:pointer;
        width:100%;text-align:left;font:inherit;background:none;border:0;color:inherit}
-.thead:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .chev{font-size:9px;color:var(--muted);width:9px;flex-shrink:0;transition:transform .15s}
 .tnode.open .chev{transform:rotate(90deg)}
-.tname{font-family:var(--f-mono);font-size:11px;color:var(--ink);overflow:hidden;
-       text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
-.tmeta{font-size:9px;color:var(--muted);white-space:nowrap}
-.tsub{font-size:9.5px;color:var(--muted);padding:0 9px 7px 25px;margin-top:-4px;
-      overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cols{border-top:1px solid var(--panel2)}
-.crow{display:flex;gap:7px;align-items:center;width:100%;text-align:left;font:inherit;
-      background:none;border:0;border-top:1px solid var(--panel2);padding:4px 9px 4px 25px;
-      cursor:pointer;color:inherit}
-.crow:first-child{border-top:0}
-.crow:hover{background:color-mix(in srgb,var(--accent) 7%,transparent)}
-.crow.on{background:color-mix(in srgb,var(--accent) 13%,transparent);font-weight:500}
-.crow:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
-.cname{font-family:var(--f-mono);font-size:10px;overflow:hidden;text-overflow:ellipsis;
-       white-space:nowrap;flex:1;min-width:0}
-.ctype{font-size:8.5px;color:var(--muted);white-space:nowrap}
-.dimmed{opacity:.3}
+.tname{font-family:var(--f-mono);font-size:10.5px;overflow:hidden;
+       text-overflow:ellipsis;white-space:nowrap}
+.mix{display:flex;height:5px;border-radius:3px;overflow:hidden;background:#e8edf2;
+     flex-shrink:0}
+.mix i{display:block}
+.crow{display:flex;gap:6px;align-items:center;width:100%;text-align:left;font:inherit;
+      background:none;border:0;border-top:1px solid var(--panel2);
+      padding:3px 8px 3px 10px;cursor:pointer;color:inherit;height:22px}
+.crow:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.crow.on{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.cname{font-family:var(--f-mono);font-size:9.5px;overflow:hidden;
+       text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.oplab{font-size:7.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;
+       flex-shrink:0}
+.pips{display:flex;gap:1.5px;flex-shrink:0;align-items:center}
+.pips i{width:3px;height:3px;border-radius:50%;background:#d7dee4}
+.pips i.f{background:var(--sub)}
+.more{width:100%;height:22px;font:inherit;font-size:9px;background:none;cursor:pointer;
+      border:0;border-top:1px solid var(--panel2);color:var(--accent)}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--warn);flex-shrink:0}
 
-.opchip{font-family:var(--f-mono);font-size:8.5px;font-weight:700;padding:1px 5px;
-        border-radius:2px;white-space:nowrap}
 .zoom{position:absolute;right:10px;bottom:10px;display:flex;gap:4px}
 .zoom button{font:inherit;font-size:12px;width:26px;height:26px;border-radius:3px;
       border:1px solid var(--line);background:var(--panel);color:var(--sub);cursor:pointer}
 .zoom button.w{width:auto;padding:0 9px;font-size:10.5px}
-.zoom button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
-.drawer{margin-top:12px}
-.drawer .body{padding:12px 14px}
-.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:11.5px}
-.kv dt{color:var(--muted);font-size:9px;font-weight:700;letter-spacing:.05em;
-       text-transform:uppercase;padding-top:2px;white-space:nowrap}
-.kv dd{margin:0;color:var(--sub);min-width:0}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:9.5px;color:var(--sub);
+        margin-top:8px;align-items:center}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px}
+
+.detail{margin-top:11px;border:1px solid var(--panel2);border-left:3px solid var(--dc);
+        border-radius:4px;padding:11px 13px;background:var(--panel)}
+.ends{display:flex;gap:10px;flex-wrap:wrap;margin-top:9px;align-items:center}
+.end{flex:1 1 200px;min-width:0;border:1px solid var(--panel2);
+     border-left:3px solid var(--ec);border-radius:3px;padding:5px 9px;background:var(--bg)}
+.end b{display:block;font-size:8px;font-weight:800;letter-spacing:.5px;
+       text-transform:uppercase;color:var(--ec)}
+.end .n{display:block;font-family:var(--f-mono);font-size:10.5px;color:var(--ink);
+        overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.end .ty{display:block;font-size:9px;color:var(--muted)}
+.sem{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:10px;color:var(--sub)}
+.sem b{color:var(--muted);font-weight:700}
+.dict{margin-top:9px;padding-top:8px;border-top:1px dashed var(--panel2)}
 pre.expr{margin:8px 0 0;font-family:var(--f-mono);font-size:10.5px;line-height:1.7;
      white-space:pre-wrap;word-break:break-word;background:var(--bg);
-     border:1px solid var(--panel2);border-left:3px solid var(--k-fn);
-     border-radius:3px;padding:9px 11px;max-height:150px;overflow:auto}
-.ops{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:9px}
+     border:1px solid var(--panel2);border-radius:3px;padding:8px 10px;
+     max-height:140px;overflow:auto}
+.ops{display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:9px}
 .op{display:flex;flex-direction:column;border:1px solid var(--panel2);
-    border-left:3px solid var(--oc);border-radius:3px;padding:4px 8px;background:var(--bg)}
-.op b{font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+    border-left:3px solid var(--oc);border-radius:3px;padding:3px 8px;background:var(--bg)}
+.op b{font-size:7.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;
       color:var(--oc)}
-.op span{font-family:var(--f-mono);font-size:10px;color:var(--ink)}
-.arrow{color:var(--muted);font-size:11px}
-.legend{display:flex;flex-wrap:wrap;gap:9px 14px;font-size:10px;color:var(--sub);
-        margin-top:9px}
-.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px}
+.op span{font-family:var(--f-mono);font-size:9.5px;color:var(--ink)}
+.arrow{color:var(--muted);font-size:10px}
+.chip{font-size:8.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;
+      padding:2px 7px;border-radius:2px}
 .note{font-size:10.5px;color:var(--muted);line-height:1.6;max-width:80ch}
 .footer{margin-top:16px;font-size:10.5px;color:var(--muted);line-height:1.65;max-width:88ch}
-@media (max-width:620px){.srch{width:120px}}
+@media (max-width:620px){.srch{width:110px}.sel{max-width:48vw}}
 </style>
 
 <div class="wrap">
   <h1>Where this feed lands, column by column</h1>
   <p class="lede">A feed on the left, the warehouse tables it writes on the right.
     Open a table to see its columns; open both ends and the links refine from
-    table-to-table to column-to-column. Pick a link to read the expression that
-    makes it.</p>
+    table-to-table to column-to-column. <b>Click a wire</b> for the expression
+    behind it, both ends' types, and what the field means.</p>
 
   <div class="bar">
     <span class="eyebrow">Lane</span>
@@ -137,9 +148,10 @@ pre.expr{margin:8px 0 0;font-family:var(--f-mono);font-size:10.5px;line-height:1
     <select class="sel" id="feed" aria-label="Feed"></select>
     <input class="srch" id="q" type="search" placeholder="Find a column…"
            aria-label="Find a column">
-    <span style="margin-left:auto;display:flex;gap:6px">
-      <button class="ghost" id="expand">Open every table</button>
-      <button class="ghost" id="collapse">Close all</button>
+    <button class="ghost" id="onlyx" aria-pressed="false">only transformed</button>
+    <span style="margin-left:auto;display:flex;gap:5px">
+      <button class="ghost" id="expand">open all</button>
+      <button class="ghost" id="collapse">close all</button>
     </span>
   </div>
 
@@ -153,439 +165,544 @@ pre.expr{margin:8px 0 0;font-family:var(--f-mono);font-size:10.5px;line-height:1
   </div>
 
   <div class="legend" id="legend"></div>
+  <div id="detail"></div>
 
-  <div class="card drawer">
-    <div class="body" id="drawer"></div>
-  </div>
-
-  <p class="footer"><b>Mockup.</b> Both lanes, their feeds, target tables and
-    column links are taken from the loaded IMDS data — the UAF feed and its two
-    target tables are the screen you sent. Expressions come from
-    <span class="mono">LANE_LINEAGE</span> and
-    <span class="mono">LOT_LEVEL_POSITION_MAP</span>. The SEI crosswalk screens
-    are untouched by this; this replaces the flat “where it lands” list in the
-    Source view.</p>
+  <p class="footer"><b>Mockup, matching what is built.</b> Both lanes, their
+    feeds, target tables and column links come from the loaded IMDS data — the
+    UAF feed and its two target tables are the screen that prompted this.
+    Expressions are from <span class="mono">LANE_LINEAGE</span> and
+    <span class="mono">LOT_LEVEL_POSITION_MAP</span>; definitions are resolved
+    the way the app resolves them, through five dictionaries in order, naming
+    which one answered. The SEI crosswalk screens are untouched by this.</p>
 </div>
 
 <script>
 "use strict";
 /* ---------------------------------------------------------------- data */
-const OPC = { direct:"var(--muted)", trim:"var(--k-fn)", cast:"var(--k-fn)",
-              derived:"var(--k-branch)", decode:"var(--src)",
-              constant:"var(--k-const)" };
-
-const LANES = {
-  STAR: { c:"var(--star)", feeds:[
-    { id:"PEDDIFI1", name:"Portfolio Valuation", kind:"nightly extract", fields:53,
-      targets:[
-        { t:"HOLDINGDBO.LOT_LEVEL_POSITION", cols:[
-          { c:"BOOK_VALUE", ty:"NUMBER(28,12)", src:"Base_Amortized_Cost_7", sty:"CHAR(20)",
-            op:"derived",
-            expr:"v_Trade_Date_Cash := Base_Market_Value_10;\nIF TRIM(Investment_Type_Code_42) != 'CASH' THEN\n  book_value := nvl(book_value,0) + to_number(nvl(Base_Amortized_Cost_7,0));\nELSE\n  book_value := nvl(book_value,0) + to_number(nvl(v_Trade_Date_Cash,0));",
-            ops:[["field","Base_Amortized_Cost_7"],["function","nvl( ,0)"],
-                 ["function","to_number( )"],["branch","!= 'CASH'"],["target","BOOK_VALUE"]] },
-          { c:"CURRENCY", ty:"VARCHAR2(3)", src:"local_currency_code_47", sty:"CHAR(8)",
-            op:"trim", expr:"substr(ltrim(rtrim(local_currency_code_47)),1,3);",
-            ops:[["field","local_currency_code_47"],["function","rtrim( )"],
-                 ["function","ltrim( )"],["function","substr( ,1,3)"],["target","CURRENCY"]] },
-          { c:"ACCRUED_INCOME", ty:"NUMBER(28,12)", src:"Base_Interest_Receivable_9",
-            sty:"CHAR(22)", op:"cast",
-            expr:"to_number(nvl(Base_Interest_Receivable_9,0));",
-            ops:[["field","Base_Interest_Receivable_9"],["function","nvl( ,0)"],
-                 ["function","to_number( )"],["target","ACCRUED_INCOME"]] },
-          { c:"TRADE_DATE", ty:"DATE", src:"Trade_Date_128", sty:"CHAR(10)", op:"cast",
-            expr:"pace_package.lot_level_position_record.trade_date :=\n  to_date(Trade_Date_128,'MM/DD/YYYY');",
-            ops:[["field","Trade_Date_128"],["const","'MM/DD/YYYY'"],
-                 ["function","to_date( )"],["target","TRADE_DATE"]] },
-          { c:"SETTLEMENT_DATE", ty:"DATE", src:"settlement_date_113", sty:"CHAR(10)",
-            op:"cast", expr:"to_date(settlement_date_113,'MM/DD/YYYY');",
-            ops:[["field","settlement_date_113"],["const","'MM/DD/YYYY'"],
-                 ["function","to_date( )"],["target","SETTLEMENT_DATE"]] },
-          { c:"PAR_OR_SHARES", ty:"NUMBER(28,12)", src:"Quantity_98", sty:"CHAR(20)",
-            op:"cast", expr:"to_number(nvl(Quantity_98,0));",
-            ops:[["field","Quantity_98"],["function","nvl( ,0)"],
-                 ["function","to_number( )"],["target","PAR_OR_SHARES"]] },
-          { c:"LOCAL_FX_RATE", ty:"NUMBER(28,12)", src:"FX_Rate_38", sty:"CHAR(18)",
-            op:"cast", expr:"NVL(FX_Rate_38,0);",
-            ops:[["field","FX_Rate_38"],["function","NVL( ,0)"],["target","LOCAL_FX_RATE"]] },
-          { c:"POSITION_ID", ty:"NUMBER", src:"—", sty:"", op:"constant",
-            expr:"pace_package.position_record.position_id;",
-            ops:[["function","position_record.position_id"],["target","POSITION_ID"]] },
-        ]},
-        { t:"HOLDINGDBO.POSITION_HIST", cols:[
-          { c:"MARKET_VALUE", ty:"NUMBER(28,12)", src:"Base_Market_Value_10", sty:"CHAR(22)",
-            op:"derived",
-            expr:"If TRIM(Investment_Type_Code_42) != 'CASH' THEN\n  to_number(nvl(Base_Market_Value_10,0));\nElse\n  to_number(nvl(v_Trade_Date_Cash,0));",
-            ops:[["field","Base_Market_Value_10"],["branch","!= 'CASH'"],
-                 ["function","to_number(nvl( ,0))"],["target","MARKET_VALUE"]] },
-          { c:"LOCAL_MARKET_VALUE", ty:"NUMBER(28,12)", src:"local_market_value_48",
-            sty:"CHAR(22)", op:"cast", expr:"to_number(nvl(local_market_value_48,0));",
-            ops:[["field","local_market_value_48"],["function","nvl( ,0)"],
-                 ["function","to_number( )"],["target","LOCAL_MARKET_VALUE"]] },
-          { c:"ACCRUED_INCOME_LOCAL", ty:"NUMBER(28,12)", src:"Local_Accrued_Interest_134",
-            sty:"CHAR(22)", op:"cast",
-            expr:"to_number(nvl(Local_Accrued_Interest_134,0));",
-            ops:[["field","Local_Accrued_Interest_134"],["function","nvl( ,0)"],
-                 ["function","to_number( )"],["target","ACCRUED_INCOME_LOCAL"]] },
-        ]},
-        { t:"BBHRPTDBO.BBH_STAR_NAV_TB", cols:[
-          { c:"cstdy_hd_acct_num", ty:"VARCHAR2(20)", src:"Custody_Head_Account_Number",
-            sty:"CHAR(20)", op:"direct", expr:"Custody_Head_Account_Number",
-            ops:[["field","Custody_Head_Account_Number"],["target","cstdy_hd_acct_num"]] },
-          { c:"amt_yld", ty:"NUMBER(28,12)", src:"Amortization_Yield_135", sty:"CHAR(18)",
-            op:"cast", expr:"to_number(nvl(Amortization_Yield_135,0));",
-            ops:[["field","Amortization_Yield_135"],["function","nvl( ,0)"],
-                 ["function","to_number( )"],["target","amt_yld"]] },
-        ]},
-      ]},
-    { id:"ACDDIFI1", name:"Account File", kind:"nightly extract", fields:8,
-      targets:[
-        { t:"RULESDBO.ENTITY", cols:[
-          { c:"ENTITY_ID", ty:"VARCHAR2(20)", src:"Account_Number_1", sty:"CHAR(20)",
-            op:"trim", expr:"ltrim(rtrim(Account_Number_1));",
-            ops:[["field","Account_Number_1"],["function","rtrim( )"],
-                 ["function","ltrim( )"],["target","ENTITY_ID"]] },
-          { c:"ENTITY_NAME", ty:"VARCHAR2(80)", src:"Account_Long_Name_4", sty:"CHAR(80)",
-            op:"direct", expr:"Account_Long_Name_4", ops:[["field","Account_Long_Name_4"],
-              ["target","ENTITY_NAME"]] },
-        ]},
-        { t:"HOLDINGDBO.POSITION_SUMMARY", cols:[
-          { c:"ACCOUNT_ID", ty:"VARCHAR2(20)", src:"Account_Number_1", sty:"CHAR(20)",
-            op:"trim", expr:"ltrim(rtrim(Account_Number_1));",
-            ops:[["field","Account_Number_1"],["function","rtrim( )"],
-                 ["function","ltrim( )"],["target","ACCOUNT_ID"]] },
-        ]},
-      ]},
-    { id:"TBMEIFI7", name:"Trial Balance", kind:"nightly extract", fields:23,
-      targets:[
-        { t:"BBHRPTDBO.BBH_STAR_NAV_TB", cols:[
-          { c:"tb_acct_num", ty:"VARCHAR2(20)", src:"Account_Number_1", sty:"CHAR(20)",
-            op:"trim", expr:"ltrim(rtrim(Account_Number_1));",
-            ops:[["field","Account_Number_1"],["function","rtrim( )"],
-                 ["function","ltrim( )"],["target","tb_acct_num"]] },
-          { c:"tb_base_amt", ty:"NUMBER(28,12)", src:"Base_Balance_12", sty:"CHAR(22)",
-            op:"cast", expr:"to_number(nvl(Base_Balance_12,0));",
-            ops:[["field","Base_Balance_12"],["function","nvl( ,0)"],
-                 ["function","to_number( )"],["target","tb_base_amt"]] },
-        ]},
-      ]},
-  ]},
-  UAF: { c:"var(--uaf)", feeds:[
-    { id:"BBH.UAF.BBH.PACE.MESACCT.ACCTMSG", name:"Entity & SMA Account Master",
-      kind:"MQ message", fields:3,
-      targets:[
-        { t:"RULESDBO.ENTITY", cols:[
-          { c:"ENTITY_ID", ty:"VARCHAR2(20)", src:"ACCT_ID", sty:"CHAR(20)",
-            op:"trim", expr:"SP_LOAD_UAF: trim(ACCT_ID)",
-            ops:[["field","ACCT_ID"],["function","trim( )"],["target","ENTITY_ID"]] },
-          { c:"ENTITY_NAME", ty:"VARCHAR2(80)", src:"ACCT_LONG_NAME", sty:"CHAR(80)",
-            op:"direct", expr:"SP_LOAD_UAF: ACCT_LONG_NAME as-is",
-            ops:[["field","ACCT_LONG_NAME"],["target","ENTITY_NAME"]] },
-          { c:"SMA_FLAG", ty:"CHAR(1)", src:"SMA_IND", sty:"CHAR(1)", op:"decode",
-            expr:"decode(SMA_IND,'Y','Y','N');",
-            ops:[["field","SMA_IND"],["function","decode( )"],["target","SMA_FLAG"]] },
-        ]},
-        { t:"RULESDBO.ENTITY_HIST", cols:[
-          { c:"ENTITY_ID", ty:"VARCHAR2(20)", src:"ACCT_ID", sty:"CHAR(20)",
-            op:"trim", expr:"SP_LOAD_UAF: trim(ACCT_ID) — delete and reinsert",
-            ops:[["field","ACCT_ID"],["function","trim( )"],["target","ENTITY_ID"]] },
-        ]},
-      ]},
-  ]},
+const OPM = {
+  direct:{c:"var(--o-direct)",label:"direct",note:"Carried across untouched."},
+  trim:{c:"var(--o-trim)",label:"trim",note:"Padding removed. Length can change; the value does not."},
+  cast:{c:"var(--o-cast)",label:"cast",note:"Converted to another type. A value that will not convert is the failure to look for."},
+  decode:{c:"var(--o-decode)",label:"decode",note:"A coded value translated. Needs a complete code set or it produces a valid-looking wrong value."},
+  derived:{c:"var(--o-derived)",label:"derived",note:"Computed. The rule is the risk, not the type."},
+  constant:{c:"var(--o-constant)",label:"constant",note:"No source column — the value is produced rather than carried."},
+  unmapped:{c:"var(--o-unmapped)",label:"no source",note:"Nothing feeds this column."},
 };
+const OP_ORDER = ["direct","trim","cast","decode","derived","constant","unmapped"];
 
-/* -------------------------------------------------------------- state */
+const L = (o) => ({ ops:[], ...o });
+const LANES = {
+STAR:{c:"var(--star)",feeds:[
+ {id:"PEDDIFI1",name:"Portfolio Valuation",kind:"nightly extract",fields:53,targets:[
+  {t:"HOLDINGDBO.LOT_LEVEL_POSITION",cols:[
+   L({col:"BOOK_VALUE",ty:"NUMBER",len:"28",prec:"12",nul:"Y",src:"Base_Amortized_Cost_7",
+      sty:"CHAR",slen:"20",op:"derived",steps:5,unit:"amount",cur:"base",sign:"debit/credit",
+      expr:"v_Trade_Date_Cash := Base_Market_Value_10;\nIF TRIM(Investment_Type_Code_42) != 'CASH' THEN\n  book_value := nvl(book_value,0) + to_number(nvl(Base_Amortized_Cost_7,0));\nELSE\n  book_value := nvl(book_value,0) + to_number(nvl(v_Trade_Date_Cash,0));",
+      ops:[["field","Base_Amortized_Cost_7"],["const","0"],["function","nvl( )"],
+           ["function","to_number( )"],["branch","!= 'CASH'"],["target","BOOK_VALUE"]],
+      def:{term:"Base Amortised Cost",src:"STAR published layout · PEDDIFI1",
+        ty:"NUMERIC(20)",ev:"COPYBOOK",
+        d:"Amortised cost of the lot expressed in the portfolio base currency."}}),
+   L({col:"CURRENCY",ty:"VARCHAR2",len:"3",nul:"Y",src:"local_currency_code_47",
+      sty:"CHAR",slen:"8",op:"derived",steps:3,
+      expr:"substr(ltrim(rtrim(local_currency_code_47)),1,3);",
+      ops:[["field","local_currency_code_47"],["function","rtrim( )"],
+           ["function","ltrim( )"],["const","1"],["const","3"],
+           ["function","substr( )"],["target","CURRENCY"]],
+      def:{term:"Local Currency Code",src:"STAR published layout · PEDDIFI1",
+        ty:"CHAR(8)",ev:"COPYBOOK",
+        d:"ISO currency of the local-currency amounts on this lot. Padded to 8."}}),
+   L({col:"ACCRUED_INCOME",ty:"NUMBER",len:"28",prec:"12",nul:"Y",
+      src:"Base_Interest_Receivable_9",sty:"CHAR",slen:"22",op:"cast",steps:2,
+      unit:"amount",cur:"base",
+      expr:"to_number(nvl(Base_Interest_Receivable_9,0));",
+      ops:[["field","Base_Interest_Receivable_9"],["const","0"],["function","nvl( )"],
+           ["function","to_number( )"],["target","ACCRUED_INCOME"]],
+      def:{term:"Base Interest Receivable",src:"STAR published layout · PEDDIFI1",
+        ty:"NUMERIC(22)",ev:"COPYBOOK",
+        d:"Interest accrued and not yet received, in base currency."}}),
+   L({col:"TRADE_DATE",ty:"DATE",nul:"Y",src:"Trade_Date_128",sty:"CHAR",slen:"10",
+      op:"cast",steps:1,
+      expr:"pace_package.lot_level_position_record.trade_date :=\n  to_date(Trade_Date_128,'MM/DD/YYYY');",
+      ops:[["field","Trade_Date_128"],["const","'MM/DD/YYYY'"],["function","to_date( )"],
+           ["target","TRADE_DATE"]],
+      def:null, defNote:"ordinal 128 matched; the name did not"}),
+   L({col:"SETTLEMENT_DATE",ty:"DATE",nul:"Y",src:"settlement_date_113",sty:"CHAR",
+      slen:"10",op:"cast",steps:1,expr:"to_date(settlement_date_113,'MM/DD/YYYY');",
+      ops:[["field","settlement_date_113"],["const","'MM/DD/YYYY'"],
+           ["function","to_date( )"],["target","SETTLEMENT_DATE"]],
+      def:{term:"Settlement Date",src:"STAR published layout · PEDDIFI1",ty:"CHAR(10)",
+        ev:"COPYBOOK",d:"Contractual settlement date of the opening trade."}}),
+   L({col:"PAR_OR_SHARES",ty:"NUMBER",len:"28",prec:"12",nul:"Y",src:"Quantity_98",
+      sty:"CHAR",slen:"20",op:"cast",steps:2,unit:"shares",
+      expr:"to_number(nvl(Quantity_98,0));",
+      ops:[["field","Quantity_98"],["const","0"],["function","nvl( )"],
+           ["function","to_number( )"],["target","PAR_OR_SHARES"]],
+      def:{term:"Quantity",src:"STAR published layout · PEDDIFI1",ty:"NUMERIC(20)",
+        ev:"COPYBOOK",d:"Units held in the lot. Par for fixed income, shares for equity."}}),
+   L({col:"LOCAL_FX_RATE",ty:"NUMBER",len:"28",prec:"12",nul:"Y",src:"FX_Rate_38",
+      sty:"CHAR",slen:"18",op:"cast",steps:1,unit:"rate",
+      expr:"NVL(FX_Rate_38,0);",
+      ops:[["field","FX_Rate_38"],["const","0"],["function","NVL( )"],
+           ["target","LOCAL_FX_RATE"]],
+      def:{term:"FX Rate",src:"STAR published layout · PEDDIFI1",ty:"NUMERIC(18)",
+        ev:"COPYBOOK",d:"Local-to-base rate applied at valuation."}}),
+   L({col:"POSITION_ID",ty:"NUMBER",nul:"N",pk:"Y",src:null,op:"constant",steps:1,
+      expr:"pace_package.position_record.position_id;",
+      ops:[["function","position_record.position_id"],["target","POSITION_ID"]],
+      def:null}),
+   L({col:"SECURITY_ALIAS",ty:"NUMBER",nul:"N",src:null,op:"constant",steps:1,
+      expr:"pace_package.position_detail_record.security_alias;",
+      ops:[["function","position_detail_record.security_alias"],["target","SECURITY_ALIAS"]],
+      def:null}),
+   L({col:"COMMISSION",ty:"NUMBER",len:"28",prec:"12",nul:"Y",src:null,op:"unmapped",
+      steps:0,expr:"",ops:[],def:null}),
+  ]},
+  {t:"HOLDINGDBO.POSITION_HIST",cols:[
+   L({col:"MARKET_VALUE",ty:"NUMBER",len:"28",prec:"12",nul:"Y",src:"Base_Market_Value_10",
+      sty:"CHAR",slen:"22",op:"derived",steps:4,unit:"amount",cur:"base",
+      expr:"If TRIM(Investment_Type_Code_42) != 'CASH' THEN\n  to_number(nvl(Base_Market_Value_10,0));\nElse\n  to_number(nvl(v_Trade_Date_Cash,0));",
+      ops:[["field","Base_Market_Value_10"],["function","TRIM( )"],["branch","!= 'CASH'"],
+           ["function","nvl( )"],["function","to_number( )"],["target","MARKET_VALUE"]],
+      def:{term:"Base Market Value",src:"STAR published layout · PEDDIFI1",
+        ty:"NUMERIC(22)",ev:"COPYBOOK",
+        d:"Market value of the position in base currency at the valuation point."}}),
+   L({col:"LOCAL_MARKET_VALUE",ty:"NUMBER",len:"28",prec:"12",nul:"Y",
+      src:"local_market_value_48",sty:"CHAR",slen:"22",op:"cast",steps:2,
+      unit:"amount",cur:"local",
+      expr:"to_number(nvl(local_market_value_48,0));",
+      ops:[["field","local_market_value_48"],["const","0"],["function","nvl( )"],
+           ["function","to_number( )"],["target","LOCAL_MARKET_VALUE"]],
+      def:{term:"Local Market Value",src:"STAR published layout · PEDDIFI1",
+        ty:"NUMERIC(22)",ev:"COPYBOOK",d:"Market value in the security's local currency."}}),
+   L({col:"ACCRUED_INCOME_LOCAL",ty:"NUMBER",len:"28",prec:"12",nul:"Y",
+      src:"Local_Accrued_Interest_134",sty:"CHAR",slen:"22",op:"cast",steps:2,
+      unit:"amount",cur:"local",
+      expr:"to_number(nvl(Local_Accrued_Interest_134,0));",
+      ops:[["field","Local_Accrued_Interest_134"],["const","0"],["function","nvl( )"],
+           ["function","to_number( )"],["target","ACCRUED_INCOME_LOCAL"]],
+      def:null,defNote:"ordinal 134 matched; the name did not"}),
+  ]},
+  {t:"BBHRPTDBO.BBH_STAR_NAV_TB",cols:[
+   L({col:"cstdy_hd_acct_num",ty:"VARCHAR2",len:"20",nul:"Y",
+      src:"Custody_Head_Account_Number",sty:"CHAR",slen:"20",op:"direct",steps:0,
+      expr:"",ops:[],
+      def:{term:"Custody Head Account Number",src:"SEI input catalogue · ACCOUNT.DAT",
+        ty:"CHAR(20)",ev:"DOCUMENT",
+        d:"Head-level custody account the SMA rolls up to.",
+        caveat:"SEI's INBOUND catalogue. A field loaded into SEI is not thereby exposed on the outbound interface the contract needs."}}),
+   L({col:"amt_yld",ty:"NUMBER",len:"28",prec:"12",nul:"Y",src:"Amortization_Yield_135",
+      sty:"CHAR",slen:"18",op:"cast",steps:2,unit:"rate",
+      expr:"to_number(nvl(Amortization_Yield_135,0));",
+      ops:[["field","Amortization_Yield_135"],["const","0"],["function","nvl( )"],
+           ["function","to_number( )"],["target","amt_yld"]],
+      def:null,defNote:"ordinal 135 matched; the name did not"}),
+  ]},
+ ]},
+ {id:"ACDDIFI1",name:"Account File",kind:"nightly extract",fields:8,targets:[
+  {t:"RULESDBO.ENTITY",cols:[
+   L({col:"ENTITY_ID",ty:"VARCHAR2",len:"20",nul:"N",pk:"Y",src:"Account_Number_1",
+      sty:"CHAR",slen:"20",op:"trim",steps:2,expr:"ltrim(rtrim(Account_Number_1));",
+      ops:[["field","Account_Number_1"],["function","rtrim( )"],["function","ltrim( )"],
+           ["target","ENTITY_ID"]],
+      def:{term:"Account Number",src:"AddVantage / CRD / STAR master",ty:"CHAR(20)",
+        ev:"FEED_WORKBOOK",d:"The custody account identifier, right-padded."}}),
+   L({col:"ENTITY_NAME",ty:"VARCHAR2",len:"80",nul:"Y",src:"Account_Long_Name_4",
+      sty:"CHAR",slen:"80",op:"direct",steps:0,expr:"",ops:[],
+      def:{term:"Account Long Name",src:"AddVantage / CRD / STAR master",ty:"CHAR(80)",
+        ev:"FEED_WORKBOOK",d:"Full registered name of the account."}}),
+  ]},
+  {t:"HOLDINGDBO.POSITION_SUMMARY",cols:[
+   L({col:"ACCOUNT_ID",ty:"VARCHAR2",len:"20",nul:"N",src:"Account_Number_1",sty:"CHAR",
+      slen:"20",op:"trim",steps:2,expr:"ltrim(rtrim(Account_Number_1));",
+      ops:[["field","Account_Number_1"],["function","rtrim( )"],["function","ltrim( )"],
+           ["target","ACCOUNT_ID"]],
+      def:{term:"Account Number",src:"AddVantage / CRD / STAR master",ty:"CHAR(20)",
+        ev:"FEED_WORKBOOK",d:"The custody account identifier, right-padded."}}),
+  ]},
+ ]},
+ {id:"TBMEIFI7",name:"Trial Balance",kind:"nightly extract",fields:23,targets:[
+  {t:"BBHRPTDBO.BBH_STAR_NAV_TB",cols:[
+   L({col:"tb_acct_num",ty:"VARCHAR2",len:"20",nul:"Y",src:"Account_Number_1",sty:"CHAR",
+      slen:"20",op:"trim",steps:2,expr:"ltrim(rtrim(Account_Number_1));",
+      ops:[["field","Account_Number_1"],["function","rtrim( )"],["function","ltrim( )"],
+           ["target","tb_acct_num"]],
+      def:{term:"Account Number",src:"AddVantage / CRD / STAR master",ty:"CHAR(20)",
+        ev:"FEED_WORKBOOK",d:"The custody account identifier, right-padded."}}),
+   L({col:"tb_base_amt",ty:"NUMBER",len:"28",prec:"12",nul:"Y",src:"Base_Balance_12",
+      sty:"CHAR",slen:"22",op:"cast",steps:2,unit:"amount",cur:"base",
+      sign:"debit/credit",expr:"to_number(nvl(Base_Balance_12,0));",
+      ops:[["field","Base_Balance_12"],["const","0"],["function","nvl( )"],
+           ["function","to_number( )"],["target","tb_base_amt"]],
+      def:null,defNote:"no loaded dictionary defines this field"}),
+  ]},
+ ]},
+]},
+UAF:{c:"var(--uaf)",feeds:[
+ {id:"BBH.UAF.BBH.PACE.MESACCT.ACCTMSG",name:"Entity & SMA Account Master",
+  kind:"MQ message",fields:3,targets:[
+  {t:"RULESDBO.ENTITY",cols:[
+   L({col:"ENTITY_ID",ty:"VARCHAR2",len:"20",nul:"N",pk:"Y",src:"ACCT_ID",sty:"CHAR",
+      slen:"20",op:"trim",steps:1,expr:"SP_LOAD_UAF: trim(ACCT_ID)",
+      ops:[["field","ACCT_ID"],["function","trim( )"],["target","ENTITY_ID"]],
+      def:{term:"ACCT_ID",src:"UAF layout · BBH.UAF… · ENT",ty:"CHAR(20)",ev:"DOCUMENT",
+        d:"Documented target RULESDBO.ENTITY.ENTITY_ID."}}),
+   L({col:"ENTITY_NAME",ty:"VARCHAR2",len:"80",nul:"Y",src:"ACCT_LONG_NAME",sty:"CHAR",
+      slen:"80",op:"direct",steps:0,expr:"",ops:[],
+      def:{term:"ACCT_LONG_NAME",src:"UAF layout · BBH.UAF… · ENT",ty:"CHAR(80)",
+        ev:"DOCUMENT",d:"Registered account name as published on the MQ message."}}),
+   L({col:"SMA_FLAG",ty:"CHAR",len:"1",nul:"Y",src:"SMA_IND",sty:"CHAR",slen:"1",
+      op:"decode",steps:1,codeset:"SMA_INDICATOR",
+      expr:"decode(SMA_IND,'Y','Y','N');",
+      ops:[["field","SMA_IND"],["function","decode( )"],["target","SMA_FLAG"]],
+      def:{term:"SMA_IND",src:"UAF layout · BBH.UAF… · ENT",ty:"CHAR(1)",ev:"DOCUMENT",
+        d:"Separately managed account indicator."}}),
+  ]},
+  {t:"RULESDBO.ENTITY_HIST",cols:[
+   L({col:"ENTITY_ID",ty:"VARCHAR2",len:"20",nul:"N",pk:"Y",src:"ACCT_ID",sty:"CHAR",
+      slen:"20",op:"trim",steps:1,
+      expr:"SP_LOAD_UAF: trim(ACCT_ID) — delete and reinsert",
+      ops:[["field","ACCT_ID"],["function","trim( )"],["target","ENTITY_ID"]],
+      def:{term:"ACCT_ID",src:"UAF layout · BBH.UAF… · ENT",ty:"CHAR(20)",ev:"DOCUMENT",
+        d:"Documented target RULESDBO.ENTITY.ENTITY_ID."}}),
+  ]},
+ ]},
+]}};
+
+/* --------------------------------------------------------------- state */
 const el = s => document.querySelector(s);
 const stage = el("#stage"), wires = el("#wires"), cv = el("#cv");
-let lane = "STAR", feed = LANES.STAR.feeds[0];
-let open = new Set();                     // node ids that are expanded
-let sel = null;                           // {src, tbl, col} of the chosen link
-let q = "", z = { k:1, x:0, y:0 }, view = null;
+let lane="STAR", feed=LANES.STAR.feeds[0], open=new Set(), showAll=new Set();
+let sel=null, q="", onlyX=false, z={k:1,x:0,y:0}, view=null;
+const esc = s => String(s??"").replace(/[&<>"]/g,
+  c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const CAP = 8;   // the built screen caps at 15; 8 shows the behaviour sooner
 
-const esc = s => String(s ?? "").replace(/[&<>"]/g,
-  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const srcId = () => `src:${feed.id}`;
-const tgtId = t => `tgt:${t}`;
-
-function links(){
-  const out = [];
-  feed.targets.forEach(tg => tg.cols.forEach(c => out.push({ tbl:tg.t, ...c })));
-  return out;
-}
-function matches(c){
+const allCols = () => feed.targets.flatMap(t => t.cols.map(c => ({...c, table:t.t})));
+const hit = c => {
+  if (onlyX && (c.op==="direct"||c.op==="unmapped")) return false;
   if (!q) return true;
-  const s = q.toLowerCase();
-  return (c.c + " " + c.src + " " + c.tbl).toLowerCase().includes(s);
-}
+  const s=q.toLowerCase();
+  return `${c.col} ${c.src||""}`.toLowerCase().includes(s);
+};
+const mixOf = cols => {
+  const by={}; let tr=0;
+  cols.forEach(c=>{ by[c.op]=(by[c.op]||0)+1; if(c.op!=="direct"&&c.op!=="unmapped")tr++; });
+  return { total:cols.length, transformed:tr,
+           mix:OP_ORDER.filter(k=>by[k]).map(k=>({op:k,n:by[k]})) };
+};
+const srcFields = () => {
+  const m=new Map();
+  allCols().forEach(c=>{ if(!c.src)return;
+    const e=m.get(c.src)||{name:c.src,n:0,x:0};
+    e.n++; if(c.op!=="direct"&&c.op!=="unmapped")e.x++; m.set(c.src,e); });
+  return [...m.values()].sort((a,b)=>b.n-a.n);
+};
 
-/* -------------------------------------------------------------- layout
-   Two columns. Node height follows its content, because a table with
-   twelve columns and a table with one should not be the same size — the
-   size IS the fan-out. */
-const NW = 268, HEAD = 40, ROW = 22, GAPY = 14, PADX = 20, COLGAP = 230;
-
+/* -------------------------------------------------------------- layout */
+const NW=272, HEAD=40, ROW=22, GAPY=14, PAD=20, COLGAP=226;
 function layout(){
-  const L = links();
-  const srcCols = [...new Set(L.map(x => x.src))].filter(s => s && s !== "—");
-  const sOpen = open.has(srcId());
-  const sh = HEAD + (sOpen ? srcCols.length * ROW + 1 : 0);
-
-  const tg = feed.targets.map(t => {
-    const o = open.has(tgtId(t.t));
-    return { id:tgtId(t.t), t, open:o,
-             h: HEAD + (o ? t.cols.length * ROW + 1 : 0) };
+  const SF=srcFields(), sOpen=open.has("src");
+  const sRows = sOpen ? (showAll.has("src") ? SF.length : Math.min(SF.length,CAP)) : 0;
+  const sh = HEAD + (sOpen ? sRows*ROW + (sRows<SF.length?ROW:0) + 1 : 0);
+  const tg = feed.targets.map(tb=>{
+    const o=open.has("t:"+tb.t), shown=o?tb.cols.filter(hit):[];
+    const n = showAll.has("t:"+tb.t) ? shown.length : Math.min(shown.length,CAP);
+    return { tb, open:o, shown, n,
+             h: HEAD + (o ? n*ROW + (n<shown.length?ROW:0) + (shown.length?1:ROW) : 0) };
   });
-  const totalT = tg.reduce((a,b) => a + b.h, 0) + (tg.length - 1) * GAPY;
-  const H = Math.max(sh, totalT) + PADX * 2;
-
-  const s = { id:srcId(), x:PADX, y:PADX + (H - PADX*2 - sh)/2, w:NW, h:sh,
-              open:sOpen, cols:srcCols };
-  let y = PADX + (H - PADX*2 - totalT)/2;
-  tg.forEach(n => { n.x = PADX + NW + COLGAP; n.y = y; n.w = NW; y += n.h + GAPY; });
-
-  return { src:s, tgts:tg, W: PADX*2 + NW*2 + COLGAP, H };
+  const totalT = tg.reduce((a,b)=>a+b.h,0) + Math.max(0,tg.length-1)*GAPY;
+  const H = Math.max(sh,totalT,120) + PAD*2;
+  const src = { x:PAD, y:PAD+(H-PAD*2-sh)/2, w:NW, h:sh, open:sOpen, rows:sRows, SF };
+  let y = PAD+(H-PAD*2-totalT)/2;
+  tg.forEach(n=>{ n.x=PAD+NW+COLGAP; n.y=y; n.w=NW; y+=n.h+GAPY; });
+  return { src, tg, W:PAD*2+NW*2+COLGAP, H };
 }
-
-/* Where a link attaches: the column row when its side is open, otherwise
-   the node's own edge. This is the whole mechanic — collapse one side and
-   its links gather into one thicker wire instead of disappearing. */
-function anchorSrc(v, srcName){
-  if (v.src.open){
-    const i = v.src.cols.indexOf(srcName);
-    if (i >= 0) return { x: v.src.x + v.src.w, y: v.src.y + HEAD + 1 + i*ROW + ROW/2 };
+const anchorSrc = name => {
+  if (view.src.open){
+    const i=view.src.SF.findIndex(s=>s.name===name);
+    if(i>=0&&i<view.src.rows) return {x:view.src.x+NW,y:view.src.y+HEAD+1+i*ROW+ROW/2};
   }
-  return { x: v.src.x + v.src.w, y: v.src.y + HEAD/2 };
-}
-function anchorTgt(v, tbl, colName){
-  const n = v.tgts.find(t => t.t.t === tbl);
-  if (!n) return null;
-  if (n.open){
-    const i = n.t.cols.findIndex(c => c.c === colName);
-    if (i >= 0) return { x:n.x, y: n.y + HEAD + 1 + i*ROW + ROW/2 };
-  }
-  return { x:n.x, y: n.y + HEAD/2 };
-}
+  return {x:view.src.x+NW, y:view.src.y+HEAD/2};
+};
+const anchorTgt = (table,col) => {
+  const n=view.tg.find(x=>x.tb.t===table); if(!n) return null;
+  if(n.open){ const i=n.shown.findIndex(c=>c.col===col);
+    if(i>=0&&i<n.n) return {x:n.x,y:n.y+HEAD+1+i*ROW+ROW/2}; }
+  return {x:n.x, y:n.y+HEAD/2};
+};
 
 /* -------------------------------------------------------------- render */
 function drawFeeds(){
-  el("#feed").innerHTML = LANES[lane].feeds.map(f =>
+  el("#feed").innerHTML = LANES[lane].feeds.map(f=>
     `<option value="${esc(f.id)}"${f.id===feed.id?" selected":""}>${esc(f.name)} · ${esc(f.id)}</option>`).join("");
 }
-
-function tnode(n, kind){
-  const tc = kind === "src" ? "var(--src)" : "var(--dwh)";
-  const d = document.createElement("div");
-  d.className = "tnode" + (n.open ? " open" : "");
-  d.style.setProperty("--tc", tc);
-  Object.assign(d.style, { left:`${n.x}px`, top:`${n.y}px`, width:`${n.w}px` });
-
-  if (kind === "src"){
-    const mapped = links().length;
-    d.innerHTML = `
-      <button class="thead" data-toggle="${esc(n.id)}">
-        <span class="chev">▶</span>
-        <span class="tname">${esc(feed.id)}</span>
-        <span class="tmeta">${feed.fields} fields</span>
-      </button>
-      <div class="tsub">${esc(feed.name)} · ${esc(feed.kind)} · ${mapped} links</div>
-      ${n.open ? `<div class="cols">${n.cols.map(c => {
-        const any = links().some(l => l.src === c && matches(l));
-        return `<button class="crow${any?"":" dimmed"}" data-src="${esc(c)}">
-          <span class="cname">${esc(c)}</span></button>`;
-      }).join("")}</div>` : ""}`;
-  } else {
-    const t = n.t;
-    const hit = t.cols.filter(matches).length;
-    d.innerHTML = `
-      <button class="thead" data-toggle="${esc(n.id)}">
-        <span class="chev">▶</span>
-        <span class="tname">${esc(t.t)}</span>
-        <span class="tmeta">${t.cols.length} col${t.cols.length===1?"":"s"}</span>
-      </button>
-      <div class="tsub">${q ? `${hit} match${hit===1?"":"es"}` : "IMDS warehouse"}</div>
-      ${n.open ? `<div class="cols">${t.cols.map(c => {
-        const on = sel && sel.tbl === t.t && sel.col === c.c;
-        return `<button class="crow${on?" on":""}${matches(c)?"":" dimmed"}"
-            data-col="${esc(c.c)}" data-tbl="${esc(t.t)}">
-          <span class="opchip" style="background:color-mix(in srgb,${OPC[c.op]} 20%,transparent);
-            color:${OPC[c.op]}">${esc(c.op)}</span>
-          <span class="cname">${esc(c.c)}</span>
-          <span class="ctype">${esc(c.ty)}</span></button>`;
-      }).join("")}</div>` : ""}`;
-  }
-  return d;
-}
+const pips = n => `<span class="pips" title="${n} operation${n===1?"":"s"} between source and target">`
+  + [0,1,2,3].map(i=>`<i class="${i<Math.min(n,4)?"f":""}"></i>`).join("")
+  + (n>4?`<b style="font-size:7.5px;color:var(--muted);margin-left:1px">+${n-4}</b>`:"")
+  + `</span>`;
+const mixBar = (m,w) => `<span class="mix" style="width:${w}px"
+    title="${m.mix.map(x=>x.n+" "+x.op).join(" · ")}">`
+  + m.mix.map(x=>`<i style="background:${OPM[x.op].c};width:${(x.n/Math.max(1,m.total))*100}%"></i>`).join("")
+  + `</span>`;
 
 function draw(){
   view = layout();
-  stage.querySelectorAll(".tnode").forEach(x => x.remove());
-  stage.appendChild(tnode(view.src, "src"));
-  view.tgts.forEach(n => stage.appendChild(tnode(n, "tgt")));
-  drawWires();
-  drawLegend();
-  drawDrawer();
+  stage.querySelectorAll(".tnode").forEach(x=>x.remove());
+
+  // the feed
+  const s=view.src, sd=document.createElement("div");
+  sd.className="tnode"+(s.open?" open":""); sd.style.setProperty("--tc","var(--src)");
+  Object.assign(sd.style,{left:s.x+"px",top:s.y+"px",width:NW+"px"});
+  sd.innerHTML = `
+    <button class="thead" data-toggle="src">
+      <span class="chev">▶</span>
+      <span style="flex:1;min-width:0">
+        <span style="display:block;font-size:11.5px;font-weight:500;overflow:hidden;
+          text-overflow:ellipsis;white-space:nowrap">${esc(feed.name)}</span>
+        <span class="tname" style="display:block;color:var(--muted);font-size:9px">
+          ${esc(feed.id)} · ${esc(lane)}</span></span>
+      <span style="font-size:9px;color:var(--muted)">${s.SF.length} fields</span>
+    </button>
+    ${s.open?`<div style="border-top:1px solid var(--panel2)">
+      ${s.SF.slice(0,s.rows).map(f=>`<button class="crow" data-src="${esc(f.name)}"
+        title="${esc(f.name)} feeds ${f.n} column${f.n===1?"":"s"}${f.x?`, ${f.x} with a transformation`:""}">
+        <span class="cname">${esc(f.name)}</span>
+        ${f.x?'<i class="dot" title="feeds a transformed column"></i>':""}
+        <span style="font-size:8.5px;color:var(--muted)">${f.n}</span></button>`).join("")}
+      ${s.rows<s.SF.length?`<button class="more" data-all="src">+${s.SF.length-s.rows} more fields</button>`:""}
+    </div>`:""}`;
+  stage.appendChild(sd);
+
+  // the tables
+  view.tg.forEach(n=>{
+    const m=mixOf(n.tb.cols), d=document.createElement("div");
+    d.className="tnode"+(n.open?" open":""); d.style.setProperty("--tc","var(--dwh)");
+    Object.assign(d.style,{left:n.x+"px",top:n.y+"px",width:NW+"px"});
+    d.innerHTML = `
+      <button class="thead" data-toggle="t:${esc(n.tb.t)}">
+        <span class="chev">▶</span>
+        <span style="flex:1;min-width:0">
+          <span class="tname" style="display:block">${esc(n.tb.t)}</span>
+          <span style="display:flex;gap:6px;align-items:center;margin-top:2px">
+            ${mixBar(m,86)}
+            <span style="font-size:8.5px;color:var(--muted)">
+              ${m.transformed} of ${m.total} computed</span></span></span>
+      </button>
+      ${n.open?`<div style="border-top:1px solid var(--panel2)">
+        ${n.shown.slice(0,n.n).map(c=>{
+          const on = sel && sel.t===n.tb.t && sel.c===c.col;
+          return `<button class="crow${on?" on":""}" data-col="${esc(c.col)}"
+            data-tbl="${esc(n.tb.t)}" title="${esc(c.src||"no source")} → ${esc(c.col)}
+${esc(OPM[c.op].note)}">
+            <i style="width:6px;height:6px;border-radius:1.5px;flex-shrink:0;
+              background:${OPM[c.op].c}"></i>
+            <span class="cname"${on?' style="font-weight:700"':""}>${esc(c.col)}</span>
+            ${c.steps?pips(c.steps):""}
+            <span class="oplab" style="color:${OPM[c.op].c}">${esc(OPM[c.op].label)}</span>
+          </button>`;}).join("")}
+        ${n.n<n.shown.length?`<button class="more" data-all="t:${esc(n.tb.t)}">+${n.shown.length-n.n} more columns</button>`:""}
+        ${!n.shown.length?`<div style="padding:6px 10px;font-size:9.5px;color:var(--muted)">no column matches the filter</div>`:""}
+      </div>`:""}`;
+    stage.appendChild(d);
+  });
+
+  drawWires(); drawLegend(); drawDetail();
 }
 
 function drawWires(){
-  const L = links();
-  // merge links that land on the same pair of anchors, so a closed table
-  // shows one wire carrying N columns rather than N wires on one point
-  const merged = new Map();
-  L.forEach(l => {
-    const a = anchorSrc(view, l.src), b = anchorTgt(view, l.tbl, l.c);
-    if (!a || !b) return;
-    const k = `${a.x},${a.y}>${b.x},${b.y}`;
-    if (!merged.has(k)) merged.set(k, { a, b, items:[] });
-    merged.get(k).items.push(l);
+  const merged=new Map();
+  allCols().forEach(c=>{
+    /* No source field means nothing feeds this column — a constant, or
+       nothing at all. Drawing a wire back to the feed would say the
+       opposite of what the row's own chip says. The row stays clickable
+       either way, so the detail is still one click from here. */
+    if(!c.src) return;
+    const a=anchorSrc(c.src), b=anchorTgt(c.table,c.col); if(!a||!b)return;
+    const k=`${a.y}>${b.y}`; if(!merged.has(k))merged.set(k,{a,b,items:[]});
+    merged.get(k).items.push(c);
   });
-  let d = "";
-  merged.forEach(m => {
-    const one = m.items.length === 1 ? m.items[0] : null;
-    const hit = m.items.some(matches);
-    const on = !sel || m.items.some(i => sel.tbl === i.tbl && sel.col === i.c);
-    const op = !hit ? .08 : on ? .8 : .18;
-    const w = Math.min(7, 1.3 + Math.log2(m.items.length + 1) * 1.7);
-    const c = one ? OPC[one.op] : LANES[lane].c;
-    const mx = (m.a.x + m.b.x) / 2;
-    d += `<path d="M${m.a.x},${m.a.y} C${mx},${m.a.y} ${mx},${m.b.y} ${m.b.x},${m.b.y}"
-        fill="none" stroke="${c}" stroke-width="${w}" opacity="${op}"
-        stroke-linecap="round"></path>`;
-    if (m.items.length > 1 && hit){
-      d += `<circle cx="${mx}" cy="${(m.a.y+m.b.y)/2}" r="8.5"
-              fill="var(--panel)" stroke="${c}" stroke-width="1.2" opacity="${op}"></circle>
-            <text x="${mx}" y="${(m.a.y+m.b.y)/2+3}" text-anchor="middle"
-              font-family="var(--f-mono)" font-size="9" font-weight="700"
-              fill="${c}" opacity="${op}">${m.items.length}</text>`;
-    } else if (one && hit && on && sel){
-      d += `<text x="${mx}" y="${(m.a.y+m.b.y)/2 - 6}" text-anchor="middle"
-              font-family="var(--f-mono)" font-size="9" font-weight="700"
-              fill="${c}">${esc(one.op)}</text>`;
+  let d=""; let i=0;
+  merged.forEach(m=>{
+    const one = m.items.length===1?m.items[0]:null;
+    const vis = m.items.some(hit);
+    const lit = !sel || m.items.some(x=>x.table===sel.t&&x.col===sel.c);
+    const op = !vis?.07 : lit?.8 : .16;
+    const w = Math.min(7, 1.3+Math.log2(m.items.length+1)*1.7);
+    const c = one?OPM[one.op].c
+      : (m.items.some(x=>x.op!=="direct"&&x.op!=="unmapped")?"var(--o-derived)":"#9aa7b2");
+    const mx=(m.a.x+m.b.x)/2, my=(m.a.y+m.b.y)/2;
+    const path=`M${m.a.x},${m.a.y} C${mx},${m.a.y} ${mx},${m.b.y} ${m.b.x},${m.b.y}`;
+    /* A 1.4px curve is not a click target. An invisible wide stroke over the
+       same path is — the visible wire keeps its weight and the hit area is a
+       finger. */
+    if(vis) d += `<path class="hit" d="${path}" fill="none" stroke="transparent"
+      stroke-width="${Math.max(16,w+10)}" stroke-linecap="round"
+      data-wire="${i}"><title>${one
+        ? esc((one.src||"no source")+" → "+one.table+"."+one.col)+"\n"+esc(OPM[one.op].label)
+        : m.items.length+" columns into "+esc(m.items[0].table)+" — click to open the table"}</title></path>`;
+    d += `<path d="${path}" fill="none" stroke="${c}" stroke-width="${w}"
+      opacity="${op}" stroke-linecap="round"></path>`;
+    if(m.items.length>1&&vis){
+      d += `<g class="bub" data-wire="${i}">
+        <circle cx="${mx}" cy="${my}" r="8.5" fill="var(--panel)" stroke="${c}"
+          stroke-width="1.2" opacity="${op}"></circle>
+        <text x="${mx}" y="${my+3}" text-anchor="middle" font-family="var(--f-mono)"
+          font-size="9" font-weight="700" fill="${c}" opacity="${op}">${m.items.length}</text></g>`;
     }
+    WIRES[i++]=m;
   });
-  wires.innerHTML = d;
-  Object.assign(wires.style, { width:`${view.W}px`, height:`${view.H}px` });
-  wires.setAttribute("viewBox", `0 0 ${view.W} ${view.H}`);
+  wires.innerHTML=d;
+  Object.assign(wires.style,{width:view.W+"px",height:view.H+"px"});
+  wires.setAttribute("viewBox",`0 0 ${view.W} ${view.H}`);
 }
+const WIRES=[];
 
 function drawLegend(){
-  el("#legend").innerHTML = Object.keys(OPC).map(k =>
-    `<span><i style="background:${OPC[k]}"></i>${k}</span>`).join("")
-    + `<span style="margin-left:auto">Wire thickness is how many columns it carries.
-       A number on a wire means it is still collapsed.</span>`;
+  const m=mixOf(allCols());
+  el("#legend").innerHTML = m.mix.map(x=>
+    `<span title="${esc(OPM[x.op].note)}" style="cursor:help">
+      <i style="background:${OPM[x.op].c}"></i>${OPM[x.op].label}</span>`).join("")
+    + `<span style="margin-left:auto;color:var(--muted)">Wire thickness is columns
+       carried · dots on a row are operations between source and target</span>`;
 }
 
-function drawDrawer(){
-  const host = el("#drawer");
-  if (!sel){
-    const L = links();
-    const byOp = {};
-    L.forEach(l => { byOp[l.op] = (byOp[l.op]||0)+1; });
-    host.innerHTML = `
-      <div class="eyebrow" style="margin-bottom:6px">This feed</div>
-      <dl class="kv">
-        <dt>Feed</dt><dd><b>${esc(feed.name)}</b>
-          <span class="mono" style="color:var(--muted)">${esc(feed.id)}</span></dd>
-        <dt>Lands in</dt><dd>${feed.targets.length} table${feed.targets.length===1?"":"s"} ·
-          ${L.length} column link${L.length===1?"":"s"}</dd>
-        <dt>Operations</dt><dd>${Object.entries(byOp).map(([k,v]) =>
-          `<span class="opchip" style="background:color-mix(in srgb,${OPC[k]} 20%,transparent);
-            color:${OPC[k]};margin-right:5px">${esc(k)} ${v}</span>`).join("")}</dd>
-      </dl>
-      <p class="note" style="margin:9px 0 0">Open a table and pick a column to see
-        the expression behind it. Nothing here is a verdict — the expression is
-        what the mapping document records, not what anyone has checked.</p>`;
-    return;
-  }
-  const l = links().find(x => x.tbl === sel.tbl && x.c === sel.col);
-  if (!l){ sel = null; drawDrawer(); return; }
+function drawDetail(){
+  const host=el("#detail");
+  if(!sel){ host.innerHTML=""; return; }
+  const c = allCols().find(x=>x.table===sel.t&&x.col===sel.c);
+  if(!c){ sel=null; host.innerHTML=""; return; }
+  const meta=OPM[c.op];
+  const KC={field:"var(--src)",const:"#7b8894",function:"var(--o-trim)",
+            branch:"var(--o-derived)",join:"var(--o-decode)",target:"var(--dwh)"};
+  const sem=[c.unit&&`<span><b>unit</b> ${esc(c.unit)}</span>`,
+             c.cur&&`<span><b>currency</b> ${esc(c.cur)}</span>`,
+             c.sign&&`<span><b>sign</b> ${esc(c.sign)}</span>`,
+             c.codeset&&`<span><b>code set</b> <span class="mono">${esc(c.codeset)}</span></span>`]
+            .filter(Boolean).join("");
   host.innerHTML = `
-    <div style="display:flex;gap:9px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px">
-      <span class="mono" style="font-size:12px">${esc(feed.id)}.${esc(l.src)}</span>
-      <span class="arrow">→</span>
-      <span class="mono" style="font-size:12px">${esc(l.tbl)}.${esc(l.c)}</span>
-      <span class="opchip" style="background:color-mix(in srgb,${OPC[l.op]} 20%,transparent);
-        color:${OPC[l.op]}">${esc(l.op)}</span>
-      <button class="ghost" id="clr" style="margin-left:auto">clear</button>
-    </div>
-    <dl class="kv">
-      <dt>Source</dt><dd class="mono">${esc(l.src)} ${esc(l.sty||"")}</dd>
-      <dt>Target</dt><dd class="mono">${esc(l.c)} ${esc(l.ty)}</dd>
-    </dl>
-    <pre class="expr">${esc(l.expr)}</pre>
-    <div class="eyebrow" style="margin-top:11px">Operations, in order</div>
-    <div class="ops">${l.ops.map(([k,v],i) => {
-      const c = k === "field" ? "var(--src)" : k === "target" ? "var(--dwh)"
-              : k === "branch" ? "var(--k-branch)" : k === "const" ? "var(--k-const)"
-              : "var(--k-fn)";
-      return `${i ? '<span class="arrow">→</span>' : ""}
-        <span class="op" style="--oc:${c}"><b>${esc(k)}</b><span>${esc(v)}</span></span>`;
-    }).join("")}</div>`;
-  const c = el("#clr");
-  if (c) c.onclick = () => { sel = null; draw(); };
+    <div class="detail" style="--dc:${meta.c}">
+      <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap">
+        <span class="mono" style="font-size:11px">${esc(feed.id)}.${esc(c.src||"—")}</span>
+        <span class="arrow">→</span>
+        <span class="mono" style="font-size:11px">${esc(c.table)}.${esc(c.col)}</span>
+        <span class="chip" style="background:color-mix(in srgb,${meta.c} 22%,transparent);
+          color:${meta.c}">${esc(meta.label)}</span>
+        <span style="font-size:10px;color:var(--muted)">${c.steps} operation${c.steps===1?"":"s"}</span>
+        <button class="ghost" id="clr" style="margin-left:auto">clear</button>
+      </div>
+      <div style="font-size:10.5px;color:var(--sub);line-height:1.6;margin-top:4px">
+        ${esc(meta.note)}</div>
+
+      <div class="ends">
+        <span class="end" style="--ec:var(--src)"><b>Source field</b>
+          <span class="n">${esc(c.src||"— none —")}</span>
+          <span class="ty">${c.sty?esc(c.sty)+(c.slen?`(${esc(c.slen)})`:""):"type not published"}</span></span>
+        <span class="arrow">→</span>
+        <span class="end" style="--ec:var(--dwh)"><b>Warehouse column</b>
+          <span class="n">${esc(c.col)}</span>
+          <span class="ty">${esc(c.ty||"")}${c.len?`(${esc(c.len)}${c.prec?","+esc(c.prec):""})`:""}
+            ${c.nul?` · nullable ${esc(c.nul)}`:""}${c.pk==="Y"?" · key":""}</span></span>
+      </div>
+
+      ${sem?`<div class="sem">${sem}</div>`:""}
+
+      <div class="dict">
+        <span class="eyebrow">What the field means</span>
+        ${c.def?`<div style="font-size:10.5px;color:var(--sub);line-height:1.6;
+            margin-top:3px;max-width:76ch">
+            <b style="color:var(--ink)">${esc(c.def.term)}</b> — ${esc(c.def.d)}
+            <div style="color:var(--muted);margin-top:2px">from ${esc(c.def.src)}
+              ${c.def.ty?` · ${esc(c.def.ty)}`:""}${c.def.ev?` · ${esc(c.def.ev)}`:""}</div>
+            ${c.def.caveat?`<div style="color:#b45309;margin-top:2px">${esc(c.def.caveat)}</div>`:""}
+          </div>`
+          :`<div style="font-size:10.5px;color:var(--muted);margin-top:3px">
+            ${c.src?esc(c.defNote||"No loaded dictionary defines this field.")
+                   :"No source field, so nothing to define."}</div>`}
+      </div>
+
+      ${c.expr?`<pre class="expr">${esc(c.expr)}</pre>
+        <div class="ops">${c.ops.map(([k,v],i)=>
+          `${i?'<span class="arrow">→</span>':""}
+           <span class="op" style="--oc:${KC[k]||"#5f87a7"}"><b>${esc(k)}</b>
+             <span>${esc(v)}</span></span>`).join("")}</div>`
+        :`<div style="font-size:10.5px;color:var(--muted);margin-top:8px">
+           No expression is recorded — the value is carried across as it arrives.</div>`}
+    </div>`;
+  const b=el("#clr"); if(b) b.onclick=()=>{ sel=null; draw(); };
 }
 
 /* ------------------------------------------------------ pan/zoom/events */
-function apply(){ stage.style.transform = `translate(${z.x}px,${z.y}px) scale(${z.k})`; }
+function apply(){ stage.style.transform=`translate(${z.x}px,${z.y}px) scale(${z.k})`; }
 function fit(){
-  const r = cv.getBoundingClientRect();
-  const k = Math.max(.35, Math.min((r.width-20)/view.W, (r.height-20)/view.H, 1.1));
-  z = { k, x:(r.width - view.W*k)/2, y:(r.height - view.H*k)/2 };
-  apply();
+  const r=cv.getBoundingClientRect();
+  const k=Math.max(.35,Math.min((r.width-20)/view.W,(r.height-20)/view.H,1.1));
+  z={k,x:(r.width-view.W*k)/2,y:(r.height-view.H*k)/2}; apply();
 }
-el("#zin").onclick = () => { z.k = Math.min(2, z.k*1.2); apply(); };
-el("#zout").onclick = () => { z.k = Math.max(.35, z.k/1.2); apply(); };
-el("#zfit").onclick = fit;
-
-let dr = null;
-cv.addEventListener("pointerdown", e => {
-  if (e.target.closest(".tnode") || e.target.closest(".zoom")) return;
-  dr = { x:e.clientX - z.x, y:e.clientY - z.y };
-  cv.classList.add("drag"); cv.setPointerCapture(e.pointerId);
+el("#zin").onclick=()=>{z.k=Math.min(2,z.k*1.2);apply();};
+el("#zout").onclick=()=>{z.k=Math.max(.35,z.k/1.2);apply();};
+el("#zfit").onclick=fit;
+let dr=null;
+cv.addEventListener("pointerdown",e=>{
+  if(e.target.closest(".tnode")||e.target.closest(".zoom")||e.target.closest("[data-wire]"))return;
+  dr={x:e.clientX-z.x,y:e.clientY-z.y}; cv.classList.add("drag");
+  cv.setPointerCapture(e.pointerId);
 });
-cv.addEventListener("pointermove", e => {
-  if (!dr) return; z.x = e.clientX - dr.x; z.y = e.clientY - dr.y; apply();
-});
-["pointerup","pointercancel"].forEach(ev =>
-  cv.addEventListener(ev, () => { dr = null; cv.classList.remove("drag"); }));
-cv.addEventListener("wheel", e => {
+cv.addEventListener("pointermove",e=>{ if(!dr)return;
+  z.x=e.clientX-dr.x; z.y=e.clientY-dr.y; apply(); });
+["pointerup","pointercancel"].forEach(ev=>
+  cv.addEventListener(ev,()=>{dr=null;cv.classList.remove("drag");}));
+cv.addEventListener("wheel",e=>{
   e.preventDefault();
-  const r = cv.getBoundingClientRect(), mx = e.clientX-r.left, my = e.clientY-r.top;
-  const nk = Math.min(2, Math.max(.35, z.k * (e.deltaY < 0 ? 1.08 : 1/1.08)));
-  z = { k:nk, x: mx-(mx-z.x)*(nk/z.k), y: my-(my-z.y)*(nk/z.k) }; apply();
-}, { passive:false });
+  const r=cv.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+  const nk=Math.min(2,Math.max(.35,z.k*(e.deltaY<0?1.08:1/1.08)));
+  z={k:nk,x:mx-(mx-z.x)*(nk/z.k),y:my-(my-z.y)*(nk/z.k)}; apply();
+},{passive:false});
 
-document.addEventListener("click", e => {
-  const tg = e.target.closest("[data-toggle]");
-  if (tg){ const id = tg.dataset.toggle;
-    open.has(id) ? open.delete(id) : open.add(id); draw(); return; }
-  const col = e.target.closest("[data-col]");
-  if (col){ const k = { tbl:col.dataset.tbl, col:col.dataset.col };
-    sel = (sel && sel.tbl===k.tbl && sel.col===k.col) ? null : k; draw(); return; }
-  const s = e.target.closest("[data-src]");
-  if (s){ q = s.dataset.src; el("#q").value = q; draw(); return; }
+document.addEventListener("click",e=>{
+  const w=e.target.closest("[data-wire]");
+  if(w){ const m=WIRES[+w.dataset.wire]; if(!m)return;
+    if(m.items.length>1){ open.add("t:"+m.items[0].table);
+      sel={t:m.items[0].table,c:m.items[0].col}; }
+    else { const o=m.items[0];
+      sel=(sel&&sel.t===o.table&&sel.c===o.col)?null:{t:o.table,c:o.col}; }
+    draw(); return; }
+  const tg=e.target.closest("[data-toggle]");
+  if(tg){ const id=tg.dataset.toggle; open.has(id)?open.delete(id):open.add(id);
+    draw(); return; }
+  const all=e.target.closest("[data-all]");
+  if(all){ showAll.add(all.dataset.all); draw(); return; }
+  const col=e.target.closest("[data-col]");
+  if(col){ const k={t:col.dataset.tbl,c:col.dataset.col};
+    sel=(sel&&sel.t===k.t&&sel.c===k.c)?null:k; draw(); return; }
+  const s=e.target.closest("[data-src]");
+  if(s){ q=s.dataset.src; el("#q").value=q; draw(); return; }
 });
 
-el("#p-star").onclick = () => pick("STAR");
-el("#p-uaf").onclick = () => pick("UAF");
+el("#p-star").onclick=()=>pick("STAR");
+el("#p-uaf").onclick=()=>pick("UAF");
 function pick(l){
-  lane = l; feed = LANES[l].feeds[0]; open = new Set(); sel = null;
-  el("#p-star").setAttribute("aria-pressed", String(l==="STAR"));
-  el("#p-uaf").setAttribute("aria-pressed", String(l==="UAF"));
-  drawFeeds(); draw(); fit();
+  lane=l; feed=LANES[l].feeds[0]; open=new Set(); showAll=new Set(); sel=null;
+  el("#p-star").setAttribute("aria-pressed",String(l==="STAR"));
+  el("#p-uaf").setAttribute("aria-pressed",String(l==="UAF"));
+  drawFeeds(); open=new Set(["t:"+feed.targets[0].t]); draw(); fit();
 }
-el("#feed").onchange = e => {
-  feed = LANES[lane].feeds.find(f => f.id === e.target.value);
-  open = new Set(); sel = null; draw(); fit();
+el("#feed").onchange=e=>{
+  feed=LANES[lane].feeds.find(f=>f.id===e.target.value);
+  open=new Set(["t:"+feed.targets[0].t]); showAll=new Set(); sel=null; draw(); fit();
 };
-el("#q").oninput = e => { q = e.target.value.trim(); draw(); };
-el("#expand").onclick = () => {
-  open = new Set([srcId(), ...feed.targets.map(t => tgtId(t.t))]); draw(); fit(); };
-el("#collapse").onclick = () => { open = new Set(); draw(); fit(); };
+el("#q").oninput=e=>{ q=e.target.value.trim(); draw(); };
+el("#onlyx").onclick=()=>{ onlyX=!onlyX;
+  el("#onlyx").setAttribute("aria-pressed",String(onlyX)); draw(); };
+el("#expand").onclick=()=>{ open=new Set(["src",...feed.targets.map(t=>"t:"+t.t)]);
+  draw(); fit(); };
+el("#collapse").onclick=()=>{ open=new Set(); showAll=new Set(); draw(); fit(); };
 
-new ResizeObserver(() => { if (view) fit(); }).observe(cv);
+new ResizeObserver(()=>{ if(view) fit(); }).observe(cv);
 drawFeeds();
-// open at the state that shows what the screen does: one table open, so the
-// column-level links are visible without the reader having to find them
-open = new Set([tgtId(LANES.STAR.feeds[0].targets[0].t)]);
+// open at a state that shows what the screen does, with a wire already
+// selected — a canvas with an empty panel below it explains nothing
+open=new Set(["t:"+LANES.STAR.feeds[0].targets[0].t]);
+sel={t:"HOLDINGDBO.LOT_LEVEL_POSITION",c:"BOOK_VALUE"};
 draw(); fit();
 </script>

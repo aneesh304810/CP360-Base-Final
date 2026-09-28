@@ -107,6 +107,22 @@ const hitWidth = (n) => Math.max(16, Math.min(7, 1.3 + Math.log2(n + 1) * 1.7) +
      hitWidth(n));
 });
 
+// ---- a column with no source field draws no wire ------------------------
+// The wire says "this value comes from the feed". For a constant or an
+// unmapped column nothing does, so a wire there contradicts the row's own
+// "no source" chip and, when the wire is a merged one, inflates its count.
+// The row stays clickable, so the detail is still one click away.
+const wired = STAR.filter((c) => c.src);
+ok(wired.length === STAR.length - 1,
+   "the fixture has exactly one source-less column", STAR.length - wired.length);
+ok(!wired.some((c) => c.col === "POSITION_ID"),
+   "the constant column is not wired back to the feed");
+ok(wired.every((c) => classifyLink(c).op !== "unmapped"),
+   "no wire is drawn for a column nothing feeds");
+// and its detail is still reachable, because the row carries the click
+ok(STAR.some((c) => c.col === "POSITION_ID" && classifyLink(c).rule),
+   "the source-less column still has a rule the panel can show");
+
 // ---- the detail panel has something to say for every link ---------------
 // Panel content comes from the link row, so every field it reads must
 // survive the endpoint's shape. A missing key renders "undefined", which

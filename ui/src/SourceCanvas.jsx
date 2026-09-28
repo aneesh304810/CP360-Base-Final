@@ -165,6 +165,11 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
   const wires = [];
   const merged = new Map();
   targets.forEach((tg) => tg.cols.forEach((c) => {
+    // No source field means nothing feeds this column -- a constant, or
+    // nothing at all. A wire back to the feed would contradict the row's own
+    // "no source" chip, and would inflate the count on a merged wire. The row
+    // is clickable on its own, so the detail stays one click away.
+    if (!c.src) return;
     const a = anchorSrc(c.src), b = anchorTgt(tg.table, c.col);
     if (!a || !b) return;
     const k = `${a.y}>${b.y}`;
