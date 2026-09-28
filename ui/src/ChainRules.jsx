@@ -27,6 +27,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { crosswalkApi } from "./seiCrosswalkApi.js";
 import { EQ_MEANING } from "./CrosswalkFlow.jsx";
 import { compareRules } from "./ruleParse.js";
+import OperatorGraph from "./OperatorGraph.jsx";
 
 const MONO = "'Roboto Mono', ui-monospace, Menlo, monospace";
 const STAGE_C = { SRC: "#7c3aed", STG1: "#00a3a3", STG2: "#0091bf", DWH: "#0f4775" };
@@ -249,6 +250,7 @@ export default function ChainRules({ t, chain, dataSource, onSaved }) {
               longer gets a pane of its own — with the structural
               comparison under it. */}
           <RuleCompare t={t} dataSource={dataSource}
+            target={L("dwh_target_column") || chain.column}
             legacyText={(xf && xf.legacy_logic) || (cmp && cmp.imds_logic)
                         || L("stg2_to_dwh_transform")}
             seiText={seiRule} />
@@ -501,10 +503,15 @@ function RulePane({ t, title, colour, text, parsed, res, empty }) {
     </div>);
 }
 
-export function RuleCompare({ t, legacyText, seiText, dataSource }) {
+export function RuleCompare({ t, legacyText, seiText, dataSource, target }) {
   const cmp = useMemo(() => compareRules(legacyText, seiText),
     [legacyText, seiText]);
   const [res, setRes] = useState(null);
+  // TEXT OR GRAPH, NOT BOTH AT ONCE. The graph shows the shape and the
+  // text shows the characters, and a reader checking an expression wants
+  // the characters — so the panes stay the default and the graph is a
+  // step away rather than a replacement.
+  const [mode, setMode] = useState("text");
 
   const wanted = useMemo(() => {
     const all = new Set();
@@ -527,16 +534,35 @@ export function RuleCompare({ t, legacyText, seiText, dataSource }) {
   if (cmp.legacy.empty && cmp.sei.empty) return null;
   const SEV = { risk: ["#c1113a", "Risk"], check: ["#e67e22", "Check"],
                 gap: ["#6b7c8a", "Gap"] };
+  const tab = (k, label) => (
+    <button type="button" onClick={() => setMode(k)}
+      style={{ font: "inherit", fontSize: 10.5, padding: "3px 11px",
+        borderRadius: 999, cursor: "pointer",
+        border: `1px solid ${mode === k ? (t.accent || "#0f4775")
+                                        : (t.panel2 || "#dfe6e9")}`,
+        background: mode === k ? (t.accent || "#0f4775") : "transparent",
+        color: mode === k ? "#fff" : (t.sub || "#666"),
+        fontWeight: mode === k ? 500 : 400 }}>{label}</button>);
 
   return (
     <div style={{ marginTop: 16 }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+        {tab("text", "Expressions")}
+        {tab("graph", "Operations")}
+      </div>
+
+      {mode === "graph" && (
+        <OperatorGraph t={t} legacyText={legacyText} seiText={seiText}
+          target={target} dataSource={dataSource} />)}
+
+      {mode === "text" && (
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
         <RulePane t={t} title="Today · STAR → IMDS" colour="#b5651d"
           text={cmp.legacy.raw} parsed={cmp.legacy} res={res}
           empty={cmp.legacy.empty} />
         <RulePane t={t} title="Proposed · SEI" colour="#0091bf"
           text={cmp.sei.raw} parsed={cmp.sei} res={res} empty={cmp.sei.empty} />
-      </div>
+      </div>)}
 
       {/* The join is a PRECONDITION, not a value rule, and burying it in
           the same cell as the arithmetic hides that. If the join misses,

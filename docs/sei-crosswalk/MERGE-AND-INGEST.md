@@ -66,12 +66,16 @@ ui/src/crosswalkGlossary.js
 ui/src/feedNames.js
 ui/src/ChainRules.jsx
 ui/src/ruleParse.js
+ui/src/ruleGraph.js
+ui/src/dagLayout.js
+ui/src/OperatorGraph.jsx
 docs/sei-crosswalk/MERGE-AND-INGEST.md
 docs/sei-crosswalk/TAG-REFERENCE.md
 docs/sei-crosswalk/gen-tag-reference.mjs
 docs/sei-crosswalk/validate-crosswalk.sql
 docs/ingestion-prompts/PROMPT_VALIDATE_INGESTED_CROSSWALK.md
-ui/test/  (run.mjs + seven .test.jsx — `npm test` in ui/)
+ui/test/  (run.mjs + ten .test.jsx — `npm test` in ui/)
+api/test/test_graph_chain.py
 ingestion/test/test_lane_lineage_parse.py
 docs/ingestion-prompts/PROMPT_IMDS_STAR_UAF_SEI_data_lineage.md
 docs/ingestion-prompts/PROMPT_PBDW_ADDVANTAGE_SEI_crosswalk.md
