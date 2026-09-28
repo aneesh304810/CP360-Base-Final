@@ -4,6 +4,7 @@ import { api } from "./api.js";
 import { crosswalkApi } from "./seiCrosswalkApi.js";
 import { useBusinessCatalog, useFieldTerms, bizName, bizEntry, termName }
   from "./businessCatalog.js";
+import { explainRule, STEP_META } from "./plainRule.js";
 
 // Columns the dictionary does not know. A sentinel rather than a prefix
 // trick, because it has to be compared, not sorted into place.
@@ -567,6 +568,72 @@ export default function BizLineage({ t, system, dictSystem, dataSource = "PBDW",
 
 /* ---------------- level 3 renderer ---------------- */
 
+function PlainRule({ t, f }) {
+  const [tech, setTech] = useState(false);
+  const rule = [f.src_to_stg1_transform, f.stg1_to_stg2_transform,
+                f.stg2_to_dwh_transform].filter(Boolean).join("\n");
+  const hasSource = Boolean(f.src_source_column || f.stg1_source_column);
+  const e = explainRule(rule, { hasSource, target: f.dwh_target_column });
+
+  return (
+    <div style={{ maxWidth: 760, margin: "14px auto 0", background: "#fff",
+      border: "1px solid #c9d4dc", borderRadius: 10, overflow: "hidden" }}>
+      <div style={{ background: "#f4f7f9", borderBottom: "1px solid #c9d4dc",
+        padding: "8px 18px", fontSize: 11, fontWeight: 700,
+        textTransform: "uppercase", letterSpacing: ".05em", color: "#7b8894",
+        display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ flex: 1 }}>What happens to it</span>
+        {rule && (
+          <button type="button" onClick={() => setTech((v) => !v)}
+            style={{ font: "inherit", fontSize: 10, textTransform: "none",
+              letterSpacing: 0, fontWeight: 400, cursor: "pointer",
+              border: "1px solid #c9d4dc", borderRadius: 3, background: "#fff",
+              color: "#0f4775", padding: "2px 9px" }}>
+            {tech ? "hide the rule" : "show the rule"}</button>)}
+      </div>
+      <div style={{ padding: "14px 20px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+          {e.steps.map((s, i) => {
+            const m = STEP_META[s.op] || STEP_META.derived;
+            return (
+              <div key={i} style={{ display: "flex", gap: 11,
+                alignItems: "flex-start" }}>
+                <span style={{ flexShrink: 0, width: 21, height: 21,
+                  borderRadius: "50%", background: m.c, color: "#fff",
+                  fontSize: 10.5, fontWeight: 700, display: "flex",
+                  alignItems: "center", justifyContent: "center" }}>{i + 1}</span>
+                <span style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 9.5, fontWeight: 700,
+                    letterSpacing: ".06em", textTransform: "uppercase",
+                    color: m.c }}>{m.label}</div>
+                  <div style={{ fontSize: 13, lineHeight: 1.55,
+                    color: "#233240" }}>{s.what}</div>
+                  {s.watch && (
+                    <div style={{ display: "flex", gap: 8, marginTop: 5,
+                      fontSize: 11.5, lineHeight: 1.5, color: "#4a5a68",
+                      background: "#fdf3e4", borderLeft: "2px solid #e67e22",
+                      borderRadius: "0 3px 3px 0", padding: "6px 10px" }}>
+                      <b style={{ color: "#b45309", fontWeight: 700, flexShrink: 0,
+                        fontSize: 9.5, letterSpacing: ".06em",
+                        textTransform: "uppercase", paddingTop: 1 }}>Watch</b>
+                      <span>{s.watch}</span>
+                    </div>)}
+                </span>
+              </div>);
+          })}
+        </div>
+        {tech && rule && (
+          <pre style={{ margin: "12px 0 0", fontFamily: "Roboto Mono, monospace",
+            fontSize: 11, lineHeight: 1.7, whiteSpace: "pre-wrap",
+            wordBreak: "break-word", background: "#f5f8f8",
+            border: "1px solid #dfe6e9", borderLeft: "3px solid #0091bf",
+            borderRadius: 3, padding: "10px 12px", maxHeight: 220,
+            overflow: "auto", color: "#10193b" }}>{rule}</pre>)}
+      </div>
+    </div>);
+}
+
+
 function ColumnPage({ t, f, tbl, ds, system, dictSystem, rows, onWalk, onTechnical,
   onDataSource }) {
   const [def, setDef] = useState(undefined);   // undefined=loading, null=none
@@ -728,6 +795,13 @@ function ColumnPage({ t, f, tbl, ds, system, dictSystem, rows, onWalk, onTechnic
           marginTop: 12, background: seal.bg, color: seal.fg, fontSize: 12,
           fontWeight: 500, borderRadius: 999, padding: "6px 16px" }}>{seal.txt}</div>
       </div>
+
+      {/* WHAT HAPPENS TO IT, in words. The spine above says where the
+          figure goes; this says what is done to it on the way, and what
+          that costs when the input is not what the rule assumed. Read from
+          the same parse the Technical view draws as a graph, so a sentence
+          here cannot contradict the picture there. */}
+      <PlainRule t={t} f={f} />
 
       {def && (
         <div style={{ maxWidth: 760, margin: "14px auto 0", background: "#fff",

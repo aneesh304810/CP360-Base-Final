@@ -83,7 +83,9 @@ api/test/test_lane_scope_filter.py
 ingestion/test/test_table_catalog.py
 api/app/routers_business_catalog.py
 ui/src/businessCatalog.js
+ui/src/plainRule.js
 ui/test/business-catalog.test.jsx
+ui/test/plain-rule.test.jsx
 ingestion/test/test_lane_lineage_parse.py
 docs/ingestion-prompts/PROMPT_IMDS_STAR_UAF_SEI_data_lineage.md
 docs/ingestion-prompts/PROMPT_PBDW_ADDVANTAGE_SEI_crosswalk.md
