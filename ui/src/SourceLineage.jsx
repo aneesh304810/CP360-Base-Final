@@ -337,10 +337,31 @@ export default function SourceLineage({ t, system, dictSystem,
       ["DWH",  `Warehouse · ${ds}`, target || (flow ? `${flow.target_count} tables` : ds),
        file && flow ? `${st.mapped || 0} mapped` : "157 tables"],
     ];
+
+    // A STAGE WITH NOTHING IN IT IS NOT A STAGE. A STAR extract lands in
+    // IMDS directly, so LANDING read "STG1_* · 0 tables" and CONFORMED
+    // read "STG2_* · 0 fields reach" — half the strip spent saying
+    // nothing happens, with the source pushed away from the warehouse it
+    // actually feeds. Once a file is in focus and its flow has come back,
+    // an empty middle stage is dropped and a line below says which, so a
+    // lane with no staging cannot be mistaken for staging that failed to
+    // load.
+    const dropped = [];
+    const shown = steps.filter(([k]) => {
+      if (k === "SRC" || k === "DWH" || !file || !flow) return true;
+      const live = k === "STG1"
+        ? (st.stg1_count || 0) > 0 || Boolean(st.stg1_source_table)
+        : (st.reach_stg2 || 0) > 0 || Boolean(st.stg2_source_table);
+      if (!live) dropped.push(k === "STG1" ? "landing" : "conformed");
+      return live;
+    });
+
     return (
-      <div style={{ display: "flex", overflowX: "auto", marginBottom: 14,
+      <>
+      <div style={{ display: "flex", overflowX: "auto",
+                    marginBottom: dropped.length ? 4 : 14,
                     border: `1px solid ${line}`, borderRadius: 8, background: panel }}>
-        {steps.map(([k, label, val, note], i) => (
+        {shown.map(([k, label, val, note], i) => (
           <div key={k} style={{ flex: 1, minWidth: 150, padding: "10px 12px",
                                 position: "relative",
                                 borderLeft: i ? `1px solid ${line}` : "none",
@@ -353,7 +374,14 @@ export default function SourceLineage({ t, system, dictSystem,
               {val}</div>
             <div style={{ fontSize: 10, color: muted }}>{note}</div>
           </div>))}
-      </div>);
+      </div>
+      {dropped.length > 0 && (
+        <div style={{ fontSize: 10.5, color: muted, marginBottom: 14,
+                      lineHeight: 1.6 }}>
+          No {dropped.join(" or ")} stage on this chain — {file} lands in
+          {" "}{ds} directly. Those steps are not drawn rather than drawn empty.
+        </div>)}
+      </>);
   };
 
   // ================================================================== L0

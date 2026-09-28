@@ -71,7 +71,7 @@ docs/sei-crosswalk/TAG-REFERENCE.md
 docs/sei-crosswalk/gen-tag-reference.mjs
 docs/sei-crosswalk/validate-crosswalk.sql
 docs/ingestion-prompts/PROMPT_VALIDATE_INGESTED_CROSSWALK.md
-ui/test/  (run.mjs + six .test.jsx — `npm test` in ui/)
+ui/test/  (run.mjs + seven .test.jsx — `npm test` in ui/)
 ingestion/test/test_lane_lineage_parse.py
 docs/ingestion-prompts/PROMPT_IMDS_STAR_UAF_SEI_data_lineage.md
 docs/ingestion-prompts/PROMPT_PBDW_ADDVANTAGE_SEI_crosswalk.md
@@ -84,7 +84,7 @@ file copy would clobber work that is not mine.**
 api/app/main.py             one entry in the router mount tuple
 ingestion/run.py            one STEPS entry + one dispatch branch
 ui/src/LineageHome.jsx      CrosswalkDashboard, UAF in SYS_META, dsSystems, dictSys
-ui/src/LineageGraph.jsx     dim floors 0.07/0.18/0.25 -> 0.22/0.42/0.5
+ui/src/LineageGraph.jsx     dim floors, empty-lane collapse, stage colour on nodes
 ui/src/LegacyLineage.jsx    DictionaryMiss replaces the AddVantage-only message
 ui/src/SourceLineage.jsx    stageMeta, lane filter, dictSystem
 ui/src/BizLineage.jsx       stageMeta, lane filter, dictSystem

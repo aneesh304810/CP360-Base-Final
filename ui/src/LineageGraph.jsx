@@ -81,10 +81,6 @@ export default function LineageGraph({ t, table, column, code, dataSource = "PBD
   // Tighten the gaps first — whitespace is cheaper to lose than a column
   // name — and only then shrink the lanes, never below LANE_W_MIN.
   const LANE_GAP = avail && avail < NARROW ? LANE_GAP_MIN : LANE_GAP_MAX;
-  const LANE_W = avail
-    ? Math.max(LANE_W_MIN,
-               Math.min(LANE_W_MAX, (avail - 30 - 3 * LANE_GAP) / 4))
-    : LANE_W_MAX;
 
   const ds = (dataSource || "PBDW").toUpperCase();
 
@@ -101,11 +97,46 @@ export default function LineageGraph({ t, table, column, code, dataSource = "PBD
   const nodes = (data && data.nodes) || [];
   const edges = (data && data.edges) || [];
 
+  // A LANE WITH NOTHING IN IT IS NOT A STAGE, IT IS A GAP IN THE PICTURE.
+  //
+  // The graph always drew four: source, landing, conformed, warehouse.
+  // The STAR lane has no staging — a STAR extract lands in IMDS directly —
+  // so two of the four read "0 tables" and "0 fields reach" while taking
+  // half the canvas, and the source sat a long way from the warehouse it
+  // actually feeds with nothing in between.
+  //
+  // Only stages that have a node are drawn. That is not hiding anything:
+  // an empty stage carries no information, and removing it puts the two
+  // ends of the chain next to each other, which is where they belong when
+  // nothing happens between them. The caption says which were dropped so
+  // "this lane has no staging" cannot be mistaken for "the staging is not
+  // loaded".
+  const activeStages = useMemo(() => {
+    const has = new Set(nodes.map((n) => n.stage));
+    const live = STAGES.filter((s) => has.has(s));
+    // Never collapse to a single lane: with one stage there is no flow to
+    // draw, and the four-lane frame at least says what is missing.
+    return live.length >= 2 ? live : STAGES;
+  }, [nodes]);
+  const droppedStages = STAGES.filter((s) => !activeStages.includes(s));
+  const laneOf = (stage) => activeStages.indexOf(stage);
+
+  // Divided by the lanes actually drawn, not always by four. Two lanes on
+  // a STAR column get the whole width between them instead of a third of
+  // it — the difference between a readable column name and
+  // "Base_Amortized_Cost_7…".
+  const LANE_W = avail
+    ? Math.max(LANE_W_MIN,
+               Math.min(LANE_W_MAX,
+                        (avail - 30 - (activeStages.length - 1) * LANE_GAP)
+                        / activeStages.length))
+    : LANE_W_MAX;
+
   // ---- layout: group nodes into table boxes per lane, stack vertically ----
   const layout = useMemo(() => {
-    const lanes = STAGES.map(() => []);
+    const lanes = activeStages.map(() => []);
     nodes.forEach((n) => {
-      const li = STAGES.indexOf(n.stage);
+      const li = activeStages.indexOf(n.stage);
       if (li < 0) return;
       let box = lanes[li].find((b) => b.table === n.table);
       if (!box) { box = { table: n.table, rows: [] }; lanes[li].push(box); }
@@ -128,9 +159,9 @@ export default function LineageGraph({ t, table, column, code, dataSource = "PBD
       height = Math.max(height, y);
     });
     return { pos, boxes,
-             W: STAGES.length * LANE_W + (STAGES.length - 1) * LANE_GAP,
+             W: activeStages.length * LANE_W + (activeStages.length - 1) * LANE_GAP,
              H: Math.max(height + BOT, 120) };
-  }, [nodes, LANE_W, LANE_GAP]);
+  }, [nodes, LANE_W, LANE_GAP, activeStages]);
 
   // ---- trace: everything upstream and downstream of the focused column ----
   const trace = useMemo(() => {
@@ -252,7 +283,7 @@ export default function LineageGraph({ t, table, column, code, dataSource = "PBD
              role="img"
              aria-label="Column-level lineage from source through landing and conformed to warehouse">
           {/* lane headings */}
-          {STAGES.map((s, i) => (
+          {activeStages.map((s, i) => (
             <text key={s} x={i * (LANE_W + LANE_GAP)} y={16} fill={STAGE_C[s]}
                   style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".09em" }}>
               {STAGE_LABEL[s].toUpperCase()}{s === "DWH" ? ` · ${ds}` : ""}
@@ -285,13 +316,13 @@ export default function LineageGraph({ t, table, column, code, dataSource = "PBD
           {/* table containers */}
           {layout.boxes.map((b) => {
             const any = nodes.some((n) => n.table === b.table &&
-                                          STAGES.indexOf(n.stage) === b.lane && nodeOn(n.id));
+                                          laneOf(n.stage) === b.lane && nodeOn(n.id));
             return (
               <g key={`${b.lane}:${b.table}`} opacity={any ? 1 : 0.5}>
                 <rect x={b.x} y={b.y} width={b.w} height={b.h} rx={6}
                       fill={panel} stroke={line} />
                 <rect x={b.x} y={b.y} width={b.w} height={3} rx={1.5}
-                      fill={STAGE_C[STAGES[b.lane]]} opacity={0.9} />
+                      fill={STAGE_C[activeStages[b.lane]]} opacity={0.9} />
                 <text x={b.x + 9} y={b.y + 17} fill={sub}
                       style={{ fontFamily: mono, fontSize: 10.5 }}>
                   {b.table.length > 26 ? b.table.slice(0, 25) + "…" : b.table}
@@ -320,10 +351,20 @@ export default function LineageGraph({ t, table, column, code, dataSource = "PBD
                  onDoubleClick={() => {
                    if (n.stage === "DWH" && onOpenColumn) onOpenColumn(n.table, n.column);
                  }}>
+                {/* EVERY NODE CARRIES ITS STAGE'S COLOUR. The fill was
+                    transparent unless focused, so a source column was
+                    black text on white with the only colour in a 10px
+                    lane heading far above it — the stage a node belongs
+                    to was invisible at the node. A tint and a colour bar
+                    put it back without competing with the focus ring. */}
                 <rect x={p.x + 4} y={p.y - 10} width={LANE_W - 8} height={20} rx={4}
-                      fill={isFocus ? (t.tint || "#cae3ee") : "transparent"}
-                      stroke={isFocus ? STAGE_C[n.stage] : "none"} strokeWidth={1.5} />
-                <text x={p.x + 10} y={p.y + 3.5}
+                      fill={isFocus ? (t.tint || "#cae3ee") : `${STAGE_C[n.stage]}14`}
+                      stroke={isFocus ? STAGE_C[n.stage] : `${STAGE_C[n.stage]}33`}
+                      strokeWidth={isFocus ? 1.5 : 1} />
+                <rect x={p.x + 4} y={p.y - 10} width={2.5} height={20}
+                      rx={1.25} fill={STAGE_C[n.stage]}
+                      opacity={isFocus ? 1 : 0.75} />
+                <text x={p.x + 12} y={p.y + 3.5}
                       fill={unmapped ? (t.danger || "#c1113a") : (t.text || "#333")}
                       style={{ fontFamily: mono, fontSize: 11,
                                fontWeight: isFocus ? 700 : 400 }}>
@@ -379,6 +420,15 @@ export default function LineageGraph({ t, table, column, code, dataSource = "PBD
           <div style={{ color: t.warning || "#e67e22", marginBottom: 6 }}>
             Showing the first {data.max_chains} chains — this code is used more widely.
             Untick “same code in other masters” to narrow it.
+          </div>)}
+        {/* A DROPPED STAGE IS SAID OUT LOUD. Silently removing two lanes
+            would leave "this lane has no staging" and "the staging did
+            not load" looking identical, and those need opposite actions. */}
+        {droppedStages.length > 0 && (
+          <div style={{ marginBottom: 6 }}>
+            No {droppedStages.map((x) => STAGE_LABEL[x].toLowerCase()).join(" or ")}
+            {" "}stage on this chain — the source lands in {ds} directly, so
+            those lanes are not drawn rather than drawn empty.
           </div>)}
         {focusNode
           ? <>Everything off the path is dimmed. Follow{" "}

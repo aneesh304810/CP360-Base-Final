@@ -50,9 +50,9 @@ function Box({ t, stage, table, column, type, len }) {
         textTransform: "uppercase", color: STAGE_C[stage], marginBottom: 3 }}>
         {stage === "SRC" ? "Source" : stage === "STG1" ? "Landing"
           : stage === "STG2" ? "Conformed" : "Warehouse"}</div>
-      <div style={{ border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+      <div style={{ border: `1px solid ${STAGE_C[stage]}33`,
         borderLeft: `3px solid ${STAGE_C[stage]}`, borderRadius: 3,
-        background: t.panel || "#fff", padding: "7px 9px", minWidth: 0 }}>
+        background: `${STAGE_C[stage]}0f`, padding: "7px 9px", minWidth: 0 }}>
         <div title={column} style={{ fontFamily: MONO, fontSize: 11,
           color: t.navy || "#10193b", overflow: "hidden",
           textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{column || "—"}</div>
@@ -87,6 +87,37 @@ function Hop({ t, rule }) {
     </div>);
 }
 
+/** Drop the stages that have nothing in them and close the chain up,
+ *  WITHOUT LOSING A SINGLE RULE.
+ *
+ *  A dropped stage takes two hops with it — the one into it and the one
+ *  out of it — and both describe work that still happens. They move onto
+ *  the surviving hop before it, joined by a newline, so collapsing the
+ *  picture never collapses the logic. Getting this wrong loses an
+ *  expression silently, which is the one failure this screen cannot have:
+ *  a rule that is not shown reads as a rule that does not exist.
+ *
+ *  `stages` is [stage, table, column, type, length, outgoingRule]. SRC and
+ *  DWH are always kept — they are the two ends, and a chain with one end
+ *  is not a chain. */
+export function collapseChain(stages) {
+  const live = [];
+  stages.forEach((st, i) => {
+    const isEnd = i === 0 || i === stages.length - 1;
+    const present = isEnd || st[1] || st[2];
+    if (present) {
+      live.push({ stage: st[0], table: st[1], column: st[2],
+                  type: st[3], len: st[4],
+                  rules: st[5] ? [st[5]] : [] });
+    } else if (st[5] && live.length) {
+      // the dropped stage's outgoing rule belongs to the last surviving
+      // hop; its incoming rule is already there
+      live[live.length - 1].rules.push(st[5]);
+    }
+  });
+  return live.map((n) => ({ ...n, rule: n.rules.filter(Boolean).join("\n") }));
+}
+
 export default function ChainRules({ t, chain, dataSource, onSaved }) {
   const legacy = (chain && chain.legacy && chain.legacy[0]) || null;
   const sei = (chain && chain.sei && chain.sei[0]) || null;
@@ -106,20 +137,48 @@ export default function ChainRules({ t, chain, dataSource, onSaved }) {
         textTransform: "uppercase", color: t.muted || "#999", marginBottom: 8 }}>
         Today · {L("source_system") || "incumbent"} → warehouse</div>
 
-      <div style={{ display: "flex", alignItems: "stretch", gap: 4,
-        flexWrap: "wrap" }}>
-        <Box t={t} stage="SRC" table={L("src_source_table")}
-          column={L("src_source_column")} type={L("src_type")} len={L("src_length")} />
-        <Hop t={t} rule={L("src_to_stg1_transform")} />
-        <Box t={t} stage="STG1" table={L("stg1_source_table")}
-          column={L("stg1_source_column")} type={L("stg1_type")} />
-        <Hop t={t} rule={L("stg1_to_stg2_transform")} />
-        <Box t={t} stage="STG2" table={L("stg2_source_table")}
-          column={L("stg2_source_column")} type={L("stg2_type")} />
-        <Hop t={t} rule={L("stg2_to_dwh_transform")} />
-        <Box t={t} stage="DWH" table={L("dwh_target_table")}
-          column={L("dwh_target_column")} type={L("dwh_type")} len={L("dwh_length")} />
-      </div>
+      {/* EMPTY STAGES ARE DROPPED AND THE CHAIN CLOSES UP. A STAR extract
+          lands in IMDS directly, so STG1 and STG2 are blank on most of
+          these rows — four boxes with two of them empty puts a gap where
+          the reader looks for a step, and pushes the source away from the
+          warehouse it actually feeds. The rule that WOULD have been on a
+          dropped hop is carried onto the surviving one, so no expression
+          is lost by collapsing. */}
+      {(() => {
+        const stages = [
+          ["SRC", L("src_source_table"), L("src_source_column"),
+           L("src_type"), L("src_length"), L("src_to_stg1_transform")],
+          ["STG1", L("stg1_source_table"), L("stg1_source_column"),
+           L("stg1_type"), null, L("stg1_to_stg2_transform")],
+          ["STG2", L("stg2_source_table"), L("stg2_source_column"),
+           L("stg2_type"), null, L("stg2_to_dwh_transform")],
+          ["DWH", L("dwh_target_table"), L("dwh_target_column"),
+           L("dwh_type"), L("dwh_length"), null],
+        ];
+        const live = collapseChain(stages);
+        const out = [];
+        live.forEach((n, i) => {
+          out.push(<Box key={n.stage} t={t} stage={n.stage} table={n.table}
+            column={n.column} type={n.type} len={n.len} />);
+          if (i < live.length - 1) out.push(
+            <Hop key={`h${n.stage}`} t={t} rule={n.rule} />);
+        });
+        return (
+          <>
+            <div style={{ display: "flex", alignItems: "stretch", gap: 4,
+              flexWrap: "wrap" }}>{out}</div>
+            {live.length < 4 && (
+              <div style={{ fontSize: 10, color: t.muted || "#999",
+                marginTop: 5, lineHeight: 1.6 }}>
+                No {["SRC", "STG1", "STG2", "DWH"]
+                     .filter((k) => !live.some((n) => n.stage === k))
+                     .map((k) => (k === "STG1" ? "landing" : "conformed"))
+                     .join(" or ")} stage on this chain — it lands in the
+                warehouse directly. Any rule that sat on a dropped hop has
+                been carried onto the one before it.
+              </div>)}
+          </>);
+      })()}
 
       {anySei ? (
         <>
