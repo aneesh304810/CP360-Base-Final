@@ -1,0 +1,684 @@
+<title>SEI Transformation Graph</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500;700&display=swap">
+<style>
+/* Layout: a fixed rail of target columns on the left, a pan/zoom canvas in
+   the middle carrying two stacked operator tracks, and a details rail on the
+   right that fills from whatever is selected. Tokens are Lineage 360's own
+   (bbhTheme.js) — this is a screen inside an existing app, not a new one. */
+:root {
+  --bg:#f5f8f8; --panel:#fff; --panel2:#dfe6e9; --line:#c9d4dc;
+  --ink:#10193b; --sub:#4a5a68; --muted:#7b8894;
+  --accent:#0f4775; --ok:#159943; --warn:#e67e22; --bad:#c1113a;
+  /* operator kinds — colour says WHAT a node does, never which track it is on */
+  --k-field:#6d3ac0; --k-const:#7b8894; --k-fn:#00a3a3; --k-branch:#e67e22;
+  --k-join:#7c3aed; --k-agg:#0091bf; --k-target:#0f4775;
+  --track-legacy:#fdf6ef; --track-legacy-edge:#b5651d;
+  --track-sei:#f1f8fc;   --track-sei-edge:#0091bf;
+  --f-ui:"Roboto","Helvetica Neue",Arial,sans-serif;
+  --f-mono:"Roboto Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --bg:#0e1419; --panel:#161e26; --panel2:#24303a; --line:#2e3b47;
+  --ink:#e8eef4; --sub:#a9b8c6; --muted:#7d8d9c;
+  --accent:#5aa8e0; --ok:#3ec27a; --warn:#f0993f; --bad:#ef6b7f;
+  --k-field:#a684ea; --k-const:#8b9aa8; --k-fn:#3ecfcf; --k-branch:#f0993f;
+  --k-join:#b18cf5; --k-agg:#48b6e4; --k-target:#5aa8e0;
+  --track-legacy:#231b12; --track-legacy-edge:#d08a3f;
+  --track-sei:#111f29;   --track-sei-edge:#48b6e4;
+  color-scheme:dark; } }
+:root[data-theme="dark"]{
+  --bg:#0e1419; --panel:#161e26; --panel2:#24303a; --line:#2e3b47;
+  --ink:#e8eef4; --sub:#a9b8c6; --muted:#7d8d9c;
+  --accent:#5aa8e0; --ok:#3ec27a; --warn:#f0993f; --bad:#ef6b7f;
+  --k-field:#a684ea; --k-const:#8b9aa8; --k-fn:#3ecfcf; --k-branch:#f0993f;
+  --k-join:#b18cf5; --k-agg:#48b6e4; --k-target:#5aa8e0;
+  --track-legacy:#231b12; --track-legacy-edge:#d08a3f;
+  --track-sei:#111f29;   --track-sei-edge:#48b6e4;
+  color-scheme:dark; }
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-ui);
+     font-size:13px;line-height:1.5}
+.wrap{padding-block:18px;padding-inline:16px;max-width:1500px;margin:0 auto}
+
+h1{font-size:19px;font-weight:500;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.lede{font-size:12.5px;color:var(--sub);margin:5px 0 0;max-width:74ch}
+.eyebrow{font-size:9.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+         color:var(--muted)}
+
+.top{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;margin-bottom:14px}
+.pillbar{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.pill{font:inherit;font-size:11px;padding:4px 11px;border-radius:999px;cursor:pointer;
+      border:1px solid var(--line);background:var(--panel);color:var(--sub)}
+.pill[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff;
+      font-weight:500}
+.pill:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.grid{display:grid;grid-template-columns:232px minmax(0,1fr) 288px;gap:14px;align-items:start}
+@media (max-width:1180px){.grid{grid-template-columns:200px minmax(0,1fr)}
+  .rail-right{grid-column:1/-1}}
+@media (max-width:760px){.grid{grid-template-columns:minmax(0,1fr)}}
+
+.card{background:var(--panel);border:1px solid var(--panel2);border-radius:4px}
+.card>header{padding:9px 12px;border-bottom:1px solid var(--panel2);
+             display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.card>.body{padding:11px 12px}
+
+/* ---- left rail: the target columns ---- */
+.col{display:block;width:100%;text-align:left;font:inherit;cursor:pointer;
+     background:none;border:0;border-top:1px solid var(--panel2);padding:9px 12px}
+.col:first-of-type{border-top:0}
+.col[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 9%,transparent);
+     box-shadow:inset 3px 0 0 var(--accent)}
+.col:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.col b{display:block;font-family:var(--f-mono);font-size:11.5px;font-weight:500;color:var(--ink)}
+.col small{display:block;font-size:10px;color:var(--muted);margin-top:2px}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;
+     vertical-align:1px}
+
+/* ---- canvas ---- */
+.canvaswrap{position:relative;overflow:hidden;height:min(62vh,540px);min-height:330px;
+            background:var(--bg);border-radius:0 0 4px 4px;cursor:grab;touch-action:none}
+.canvaswrap.drag{cursor:grabbing}
+.stage{position:absolute;inset:0;transform-origin:0 0}
+.edges{position:absolute;inset:0;overflow:visible;pointer-events:none}
+.band{position:absolute;border-radius:5px;border:1px dashed var(--line)}
+.band.legacy{background:var(--track-legacy)}
+.band.sei{background:var(--track-sei)}
+.bandlab{position:absolute;font-size:9.5px;font-weight:700;letter-spacing:.08em;
+         text-transform:uppercase;padding:2px 7px;border-radius:3px;color:#fff}
+
+.node{position:absolute;background:var(--panel);border:1px solid var(--panel2);
+      border-left:3px solid var(--nc);border-radius:4px;padding:6px 9px;cursor:pointer;
+      display:flex;flex-direction:column;justify-content:center;
+      box-shadow:0 1px 2px rgba(16,25,59,.06)}
+.node:hover{border-color:var(--nc)}
+.node[aria-pressed="true"]{box-shadow:0 0 0 2px var(--nc);border-color:var(--nc)}
+.node:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.node .kind{font-size:8.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+            color:var(--nc)}
+.node .lab{font-family:var(--f-mono);font-size:10.5px;color:var(--ink);
+           overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.node .sub{font-size:9px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;
+           white-space:nowrap}
+.node.onlyhere::after{content:"";position:absolute;inset:-4px;border-radius:6px;
+      border:1.5px dashed var(--bad);pointer-events:none}
+.node.dim{opacity:.26}
+
+.zoom{position:absolute;right:10px;bottom:10px;display:flex;gap:4px}
+.zoom button{font:inherit;font-size:12px;width:26px;height:26px;border-radius:3px;
+      border:1px solid var(--line);background:var(--panel);color:var(--sub);cursor:pointer}
+.zoom button.wide{width:auto;padding:0 9px;font-size:10.5px}
+.zoom button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ---- right rail ---- */
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 9px;font-size:11px}
+.kv dt{color:var(--muted);font-size:9px;font-weight:700;letter-spacing:.05em;
+       text-transform:uppercase;padding-top:2px}
+.kv dd{margin:0;color:var(--sub)}
+.mono{font-family:var(--f-mono)}
+pre.rule{margin:0;font-family:var(--f-mono);font-size:10.5px;line-height:1.65;
+     white-space:pre-wrap;word-break:break-word;background:var(--bg);
+     border:1px solid var(--panel2);border-radius:3px;padding:8px 10px;
+     max-height:190px;overflow:auto}
+
+.finding{display:flex;gap:8px;align-items:baseline;width:100%;text-align:left;font:inherit;
+     background:none;border:0;border-top:1px solid var(--panel2);padding:8px 0;cursor:pointer}
+.finding:first-of-type{border-top:0}
+.finding:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sev{font-size:8.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+     padding:2px 6px;border-radius:2px;flex-shrink:0;min-width:36px;text-align:center}
+.sev.risk{color:var(--bad);background:color-mix(in srgb,var(--bad) 14%,transparent)}
+.sev.check{color:var(--warn);background:color-mix(in srgb,var(--warn) 16%,transparent)}
+.sev.gap{color:var(--muted);background:color-mix(in srgb,var(--muted) 16%,transparent)}
+.finding span.txt{font-size:11px;line-height:1.55;color:var(--sub)}
+
+.legend{display:flex;flex-wrap:wrap;gap:9px 14px;font-size:10px;color:var(--sub)}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;
+          vertical-align:0}
+.note{font-size:10.5px;color:var(--muted);line-height:1.6;max-width:74ch}
+.verdictrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.vbtn{font:inherit;font-size:10.5px;padding:4px 10px;border-radius:999px;cursor:pointer;
+      border:1px solid var(--line);background:var(--panel);color:var(--sub)}
+.vbtn[aria-pressed="true"]{font-weight:700}
+.vbtn.agrees[aria-pressed="true"]{border-color:var(--ok);color:var(--ok);
+      background:color-mix(in srgb,var(--ok) 12%,transparent)}
+.vbtn.differs[aria-pressed="true"]{border-color:var(--bad);color:var(--bad);
+      background:color-mix(in srgb,var(--bad) 12%,transparent)}
+.vbtn.cannot[aria-pressed="true"]{border-color:var(--muted);color:var(--sub);
+      background:color-mix(in srgb,var(--muted) 14%,transparent)}
+.vbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.footer{margin-top:16px;font-size:10.5px;color:var(--muted);line-height:1.65;max-width:86ch}
+@media (prefers-reduced-motion:no-preference){
+  .node,.edgepath{transition:opacity .16s ease}
+}
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Transformation, as a graph</h1>
+      <p class="lede">The same rule you can read as five lines of PL/SQL, drawn as the
+        operations it performs. Legacy above, the proposed SEI equivalent below,
+        aligned so the difference is where the shapes stop matching.</p>
+    </div>
+    <div class="pillbar" role="group" aria-label="Layout">
+      <button class="pill" id="m-stack" aria-pressed="true">Stacked</button>
+      <button class="pill" id="m-diff" aria-pressed="false">Differences only</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- ------------------------------------------------ left rail -->
+    <div class="card" role="group" aria-label="Target columns">
+      <header>
+        <span class="eyebrow">HOLDINGDBO.LOT_LEVEL_POSITION</span>
+      </header>
+      <div id="collist"></div>
+      <div class="body" style="border-top:1px solid var(--panel2)">
+        <p class="note" style="margin:0">Four of the 161 columns in the lot-level
+          mapping. Colour is the equivalence the workbook recorded, not a review.</p>
+      </div>
+    </div>
+
+    <!-- ------------------------------------------------ canvas -->
+    <div class="card" style="min-width:0">
+      <header>
+        <b id="cvTitle" class="mono" style="font-size:12.5px;font-weight:500"></b>
+        <span class="eyebrow" id="cvSub"></span>
+      </header>
+      <div class="canvaswrap" id="cv">
+        <div class="stage" id="stage">
+          <svg class="edges" id="edges" aria-hidden="true"></svg>
+        </div>
+        <div class="zoom">
+          <button id="zout" aria-label="Zoom out">−</button>
+          <button id="zin" aria-label="Zoom in">+</button>
+          <button id="zfit" class="wide">Fit</button>
+        </div>
+      </div>
+      <div class="body" style="border-top:1px solid var(--panel2)">
+        <div class="legend" id="legend"></div>
+      </div>
+    </div>
+
+    <!-- ------------------------------------------------ right rail -->
+    <div class="rail-right" style="display:grid;gap:14px;min-width:0">
+      <div class="card">
+        <header><span class="eyebrow">Selected</span></header>
+        <div class="body" id="detail"></div>
+      </div>
+
+      <div class="card">
+        <header>
+          <span class="eyebrow">What differs</span>
+          <span class="eyebrow" id="diffCount" style="margin-left:auto"></span>
+        </header>
+        <div class="body" id="findings"></div>
+      </div>
+
+      <div class="card">
+        <header><span class="eyebrow">Is this correct?</span></header>
+        <div class="body">
+          <div class="kv" style="margin-bottom:8px">
+            <dt>Workbook</dt><dd id="wbStatus"></dd>
+          </div>
+          <div class="verdictrow" role="group" aria-label="Review verdict">
+            <button class="vbtn agrees" data-v="AGREES" aria-pressed="false">Same value</button>
+            <button class="vbtn differs" data-v="DIFFERS" aria-pressed="false">Different value</button>
+            <button class="vbtn cannot" data-v="CANNOT_TELL" aria-pressed="false">Can't tell</button>
+          </div>
+          <p class="note" id="reviewNote" style="margin:9px 0 0">Nobody has reviewed
+            this column. A review is stored beside the workbook, never over it.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="footer"><b>Mockup.</b> The four columns and both rules on each are
+    transcribed from <span class="mono">LOT_LEVEL_POSITION_MAP</span> in the
+    delivered workbook. Node positions, operator decomposition and the difference
+    list are computed in the page from those rules; nothing is drawn by hand. The
+    review control is inert here.</p>
+</div>
+
+<script>
+"use strict";
+/* ------------------------------------------------------------------ data
+   Operator graphs for four real target columns. `kind` drives colour and
+   shape of the node; `track` puts it in the legacy or the SEI band. Edges
+   are (from, to) ids. Node ids are prefixed by track so the two graphs can
+   share operator names without colliding. */
+const K = { field:"--k-field", const:"--k-const", fn:"--k-fn", branch:"--k-branch",
+            join:"--k-join", agg:"--k-agg", target:"--k-target" };
+const KIND_LABEL = { field:"field", const:"const", fn:"function", branch:"branch",
+                     join:"join", agg:"aggregate", target:"target" };
+
+const COLUMNS = [
+  {
+    id:"accrued", name:"ACCRUED_INCOME", type:"NUMBER(28,12)",
+    equivalence:"UNVERIFIED_COMPARISON", approval:"DRAFT_REVIEW_REQUIRED",
+    legacyRule:"to_number(nvl(Base_Interest_Receivable_9,0));",
+    seiRule:
+`Pro-rate receivables based on Taxlot Qty.
+If DEBIT_CREDIT_FLAG_6 = 'C'
+  (Taxlot_Qty/QUANTITY_HELD * VALUATION_ACCRUED_INTEREST)
+Else
+If DEBIT_CREDIT_FLAG_6 = 'D'
+  (Taxlot_Qty/QUANTITY_HELD * VALUATION_ACCRUED_INTEREST)*-1
+Join Taxlot and End of day positions by Account, Portfolio, Instrument_id
+where as_of_date=<processing_dt>`,
+    nodes:[
+      {id:"l1",track:"legacy",kind:"field",lab:"Base_Interest_Receivable_9",
+       sub:"PEDDIFI1 · field 9",res:"name+ordinal"},
+      {id:"l2",track:"legacy",kind:"const",lab:"0",sub:"default"},
+      {id:"l3",track:"legacy",kind:"fn",lab:"nvl( , 0)",sub:"null → 0"},
+      {id:"l4",track:"legacy",kind:"fn",lab:"to_number( )",sub:"char → numeric"},
+      {id:"l5",track:"legacy",kind:"target",lab:"ACCRUED_INCOME",sub:"NUMBER(28,12)"},
+
+      {id:"s0",track:"sei",kind:"join",lab:"Taxlot ⋈ EODP",
+       sub:"Account, Portfolio, Instrument_id · as_of_date = processing_dt"},
+      {id:"s1",track:"sei",kind:"field",lab:"Taxlot_Qty",sub:"Taxlot"},
+      {id:"s2",track:"sei",kind:"field",lab:"QUANTITY_HELD",sub:"End of Day Positions"},
+      {id:"s3",track:"sei",kind:"field",lab:"VALUATION_ACCRUED_INTEREST",
+       sub:"End of Day Positions"},
+      {id:"s4",track:"sei",kind:"field",lab:"DEBIT_CREDIT_FLAG_6",sub:"Taxlot · field 6"},
+      {id:"s5",track:"sei",kind:"fn",lab:"Taxlot_Qty / QUANTITY_HELD",sub:"pro-rata share"},
+      {id:"s6",track:"sei",kind:"fn",lab:"× VALUATION_ACCRUED_INTEREST",sub:"apportion"},
+      {id:"s7",track:"sei",kind:"branch",lab:"DEBIT_CREDIT_FLAG_6",sub:"'C' → + · 'D' → −"},
+      {id:"s8",track:"sei",kind:"fn",lab:"× -1",sub:"debit leg"},
+      {id:"s9",track:"sei",kind:"target",lab:"ACCRUED_INCOME",sub:"NUMBER(28,12)"},
+    ],
+    edges:[["l1","l3"],["l2","l3"],["l3","l4"],["l4","l5"],
+           ["s0","s1"],["s0","s2"],["s0","s3"],["s0","s4"],
+           ["s1","s5"],["s2","s5"],["s5","s6"],["s3","s6"],
+           ["s6","s7"],["s4","s7"],["s7","s8","D"],["s7","s9","C"],["s8","s9"]],
+    onlyLegacy:["l1","l3"], onlySei:["s0","s7","s8"],
+    findings:[
+      {sev:"risk", txt:"The proposal needs a join the legacy rule does not — Taxlot to End of Day Positions on three keys and a date. A join is a precondition: if it misses, the value is wrong rather than absent.", nodes:["s0"]},
+      {sev:"risk", txt:"The proposal branches on DEBIT_CREDIT_FLAG_6 and negates one leg. The legacy rule does not branch at all, so the sign comes from somewhere else — or from nowhere.", nodes:["s7","s8"]},
+      {sev:"risk", txt:"The legacy rule defaults nulls with nvl(…,0). The proposal does not say what happens when an input is missing.", nodes:["l3"]},
+      {sev:"check", txt:"Base_Interest_Receivable_9 is read by the legacy rule and by nothing in the proposal. Either it is replaced by the pro-rata calculation or it was dropped.", nodes:["l1"]},
+      {sev:"check", txt:"The proposal is pro-rata at lot grain; the legacy value is taken whole. Grain equivalence is not established by either expression.", nodes:["s5","s6"]},
+    ],
+  },
+  {
+    id:"book", name:"BOOK_VALUE", type:"NUMBER(28,12)",
+    equivalence:"NO_SEI_SOURCE", approval:"DRAFT_REVIEW_REQUIRED",
+    legacyRule:
+`v_Trade_Date_Cash := Base_Market_Value_10;
+IF TRIM(Investment_Type_Code_42) != 'CASH' THEN
+  book_value := nvl(book_value,0) + to_number(nvl(Base_Amortized_Cost_7,0));
+ELSE
+  book_value := nvl(book_value,0) + to_number(nvl(v_Trade_Date_Cash,0));`,
+    seiRule:"Null",
+    nodes:[
+      {id:"l1",track:"legacy",kind:"field",lab:"Base_Market_Value_10",
+       sub:"PEDDIFI1 · field 10",res:"name+ordinal"},
+      {id:"l2",track:"legacy",kind:"fn",lab:"v_Trade_Date_Cash :=",sub:"local variable"},
+      {id:"l3",track:"legacy",kind:"field",lab:"Investment_Type_Code_42",
+       sub:"PEDDIFI1 · field 42",res:"name+ordinal"},
+      {id:"l4",track:"legacy",kind:"fn",lab:"TRIM( )",sub:"padding removed"},
+      {id:"l5",track:"legacy",kind:"branch",lab:"!= 'CASH'",sub:"two legs"},
+      {id:"l6",track:"legacy",kind:"field",lab:"Base_Amortized_Cost_7",
+       sub:"PEDDIFI1 · field 7",res:"name+ordinal"},
+      {id:"l7",track:"legacy",kind:"fn",lab:"to_number(nvl( ,0))",sub:"non-cash leg"},
+      {id:"l8",track:"legacy",kind:"fn",lab:"to_number(nvl( ,0))",sub:"cash leg"},
+      {id:"l9",track:"legacy",kind:"agg",lab:"book_value + …",sub:"accumulates"},
+      {id:"l10",track:"legacy",kind:"target",lab:"BOOK_VALUE",sub:"NUMBER(28,12)"},
+      {id:"s1",track:"sei",kind:"target",lab:"BOOK_VALUE",sub:"nothing proposed"},
+    ],
+    edges:[["l1","l2"],["l3","l4"],["l4","l5"],["l5","l7","not CASH"],
+           ["l6","l7"],["l5","l8","CASH"],["l2","l8"],["l7","l9"],["l8","l9"],
+           ["l9","l10"]],
+    onlyLegacy:[], onlySei:["s1"],
+    findings:[
+      {sev:"gap", txt:"No SEI rule is proposed. The column computes nothing on the new side, and the legacy rule has no replacement to compare against.", nodes:["s1"]},
+      {sev:"check", txt:"The legacy rule accumulates — book_value appears on both sides of the assignment — so it depends on the order rows arrive in. Any replacement has to reproduce that or prove it does not matter.", nodes:["l9"]},
+      {sev:"check", txt:"Three PEDDIFI1 fields feed this column, all confirmed by name and ordinal against the published layout.", nodes:["l1","l3","l6"]},
+    ],
+  },
+  {
+    id:"currency", name:"CURRENCY", type:"VARCHAR2(3 BYTE)",
+    equivalence:"UNVERIFIED_COMPARISON", approval:"DRAFT_REVIEW_REQUIRED",
+    legacyRule:"substr(ltrim(rtrim(local_currency_code_47)),1,3);",
+    seiRule:"Taxlot.LOCAL_CURRENCY",
+    nodes:[
+      {id:"l1",track:"legacy",kind:"field",lab:"local_currency_code_47",
+       sub:"PEDDIFI1 · field 47",res:"name+ordinal"},
+      {id:"l2",track:"legacy",kind:"fn",lab:"rtrim( )",sub:"trailing padding"},
+      {id:"l3",track:"legacy",kind:"fn",lab:"ltrim( )",sub:"leading padding"},
+      {id:"l4",track:"legacy",kind:"fn",lab:"substr( ,1,3)",sub:"first three characters"},
+      {id:"l5",track:"legacy",kind:"target",lab:"CURRENCY",sub:"VARCHAR2(3)"},
+      {id:"s1",track:"sei",kind:"field",lab:"LOCAL_CURRENCY",sub:"Taxlot"},
+      {id:"s2",track:"sei",kind:"target",lab:"CURRENCY",sub:"VARCHAR2(3)"},
+    ],
+    edges:[["l1","l2"],["l2","l3"],["l3","l4"],["l4","l5"],["s1","s2"]],
+    onlyLegacy:["l2","l3","l4"], onlySei:[],
+    findings:[
+      {sev:"risk", txt:"The legacy rule truncates to three characters. The proposal carries LOCAL_CURRENCY across untouched, so a longer value overflows a VARCHAR2(3) instead of being cut.", nodes:["l4","s1"]},
+      {sev:"check", txt:"Trimming disappears. If SEI publishes the code unpadded that is fine; nothing in the mapping says it does.", nodes:["l2","l3"]},
+    ],
+  },
+  {
+    id:"trade", name:"TRADE_DATE", type:"DATE",
+    equivalence:"SEI_SOURCE_IDENTIFIED_LOGIC_INCOMPLETE",
+    approval:"DRAFT_REVIEW_REQUIRED",
+    legacyRule:
+`pace_package.lot_level_position_record.trade_date :=
+  to_date(Trade_Date_128,'MM/DD/YYYY');`,
+    seiRule:"Taxlot.TRADE_DATE",
+    nodes:[
+      {id:"l1",track:"legacy",kind:"field",lab:"Trade_Date_128",
+       sub:"PEDDIFI1 · field 128",res:"ordinal"},
+      {id:"l2",track:"legacy",kind:"const",lab:"'MM/DD/YYYY'",sub:"format mask"},
+      {id:"l3",track:"legacy",kind:"fn",lab:"to_date( )",sub:"char → DATE"},
+      {id:"l4",track:"legacy",kind:"target",lab:"TRADE_DATE",sub:"DATE"},
+      {id:"s1",track:"sei",kind:"field",lab:"TRADE_DATE",sub:"Taxlot · type not published"},
+      {id:"s2",track:"sei",kind:"target",lab:"TRADE_DATE",sub:"DATE"},
+    ],
+    edges:[["l1","l3"],["l2","l3"],["l3","l4"],["s1","s2"]],
+    onlyLegacy:["l2","l3"], onlySei:[],
+    findings:[
+      {sev:"risk", txt:"The legacy rule parses with an explicit MM/DD/YYYY mask. The proposal states no format, so a DD/MM value would be read as a different date rather than rejected.", nodes:["l2","l3"]},
+      {sev:"check", txt:"Trade_Date_128 matched the published layout on ordinal only — the name does not. Field 128 of the wrong feed is still field 128.", nodes:["l1"]},
+    ],
+  },
+];
+
+const EQ_C = { EXACT_TEXT:"var(--ok)", UNVERIFIED_COMPARISON:"var(--muted)",
+  SEI_SOURCE_IDENTIFIED_LOGIC_INCOMPLETE:"var(--warn)",
+  LEGACY_LOGIC_NOT_DOCUMENTED:"var(--warn)", NO_SEI_SOURCE:"var(--bad)",
+  REQUIRES_BUSINESS_DECISION:"var(--k-join)" };
+
+/* --------------------------------------------------------------- layout
+   A layered left-to-right DAG per track. Depth is the longest path from a
+   node with no inbound edge, so an operator always sits to the right of
+   everything it consumes; within a layer nodes stack and the stack is
+   centred. Small graphs, so longest-path is both exact and instant. */
+const NW = 168, NH = 44, LAYER_GAP = 62, ROW_GAP = 13, BAND_PAD = 18, TRACK_GAP = 26;
+
+function layout(col){
+  const byId = new Map(col.nodes.map(n => [n.id, {...n}]));
+  const out = new Map(), inn = new Map();
+  col.nodes.forEach(n => { out.set(n.id, []); inn.set(n.id, []); });
+  col.edges.forEach(([a,b]) => {
+    if (!out.has(a) || !inn.has(b)) return;
+    out.get(a).push(b); inn.get(b).push(a);
+  });
+
+  const depth = new Map();
+  const visit = (id, seen) => {
+    if (depth.has(id)) return depth.get(id);
+    if (seen.has(id)) return 0;               // cycles cannot happen here, but
+    seen.add(id);                             // never loop forever if one does
+    const d = inn.get(id).length
+      ? Math.max(...inn.get(id).map(p => visit(p, seen) + 1)) : 0;
+    depth.set(id, d); return d;
+  };
+  col.nodes.forEach(n => visit(n.id, new Set()));
+
+  const tracks = ["legacy","sei"].filter(t => col.nodes.some(n => n.track === t));
+  let y = 0; const bands = [];
+  tracks.forEach(tr => {
+    const mine = col.nodes.filter(n => n.track === tr);
+    const layers = new Map();
+    mine.forEach(n => {
+      const d = depth.get(n.id);
+      if (!layers.has(d)) layers.set(d, []);
+      layers.get(d).push(n.id);
+    });
+    const maxRows = Math.max(...[...layers.values()].map(a => a.length));
+    const bandH = maxRows * NH + (maxRows - 1) * ROW_GAP + BAND_PAD * 2;
+    [...layers.keys()].sort((a,b) => a-b).forEach(d => {
+      const ids = layers.get(d);
+      const stackH = ids.length * NH + (ids.length - 1) * ROW_GAP;
+      let ny = y + BAND_PAD + (bandH - BAND_PAD*2 - stackH) / 2;
+      ids.forEach(id => {
+        const n = byId.get(id);
+        n.x = BAND_PAD + d * (NW + LAYER_GAP); n.y = ny; n.w = NW; n.h = NH;
+        ny += NH + ROW_GAP;
+      });
+    });
+    const maxD = Math.max(...[...layers.keys()]);
+    bands.push({ track:tr, y, h:bandH,
+                 w: BAND_PAD*2 + (maxD+1) * NW + maxD * LAYER_GAP });
+    y += bandH + TRACK_GAP;
+  });
+
+  const W = Math.max(...bands.map(b => b.w));
+  return { nodes:[...byId.values()], bands, W, H: y - TRACK_GAP };
+}
+
+/* ----------------------------------------------------------------- view */
+const el = s => document.querySelector(s);
+const stage = el("#stage"), svg = el("#edges"), cv = el("#cv");
+let cur = COLUMNS[0], view = null, sel = null, diffOnly = false, verdict = null;
+let zoom = 1, panX = 0, panY = 0;
+
+function esc(s){ return String(s ?? "").replace(/[&<>"]/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function drawColumns(){
+  el("#collist").innerHTML = COLUMNS.map(c => `
+    <button class="col" data-col="${c.id}" aria-pressed="${c.id===cur.id}">
+      <b><span class="dot" style="background:${EQ_C[c.equivalence]||"var(--muted)"}"></span>${esc(c.name)}</b>
+      <small>${esc(c.type)} · ${esc(c.equivalence.replace(/_/g," ").toLowerCase())}</small>
+    </button>`).join("");
+}
+
+function nodeVisible(n){
+  if (!diffOnly) return true;
+  return cur.onlyLegacy.includes(n.id) || cur.onlySei.includes(n.id)
+      || n.kind === "target" || n.kind === "branch" || n.kind === "join";
+}
+
+function draw(){
+  view = layout(cur);
+  el("#cvTitle").textContent = `HOLDINGDBO.LOT_LEVEL_POSITION.${cur.name}`;
+  el("#cvSub").textContent =
+    `${cur.nodes.filter(n=>n.track==="legacy").length} legacy operations · ` +
+    `${cur.nodes.filter(n=>n.track==="sei").length} proposed`;
+
+  // bands first, then nodes; edges live in the SVG under both
+  stage.querySelectorAll(".band,.bandlab,.node").forEach(x => x.remove());
+  view.bands.forEach(b => {
+    const d = document.createElement("div");
+    d.className = `band ${b.track}`;
+    Object.assign(d.style, { left:"0px", top:`${b.y}px`,
+      width:`${view.W}px`, height:`${b.h}px` });
+    stage.appendChild(d);
+    const lab = document.createElement("div");
+    lab.className = "bandlab";
+    lab.textContent = b.track === "legacy" ? "Today · STAR → IMDS" : "Proposed · SEI";
+    Object.assign(lab.style, { left:"8px", top:`${b.y - 9}px`,
+      background: b.track === "legacy" ? "var(--track-legacy-edge)" : "var(--track-sei-edge)" });
+    stage.appendChild(lab);
+  });
+
+  view.nodes.forEach(n => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "node";
+    const only = cur.onlyLegacy.includes(n.id) || cur.onlySei.includes(n.id);
+    if (only) b.classList.add("onlyhere");
+    if (!nodeVisible(n)) b.classList.add("dim");
+    b.dataset.id = n.id;
+    b.setAttribute("aria-pressed", sel === n.id ? "true" : "false");
+    b.style.setProperty("--nc", `var(${K[n.kind]})`);
+    Object.assign(b.style, { left:`${n.x}px`, top:`${n.y}px`,
+      width:`${n.w}px`, height:`${n.h}px` });
+    b.innerHTML = `<span class="kind">${esc(KIND_LABEL[n.kind])}</span>
+      <span class="lab" title="${esc(n.lab)}">${esc(n.lab)}</span>
+      <span class="sub" title="${esc(n.sub||"")}">${esc(n.sub||"")}</span>`;
+    stage.appendChild(b);
+  });
+
+  drawEdges();
+  fit();
+  drawDetail(); drawFindings(); drawLegend();
+}
+
+function drawEdges(){
+  const pos = new Map(view.nodes.map(n => [n.id, n]));
+  let d = "";
+  cur.edges.forEach(([a,b,lab]) => {
+    const A = pos.get(a), B = pos.get(b);
+    if (!A || !B) return;
+    const x1 = A.x + A.w, y1 = A.y + A.h/2, x2 = B.x, y2 = B.y + B.h/2;
+    const mx = (x1 + x2) / 2;
+    const on = !sel || sel === a || sel === b;
+    const vis = nodeVisible(A) && nodeVisible(B);
+    const op = !vis ? .1 : (on ? .85 : .2);
+    const col = A.track === "legacy" ? "var(--track-legacy-edge)" : "var(--track-sei-edge)";
+    d += `<path class="edgepath" d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"
+            fill="none" stroke="${col}" stroke-width="${on&&sel?2.1:1.4}"
+            opacity="${op}"></path>`;
+    d += `<circle cx="${x2-2}" cy="${y2}" r="2.6" fill="${col}" opacity="${op}"></circle>`;
+    if (lab) d += `<text x="${mx}" y="${(y1+y2)/2 - 5}" text-anchor="middle"
+        fill="${col}" opacity="${op}" font-family="var(--f-mono)"
+        font-size="9" font-weight="700">${esc(lab)}</text>`;
+  });
+  svg.innerHTML = d;
+  svg.setAttribute("viewBox", `0 0 ${view.W} ${view.H}`);
+  Object.assign(svg.style, { width:`${view.W}px`, height:`${view.H}px` });
+}
+
+const RES_LABEL = { "name+ordinal":"name and ordinal both match — confirmed",
+  "name":"name matches, ordinal does not — likely",
+  "ordinal":"ordinal only — a guess" };
+
+function drawDetail(){
+  const n = view.nodes.find(x => x.id === sel);
+  const host = el("#detail");
+  if (!n){
+    host.innerHTML = `
+      <p class="note" style="margin:0 0 10px">Pick any operation to see what it
+        reads and where it sits in the rule. Both rules in full:</p>
+      <div class="eyebrow" style="margin-bottom:4px">Today · STAR</div>
+      <pre class="rule">${esc(cur.legacyRule)}</pre>
+      <div class="eyebrow" style="margin:10px 0 4px">Proposed · SEI</div>
+      <pre class="rule">${cur.seiRule.trim().toLowerCase()==="null"
+        ? '<span style="color:var(--muted);font-style:italic">no rule written down</span>'
+        : esc(cur.seiRule)}</pre>`;
+    return;
+  }
+  const only = cur.onlyLegacy.includes(n.id) || cur.onlySei.includes(n.id);
+  host.innerHTML = `
+    <div style="display:flex;gap:7px;align-items:baseline;margin-bottom:7px">
+      <span class="eyebrow" style="color:var(${K[n.kind]})">${esc(KIND_LABEL[n.kind])}</span>
+      <b class="mono" style="font-size:12px;font-weight:500">${esc(n.lab)}</b>
+    </div>
+    <dl class="kv">
+      <dt>Track</dt><dd>${n.track === "legacy" ? "Today · STAR → IMDS" : "Proposed · SEI"}</dd>
+      <dt>Reads</dt><dd>${esc(n.sub || "—")}</dd>
+      ${n.res ? `<dt>Resolved</dt><dd style="color:${
+        n.res==="name+ordinal"?"var(--ok)":n.res==="name"?"var(--k-agg)":"var(--warn)"
+      }">${esc(RES_LABEL[n.res])}</dd>` : ""}
+      ${only ? `<dt>Only here</dt><dd style="color:var(--bad)">No operation on the other
+        track corresponds to this one.</dd>` : ""}
+    </dl>
+    <p class="note" style="margin:10px 0 0">Ringed nodes appear on one track only.
+      That is where the two rules stop having the same shape.</p>`;
+}
+
+function drawFindings(){
+  el("#diffCount").textContent =
+    `${cur.findings.filter(f=>f.sev==="risk").length} risk · ${cur.findings.length} total`;
+  el("#findings").innerHTML = cur.findings.map((f,i) => `
+    <button class="finding" data-f="${i}">
+      <span class="sev ${f.sev}">${f.sev}</span>
+      <span class="txt">${esc(f.txt)}</span>
+    </button>`).join("")
+    + `<p class="note" style="margin:10px 0 0">Each line is a fact about the two
+       graphs, not a verdict on them. Two rules drawn differently can still
+       compute the same value.</p>`;
+  el("#wbStatus").innerHTML =
+    `<span style="color:${EQ_C[cur.equivalence]||"var(--muted)"}">${
+      esc(cur.equivalence.replace(/_/g," ").toLowerCase())}</span> ·
+     ${esc(cur.approval.replace(/_/g," ").toLowerCase())}`;
+}
+
+function drawLegend(){
+  el("#legend").innerHTML = Object.keys(K).map(k =>
+    `<span><i style="background:var(${K[k]})"></i>${KIND_LABEL[k]}</span>`).join("")
+    + `<span><i style="background:transparent;border:1.5px dashed var(--bad)"></i>only on one track</span>`;
+}
+
+/* ------------------------------------------------------- pan, zoom, fit */
+function apply(){ stage.style.transform = `translate(${panX}px,${panY}px) scale(${zoom})`; }
+function fit(){
+  const r = cv.getBoundingClientRect();
+  const z = Math.min((r.width - 24) / view.W, (r.height - 24) / view.H, 1.15);
+  zoom = Math.max(.3, z);
+  panX = (r.width - view.W * zoom) / 2;
+  panY = (r.height - view.H * zoom) / 2;
+  apply();
+}
+el("#zin").onclick = () => { zoom = Math.min(2, zoom * 1.2); apply(); };
+el("#zout").onclick = () => { zoom = Math.max(.3, zoom / 1.2); apply(); };
+el("#zfit").onclick = fit;
+
+let dragging = false, sx = 0, sy = 0;
+cv.addEventListener("pointerdown", e => {
+  if (e.target.closest(".node") || e.target.closest(".zoom")) return;
+  dragging = true; sx = e.clientX - panX; sy = e.clientY - panY;
+  cv.classList.add("drag"); cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener("pointermove", e => {
+  if (!dragging) return;
+  panX = e.clientX - sx; panY = e.clientY - sy; apply();
+});
+["pointerup","pointercancel"].forEach(ev =>
+  cv.addEventListener(ev, () => { dragging = false; cv.classList.remove("drag"); }));
+cv.addEventListener("wheel", e => {
+  e.preventDefault();
+  const r = cv.getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  const nz = Math.min(2, Math.max(.3, zoom * (e.deltaY < 0 ? 1.08 : 1/1.08)));
+  panX = mx - (mx - panX) * (nz / zoom);
+  panY = my - (my - panY) * (nz / zoom);
+  zoom = nz; apply();
+}, { passive:false });
+
+/* ------------------------------------------------------------- handlers */
+document.addEventListener("click", e => {
+  const c = e.target.closest("[data-col]");
+  if (c){ cur = COLUMNS.find(x => x.id === c.dataset.col); sel = null; verdict = null;
+          document.querySelectorAll(".vbtn").forEach(b => b.setAttribute("aria-pressed","false"));
+          el("#reviewNote").textContent =
+            "Nobody has reviewed this column. A review is stored beside the workbook, never over it.";
+          drawColumns(); draw(); return; }
+  const n = e.target.closest(".node");
+  if (n){ sel = sel === n.dataset.id ? null : n.dataset.id;
+          document.querySelectorAll(".node").forEach(x =>
+            x.setAttribute("aria-pressed", x.dataset.id === sel ? "true" : "false"));
+          drawEdges(); drawDetail(); return; }
+  const f = e.target.closest("[data-f]");
+  if (f){ const ids = cur.findings[+f.dataset.f].nodes;
+          sel = ids[0] || null;
+          document.querySelectorAll(".node").forEach(x =>
+            x.classList.toggle("dim", !ids.includes(x.dataset.id)));
+          document.querySelectorAll(".node").forEach(x =>
+            x.setAttribute("aria-pressed", ids.includes(x.dataset.id) ? "true" : "false"));
+          drawEdges(); drawDetail(); return; }
+  const v = e.target.closest(".vbtn");
+  if (v){ verdict = v.dataset.v;
+          document.querySelectorAll(".vbtn").forEach(b =>
+            b.setAttribute("aria-pressed", b === v ? "true" : "false"));
+          el("#reviewNote").textContent = verdict === "AGREES"
+            ? "Recorded as computing the same value. The workbook still says draft — that disagreement is shown, not resolved."
+            : "A reason is required for anything but “same value”. A rejection nobody can act on stops the row and names no way forward.";
+          return; }
+});
+
+el("#m-stack").onclick = () => { diffOnly = false;
+  el("#m-stack").setAttribute("aria-pressed","true");
+  el("#m-diff").setAttribute("aria-pressed","false"); draw(); };
+el("#m-diff").onclick = () => { diffOnly = true;
+  el("#m-diff").setAttribute("aria-pressed","true");
+  el("#m-stack").setAttribute("aria-pressed","false"); draw(); };
+
+new ResizeObserver(() => { if (view) fit(); }).observe(cv);
+drawColumns(); draw();
+</script>
