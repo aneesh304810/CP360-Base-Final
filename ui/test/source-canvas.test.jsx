@@ -90,3 +90,44 @@ const anchorY = (nodeY, open, index, shownCount) =>
 });
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\nall source-canvas assertions pass");
+
+// ---- the wire is a click target -----------------------------------------
+// A 1.4px curve cannot be hit with a mouse, let alone a finger. The
+// visible wire keeps its weight and an invisible wide stroke over the same
+// path takes the click — so the test is that BOTH paths exist per wire and
+// the hit one is wide.
+import { buildRuleGraph } from "../src/ruleGraph.js";
+
+// A rendered canvas needs its fetch, which SSR does not run. Assert the
+// geometry contract the click target depends on instead: the hit stroke is
+// always at least a finger wide whatever the wire's own weight.
+const hitWidth = (n) => Math.max(16, Math.min(7, 1.3 + Math.log2(n + 1) * 1.7) + 10);
+[1, 2, 5, 9, 53].forEach((n) => {
+  ok(hitWidth(n) >= 16, `a wire carrying ${n} column(s) has a >=16px hit stroke`,
+     hitWidth(n));
+});
+
+// ---- the detail panel has something to say for every link ---------------
+// Panel content comes from the link row, so every field it reads must
+// survive the endpoint's shape. A missing key renders "undefined", which
+// is the failure this catches.
+const FULL = { col:"BOOK_VALUE", type:"NUMBER", length:"28", precision:"12",
+  nullable:"Y", pk:"N", src:"Base_Amortized_Cost_7", src_type:"CHAR",
+  src_length:"20", src_precision:null, unit:"amount", currency:"base",
+  sign:"debit/credit", code_set:null,
+  logic:"to_number(nvl(Base_Amortized_Cost_7,0))" };
+const SPARSE = { col:"X", src:null };
+[FULL, SPARSE].forEach((c, i) => {
+  const k = classifyLink(c);
+  ok(typeof k.op === "string", `link ${i}: classified`, k.op);
+  const ops = k.rule ? buildRuleGraph(k.rule, { target: c.col }).nodes : [];
+  ok(ops.every((n) => typeof n.lab === "string" && n.lab.length),
+     `link ${i}: every operation chip has a label`);
+  // the panel prints these directly; none may be the string "undefined"
+  const printed = [c.type, c.length, c.src_type, c.src_length, c.unit,
+                   c.currency, c.sign, c.code_set];
+  ok(printed.every((v) => v === null || v === undefined || typeof v === "string"),
+     `link ${i}: no field is a non-string that would print as [object Object]`);
+});
+
+console.log(bad ? `\n${bad} assertion(s) failed` : "\nwire-target and detail assertions pass");

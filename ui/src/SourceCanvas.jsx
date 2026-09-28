@@ -298,19 +298,48 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
                 : (m.items.some((x) => x.__op.transformed) ? "#e67e22" : "#9aa7b2");
               const mx = (m.a.x + m.b.x) / 2;
               const my = (m.a.y + m.b.y) / 2;
+              const d = `M${m.a.x},${m.a.y} C${mx},${m.a.y} ${mx},${m.b.y} ${m.b.x},${m.b.y}`;
+              const pick = () => {
+                // A merged wire means the table it lands in is closed.
+                // Opening it is what the reader wanted by clicking, and
+                // then the wire they meant is one of the ones that appear.
+                if (m.items.length > 1) {
+                  setOpen((st) => new Set(st).add(`t:${m.items[0].table}`));
+                  setSel({ table: m.items[0].table, col: m.items[0].col });
+                } else {
+                  const one0 = m.items[0];
+                  const same = sel && sel.table === one0.table && sel.col === one0.col;
+                  setSel(same ? null : { table: one0.table, col: one0.col });
+                }
+              };
               return (
                 <g key={i}>
-                  <path d={`M${m.a.x},${m.a.y} C${mx},${m.a.y} ${mx},${m.b.y} ${m.b.x},${m.b.y}`}
+                  {/* A 1.4px curve is not a click target. An invisible
+                      wide stroke over the same path is — the visible wire
+                      keeps its weight and the hit area is a finger. */}
+                  {vis && (
+                    <path data-node d={d} fill="none" stroke="transparent"
+                      strokeWidth={Math.max(16, w + 10)} strokeLinecap="round"
+                      onClick={pick}
+                      style={{ pointerEvents: "stroke", cursor: "pointer" }}>
+                      <title>{m.items.length === 1
+                        ? `${m.items[0].src || "no source"} → ${m.items[0].table}.${m.items[0].col}`
+                          + `\n${OP_META[m.items[0].__op.op].label}`
+                        : `${m.items.length} columns into ${m.items[0].table}`
+                          + ` — click to open the table`}</title>
+                    </path>)}
+                  <path d={d}
                     fill="none" stroke={c} strokeWidth={w} opacity={op}
                     strokeLinecap="round" />
                   {m.items.length > 1 && vis && (
-                    <>
+                    <g data-node onClick={pick}
+                      style={{ pointerEvents: "all", cursor: "pointer" }}>
                       <circle cx={mx} cy={my} r="8.5" fill={t.panel || "#fff"}
                         stroke={c} strokeWidth="1.2" opacity={op} />
                       <text x={mx} y={my + 3} textAnchor="middle" fill={c}
                         opacity={op} fontFamily={MONO} fontSize="9"
                         fontWeight="700">{m.items.length}</text>
-                    </>)}
+                    </g>)}
                 </g>);
             })}
           </svg>
@@ -449,15 +478,30 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
 
       {/* the selected link */}
       {selected && <LinkDetail t={t} c={selected} table={sel.table}
-        srcTable={srcTable} />}
+        srcTable={srcTable} dataSource={dataSource} />}
     </div>);
 }
 
 // The expression as written, and the operations in order. A single link is
 // a chain, not a DAG, so it reads as a chain — the branching picture is the
 // operator graph's job and lives on the crosswalk column page.
-function LinkDetail({ t, c, table, srcTable }) {
+function LinkDetail({ t, c, table, srcTable, dataSource }) {
   const meta = OP_META[c.__op.op];
+  // WHAT THE COLUMN MEANS, not only what happens to it. Five dictionaries
+  // are loaded — the AddVantage/CRD/STAR master, the published STAR
+  // layouts, the SEI input catalogue, the UAF layouts and the contract
+  // metadata — and the endpoint says which one answered, because a
+  // definition from SEI's inbound catalogue is not the same warrant as one
+  // from a published layout.
+  const [def, setDef] = useState(undefined);
+  useEffect(() => {
+    if (!c.src) { setDef(null); return; }
+    let live = true;
+    setDef(undefined);
+    crosswalkApi.fieldDefinition(c.src, dataSource, srcTable)
+      .then((r) => { if (live) setDef(r.definition || null); });
+    return () => { live = false; };
+  }, [c.src, dataSource, srcTable]);
   const ops = useMemo(() => {
     if (!c.__op.rule) return [];
     const g = buildRuleGraph(c.__op.rule, { target: c.col });
@@ -467,6 +511,22 @@ function LinkDetail({ t, c, table, srcTable }) {
   }, [c]);
   const KC = { field: SRC_C, const: "#7b8894", fn: "#00a3a3", branch: "#e67e22",
                join: "#7c3aed", agg: "#0091bf", target: DWH_C };
+  const End = ({ eyebrow, c: col, name, type, len, prec, extra }) => (
+    <span style={{ flex: "1 1 180px", minWidth: 0,
+      border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+      borderLeft: `3px solid ${col}`, borderRadius: 3, padding: "5px 9px",
+      background: t.bg || "#f5f8f8" }}>
+      <span style={{ display: "block", fontSize: 8, fontWeight: 800,
+        letterSpacing: 0.5, textTransform: "uppercase", color: col }}>
+        {eyebrow}</span>
+      <span title={name} style={{ display: "block", fontFamily: MONO,
+        fontSize: 10.5, color: t.navy || "#10193b", overflow: "hidden",
+        textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+      <span style={{ display: "block", fontSize: 9, color: t.muted || "#999" }}>
+        {type || "type not published"}
+        {len ? `(${len}${prec ? `,${prec}` : ""})` : ""}
+        {extra ? ` · ${extra}` : ""}</span>
+    </span>);
   return (
     <div style={{ marginTop: 11, border: `1px solid ${t.panel2 || "#dfe6e9"}`,
       borderLeft: `3px solid ${meta.c}`, borderRadius: 4, padding: "10px 13px",
@@ -485,6 +545,57 @@ function LinkDetail({ t, c, table, srcTable }) {
       </div>
       <div style={{ fontSize: 10.5, color: t.sub || "#666", lineHeight: 1.6 }}>
         {meta.note}</div>
+
+      {/* the two ends, side by side — a type comparison you can make by
+          eye is the cheapest check on this screen */}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 9 }}>
+        <End t={t} eyebrow="Source field" c={SRC_C} name={c.src || "— none —"}
+          type={c.src_type} len={c.src_length} prec={c.src_precision} />
+        <span style={{ alignSelf: "center", color: t.muted || "#999" }}>→</span>
+        <End t={t} eyebrow="Warehouse column" c={DWH_C} name={c.col}
+          type={c.type} len={c.length} prec={c.precision}
+          extra={[c.nullable && `nullable ${c.nullable}`,
+                  c.pk && c.pk !== "N" && "key"].filter(Boolean).join(" · ")} />
+      </div>
+
+      {/* the semantics a type comparison cannot see. Two NUMBER(28,12)
+          columns in different units are not the same column. */}
+      {(c.unit || c.currency || c.sign || c.code_set) && (
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 8,
+          fontSize: 10, color: t.sub || "#666" }}>
+          {c.unit && <span><b style={{ color: t.muted || "#999" }}>unit</b> {c.unit}</span>}
+          {c.currency && <span><b style={{ color: t.muted || "#999" }}>currency</b> {c.currency}</span>}
+          {c.sign && <span><b style={{ color: t.muted || "#999" }}>sign</b> {c.sign}</span>}
+          {c.code_set && <span><b style={{ color: t.muted || "#999" }}>code set</b>{" "}
+            <span style={{ fontFamily: MONO }}>{c.code_set}</span></span>}
+        </div>)}
+
+      {/* the dictionary */}
+      <div style={{ marginTop: 9, paddingTop: 8,
+        borderTop: `1px dashed ${t.panel2 || "#dfe6e9"}` }}>
+        <span style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: 0.5,
+          textTransform: "uppercase", color: t.muted || "#999" }}>
+          What the field means</span>
+        {def === undefined ? (
+          <div style={{ fontSize: 10.5, color: t.muted || "#999", marginTop: 3 }}>
+            looking in the loaded dictionaries…</div>
+        ) : def ? (
+          <div style={{ fontSize: 10.5, color: t.sub || "#666", lineHeight: 1.6,
+            marginTop: 3, maxWidth: "76ch" }}>
+            <b style={{ color: t.navy || "#10193b" }}>{def.term || c.src}</b>
+            {def.description ? ` — ${def.description}` : ""}
+            <div style={{ color: t.muted || "#999", marginTop: 2 }}>
+              from {def.source_label}
+              {def.type ? ` · ${def.type}${def.length ? `(${def.length})` : ""}` : ""}
+              {def.evidence ? ` · ${def.evidence}` : ""}</div>
+            {def.caveat && <div style={{ color: "#b45309", marginTop: 2 }}>
+              {def.caveat}</div>}
+          </div>
+        ) : (
+          <div style={{ fontSize: 10.5, color: t.muted || "#999", marginTop: 3 }}>
+            {c.src ? "No loaded dictionary defines this field."
+                   : "No source field, so nothing to define."}</div>)}
+      </div>
       {c.__op.rule ? (
         <>
           <pre style={{ margin: "8px 0 0", fontFamily: MONO, fontSize: 10.5,
