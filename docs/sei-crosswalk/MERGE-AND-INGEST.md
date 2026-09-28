@@ -78,6 +78,7 @@ docs/sei-crosswalk/validate-crosswalk.sql
 docs/ingestion-prompts/PROMPT_VALIDATE_INGESTED_CROSSWALK.md
 ui/test/  (run.mjs + twelve .test.jsx — `npm test` in ui/)
 api/test/test_graph_chain.py
+api/test/test_source_canvas_scope.py
 ingestion/test/test_lane_lineage_parse.py
 docs/ingestion-prompts/PROMPT_IMDS_STAR_UAF_SEI_data_lineage.md
 docs/ingestion-prompts/PROMPT_PBDW_ADDVANTAGE_SEI_crosswalk.md

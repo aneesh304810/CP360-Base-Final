@@ -137,9 +137,33 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
     return <div style={{ padding: 24, fontSize: 12, color: t.muted || "#999" }}>
       Loading where this feed lands…</div>;
   }
+  // WHY, NOT JUST "NOTHING". "No warehouse column records this feed as its
+  // source" is a claim about the business, and it was printed on a screen
+  // whose own spine said 31 fields across 4 tables directly above it. The
+  // endpoint now separates a schema gap, a scope mismatch and a genuinely
+  // unmapped feed, and each of those needs a different person to do a
+  // different thing, so the screen names which.
   if (!targets.length) {
-    return <div style={{ padding: 20, fontSize: 12, color: t.sub || "#666" }}>
-      No warehouse column records this feed as its source.</div>;
+    const d = data.diagnostics || {};
+    return (
+      <div style={{ padding: 20, fontSize: 12, color: t.sub || "#666",
+                    lineHeight: 1.6, maxWidth: "72ch" }}>
+        <div style={{ color: d.ok === false ? "#c1113a" : (t.sub || "#666"),
+                      fontWeight: d.ok === false ? 500 : 400 }}>
+          {d.reason || "No warehouse column records this feed as its source."}
+        </div>
+        {(d.missing || []).length > 0 && (
+          <div style={{ marginTop: 8, fontSize: 11, color: t.muted || "#999" }}>
+            Not present in this database:{" "}
+            <span style={{ fontFamily: MONO }}>{d.missing.join(", ")}</span>.
+            {" "}Run the outstanding migrations and this fills in.
+          </div>)}
+        {(d.near_names || []).length > 0 && (
+          <div style={{ marginTop: 8, fontSize: 11, color: t.muted || "#999" }}>
+            Nearest source-table names under this data source:{" "}
+            <span style={{ fontFamily: MONO }}>{d.near_names.join(", ")}</span>
+          </div>)}
+      </div>);
   }
 
   // ---- anchors: the mechanic ---------------------------------------------
@@ -234,6 +258,22 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
 
   return (
     <div>
+      {/* A widened match is not a detail to hide. Silently dropping the
+          data-source filter is exactly how this canvas and the spine above
+          it came to state different numbers on the same screen, so when the
+          rows answered only on a wider rung the screen says so. */}
+      {data.diagnostics && data.diagnostics.scope_note && (
+        <div style={{ marginBottom: 9, padding: "7px 10px", fontSize: 11,
+          lineHeight: 1.55, borderRadius: 3, color: "#7a4a12",
+          background: "#fdf3e4", border: "1px solid #f0d5ae" }}>
+          {data.diagnostics.scope_note}</div>)}
+      {data.diagnostics && (data.diagnostics.missing || []).length > 0 && (
+        <div style={{ marginBottom: 9, fontSize: 10.5, color: t.muted || "#999" }}>
+          Shown without{" "}
+          <span style={{ fontFamily: MONO }}>
+            {data.diagnostics.missing.join(", ")}</span>
+          {" "}— those tables are not in this database yet, so the lane badge
+          and registered rules are blank rather than wrong.</div>)}
       <div style={{ display: "flex", gap: 8, alignItems: "center",
         flexWrap: "wrap", marginBottom: 9 }}>
         <span style={eyebrow}>Where it lands</span>

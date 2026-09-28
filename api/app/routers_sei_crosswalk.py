@@ -26,7 +26,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from ._legacy_compat import _safe, _norm_code
-from .db import execute as _execute
+from .db import execute as _execute, query as _query
 
 log = logging.getLogger("cp.api.sei_crosswalk")
 router = APIRouter(prefix="/sei-crosswalk", tags=["sei-crosswalk"])
@@ -1376,6 +1376,55 @@ def resolve_tokens(tokens: str, data_source: str | None = None):
             "layout_rows": len(rows)}
 
 
+# Columns /source-canvas reads from LEGACY_LINEAGE. The first group is what
+# the screen cannot work without; the second is enrichment that older
+# installs may not have yet. Both are intersected with the real table before
+# a SELECT is built, because naming a column that is not there fails the
+# whole statement and _safe turns that into an empty screen.
+_CANVAS_CORE = ["lineage_id", "dwh_target_table", "dwh_target_column"]
+_CANVAS_NICE = ["dwh_type", "dwh_length", "dwh_precision",
+                "src_source_column", "src_type", "src_length", "src_precision",
+                "stg1_source_table", "stg1_source_column",
+                "stg2_source_table", "stg2_source_column",
+                "src_to_stg1_transform", "stg1_to_stg2_transform",
+                "stg2_to_dwh_transform",
+                "lineage_status", "lineage_status_detail", "functional_group",
+                "unit_of_measure", "currency_basis", "sign_convention",
+                "code_set_name"]
+
+
+def _table_cols(table):
+    """The columns a table actually has, upper-cased, or an empty set.
+
+    Empty means one of two things the caller must tell apart: the table is
+    not there, or the dictionary is not readable. Both end the same way for
+    a query, so the caller reports the table by name rather than guessing.
+    """
+    rows = _safe("SELECT column_name FROM user_tab_columns WHERE table_name = :t",
+                 {"t": table.upper()})
+    if not rows:
+        rows = _safe("""SELECT DISTINCT column_name FROM all_tab_columns
+                        WHERE table_name = :t""", {"t": table.upper()})
+    return {(r.get("column_name") or "").upper() for r in rows}
+
+
+def _try(sql, params=None):
+    """_safe, but it hands back the error instead of hiding it.
+
+    Returning [] on failure is right for a widget that should degrade
+    quietly — a missing side table costs a badge. It is wrong for the ONE
+    query a screen is built on, because "no rows" then reads as "this feed
+    feeds nothing", which is a claim about the business made on the strength
+    of a missing column. The caller needs to know which it is so the screen
+    can say which it is.
+    """
+    try:
+        return _query(sql, params or {}), None
+    except Exception as e:                                    # noqa: BLE001
+        log.warning("sei_crosswalk query failed: %s", e)
+        return [], str(e).strip().splitlines()[0][:300]
+
+
 @router.get("/source-canvas")
 def source_canvas(src_table: str, data_source: str | None = None,
                   limit_cols: int = 400):
@@ -1395,39 +1444,138 @@ def source_canvas(src_table: str, data_source: str | None = None,
     operator graph drew a branch. So the three hop transforms go across
     as written and one parser decides what they mean.
 
-    The lane comes from LEGACY_LINEAGE_LANE where it has been recorded,
-    so a feed is shown under the system that actually publishes it.
+    ONE WIDE QUERY WAS THE BUG. This read LEGACY_LINEAGE joined to
+    LEGACY_LINEAGE_LANE, LEGACY_LINEAGE_XFORM and SEI_TRANSFORMATION in a
+    single statement naming twenty-six columns, wrapped in _safe. Any one
+    of those tables not yet migrated, or any one of those columns not yet
+    added, failed the statement — and _safe turned the failure into zero
+    rows, which the screen rendered as "no warehouse column records this
+    feed as its source". A true sentence about the schema printed as a
+    false sentence about the data, with nothing on screen to tell them
+    apart.
+
+    So the core read stands alone over columns confirmed to exist, each
+    enrichment is its own query, and what did not answer is reported.
+    A missing migration now costs the lane badge or the registered rule.
+    It cannot cost the screen.
     """
     ds = _ds(data_source)
-    rows = _safe(f"""
-        SELECT l.dwh_target_table, l.dwh_target_column, l.dwh_type, l.dwh_length,
-               l.src_source_column, l.src_type, l.src_length,
-               l.stg1_source_table, l.stg1_source_column,
-               l.stg2_source_table, l.stg2_source_column,
-               l.src_to_stg1_transform, l.stg1_to_stg2_transform,
-               l.stg2_to_dwh_transform,
-               l.lineage_status, l.lineage_status_detail, l.functional_group,
-               l.dwh_precision, l.src_precision,
-               l.unit_of_measure, l.currency_basis, l.sign_convention,
-               l.code_set_name,
-               x.dwh_nullable, x.dwh_pk_flag,
-               n.source_system, n.lane_id,
-               x.legacy_transformation_id, x.sei_transformation_id,
-               x.transformation_equivalence,
-               g.transformation_logic AS legacy_logic
-        FROM   legacy_lineage l
-        LEFT   JOIN legacy_lineage_lane n ON n.lineage_id = l.lineage_id
-        LEFT   JOIN legacy_lineage_xform x ON x.lineage_id = l.lineage_id
-        LEFT   JOIN sei_transformation g
-               ON g.transformation_id = x.legacy_transformation_id
-        WHERE  l.data_source = :ds AND l.src_source_table = :s
-        ORDER  BY l.dwh_target_table, l.dwh_target_column
-        FETCH FIRST {int(limit_cols)} ROWS ONLY""",
-        {"ds": ds, "s": src_table})
+    diag = {"ok": True, "reason": None, "missing": [], "degraded": [],
+            "matched_on": "exact"}
 
+    have = _table_cols("LEGACY_LINEAGE")
+    if not have:
+        return {"data_source": ds, "src_table": src_table, "source_system": None,
+                "feed": {}, "targets": [], "source_columns": [],
+                "source_column_use": {}, "column_count": 0, "truncated": False,
+                "diagnostics": {**diag, "ok": False,
+                    "missing": ["LEGACY_LINEAGE"],
+                    "reason": "LEGACY_LINEAGE is not present or not readable "
+                              "from this connection, so there is no lineage to "
+                              "read for any feed."}}
+    if "SRC_SOURCE_TABLE" not in have:
+        return {"data_source": ds, "src_table": src_table, "source_system": None,
+                "feed": {}, "targets": [], "source_columns": [],
+                "source_column_use": {}, "column_count": 0, "truncated": False,
+                "diagnostics": {**diag, "ok": False,
+                    "missing": ["LEGACY_LINEAGE.SRC_SOURCE_TABLE"],
+                    "reason": "LEGACY_LINEAGE has no SRC_SOURCE_TABLE column, "
+                              "so a feed cannot be looked up by name."}}
+
+    sel = [c for c in _CANVAS_CORE + _CANVAS_NICE if c.upper() in have]
+    diag["degraded"] = [c.upper() for c in _CANVAS_NICE if c.upper() not in have]
+    cols_sql = ", ".join(f"l.{c}" for c in sel)
+
+    # SCOPE THE WAY THE REST OF THIS SCREEN SCOPES. Every other Source view
+    # query goes through _ds_scoped, which tries `data_source = :ds` and, when
+    # that finds NOTHING, retries with no data-source filter at all. This
+    # endpoint hard-filtered on :ds instead — so on a database whose
+    # LEGACY_LINEAGE rows carry a different data source (or none; the
+    # neighbouring queries NVL it to PBDW, which is the tell), the spine above
+    # the canvas counted 31 fields across 4 tables from the unscoped retry
+    # while the canvas below it counted zero from the scoped one, and the same
+    # screen stated both. A screen that disagrees with itself is worse than a
+    # screen that is empty.
+    #
+    # The ladder widens one step at a time and each step is recorded, because
+    # "these rows carry no data source" and "this feed is spelled differently
+    # in the lineage than in the file list" are both findings someone owns —
+    # they just are not reasons to show a blank canvas.
+    #
+    # The bind set is built per rung. Oracle rejects a bind the statement does
+    # not use, and an unscoped rung has no :ds in it.
+    name_x = "l.src_source_table = :s"
+    name_f = "UPPER(TRIM(l.src_source_table)) = UPPER(TRIM(:s))"
+    rungs = [
+        ("exact", f"l.data_source = :ds AND {name_x}", {"ds": ds, "s": src_table}),
+        ("name folded", f"l.data_source = :ds AND {name_f}", {"ds": ds, "s": src_table}),
+        ("any data source", name_x, {"s": src_table}),
+        ("name folded, any data source", name_f, {"s": src_table}),
+    ]
+    rows, err, where, params = [], None, rungs[0][1], rungs[0][2]
+    for how, w, p in rungs:
+        rows, err = _try(f"""SELECT {cols_sql} FROM legacy_lineage l
+            WHERE {w}
+            ORDER BY l.dwh_target_table, l.dwh_target_column
+            FETCH FIRST {int(limit_cols)} ROWS ONLY""", p)
+        where, params, diag["matched_on"] = w, p, how
+        if rows or err:
+            break
+    if err:
+        diag.update(ok=False, reason=f"The lineage read failed: {err}")
+    elif rows and diag["matched_on"] != "exact":
+        diag["scope_note"] = _scope_note(diag["matched_on"], ds, src_table, len(rows))
+
+    # ---- enrichment, each on its own so one gap costs one badge ----------
+    ids = [r.get("lineage_id") for r in rows if r.get("lineage_id") is not None]
+    sub = f"SELECT l.lineage_id FROM legacy_lineage l WHERE {where}"
+
+    lane_by, lane = {}, None
+    if ids:
+        lr = _safe(f"""SELECT lineage_id, source_system, lane_id
+                       FROM legacy_lineage_lane WHERE lineage_id IN ({sub})""",
+                   params)
+        if lr:
+            lane_by = {r.get("lineage_id"): r for r in lr}
+            lane = next((r.get("source_system") for r in lr
+                         if r.get("source_system")), None)
+
+    xf_by = {}
+    if ids:
+        xr = _safe(f"""SELECT lineage_id, dwh_nullable, dwh_pk_flag,
+                              legacy_transformation_id, sei_transformation_id,
+                              transformation_equivalence
+                       FROM legacy_lineage_xform WHERE lineage_id IN ({sub})""",
+                   params)
+        xf_by = {r.get("lineage_id"): r for r in xr}
+
+    logic_by = {}
+    tids = [x.get("legacy_transformation_id") for x in xf_by.values()
+            if x.get("legacy_transformation_id")]
+    if tids:
+        gr = _safe(f"""SELECT transformation_id, transformation_logic
+                       FROM sei_transformation
+                       WHERE transformation_id IN (
+                         SELECT legacy_transformation_id FROM legacy_lineage_xform
+                         WHERE lineage_id IN ({sub})
+                           AND legacy_transformation_id IS NOT NULL)""", params)
+        logic_by = {r.get("transformation_id"): r.get("transformation_logic")
+                    for r in gr}
+
+    # What did not answer, named. A side table that is simply empty is not a
+    # gap; one that is not there is, and only the dictionary tells them apart.
+    for tbl, got in (("LEGACY_LINEAGE_LANE", lane_by),
+                     ("LEGACY_LINEAGE_XFORM", xf_by),
+                     ("SEI_TRANSFORMATION", logic_by)):
+        if not got and not _table_cols(tbl):
+            diag["missing"].append(tbl)
+
+    # ---- shape ------------------------------------------------------------
     targets: dict[str, dict] = {}
     src_cols: dict[str, int] = {}
     for r in rows:
+        lid = r.get("lineage_id")
+        x = xf_by.get(lid) or {}
         tbl = r.get("dwh_target_table") or "(unnamed)"
         t = targets.setdefault(tbl, {"table": tbl, "cols": [],
                                      "functional_group": r.get("functional_group")})
@@ -1438,7 +1586,7 @@ def source_canvas(src_table: str, data_source: str | None = None,
             "col": r.get("dwh_target_column"),
             "type": r.get("dwh_type"), "length": r.get("dwh_length"),
             "precision": r.get("dwh_precision"),
-            "nullable": r.get("dwh_nullable"), "pk": r.get("dwh_pk_flag"),
+            "nullable": x.get("dwh_nullable"), "pk": x.get("dwh_pk_flag"),
             "src": sc, "src_type": r.get("src_type"),
             "src_length": r.get("src_length"),
             "src_precision": r.get("src_precision"),
@@ -1458,12 +1606,11 @@ def source_canvas(src_table: str, data_source: str | None = None,
             "t3": r.get("stg2_to_dwh_transform"),
             # the registered rule, where the transformation layer has one.
             # Richer than the hop text and the thing worth drawing.
-            "logic": r.get("legacy_logic"),
-            "equivalence": r.get("transformation_equivalence"),
+            "logic": logic_by.get(x.get("legacy_transformation_id")),
+            "equivalence": x.get("transformation_equivalence"),
             "status": r.get("lineage_status"),
         })
 
-    lane = next((r.get("source_system") for r in rows if r.get("source_system")), None)
     feed = _safe("""
         SELECT f.src_file, f.dataset, f.source_system,
                a.business_name
@@ -1474,6 +1621,18 @@ def source_canvas(src_table: str, data_source: str | None = None,
           AND  f.src_file_key = REGEXP_REPLACE(UPPER(TRIM('_' FROM
                  REGEXP_REPLACE(:s, '[[:space:]/.-]+', '_'))), '_{2,}', '_')
         FETCH FIRST 1 ROWS ONLY""", {"ds": ds, "s": src_table})
+    if not feed:
+        # feed_alias is the newest of these tables and the likeliest to be
+        # absent. The feed's own row is what the header needs; the business
+        # name is the part that can be missing.
+        feed = _safe("""
+            SELECT src_file, dataset, source_system, NULL AS business_name
+            FROM   legacy_source_file
+            WHERE  data_source = :ds AND UPPER(TRIM(src_file)) = UPPER(TRIM(:s))
+            FETCH FIRST 1 ROWS ONLY""", {"ds": ds, "s": src_table})
+
+    if not targets and diag["ok"]:
+        diag.update(_why_empty(ds, src_table, diag))
 
     return {
         "data_source": ds, "src_table": src_table,
@@ -1484,7 +1643,88 @@ def source_canvas(src_table: str, data_source: str | None = None,
         "source_column_use": src_cols,
         "column_count": sum(len(t["cols"]) for t in targets.values()),
         "truncated": len(rows) >= int(limit_cols),
+        "diagnostics": diag,
     }
+
+
+def _scope_note(how, ds, src_table, n):
+    """Say out loud that the rows were found by widening the search.
+
+    Silently widening is how the spine and the canvas came to disagree in
+    the first place. Whoever owns the load should see that the rows answered
+    only once the data source was dropped.
+    """
+    if how == "any data source":
+        return (f"These {n} rows were found only after dropping the data-source "
+                f"filter — they are in LEGACY_LINEAGE but not under {ds}. "
+                f"The rest of this screen scopes the same way, so the counts "
+                f"agree; the load is what needs looking at.")
+    if how == "name folded":
+        return (f"{src_table} matched only after folding case and trimming "
+                f"spaces. The file list and the lineage spell this feed "
+                f"differently.")
+    return (f"{src_table} matched only after folding case and dropping the "
+            f"data-source filter. Both the spelling and the data source of "
+            f"these rows differ from what this screen asked for.")
+
+
+def _why_empty(ds, src_table, diag):
+    """Nothing came back and nothing failed. Say which of those it was.
+
+    "No warehouse column records this feed as its source" is a strong
+    claim, and it is the wrong one when the data source is empty, when the
+    feed is spelled differently in the lineage than in the file list, or
+    when the whole table is empty. Each of those needs a different person
+    to do a different thing, so the screen has to name which.
+    """
+    n_ds = _one("SELECT COUNT(*) AS n FROM legacy_lineage WHERE data_source = :ds",
+                {"ds": ds})
+    n_all = _one("SELECT COUNT(*) AS n FROM legacy_lineage", {})
+    n_feed_any = _one("""SELECT COUNT(*) AS n FROM legacy_lineage
+                         WHERE UPPER(TRIM(src_source_table)) = UPPER(TRIM(:s))""",
+                      {"s": src_table})
+    near = _safe("""SELECT DISTINCT src_source_table FROM legacy_lineage
+                    WHERE data_source = :ds AND src_source_table IS NOT NULL
+                      AND UPPER(src_source_table) LIKE '%' || UPPER(:s) || '%'
+                    FETCH FIRST 5 ROWS ONLY""", {"ds": ds, "s": src_table})
+    others = _safe("""SELECT DISTINCT data_source FROM legacy_lineage
+                      WHERE UPPER(TRIM(src_source_table)) = UPPER(TRIM(:s))
+                      FETCH FIRST 5 ROWS ONLY""", {"s": src_table})
+
+    out = {"rows_for_data_source": n_ds, "rows_in_table": n_all,
+           "rows_for_feed_any_source": n_feed_any,
+           "near_names": [r.get("src_source_table") for r in near],
+           "other_data_sources": [r.get("data_source") for r in others]}
+
+    if n_all == 0:
+        out["reason"] = ("LEGACY_LINEAGE is empty — no lineage has been "
+                         "loaded into this database yet.")
+    elif n_ds == 0:
+        out["reason"] = (f"LEGACY_LINEAGE has {n_all} rows but none for data "
+                         f"source {ds}. The loader wrote a different data "
+                         f"source, or this screen is asking for the wrong one.")
+    elif n_feed_any > 0:
+        ods = ", ".join(str(x) for x in out["other_data_sources"] if x)
+        out["reason"] = (f"{src_table} has {n_feed_any} lineage rows, but under "
+                         f"data source {ods or 'another value'} rather than {ds}.")
+    elif out["near_names"]:
+        out["reason"] = (f"No row names {src_table} as its source table. "
+                         f"Rows under {ds} name: "
+                         + ", ".join(str(x) for x in out["near_names"]) + ".")
+    else:
+        out["reason"] = (f"Of {n_ds} lineage rows for {ds}, none names "
+                         f"{src_table} as its source table. This feed is in the "
+                         f"file list but nothing downstream is mapped from it "
+                         f"yet.")
+    return out
+
+
+def _one(sql, params):
+    r = _safe(sql, params)
+    try:
+        return int((r[0].get("n") if r else 0) or 0)
+    except Exception:                                         # noqa: BLE001
+        return 0
 
 
 @router.get("/catalog")

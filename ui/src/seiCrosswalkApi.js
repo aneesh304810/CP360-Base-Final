@@ -135,7 +135,11 @@ export const crosswalkApi = {
   sourceCanvas: (src_table, data_source) =>
     _get(`/sei-crosswalk/source-canvas${_qs({ src_table, data_source })}`,
       () => ({ src_table, feed: {}, targets: [], source_columns: [],
-               column_count: 0 })),
+               column_count: 0,
+               // the fallback is itself a diagnosis: the call did not answer
+               diagnostics: { ok: false, missing: [], near_names: [],
+                 reason: "The lineage service did not answer, so this is not "
+                       + "a statement about the feed." } })),
 
   lanes: (data_source) =>
     _get(`/sei-crosswalk/lanes${_qs({ data_source })}`, () => ({ lanes: [] })),
