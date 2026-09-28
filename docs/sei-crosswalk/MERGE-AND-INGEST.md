@@ -53,6 +53,7 @@ sql/53_sei_catalog.sql
 sql/54_sei_widen.sql
 sql/55_lineage_lane.sql
 sql/56_transformations.sql
+sql/57_widen_v3.sql
 ingestion/lane_lineage_conn.py
 api/app/routers_sei_crosswalk.py
 ui/src/seiCrosswalkApi.js
@@ -155,6 +156,7 @@ sqlplus $CP_DB_USER/$CP_DB_PASS@$CP_DB_DSN @sql/53_sei_catalog.sql
 sqlplus $CP_DB_USER/$CP_DB_PASS@$CP_DB_DSN @sql/54_sei_widen.sql
 sqlplus $CP_DB_USER/$CP_DB_PASS@$CP_DB_DSN @sql/55_lineage_lane.sql
 sql/56_transformations.sql
+sql/57_widen_v3.sql
 ```
 
 Run them in order. All idempotent — `CREATE` swallows ORA-955, `ALTER`
@@ -171,6 +173,11 @@ new tables; no existing table is altered.**
   without it the undecided count reads zero. It also drops the disposition
   check constraint, because the workbook now uses GENERATE, RETAIN and
   DEFER as well as the original five.
+- `57` widens the two columns the first 24-sheet load rejected rows on
+  (`SEI_INPUT_LINEAGE.CODE_SET_NAME`, `STAR_UPLOADER_JOB.PRE_PROCESS`),
+  adds `ACCEPTABLE_VALUES` its own column, and pre-emptively widens the
+  free-text columns that hold paragraphs rather than phrases. Re-ingest
+  after it: the 15 rejected rows only come back on a reload.
 - `55` adds `LEGACY_LINEAGE_LANE`. **Without it the STAR/UAF badge filters
   nothing** — both lanes live in `LEGACY_LINEAGE` under one `DATA_SOURCE`
   with no column telling them apart, so selecting UAF relabelled the spine

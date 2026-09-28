@@ -538,8 +538,15 @@ class SeiCrosswalkConnector:
             for r in xforms:
                 k = r["transformation_equivalence"] or "(none recorded)"
                 eq[k] = eq.get(k, 0) + 1
-            log.info("sei_crosswalk: %d of %d lineage rows carry a transformation "
-                     "(%s)", len(xforms), len(lin),
+            # Count the two things separately. A row can be here for its
+            # DWH_NULLABLE alone, and reporting all of them as "carry a
+            # transformation" reads as full coverage when 96 of 124 have
+            # no transformation recorded at all.
+            withx = sum(1 for r in xforms
+                        if r["legacy_transformation_id"] or r["sei_transformation_id"])
+            log.info("sei_crosswalk: %d of %d lineage rows carry target metadata; "
+                     "%d of those name a transformation. Equivalence: %s",
+                     len(xforms), len(lin), withx,
                      ", ".join(f"{k}={v}" for k, v in sorted(eq.items())))
         return lin, cols, lanerows, xforms
 
@@ -796,7 +803,14 @@ class SeiCrosswalkConnector:
                 "record_scope": sh.get(row, "RECORD_SCOPE"),
                 "validation_rule": sh.get(row, "VALIDATION_RULE"),
                 "field_definition": sh.get(row, "FIELD_DEFINITION"),
-                "code_set_name": _nz(sh.get(row, "CODE_SET_NAME", "ACCEPTABLE_VALUES")),
+                # NOT aliased to ACCEPTABLE_VALUES. A code-set name is an
+                # identifier that joins to SEI_CODE_SET; ACCEPTABLE_VALUES
+                # is free text listing the values themselves. Loading one
+                # into the other gave a column that looks joinable and
+                # joins to nothing — and overflowed at 177 characters,
+                # which is the only reason it was noticed.
+                "code_set_name": _nz(sh.get(row, "CODE_SET_NAME")),
+                "acceptable_values": sh.get(row, "ACCEPTABLE_VALUES"),
                 "mapping_status": _nz(sh.get(row, "MAPPING_STATUS")),
                 "source_mapping_rule": sh.get(row, "MAPPING_LOGIC", "SOURCE_MAPPING_RULE"),
                 "upstream_object": sh.get(row, "SOURCE_OBJECT", "UPSTREAM_SOURCE_OBJECT", "UPSTREAM_OBJECT"),

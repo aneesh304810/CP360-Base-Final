@@ -119,9 +119,13 @@ SHEETS = {
                            "SOURCE_OBJECT", "SOURCE_FIELD", "MAPPING_LOGIC",
                            "MAPPING_STATUS", "SOURCE_WORKBOOK", "SOURCE_SHEET",
                            "NOTES"], [
+        # ACCEPTABLE_VALUES is deliberately long here: the real sheet put
+        # 177 characters in it, the connector was aliasing it into a
+        # 120-char CODE_SET_NAME, and 13 of 950 rows were rejected.
         ["IN_1", "SEI_IMDS", "INBOUND", "Holdings", "POSITION.DAT", "3",
          "LOT_QUANTITY", "DECIMAL", "18", "6", "detail", "not null",
-         "Lot quantity held", "", "BBH", "HOLDING", "QTY", "direct",
+         "Lot quantity held", "LONG " * 45,
+         "BBH", "HOLDING", "QTY", "direct",
          "MAPPED", "sei_input.xlsx", "Positions", ""],
     ]),
     "SEI_CATALOG_VERIFY": (["MAP_ID", "SEI_DATAPOINT", "MATCH_COUNT",
@@ -309,6 +313,12 @@ def main():
     ok(si["upstream_field"] == "QTY", "seiinput reads SOURCE_FIELD", si)
     ok(si["source_mapping_rule"] == "direct", "seiinput reads MAPPING_LOGIC", si)
     ok(si["origin_sheet"] == "Positions", "seiinput reads SOURCE_SHEET", si)
+    ok(si["code_set_name"] is None,
+       "ACCEPTABLE_VALUES does NOT land in code_set_name — one is an "
+       "identifier that joins, the other is free text", si["code_set_name"])
+    ok(len(si.get("acceptable_values") or "") > 120,
+       "it lands in its own column, at its real length",
+       len(si.get("acceptable_values") or ""))
 
     uf = parsed["uafschema"][0]
     ok(uf["published_type"] == "CHAR", "uafschema reads NORMALIZED_TYPE", uf)
