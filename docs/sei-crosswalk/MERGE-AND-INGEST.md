@@ -69,12 +69,14 @@ ui/src/ruleParse.js
 ui/src/ruleGraph.js
 ui/src/dagLayout.js
 ui/src/OperatorGraph.jsx
+ui/src/SourceCanvas.jsx
+ui/src/linkOps.js
 docs/sei-crosswalk/MERGE-AND-INGEST.md
 docs/sei-crosswalk/TAG-REFERENCE.md
 docs/sei-crosswalk/gen-tag-reference.mjs
 docs/sei-crosswalk/validate-crosswalk.sql
 docs/ingestion-prompts/PROMPT_VALIDATE_INGESTED_CROSSWALK.md
-ui/test/  (run.mjs + ten .test.jsx — `npm test` in ui/)
+ui/test/  (run.mjs + twelve .test.jsx — `npm test` in ui/)
 api/test/test_graph_chain.py
 ingestion/test/test_lane_lineage_parse.py
 docs/ingestion-prompts/PROMPT_IMDS_STAR_UAF_SEI_data_lineage.md
@@ -90,7 +92,7 @@ ingestion/run.py            one STEPS entry + one dispatch branch
 ui/src/LineageHome.jsx      CrosswalkDashboard, UAF in SYS_META, dsSystems, dictSys
 ui/src/LineageGraph.jsx     dim floors, empty-lane collapse, stage colour on nodes
 ui/src/LegacyLineage.jsx    DictionaryMiss replaces the AddVantage-only message
-ui/src/SourceLineage.jsx    stageMeta, lane filter, dictSystem
+ui/src/SourceLineage.jsx    stageMeta, lane filter, dictSystem, SourceCanvas
 ui/src/BizLineage.jsx       stageMeta, lane filter, dictSystem
 api/app/routers_legacy_source.py   /source-fields `system` made optional
 ```

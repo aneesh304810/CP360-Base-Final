@@ -130,6 +130,13 @@ export const crosswalkApi = {
           tokens: (tokens || []).join(","), data_source })}`,
       () => ({ tokens: [], resolved: 0, confirmed: 0, layout_rows: 0 })),
 
+  // One feed, every warehouse column it writes, with the rules attached.
+  // Raw transform text — the UI's parser is the single classifier.
+  sourceCanvas: (src_table, data_source) =>
+    _get(`/sei-crosswalk/source-canvas${_qs({ src_table, data_source })}`,
+      () => ({ src_table, feed: {}, targets: [], source_columns: [],
+               column_count: 0 })),
+
   lanes: (data_source) =>
     _get(`/sei-crosswalk/lanes${_qs({ data_source })}`, () => ({ lanes: [] })),
 

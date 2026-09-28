@@ -1376,6 +1376,103 @@ def resolve_tokens(tokens: str, data_source: str | None = None):
             "layout_rows": len(rows)}
 
 
+@router.get("/source-canvas")
+def source_canvas(src_table: str, data_source: str | None = None,
+                  limit_cols: int = 400):
+    """One feed, every warehouse column it writes, with the rules attached.
+
+    The Source view's "where it lands" listed the target tables and a
+    percentage each. That says how MANY columns land and never which, so
+    the question the screen is opened for — does my column come from this
+    feed, and what happens to it on the way — needed a different view to
+    answer.
+
+    RAW TRANSFORM TEXT, NOT A CLASSIFICATION. The obvious thing is to
+    label each link `trim` or `cast` here and send the label. The UI
+    already has a parser that decomposes these expressions into
+    operations, and a second classifier on the server would be a second
+    opinion that drifts from it — the screen would say `cast` while the
+    operator graph drew a branch. So the three hop transforms go across
+    as written and one parser decides what they mean.
+
+    The lane comes from LEGACY_LINEAGE_LANE where it has been recorded,
+    so a feed is shown under the system that actually publishes it.
+    """
+    ds = _ds(data_source)
+    rows = _safe(f"""
+        SELECT l.dwh_target_table, l.dwh_target_column, l.dwh_type, l.dwh_length,
+               l.src_source_column, l.src_type, l.src_length,
+               l.stg1_source_table, l.stg1_source_column,
+               l.stg2_source_table, l.stg2_source_column,
+               l.src_to_stg1_transform, l.stg1_to_stg2_transform,
+               l.stg2_to_dwh_transform,
+               l.lineage_status, l.functional_group,
+               n.source_system, n.lane_id,
+               x.legacy_transformation_id, x.sei_transformation_id,
+               x.transformation_equivalence,
+               g.transformation_logic AS legacy_logic
+        FROM   legacy_lineage l
+        LEFT   JOIN legacy_lineage_lane n ON n.lineage_id = l.lineage_id
+        LEFT   JOIN legacy_lineage_xform x ON x.lineage_id = l.lineage_id
+        LEFT   JOIN sei_transformation g
+               ON g.transformation_id = x.legacy_transformation_id
+        WHERE  l.data_source = :ds AND l.src_source_table = :s
+        ORDER  BY l.dwh_target_table, l.dwh_target_column
+        FETCH FIRST {int(limit_cols)} ROWS ONLY""",
+        {"ds": ds, "s": src_table})
+
+    targets: dict[str, dict] = {}
+    src_cols: dict[str, int] = {}
+    for r in rows:
+        tbl = r.get("dwh_target_table") or "(unnamed)"
+        t = targets.setdefault(tbl, {"table": tbl, "cols": [],
+                                     "functional_group": r.get("functional_group")})
+        sc = r.get("src_source_column")
+        if sc:
+            src_cols[sc] = src_cols.get(sc, 0) + 1
+        t["cols"].append({
+            "col": r.get("dwh_target_column"),
+            "type": r.get("dwh_type"), "length": r.get("dwh_length"),
+            "src": sc, "src_type": r.get("src_type"),
+            "src_length": r.get("src_length"),
+            "stg1": r.get("stg1_source_column"),
+            "stg2": r.get("stg2_source_column"),
+            # three hops, as written. Empty ones mean this lane has no such
+            # stage, which the UI already knows how to collapse.
+            "t1": r.get("src_to_stg1_transform"),
+            "t2": r.get("stg1_to_stg2_transform"),
+            "t3": r.get("stg2_to_dwh_transform"),
+            # the registered rule, where the transformation layer has one.
+            # Richer than the hop text and the thing worth drawing.
+            "logic": r.get("legacy_logic"),
+            "equivalence": r.get("transformation_equivalence"),
+            "status": r.get("lineage_status"),
+        })
+
+    lane = next((r.get("source_system") for r in rows if r.get("source_system")), None)
+    feed = _safe("""
+        SELECT f.src_file, f.dataset, f.source_system,
+               a.business_name
+        FROM   legacy_source_file f
+        LEFT   JOIN feed_alias a
+               ON a.data_source = f.data_source AND a.feed_key = f.src_file_key
+        WHERE  f.data_source = :ds
+          AND  f.src_file_key = REGEXP_REPLACE(UPPER(TRIM('_' FROM
+                 REGEXP_REPLACE(:s, '[[:space:]/.-]+', '_'))), '_{2,}', '_')
+        FETCH FIRST 1 ROWS ONLY""", {"ds": ds, "s": src_table})
+
+    return {
+        "data_source": ds, "src_table": src_table,
+        "source_system": lane,
+        "feed": (feed or [{}])[0],
+        "targets": sorted(targets.values(), key=lambda t: -len(t["cols"])),
+        "source_columns": sorted(src_cols.keys()),
+        "source_column_use": src_cols,
+        "column_count": sum(len(t["cols"]) for t in targets.values()),
+        "truncated": len(rows) >= int(limit_cols),
+    }
+
+
 @router.get("/catalog")
 def catalog(data_source: str | None = None, limit: int = 200):
     """Does the proposed OUTBOUND datapoint appear in SEI's own INBOUND catalog?

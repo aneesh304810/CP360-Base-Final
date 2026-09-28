@@ -4,6 +4,7 @@ import LineageGraph from "./LineageGraph.jsx";
 import { stageMeta, laneMeta } from "./laneMeta.js";
 import { crosswalkApi } from "./seiCrosswalkApi.js";
 import { useFeedNames, feedName } from "./feedNames.js";
+import SourceCanvas from "./SourceCanvas.jsx";
 
 // =====================================================================
 // SourceLineage — the source-first drill.
@@ -598,27 +599,15 @@ export default function SourceLineage({ t, system, dictSystem,
             Business has nowhere, exactly what the line above already says in
             words. The one number they added — how many fields reach the
             conformed stage — joins that sentence instead. */}
-        <div style={h2}>Where it lands</div>
-        <div style={card}>
-          {flow.targets.map((tg) => (
-            <button key={tg.dwh_target_table + tg.data_source}
-              style={{ ...rowCss, gridTemplateColumns: "minmax(0,1fr) 96px 130px 70px" }}
-              onClick={() => { setTarget(tg.dwh_target_table); setLevel(2);
-                               setBucket(null); }}>
-              <span style={{ minWidth: 0 }}>
-                <span style={{ fontFamily: mono, fontSize: 12.5, color: navy,
-                               display: "block", overflow: "hidden",
-                               textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {tg.dwh_target_table}</span>
-                <span style={{ fontSize: 10.5, color: muted }}>
-                  {tg.functional_group}</span>
-              </span>
-              <span style={{ fontFamily: mono, fontSize: 11.5, color: sub,
-                             textAlign: "right" }}>{tg.column_count} cols</span>
-              {meter(tg.mapped, tg.column_count)}
-              {gapCell(tg.column_count - tg.mapped)}
-            </button>))}
-        </div>
+        {/* THE LIST THAT STOOD HERE gave a percentage mapped per target
+            table. That says how many columns arrive and nothing about
+            what happens to them — and a column carried across untouched
+            and one assembled from a branch over two feeds are very
+            different risks wearing the same badge. The canvas answers
+            both: which columns, and which of them are computed. */}
+        <SourceCanvas t={t} srcTable={file} dataSource={ds}
+          feedName={feedName(feedMap, file) || flow.dataset}
+          onOpenTarget={(tbl) => { setTarget(tbl); setLevel(2); setBucket(null); }} />
         <button onClick={() => { setTarget(null); setLevel(2); setBucket(null); }}
           style={{ border: `1px solid ${line}`, borderRadius: 4, background: panel,
                    padding: "7px 14px", cursor: "pointer", fontSize: 12,
