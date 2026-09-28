@@ -17,6 +17,21 @@ sheets, no lineage sheet. It requires two SQL extracts as inputs, and the rule
 that decides whether the load joins at all is that every
 `TARGET_CONTRACT_FIELD` must be copied verbatim from the contract inventory.
 
+## After the load — validate what actually landed
+
+**`PROMPT_VALIDATE_INGESTED_CROSSWALK.md`** — audits the LOADED data rather
+than the workbook. Different question: the workbook's own self-checks say it
+is internally consistent, and ingestion still normalises feed names,
+canonicalises field codes and resolves lanes, any of which can drop rows
+silently. A join that matches nothing renders an empty panel, not an error.
+
+Run `docs/sei-crosswalk/validate-crosswalk.sql` (read only), optionally dump
+the API responses as the prompt describes, paste both under the prompt. It
+returns a JSON findings block plus a short reading — vocabulary drift, join
+loss per join, rule violations ranked by whether they make a number wrong or
+merely incomplete, and the UI and functional gaps the shape of the data
+implies.
+
 ## Superseded — kept for history, do not run
 
 - `PROMPT_star_sei_workbook.md` — the first generation prompt. Scoped the
