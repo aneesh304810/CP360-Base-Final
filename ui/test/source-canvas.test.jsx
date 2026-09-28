@@ -107,6 +107,84 @@ const hitWidth = (n) => Math.max(16, Math.min(7, 1.3 + Math.log2(n + 1) * 1.7) +
      hitWidth(n));
 });
 
+// ---- the drawing takes the room it is given -----------------------------
+// A fixed 272px node ellipsised `Base_Total_Unrealized_Gain_15,Base_Tot…`
+// on a 1400px screen with 600px going spare. The sizes are now solved from
+// the measured box. Two properties matter:
+//
+//   below the ceiling   the laid-out width EQUALS the room available. Wider
+//                       and fit() scales the drawing down, which is the
+//                       wasted space again in another form; narrower is the
+//                       original bug.
+//   at the ceiling      it stops. A node wider than 460 does not make a name
+//                       more readable and a gap wider than 440 just makes a
+//                       longer wire, so past that point the extra width goes
+//                       to the detail pane instead of to gutter.
+const NW0 = 272, COLGAP0 = 226, CAP0 = 15;
+const HEAD_ = 40, ROW_ = 22, PAD_ = 20;
+const NW_MAX = 460, GAP_MAX = 440;
+const W_MAX = PAD_ * 2 + NW_MAX * 2 + GAP_MAX;          // 1400
+const ASIDE_AT = W_MAX + 320;                            // 1720
+const dimsOf = (w, h) => {
+  const room = Math.max(620, (w || 900) - 24);
+  const nw = Math.round(Math.min(NW_MAX,
+    Math.max(NW0, (room - PAD_ * 2 - COLGAP0) / 2)));
+  const gap = Math.round(Math.min(GAP_MAX, Math.max(COLGAP0,
+    room - nw * 2 - PAD_ * 2)));
+  const cap = Math.max(CAP0,
+    Math.floor(((h || 380) - HEAD_ - PAD_ * 2 - ROW_) / ROW_));
+  return { nw, gap, cap, room, W: PAD_ * 2 + nw * 2 + gap };
+};
+
+[1024, 1180, 1280, 1366, 1424].forEach((w) => {
+  const d = dimsOf(w, 600);
+  ok(d.W === d.room, `${w}px wide: the layout fills the box exactly`,
+     [d.W, d.room]);
+});
+[1600, 1920, 2560].forEach((w) => {
+  const d = dimsOf(w, 600);
+  ok(d.W === W_MAX, `${w}px wide: the drawing stops at its ceiling`, d.W);
+  ok(d.nw === NW_MAX && d.gap === GAP_MAX,
+     `${w}px wide: both node and gap are at their ceiling`, [d.nw, d.gap]);
+});
+// past the breakpoint the leftover becomes the detail pane, not gutter
+const asideOn = (w) => w >= ASIDE_AT;
+[[1600, false], [1719, false], [1720, true], [1920, true], [2560, true]]
+  .forEach(([w, want]) => {
+    ok(asideOn(w) === want,
+       `${w}px wide: detail ${want ? "sits beside" : "stays below"} the canvas`,
+       asideOn(w));
+  });
+// the breakpoint itself: past it the detail pane sits beside the canvas,
+// and the canvas column is still wide enough to be worth drawing in
+ok(ASIDE_AT - 400 - 14 > W_MAX - 200,
+   "the aside only triggers where the canvas keeps a usable width",
+   ASIDE_AT - 414);
+[1024, 1280, 1600, 1920, 2560].forEach((w) => {
+  const d = dimsOf(w, 600);
+  ok(d.nw >= NW0, `${w}px wide: nodes never shrink below the base width`, d.nw);
+  ok(d.gap >= COLGAP0, `${w}px wide: the gap never closes below its base`, d.gap);
+});
+ok(dimsOf(1920, 600).nw > dimsOf(1024, 600).nw,
+   "a wider screen buys wider nodes");
+ok(dimsOf(4000, 600).nw <= NW_MAX,
+   "but not past the point where a name stops being a name",
+   dimsOf(4000, 600).nw);
+// a narrow box degrades to the base sizes rather than to a negative gap
+[320, 500, 620, 800].forEach((w) => {
+  const d = dimsOf(w, 400);
+  ok(d.nw >= NW0 && d.gap >= COLGAP0,
+     `${w}px wide: degrades to base sizes, never below`, [d.nw, d.gap]);
+  ok(d.W > 0 && Number.isFinite(d.W), `${w}px wide: still a valid width`, d.W);
+});
+// height buys rows, and the cap never drops below the base
+[380, 600, 900, 1400].forEach((h) => {
+  const d = dimsOf(1440, h);
+  ok(d.cap >= CAP0, `${h}px tall: the cap never falls below ${CAP0}`, d.cap);
+});
+ok(dimsOf(1440, 1000).cap > dimsOf(1440, 400).cap,
+   "a taller window shows more rows before the cap bites");
+
 // ---- a column with no source field draws no wire ------------------------
 // The wire says "this value comes from the feed". For a constant or an
 // unmapped column nothing does, so a wire there contradicts the row's own

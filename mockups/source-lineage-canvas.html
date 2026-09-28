@@ -57,7 +57,11 @@ h1{font-size:19px;font-weight:500;margin:0;letter-spacing:-.01em;text-wrap:balan
 button:focus-visible,select:focus-visible,input:focus-visible{
   outline:2px solid var(--accent);outline-offset:2px}
 
-.cv{position:relative;overflow:hidden;height:min(54vh,470px);min-height:330px;
+body.fs .wrap{position:fixed;inset:0;max-width:none;overflow:auto;z-index:9000;
+  background:var(--bg);padding:14px 18px 16px}
+body.fs .cv{height:calc(100vh - 230px)}
+body.fs h1,body.fs .lede,body.fs .footer{display:none}
+.cv{position:relative;overflow:hidden;height:min(62vh,640px);min-height:360px;
     background:var(--bg);border-radius:4px;border:1px solid var(--panel2);
     cursor:grab;touch-action:none}
 .cv.drag{cursor:grabbing}
@@ -152,6 +156,7 @@ pre.expr{margin:8px 0 0;font-family:var(--f-mono);font-size:10.5px;line-height:1
     <span style="margin-left:auto;display:flex;gap:5px">
       <button class="ghost" id="expand">open all</button>
       <button class="ghost" id="collapse">close all</button>
+      <button class="ghost" id="fs">&#10530; full screen</button>
     </span>
   </div>
 
@@ -400,8 +405,23 @@ const srcFields = () => {
 };
 
 /* -------------------------------------------------------------- layout */
-const NW=272, HEAD=40, ROW=22, GAPY=14, PAD=20, COLGAP=226;
+/* BASE sizes, not fixed ones. A 272px node ellipsised
+   `Base_Total_Unrealized_Gain_15,Base_Tot…` on a 1400px screen with 600px
+   going spare, so the real sizes are solved from the measured canvas: the
+   two nodes, the gap and the padding come to exactly the room available.
+   Both stop at a ceiling — a wider node does not make a name more readable
+   and a wider gap just makes a longer wire — and past that the drawing
+   centres and the detail pane takes the width instead. */
+const HEAD=40, ROW=22, GAPY=14, PAD=20;
+const NW0=272, COLGAP0=226, NW_MAX=460, GAP_MAX=440;
+let NW=NW0, COLGAP=COLGAP0;
+function sizes(){
+  const room = Math.max(620, (cv.getBoundingClientRect().width || 900) - 24);
+  NW  = Math.round(Math.min(NW_MAX, Math.max(NW0, (room-PAD*2-COLGAP0)/2)));
+  COLGAP = Math.round(Math.min(GAP_MAX, Math.max(COLGAP0, room-NW*2-PAD*2)));
+}
 function layout(){
+  sizes();
   const SF=srcFields(), sOpen=open.has("src");
   const sRows = sOpen ? (showAll.has("src") ? SF.length : Math.min(SF.length,CAP)) : 0;
   const sh = HEAD + (sOpen ? sRows*ROW + (sRows<SF.length?ROW:0) + 1 : 0);
@@ -697,6 +717,16 @@ el("#onlyx").onclick=()=>{ onlyX=!onlyX;
 el("#expand").onclick=()=>{ open=new Set(["src",...feed.targets.map(t=>"t:"+t.t)]);
   draw(); fit(); };
 el("#collapse").onclick=()=>{ open=new Set(); showAll=new Set(); draw(); fit(); };
+/* Full screen keeps the open tables, the selection and the search — you
+   come back to the picture you left, not a reset one. */
+el("#fs").onclick=()=>{
+  const on=document.body.classList.toggle("fs");
+  el("#fs").innerHTML = on ? "\u2715 close \u00b7 Esc" : "\u2922 full screen";
+  requestAnimationFrame(()=>{ draw(); fit(); });
+};
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape" && document.body.classList.contains("fs")) el("#fs").click();
+});
 
 new ResizeObserver(()=>{ if(view) fit(); }).observe(cv);
 drawFeeds();

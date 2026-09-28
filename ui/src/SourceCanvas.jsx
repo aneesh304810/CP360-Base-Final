@@ -35,10 +35,24 @@ import { buildRuleGraph } from "./ruleGraph.js";
 
 const MONO = "'Roboto Mono', ui-monospace, Menlo, monospace";
 const SRC_C = "#6d3ac0", DWH_C = "#0f4775";
-const NW = 272, HEAD = 40, ROW = 22, GAPY = 14, PAD = 20, COLGAP = 226;
+// BASE sizes, not fixed ones. These are the smallest the drawing is ever
+// laid out at; the real ones are computed per render from the space the
+// canvas actually has. A 272px node ellipsised
+// `Base_Total_Unrealized_Gain_15,Base_Total_Un…` on a 1400px-wide screen
+// that had 600px going spare, which is a legibility problem caused
+// entirely by not looking at the container.
+const HEAD = 40, ROW = 22, GAPY = 14, PAD = 20;
+const NW0 = 272, COLGAP0 = 226;
 // A feed with 53 fields across four tables is a long scroll fully open.
 // Cap the rows and say what was capped, rather than truncating in silence.
-const CAP = 15;
+// The cap is how many rows FIT, so a tall window shows more of them.
+const CAP0 = 15;
+// Node width tops out at 460 and the gap at 440, so the drawing stops
+// growing at 20*2 + 460*2 + 440. Wider than that and the detail pane moves
+// alongside rather than the gutter growing.
+const NW_MAX = 460, GAP_MAX = 440;
+const ASIDE_AT = PAD * 2 + NW_MAX * 2 + GAP_MAX + 320;   // 1720
+const ASIDE_W = 400;
 
 export default function SourceCanvas({ t, srcTable, dataSource, feedName,
                                        onOpenTarget }) {
@@ -49,7 +63,19 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
   const [q, setQ] = useState("");
   const [onlyX, setOnlyX] = useState(false);  // only transformed
   const [z, setZ] = useState({ k: 1, x: 0, y: 0 });
+  const [full, setFull] = useState(false);
+  // The canvas box measures itself. Everything below sizes from this rather
+  // than from a constant, which is the difference between a drawing that
+  // uses a laptop screen and one that sits in the middle of it.
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  // Measured on the OUTER shell, not the canvas. The side-by-side decision
+  // below moves the detail pane into the same row as the canvas, which
+  // narrows the canvas — decide from the canvas width and the layout
+  // oscillates across the breakpoint forever. The shell's width does not
+  // change when its contents rearrange, so it is the stable thing to ask.
+  const [shellW, setShellW] = useState(0);
   const box = useRef(null);
+  const shell = useRef(null);
   const drag = useRef(null);
 
   useEffect(() => {
@@ -94,7 +120,36 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
     return [...m.values()].sort((a, b) => b.n - a.n);
   }, [targets]);
 
+  // THE DRAWING TAKES THE ROOM IT IS GIVEN.
+  //
+  // Two node columns and the gap between them fill the measured width
+  // instead of being centred inside it with the remainder left blank.
+  // Wider nodes are the whole point: these source names are composites
+  // (`Base_Amortized_Cost_7,Trade_Date_Cash_136`) and a fixed 272px cut
+  // every one of them in half while 600px sat unused on either side.
+  //
+  // Height does the same for the row cap. The cap exists so a 53-field
+  // feed is not an endless scroll, and "how many rows fit" is a better
+  // answer to that than a constant 15 — a tall window shows more, a short
+  // one shows fewer, and either way the "+N more" row says what was held
+  // back.
+  const dims = useMemo(() => {
+    const room = Math.max(620, (size.w || 900) - 24);
+    // solved so the two nodes plus the gap plus the padding come to exactly
+    // `room` while the gap is at its minimum — otherwise the layout comes
+    // out a little wider than the box and fit() scales the whole thing down
+    // to compensate, which is the wasted space again in another form.
+    const nw = Math.round(Math.min(NW_MAX,
+      Math.max(NW0, (room - PAD * 2 - COLGAP0) / 2)));
+    const gap = Math.round(Math.min(GAP_MAX, Math.max(COLGAP0,
+      room - nw * 2 - PAD * 2)));
+    const cap = Math.max(CAP0,
+      Math.floor(((size.h || 380) - HEAD - PAD * 2 - ROW) / ROW));
+    return { nw, gap, cap };
+  }, [size.w, size.h]);
+
   const view = useMemo(() => {
+    const { nw: NW, gap: COLGAP, cap: CAP } = dims;
     const sOpen = open.has("src");
     const sRows = sOpen ? Math.min(srcCols.length, showAll.has("src")
       ? srcCols.length : CAP) : 0;
@@ -112,8 +167,8 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
                   open: sOpen, rows: sRows };
     let y = PAD + (H - PAD * 2 - totalT) / 2;
     tg.forEach((n) => { n.x = PAD + NW + COLGAP; n.y = y; n.w = NW; y += n.h + GAPY; });
-    return { src, tg, W: PAD * 2 + NW * 2 + COLGAP, H };
-  }, [targets, open, showAll, q, onlyX, srcCols]);   // eslint-disable-line react-hooks/exhaustive-deps
+    return { src, tg, W: PAD * 2 + NW * 2 + COLGAP, H, nw: NW, cap: CAP };
+  }, [targets, open, showAll, q, onlyX, srcCols, dims]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const fit = () => {
     const el = box.current;
@@ -123,15 +178,76 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
                                       (r.height - 20) / view.H, 1.1));
     setZ({ k, x: (r.width - view.W * k) / 2, y: (r.height - view.H * k) / 2 });
   };
+  // One observer answers both questions: what scale fits, and how much room
+  // the layout has to spend. Measuring in the same place they are used keeps
+  // the panel widening, the window resizing and the full-screen toggle on
+  // one mechanism.
   useEffect(() => {
     const el = box.current;
     if (!el) return;
-    fit();
-    if (typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(fit);
+    const read = () => {
+      const r = el.getBoundingClientRect();
+      setSize((p) => (Math.abs(p.w - r.width) < 1 && Math.abs(p.h - r.height) < 1
+        ? p : { w: r.width, h: r.height }));
+      fit();
+    };
+    read();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", read);
+      return () => window.removeEventListener("resize", read);
+    }
+    const ro = new ResizeObserver(read);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [view.W, view.H]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [view.W, view.H, full]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Esc closes, and the page behind does not scroll under the overlay.
+  useEffect(() => {
+    if (!full) return;
+    const onKey = (e) => { if (e.key === "Escape") setFull(false); };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [full]);
+
+  useEffect(() => {
+    const el = shell.current;
+    if (!el) return;
+    const read = () => {
+      const w = el.getBoundingClientRect().width;
+      setShellW((p) => (Math.abs(p - w) < 1 ? p : w));
+    };
+    read();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", read);
+      return () => window.removeEventListener("resize", read);
+    }
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [full]);
+
+  // PAST THE CEILING, WIDTH BUYS SOMETHING ELSE.
+  //
+  // Node width and the gap both stop growing at the point where a wider
+  // node stops making a name more readable and a wider gap just makes a
+  // longer wire. Past that the drawing is centred and the remaining width
+  // would be gutter — so it goes to the detail pane instead, which today
+  // sits below the canvas and pushes the expression off the fold every
+  // time a wire is clicked. Beside the canvas, the picture and the
+  // expression are visible at once, which is the whole reason to click.
+  const aside = shellW >= ASIDE_AT;
+
+  // Inline, the canvas takes what the window has below the header and the
+  // detail drawer rather than a constant 380. A fixed height was 380px of
+  // drawing inside 900px of screen.
+  const vh = typeof window !== "undefined" ? window.innerHeight : 900;
+  // Full screen leaves the height to flex:1 — an explicit height fights it.
+  const canvasH = full ? undefined : Math.max(380, Math.min(760, vh - 430));
 
   if (!data) {
     return <div style={{ padding: 24, fontSize: 12, color: t.muted || "#999" }}>
@@ -171,10 +287,11 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
     if (view.src.open) {
       const i = srcCols.findIndex((s) => s.name === name);
       if (i >= 0 && i < view.src.rows) {
-        return { x: view.src.x + NW, y: view.src.y + HEAD + 1 + i * ROW + ROW / 2 };
+        return { x: view.src.x + view.nw,
+                 y: view.src.y + HEAD + 1 + i * ROW + ROW / 2 };
       }
     }
-    return { x: view.src.x + NW, y: view.src.y + HEAD / 2 };
+    return { x: view.src.x + view.nw, y: view.src.y + HEAD / 2 };
   };
   const anchorTgt = (table, col) => {
     const n = view.tg.find((x) => x.tb.table === table);
@@ -256,8 +373,8 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
       </button>);
   };
 
-  return (
-    <div>
+  const inner = (
+    <>
       {/* A widened match is not a detail to hide. Silently dropping the
           data-source filter is exactly how this canvas and the spine above
           it came to state different numbers on the same screen, so when the
@@ -298,9 +415,18 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
           <button type="button" style={ghost}
             onClick={() => setOpen(new Set())}>close all</button>
           <button type="button" style={ghost} onClick={fit}>fit</button>
+          <button type="button" style={ghost}
+            onClick={() => setFull((v) => !v)}>
+            {full ? "✕ close · Esc" : "⤢ full screen"}</button>
         </span>
       </div>
 
+      {/* canvas and detail: stacked normally, side by side once the shell is
+          wide enough that the alternative is gutter. */}
+      <div style={{ display: "flex", gap: 14, alignItems: "stretch",
+        flex: full ? 1 : undefined, minHeight: full ? 0 : undefined }}>
+      <div style={{ flex: 1, minWidth: 0, display: "flex",
+        flexDirection: "column" }}>
       <div ref={box}
         onPointerDown={(e) => {
           if (e.target.closest("[data-node]")) return;
@@ -322,7 +448,8 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
                         y: my - (my - s.y) * (k / s.k) };
           });
         }}
-        style={{ position: "relative", overflow: "hidden", height: 380,
+        style={{ position: "relative", overflow: "hidden", height: canvasH,
+          flex: full ? 1 : undefined, minHeight: full ? 0 : undefined,
           background: t.bg || "#f5f8f8", borderRadius: 4,
           border: `1px solid ${t.panel2 || "#dfe6e9"}`,
           cursor: drag.current ? "grabbing" : "grab", touchAction: "none" }}>
@@ -391,7 +518,7 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
 
           {/* the feed */}
           <div style={{ position: "absolute", left: view.src.x, top: view.src.y,
-            width: NW, background: t.panel || "#fff", borderRadius: 5,
+            width: view.nw, background: t.panel || "#fff", borderRadius: 5,
             border: `1px solid ${t.panel2 || "#dfe6e9"}`,
             borderTop: `3px solid ${SRC_C}`, overflow: "hidden",
             boxShadow: "0 1px 3px rgba(16,25,59,.07)" }}>
@@ -454,7 +581,8 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
           {/* the warehouse tables */}
           {view.tg.map((n) => (
             <div key={n.tb.table} style={{ position: "absolute", left: n.x,
-              top: n.y, width: NW, background: t.panel || "#fff", borderRadius: 5,
+              top: n.y, width: view.nw, background: t.panel || "#fff",
+              borderRadius: 5,
               border: `1px solid ${t.panel2 || "#dfe6e9"}`,
               borderTop: `3px solid ${DWH_C}`, overflow: "hidden",
               boxShadow: "0 1px 3px rgba(16,25,59,.07)" }}>
@@ -521,9 +649,51 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
           between source and target</span>
       </div>
 
-      {/* the selected link */}
-      {selected && <LinkDetail t={t} c={selected} table={sel.table}
-        srcTable={srcTable} dataSource={dataSource} />}
+      {!aside && selected && (
+        <LinkDetail t={t} c={selected} table={sel.table}
+          srcTable={srcTable} dataSource={dataSource} />)}
+      </div>
+      {aside && (
+        <div style={{ width: ASIDE_W, flexShrink: 0, overflow: "auto",
+          maxHeight: full ? undefined : canvasH }}>
+          {selected
+            ? <LinkDetail t={t} c={selected} table={sel.table}
+                srcTable={srcTable} dataSource={dataSource} />
+            : <div style={{ fontSize: 10.5, color: t.muted || "#999",
+                border: `1px dashed ${t.panel2 || "#dfe6e9"}`, borderRadius: 4,
+                padding: "14px 12px", lineHeight: 1.6 }}>
+                Click a wire, or a column row, to read the expression behind
+                it here — the two ends, what the dictionary says the source
+                field means, and the operations in order.</div>}
+        </div>)}
+      </div>
+    </>);
+
+  if (!full) return <div>{inner}</div>;
+
+  // Full screen is a fixed overlay, not a route. The open tables, the
+  // selected link, the search and the zoom all survive the toggle, so you
+  // come back to the picture you left rather than a reset one. The column
+  // layout is a flex box so the canvas takes every pixel the chrome and the
+  // detail drawer do not, which is the point of going full screen at all.
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 9000,
+      background: t.bg || "#f5f8f8", display: "flex", flexDirection: "column",
+      padding: "14px 18px 16px", boxSizing: "border-box", overflow: "auto" }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 12,
+        marginBottom: 10, flexShrink: 0 }}>
+        <b style={{ fontSize: 14.5, color: t.navy || "#10193b" }}>
+          {feedName || srcTable}</b>
+        <span style={{ fontFamily: MONO, fontSize: 11,
+          color: t.muted || "#999" }}>{srcTable}</span>
+        <span style={{ fontSize: 10.5, color: t.sub || "#666" }}>
+          where it lands, column by column · click a wire for its expression
+        </span>
+      </div>
+      <div style={{ flex: 1, minHeight: 0, display: "flex",
+        flexDirection: "column" }}>
+        {inner}
+      </div>
     </div>);
 }
 
