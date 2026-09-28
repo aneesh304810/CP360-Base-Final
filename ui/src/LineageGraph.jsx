@@ -45,6 +45,12 @@ const EDGE_KIND = {
   trim:   { c: "#00a3a3", dash: "",    legend: "Trimmed — padding removed" },
   merge:  { c: "#c1113a", dash: "",    legend: "Fan-in — sources converge" },
   direct: { c: "#9aa7b2", dash: "",    legend: "Direct" },
+  // An edge that closes a chain across stages this lane does not have.
+  // Dashed and named, because it is a real link — one LEGACY_LINEAGE row
+  // asserts that the source feeds the target — described by less evidence
+  // than a documented hop. Drawing it as `direct` would claim a hop
+  // nobody wrote down; drawing nothing denied the row.
+  bridged: { c: "#5f87a7", dash: "6 4", legend: "No staging on this lane — source lands directly" },
 };
 
 // Geometry. The vertical numbers stay fixed — a row is a row. The two
@@ -310,6 +316,13 @@ export default function LineageGraph({ t, table, column, code, dataSource = "PBD
                         style={{ fontFamily: mono, fontSize: 9, fontWeight: 500 }}>
                     {e.label}
                   </text>)}
+                {/* Hover carries what the label cannot: which stages the
+                    edge skipped and the transforms that sat on them. */}
+                <title>{`${e.from.split(":").pop()} → ${e.to.split(":").pop()}`}
+                  {e.skipped && e.skipped.length
+                    ? ` · skips ${e.skipped.join(", ")} — this lane has no such stage`
+                    : ""}
+                  {e.transform ? `\n${e.transform}` : ""}</title>
               </g>);
           })}
 

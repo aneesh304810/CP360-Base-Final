@@ -121,10 +121,34 @@ def _chain_nodes_edges(r: dict) -> tuple[list[dict], list[dict]]:
                                   r.get("stg1_source_table"),
                                   r.get("dwh_target_table"))
     nodes, edges, prev = [], [], None
+    # Transforms belonging to hops we had to skip, carried onto the next
+    # edge that is actually drawn. See the note below.
+    pending_xf: list[str] = []
+    skipped: list[str] = []
     for stage, tbl, col, ty, ln in steps:
         nid = _nid(stage, tbl, col)
         if not nid:
-            prev = None          # chain stops here; do not bridge the gap
+            # THIS USED TO SET prev = None AND DRAW NOTHING FURTHER, on the
+            # reasoning that a missing stage is a hole in the chain and
+            # bridging it would invent a link.
+            #
+            # That is right when a stage is missing because the data is
+            # incomplete. It is wrong for a lane that HAS no staging: a
+            # STAR extract lands in IMDS directly, so STG1 and STG2 are
+            # null on every one of its rows, and the result was a source
+            # column and a warehouse column sitting side by side with
+            # nothing drawn between them — on a single LEGACY_LINEAGE row
+            # whose entire content is the assertion that the first feeds
+            # the second. Drawing no edge contradicted the row itself.
+            #
+            # So the chain closes up, and the edge that closes it is
+            # marked `bridged` rather than passed off as a documented
+            # direct hop. It names the stages it skipped and carries their
+            # transforms, so nothing is claimed and nothing is lost.
+            skipped.append(stage)
+            xf = xf_into.get(stage)
+            if xf and not _is_na(xf):
+                pending_xf.append(str(xf).strip())
             continue
         nodes.append({
             "id": nid, "stage": stage, "table": tbl, "column": col,
@@ -134,8 +158,16 @@ def _chain_nodes_edges(r: dict) -> tuple[list[dict], list[dict]]:
         })
         if prev:
             hop = _hop(stage, prev["column"], col, xf_into.get(stage))
+            if skipped:
+                own = hop.get("transform") or ""
+                joined = " ; ".join([*pending_xf, own] if own else pending_xf)
+                hop = {**hop, "kind": "bridged",
+                       "label": hop.get("label") or "NO STAGING",
+                       "transform": joined,
+                       "skipped": list(skipped)}
             edges.append({"from": prev["id"], "to": nid,
                           "lineage_id": r.get("lineage_id"), **hop})
+            skipped, pending_xf = [], []
         prev = {"id": nid, "column": col}
     return nodes, edges
 
