@@ -50,6 +50,13 @@ export const catalogApi = {
     _get(`/business-catalog/table${_qs({ table_name, data_source })}`,
       () => ({ table_name, found: false, entry: null })),
 
+  // One table's columns with the business term on each. The column page
+  // already shows the term; this is the same join in bulk, because 251
+  // single-field calls is not a list.
+  fields: (table, data_source) =>
+    _get(`/business-catalog/fields${_qs({ table, data_source })}`,
+      () => ({ table, fields: [], count: 0, named: 0, unnamed: 0 })),
+
   groups: (data_source) =>
     _get(`/business-catalog/groups${_qs({ data_source })}`,
       () => ({ groups: [], count: 0 })),
@@ -98,3 +105,34 @@ export const bizEntry = (by, table) =>
   (by && by[_key(table)]) || null;
 
 export default catalogApi;
+
+
+/** Business terms for one table's columns, keyed by warehouse column.
+ *
+ *  `{ by, named, unnamed, loaded }`. Same contract as useBusinessCatalog:
+ *  `by` is always an object, so a caller falls back to the physical column
+ *  name with no branch of its own. */
+export function useFieldTerms(table, dataSource) {
+  const [state, setState] = useState({ by: {}, named: 0, unnamed: 0, loaded: false });
+
+  useEffect(() => {
+    if (!table) { setState({ by: {}, named: 0, unnamed: 0, loaded: false }); return; }
+    let live = true;
+    setState({ by: {}, named: 0, unnamed: 0, loaded: false });
+    catalogApi.fields(table, dataSource).then((r) => {
+      if (!live) return;
+      const by = {};
+      (r.fields || []).forEach((f) => {
+        if (f.dwh_target_column) by[_key(f.dwh_target_column)] = f;
+      });
+      setState({ by, named: r.named || 0, unnamed: r.unnamed || 0, loaded: true });
+    });
+    return () => { live = false; };
+  }, [table, dataSource]);
+
+  return state;
+}
+
+/** The business term for a warehouse column, else the column name. */
+export const termName = (by, col) =>
+  (by && by[_key(col)]?.business_term) || (col == null ? "" : String(col));

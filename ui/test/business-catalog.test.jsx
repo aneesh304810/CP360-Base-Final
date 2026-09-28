@@ -7,7 +7,7 @@
 // does not answer must all render exactly what the screen rendered before
 // — the physical name — never a blank heading.
 
-import { bizName, bizEntry } from "../src/businessCatalog.js";
+import { bizName, bizEntry, termName } from "../src/businessCatalog.js";
 
 let bad = 0;
 const ok = (cond, msg, got) => {
@@ -67,6 +67,71 @@ const PARTIAL = { DIM_OFFICE: { table_name: "DIM_OFFICE", business_name: null } 
 ok(bizName(PARTIAL, "DIM_OFFICE") === "DIM_OFFICE",
    "a row with a null business name falls back rather than printing null",
    bizName(PARTIAL, "DIM_OFFICE"));
+
+// ---- field terms: the list, not the column page ------------------------
+// The field list showed ACCOUNT_KEY and ACCOUNT_LONG_NAME_1 because
+// /legacy-lineage/fields carries no business term. The term existed all
+// along -- the column page fetched it one field at a time -- so the list
+// now reads the same join in bulk. Same fallback rule as the table names.
+const TERMS = {
+  ACCOUNT_LONG_NAME_1: { dwh_target_column: "ACCOUNT_LONG_NAME_1",
+    business_term: "Account Long Name Line 1", field_code: "BI/2-1",
+    business_function: "Basic Information (BI)", is_pii: "N",
+    short_desc: "Stores full name of account." },
+  ACCOUNT_TAX_ID: { dwh_target_column: "ACCOUNT_TAX_ID",
+    business_term: "Tax Identification Number", field_code: "TX/1-1",
+    business_function: "Tax & Regulatory", is_pii: "Y", short_desc: null },
+  ACCOUNT_KEY: { dwh_target_column: "ACCOUNT_KEY", business_term: null,
+    field_code: null, business_function: null, is_pii: "N" },
+};
+ok(termName(TERMS, "ACCOUNT_LONG_NAME_1") === "Account Long Name Line 1",
+   "a column with a term shows the term");
+ok(termName(TERMS, "account_long_name_1") === "Account Long Name Line 1",
+   "case does not matter");
+ok(termName(TERMS, " ACCOUNT_LONG_NAME_1 ") === "Account Long Name Line 1",
+   "nor does a stray space from a hand-edited sheet");
+ok(TERMS.ACCOUNT_TAX_ID.is_pii === "Y", "personal data is flagged on the row");
+
+// the fallback, which is the direction that must not regress
+ok(termName(TERMS, "ACCOUNT_KEY") === "ACCOUNT_KEY",
+   "a column with a null term keeps its physical name",
+   termName(TERMS, "ACCOUNT_KEY"));
+ok(termName(TERMS, "BATCH_ID") === "BATCH_ID",
+   "a column absent from the dictionary keeps its physical name");
+ok(termName({}, "BATCH_ID") === "BATCH_ID", "no terms loaded: physical name");
+ok(termName(null, "BATCH_ID") === "BATCH_ID", "null map: physical name");
+[null, undefined, ""].forEach((c) => {
+  ok(termName(TERMS, c) === "", "a missing column name yields an empty string");
+  ok(typeof termName(TERMS, c) === "string", "and always a string");
+});
+
+// grouping: an unnamed column must be grouped, never dropped
+const NO_FN = "\u0000__no_business_function__";
+const GROUPED = {};
+["ACCOUNT_LONG_NAME_1", "ACCOUNT_TAX_ID", "ACCOUNT_KEY", "BATCH_ID"].forEach((c) => {
+  const e = TERMS[c];
+  const k = (e && e.business_function) || NO_FN;
+  (GROUPED[k] = GROUPED[k] || []).push(c);
+});
+ok(Object.values(GROUPED).flat().length === 4,
+   "every column lands in exactly one group, including the unnamed ones",
+   Object.values(GROUPED).flat().length);
+ok(GROUPED[NO_FN].length === 2,
+   "the two without a term are grouped together, not dropped", GROUPED[NO_FN]);
+// localeCompare ignores control characters, so a "\u0000" prefix does NOT
+// push the group to the end -- it sorted as "not in the dictionary" and
+// landed between Basic Information and Tax. The sentinel is compared, not
+// sorted into place.
+const order = Object.keys(GROUPED).sort((a, b) =>
+  a === NO_FN ? 1 : b === NO_FN ? -1 : a.localeCompare(b));
+ok(order[order.length - 1] === NO_FN,
+   "the unnamed group sorts last, never into the middle", order);
+ok(order[0] === "Basic Information (BI)",
+   "and the named groups stay alphabetical", order[0]);
+ok(Object.keys(GROUPED).sort((a, b) => a.localeCompare(b)).indexOf(NO_FN)
+   !== Object.keys(GROUPED).length - 1,
+   "localeCompare alone does NOT put it last -- the reason the comparator "
+   + "checks the sentinel instead of relying on the prefix");
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\nbusiness-catalog assertions pass");
 if (bad) process.exit(1);

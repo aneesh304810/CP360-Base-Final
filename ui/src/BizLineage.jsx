@@ -2,7 +2,12 @@ import { stageMeta } from "./laneMeta.js";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { api } from "./api.js";
 import { crosswalkApi } from "./seiCrosswalkApi.js";
-import { useBusinessCatalog, bizName, bizEntry } from "./businessCatalog.js";
+import { useBusinessCatalog, useFieldTerms, bizName, bizEntry, termName }
+  from "./businessCatalog.js";
+
+// Columns the dictionary does not know. A sentinel rather than a prefix
+// trick, because it has to be compared, not sorted into place.
+const NO_FN = "\u0000__no_business_function__";
 
 // =====================================================================
 // BizLineage — the pictorial Business view of legacy lineage.
@@ -156,6 +161,11 @@ export default function BizLineage({ t, system, dictSystem, dataSource = "PBDW",
   // empty for good on a warehouse with no catalogue — bizName falls back to
   // the physical name, which is what this screen showed before.
   const { by: cat, health: catHealth } = useBusinessCatalog(ds);
+  // The business term for each column of the table being looked at. The
+  // column page already showed these one at a time; the list had nothing
+  // but the physical name to print.
+  const { by: terms, named: termsNamed, unnamed: termsUnnamed,
+          loaded: termsLoaded } = useFieldTerms(nav.table, ds);
   const [pills, setPills] = useState({ pass: true, xf: true, ud: true, gap: true });
 
   useEffect(() => {
@@ -381,8 +391,29 @@ export default function BizLineage({ t, system, dictSystem, dataSource = "PBDW",
       else if (v === "changed") vcounts.changed += 1;
       else vcounts.none += 1;
     });
+    // Search what the reader can see. Filtering only on the physical name
+    // means typing the term that is printed on the row finds nothing.
+    const q = flt.toLowerCase();
+    const hay = (f) => `${f.dwh_target_column || ""} ${termName(terms, f.dwh_target_column)} `
+      + `${terms[String(f.dwh_target_column || "").trim().toUpperCase()]?.field_code || ""}`;
     const shown = rows.filter((f) => pills[fieldKind(f)] &&
-      (f.dwh_target_column || "").toLowerCase().includes(flt.toLowerCase()));
+      hay(f).toLowerCase().includes(q));
+    // Grouped by the business's own function, with the columns the
+    // dictionary does not know listed last under their own heading rather
+    // than dropped. A term-first list that silently omits them would be
+    // this screen's version of the bug that emptied it.
+    const byFn = new Map();
+    shown.forEach((f) => {
+      const e = terms[String(f.dwh_target_column || "").trim().toUpperCase()];
+      const k = (e && e.business_function) || NO_FN;
+      if (!byFn.has(k)) byFn.set(k, []);
+      byFn.get(k).push(f);
+    });
+    // Sort the sentinel explicitly. A "\u0000" prefix does not do it:
+    // localeCompare ignores control characters, so the group sorted as
+    // "not in the dictionary" and landed in the middle of the list.
+    const fnGroups = [...byFn.entries()].sort((a, b) =>
+      a[0] === NO_FN ? 1 : b[0] === NO_FN ? -1 : a[0].localeCompare(b[0]));
     return (
       <div style={{ maxWidth: 1000, margin: "0 auto" }}>{crumb}
         <H1>{bizName(cat, nav.table)}</H1>
@@ -413,7 +444,7 @@ export default function BizLineage({ t, system, dictSystem, dataSource = "PBDW",
         <div style={{ display: "flex", gap: 8, alignItems: "center",
           marginBottom: 14, flexWrap: "wrap" }}>
           <input value={flt} onChange={(e) => setFlt(e.target.value)}
-            placeholder={`type to filter ${rows.length} fields…`}
+            placeholder={`search ${rows.length} fields by business name or code…`}
             style={{ flex: 1, maxWidth: 320, height: 32, border: "1px solid #c9d4dc",
               borderRadius: 7, padding: "0 12px", fontSize: 12.5 }} />
           {Object.keys(KIND_META).map((k) => (
@@ -439,8 +470,26 @@ export default function BizLineage({ t, system, dictSystem, dataSource = "PBDW",
             background: "#edf1f4", color: "#666" }}>
             ◌ {vcounts.none} no sample yet</span>
         </div>
-        {shown.map((f) => {
+        {termsLoaded && termsUnnamed > 0 && (
+          <div style={{ fontSize: 11, color: "#7b8894", marginBottom: 10 }}>
+            {termsNamed} of {termsNamed + termsUnnamed} columns have a business
+            name in the dictionary. The other {termsUnnamed} are listed at the
+            bottom under their physical names — housekeeping columns mostly,
+            but not always.</div>)}
+        {fnGroups.map(([fnKey, fnRows]) => (
+        <div key={fnKey}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 9,
+            margin: "16px 0 7px" }}>
+            <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: ".09em",
+              textTransform: "uppercase",
+              color: fnKey === NO_FN ? "#b45309" : "#7b8894" }}>
+              {fnKey === NO_FN ? "Not in the dictionary" : fnKey}</span>
+            <span style={{ fontSize: 11, color: "#7b8894" }}>
+              {fnRows.length} field{fnRows.length === 1 ? "" : "s"}</span>
+          </div>
+        {fnRows.map((f) => {
           const kind = fieldKind(f);
+          const te = terms[String(f.dwh_target_column || "").trim().toUpperCase()];
           const xfName = friendly(f.stg1_to_stg2_transform) ||
             friendly(f.src_to_stg1_transform) ||
             friendly(f.stg2_to_dwh_transform);
@@ -453,8 +502,29 @@ export default function BizLineage({ t, system, dictSystem, dataSource = "PBDW",
               style={{ display: "flex", alignItems: "center", gap: 14,
                 background: "#fff", border: "1px solid #c9d4dc", borderRadius: 8,
                 padding: "10px 16px", marginBottom: 8, cursor: "pointer" }}>
-              <span style={{ fontFamily: "Roboto Mono, monospace", fontSize: 12.5,
-                flex: 1 }}>{f.is_ud === "Y" ? "↳ " : ""}{f.dwh_target_column}</span>
+              {/* The business term leads and the column follows it. With no
+                  dictionary entry termName returns the column name, so the
+                  row reads exactly as it did before. */}
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ fontSize: 13, fontWeight: te?.business_term ? 500 : 400,
+                  fontFamily: te?.business_term
+                    ? "inherit" : "Roboto Mono, monospace" }}>
+                  {f.is_ud === "Y" ? "↳ " : ""}
+                  {termName(terms, f.dwh_target_column)}</span>
+                {te?.business_term && (
+                  <span style={{ fontSize: 10.5, color: "#7b8894", marginLeft: 8,
+                    fontFamily: "Roboto Mono, monospace" }}>
+                    {f.dwh_target_column}
+                    {te.field_code ? ` · ${te.field_code}` : ""}</span>)}
+                {te?.is_pii === "Y" && (
+                  <span style={{ fontSize: 9, fontWeight: 700, marginLeft: 7,
+                    padding: "1px 7px", borderRadius: 999, color: "#c1113a",
+                    background: "#f7dde2" }}>personal data</span>)}
+                {te?.short_desc && (
+                  <small style={{ display: "block", fontSize: 11, color: "#4a5a68",
+                    marginTop: 2, overflow: "hidden", textOverflow: "ellipsis",
+                    whiteSpace: "nowrap" }}>{te.short_desc}</small>)}
+              </span>
               <Dots f={f} />
               {(() => {
                 const v = String(f.variance_status || f.variance || "")
@@ -474,6 +544,7 @@ export default function BizLineage({ t, system, dictSystem, dataSource = "PBDW",
                 {label}</span>
             </div>);
         })}
+        </div>))}
         <div style={{ textAlign: "center", fontSize: 11, color: "#7b8894",
           marginTop: 12 }}>{shown.length} of {rows.length} shown</div>
       </div>);

@@ -215,3 +215,78 @@ def groups(data_source: str | None = None):
         GROUP  BY NVL(t.functional_group, NVL(c.suggested_group, 'Ungrouped'))
         ORDER  BY COUNT(DISTINCT t.table_name) DESC""", {"ds": ds})
     return {"data_source": ds, "groups": rows, "count": len(rows)}
+
+
+@router.get("/fields")
+def fields(table: str, data_source: str | None = None):
+    """One table's columns, named the way the business names them.
+
+    The Business view's field list showed ACCOUNT_KEY, ACCOUNT_LONG_NAME_1,
+    ACCOUNT_LONG_NAME_2 because /legacy-lineage/fields returns no business
+    term and there was nothing else to print. The term exists — the column
+    page already shows "Account Long Name Line 1" — but it is fetched one
+    field at a time from /business-def, which is fine for one field and
+    impossible for 251.
+
+    So this is the same join, in bulk, for one table.
+
+    CANONICALISE ONCE, HASH JOIN. /dictionary's first version ran a
+    correlated REGEXP_REPLACE per row and blew the UI's 15s timeout; the UI
+    then fell back to an empty shape and the tab read "no definitions" while
+    the count chip said 2,759. The source side is normalised once in a CTE
+    here for the same reason. `canon` must agree byte for byte with
+    _norm_code and the loader, or BI/2-1 and BI_2_L1 stop meeting.
+    """
+    ds = _ds(data_source)
+    rows = _safe("""
+        WITH lin AS (
+            SELECT dwh_target_column,
+                   MIN(src_source_column)  KEEP (DENSE_RANK FIRST
+                        ORDER BY CASE WHEN LOWER(lineage_status)='mapped'
+                                 THEN 0 ELSE 1 END) AS src_source_column,
+                   MIN(lineage_status)     KEEP (DENSE_RANK FIRST
+                        ORDER BY CASE WHEN LOWER(lineage_status)='mapped'
+                                 THEN 0 ELSE 1 END) AS lineage_status,
+                   MIN(dwh_type) AS dwh_type,
+                   COUNT(DISTINCT src_source_table || '.' || src_source_column)
+                        AS source_count
+            FROM   legacy_lineage
+            WHERE  UPPER(dwh_target_table) = UPPER(TRIM(:t))
+              AND  (data_source = :ds OR data_source IS NULL)
+            GROUP  BY dwh_target_column),
+        k AS (
+            SELECT l.*,
+                   REGEXP_REPLACE(
+                     UPPER(TRIM('_' FROM REGEXP_REPLACE(l.src_source_column,
+                           '[[:space:]/.-]+', '_'))),
+                     '_L([0-9]+)', '_\1') AS code_norm
+            FROM   lin l),
+        d AS (
+            SELECT field_code_norm,
+                   MAX(field_code)        AS field_code,
+                   MAX(business_term)     AS business_term,
+                   MAX(business_function) AS business_function,
+                   MAX(master_name)       AS master_name,
+                   MAX(short_desc)        AS short_desc,
+                   MAX(is_pii)            AS is_pii,
+                   MAX(privacy_class)     AS privacy_class,
+                   MAX(status)            AS status
+            FROM   legacy_dictionary
+            GROUP  BY field_code_norm)
+        SELECT k.dwh_target_column, k.src_source_column, k.lineage_status,
+               k.dwh_type, k.source_count, k.code_norm,
+               d.field_code, d.business_term, d.business_function,
+               d.master_name, d.short_desc, d.is_pii, d.privacy_class,
+               d.status AS term_status
+        FROM   k LEFT JOIN d ON d.field_code_norm = k.code_norm
+        ORDER  BY d.business_function NULLS LAST,
+                  NVL(d.business_term, k.dwh_target_column)""",
+        {"t": table, "ds": ds})
+
+    named = sum(1 for r in rows if r.get("business_term"))
+    return {"data_source": ds, "table": table, "fields": rows,
+            "count": len(rows), "named": named,
+            # A field list that silently drops the unnamed columns would be
+            # the term-first view's version of the bug that emptied this
+            # screen. They are returned, grouped last, and counted here.
+            "unnamed": len(rows) - named}
