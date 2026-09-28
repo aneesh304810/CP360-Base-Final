@@ -45,11 +45,14 @@ export const crosswalkApi = {
       () => ({ data_source, systems: [] })),
 
   // What one lane actually contains, so the badge can filter rather than
-  // relabel. resolved:false means "could not answer" — show everything, not
-  // nothing. The safe fallback below says exactly that.
+  // relabel. The UI filters on safe_to_filter, never on resolved: resolved
+  // only says the question was answerable, and a partial answer filters out
+  // rows nothing has claimed. The fallback says "do not filter".
   laneScope: (system, data_source) =>
     _get(`/sei-crosswalk/lane-scope${_qs({ system, data_source })}`,
       () => ({ data_source, source_system: system, resolved: false,
+               safe_to_filter: false, complete: false, lanes: 0,
+               attributed: 0, lineage_rows: 0,
                route: "none", src_tables: [], target_tables: [], columns: 0 })),
 
   // The three-column ribbon diagram. `left` is grouped by verdict as well as

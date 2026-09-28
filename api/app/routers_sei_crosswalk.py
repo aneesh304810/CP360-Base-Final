@@ -740,10 +740,31 @@ def lane_scope(system: str, data_source: str | None = None):
          holds for STAR and breaks for UAF whenever the same message is
          named two ways.
 
-    `resolved` is the contract with the UI: false means this question could
-    not be answered for this lane, and the caller must show the unfiltered
-    view rather than an empty one. Filtering a screen down to nothing on the
-    strength of a join that failed is worse than not filtering at all.
+    RESOLVED IS NOT COMPLETE, and conflating them broke PBDW.
+
+    The original contract was: resolved=false means unanswerable, show
+    everything; resolved=true means filter. That is wrong, because both
+    routes can answer PARTIALLY. Route 2 is a join, so any lineage row whose
+    source table does not resolve to a feed key is dropped from the answer
+    without comment. And this endpoint scoped with `data_source = :ds` while
+    /legacy-lineage/tables — the very query whose output gets filtered — uses
+    `(data_source = :ds OR data_source IS NULL)`, because most PBDW rows
+    carry no tag at all. Two different definitions of "in this warehouse",
+    intersected: the Business view filtered 17 functional groups down to the
+    one that happened to survive, and it looked like the data was gone.
+
+    So three things now travel with the answer, and the UI must weigh all
+    three before it filters anything:
+
+      resolved   the question was answerable at all
+      complete   every lineage row in the warehouse was attributed to SOME
+                 lane, so what this lane excludes really belongs elsewhere
+      lanes      how many lanes there are to choose between. With one, the
+                 warehouse IS the lane and filtering can only subtract.
+
+    Filtering a screen on a partial answer is worse than not filtering, and
+    it is worse precisely because it looks like data loss rather than a
+    filter.
     """
     ds = _ds(data_source)
     sysname = (system or "").strip().upper()
@@ -752,43 +773,95 @@ def lane_scope(system: str, data_source: str | None = None):
                 "route": "none", "src_tables": [], "target_tables": [],
                 "columns": 0, "hint": "no system given"}
 
+    # NULL counts as belonging to the warehouse, exactly as
+    # /legacy-lineage/tables has it. Rows loaded before sql/29 have no tag.
+    IN_DS = "(data_source = :ds OR data_source IS NULL)"
     route = "lineage_lane"
-    rows = _safe("""
+    rows = _safe(f"""
         SELECT src_source_table, dwh_target_table,
                COUNT(DISTINCT dwh_target_table || '.' || dwh_target_column) AS columns_
         FROM   legacy_lineage_lane
-        WHERE  data_source = :ds AND UPPER(source_system) = :sys
+        WHERE  {IN_DS} AND UPPER(source_system) = :sys
         GROUP  BY src_source_table, dwh_target_table""",
         {"ds": ds, "sys": sysname})
 
     if not rows:
         route = "feed_key"
-        rows = _safe("""
+        rows = _safe(f"""
             SELECT l.src_source_table, l.dwh_target_table,
                    COUNT(DISTINCT l.dwh_target_table || '.' || l.dwh_target_column) AS columns_
             FROM   legacy_lineage l
             JOIN   legacy_source_file f
-                   ON f.data_source  = l.data_source
+                   ON NVL(f.data_source,'~') = NVL(l.data_source,'~')
                   AND f.src_file_key = REGEXP_REPLACE(UPPER(TRIM('_' FROM
-                        REGEXP_REPLACE(l.src_source_table,'[[:space:]/.-]+','_'))),'_{2,}','_')
-            WHERE  l.data_source = :ds AND UPPER(f.source_system) = :sys
+                        REGEXP_REPLACE(l.src_source_table,'[[:space:]/.-]+','_'))),'_{{2,}}','_')
+            WHERE  (l.data_source = :ds OR l.data_source IS NULL)
+              AND  UPPER(f.source_system) = :sys
             GROUP  BY l.src_source_table, l.dwh_target_table""",
             {"ds": ds, "sys": sysname})
 
     src = sorted({(r.get("src_source_table") or "") for r in rows} - {""})
     tgt = sorted({(r.get("dwh_target_table") or "") for r in rows} - {""})
     cols = sum(int(r.get("columns_") or 0) for r in rows)
+    resolved = bool(src or tgt)
+
+    # How much of the warehouse this route can attribute to ANY lane. A route
+    # that accounts for every row partitions the estate, and excluding one
+    # lane's share is then a real statement. A route that accounts for a
+    # third of it does not, and filtering on it deletes two thirds of the
+    # screen while looking like missing data.
+    total = _one(f"SELECT COUNT(*) AS n FROM legacy_lineage WHERE {IN_DS}",
+                 {"ds": ds})
+    if route == "lineage_lane":
+        attributed = _one(
+            f"SELECT COUNT(*) AS n FROM legacy_lineage_lane WHERE {IN_DS}",
+            {"ds": ds})
+        lanes = _one(f"""SELECT COUNT(DISTINCT UPPER(source_system)) AS n
+                         FROM legacy_lineage_lane WHERE {IN_DS}""", {"ds": ds})
+    else:
+        attributed = _one("""
+            SELECT COUNT(*) AS n
+            FROM   legacy_lineage l
+            JOIN   legacy_source_file f
+                   ON NVL(f.data_source,'~') = NVL(l.data_source,'~')
+                  AND f.src_file_key = REGEXP_REPLACE(UPPER(TRIM('_' FROM
+                        REGEXP_REPLACE(l.src_source_table,'[[:space:]/.-]+','_'))),'_{2,}','_')
+            WHERE  (l.data_source = :ds OR l.data_source IS NULL)""", {"ds": ds})
+        lanes = _one("""
+            SELECT COUNT(DISTINCT UPPER(f.source_system)) AS n
+            FROM   legacy_lineage l
+            JOIN   legacy_source_file f
+                   ON NVL(f.data_source,'~') = NVL(l.data_source,'~')
+                  AND f.src_file_key = REGEXP_REPLACE(UPPER(TRIM('_' FROM
+                        REGEXP_REPLACE(l.src_source_table,'[[:space:]/.-]+','_'))),'_{2,}','_')
+            WHERE  (l.data_source = :ds OR l.data_source IS NULL)""", {"ds": ds})
+    complete = bool(total) and attributed >= total
+
     return {
         "data_source": ds,
         "source_system": sysname,
-        "resolved": bool(src or tgt),
-        "route": route if (src or tgt) else "none",
+        "resolved": resolved,
+        # The UI filters on this one, not on `resolved`. One lane means the
+        # warehouse is the lane; a partial attribution means the excluded
+        # rows were never shown to belong to anyone else.
+        "safe_to_filter": bool(resolved and complete and lanes > 1),
+        "complete": complete,
+        "lanes": lanes,
+        "attributed": attributed,
+        "lineage_rows": total,
+        "route": route if resolved else "none",
         "src_tables": src,
         "target_tables": tgt,
         "columns": cols,
         "hint": (f"no lineage row could be attributed to {sysname}; run "
                  f"sql/55_lineage_lane.sql and re-ingest so LANE_ID is recorded"
-                 if not (src or tgt) else None),
+                 if not resolved else
+                 (f"only {attributed} of {total} lineage rows can be attributed "
+                  f"to a lane by the {route} route, so the view is not filtered "
+                  f"— filtering would hide the other {total - attributed} as if "
+                  f"they did not exist" if not complete else
+                  (f"{ds} has one lane, so the whole warehouse is it"
+                   if lanes <= 1 else None))),
     }
 
 

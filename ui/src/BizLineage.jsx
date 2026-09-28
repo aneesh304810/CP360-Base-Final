@@ -169,11 +169,16 @@ export default function BizLineage({ t, system, dictSystem, dataSource = "PBDW",
     return () => { dead = true; };
   }, [system, ds]);
 
-  // resolved:false means the lane could not be resolved, not that it is
-  // empty. An unanswerable question shows the whole estate, never a blank one.
+  // safe_to_filter, NOT resolved. resolved only says the question was
+  // answerable; it can be answered PARTIALLY, and filtering on a partial
+  // answer is what cut PBDW's 17 functional groups down to the one that
+  // survived a lossy join. The endpoint now also reports whether every
+  // lineage row was attributed to some lane, and whether there is more than
+  // one lane to choose between — with one lane the warehouse IS the lane and
+  // filtering can only subtract.
   const tables = useMemo(() => {
     if (!tablesRaw) return null;
-    if (!lane || !lane.resolved) return tablesRaw;
+    if (!lane || !lane.safe_to_filter) return tablesRaw;
     const keep = new Set(lane.target_tables || []);
     const kept = tablesRaw.filter((tb) =>
       keep.has(tb.dwh_target_table || tb.table_name || tb.table));
@@ -185,7 +190,7 @@ export default function BizLineage({ t, system, dictSystem, dataSource = "PBDW",
   // Standing on a table the new lane does not feed is the same confusion the
   // Source view had: the breadcrumb says UAF, the content is STAR's.
   useEffect(() => {
-    if (!lane || !lane.resolved || !nav.table) return;
+    if (!lane || !lane.safe_to_filter || !nav.table) return;
     if (!(lane.target_tables || []).includes(nav.table))
       setNav({ level: 0, group: null, table: null, col: null });
   }, [lane]);   // eslint-disable-line react-hooks/exhaustive-deps

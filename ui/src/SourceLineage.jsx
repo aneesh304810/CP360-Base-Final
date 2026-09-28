@@ -171,9 +171,11 @@ export default function SourceLineage({ t, system, dictSystem,
 
   const srcs = useMemo(() => {
     if (!srcsRaw) return null;
-    // resolved:false is "could not answer". Filtering to nothing on a join
+    // safe_to_filter, not resolved: a PARTIAL answer filters out rows that
+    // were never shown to belong to another lane, which reads as data loss.
+    // "could not answer". Filtering to nothing on a join
     // that failed is worse than not filtering, so the whole warehouse shows.
-    if (!lane || !lane.resolved) return srcsRaw;
+    if (!lane || !lane.safe_to_filter) return srcsRaw;
     const keep = new Set(lane.src_tables || []);
     const files = (srcsRaw.sources || []).filter((f) =>
       keep.has(f.src_source_table));
@@ -211,7 +213,7 @@ export default function SourceLineage({ t, system, dictSystem,
   // leaves the breadcrumb showing one lane and the content another. Step back
   // to the file list rather than show a STAR file under the UAF badge.
   useEffect(() => {
-    if (!lane || !lane.resolved || !file) return;
+    if (!lane || !lane.safe_to_filter || !file) return;
     if (!(lane.src_tables || []).includes(file)) {
       setFile(null); setTarget(null); setFamKey(null); setMember(null);
       setLevel(0);
