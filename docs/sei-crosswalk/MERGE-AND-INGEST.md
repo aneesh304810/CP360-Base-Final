@@ -57,7 +57,10 @@ api/app/routers_sei_crosswalk.py
 ui/src/seiCrosswalkApi.js
 ui/src/CrosswalkDashboard.jsx
 ui/src/laneMeta.js
+ui/src/crosswalkGlossary.js
 docs/sei-crosswalk/MERGE-AND-INGEST.md
+docs/sei-crosswalk/TAG-REFERENCE.md
+docs/sei-crosswalk/gen-tag-reference.mjs
 docs/ingestion-prompts/PROMPT_IMDS_STAR_UAF_SEI_data_lineage.md
 docs/ingestion-prompts/PROMPT_PBDW_ADDVANTAGE_SEI_crosswalk.md
 ```

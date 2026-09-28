@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { crosswalkApi, VERDICT, VERDICT_ORDER, LANE_C } from "./seiCrosswalkApi.js";
+import { GLOSSARY_SECTIONS, VERDICT_INFO, SHAPE_INFO, verdictShort }
+  from "./crosswalkGlossary.js";
 
 // =====================================================================
 // CrosswalkDashboard — mapping, analysis and divergence for one warehouse.
@@ -29,12 +31,31 @@ const MONO = "'Roboto Mono', ui-monospace, Menlo, monospace";
 const pct = (n, d) => (d ? Math.round((n / d) * 100) : 0);
 const g = (o, ...k) => k.reduce((a, x) => (a != null ? a : o?.[x] ?? o?.[x?.toUpperCase?.()] ?? o?.[x?.toLowerCase?.()]), null);
 
-function Pill({ v }) {
+function Pill({ v, onWhat }) {
   const d = VERDICT[v] || VERDICT.UNKNOWN;
+  // Every pill says what it means on hover. A tag nobody can decode is a tag
+  // that gets ignored, and NO_SOURCE in particular reads as a minor note
+  // rather than as the column arriving empty on cutover day.
   return (
-    <span style={{ display: "inline-block", fontSize: 9, fontWeight: 700,
+    <span title={verdictShort(v)}
+      onClick={onWhat ? (e) => { e.stopPropagation(); onWhat(v); } : undefined}
+      style={{ display: "inline-block", fontSize: 9, fontWeight: 700,
       letterSpacing: 0.4, padding: "2px 8px", borderRadius: 999,
-      background: d.bg, color: d.c, whiteSpace: "nowrap" }}>{d.t}</span>);
+      background: d.bg, color: d.c, whiteSpace: "nowrap",
+      cursor: onWhat ? "help" : "default" }}>{d.t}</span>);
+}
+
+// Renders the glossary's light markdown: **bold** and paragraph breaks. Kept
+// to those two because that is all the copy uses.
+function Prose({ text, style }) {
+  return (
+    <div style={{ fontSize: 11.5, lineHeight: 1.65, maxWidth: "72ch", ...style }}>
+      {String(text || "").split("\n\n").map((para, i) => (
+        <p key={i} style={{ margin: i ? "8px 0 0" : 0 }}>
+          {para.split(/\*\*(.+?)\*\*/g).map((chunk, j) =>
+            j % 2 ? <b key={j}>{chunk}</b> : <span key={j}>{chunk}</span>)}
+        </p>))}
+    </div>);
 }
 
 function LaneTag({ lane }) {
@@ -60,9 +81,9 @@ function Stack({ verdicts, h = 8, onPick }) {
     </span>);
 }
 
-function Kpi({ t, v, of, sub, c, meter, onClick }) {
+function Kpi({ t, v, of, sub, c, meter, onClick, title }) {
   return (
-    <div onClick={onClick} style={{ background: t.panel || "#fff",
+    <div onClick={onClick} title={title} style={{ background: t.panel || "#fff",
       border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderTop: `3px solid ${c}`,
       borderRadius: 3, padding: "12px 14px", cursor: onClick ? "pointer" : "default" }}>
       <div style={{ fontSize: 26, fontWeight: 500, lineHeight: 1, color: c,
@@ -160,6 +181,8 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
   const push = (s) => setStack((x) => [...x, s]);
   const back = () => setStack((x) => x.slice(0, -1));
   const drill = (filter, title) => { setList(null); push({ kind: "list", filter, title }); };
+  const openGlossary = (focus) => push({ kind: "glossary", focus,
+    title: "What these tags mean" });
   const openCol = (table, column) => { setDetail(null); push({ kind: "column", table, column }); };
 
   const card = { background: t.panel || "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
@@ -191,6 +214,88 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
       </div>);
   }
 
+  /* --------------------------------------------------- drill: glossary --- */
+  // Reached from the "what do these mean?" link beside any tag row, and from
+  // clicking a pill. `focus` scrolls the asked-about tag into view and rings
+  // it, so arriving from a NO_SOURCE pill lands on NO_SOURCE rather than at
+  // the top of a long page.
+  if (top && top.kind === "glossary") {
+    const focus = top.focus;
+    return (
+      <div style={{ fontFamily: F }}>
+        <Crumbs t={t} stack={stack} onBack={back} onHome={() => setStack([])} />
+        <div style={card}>
+          <div style={head}>
+            <h3 style={h2}>What these tags mean</h3>
+            <span style={note}>every vocabulary on these screens, with the
+              rule that produces it</span>
+          </div>
+          <div style={body}>
+            <Prose style={{ color: t.sub || "#666", marginBottom: 4 }}
+              text={"The verdicts are not a severity scale and not opinions. "
+                  + "They are the output of one algorithm applied in a fixed "
+                  + "order, first match wins.\n\n"
+                  + "**A column is tagged with the rule that stopped it, and "
+                  + "nothing below that rule was tested.** A NO_SOURCE column "
+                  + "is not a column whose types happen to be fine — its types "
+                  + "were never compared, because there was nothing to compare "
+                  + "them to."} />
+          </div>
+        </div>
+
+        {GLOSSARY_SECTIONS.map((sec) => (
+          <div key={sec.key} style={card}>
+            <div style={head}>
+              <h3 style={h2}>{sec.title}</h3>
+              <span style={note}>{sec.order.length} values</span>
+            </div>
+            <div style={body}>
+              <Prose style={{ color: t.muted || "#999", marginBottom: 13 }}
+                text={sec.intro} />
+              {sec.order.map((k, i) => {
+                const e = sec.info[k];
+                const rich = typeof e === "object" && e !== null;
+                const on = focus && String(focus).toUpperCase() === String(k).toUpperCase();
+                const c = sec.key === "verdict"
+                  ? (VERDICT[k] || VERDICT.UNKNOWN).c
+                  : sec.key === "shape" ? "#7c3aed" : (t.accent || "#0f4775");
+                return (
+                  <div key={k} id={`gl-${k}`} style={{
+                    borderTop: i ? `1px solid ${t.panel2 || "#dfe6e9"}` : "none",
+                    padding: i ? "13px 0 2px" : "0 0 2px",
+                    background: on ? "#fff8e1" : undefined,
+                    boxShadow: on ? "0 0 0 8px #fff8e1" : undefined,
+                    borderRadius: on ? 2 : undefined }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10,
+                      flexWrap: "wrap", marginBottom: 6 }}>
+                      {sec.key === "verdict"
+                        ? <Pill v={k} />
+                        : <span style={{ fontFamily: MONO, fontSize: 10.5,
+                            fontWeight: 700, letterSpacing: 0.3, color: c,
+                            background: `${c}14`, padding: "2px 8px",
+                            borderRadius: 2 }}>{rich ? e.label : k}</span>}
+                      {sec.key === "verdict" && (
+                        <span style={{ fontFamily: MONO, fontSize: 10,
+                          color: t.muted || "#999" }}>{k}</span>)}
+                      {sec.key === "shape" && <Shape kind={k} c={c} />}
+                    </div>
+                    {rich ? (
+                      <>
+                        <Prose text={e.what || e.short}
+                          style={{ color: t.navy || "#10193b" }} />
+                        {e.why && <Field t={t} k="Why a row gets it" v={e.why} />}
+                        {e.blocks && <Field t={t} k="Blocks cutover" v={e.blocks} />}
+                        {e.clears && <Field t={t} k="What clears it" v={e.clears} />}
+                        {e.watch && <Field t={t} k="What to watch" v={e.watch} />}
+                      </>
+                    ) : <Prose text={e} style={{ color: t.navy || "#10193b" }} />}
+                  </div>);
+              })}
+            </div>
+          </div>))}
+      </div>);
+  }
+
   /* ------------------------------------------------ drill: one column --- */
   if (top && top.kind === "column") {
     const d = detail;
@@ -206,15 +311,37 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
                 {(d.verdicts || []).map((v, i) => (
                   <span key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
                     <LaneTag lane={g(v, "lane_id", "LANE_ID")} />
-                    <Pill v={g(v, "match_verdict", "MATCH_VERDICT")} /></span>))}
+                    <Pill v={g(v, "match_verdict", "MATCH_VERDICT")}
+                      onWhat={openGlossary} /></span>))}
               </div>
               <div style={body}>
                 {(d.verdicts || []).map((v, i) => {
                   const reason = g(v, "verdict_reason", "VERDICT_REASON");
                   const clear = g(v, "what_would_clear_it", "WHAT_WOULD_CLEAR_IT");
                   const fc = g(v, "failed_checks", "FAILED_CHECKS");
+                  const mv = g(v, "match_verdict", "MATCH_VERDICT");
+                  const info = VERDICT_INFO[mv];
                   return (
                     <div key={i} style={{ marginBottom: 12 }}>
+                      {/* What the verdict MEANS, before what this row's
+                          author wrote about it. The reason line assumes you
+                          already know; most readers do not, and NO_SOURCE in
+                          particular reads as mild when it is the one that
+                          nulls the column. */}
+                      {info && (
+                        <div style={{ borderLeft: `3px solid ${(VERDICT[mv] || VERDICT.UNKNOWN).c}`,
+                          background: (VERDICT[mv] || VERDICT.UNKNOWN).bg + "66",
+                          padding: "9px 12px", borderRadius: 2, marginBottom: 9 }}>
+                          <Prose text={info.what} style={{ color: t.navy || "#10193b" }} />
+                          <Field t={t} k="Blocks cutover" v={info.blocks} />
+                          <Field t={t} k="What clears it" v={info.clears} />
+                          <button type="button" onClick={() => openGlossary(mv)}
+                            style={{ marginTop: 7, background: "none", border: "none",
+                              padding: 0, font: "inherit", fontSize: 10.5,
+                              cursor: "pointer", color: t.accent || "#0f4775",
+                              textDecoration: "underline" }}>
+                            all tag definitions →</button>
+                        </div>)}
                       {reason && <p style={{ margin: "0 0 6px", fontSize: 12,
                         color: t.sub || "#666", lineHeight: 1.6 }}>{reason}</p>}
                       {fc && <div style={{ fontSize: 10.5, color: t.muted || "#999" }}>
@@ -302,7 +429,8 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
                       {g(r, "contract_field", "CONTRACT_FIELD") || "—"}</td>
                     <td style={{ ...td, fontFamily: MONO, fontSize: 11 }}>
                       {g(r, "sei_datapoints", "SEI_DATAPOINTS") || "—"}</td>
-                    <td style={td}><Pill v={g(r, "match_verdict", "MATCH_VERDICT")} /></td>
+                    <td style={td}><Pill v={g(r, "match_verdict", "MATCH_VERDICT")}
+                      onWhat={openGlossary} /></td>
                     <td style={{ ...td, fontSize: 10.5, color: t.muted || "#999" }}>
                       {g(r, "failed_checks", "FAILED_CHECKS") || "—"}</td>
                   </tr>))}
@@ -330,9 +458,11 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
           meter={pct(sum.mapped, sum.in_denominator)}
           sub={["Have a SEI datapoint", "proposed, none of it verified yet"]} />
         <Kpi t={t} v={sum.proven} c="#159943" meter={pct(sum.proven, sum.mapped)}
+          title={verdictShort("PROVEN_MATCH")}
           sub={["Proven matches", sum.ceiling?.blocked ? "ceiling is 0 until live DDL lands" : "both sides from live metadata"]}
           onClick={() => drill({ verdict: "PROVEN_MATCH" }, "Proven matches")} />
         <Kpi t={t} v={sum.no_source} c="#c1113a" meter={pct(sum.no_source, sum.in_denominator)}
+          title={verdictShort("NO_SOURCE")}
           sub={["No SEI source", `${sum.undecided_dispositions} dispositions still undecided`]}
           onClick={() => drill({ verdict: "NO_SOURCE" }, "Columns with no SEI source")} />
         <Kpi t={t} v={sum.dual_source} c="#7c3aed"
@@ -350,15 +480,32 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
       <Panel t={t} title="Verdict spread" note="click a band to drill into it">
         <Stack verdicts={v} h={18} onPick={(x) => drill({ verdict: x },
           `${VERDICT[x]?.t || x} columns`)} />
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 13, marginTop: 11 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 13, marginTop: 11,
+          alignItems: "center" }}>
           {v.map((x) => (
-            <span key={x.verdict} onClick={() => drill({ verdict: x.verdict },
+            <span key={x.verdict} title={verdictShort(x.verdict)}
+              onClick={() => drill({ verdict: x.verdict },
               `${VERDICT[x.verdict]?.t || x.verdict} columns`)}
               style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10.5,
                 color: t.sub || "#666", cursor: "pointer" }}>
               <i style={{ width: 11, height: 11, borderRadius: 2,
                 background: (VERDICT[x.verdict] || VERDICT.UNKNOWN).c }} />
               {VERDICT[x.verdict]?.t || x.verdict} <b>{x.n}</b></span>))}
+          <button type="button" onClick={() => openGlossary(null)}
+            style={{ marginLeft: "auto", background: "none", border: "none",
+              padding: 0, font: "inherit", fontSize: 10.5, cursor: "pointer",
+              color: t.accent || "#0f4775", textDecoration: "underline" }}>
+            what do these mean? →</button>
+        </div>
+        {/* The one sentence that stops the spread being read as a severity
+            ladder. Everything else lives behind the link. */}
+        <div style={{ fontSize: 10.5, color: t.muted || "#999", marginTop: 9,
+          lineHeight: 1.6, maxWidth: "80ch" }}>
+          One verdict per column, from a fixed algorithm, first match wins —
+          so a column carries the rule that stopped it and nothing below that
+          rule was tested. <b>UNKNOWN is never a pass</b>, and{" "}
+          <b>NO SOURCE means SEI offers nothing at all</b> for a column the
+          incumbent fills today.
         </div>
       </Panel>
 
@@ -381,9 +528,21 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
                   <span style={{ fontSize: 12.5, fontWeight: 700 }}>{s.label}</span>
                   <span style={{ marginLeft: "auto" }}><Shape kind={s.key} c={c} /></span>
                 </div>
+                <div style={{ marginTop: 7, fontSize: 10.5, lineHeight: 1.55,
+                  color: t.sub || "#666" }}>
+                  {SHAPE_INFO[s.key]?.short || ""}</div>
                 <div style={{ marginTop: 8, paddingTop: 7,
                   borderTop: `1px dashed ${t.panel2 || "#dfe6e9"}`, fontSize: 10,
-                  color: t.muted || "#999" }}><b>Owner</b> {s.owner}</div>
+                  color: t.muted || "#999", display: "flex", gap: 8,
+                  alignItems: "baseline" }}>
+                  <span><b>Owner</b> {s.owner}</span>
+                  <button type="button"
+                    onClick={(e) => { e.stopPropagation(); openGlossary(s.key); }}
+                    style={{ marginLeft: "auto", background: "none",
+                      border: "none", padding: 0, font: "inherit", fontSize: 10,
+                      cursor: "pointer", color: t.accent || "#0f4775",
+                      textDecoration: "underline" }}>what this means</button>
+                </div>
               </div>);
           })}
         </div>
@@ -474,6 +633,19 @@ const sub = (t) => ({ display: "block", fontSize: 10, color: t.muted || "#999", 
 const btn = (t) => ({ fontSize: 11.5, fontWeight: 700, padding: "7px 14px", cursor: "pointer",
   fontFamily: F, borderRadius: 3, border: `1px solid ${t.panel2 || "#dfe6e9"}`,
   background: t.panel || "#fff", color: t.accent || "#0f4775" });
+
+// A labelled line inside a glossary entry: "Blocks cutover — Yes, and it is
+// the hardest kind." The label is what makes the entries scannable side by
+// side, since every verdict answers the same four questions.
+function Field({ t, k, v }) {
+  return (
+    <div style={{ display: "flex", gap: 9, marginTop: 6, alignItems: "baseline" }}>
+      <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 0.4,
+        textTransform: "uppercase", color: t.muted || "#999",
+        minWidth: 112, flexShrink: 0 }}>{k}</span>
+      <Prose text={v} style={{ color: t.sub || "#666", fontSize: 11 }} />
+    </div>);
+}
 
 function Panel({ t, title, note, children }) {
   return (
