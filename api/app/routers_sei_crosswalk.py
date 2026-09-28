@@ -22,7 +22,10 @@ from __future__ import annotations
 import logging
 from fastapi import APIRouter
 
-from ._legacy_compat import _safe
+from pydantic import BaseModel
+
+from ._legacy_compat import _safe, _norm_code
+from .db import execute as _execute
 
 log = logging.getLogger("cp.api.sei_crosswalk")
 router = APIRouter(prefix="/sei-crosswalk", tags=["sei-crosswalk"])
@@ -951,6 +954,351 @@ def feed_names(data_source: str | None = None):
             "unnamed": unnamed, "unnamed_count": len(unnamed),
             "orphans": orphans,
             "generic_datasets": sorted(generic)}
+
+
+@router.get("/field-definition")
+def field_definition(code: str, data_source: str | None = None,
+                     src_table: str | None = None):
+    """What a source column MEANS — from whichever dictionary has it.
+
+    The screens said "No dictionary entry — this source column is not an
+    AddVantage field code. The dictionary covers the AddVantage master
+    workbook only." That was true when AddVantage was the only incumbent.
+    On a STAR column it is both wrong and unhelpful: it names a system
+    that has nothing to do with the lane, and it tells the reader to wait
+    for a workbook that has in fact already arrived.
+
+    Four dictionaries are loaded now and the message knew about one:
+
+      legacy_dictionary    AddVantage, CRD and STAR master definitions
+      star_layout_field    434 published STAR fields, with descriptions
+      sei_input_lineage    950 SEI catalogue fields, with definitions
+      uaf_field_schema     197 UAF fields, with published attributes
+
+    All four are searched on the canonical code, strongest first, and the
+    answer says which one answered. `searched` lists every source tried
+    with whether it holds anything at all for this warehouse, so "not
+    found" can be told apart from "that dictionary is not loaded" — the
+    two need completely different actions and the old message conflated
+    them.
+    """
+    ds = _ds(data_source)
+    norm = _norm_code(code or "")
+    if not norm:
+        return {"code": code, "definition": None, "source": None, "searched": []}
+
+    found = None
+
+    rows = _safe("""
+        SELECT source_system, field_code, master_name, business_term,
+               business_function, short_desc, long_desc, is_pii, is_required
+        FROM   legacy_dictionary WHERE field_code_norm = :c
+        ORDER  BY source_system FETCH FIRST 1 ROWS ONLY""", {"c": norm})
+    if rows:
+        r = rows[0]
+        found = {"source": "legacy_dictionary",
+                 "source_label": f"{r.get('source_system')} dictionary",
+                 "term": r.get("business_term") or r.get("field_code"),
+                 "description": r.get("long_desc") or r.get("short_desc"),
+                 "master": r.get("master_name"),
+                 "function": r.get("business_function"),
+                 "is_pii": r.get("is_pii"), "is_required": r.get("is_required")}
+
+    if not found:
+        rows = _safe("""
+            SELECT feed_family, field_name, published_type, published_length,
+                   published_format, description, evidence_status, source_document
+            FROM   star_layout_field
+            WHERE  data_source = :ds AND field_norm = :c
+            ORDER  BY feed_family FETCH FIRST 1 ROWS ONLY""",
+            {"ds": ds, "c": norm})
+        if rows:
+            r = rows[0]
+            found = {"source": "star_layout_field",
+                     "source_label": f"STAR published layout · {r.get('feed_family')}",
+                     "term": r.get("field_name"),
+                     "description": r.get("description"),
+                     "type": r.get("published_type"),
+                     "length": r.get("published_length"),
+                     "format": r.get("published_format"),
+                     "evidence": r.get("evidence_status"),
+                     "source_doc": r.get("source_document")}
+
+    if not found:
+        rows = _safe("""
+            SELECT sei_target_file, sei_field, published_type, published_length,
+                   field_definition, validation_rule, record_scope
+            FROM   sei_input_lineage
+            WHERE  data_source = :ds AND sei_field_norm = :c
+            ORDER  BY sei_target_file FETCH FIRST 1 ROWS ONLY""",
+            {"ds": ds, "c": norm})
+        if rows:
+            r = rows[0]
+            found = {"source": "sei_input_lineage",
+                     "source_label": f"SEI input catalogue · {r.get('sei_target_file')}",
+                     "term": r.get("sei_field"),
+                     "description": r.get("field_definition"),
+                     "type": r.get("published_type"),
+                     "length": r.get("published_length"),
+                     "validation": r.get("validation_rule"),
+                     "scope": r.get("record_scope"),
+                     # An inbound field is not thereby on the outbound
+                     # interface. Saying so here stops the definition being
+                     # read as availability.
+                     "caveat": "SEI's INBOUND catalogue. A field loaded into "
+                               "SEI is not thereby exposed on the outbound "
+                               "interface the contract needs."}
+
+    if not found:
+        rows = _safe("""
+            SELECT uaf_feed, record_type, source_field, published_type,
+                   published_length, imds_target, transformation
+            FROM   uaf_field_schema
+            WHERE  data_source = :ds AND source_field_norm = :c
+            ORDER  BY uaf_feed FETCH FIRST 1 ROWS ONLY""",
+            {"ds": ds, "c": norm})
+        if rows:
+            r = rows[0]
+            found = {"source": "uaf_field_schema",
+                     "source_label": f"UAF layout · {r.get('uaf_feed')}"
+                                     f" · {r.get('record_type')}",
+                     "term": r.get("source_field"),
+                     "description": r.get("imds_target"),
+                     "type": r.get("published_type"),
+                     "length": r.get("published_length"),
+                     "rule": r.get("transformation")}
+
+    if not found:
+        rows = _safe("""
+            SELECT src_source_column, src_type, src_length, src_description,
+                   unit_of_measure, currency_basis, code_set_name
+            FROM   legacy_src_column
+            WHERE  data_source = :ds AND src_col_norm = :c
+            FETCH FIRST 1 ROWS ONLY""", {"ds": ds, "c": norm})
+        if rows and (rows[0].get("src_description") or rows[0].get("src_type")):
+            r = rows[0]
+            found = {"source": "legacy_src_column",
+                     "source_label": "contract field metadata",
+                     "term": r.get("src_source_column"),
+                     "description": r.get("src_description"),
+                     "type": r.get("src_type"), "length": r.get("src_length"),
+                     "unit": r.get("unit_of_measure"),
+                     "currency": r.get("currency_basis"),
+                     "code_set": r.get("code_set_name")}
+
+    def loaded(sql, params=None):
+        r = _safe(sql, {"ds": ds, **(params or {})})
+        return int((r[0] or {}).get("n") or 0) if r else 0
+
+    searched = [
+        {"source": "legacy_dictionary", "label": "AddVantage / CRD / STAR master",
+         "rows": loaded("SELECT COUNT(*) AS n FROM legacy_dictionary")},
+        {"source": "star_layout_field", "label": "STAR published layouts",
+         "rows": loaded("SELECT COUNT(*) AS n FROM star_layout_field WHERE data_source = :ds")},
+        {"source": "sei_input_lineage", "label": "SEI input catalogue",
+         "rows": loaded("SELECT COUNT(*) AS n FROM sei_input_lineage WHERE data_source = :ds")},
+        {"source": "uaf_field_schema", "label": "UAF layouts",
+         "rows": loaded("SELECT COUNT(*) AS n FROM uaf_field_schema WHERE data_source = :ds")},
+        {"source": "legacy_src_column", "label": "contract field metadata",
+         "rows": loaded("SELECT COUNT(*) AS n FROM legacy_src_column WHERE data_source = :ds")},
+    ]
+    return {"code": code, "code_norm": norm, "data_source": ds,
+            "definition": found, "source": (found or {}).get("source"),
+            "searched": searched,
+            "empty_sources": [x["label"] for x in searched if not x["rows"]]}
+
+
+@router.get("/column-chain")
+def column_chain(table: str, column: str, data_source: str | None = None):
+    """The whole chain for one warehouse column, both eras, with the rule
+    on every hop.
+
+    WHERE THE TRANSFORMATION RULES BELONG. They were nowhere: the column
+    graph drew SOURCE -> LANDING -> CONFORMED -> WAREHOUSE as four boxes
+    and three arrows, and the arrows were blank. The expression that turns
+    one box into the next is the only thing on that picture that can be
+    wrong in an interesting way, and it was the one thing not drawn.
+
+    So the hop carries its rule. Three hops, three expressions, straight
+    off LEGACY_LINEAGE where they have been all along.
+
+    The SEI side is a SECOND TRACK UNDER THE SAME CHAIN rather than a
+    separate screen, because the question is a comparison and a comparison
+    needs both halves in one eye-span. It lands at the contract field, not
+    at the warehouse column: SEI replaces the front of the chain and the
+    existing pipeline carries it from there, and drawing it as a parallel
+    line to the warehouse would assert an architecture nobody proposed.
+    """
+    ds = _ds(data_source)
+    legacy = _safe("""
+        SELECT l.src_source_table, l.src_source_column, l.src_type, l.src_length,
+               l.src_to_stg1_transform,
+               l.stg1_source_table, l.stg1_source_column, l.stg1_type,
+               l.stg1_to_stg2_transform,
+               l.stg2_source_table, l.stg2_source_column, l.stg2_type,
+               l.stg2_to_dwh_transform,
+               l.dwh_target_table, l.dwh_target_column, l.dwh_type,
+               l.dwh_length, l.dwh_precision, l.lineage_status,
+               n.source_system
+        FROM   legacy_lineage l
+        LEFT   JOIN legacy_lineage_lane n ON n.lineage_id = l.lineage_id
+        WHERE  l.data_source = :ds AND l.dwh_target_table = :t
+          AND  l.dwh_target_column = :c""", {"ds": ds, "t": table, "c": column})
+
+    sei = _safe(f"""
+        SELECT m.sei_feed, m.sei_entity, m.sei_datapoint, m.sei_type,
+               m.sei_length, m.sei_scale, m.map_kind, m.composite_group,
+               m.composite_role, m.map_rule, m.join_key, m.depends_on_feed,
+               m.evidence, m.open_question,
+               v.contract_feed, v.contract_field, v.match_verdict,
+               v.failed_checks
+        FROM   sei_verify v
+        LEFT   JOIN sei_source_map m
+               ON m.data_source = v.data_source
+              AND NVL(m.src_col_norm, {_canon('m.src_source_column')})
+                = {_canon('v.contract_field')}
+        WHERE  v.data_source = :ds AND v.dwh_target_table = :t
+          AND  v.dwh_target_column = :c""", {"ds": ds, "t": table, "c": column})
+
+    xform = _safe("""
+        SELECT x.legacy_transformation_id, x.sei_transformation_id,
+               x.transformation_equivalence, x.transformation_approval,
+               x.sei_equivalent_transformation, x.sei_source_objects,
+               x.sei_source_fields, x.transformation_evidence,
+               lg.transformation_logic AS legacy_logic,
+               lg.transformation_type  AS legacy_kind,
+               lg.null_handling        AS legacy_null_handling,
+               lg.conditional_logic    AS legacy_conditional,
+               se.transformation_logic AS sei_logic,
+               se.transformation_type  AS sei_kind,
+               se.null_handling        AS sei_null_handling,
+               se.status               AS sei_status
+        FROM   legacy_lineage_xform x
+        LEFT   JOIN sei_transformation lg ON lg.transformation_id = x.legacy_transformation_id
+        LEFT   JOIN sei_transformation se ON se.transformation_id = x.sei_transformation_id
+        WHERE  x.data_source = :ds AND x.dwh_target_table = :t
+          AND  x.dwh_target_column = :c""", {"ds": ds, "t": table, "c": column})
+
+    cmp_ = _safe("""
+        SELECT comparison_id, equivalence, evidence_completeness,
+               approval_status, review_note, imds_logic, sei_logic,
+               sei_source_objects, sei_source_fields
+        FROM   sei_transformation_compare
+        WHERE  data_source = :ds AND target_object = :t AND target_attribute = :c""",
+        {"ds": ds, "t": table, "c": column})
+
+    review = _safe("""
+        SELECT verdict, rationale, reviewer,
+               TO_CHAR(reviewed_at, 'YYYY-MM-DD HH24:MI') AS reviewed_at,
+               workbook_status
+        FROM   sei_xform_review
+        WHERE  data_source = :ds AND dwh_target_table = :t
+          AND  dwh_target_column = :c""", {"ds": ds, "t": table, "c": column})
+
+    return {"data_source": ds, "table": table, "column": column,
+            "legacy": legacy, "sei": sei, "xform": xform,
+            "compare": cmp_, "review": (review or [None])[0]}
+
+
+class XformReviewIn(BaseModel):
+    data_source: str | None = None
+    table: str
+    column: str
+    verdict: str
+    rationale: str | None = None
+    reviewer: str | None = None
+    comparison_id: str | None = None
+
+
+@router.post("/xform-review")
+def save_xform_review(body: XformReviewIn):
+    """Record whether the proposed SEI transformation is correct.
+
+    NOT WRITTEN BACK INTO THE WORKBOOK'S APPROVAL_STATUS, which is an
+    input: the loader upserts on COMPARISON_ID and the next ingest would
+    erase the decision. The review sits beside it and the API reports
+    both, so a reviewer who disagrees with the document produces a visible
+    disagreement rather than a silent overwrite.
+
+    A rationale is required for anything but AGREES. A rejection nobody
+    can act on is worse than no rejection, because it stops the row and
+    names no way forward.
+    """
+    verdict = (body.verdict or "").strip().upper()
+    if verdict not in ("AGREES", "DIFFERS", "CANNOT_TELL", "NEEDS_BUSINESS"):
+        return {"ok": False, "error": f"unknown verdict {body.verdict!r}"}
+    rationale = (body.rationale or "").strip()
+    if verdict != "AGREES" and len(rationale) < 3:
+        return {"ok": False,
+                "error": "a rationale is required for anything but AGREES — "
+                         "a rejection nobody can act on stops the row and "
+                         "names no way forward"}
+    ds = _ds(body.data_source)
+    rid = f"{ds}:{body.table}:{body.column}"
+    reviewer = (body.reviewer or "").strip() or "unattributed"
+
+    merge = """
+        MERGE INTO sei_xform_review r
+        USING (SELECT :rid AS rid FROM dual) x ON (r.review_id = x.rid)
+        WHEN MATCHED THEN UPDATE SET
+             verdict = :v, rationale = :ra, reviewer = :who,
+             reviewed_at = SYSTIMESTAMP, updated_at = SYSTIMESTAMP,
+             comparison_id = NVL(:cid, r.comparison_id)
+        WHEN NOT MATCHED THEN INSERT
+             (review_id, data_source, dwh_target_table, dwh_target_column,
+              comparison_id, verdict, rationale, reviewer, workbook_status)
+             VALUES (:rid, :ds, :t, :c, :cid, :v, :ra, :who,
+               (SELECT MAX(approval_status) FROM sei_transformation_compare
+                WHERE data_source = :ds AND target_object = :t
+                  AND target_attribute = :c))"""
+    # the history, because a decision that changed is worth more than the
+    # decision that stands
+    logsql = """
+        INSERT INTO sei_xform_review_log
+          (log_id, review_id, data_source, verdict, rationale, reviewer)
+        VALUES (:rid || ':' || TO_CHAR(SYSTIMESTAMP,'YYYYMMDDHH24MISSFF3'),
+                :rid, :ds, :v, :ra, :who)"""
+    p = {"rid": rid, "ds": ds, "t": body.table, "c": body.column,
+         "cid": body.comparison_id, "v": verdict,
+         "ra": rationale or None, "who": reviewer}
+    plog = {"rid": rid, "ds": ds, "v": verdict, "ra": rationale or None,
+            "who": reviewer}
+    try:
+        # One transaction for both, via the house helper: a merge that
+        # lands without its log row would leave a decision with no record
+        # of who changed what.
+        _execute([(merge, p), (logsql, plog)])
+    except Exception as e:                                      # noqa: BLE001
+        log.warning("xform review save failed: %s", e)
+        return {"ok": False, "error": str(e)[:300]}
+    return {"ok": True, "review_id": rid, "verdict": verdict,
+            "reviewer": reviewer}
+
+
+@router.get("/xform-reviews")
+def xform_reviews(data_source: str | None = None):
+    """Every review, and where a reviewer and the workbook disagree."""
+    ds = _ds(data_source)
+    by = _safe("""
+        SELECT verdict, COUNT(*) AS n FROM sei_xform_review
+        WHERE data_source = :ds GROUP BY verdict ORDER BY 2 DESC""", {"ds": ds})
+    rows = _safe("""
+        SELECT r.dwh_target_table, r.dwh_target_column, r.verdict, r.reviewer,
+               r.rationale, TO_CHAR(r.reviewed_at,'YYYY-MM-DD HH24:MI') AS reviewed_at,
+               c.approval_status, c.equivalence
+        FROM   sei_xform_review r
+        LEFT   JOIN sei_transformation_compare c
+               ON c.data_source = r.data_source
+              AND c.target_object = r.dwh_target_table
+              AND c.target_attribute = r.dwh_target_column
+        WHERE  r.data_source = :ds
+        ORDER  BY r.reviewed_at DESC FETCH FIRST 200 ROWS ONLY""", {"ds": ds})
+    disagree = [r for r in rows
+                if (r.get("verdict") == "AGREES")
+                != str(r.get("approval_status") or "").upper().startswith("APPROVED")]
+    return {"data_source": ds, "by_verdict": by, "rows": rows,
+            "count": len(rows), "disagreements": disagree,
+            "disagreement_count": len(disagree)}
 
 
 @router.get("/catalog")

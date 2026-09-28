@@ -5,6 +5,7 @@ import { GLOSSARY_SECTIONS, VERDICT_INFO, SHAPE_INFO, verdictShort }
 import { FlowDiagram, EvidencePanel, Waffle, TransformationPanel, LogicCompare }
   from "./CrosswalkFlow.jsx";
 import { useFeedNames, feedName } from "./feedNames.js";
+import ChainRules from "./ChainRules.jsx";
 
 // =====================================================================
 // CrosswalkDashboard — mapping, analysis and divergence for one warehouse.
@@ -155,6 +156,10 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
   const [stack, setStack] = useState([]);
   const [list, setList] = useState(null);
   const [detail, setDetail] = useState(null);
+  const [chain, setChain] = useState(null);
+  // Bumped after a review saves, so the chain refetches and the panel
+  // shows the decision that was just recorded rather than the one before.
+  const [chainNonce, setChainNonce] = useState(0);
 
   useEffect(() => {
     let live = true;
@@ -190,6 +195,14 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
       .then((r) => { if (live) setDetail(r); });
     return () => { live = false; };
   }, [ds, top]);
+
+  useEffect(() => {
+    if (!top || top.kind !== "column") { setChain(null); return; }
+    let live = true;
+    crosswalkApi.columnChain(top.table, top.column, ds)
+      .then((r) => { if (live) setChain(r); });
+    return () => { live = false; };
+  }, [ds, top, chainNonce]);
 
   const push = (s) => setStack((x) => [...x, s]);
   const back = () => setStack((x) => x.slice(0, -1));
@@ -403,10 +416,13 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
                 There is no error when they disagree — the value depends on load order.
               </Callout>)}
 
-            {/* The logic, beside the shape. Everything above this compares
-                what the value LOOKS like; this is whether it is the same
-                number. */}
-            <LogicCompare t={t} xf={d.transformation} cmp={d.compare} />
+            {/* The chain, with the rule on every hop, and the proposed SEI
+                equivalent as a second track under it. Everything above
+                this compares what the value LOOKS like; this is whether
+                it is the same number, and whether anyone has said so. */}
+            {chain ? <ChainRules t={t} chain={chain} dataSource={ds}
+                       onSaved={() => setChainNonce((n) => n + 1)} />
+                   : <LogicCompare t={t} xf={d.transformation} cmp={d.compare} />}
 
             {(d.star_layout || []).length > 0 && (
               <div style={{ marginTop: 12, fontSize: 11, color: t.sub || "#666",

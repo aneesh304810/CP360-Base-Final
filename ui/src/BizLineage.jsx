@@ -592,7 +592,9 @@ function ColumnPage({ t, f, tbl, ds, system, dictSystem, rows, onWalk, onTechnic
           <b>What it is: </b>
           {def === undefined ? "loading definition…"
             : def ? (def.short_desc || def.long_desc || "—")
-            : "No dictionary entry — this source column is not an AddVantage field code."}
+            : "No definition found for this column in any loaded dictionary — "
+              + "the AddVantage/CRD/STAR master, the published STAR layouts, "
+              + "the SEI input catalogue or the UAF layouts."}
         </p>
         <div style={{ display: "inline-flex", gap: 8, alignItems: "center",
           marginTop: 12, background: seal.bg, color: seal.fg, fontSize: 12,

@@ -88,6 +88,41 @@ export const crosswalkApi = {
       () => ({ feeds: [], count: 0, unnamed: [], unnamed_count: 0,
                orphans: [] })),
 
+  // What a source column MEANS, from whichever of the five loaded
+  // dictionaries has it — not just the AddVantage master.
+  fieldDefinition: (code, data_source, src_table) =>
+    _get(`/sei-crosswalk/field-definition${_qs({ code, data_source, src_table })}`,
+      () => ({ code, definition: null, source: null, searched: [],
+               empty_sources: [] })),
+
+  // The whole chain for one column, both eras, rule on every hop.
+  columnChain: (table, column, data_source) =>
+    _get(`/sei-crosswalk/column-chain${_qs({ table, column, data_source })}`,
+      () => ({ table, column, legacy: [], sei: [], xform: [], compare: [],
+               review: null })),
+
+  xformReviews: (data_source) =>
+    _get(`/sei-crosswalk/xform-reviews${_qs({ data_source })}`,
+      () => ({ by_verdict: [], rows: [], count: 0, disagreements: [],
+               disagreement_count: 0 })),
+
+  // Write. Returns {ok:false,error} rather than throwing, so the caller
+  // renders the reason instead of a blank.
+  saveXformReview: async (body) => {
+    try {
+      const r = await fetch(`${API_BASE}/sei-crosswalk/xform-review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
+      return await r.json();
+    } catch (e) {
+      return { ok: false, error: String((e && e.message) || e) };
+    }
+  },
+
   lanes: (data_source) =>
     _get(`/sei-crosswalk/lanes${_qs({ data_source })}`, () => ({ lanes: [] })),
 

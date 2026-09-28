@@ -55,6 +55,7 @@ sql/55_lineage_lane.sql
 sql/56_transformations.sql
 sql/57_widen_v3.sql
 sql/58_feed_names.sql
+sql/59_transformation_review.sql
 ingestion/lane_lineage_conn.py
 api/app/routers_sei_crosswalk.py
 ui/src/seiCrosswalkApi.js
@@ -63,6 +64,7 @@ ui/src/CrosswalkFlow.jsx
 ui/src/laneMeta.js
 ui/src/crosswalkGlossary.js
 ui/src/feedNames.js
+ui/src/ChainRules.jsx
 docs/sei-crosswalk/MERGE-AND-INGEST.md
 docs/sei-crosswalk/TAG-REFERENCE.md
 docs/sei-crosswalk/gen-tag-reference.mjs
@@ -81,6 +83,8 @@ file copy would clobber work that is not mine.**
 api/app/main.py             one entry in the router mount tuple
 ingestion/run.py            one STEPS entry + one dispatch branch
 ui/src/LineageHome.jsx      CrosswalkDashboard, UAF in SYS_META, dsSystems, dictSys
+ui/src/LineageGraph.jsx     dim floors 0.07/0.18/0.25 -> 0.22/0.42/0.5
+ui/src/LegacyLineage.jsx    DictionaryMiss replaces the AddVantage-only message
 ui/src/SourceLineage.jsx    stageMeta, lane filter, dictSystem
 ui/src/BizLineage.jsx       stageMeta, lane filter, dictSystem
 api/app/routers_legacy_source.py   /source-fields `system` made optional
@@ -160,6 +164,7 @@ sqlplus $CP_DB_USER/$CP_DB_PASS@$CP_DB_DSN @sql/55_lineage_lane.sql
 sql/56_transformations.sql
 sql/57_widen_v3.sql
 sql/58_feed_names.sql
+sql/59_transformation_review.sql
 ```
 
 Run them in order. All idempotent — `CREATE` swallows ORA-955, `ALTER`
@@ -185,6 +190,11 @@ new tables; no existing table is altered.**
   so a feed shows as "Portfolio Valuation · PEDDIFI1" rather than as one of
   three cards all headed "STAR outbound dataset". Renaming a feed is an
   UPDATE to this table, not a UI release. No re-ingest needed.
+- `59` adds `SEI_XFORM_REVIEW` and its log — a reviewer's decision on
+  whether the proposed SEI transformation is correct. **Not purged by the
+  loader**, deliberately: these are people's decisions, and a workbook
+  reload must not delete them. The loader's purge list does not name
+  either table.
 - `55` adds `LEGACY_LINEAGE_LANE`. **Without it the STAR/UAF badge filters
   nothing** — both lanes live in `LEGACY_LINEAGE` under one `DATA_SOURCE`
   with no column telling them apart, so selecting UAF relabelled the spine

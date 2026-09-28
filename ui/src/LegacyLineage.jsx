@@ -3,6 +3,7 @@ import { api } from "./api.js";
 import LineageGraph from "./LineageGraph.jsx";
 import DependencyMatrix from "./DependencyMatrix.jsx";
 import TableExplorer from "./TableExplorer.jsx";
+import { crosswalkApi } from "./seiCrosswalkApi.js";
 
 // =====================================================================
 // LegacyLineage v5 — the Non-SEI lineage engine.
@@ -308,6 +309,59 @@ function DefModal({ t, title, onClose, children }) {
 // turn four stacked sections — graph, proof, plain-terms strip, dictionary
 // card, about three laptop screens — into two tabs. Everywhere else (map
 // mode, passports, the rail) leaves it unset and gets both halves as before.
+// What was actually searched, and what is actually missing.
+//
+// The old copy asserted one dictionary and one reason. Five are loaded
+// now, and "the code is in none of them" is a different problem from
+// "three of them hold nothing for this warehouse" — the first needs
+// someone to write a definition, the second needs a load. Saying which
+// is which is the entire value of this box.
+function DictionaryMiss({ t, code, dataSource }) {
+  const [r, setR] = useState(null);
+  useEffect(() => {
+    if (!code) return;
+    let live = true;
+    crosswalkApi.fieldDefinition(code, dataSource)
+      .then((x) => { if (live) setR(x); });
+    return () => { live = false; };
+  }, [code, dataSource]);
+
+  const sub = { fontSize: 10.5, color: t.sub || "#666", marginTop: 6,
+                lineHeight: 1.65 };
+  if (!r) return <div style={sub}>Looking in the loaded dictionaries…</div>;
+
+  const d = r.definition;
+  if (d) {
+    // The fallback found one. Say where it came from — a definition from
+    // the SEI inbound catalogue is not the same warrant as one from the
+    // AddVantage master, and the reader has to be able to tell.
+    return (
+      <div style={sub}>
+        <div style={{ fontSize: 11.5, color: t.navy || "#10193b",
+          fontWeight: 600, marginBottom: 3 }}>{d.term || code}</div>
+        {d.description && <div>{d.description}</div>}
+        <div style={{ color: t.muted || "#999", marginTop: 5 }}>
+          from <b>{d.source_label}</b>
+          {d.type ? ` · ${d.type}${d.length ? `(${d.length})` : ""}` : ""}
+          {d.evidence ? ` · ${d.evidence}` : ""}</div>
+        {d.caveat && <div style={{ color: "#b45309", marginTop: 4 }}>{d.caveat}</div>}
+      </div>);
+  }
+
+  const searched = r.searched || [];
+  const have = searched.filter((x) => x.rows);
+  const empty = searched.filter((x) => !x.rows);
+  return (
+    <div style={sub}>
+      The lineage row exists and no loaded dictionary defines this code.
+      {have.length > 0 && <> Searched {have.map((x) => x.label).join(", ")}.</>}
+      {empty.length > 0 && (
+        <div style={{ color: "#b45309", marginTop: 5 }}>
+          Not loaded for this warehouse: {empty.map((x) => x.label).join(", ")}.
+          {" "}Those are a load away, not a definition away.</div>)}
+    </div>);
+}
+
 function InlineDef({ t, system, dataSource, code, ctx, row, tableName, onDataSource,
  onJump, compact = false, roomy = false, only = null }) {
  const [def, setDef] = useState(null);
@@ -370,11 +424,14 @@ function InlineDef({ t, system, dataSource, code, ctx, row, tableName, onDataSou
  <div style={{ fontSize: 12.5, fontWeight: 700, color: t.navy || "#10193b" }}>
  No dictionary entry for{" "}
  <span style={{ fontFamily: "Roboto Mono, monospace" }}>{code}</span></div>
- <div style={{ fontSize: 10.5, color: t.sub || "#666", marginTop: 6, lineHeight: 1.65 }}>
- The lineage row exists, but this source column is not an AddVantage field code —
- the dictionary covers the AddVantage master workbook only. Non-AddVantage sources
- (e.g. CRM / config feeds) get definitions once their own dictionary sheet is
- loaded as an additional system workbook.</div>
+ {/* THIS USED TO NAME ADDVANTAGE UNCONDITIONALLY and tell the reader
+     to wait for a workbook that has since arrived. On a STAR column it
+     was wrong twice over: the lane has nothing to do with AddVantage,
+     and four more dictionaries are loaded now. DictionaryMiss asks the
+     API which ones were actually searched and which hold nothing, so
+     "not in any of them" and "that one is not loaded" stop reading the
+     same — they need completely different actions. */}
+ <DictionaryMiss t={t} code={code} dataSource={dataSource} />
  </div>
  ) : (<>
  <div style={{ fontSize: roomy ? 12.5 : 11, fontWeight: 800, color: "#fff",

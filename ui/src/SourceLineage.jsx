@@ -729,7 +729,7 @@ export default function SourceLineage({ t, system, dictSystem,
                 : (member.business_term || member.code_norm)}</h1>
         <p style={{ fontSize: 12.5, color: "#7b8894", textAlign: "center",
                     margin: "0 auto 22px", maxWidth: "74ch" }}>
-          {member.short_desc || (tech ? "No dictionary entry for this code."
+          {member.short_desc || (tech ? "No definition in any loaded dictionary."
                                       : "No business definition recorded yet.")}
         </p>
 

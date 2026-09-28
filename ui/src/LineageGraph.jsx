@@ -272,7 +272,7 @@ export default function LineageGraph({ t, table, column, code, dataSource = "PBD
                       fill="none" stroke={k.c}
                       strokeWidth={on && trace ? 2.2 : 1.4}
                       strokeDasharray={k.dash || undefined}
-                      opacity={on ? (trace ? 0.95 : 0.55) : 0.07} />
+                      opacity={on ? (trace ? 0.95 : 0.55) : 0.22} />
                 {/* label only on the traced path — otherwise they collide */}
                 {on && trace && e.label && (
                   <text x={mx} y={(y1 + y2) / 2 - 5} textAnchor="middle" fill={k.c}
@@ -287,7 +287,7 @@ export default function LineageGraph({ t, table, column, code, dataSource = "PBD
             const any = nodes.some((n) => n.table === b.table &&
                                           STAGES.indexOf(n.stage) === b.lane && nodeOn(n.id));
             return (
-              <g key={`${b.lane}:${b.table}`} opacity={any ? 1 : 0.25}>
+              <g key={`${b.lane}:${b.table}`} opacity={any ? 1 : 0.5}>
                 <rect x={b.x} y={b.y} width={b.w} height={b.h} rx={6}
                       fill={panel} stroke={line} />
                 <rect x={b.x} y={b.y} width={b.w} height={3} rx={1.5}
@@ -309,8 +309,13 @@ export default function LineageGraph({ t, table, column, code, dataSource = "PBD
             const badge = fi > 1 ? ["#c1113a", `${fi} in`]
                         : fo > 1 ? ["#0091bf", `${fo} out`] : null;
             const unmapped = n.status && n.status !== "mapped";
+            // DIMMED, NOT ERASED. 0.18 on an already-light node against a
+            // white panel is invisible on a laptop screen at an angle, and
+            // an off-path node you cannot see is one you cannot click to
+            // move the trace onto. The contrast between on and off still
+            // reads at 0.42; what stops reading is the node itself.
             return (
-              <g key={n.id} opacity={on ? 1 : 0.18} style={{ cursor: "pointer" }}
+              <g key={n.id} opacity={on ? 1 : 0.42} style={{ cursor: "pointer" }}
                  onClick={() => setFocus(isFocus ? null : n.id)}
                  onDoubleClick={() => {
                    if (n.stage === "DWH" && onOpenColumn) onOpenColumn(n.table, n.column);

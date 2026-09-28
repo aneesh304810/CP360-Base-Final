@@ -95,13 +95,15 @@ export function FlowDiagram({ t, flow, onPickVerdict, onDrill, onOpenTable,
     if (!focus) return base;
     if (focus.primary.has(i)) return 0.72;
     if (focus.onward.has(i)) return 0.26;
-    return 0.05;
+    // Same reason the column graph's floor went up: 0.05 against white is
+    // gone, and a ribbon you cannot see is one you cannot click.
+    return 0.13;
   };
   const arcOp = (a, i) => {
     if (!focus) return 0.85;
-    return focus.arcs.has(i) ? 0.95 : 0.06;
+    return focus.arcs.has(i) ? 0.95 : 0.14;
   };
-  const nodeOp = (n) => (!focus ? 1 : focus.nodes.has(n.id) ? 1 : 0.2);
+  const nodeOp = (n) => (!focus ? 1 : focus.nodes.has(n.id) ? 1 : 0.38);
   const same = (a, b) => a && b && JSON.stringify(a) === JSON.stringify(b);
   const toggle = (next) => setSel((cur) => (same(cur, next) ? null : next));
 
