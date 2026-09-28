@@ -1,0 +1,591 @@
+<title>IMDS Source Lineage</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500;700&display=swap">
+<style>
+/* Layout: lane and feed picker across the top, an expandable table-to-column
+   canvas filling the middle, and a drawer along the bottom that fills from the
+   selected link. Tokens are Lineage 360's own — a screen inside the app. */
+:root{
+  --bg:#f5f8f8; --panel:#fff; --panel2:#dfe6e9; --line:#c9d4dc;
+  --ink:#10193b; --sub:#4a5a68; --muted:#7b8894;
+  --accent:#0f4775; --ok:#159943; --warn:#e67e22; --bad:#c1113a;
+  --src:#6d3ac0; --dwh:#0f4775; --star:#b5651d; --uaf:#0b7d7d;
+  --k-fn:#00a3a3; --k-branch:#e67e22; --k-const:#7b8894;
+  --f-ui:"Roboto","Helvetica Neue",Arial,sans-serif;
+  --f-mono:"Roboto Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1419; --panel:#161e26; --panel2:#24303a; --line:#2e3b47;
+  --ink:#e8eef4; --sub:#a9b8c6; --muted:#7d8d9c;
+  --accent:#5aa8e0; --ok:#3ec27a; --warn:#f0993f; --bad:#ef6b7f;
+  --src:#a684ea; --dwh:#5aa8e0; --star:#d08a3f; --uaf:#3ecfcf;
+  --k-fn:#3ecfcf; --k-branch:#f0993f; --k-const:#8b9aa8;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1419; --panel:#161e26; --panel2:#24303a; --line:#2e3b47;
+  --ink:#e8eef4; --sub:#a9b8c6; --muted:#7d8d9c;
+  --accent:#5aa8e0; --ok:#3ec27a; --warn:#f0993f; --bad:#ef6b7f;
+  --src:#a684ea; --dwh:#5aa8e0; --star:#d08a3f; --uaf:#3ecfcf;
+  --k-fn:#3ecfcf; --k-branch:#f0993f; --k-const:#8b9aa8;
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-ui);
+     font-size:13px;line-height:1.5}
+.wrap{padding-block:18px;padding-inline:16px;max-width:1500px;margin:0 auto}
+h1{font-size:19px;font-weight:500;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.lede{font-size:12.5px;color:var(--sub);margin:5px 0 0;max-width:76ch}
+.eyebrow{font-size:9.5px;font-weight:700;letter-spacing:.09em;
+         text-transform:uppercase;color:var(--muted)}
+.mono{font-family:var(--f-mono)}
+
+.bar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:14px 0 10px}
+.pill{font:inherit;font-size:11px;padding:4px 12px;border-radius:999px;cursor:pointer;
+      border:1px solid var(--line);background:var(--panel);color:var(--sub)}
+.pill[aria-pressed="true"]{color:#fff;font-weight:500}
+.pill.star[aria-pressed="true"]{background:var(--star);border-color:var(--star)}
+.pill.uaf[aria-pressed="true"]{background:var(--uaf);border-color:var(--uaf)}
+.pill:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sel{font:inherit;font-size:11.5px;padding:5px 9px;border-radius:3px;
+     border:1px solid var(--line);background:var(--panel);color:var(--ink);
+     max-width:min(360px,60vw)}
+.srch{font:inherit;font-size:11.5px;padding:5px 10px;border-radius:3px;
+      border:1px solid var(--line);background:var(--panel);color:var(--ink);width:180px}
+.ghost{font:inherit;font-size:10.5px;padding:4px 10px;border-radius:3px;cursor:pointer;
+       border:1px solid var(--line);background:var(--panel);color:var(--accent)}
+.ghost:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.card{background:var(--panel);border:1px solid var(--panel2);border-radius:4px}
+.cv{position:relative;overflow:hidden;height:min(58vh,520px);min-height:340px;
+    background:var(--bg);border-radius:4px;border:1px solid var(--panel2);
+    cursor:grab;touch-action:none}
+.cv.drag{cursor:grabbing}
+.stage{position:absolute;inset:0;transform-origin:0 0}
+.wires{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+
+.tnode{position:absolute;background:var(--panel);border:1px solid var(--panel2);
+       border-top:3px solid var(--tc);border-radius:5px;overflow:hidden;
+       box-shadow:0 1px 3px rgba(16,25,59,.07)}
+.tnode.on{border-color:var(--tc);box-shadow:0 0 0 2px var(--tc)}
+.thead{display:flex;gap:7px;align-items:center;padding:7px 9px;cursor:pointer;
+       width:100%;text-align:left;font:inherit;background:none;border:0;color:inherit}
+.thead:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.chev{font-size:9px;color:var(--muted);width:9px;flex-shrink:0;transition:transform .15s}
+.tnode.open .chev{transform:rotate(90deg)}
+.tname{font-family:var(--f-mono);font-size:11px;color:var(--ink);overflow:hidden;
+       text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.tmeta{font-size:9px;color:var(--muted);white-space:nowrap}
+.tsub{font-size:9.5px;color:var(--muted);padding:0 9px 7px 25px;margin-top:-4px;
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cols{border-top:1px solid var(--panel2)}
+.crow{display:flex;gap:7px;align-items:center;width:100%;text-align:left;font:inherit;
+      background:none;border:0;border-top:1px solid var(--panel2);padding:4px 9px 4px 25px;
+      cursor:pointer;color:inherit}
+.crow:first-child{border-top:0}
+.crow:hover{background:color-mix(in srgb,var(--accent) 7%,transparent)}
+.crow.on{background:color-mix(in srgb,var(--accent) 13%,transparent);font-weight:500}
+.crow:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.cname{font-family:var(--f-mono);font-size:10px;overflow:hidden;text-overflow:ellipsis;
+       white-space:nowrap;flex:1;min-width:0}
+.ctype{font-size:8.5px;color:var(--muted);white-space:nowrap}
+.dimmed{opacity:.3}
+
+.opchip{font-family:var(--f-mono);font-size:8.5px;font-weight:700;padding:1px 5px;
+        border-radius:2px;white-space:nowrap}
+.zoom{position:absolute;right:10px;bottom:10px;display:flex;gap:4px}
+.zoom button{font:inherit;font-size:12px;width:26px;height:26px;border-radius:3px;
+      border:1px solid var(--line);background:var(--panel);color:var(--sub);cursor:pointer}
+.zoom button.w{width:auto;padding:0 9px;font-size:10.5px}
+.zoom button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.drawer{margin-top:12px}
+.drawer .body{padding:12px 14px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:11.5px}
+.kv dt{color:var(--muted);font-size:9px;font-weight:700;letter-spacing:.05em;
+       text-transform:uppercase;padding-top:2px;white-space:nowrap}
+.kv dd{margin:0;color:var(--sub);min-width:0}
+pre.expr{margin:8px 0 0;font-family:var(--f-mono);font-size:10.5px;line-height:1.7;
+     white-space:pre-wrap;word-break:break-word;background:var(--bg);
+     border:1px solid var(--panel2);border-left:3px solid var(--k-fn);
+     border-radius:3px;padding:9px 11px;max-height:150px;overflow:auto}
+.ops{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:9px}
+.op{display:flex;flex-direction:column;border:1px solid var(--panel2);
+    border-left:3px solid var(--oc);border-radius:3px;padding:4px 8px;background:var(--bg)}
+.op b{font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+      color:var(--oc)}
+.op span{font-family:var(--f-mono);font-size:10px;color:var(--ink)}
+.arrow{color:var(--muted);font-size:11px}
+.legend{display:flex;flex-wrap:wrap;gap:9px 14px;font-size:10px;color:var(--sub);
+        margin-top:9px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px}
+.note{font-size:10.5px;color:var(--muted);line-height:1.6;max-width:80ch}
+.footer{margin-top:16px;font-size:10.5px;color:var(--muted);line-height:1.65;max-width:88ch}
+@media (max-width:620px){.srch{width:120px}}
+</style>
+
+<div class="wrap">
+  <h1>Where this feed lands, column by column</h1>
+  <p class="lede">A feed on the left, the warehouse tables it writes on the right.
+    Open a table to see its columns; open both ends and the links refine from
+    table-to-table to column-to-column. Pick a link to read the expression that
+    makes it.</p>
+
+  <div class="bar">
+    <span class="eyebrow">Lane</span>
+    <button class="pill star" id="p-star" aria-pressed="true">STAR → IMDS</button>
+    <button class="pill uaf" id="p-uaf" aria-pressed="false">UAF → IMDS</button>
+    <select class="sel" id="feed" aria-label="Feed"></select>
+    <input class="srch" id="q" type="search" placeholder="Find a column…"
+           aria-label="Find a column">
+    <span style="margin-left:auto;display:flex;gap:6px">
+      <button class="ghost" id="expand">Open every table</button>
+      <button class="ghost" id="collapse">Close all</button>
+    </span>
+  </div>
+
+  <div class="cv" id="cv">
+    <div class="stage" id="stage"><svg class="wires" id="wires"></svg></div>
+    <div class="zoom">
+      <button id="zout" aria-label="Zoom out">−</button>
+      <button id="zin" aria-label="Zoom in">+</button>
+      <button id="zfit" class="w">Fit</button>
+    </div>
+  </div>
+
+  <div class="legend" id="legend"></div>
+
+  <div class="card drawer">
+    <div class="body" id="drawer"></div>
+  </div>
+
+  <p class="footer"><b>Mockup.</b> Both lanes, their feeds, target tables and
+    column links are taken from the loaded IMDS data — the UAF feed and its two
+    target tables are the screen you sent. Expressions come from
+    <span class="mono">LANE_LINEAGE</span> and
+    <span class="mono">LOT_LEVEL_POSITION_MAP</span>. The SEI crosswalk screens
+    are untouched by this; this replaces the flat “where it lands” list in the
+    Source view.</p>
+</div>
+
+<script>
+"use strict";
+/* ---------------------------------------------------------------- data */
+const OPC = { direct:"var(--muted)", trim:"var(--k-fn)", cast:"var(--k-fn)",
+              derived:"var(--k-branch)", decode:"var(--src)",
+              constant:"var(--k-const)" };
+
+const LANES = {
+  STAR: { c:"var(--star)", feeds:[
+    { id:"PEDDIFI1", name:"Portfolio Valuation", kind:"nightly extract", fields:53,
+      targets:[
+        { t:"HOLDINGDBO.LOT_LEVEL_POSITION", cols:[
+          { c:"BOOK_VALUE", ty:"NUMBER(28,12)", src:"Base_Amortized_Cost_7", sty:"CHAR(20)",
+            op:"derived",
+            expr:"v_Trade_Date_Cash := Base_Market_Value_10;\nIF TRIM(Investment_Type_Code_42) != 'CASH' THEN\n  book_value := nvl(book_value,0) + to_number(nvl(Base_Amortized_Cost_7,0));\nELSE\n  book_value := nvl(book_value,0) + to_number(nvl(v_Trade_Date_Cash,0));",
+            ops:[["field","Base_Amortized_Cost_7"],["function","nvl( ,0)"],
+                 ["function","to_number( )"],["branch","!= 'CASH'"],["target","BOOK_VALUE"]] },
+          { c:"CURRENCY", ty:"VARCHAR2(3)", src:"local_currency_code_47", sty:"CHAR(8)",
+            op:"trim", expr:"substr(ltrim(rtrim(local_currency_code_47)),1,3);",
+            ops:[["field","local_currency_code_47"],["function","rtrim( )"],
+                 ["function","ltrim( )"],["function","substr( ,1,3)"],["target","CURRENCY"]] },
+          { c:"ACCRUED_INCOME", ty:"NUMBER(28,12)", src:"Base_Interest_Receivable_9",
+            sty:"CHAR(22)", op:"cast",
+            expr:"to_number(nvl(Base_Interest_Receivable_9,0));",
+            ops:[["field","Base_Interest_Receivable_9"],["function","nvl( ,0)"],
+                 ["function","to_number( )"],["target","ACCRUED_INCOME"]] },
+          { c:"TRADE_DATE", ty:"DATE", src:"Trade_Date_128", sty:"CHAR(10)", op:"cast",
+            expr:"pace_package.lot_level_position_record.trade_date :=\n  to_date(Trade_Date_128,'MM/DD/YYYY');",
+            ops:[["field","Trade_Date_128"],["const","'MM/DD/YYYY'"],
+                 ["function","to_date( )"],["target","TRADE_DATE"]] },
+          { c:"SETTLEMENT_DATE", ty:"DATE", src:"settlement_date_113", sty:"CHAR(10)",
+            op:"cast", expr:"to_date(settlement_date_113,'MM/DD/YYYY');",
+            ops:[["field","settlement_date_113"],["const","'MM/DD/YYYY'"],
+                 ["function","to_date( )"],["target","SETTLEMENT_DATE"]] },
+          { c:"PAR_OR_SHARES", ty:"NUMBER(28,12)", src:"Quantity_98", sty:"CHAR(20)",
+            op:"cast", expr:"to_number(nvl(Quantity_98,0));",
+            ops:[["field","Quantity_98"],["function","nvl( ,0)"],
+                 ["function","to_number( )"],["target","PAR_OR_SHARES"]] },
+          { c:"LOCAL_FX_RATE", ty:"NUMBER(28,12)", src:"FX_Rate_38", sty:"CHAR(18)",
+            op:"cast", expr:"NVL(FX_Rate_38,0);",
+            ops:[["field","FX_Rate_38"],["function","NVL( ,0)"],["target","LOCAL_FX_RATE"]] },
+          { c:"POSITION_ID", ty:"NUMBER", src:"—", sty:"", op:"constant",
+            expr:"pace_package.position_record.position_id;",
+            ops:[["function","position_record.position_id"],["target","POSITION_ID"]] },
+        ]},
+        { t:"HOLDINGDBO.POSITION_HIST", cols:[
+          { c:"MARKET_VALUE", ty:"NUMBER(28,12)", src:"Base_Market_Value_10", sty:"CHAR(22)",
+            op:"derived",
+            expr:"If TRIM(Investment_Type_Code_42) != 'CASH' THEN\n  to_number(nvl(Base_Market_Value_10,0));\nElse\n  to_number(nvl(v_Trade_Date_Cash,0));",
+            ops:[["field","Base_Market_Value_10"],["branch","!= 'CASH'"],
+                 ["function","to_number(nvl( ,0))"],["target","MARKET_VALUE"]] },
+          { c:"LOCAL_MARKET_VALUE", ty:"NUMBER(28,12)", src:"local_market_value_48",
+            sty:"CHAR(22)", op:"cast", expr:"to_number(nvl(local_market_value_48,0));",
+            ops:[["field","local_market_value_48"],["function","nvl( ,0)"],
+                 ["function","to_number( )"],["target","LOCAL_MARKET_VALUE"]] },
+          { c:"ACCRUED_INCOME_LOCAL", ty:"NUMBER(28,12)", src:"Local_Accrued_Interest_134",
+            sty:"CHAR(22)", op:"cast",
+            expr:"to_number(nvl(Local_Accrued_Interest_134,0));",
+            ops:[["field","Local_Accrued_Interest_134"],["function","nvl( ,0)"],
+                 ["function","to_number( )"],["target","ACCRUED_INCOME_LOCAL"]] },
+        ]},
+        { t:"BBHRPTDBO.BBH_STAR_NAV_TB", cols:[
+          { c:"cstdy_hd_acct_num", ty:"VARCHAR2(20)", src:"Custody_Head_Account_Number",
+            sty:"CHAR(20)", op:"direct", expr:"Custody_Head_Account_Number",
+            ops:[["field","Custody_Head_Account_Number"],["target","cstdy_hd_acct_num"]] },
+          { c:"amt_yld", ty:"NUMBER(28,12)", src:"Amortization_Yield_135", sty:"CHAR(18)",
+            op:"cast", expr:"to_number(nvl(Amortization_Yield_135,0));",
+            ops:[["field","Amortization_Yield_135"],["function","nvl( ,0)"],
+                 ["function","to_number( )"],["target","amt_yld"]] },
+        ]},
+      ]},
+    { id:"ACDDIFI1", name:"Account File", kind:"nightly extract", fields:8,
+      targets:[
+        { t:"RULESDBO.ENTITY", cols:[
+          { c:"ENTITY_ID", ty:"VARCHAR2(20)", src:"Account_Number_1", sty:"CHAR(20)",
+            op:"trim", expr:"ltrim(rtrim(Account_Number_1));",
+            ops:[["field","Account_Number_1"],["function","rtrim( )"],
+                 ["function","ltrim( )"],["target","ENTITY_ID"]] },
+          { c:"ENTITY_NAME", ty:"VARCHAR2(80)", src:"Account_Long_Name_4", sty:"CHAR(80)",
+            op:"direct", expr:"Account_Long_Name_4", ops:[["field","Account_Long_Name_4"],
+              ["target","ENTITY_NAME"]] },
+        ]},
+        { t:"HOLDINGDBO.POSITION_SUMMARY", cols:[
+          { c:"ACCOUNT_ID", ty:"VARCHAR2(20)", src:"Account_Number_1", sty:"CHAR(20)",
+            op:"trim", expr:"ltrim(rtrim(Account_Number_1));",
+            ops:[["field","Account_Number_1"],["function","rtrim( )"],
+                 ["function","ltrim( )"],["target","ACCOUNT_ID"]] },
+        ]},
+      ]},
+    { id:"TBMEIFI7", name:"Trial Balance", kind:"nightly extract", fields:23,
+      targets:[
+        { t:"BBHRPTDBO.BBH_STAR_NAV_TB", cols:[
+          { c:"tb_acct_num", ty:"VARCHAR2(20)", src:"Account_Number_1", sty:"CHAR(20)",
+            op:"trim", expr:"ltrim(rtrim(Account_Number_1));",
+            ops:[["field","Account_Number_1"],["function","rtrim( )"],
+                 ["function","ltrim( )"],["target","tb_acct_num"]] },
+          { c:"tb_base_amt", ty:"NUMBER(28,12)", src:"Base_Balance_12", sty:"CHAR(22)",
+            op:"cast", expr:"to_number(nvl(Base_Balance_12,0));",
+            ops:[["field","Base_Balance_12"],["function","nvl( ,0)"],
+                 ["function","to_number( )"],["target","tb_base_amt"]] },
+        ]},
+      ]},
+  ]},
+  UAF: { c:"var(--uaf)", feeds:[
+    { id:"BBH.UAF.BBH.PACE.MESACCT.ACCTMSG", name:"Entity & SMA Account Master",
+      kind:"MQ message", fields:3,
+      targets:[
+        { t:"RULESDBO.ENTITY", cols:[
+          { c:"ENTITY_ID", ty:"VARCHAR2(20)", src:"ACCT_ID", sty:"CHAR(20)",
+            op:"trim", expr:"SP_LOAD_UAF: trim(ACCT_ID)",
+            ops:[["field","ACCT_ID"],["function","trim( )"],["target","ENTITY_ID"]] },
+          { c:"ENTITY_NAME", ty:"VARCHAR2(80)", src:"ACCT_LONG_NAME", sty:"CHAR(80)",
+            op:"direct", expr:"SP_LOAD_UAF: ACCT_LONG_NAME as-is",
+            ops:[["field","ACCT_LONG_NAME"],["target","ENTITY_NAME"]] },
+          { c:"SMA_FLAG", ty:"CHAR(1)", src:"SMA_IND", sty:"CHAR(1)", op:"decode",
+            expr:"decode(SMA_IND,'Y','Y','N');",
+            ops:[["field","SMA_IND"],["function","decode( )"],["target","SMA_FLAG"]] },
+        ]},
+        { t:"RULESDBO.ENTITY_HIST", cols:[
+          { c:"ENTITY_ID", ty:"VARCHAR2(20)", src:"ACCT_ID", sty:"CHAR(20)",
+            op:"trim", expr:"SP_LOAD_UAF: trim(ACCT_ID) — delete and reinsert",
+            ops:[["field","ACCT_ID"],["function","trim( )"],["target","ENTITY_ID"]] },
+        ]},
+      ]},
+  ]},
+};
+
+/* -------------------------------------------------------------- state */
+const el = s => document.querySelector(s);
+const stage = el("#stage"), wires = el("#wires"), cv = el("#cv");
+let lane = "STAR", feed = LANES.STAR.feeds[0];
+let open = new Set();                     // node ids that are expanded
+let sel = null;                           // {src, tbl, col} of the chosen link
+let q = "", z = { k:1, x:0, y:0 }, view = null;
+
+const esc = s => String(s ?? "").replace(/[&<>"]/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const srcId = () => `src:${feed.id}`;
+const tgtId = t => `tgt:${t}`;
+
+function links(){
+  const out = [];
+  feed.targets.forEach(tg => tg.cols.forEach(c => out.push({ tbl:tg.t, ...c })));
+  return out;
+}
+function matches(c){
+  if (!q) return true;
+  const s = q.toLowerCase();
+  return (c.c + " " + c.src + " " + c.tbl).toLowerCase().includes(s);
+}
+
+/* -------------------------------------------------------------- layout
+   Two columns. Node height follows its content, because a table with
+   twelve columns and a table with one should not be the same size — the
+   size IS the fan-out. */
+const NW = 268, HEAD = 40, ROW = 22, GAPY = 14, PADX = 20, COLGAP = 230;
+
+function layout(){
+  const L = links();
+  const srcCols = [...new Set(L.map(x => x.src))].filter(s => s && s !== "—");
+  const sOpen = open.has(srcId());
+  const sh = HEAD + (sOpen ? srcCols.length * ROW + 1 : 0);
+
+  const tg = feed.targets.map(t => {
+    const o = open.has(tgtId(t.t));
+    return { id:tgtId(t.t), t, open:o,
+             h: HEAD + (o ? t.cols.length * ROW + 1 : 0) };
+  });
+  const totalT = tg.reduce((a,b) => a + b.h, 0) + (tg.length - 1) * GAPY;
+  const H = Math.max(sh, totalT) + PADX * 2;
+
+  const s = { id:srcId(), x:PADX, y:PADX + (H - PADX*2 - sh)/2, w:NW, h:sh,
+              open:sOpen, cols:srcCols };
+  let y = PADX + (H - PADX*2 - totalT)/2;
+  tg.forEach(n => { n.x = PADX + NW + COLGAP; n.y = y; n.w = NW; y += n.h + GAPY; });
+
+  return { src:s, tgts:tg, W: PADX*2 + NW*2 + COLGAP, H };
+}
+
+/* Where a link attaches: the column row when its side is open, otherwise
+   the node's own edge. This is the whole mechanic — collapse one side and
+   its links gather into one thicker wire instead of disappearing. */
+function anchorSrc(v, srcName){
+  if (v.src.open){
+    const i = v.src.cols.indexOf(srcName);
+    if (i >= 0) return { x: v.src.x + v.src.w, y: v.src.y + HEAD + 1 + i*ROW + ROW/2 };
+  }
+  return { x: v.src.x + v.src.w, y: v.src.y + HEAD/2 };
+}
+function anchorTgt(v, tbl, colName){
+  const n = v.tgts.find(t => t.t.t === tbl);
+  if (!n) return null;
+  if (n.open){
+    const i = n.t.cols.findIndex(c => c.c === colName);
+    if (i >= 0) return { x:n.x, y: n.y + HEAD + 1 + i*ROW + ROW/2 };
+  }
+  return { x:n.x, y: n.y + HEAD/2 };
+}
+
+/* -------------------------------------------------------------- render */
+function drawFeeds(){
+  el("#feed").innerHTML = LANES[lane].feeds.map(f =>
+    `<option value="${esc(f.id)}"${f.id===feed.id?" selected":""}>${esc(f.name)} · ${esc(f.id)}</option>`).join("");
+}
+
+function tnode(n, kind){
+  const tc = kind === "src" ? "var(--src)" : "var(--dwh)";
+  const d = document.createElement("div");
+  d.className = "tnode" + (n.open ? " open" : "");
+  d.style.setProperty("--tc", tc);
+  Object.assign(d.style, { left:`${n.x}px`, top:`${n.y}px`, width:`${n.w}px` });
+
+  if (kind === "src"){
+    const mapped = links().length;
+    d.innerHTML = `
+      <button class="thead" data-toggle="${esc(n.id)}">
+        <span class="chev">▶</span>
+        <span class="tname">${esc(feed.id)}</span>
+        <span class="tmeta">${feed.fields} fields</span>
+      </button>
+      <div class="tsub">${esc(feed.name)} · ${esc(feed.kind)} · ${mapped} links</div>
+      ${n.open ? `<div class="cols">${n.cols.map(c => {
+        const any = links().some(l => l.src === c && matches(l));
+        return `<button class="crow${any?"":" dimmed"}" data-src="${esc(c)}">
+          <span class="cname">${esc(c)}</span></button>`;
+      }).join("")}</div>` : ""}`;
+  } else {
+    const t = n.t;
+    const hit = t.cols.filter(matches).length;
+    d.innerHTML = `
+      <button class="thead" data-toggle="${esc(n.id)}">
+        <span class="chev">▶</span>
+        <span class="tname">${esc(t.t)}</span>
+        <span class="tmeta">${t.cols.length} col${t.cols.length===1?"":"s"}</span>
+      </button>
+      <div class="tsub">${q ? `${hit} match${hit===1?"":"es"}` : "IMDS warehouse"}</div>
+      ${n.open ? `<div class="cols">${t.cols.map(c => {
+        const on = sel && sel.tbl === t.t && sel.col === c.c;
+        return `<button class="crow${on?" on":""}${matches(c)?"":" dimmed"}"
+            data-col="${esc(c.c)}" data-tbl="${esc(t.t)}">
+          <span class="opchip" style="background:color-mix(in srgb,${OPC[c.op]} 20%,transparent);
+            color:${OPC[c.op]}">${esc(c.op)}</span>
+          <span class="cname">${esc(c.c)}</span>
+          <span class="ctype">${esc(c.ty)}</span></button>`;
+      }).join("")}</div>` : ""}`;
+  }
+  return d;
+}
+
+function draw(){
+  view = layout();
+  stage.querySelectorAll(".tnode").forEach(x => x.remove());
+  stage.appendChild(tnode(view.src, "src"));
+  view.tgts.forEach(n => stage.appendChild(tnode(n, "tgt")));
+  drawWires();
+  drawLegend();
+  drawDrawer();
+}
+
+function drawWires(){
+  const L = links();
+  // merge links that land on the same pair of anchors, so a closed table
+  // shows one wire carrying N columns rather than N wires on one point
+  const merged = new Map();
+  L.forEach(l => {
+    const a = anchorSrc(view, l.src), b = anchorTgt(view, l.tbl, l.c);
+    if (!a || !b) return;
+    const k = `${a.x},${a.y}>${b.x},${b.y}`;
+    if (!merged.has(k)) merged.set(k, { a, b, items:[] });
+    merged.get(k).items.push(l);
+  });
+  let d = "";
+  merged.forEach(m => {
+    const one = m.items.length === 1 ? m.items[0] : null;
+    const hit = m.items.some(matches);
+    const on = !sel || m.items.some(i => sel.tbl === i.tbl && sel.col === i.c);
+    const op = !hit ? .08 : on ? .8 : .18;
+    const w = Math.min(7, 1.3 + Math.log2(m.items.length + 1) * 1.7);
+    const c = one ? OPC[one.op] : LANES[lane].c;
+    const mx = (m.a.x + m.b.x) / 2;
+    d += `<path d="M${m.a.x},${m.a.y} C${mx},${m.a.y} ${mx},${m.b.y} ${m.b.x},${m.b.y}"
+        fill="none" stroke="${c}" stroke-width="${w}" opacity="${op}"
+        stroke-linecap="round"></path>`;
+    if (m.items.length > 1 && hit){
+      d += `<circle cx="${mx}" cy="${(m.a.y+m.b.y)/2}" r="8.5"
+              fill="var(--panel)" stroke="${c}" stroke-width="1.2" opacity="${op}"></circle>
+            <text x="${mx}" y="${(m.a.y+m.b.y)/2+3}" text-anchor="middle"
+              font-family="var(--f-mono)" font-size="9" font-weight="700"
+              fill="${c}" opacity="${op}">${m.items.length}</text>`;
+    } else if (one && hit && on && sel){
+      d += `<text x="${mx}" y="${(m.a.y+m.b.y)/2 - 6}" text-anchor="middle"
+              font-family="var(--f-mono)" font-size="9" font-weight="700"
+              fill="${c}">${esc(one.op)}</text>`;
+    }
+  });
+  wires.innerHTML = d;
+  Object.assign(wires.style, { width:`${view.W}px`, height:`${view.H}px` });
+  wires.setAttribute("viewBox", `0 0 ${view.W} ${view.H}`);
+}
+
+function drawLegend(){
+  el("#legend").innerHTML = Object.keys(OPC).map(k =>
+    `<span><i style="background:${OPC[k]}"></i>${k}</span>`).join("")
+    + `<span style="margin-left:auto">Wire thickness is how many columns it carries.
+       A number on a wire means it is still collapsed.</span>`;
+}
+
+function drawDrawer(){
+  const host = el("#drawer");
+  if (!sel){
+    const L = links();
+    const byOp = {};
+    L.forEach(l => { byOp[l.op] = (byOp[l.op]||0)+1; });
+    host.innerHTML = `
+      <div class="eyebrow" style="margin-bottom:6px">This feed</div>
+      <dl class="kv">
+        <dt>Feed</dt><dd><b>${esc(feed.name)}</b>
+          <span class="mono" style="color:var(--muted)">${esc(feed.id)}</span></dd>
+        <dt>Lands in</dt><dd>${feed.targets.length} table${feed.targets.length===1?"":"s"} ·
+          ${L.length} column link${L.length===1?"":"s"}</dd>
+        <dt>Operations</dt><dd>${Object.entries(byOp).map(([k,v]) =>
+          `<span class="opchip" style="background:color-mix(in srgb,${OPC[k]} 20%,transparent);
+            color:${OPC[k]};margin-right:5px">${esc(k)} ${v}</span>`).join("")}</dd>
+      </dl>
+      <p class="note" style="margin:9px 0 0">Open a table and pick a column to see
+        the expression behind it. Nothing here is a verdict — the expression is
+        what the mapping document records, not what anyone has checked.</p>`;
+    return;
+  }
+  const l = links().find(x => x.tbl === sel.tbl && x.c === sel.col);
+  if (!l){ sel = null; drawDrawer(); return; }
+  host.innerHTML = `
+    <div style="display:flex;gap:9px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px">
+      <span class="mono" style="font-size:12px">${esc(feed.id)}.${esc(l.src)}</span>
+      <span class="arrow">→</span>
+      <span class="mono" style="font-size:12px">${esc(l.tbl)}.${esc(l.c)}</span>
+      <span class="opchip" style="background:color-mix(in srgb,${OPC[l.op]} 20%,transparent);
+        color:${OPC[l.op]}">${esc(l.op)}</span>
+      <button class="ghost" id="clr" style="margin-left:auto">clear</button>
+    </div>
+    <dl class="kv">
+      <dt>Source</dt><dd class="mono">${esc(l.src)} ${esc(l.sty||"")}</dd>
+      <dt>Target</dt><dd class="mono">${esc(l.c)} ${esc(l.ty)}</dd>
+    </dl>
+    <pre class="expr">${esc(l.expr)}</pre>
+    <div class="eyebrow" style="margin-top:11px">Operations, in order</div>
+    <div class="ops">${l.ops.map(([k,v],i) => {
+      const c = k === "field" ? "var(--src)" : k === "target" ? "var(--dwh)"
+              : k === "branch" ? "var(--k-branch)" : k === "const" ? "var(--k-const)"
+              : "var(--k-fn)";
+      return `${i ? '<span class="arrow">→</span>' : ""}
+        <span class="op" style="--oc:${c}"><b>${esc(k)}</b><span>${esc(v)}</span></span>`;
+    }).join("")}</div>`;
+  const c = el("#clr");
+  if (c) c.onclick = () => { sel = null; draw(); };
+}
+
+/* ------------------------------------------------------ pan/zoom/events */
+function apply(){ stage.style.transform = `translate(${z.x}px,${z.y}px) scale(${z.k})`; }
+function fit(){
+  const r = cv.getBoundingClientRect();
+  const k = Math.max(.35, Math.min((r.width-20)/view.W, (r.height-20)/view.H, 1.1));
+  z = { k, x:(r.width - view.W*k)/2, y:(r.height - view.H*k)/2 };
+  apply();
+}
+el("#zin").onclick = () => { z.k = Math.min(2, z.k*1.2); apply(); };
+el("#zout").onclick = () => { z.k = Math.max(.35, z.k/1.2); apply(); };
+el("#zfit").onclick = fit;
+
+let dr = null;
+cv.addEventListener("pointerdown", e => {
+  if (e.target.closest(".tnode") || e.target.closest(".zoom")) return;
+  dr = { x:e.clientX - z.x, y:e.clientY - z.y };
+  cv.classList.add("drag"); cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener("pointermove", e => {
+  if (!dr) return; z.x = e.clientX - dr.x; z.y = e.clientY - dr.y; apply();
+});
+["pointerup","pointercancel"].forEach(ev =>
+  cv.addEventListener(ev, () => { dr = null; cv.classList.remove("drag"); }));
+cv.addEventListener("wheel", e => {
+  e.preventDefault();
+  const r = cv.getBoundingClientRect(), mx = e.clientX-r.left, my = e.clientY-r.top;
+  const nk = Math.min(2, Math.max(.35, z.k * (e.deltaY < 0 ? 1.08 : 1/1.08)));
+  z = { k:nk, x: mx-(mx-z.x)*(nk/z.k), y: my-(my-z.y)*(nk/z.k) }; apply();
+}, { passive:false });
+
+document.addEventListener("click", e => {
+  const tg = e.target.closest("[data-toggle]");
+  if (tg){ const id = tg.dataset.toggle;
+    open.has(id) ? open.delete(id) : open.add(id); draw(); return; }
+  const col = e.target.closest("[data-col]");
+  if (col){ const k = { tbl:col.dataset.tbl, col:col.dataset.col };
+    sel = (sel && sel.tbl===k.tbl && sel.col===k.col) ? null : k; draw(); return; }
+  const s = e.target.closest("[data-src]");
+  if (s){ q = s.dataset.src; el("#q").value = q; draw(); return; }
+});
+
+el("#p-star").onclick = () => pick("STAR");
+el("#p-uaf").onclick = () => pick("UAF");
+function pick(l){
+  lane = l; feed = LANES[l].feeds[0]; open = new Set(); sel = null;
+  el("#p-star").setAttribute("aria-pressed", String(l==="STAR"));
+  el("#p-uaf").setAttribute("aria-pressed", String(l==="UAF"));
+  drawFeeds(); draw(); fit();
+}
+el("#feed").onchange = e => {
+  feed = LANES[lane].feeds.find(f => f.id === e.target.value);
+  open = new Set(); sel = null; draw(); fit();
+};
+el("#q").oninput = e => { q = e.target.value.trim(); draw(); };
+el("#expand").onclick = () => {
+  open = new Set([srcId(), ...feed.targets.map(t => tgtId(t.t))]); draw(); fit(); };
+el("#collapse").onclick = () => { open = new Set(); draw(); fit(); };
+
+new ResizeObserver(() => { if (view) fit(); }).observe(cv);
+drawFeeds();
+// open at the state that shows what the screen does: one table open, so the
+// column-level links are visible without the reader having to find them
+open = new Set([tgtId(LANES.STAR.feeds[0].targets[0].t)]);
+draw(); fit();
+</script>
