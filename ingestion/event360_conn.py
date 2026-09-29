@@ -55,7 +55,21 @@ _SHEETS = {
     "domains":    ("event_domains", "eventdomains"),
     "envelope":   ("payload_structure", "payloadstructure"),
     "guidance":   ("consumption_guidance", "consumptionguidance"),
+    # Added after the workbook grew it. Optional: a revision without it
+    # loads exactly as before, because markers are not catalog events and
+    # nothing already loaded depends on them.
+    "markers":    ("micro_batch_markers", "microbatchmarkers",
+                   "micro_batch_marker", "batch_markers"),
 }
+# Sheets whose absence is not a gate failure. Every other slot in _SHEETS is
+# required, and a workbook missing one is refused rather than part-loaded.
+_OPTIONAL_SHEETS = {"markers"}
+
+# The two markers the specification defines. Asserted like every other count
+# in this file: a marker sheet that grows a third entry is a change to the
+# commit-boundary contract, and the load should stop rather than absorb it.
+EXPECT_MARKERS = 2
+MARKER_IDS = (1000, 1001)
 
 # Expected shape, asserted after parse. From the contract, not from the file.
 EXPECT_EVENTS = 105
@@ -286,7 +300,7 @@ class Event360Connector:
         wb = load_workbook(path, data_only=True, read_only=True)
         got = {k: self._pick(wb, k) for k in _SHEETS}
         for k, v in got.items():
-            if not v:
+            if not v and k not in _OPTIONAL_SHEETS:
                 self.gate_failures.append(f"sheet not found: {k}")
         if self.gate_failures:
             self._finish()
@@ -309,12 +323,16 @@ class Event360Connector:
 
         events = self._parse_catalog(wb[got["catalog"]])
         fields = self._parse_fields(wb[got["fields"]])
+        markers = self._parse_markers(wb[got["markers"]]) if got.get("markers") else []
+        if not got.get("markers"):
+            self.notes.append("no Micro_Batch_Markers sheet in this workbook")
 
-        self._gates(events, fields, types, domains, envelope, guidance)
+        self._gates(events, fields, types, domains, envelope, guidance, markers)
         self._finish()
         return {"event_type": types, "event_domain": domains,
                 "envelope_field": envelope, "consumption_rule": guidance,
-                "event_definition": events, "event_field": fields}
+                "event_definition": events, "event_field": fields,
+                "micro_batch_marker": markers}
 
     def _parse_ref(self, ws, headers, cols):
         rows = self._rows(ws, dict(zip((_norm(h) for h in headers), cols)))
@@ -441,9 +459,93 @@ class Event360Connector:
         return out
 
     # ---- gates -----------------------------------------------------------
-    def _gates(self, events, fields, types, domains, envelope, guidance):
+    # The sheet mixes two row kinds and the id column is how they differ:
+    # 1000 / 1001 are markers, and the literal word "Rule" marks a
+    # consumption rule about them. Reading the column as a number turns the
+    # rules into two rows with a null key that collide on insert, so the
+    # kind is decided before anything is coerced.
+    MARKER_MAP = {
+        "markerid": "marker_id_raw", "marker": "marker_id_raw",
+        "markername": "marker_name", "name": "marker_name",
+        "publishedwhere": "published_where", "published": "published_where",
+        "catalogevent": "catalog_event",
+        "payloadfields": "payload_fields", "payload": "payload_fields",
+        "purpose": "purpose",
+    }
+
+    def _parse_markers(self, ws):
+        out, rules = [], 0
+        for i, r in enumerate(self._rows(ws, self.MARKER_MAP), start=2):
+            raw = _s(r.get("marker_id_raw"))
+            name = _s(r.get("marker_name"))
+            if not raw and not name:
+                continue
+            mid = _i(raw)
+            if mid is None:
+                # "Rule", or anything else that is not a number. Keyed by
+                # its position so two rules cannot collide, and the raw
+                # value is kept in the name rather than discarded.
+                rules += 1
+                kind, key = "RULE", f"RULE:{rules}"
+            else:
+                kind, key = "MARKER", str(mid)
+            # "No" / "Yes" / blank -> N / Y. Blank is N: the sheet has the
+            # column precisely to say these are not catalog events, and a
+            # blank there is not an invitation to assume otherwise.
+            ce = (_s(r.get("catalog_event")) or "No").strip().lower()
+            out.append({
+                "entry_key": key[:80],
+                "entry_kind": kind,
+                "marker_id": mid,
+                "marker_name": (name or (raw if kind == "RULE" else None)),
+                "published_where": _s(r.get("published_where")),
+                "catalog_event": "Y" if ce.startswith("y") else "N",
+                "payload_fields": _s(r.get("payload_fields")),
+                "purpose": _s(r.get("purpose")),
+                "source_row": i,
+            })
+        return out
+
+    def _marker_gates(self, markers, events=()):
+        """The marker checks, on their own so they can be run on their own.
+
+        They were inline in _gates, which meant exercising them needed a
+        whole valid workbook -- 105 events and 575 fields -- and a test that
+        needs that much scaffolding to check two rows is a test nobody
+        writes. Split out, the rules below are checkable against four rows.
+        """
         fail = self.gate_failures.append
         note = self.notes.append
+        if not markers:
+            return                      # the sheet is optional
+        mk = [m for m in markers if m.get("entry_kind") == "MARKER"]
+        if len(mk) != EXPECT_MARKERS:
+            fail(f"micro-batch marker count {len(mk)} <> {EXPECT_MARKERS}")
+        ids = tuple(sorted(m["marker_id"] for m in mk
+                           if m.get("marker_id") is not None))
+        if ids and ids != MARKER_IDS:
+            fail(f"micro-batch marker ids {ids} <> {MARKER_IDS}")
+        # A marker sharing an id with a catalog event would make "event 1000"
+        # ambiguous, which is worse than either table being wrong alone.
+        cat = {e.get("event_id") for e in events if isinstance(e, dict)}
+        clash = {m.get("marker_id") for m in mk} & cat
+        if clash:
+            fail(f"marker ids collide with catalog event ids: {sorted(clash)}")
+        # The sheet's own column says these are not catalog events. If a
+        # revision flips one to Yes, the two tables disagree about what a
+        # marker is, and somebody has to decide before it loads.
+        wrong = [m["entry_key"] for m in markers
+                 if (m.get("catalog_event") or "N") != "N"]
+        if wrong:
+            fail("marker rows claim to be catalog events: " + ", ".join(wrong))
+        note(f"micro-batch: {len(mk)} markers, {len(markers) - len(mk)} rules")
+
+    def _gates(self, events, fields, types, domains, envelope, guidance,
+               markers=()):
+        fail = self.gate_failures.append
+        note = self.notes.append
+
+        self._marker_gates(markers, events)
 
         if len(events) != EXPECT_EVENTS:
             fail(f"event count {len(events)} <> {EXPECT_EVENTS}")
@@ -578,6 +680,9 @@ class Event360Connector:
         for r in bundle.get("event_field", []):
             loader._merge("meta_event_field", ("section", "field_ordinal"), r)
             n += 1
+        mk = bundle.get("micro_batch_marker", [])
+        for r in mk:
+            loader._merge("ref_micro_batch_marker", ("entry_key",), r); n += 1
         loader.commit()
-        log.info("event360: merged %d rows across 6 tables", n)
+        log.info("event360: merged %d rows across %d tables", n, 7 if mk else 6)
         return n

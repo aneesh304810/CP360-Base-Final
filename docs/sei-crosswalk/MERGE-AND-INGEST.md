@@ -81,6 +81,7 @@ api/test/test_graph_chain.py
 api/test/test_source_canvas_scope.py
 api/test/test_lane_scope_filter.py
 ingestion/test/test_table_catalog.py
+ingestion/test/test_micro_batch_markers.py
 api/app/routers_business_catalog.py
 ui/src/businessCatalog.js
 ui/src/plainRule.js
