@@ -39,20 +39,30 @@ def ok(cond, msg, got=None):
 
 
 HDR = ["Marker ID", "Marker name", "Published where", "Catalog event",
-       "Payload fields", "Purpose"]
+       "Payload fields", "Purpose", "Consumer handling", "Source"]
 ROWS = [
     [1000, "Micro-Batch Start", "Every subscribed domain topic", "No",
      "eventId, key, startTime, endTime",
-     "Marks the start of a Snowflake commit boundary."],
+     "Marks the start of a Snowflake commit boundary.",
+     "Record the micro-batch key and begin tracking events on the topic.",
+     "SEI Data Cloud Event Specification v1.1, sections 2.3 and 2.4"],
     [1001, "Micro-Batch End", "Every subscribed domain topic", "No",
      "eventId, key, startTime, endTime",
-     "Marks the end of the same Snowflake commit boundary."],
+     "Marks the end of the same Snowflake commit boundary.",
+     "Mark a topic complete for the key; treat the batch complete only after "
+     "this end marker is received on every subscribed topic.",
+     "SEI Data Cloud Event Specification v1.1, sections 2.3 and 2.4"],
     ["Rule", "Zero-event topic boundary", "Every subscribed domain topic", "No",
      "Same marker pair",
-     "A start/end pair may contain no data events for a topic."],
+     "A start/end pair may contain no data events for a topic.",
+     "Treat the topic as complete with no changes for that micro-batch.",
+     "SEI Data Cloud Event Specification v1.1, section 2.3"],
     ["Rule", "Cross-topic integrity", "All subscribed topics", "No",
      "Same key across topics",
-     "Confirms all data within a commit has been consumed."],
+     "Confirms all data within a commit has been consumed across topics.",
+     "Do not declare consistency until every subscribed topic has the "
+     "matching end marker.",
+     "SEI Data Cloud Event Specification v1.1, sections 2.3 and 2.4"],
 ]
 
 
@@ -98,19 +108,32 @@ ok(mk[0]["published_where"] == "Every subscribed domain topic",
 ok([r["source_row"] for r in out] == [2, 3, 4, 5],
    "each row remembers where it came from", [r["source_row"] for r in out])
 
+# The two columns the sheet grew. Silently dropping them is the same
+# failure as ignoring the sheet -- the workbook says more and the
+# database holds the same.
+ok(all(r["consumer_handling"] for r in out),
+   "every row carries what a consumer should DO about it",
+   [r["consumer_handling"] for r in out])
+ok(all("v1.1" in (r["source_ref"] or "") for r in out),
+   "and cites the section of the specification it came from",
+   [r["source_ref"] for r in out])
+ok("every subscribed topic" in mk[1]["consumer_handling"],
+   "the end marker's handling states the cross-topic condition",
+   mk[1]["consumer_handling"])
+
 # blank Catalog event is N, not an invitation to assume otherwise
-b = C._parse_markers(sheet([[1000, "Start", "topic", None, "f", "p"]]))
+b = C._parse_markers(sheet([[1000, "Start", "topic", None, "f", "p", "h", "s"]]))
 ok(b[0]["catalog_event"] == "N", "a blank catalog-event cell reads as No",
    b[0]["catalog_event"])
-y = C._parse_markers(sheet([[1000, "Start", "topic", "Yes", "f", "p"]]))
+y = C._parse_markers(sheet([[1000, "Start", "topic", "Yes", "f", "p", "h", "s"]]))
 ok(y[0]["catalog_event"] == "Y", "and Yes is carried through, not ignored")
 
 # ---- 3. messy sheets --------------------------------------------------
-messy = C._parse_markers(sheet(ROWS + [[None, None, None, None, None, None],
-                                       ["", "", "", "", "", ""]]))
+messy = C._parse_markers(sheet(ROWS + [[None] * 8, [""] * 8]))
 ok(len(messy) == 4, "blank rows are skipped", len(messy))
 alt = C._parse_markers(sheet(header=["Marker", "Name", "Published",
-                                     "Catalog event", "Payload", "Purpose"]))
+                                     "Catalog event", "Payload", "Purpose",
+                                     "Handling", "Reference"]))
 ok(len(alt) == 4, "alternative header wording resolves", len(alt))
 ok([m["marker_id"] for m in alt if m["entry_kind"] == "MARKER"] == [1000, 1001],
    "and lands in the right columns")

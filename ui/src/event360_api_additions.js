@@ -42,6 +42,11 @@ export const evt360 = {
   groups: (by) => get(`/event360/groups?by=${encodeURIComponent(by || 'type')}`,
     { groups: [] }),
   event: (id) => get(`/event360/event/${id}`, { found: false }),
+  // Commit-boundary markers. loaded:false means the sheet or sql/63 is
+  // absent, which the screen must show as "not loaded" rather than as
+  // "there are no markers".
+  microBatch: () => get('/event360/micro-batch',
+    { markers: [], rules: [], count: 0, loaded: false, sources: [] }),
   lanes: (by) => get(`/event360/lanes?by=${encodeURIComponent(by || 'domain')}`,
     { lanes: [] }),
   link: (domain) => get('/event360/link' + (domain ? `?domain=${encodeURIComponent(domain)}` : ''),

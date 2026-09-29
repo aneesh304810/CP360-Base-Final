@@ -72,11 +72,73 @@ EXPECT_MARKERS = 2
 MARKER_IDS = (1000, 1001)
 
 # Expected shape, asserted after parse. From the contract, not from the file.
+# THE SHAPE OF v1.0, AND HOW TO ADOPT A LATER ONE.
+#
+# These come from the contract, not from the file, which is the whole point:
+# a load four rows short is worse than one that fails, because the screens
+# built on it look right and quietly under-report. So a workbook that does
+# not match is refused.
+#
+# But a specification does get revised, and when SEI ships v1.1 with more
+# events the right response is not to edit these numbers in a hurry and
+# lose the record of who decided. Each is overridable by environment, and
+# every override is logged at WARNING with the old value beside the new, so
+# adopting a revision is a decision that appears in the run log rather than
+# a diff nobody reviewed.
+#
+# CP_EVENT360_EXPECT_EVENTS     e.g. 107
+# CP_EVENT360_EXPECT_FIELDS     e.g. 583
+# CP_EVENT360_PAYLOAD_BY_TYPE   e.g. "System=3,Marker=3" — per event type,
+#                               for a revision that introduces a type whose
+#                               payload is a different width
 EXPECT_EVENTS = 105
 EXPECT_FIELDS = 575
 EXPECT_MARKER_PAYLOAD = 3        # eventId, batchDt, onlineDt
 EXPECT_DATA_PAYLOAD = 4          # eventId, key, op, view
 MISSING_IDS = (99, 100, 101)     # absent from the index by design
+
+
+def _expect(name, default):
+    raw = os.environ.get(name)
+    if raw is None or not str(raw).strip():
+        return default
+    try:
+        v = int(str(raw).strip())
+    except ValueError:
+        log.warning("%s=%r is not a number — keeping %s", name, raw, default)
+        return default
+    if v != default:
+        log.warning("%s overridden: expecting %s, not the built-in %s. "
+                    "The gate still refuses anything else.", name, v, default)
+    return v
+
+
+def _payload_by_type():
+    """Per-type payload widths, for a revision that adds a type.
+
+    Empty by default, so the built-in marker/data split is unchanged. A
+    named type wins over both.
+    """
+    raw = (os.environ.get("CP_EVENT360_PAYLOAD_BY_TYPE") or "").strip()
+    out = {}
+    for part in raw.split(","):
+        part = part.strip()
+        if not part or "=" not in part:
+            continue
+        k, v = part.split("=", 1)
+        k = k.strip().lower()
+        if not k:
+            # "=4" would key on the empty string and then match any event
+            # whose type is blank, quietly changing its expected width.
+            log.warning("CP_EVENT360_PAYLOAD_BY_TYPE: %r names no type", part)
+            continue
+        try:
+            out[k] = int(v.strip())
+        except ValueError:
+            log.warning("CP_EVENT360_PAYLOAD_BY_TYPE: %r is not a width", part)
+    if out:
+        log.warning("payload width overridden per event type: %s", out)
+    return out
 
 MARKER = "Marker"
 
@@ -471,6 +533,10 @@ class Event360Connector:
         "catalogevent": "catalog_event",
         "payloadfields": "payload_fields", "payload": "payload_fields",
         "purpose": "purpose",
+        "consumerhandling": "consumer_handling", "handling": "consumer_handling",
+        "consumeraction": "consumer_handling",
+        "source": "source_ref", "sourceref": "source_ref",
+        "reference": "source_ref",
     }
 
     def _parse_markers(self, ws):
@@ -502,6 +568,8 @@ class Event360Connector:
                 "catalog_event": "Y" if ce.startswith("y") else "N",
                 "payload_fields": _s(r.get("payload_fields")),
                 "purpose": _s(r.get("purpose")),
+                "consumer_handling": _s(r.get("consumer_handling")),
+                "source_ref": _s(r.get("source_ref")),
                 "source_row": i,
             })
         return out
@@ -547,10 +615,14 @@ class Event360Connector:
 
         self._marker_gates(markers, events)
 
-        if len(events) != EXPECT_EVENTS:
-            fail(f"event count {len(events)} <> {EXPECT_EVENTS}")
-        if len(fields) != EXPECT_FIELDS:
-            fail(f"field count {len(fields)} <> {EXPECT_FIELDS}")
+        want_events = _expect("CP_EVENT360_EXPECT_EVENTS", EXPECT_EVENTS)
+        want_fields = _expect("CP_EVENT360_EXPECT_FIELDS", EXPECT_FIELDS)
+        by_type = _payload_by_type()
+
+        if len(events) != want_events:
+            fail(f"event count {len(events)} <> {want_events}")
+        if len(fields) != want_fields:
+            fail(f"field count {len(fields)} <> {want_fields}")
 
         ids = [e["event_id"] for e in events]
         dupe = [i for i, n in Counter(ids).items() if n > 1]
@@ -615,7 +687,11 @@ class Event360Connector:
                 by_event[f["event_id"]] = by_event.get(f["event_id"], 0) + 1
         wrong = []
         for e in events:
-            want_n = EXPECT_MARKER_PAYLOAD if e["_is_marker"] else EXPECT_DATA_PAYLOAD
+            # A named type wins, then the marker/data split.
+            want_n = by_type.get((e.get("event_type") or "").strip().lower())
+            if want_n is None:
+                want_n = (EXPECT_MARKER_PAYLOAD if e["_is_marker"]
+                          else EXPECT_DATA_PAYLOAD)
             got_n = by_event.get(e["event_id"], 0)
             if got_n != want_n:
                 wrong.append((e["event_id"], e["event_type"], got_n, want_n))
@@ -633,8 +709,14 @@ class Event360Connector:
         data_ev = len(events) - markers
         trig_rows = sum(1 for f in fields
                         if (f.get("field_category") or "").upper() == "TRIGGER_DRIVING")
-        expect = (EXPECT_DATA_PAYLOAD * data_ev
-                  + EXPECT_MARKER_PAYLOAD * markers + trig_rows)
+        # Same per-type widths as the row check above, or the two totals
+        # disagree with each other and the message blames the wrong thing.
+        expect = trig_rows
+        for e in events:
+            w = by_type.get((e.get("event_type") or "").strip().lower())
+            if w is None:
+                w = EXPECT_MARKER_PAYLOAD if e["_is_marker"] else EXPECT_DATA_PAYLOAD
+            expect += w
         if expect != len(fields):
             fail(f"field arithmetic: {EXPECT_DATA_PAYLOAD}x{data_ev} + "
                  f"{EXPECT_MARKER_PAYLOAD}x{markers} + {trig_rows} trigger = "

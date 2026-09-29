@@ -20,9 +20,10 @@
 // visibly adds nothing — which is the correct answer, not a bug.
 import React, { useEffect, useMemo, useState } from 'react';
 import { evt360 } from './event360_api_additions.js';
+import EventMicroBatch from './EventMicroBatch.jsx';
 
 // The mockup's palette, so the module reads as one system with Lineage 360.
-const P = {
+export const P = {
   ink: '#233240', sub: '#7b8894', rule: '#c9d4dc', page: '#f4f7f9',
   panel: '#fff', link: '#31bced', accent: '#0f4775', ok: '#159943',
   warn: '#e67e22', warnInk: '#a8560f', danger: '#c1113a', tint: '#eef3f8',
@@ -32,7 +33,7 @@ const P = {
 };
 // categorical — event type. Three slots, validated all-pairs (CVD dE 9.2,
 // normal-vision 24.0). Never cycled, never reused for anything else.
-const TC = { Business: '#2a78d6', Technical: '#eb6834', Marker: '#1baf7a' };
+export const TC = { Business: '#2a78d6', Technical: '#eb6834', Marker: '#1baf7a' };
 // ordered severity, not categories; every chip carries its word as well
 const BC = { Critical: '#c1113a', High: '#e67e22', Moderate: '#3a6f9e', Low: '#7b8894' };
 
@@ -108,7 +109,8 @@ const td = { textAlign: 'left', padding: '7px 11px', fontSize: 12,
 const mtd = { ...td, fontFamily: P.mono, fontSize: 11 };
 
 const TABS = [['est', 'Estate'], ['swm', 'Swimlanes'], ['lnk', 'Link view'],
-  ['dep', 'Interdependence'], ['sub', 'Subscriptions & cost']];
+  ['dep', 'Interdependence'], ['sub', 'Subscriptions & cost'],
+  ['mb', 'Commit boundary']];
 
 export default function Event360() {
   const [tab, setTab] = useState('est');
@@ -196,6 +198,7 @@ export default function Event360() {
             onTech={() => setAud('tech')} />}
           {tab === 'dep' && <Interdep onOpen={setDet} />}
           {tab === 'sub' && <SubsCost onOpen={setDet} />}
+          {tab === 'mb' && <EventMicroBatch t={T} />}
         </>}
     </div>);
 }

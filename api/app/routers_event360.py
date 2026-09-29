@@ -37,6 +37,21 @@ from fastapi import APIRouter, Body
 
 from .db import query
 
+
+def _safe(sql, params=None):
+    """query(), but an absent table is an empty list rather than a 500.
+
+    Every other read in this router hits a table sql/51 creates, so a plain
+    query is right for them. REF_MICRO_BATCH_MARKER comes from sql/63, which
+    a checkout may not have run yet, and one new table must not take the
+    whole Event 360 page down.
+    """
+    try:
+        return query(sql, params or {})
+    except Exception as e:                                    # noqa: BLE001
+        log.warning("event360 query failed: %s", e)
+        return []
+
 log = logging.getLogger("cp.api.event360")
 router = APIRouter(prefix="/event360", tags=["event360"])
 
@@ -690,6 +705,38 @@ def cost(body: dict = Body(default={})):
         "minimum": floor,
         "views": rows,
         "agreement_note": ag.get("note")}
+
+
+@router.get("/micro-batch")
+def micro_batch():
+    """The commit-boundary markers, and the rules that govern them.
+
+    Markers are deliberately NOT in the event catalog -- ids 1000 and 1001,
+    clear of the catalog's 1..105, and the workbook's own column says
+    "Catalog event: No". Two extra rows in META_EVENT_DEFINITION would make
+    every "how many events are there" answer wrong by two, so they have
+    their own table and their own endpoint.
+
+    The two kinds come back separately because they are read differently: a
+    marker is a thing that arrives on a topic, a rule is a condition a
+    consumer has to satisfy before declaring a batch complete.
+    """
+    rows = _safe("""
+        SELECT entry_key, entry_kind, marker_id, marker_name, published_where,
+               catalog_event, payload_fields, purpose, consumer_handling,
+               source_ref
+        FROM   ref_micro_batch_marker
+        ORDER  BY entry_kind DESC, NVL(marker_id, 9999), entry_key""")
+    markers = [r for r in rows if (r.get("entry_kind") or "") == "MARKER"]
+    rules = [r for r in rows if (r.get("entry_kind") or "") == "RULE"]
+    return {
+        "markers": markers, "rules": rules,
+        "count": len(rows),
+        # loaded:false means the sheet or the table is absent, which the UI
+        # must show as "not loaded" rather than as "there are no markers".
+        "loaded": bool(rows),
+        "sources": sorted({r.get("source_ref") for r in rows if r.get("source_ref")}),
+    }
 
 
 @router.get("/contract")

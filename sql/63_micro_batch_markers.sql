@@ -34,6 +34,14 @@ BEGIN
         catalog_event   CHAR(1) DEFAULT ''N'',    -- the sheet says No for all
         payload_fields  VARCHAR2(600),
         purpose         VARCHAR2(2000),
+        -- What a consumer is supposed to DO about it. The purpose says what
+        -- the marker means; this says what you do when you see one, and it
+        -- is the column the UI leads with -- a marker nobody acts on is a
+        -- message, not a boundary.
+        consumer_handling VARCHAR2(2000),
+        -- Which section of which SEI document this row came from, verbatim.
+        -- A contract statement with no citation is an assertion.
+        source_ref      VARCHAR2(400),
         source_row      NUMBER,
         updated_at      TIMESTAMP DEFAULT SYSTIMESTAMP,
         CONSTRAINT pk_ref_micro_batch_marker PRIMARY KEY (entry_key),

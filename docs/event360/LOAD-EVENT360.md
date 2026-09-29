@@ -183,3 +183,62 @@ in later is inventing a contract.
 | `event_subscription` finds no events | it ran before `event360` |
 | counts off by a few | the workbook was revised; the gate will have raised |
 | markers load nothing, no error | the sheet is named something the loader does not recognise — see above |
+
+
+## When the load refuses
+
+The gates refuse rather than warn, so a workbook that does not match stops
+the load and writes nothing. That is the design. What the message needs
+from you is a decision about *which* kind of mismatch it is.
+
+```
+event count 107 <> 105
+field count 583 <> 575
+duplicate sections: ['2.3']
+14 event(s) have the wrong payload field count, e.g. (22, 'System', 3, 4)
+field arithmetic: 4x105 + 3x2 + 167 trigger = 593, but 583 rows were read
+```
+
+Two different things are in that list.
+
+### 1. The markers are in Event_Catalog as well as their own sheet
+
+`107 = 105 + 2`, and the warnings name ids 1000 and 1001. Take them out of
+`Event_Catalog`, `Field_Level_Details` and `Consumption_Guidance` and leave
+them only in `Micro_Batch_Markers`.
+
+The workbook currently contradicts itself: the marker sheet says
+**Catalog event: No** and the catalog contains them. Leaving them in makes
+every "how many events are there" answer wrong by two, and
+`duplicate sections: ['2.3']` is the same collision seen from the section
+index.
+
+### 2. The specification moved
+
+`(22, 'System', 3, 4)` is not a marker. A **System** event type with a
+three-field payload is v1.1 introducing something the gates have never
+seen — they encode v1.0's four-wide data payload.
+
+That is a decision, not a bug, and the right response is not to edit the
+constants in a hurry. Declare the new shape, and the run log records it:
+
+```powershell
+$env:CP_EVENT360_EXPECT_EVENTS   = "105"     # after the markers come out
+$env:CP_EVENT360_EXPECT_FIELDS   = "575"
+$env:CP_EVENT360_PAYLOAD_BY_TYPE = "System=3"
+```
+
+Every override logs at WARNING with the old value beside the new. **An
+override is an expectation, not an exemption** — a declared width that is
+still wrong is still refused, and the count gates still bite.
+
+Work the markers out first and re-run before declaring anything: the two
+faults inflate each other's numbers, and the second list is shorter than it
+looks once the first is fixed.
+
+### The warnings above the failure
+
+`REVIEW_REQUIRED on 13 events` and `consumption guidance has 10 rules,
+expected 6` are warnings, not gate failures. They did not stop the load and
+they will not. The guidance count is worth a look: six was the v1.0 shape,
+and four new rules is the kind of thing that is either real or a paste.

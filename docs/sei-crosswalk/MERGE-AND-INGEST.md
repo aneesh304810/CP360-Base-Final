@@ -82,6 +82,8 @@ api/test/test_source_canvas_scope.py
 api/test/test_lane_scope_filter.py
 ingestion/test/test_table_catalog.py
 ingestion/test/test_micro_batch_markers.py
+ingestion/test/test_event360_expectations.py
+ui/src/EventMicroBatch.jsx
 api/app/routers_business_catalog.py
 ui/src/businessCatalog.js
 ui/src/plainRule.js
@@ -103,6 +105,8 @@ file copy would clobber work that is not mine.**
 api/app/main.py             two entries in the router mount tuple
 ui/src/BizLineage.jsx       business names on the table list, header and crumb
 ui/src/CrosswalkDashboard.jsx  the Business/Detail toggle + SeiBusinessSummary mount
+ui/src/Event360.jsx           the Commit boundary tab + export P/TC
+api/app/routers_event360.py   /micro-batch + the _safe helper
 ingestion/run.py            one STEPS entry + one dispatch branch
 ui/src/LineageHome.jsx      CrosswalkDashboard, UAF in SYS_META, dsSystems, dictSys
 ui/src/LineageGraph.jsx     dim floors, empty-lane collapse, stage colour on nodes
