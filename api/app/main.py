@@ -1,6 +1,7 @@
 """CP Catalog API — read-only FastAPI. Mounts module routers."""
 from __future__ import annotations
 import logging
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -12,8 +13,24 @@ logging.basicConfig(
 log = logging.getLogger("cp.api")
 
 app = FastAPI(title="CP Catalog API", version="1.0.0")
-app.add_middleware(CORSMiddleware, allow_origins=["*"],
-                   allow_methods=["GET", "POST"], allow_headers=["*"])
+
+# CORS AND THE SESSION COOKIE. A browser will not send a cookie to another
+# origin unless the response says allow_credentials, and the spec forbids
+# allow_credentials together with "*". So: the open wildcard stays the
+# default (a read-only catalogue served same-origin needs nothing else),
+# and CP_CORS_ORIGINS names the UI's origin when the two are split across
+# ports. Without it, sign-in appears to succeed and every later request
+# arrives anonymous — the cookie was set and never sent back.
+_origins = [o.strip() for o in
+            (os.environ.get("CP_CORS_ORIGINS") or "").split(",") if o.strip()]
+if _origins:
+    app.add_middleware(CORSMiddleware, allow_origins=_origins,
+                       allow_credentials=True,
+                       allow_methods=["GET", "POST"], allow_headers=["*"])
+    log.info("CORS restricted to %s (credentials allowed)", _origins)
+else:
+    app.add_middleware(CORSMiddleware, allow_origins=["*"],
+                       allow_methods=["GET", "POST"], allow_headers=["*"])
 
 # ---- mount module routers (each defines its own prefix) ----------------
 # Guarded so a single import error doesn't take the whole API down; any that
@@ -31,7 +48,8 @@ for _mod in ("routers_projects", "routers_data360",
              "routers_environment360", "routers_env_infra",
              "routers_event360",
              "routers_sei_crosswalk",
-             "routers_business_catalog"):
+             "routers_business_catalog",
+             "routers_security"):
     try:
         _m = __import__(f"app.{_mod}", fromlist=["router"])
         app.include_router(_m.router)

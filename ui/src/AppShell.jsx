@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from './api.js';
 import GlobalSearch from "./GlobalSearch.jsx";
 import { NavBadge, NavLegend, MODULE_STATUS } from './navStatus.jsx';
+import { filterNav } from './securityApi.js';
 // Grouped, viewport-aware collapsing sidebar navigation.
 const BREAKPOINT = 1200;
 const GRAPH_ROUTES = new Set(['data']);
@@ -42,6 +43,7 @@ const NAV_GROUPS = [
  ["hub", "CP Integration Hub", "🏛"],
       ["integration360", "Integration 360", "◉"],
       ['environment', 'Environment 360', '🖧'],
+      ['security', 'Security Entitlement', '\u26BF'],
  ]
 },
 {
@@ -52,7 +54,11 @@ const NAV_GROUPS = [
 },
 ];
 
-export default function AppShell({ t, route, onNav, live, onSearch, onOpenHit, children }) {
+// `me` is the payload from /auth/me. When enforcement is off it carries
+// modules: null, and filterNav then returns the sidebar untouched — the
+// app looks exactly as it did before there was a login.
+export default function AppShell({ t, route, onNav, live, onSearch, onOpenHit,
+ me, onSignOut, children }) {
  const [manual, setManual] = useState(null);
  const [narrow, setNarrow] = useState(
  typeof window !== 'undefined' ? window.innerWidth < BREAKPOINT : false);
@@ -115,6 +121,8 @@ export default function AppShell({ t, route, onNav, live, onSearch, onOpenHit, c
  };
 
  const railW = collapsed ? 54 : 216;
+ const groups = filterNav(NAV_GROUPS, me ? me.modules : null);
+ const who = me && me.user ? me.user : null;
 
  return (
  <div style={{ minWidth: t.minWidth, minHeight: '100vh', background: t.bg,
@@ -137,6 +145,20 @@ export default function AppShell({ t, route, onNav, live, onSearch, onOpenHit, c
  {'\u25CF'} {live ? 'LIVE' : 'DEMO'}</span>
  <GlobalSearch t={t} onSubmit={submitSearch} onOpen={onOpenHit} />
  <span style={{ marginLeft: 'auto' }} />
+ {who && (
+ <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+ <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.25 }}>
+ <span style={{ fontSize: 12, color: '#e6edf7' }}>
+ {who.display_name || who.user_id}</span>
+ <span style={{ fontSize: 10, color: '#8fa6c4' }}>
+ {me.is_admin ? 'Security administrator' : 'Signed in'}</span>
+ </span>
+ <button onClick={onSignOut} title="Sign out"
+ style={{ border: '1px solid #33456b', background: 'transparent',
+ color: '#c5d2e4', borderRadius: t.radius.md, cursor: 'pointer',
+ fontSize: 11, padding: '5px 10px', fontFamily: t.font }}>Sign out</button>
+ </span>
+ )}
  </div>
 
  <div style={{ display: 'flex', minHeight: 'calc(100vh - 56px)' }}>
@@ -152,7 +174,7 @@ export default function AppShell({ t, route, onNav, live, onSearch, onOpenHit, c
  <span>{collapsed ? '\u00BB' : '\u00AB'}</span>
  {!collapsed && <span>Collapse</span>}
  </div>
- {NAV_GROUPS.map((grp, gi) => (
+ {groups.map((grp, gi) => (
  <div key={gi}>
  {grp.group && !collapsed && (
  <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
