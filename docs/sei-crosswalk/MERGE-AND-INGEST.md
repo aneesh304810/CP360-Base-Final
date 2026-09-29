@@ -88,6 +88,7 @@ ui/src/SeiBusinessSummary.jsx
 ui/test/business-catalog.test.jsx
 ui/test/plain-rule.test.jsx
 ui/test/sei-business.test.jsx
+ui/test/imports.test.jsx
 api/test/test_business_summary.py
 ingestion/test/test_lane_lineage_parse.py
 docs/ingestion-prompts/PROMPT_IMDS_STAR_UAF_SEI_data_lineage.md

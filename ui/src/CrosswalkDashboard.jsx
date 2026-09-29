@@ -6,6 +6,7 @@ import { FlowDiagram, EvidencePanel, Waffle, TransformationPanel, LogicCompare }
   from "./CrosswalkFlow.jsx";
 import { useFeedNames, feedName } from "./feedNames.js";
 import ChainRules from "./ChainRules.jsx";
+import SeiBusinessSummary from "./SeiBusinessSummary.jsx";
 
 // =====================================================================
 // CrosswalkDashboard — mapping, analysis and divergence for one warehouse.
