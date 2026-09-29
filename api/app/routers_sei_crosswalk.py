@@ -1895,3 +1895,102 @@ def exceptions(data_source: str | None = None, limit: int = 200):
         by.setdefault(r.get("who_can_answer") or "UNKNOWN", []).append(r)
     return {"exceptions": rows,
             "by_owner": [{"owner": k, "n": len(v)} for k, v in sorted(by.items())]}
+
+# The three questions a business audience asks, over the nine verdicts.
+# Presentation only: a field keeps the verdict the algorithm gave it, and
+# the drill-down names it. A rollup nobody can trace back to the rule that
+# produced it is a rollup nobody can act on.
+BUSINESS_BUCKET = {
+    "ready": ["PROVEN_MATCH"],
+    "diff":  ["NOT_COMPARABLE", "DECODE_NEEDED", "PRECISION_RISK", "TYPE_SHIFT"],
+    "open":  ["UNKNOWN"],
+    "none":  ["NO_SOURCE"],
+}
+# Out of the denominator, and shown as such rather than dropped.
+BUSINESS_EXCLUDED = ["OUT_OF_SCOPE", "NO_BASELINE"]
+
+
+@router.get("/business-summary")
+def business_summary(data_source: str | None = None):
+    """One call for the business dashboard: the rollup, already added up.
+
+    THE ARITHMETIC LIVES HERE, not in the page. Four tiles, a stacked bar
+    and two bar panels all have to agree with each other and with the
+    drill-downs behind them, and a UI that sums the same rows four times
+    will eventually disagree with itself. The page reads these numbers; it
+    does not compute them.
+
+    WHO IT WAITS ON IS NOT INVENTED. SEI_VERIFY has no owner column -- only
+    SEI_DISPOSITION.OWNER and SEI_EXCEPTION.WHO_CAN_ANSWER do. So the owner
+    breakdown covers exactly the open items that have a named owner, and
+    `unowned` counts the rest. An unchecked field with nobody named against
+    it is a finding, not a row to attribute to the nearest team.
+    """
+    ds = _ds(data_source)
+    rows = _safe("""
+        SELECT match_verdict AS v, COUNT(*) AS n FROM sei_verify
+        WHERE data_source = :ds GROUP BY match_verdict""", {"ds": ds})
+    by = {(r.get("v") or "UNKNOWN"): int(r.get("n") or 0) for r in rows}
+
+    excluded = {v: by.get(v, 0) for v in BUSINESS_EXCLUDED}
+    in_scope = sum(n for v, n in by.items() if v not in BUSINESS_EXCLUDED)
+    buckets = {k: sum(by.get(v, 0) for v in vs)
+               for k, vs in BUSINESS_BUCKET.items()}
+    # Any verdict the register grows that nobody has bucketed yet. Counted
+    # and named rather than silently missing from the bar.
+    known = {v for vs in BUSINESS_BUCKET.values() for v in vs} | set(BUSINESS_EXCLUDED)
+    unbucketed = {v: n for v, n in by.items() if v not in known}
+    buckets["open"] += sum(unbucketed.values())
+
+    undecided = _one("""
+        SELECT COUNT(*) AS n FROM sei_disposition
+        WHERE disposition = 'UNDECIDED'
+          AND lane_id IN (SELECT lane_id FROM legacy_lane WHERE data_source = :ds)""",
+        {"ds": ds})
+    exceptions = _one("SELECT COUNT(*) AS n FROM sei_exception WHERE data_source = :ds",
+                      {"ds": ds})
+    draft = _one("""
+        SELECT COUNT(*) AS n FROM sei_transformation
+        WHERE data_source = :ds
+          AND UPPER(NVL(approval_status,'DRAFT')) <> 'APPROVED'""", {"ds": ds})
+
+    owners: dict[str, int] = {}
+    for r in _safe("""
+            SELECT NVL(owner,'(no owner named)') AS who, COUNT(*) AS n
+            FROM   sei_disposition
+            WHERE  disposition = 'UNDECIDED'
+              AND  lane_id IN (SELECT lane_id FROM legacy_lane WHERE data_source = :ds)
+            GROUP  BY NVL(owner,'(no owner named)')""", {"ds": ds}):
+        owners[r.get("who")] = owners.get(r.get("who"), 0) + int(r.get("n") or 0)
+    for r in _safe("""
+            SELECT NVL(who_can_answer,'(no owner named)') AS who, COUNT(*) AS n
+            FROM   sei_exception WHERE data_source = :ds
+            GROUP  BY NVL(who_can_answer,'(no owner named)')""", {"ds": ds}):
+        owners[r.get("who")] = owners.get(r.get("who"), 0) + int(r.get("n") or 0)
+
+    owned = sum(n for w, n in owners.items() if w != "(no owner named)")
+    owner_rows = sorted(
+        ({"owner": w, "n": n} for w, n in owners.items() if w != "(no owner named)"),
+        key=lambda r: -r["n"])
+
+    return {
+        "data_source": ds,
+        "scope": {"in_scope": in_scope,
+                  "out_of_scope": excluded.get("OUT_OF_SCOPE", 0),
+                  "no_baseline": excluded.get("NO_BASELINE", 0),
+                  "total": sum(by.values())},
+        "buckets": buckets,
+        "has_datapoint": in_scope - buckets["none"],
+        "divergence": [{"verdict": v, "n": by.get(v, 0)}
+                       for v in BUSINESS_BUCKET["diff"] if by.get(v, 0)],
+        "open": {"unchecked": buckets["open"], "undecided": undecided,
+                 "exceptions": exceptions, "draft_rules": draft},
+        "owners": owner_rows,
+        # Open items with nobody named against them. The unchecked columns
+        # are the bulk of it and SEI_VERIFY cannot say whose they are.
+        "unowned": buckets["open"] + (undecided + exceptions - owned),
+        "unbucketed": [{"verdict": v, "n": n} for v, n in sorted(unbucketed.items())],
+        "ceiling": _ceiling(ds),
+        "scored": in_scope > 0,
+    }
+

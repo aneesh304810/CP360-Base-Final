@@ -40,6 +40,19 @@ export const crosswalkApi = {
                divergent: 0, undecided_dispositions: 0, open_exceptions: 0,
                verdicts: [], ceiling: { blocked: false, reason: "" } })),
 
+  // The business dashboard's rollup, added up server-side. Four tiles, a
+  // stacked bar and two bar panels all have to agree; a page that sums the
+  // same rows four times eventually disagrees with itself.
+  businessSummary: (data_source) =>
+    _get(`/sei-crosswalk/business-summary${_qs({ data_source })}`,
+      () => ({ data_source, scored: false,
+               scope: { in_scope: 0, out_of_scope: 0, no_baseline: 0, total: 0 },
+               buckets: { ready: 0, diff: 0, open: 0, none: 0 },
+               has_datapoint: 0, divergence: [],
+               open: { unchecked: 0, undecided: 0, exceptions: 0, draft_rules: 0 },
+               owners: [], unowned: 0, unbucketed: [],
+               ceiling: { blocked: false, reason: "" } })),
+
   laneSystems: (data_source) =>
     _get(`/sei-crosswalk/lane-systems${_qs({ data_source })}`,
       () => ({ data_source, systems: [] })),

@@ -84,8 +84,11 @@ ingestion/test/test_table_catalog.py
 api/app/routers_business_catalog.py
 ui/src/businessCatalog.js
 ui/src/plainRule.js
+ui/src/SeiBusinessSummary.jsx
 ui/test/business-catalog.test.jsx
 ui/test/plain-rule.test.jsx
+ui/test/sei-business.test.jsx
+api/test/test_business_summary.py
 ingestion/test/test_lane_lineage_parse.py
 docs/ingestion-prompts/PROMPT_IMDS_STAR_UAF_SEI_data_lineage.md
 docs/ingestion-prompts/PROMPT_PBDW_ADDVANTAGE_SEI_crosswalk.md
@@ -97,6 +100,7 @@ file copy would clobber work that is not mine.**
 ```
 api/app/main.py             two entries in the router mount tuple
 ui/src/BizLineage.jsx       business names on the table list, header and crumb
+ui/src/CrosswalkDashboard.jsx  the Business/Detail toggle + SeiBusinessSummary mount
 ingestion/run.py            one STEPS entry + one dispatch branch
 ui/src/LineageHome.jsx      CrosswalkDashboard, UAF in SYS_META, dsSystems, dictSys
 ui/src/LineageGraph.jsx     dim floors, empty-lane collapse, stage colour on nodes

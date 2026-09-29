@@ -151,6 +151,9 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
   // whole layout on every parent render.
   const nameOf = useCallback((code) => feedName(feedMap, code), [feedMap]);
   const [busy, setBusy] = useState(true);
+  // Which face of the same data is showing. Business is the landing: the
+  // verdict-first overview is still one click away and unchanged.
+  const [look, setLook] = useState("biz");
 
   // the drill stack — [{kind:"list", filter, title}, {kind:"column", ...}]
   const [stack, setStack] = useState([]);
@@ -497,6 +500,33 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
   const v = sum.verdicts || [];
   return (
     <div style={{ fontFamily: F }}>
+      {/* THE BUSINESS ANSWER FIRST. Three questions — does SEI have a
+          datapoint, would the value arrive the same, who still has to
+          decide — over the nine verdicts the rest of this page shows. The
+          verdicts are not replaced: every tile, band and bar drills into
+          the same list, and that list names the rule each field carries.
+          "Detail" collapses this back to the verdict-first overview for
+          anyone who works in it daily. */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center",
+        marginBottom: 12, flexWrap: "wrap" }}>
+        <span style={{ display: "inline-flex", borderRadius: 999, padding: 3, gap: 2,
+          background: t.navy || "#10193b" }}>
+          {[["biz", "Business"], ["detail", "Detail"]].map(([k, label]) => (
+            <button key={k} type="button" onClick={() => setLook(k)}
+              aria-pressed={look === k}
+              style={{ font: "inherit", fontSize: 11.5, padding: "4px 14px",
+                borderRadius: 999, border: 0, cursor: "pointer",
+                background: look === k ? "#2b9fe0" : "transparent",
+                fontWeight: look === k ? 500 : 400,
+                color: look === k ? "#fff" : "#c7d3de" }}>{label}</button>))}
+        </span>
+      </div>
+
+      {look === "biz" && (
+        <SeiBusinessSummary t={t} dataSource={ds} onDrill={drill}
+          onGlossary={openGlossary} />)}
+
+      {look === "detail" && (<>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(168px,1fr))",
         gap: 11, marginBottom: 16 }}>
         <Kpi t={t} v={sum.in_denominator} of={`of ${sum.total_columns}`} c={t.accent || "#0f4775"}
@@ -715,6 +745,7 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
               <span style={{ fontVariantNumeric: "tabular-nums" }}>{l.columns || 0}</span>,
               <Stack verdicts={l.verdicts} />])} />
         </Panel>)}
+      </>)}
     </div>);
 }
 
