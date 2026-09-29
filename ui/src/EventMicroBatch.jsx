@@ -20,7 +20,11 @@ import { evt360 } from "./event360_api_additions.js";
 // Event 360's own palette, imported rather than re-declared, so this tab
 // cannot drift from the five beside it. Marker green is TC.Marker — the
 // same hue the estate uses for a Marker event, validated all-pairs there.
-import { P, TC } from "./Event360.jsx";
+//
+// From eventPalette, NOT from Event360: Event360 imports this file, so
+// importing back from it is a cycle, and reading P at module top level
+// then hits the temporal dead zone at runtime.
+import { P, TC } from "./eventPalette.js";
 
 const MONO = P.mono;
 

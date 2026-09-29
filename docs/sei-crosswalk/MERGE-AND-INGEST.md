@@ -84,6 +84,7 @@ ingestion/test/test_table_catalog.py
 ingestion/test/test_micro_batch_markers.py
 ingestion/test/test_event360_expectations.py
 ui/src/EventMicroBatch.jsx
+ui/src/eventPalette.js
 api/app/routers_business_catalog.py
 ui/src/businessCatalog.js
 ui/src/plainRule.js

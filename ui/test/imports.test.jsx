@@ -75,11 +75,70 @@ files.forEach((f) => {
      `${f}: every component it renders is imported or defined`, missing.join(", "));
 });
 
+// ---- import cycles ----------------------------------------------------
+// The second runtime-only failure a clean build missed. Event360 imported
+// the Commit boundary tab; the tab imported the palette back from
+// Event360 and read it at module top level. Whichever module the bundler
+// evaluates first, the other's constants are still in the temporal dead
+// zone -- "Cannot access 'P' before initialization", in the browser, on
+// mount. esbuild resolves the cycle happily and says nothing.
+//
+// Not every cycle breaks: it only bites when the importing module reads
+// the value while the other is still evaluating. But a cycle between two
+// UI modules is never load-bearing here, and forbidding them outright is
+// cheaper than reasoning about evaluation order every time.
+const localImports = (file) => {
+  // Comment lines are skipped: several modules document their own usage
+  // with a sample `import ... from "./ThisFile"`, and counting that as an
+  // edge reported two files as importing themselves.
+  const src = fs.readFileSync(path.join(SRC, file), "utf8")
+    .split("\n").filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join("\n");
+  const out = [];
+  for (const m of src.matchAll(/^\s*(?:import|export)[^\n]*?from\s+["'](\.\/[^"']+)["']/gm)) {
+    let target = m[1].replace(/^\.\//, "");
+    if (!/\.(jsx?|mjs)$/.test(target)) {
+      for (const ext of [".js", ".jsx"]) {
+        if (fs.existsSync(path.join(SRC, target + ext))) { target += ext; break; }
+      }
+    }
+    if (fs.existsSync(path.join(SRC, target))) out.push(target);
+  }
+  return out;
+};
+
+const all = fs.readdirSync(SRC).filter((f) => /\.(jsx?|mjs)$/.test(f));
+const graph = new Map(all.map((f) => [f, localImports(f)]));
+const cycles = [];
+all.forEach((start) => {
+  const seen = new Set();
+  const walk = (node, trail) => {
+    if (node === start && trail.length) {
+      cycles.push([...trail, start].join(" -> "));
+      return;
+    }
+    if (seen.has(node)) return;
+    seen.add(node);
+    (graph.get(node) || []).forEach((n) => walk(n, [...trail, node]));
+  };
+  (graph.get(start) || []).forEach((n) => walk(n, [start]));
+});
+// One entry per cycle rather than one per rotation of it.
+const uniq = [...new Set(cycles.map((c) => {
+  const parts = c.split(" -> ").slice(0, -1).sort();
+  return parts.join(" + ");
+}))];
+ok(uniq.length === 0, "no module imports itself in a circle",
+   uniq.join(" | "));
+
 // The specific regression, named, so it cannot come back unnoticed.
 const cw = fs.readFileSync(path.join(SRC, "CrosswalkDashboard.jsx"), "utf8");
 ok(/<SeiBusinessSummary[\s/>]/.test(cw) ===
    /^import\s+SeiBusinessSummary\s+from/m.test(cw),
    "CrosswalkDashboard renders SeiBusinessSummary only if it imports it");
+
+ok(!/from\s+["']\.\/Event360\.jsx["']/.test(
+     fs.readFileSync(path.join(SRC, "EventMicroBatch.jsx"), "utf8")),
+   "EventMicroBatch takes the palette from eventPalette, not back from Event360");
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\nimport assertions pass");
 if (bad) process.exit(1);
