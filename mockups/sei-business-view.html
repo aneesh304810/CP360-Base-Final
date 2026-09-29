@@ -1,4 +1,4 @@
-<title>Can SEI Deliver This</title>
+<title>SEI Crosswalk Status</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500;700&display=swap">
 <style>
@@ -10,7 +10,13 @@
   --ink:#10193b; --sub:#4a5a68; --muted:#7b8894;
   --accent:#0f4775; --ok:#159943; --warn:#e67e22; --bad:#c1113a; --info:#0091bf;
   --star:#b5651d; --uaf:#0b7d7d; --sei:#0091bf;
-  --v-none:#c1113a; --v-diff:#e67e22; --v-open:#6b7c8a; --v-ready:#159943;
+  /* Status steps, run through the palette validator rather than eyeballed.
+     The first pair matters most: #159943 against #e67e22 sat 2.7 ΔE apart
+     under protanopia, so a red-green colourblind reader could not separate
+     "ready" from "would arrive different" in the stacked bar. Re-stepped to
+     11.3. The grey is deliberately low-chroma — "could not check" should
+     read as absent — and every use carries a text label beside it. */
+  --v-ready:#1a8f4c; --v-diff:#e8a33d; --v-open:#6b7c8a; --v-none:#c1113a;
   --f-ui:"Roboto","Helvetica Neue",Arial,sans-serif;
   --f-mono:"Roboto Mono",ui-monospace,Menlo,monospace;
 }
@@ -19,14 +25,16 @@
   --ink:#e8eef4; --sub:#a9b8c6; --muted:#7d8d9c;
   --accent:#5aa8e0; --ok:#3ec27a; --warn:#f0993f; --bad:#ef6b7f; --info:#4fb8e8;
   --star:#d08a3f; --uaf:#3ecfcf; --sei:#4fb8e8;
-  --v-none:#ef6b7f; --v-diff:#f0993f; --v-open:#8b9aa8; --v-ready:#3ec27a;
+  /* Dark is stepped from scratch against the dark surface, not flipped. */
+  --v-ready:#2ba05f; --v-diff:#e2a83a; --v-open:#7f8f9e; --v-none:#df5a70;
   color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0e1419; --panel:#161e26; --panel2:#24303a; --line:#2e3b47; --sunk:#111922;
   --ink:#e8eef4; --sub:#a9b8c6; --muted:#7d8d9c;
   --accent:#5aa8e0; --ok:#3ec27a; --warn:#f0993f; --bad:#ef6b7f; --info:#4fb8e8;
   --star:#d08a3f; --uaf:#3ecfcf; --sei:#4fb8e8;
-  --v-none:#ef6b7f; --v-diff:#f0993f; --v-open:#8b9aa8; --v-ready:#3ec27a;
+  /* Dark is stepped from scratch against the dark surface, not flipped. */
+  --v-ready:#2ba05f; --v-diff:#e2a83a; --v-open:#7f8f9e; --v-none:#df5a70;
   color-scheme:dark}
 
 *{box-sizing:border-box}
@@ -65,27 +73,64 @@ h2{font-size:16px;font-weight:500;margin:0;text-wrap:balance}
 .ceiling b{color:var(--warn)}
 .ceiling p{margin:0;font-size:12.5px;line-height:1.6;color:var(--sub);max-width:88ch}
 
-.answers{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+/* Stat tiles. The number is the point; the label names it; nothing else. */
+.tiles{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));
   margin-bottom:14px}
-.ans{background:var(--panel);border:1px solid var(--panel2);border-top:3px solid var(--c);
-  border-radius:5px;padding:14px 16px;text-align:left;font:inherit;color:inherit;
-  cursor:pointer;width:100%;display:block}
-.ans:hover{border-color:var(--c)}
-.ans:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.ans .q{font-size:11.5px;color:var(--muted);margin-bottom:6px}
-.ans .n{font-size:30px;font-weight:500;letter-spacing:-.02em;line-height:1.1;
-  color:var(--c);font-variant-numeric:tabular-nums}
-.ans .n small{font-size:13px;font-weight:400;color:var(--muted);margin-left:5px}
-.ans .a{font-size:13px;margin-top:4px;line-height:1.5}
-.ans .w{font-size:11px;color:var(--muted);margin-top:7px;line-height:1.5}
+.tile{background:var(--panel);border:1px solid var(--panel2);border-radius:6px;
+  padding:13px 15px;text-align:left;font:inherit;color:inherit;cursor:pointer;
+  width:100%;display:block;position:relative;overflow:hidden}
+.tile::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--c)}
+.tile:hover{border-color:var(--c)}
+.tile:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tile .n{font-size:29px;font-weight:500;letter-spacing:-.025em;line-height:1.1;
+  font-variant-numeric:tabular-nums}
+.tile .k{display:flex;align-items:center;gap:6px;font-size:12px;margin-top:3px}
+.tile .k i{width:9px;height:9px;border-radius:2px;background:var(--c);flex-shrink:0}
+.tile .p{font-size:11px;color:var(--muted);margin-top:3px;font-variant-numeric:tabular-nums}
 
-.bars{display:flex;height:9px;border-radius:5px;overflow:hidden;background:var(--sunk);
-  margin:4px 0 0}
-.bars i{display:block}
-.legend{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:10.5px;color:var(--sub);
-  margin-top:8px;align-items:center}
-.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;
+.panel{background:var(--panel);border:1px solid var(--panel2);border-radius:6px;
+  padding:14px 16px}
+.ptitle{font-size:12.5px;font-weight:500;margin-bottom:2px}
+.psub{font-size:11px;color:var(--muted);margin-bottom:11px}
+
+/* Stacked bar: 2px surface gaps between segments, rounded outer ends. */
+.stack{display:flex;height:30px;gap:2px;margin-bottom:9px}
+.stack button{border:0;padding:0;cursor:pointer;min-width:4px;background:var(--c);
+  position:relative}
+.stack button:first-child{border-radius:4px 0 0 4px}
+.stack button:last-child{border-radius:0 4px 4px 0}
+.stack button:hover{filter:brightness(1.07)}
+.stack button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.stack b{position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;font-size:11px;font-weight:700;color:#fff;
+  font-variant-numeric:tabular-nums;pointer-events:none}
+
+.legend{display:flex;flex-wrap:wrap;gap:7px 15px;font-size:11px;color:var(--sub);
+  align-items:center}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;
   vertical-align:-1px}
+
+/* Horizontal bars: thin marks, rounded data-end, recessive track. */
+.hb{display:grid;grid-template-columns:minmax(92px,auto) 1fr auto;gap:7px 10px;
+  align-items:center;font-size:12px}
+.hb .lab{color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hb .trk{height:12px;background:var(--sunk);border-radius:3px;overflow:hidden}
+.hb .trk i{display:block;height:12px;border-radius:0 3px 3px 0;background:var(--c)}
+.hb .val{font-variant-numeric:tabular-nums;color:var(--ink);font-weight:500;
+  text-align:right}
+.hbrow{display:contents;cursor:pointer}
+.hbrow:hover .lab{color:var(--ink)}
+
+.note{display:flex;gap:9px;align-items:baseline;font-size:11.5px;color:var(--sub);
+  background:var(--panel);border:1px solid var(--panel2);border-left:3px solid var(--warn);
+  border-radius:4px;padding:9px 13px;margin-bottom:14px;line-height:1.55}
+.note b{color:var(--warn);font-size:9.5px;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;flex-shrink:0}
+.note button{font:inherit;font-size:11.5px;background:none;border:0;padding:0;
+  color:var(--accent);cursor:pointer;text-decoration:underline}
+.grid2{display:grid;gap:12px;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);
+  margin-bottom:12px}
+@media (max-width:820px){.grid2{grid-template-columns:1fr}}
 
 .split{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
 .card{background:var(--panel);border:1px solid var(--panel2);border-radius:5px;
@@ -134,12 +179,10 @@ h2{font-size:16px;font-weight:500;margin:0;text-wrap:balance}
 </style>
 
 <div class="wrap">
-  <h1>Can SEI deliver what we have today?</h1>
-  <p class="sub" style="font-size:12.5px;margin:6px 0 0;max-width:84ch">
-    Three questions, for every field the incumbent feed carries into the warehouse:
-    does SEI have a datapoint for it, would the value arrive the same, and who
-    still has to decide. The nine technical verdicts behind these answers are on
-    the Crosswalk screen; this is what they add up to.</p>
+  <h1>SEI crosswalk</h1>
+  <p class="sub" style="font-size:12.5px;margin:5px 0 0;max-width:78ch">
+    Every field the incumbent feed carries, and where it stands. Click anything
+    to see the fields behind it.</p>
 
   <div class="bar">
     <span class="views">
@@ -237,6 +280,11 @@ const LANES = {
     counts:{ PROVEN_MATCH:0, NOT_COMPARABLE:34, DECODE_NEEDED:47,
              PRECISION_RISK:52, TYPE_SHIFT:35, UNKNOWN:263, NO_SOURCE:181 },
     open:{ undecided:96, exceptions:23, draftRules:74 },
+    // Open work only, so these sum to unchecked + undecided + exceptions
+    // (263 + 96 + 23 = 382). Summing them to the whole estate would have
+    // made the panel's own subtitle false.
+    owners:[["Fund Accounting",134],["Custody Ops",86],["Reference Data",60],
+            ["Client Reporting",38],["Tax & Regulatory",27],["Unassigned",37]],
     fields:[
       F({ name:"Book Value", col:"HOLDINGDBO.LOT_LEVEL_POSITION.BOOK_VALUE",
         contract:"Base_Amortized_Cost_7", sei:"positionAmortizedCostBase",
@@ -331,123 +379,142 @@ const fieldsOf = (b) => b === "has"
 function level0() {
   const d = L();
   if (!d.scored) {
-    return `<div class="box" style="max-width:74ch">
-      <h2>UAF is not being replaced</h2>
-      <p class="sub" style="margin:8px 0 0;font-size:13px">
-        ${d.scope.outOfScope} fields arrive on this lane and none of them is
-        scored, because nothing about UAF is changing. Scoring it would report
-        100% “SEI has nothing” against a lane nobody is touching, which is the
-        fastest way to have the whole report dismissed.</p>
-      <p class="sub" style="margin:10px 0 0;font-size:13px">
-        UAF is still in the lineage — the Source and Technical views show it in
-        full. It is out of this count, not out of the picture.</p>
-    </div>`;
+    return `<div class="panel" style="max-width:66ch">
+      <div class="ptitle">UAF is not scored</div>
+      <p class="sub" style="margin:6px 0 0;font-size:12.5px">
+        ${d.scope.outOfScope} fields arrive on this lane and nothing about it is
+        changing. Scoring it would report 100% “SEI has nothing” against a lane
+        nobody is replacing.</p>
+      <p class="mut" style="margin:8px 0 0;font-size:11.5px">
+        UAF is still in the lineage — out of this count, not out of the
+        picture.</p></div>`;
   }
   const total = d.scope.inScope;
-  const has = total - (d.counts.NO_SOURCE || 0);
-  const diff = countOf("diff"), open = countOf("open"), ready = countOf("ready");
   const none = d.counts.NO_SOURCE || 0;
+  const has = total - none;
+  const pct = (n) => Math.round((n / total) * 100);
 
-  const seg = (n, c) => n ? `<i style="width:${(n / total) * 100}%;background:${c}"></i>` : "";
+  const TILES = [
+    ["has",  "var(--sei)",      has,  "SEI has a datapoint",
+     `${pct(has)}% of fields in scope`],
+    ["diff", "var(--v-diff)",   countOf("diff"), "Would arrive different",
+     "rounded, cut, recoded or retyped"],
+    ["open", "var(--v-open)",   countOf("open"), "Not yet checked",
+     `${d.open.undecided} undecided · ${d.open.exceptions} exceptions`],
+    ["none", "var(--v-none)",   none, "SEI has nothing",
+     "arrives empty on cutover day"],
+  ];
+
+  // The stacked bar is the whole estate in one row. Segments carry their own
+  // number where they are wide enough, so identity never rests on colour.
+  const SEG = [
+    ["ready", "var(--v-ready)", countOf("ready"), "Ready"],
+    ["diff",  "var(--v-diff)",  countOf("diff"),  "Would arrive different"],
+    ["open",  "var(--v-open)",  countOf("open"),  "Not yet checked"],
+    ["none",  "var(--v-none)",  none,             "SEI has nothing"],
+  ].filter(([, , n]) => n > 0);
+
+  const DIVS = ["PRECISION_RISK", "DECODE_NEEDED", "TYPE_SHIFT", "NOT_COMPARABLE"]
+    .map((v) => [v, PLAIN[v].t, d.counts[v] || 0])
+    .sort((a, b) => b[2] - a[2]);
+  const dmax = Math.max(...DIVS.map((x) => x[2]), 1);
+  const omax = Math.max(...d.owners.map((x) => x[1]), 1);
 
   return `
-    <div class="ceiling">
-      <b style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;
-        flex-shrink:0;padding-top:2px">Read first</b>
-      <p><b>Nothing can be marked ready yet, and that is not a failure of the
-        mapping.</b> Proving two fields deliver the same value needs both sides'
-        shape read from the database. For the target we have a data dictionary —
-        a document describing the database, which cannot prove what the database
-        holds. Until one column-list extract is taken, the best any field can
-        reach is “would arrive different” or “could not check”. That single
-        extract is the highest-value action on this page.</p>
+    <div class="note">
+      <b>Note</b>
+      <span>Nothing can read “ready” yet. The target's shape comes from a data
+      dictionary, and a document describing a database cannot prove what it
+      holds — one column-list extract lifts that for every field at once.</span>
     </div>
 
-    <div class="answers">
-      <button class="ans" style="--c:var(--sei)" data-b="has">
-        <div class="q">Does SEI have a datapoint for it?</div>
-        <div class="n">${has}<small>of ${total} fields</small></div>
-        <div class="a">SEI has proposed something for ${Math.round((has / total) * 100)}%
-          of what the incumbent feed carries.</div>
-        <div class="bars">${seg(ready, "var(--v-ready)")}${seg(diff, "var(--v-diff)")}${seg(open, "var(--v-open)")}${seg(none, "var(--v-none)")}</div>
-        <div class="w">A proposal is not a delivery. The two answers beside this
-          one say what the ${has} are actually worth.</div>
-      </button>
-
-      <button class="ans" style="--c:var(--v-diff)" data-b="diff">
-        <div class="q">Would the value arrive the same?</div>
-        <div class="n">${diff}<small>would not</small></div>
-        <div class="a">Rounded, cut short, changed in kind, or needing a code
-          list nobody has written.</div>
-        <div class="w">These are the ones that pass a mapping review and fail a
-          reconciliation, because the field is populated and the number is
-          different.</div>
-      </button>
-
-      <button class="ans" style="--c:var(--v-open)" data-b="open">
-        <div class="q">What is still nobody's decision?</div>
-        <div class="n">${open}<small>unchecked</small></div>
-        <div class="a">Plus ${d.open.undecided} mappings with no disposition,
-          ${d.open.exceptions} open exceptions and ${d.open.draftRules} rules
-          drafted but not reviewed.</div>
-        <div class="w">Unchecked is not a pass. Most of these clear in one
-          extract rather than one at a time.</div>
-      </button>
-    </div>
-
-    <div class="legend">
-      <span><i style="background:var(--v-ready)"></i>ready (${ready})</span>
-      <span><i style="background:var(--v-diff)"></i>would arrive different (${diff})</span>
-      <span><i style="background:var(--v-open)"></i>could not check (${open})</span>
-      <span><i style="background:var(--v-none)"></i>SEI has nothing (${none})</span>
-      <span style="margin-left:auto" class="mut">Every field carries exactly one
-        of these — the first rule that stopped it.</span>
-    </div>
-
-    <h2 style="margin-top:20px">The gap that does not close by itself</h2>
-    <div class="split" style="margin-top:9px">
-      <button class="card" style="--c:var(--v-none)" data-b="none">
-        <div class="n">${none}</div>
-        <div class="t">SEI has nothing for these</div>
-        <div class="d">We feed these columns today and SEI has proposed no
-          datapoint at all. Each one arrives empty on cutover day unless SEI
-          proposes something or the business agrees to retire it.</div>
-      </button>
-      ${["NOT_COMPARABLE", "DECODE_NEEDED", "PRECISION_RISK", "TYPE_SHIFT"]
-        .map((v) => `
-        <button class="card" style="--c:var(--v-diff)" data-v="${v}">
-          <div class="n">${d.counts[v] || 0}</div>
-          <div class="t">${esc(PLAIN[v].t)}</div>
-          <div class="d">${esc(PLAIN[v].s)}</div>
+    <div class="tiles">
+      ${TILES.map(([k, c, n, label, sub]) => `
+        <button class="tile" style="--c:${c}" data-b="${k}">
+          <div class="n">${n}</div>
+          <div class="k"><i></i>${esc(label)}</div>
+          <div class="p">${esc(sub)}</div>
         </button>`).join("")}
     </div>
 
-    ${showScope ? `
-      <h2 style="margin-top:20px">What is excluded, and why</h2>
-      <div class="split" style="margin-top:9px">
-        <div class="card" style="--c:var(--muted);cursor:default">
-          <div class="n">${d.scope.outOfScope}</div>
-          <div class="t">Out of scope</div>
-          <div class="d">On a lane nobody is replacing, or a column the
-            programme has agreed is not in the cutover.</div>
+    <div class="grid2">
+      <div class="panel">
+        <div class="ptitle">Where the ${total} fields stand</div>
+        <div class="psub">One field, one state — the first rule that stopped it</div>
+        <div class="stack">
+          ${SEG.map(([k, c, n, label]) => `
+            <button style="--c:${c};flex:${n}" data-b="${k}"
+              title="${esc(label)} — ${n} fields, ${pct(n)}%">
+              ${pct(n) >= 8 ? `<b>${n}</b>` : ""}</button>`).join("")}
         </div>
-        <div class="card" style="--c:var(--muted);cursor:default">
-          <div class="n">${d.scope.noBaseline}</div>
-          <div class="t">No baseline to compare against</div>
-          <div class="d">Nothing feeds this column today either, so there is no
-            incumbent behaviour for SEI to match. Not a SEI finding.</div>
+        <div class="legend">
+          ${[["var(--v-ready)", "Ready", countOf("ready")],
+             ["var(--v-diff)", "Would arrive different", countOf("diff")],
+             ["var(--v-open)", "Not yet checked", countOf("open")],
+             ["var(--v-none)", "SEI has nothing", none]]
+            .map(([c, l, n]) => `<span><i style="background:${c}"></i>${l} ${n}</span>`)
+            .join("")}
         </div>
       </div>
-      <p class="mut" style="font-size:11.5px;margin-top:9px;max-width:80ch">
-        These are counted and shown rather than dropped. A denominator that
-        quietly excludes ${d.scope.outOfScope + d.scope.noBaseline} fields is
-        the fastest way to lose an audience's trust in the other numbers.</p>` : ""}`;
+
+      <div class="panel">
+        <div class="ptitle">Why they would differ</div>
+        <div class="psub">${countOf("diff")} fields SEI can supply, differently</div>
+        <div class="hb">
+          ${DIVS.map(([v, label, n]) => `
+            <span class="hbrow" data-v="${v}" title="${esc(PLAIN[v].s)}">
+              <span class="lab">${esc(label)}</span>
+              <span class="trk"><i style="--c:var(--v-diff);width:${(n / dmax) * 100}%"></i></span>
+              <span class="val">${n}</span>
+            </span>`).join("")}
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle">Who it waits on</div>
+      <div class="psub">Open items by the team that has to decide</div>
+      <div class="hb">
+        ${d.owners.map(([who, n]) => `
+          <span class="hbrow" data-owner="${esc(who)}">
+            <span class="lab">${esc(who)}</span>
+            <span class="trk"><i style="--c:${who === "Unassigned"
+              ? "var(--v-none)" : "var(--accent)"};width:${(n / omax) * 100}%"></i></span>
+            <span class="val">${n}</span>
+          </span>`).join("")}
+      </div>
+    </div>
+
+    ${showScope ? `
+      <div class="panel" style="margin-top:12px">
+        <div class="ptitle">Excluded from the ${total}</div>
+        <div class="psub">Counted and shown, not dropped</div>
+        <div class="hb">
+          <span class="hbrow" style="cursor:default">
+            <span class="lab">Out of scope</span>
+            <span class="trk"><i style="--c:var(--muted);width:${
+              (d.scope.outOfScope / (d.scope.outOfScope + d.scope.noBaseline)) * 100
+              }%"></i></span>
+            <span class="val">${d.scope.outOfScope}</span></span>
+          <span class="hbrow" style="cursor:default">
+            <span class="lab">No baseline</span>
+            <span class="trk"><i style="--c:var(--muted);width:${
+              (d.scope.noBaseline / (d.scope.outOfScope + d.scope.noBaseline)) * 100
+              }%"></i></span>
+            <span class="val">${d.scope.noBaseline}</span></span>
+        </div>
+        <p class="mut" style="font-size:11px;margin:9px 0 0">
+          On a lane nobody is replacing, or with nothing feeding the column today
+          either. Neither is a SEI finding.</p>
+      </div>` : ""}`;
 }
 
 function level1() {
-  const list = bucket.v ? L().fields.filter((f) => f.v === bucket.v)
-                        : fieldsOf(bucket.b);
-  const title = bucket.v ? PLAIN[bucket.v].t
+  let list = bucket.v ? L().fields.filter((f) => f.v === bucket.v)
+                      : fieldsOf(bucket.b);
+  if (bucket.owner) list = list.filter((f) => f.owner === bucket.owner);
+  const title = bucket.owner ? `${BUCKET[bucket.b].t} — ${bucket.owner}`
+    : bucket.v ? PLAIN[bucket.v].t
     : bucket.b === "has" ? "Every field SEI has proposed something for"
     : BUCKET[bucket.b].t;
   const n = bucket.v ? (L().counts[bucket.v] || 0)
@@ -580,10 +647,14 @@ document.addEventListener("click", (e) => {
   const v = e.target.closest("[data-v]");
   if (v) { bucket = { v: v.dataset.v }; level = 1; field = null;
            draw(); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+  const o = e.target.closest("[data-owner]");
+  if (o) { bucket = { b: "open", owner: o.dataset.owner }; level = 1; field = null;
+           draw(); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
   const r = e.target.closest("[data-f]");
   if (r) {
-    const list = bucket.v ? L().fields.filter((x) => x.v === bucket.v)
-                          : fieldsOf(bucket.b);
+    let list = bucket.v ? L().fields.filter((x) => x.v === bucket.v)
+                        : fieldsOf(bucket.b);
+    if (bucket.owner) list = list.filter((x) => x.owner === bucket.owner);
     field = list[+r.dataset.f]; level = 2;
     draw(); window.scrollTo({ top: 0, behavior: "smooth" }); return;
   }
