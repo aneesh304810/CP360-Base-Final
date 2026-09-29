@@ -388,6 +388,7 @@ class Event360Connector:
         markers = self._parse_markers(wb[got["markers"]]) if got.get("markers") else []
         if not got.get("markers"):
             self.notes.append("no Micro_Batch_Markers sheet in this workbook")
+        events, fields = self._demote_markers(events, fields, markers)
 
         self._gates(events, fields, types, domains, envelope, guidance, markers)
         self._finish()
@@ -573,6 +574,46 @@ class Event360Connector:
                 "source_row": i,
             })
         return out
+
+    def _demote_markers(self, events, fields, markers):
+        """A marker listed in Event_Catalog is still not a catalog event.
+
+        THE WORKBOOK ALREADY ANSWERED THIS. Micro_Batch_Markers carries a
+        column reading "Catalog event: No" for exactly these ids, and the
+        catalog lists them anyway. That is not an ambiguity to escalate --
+        it is one sheet stating the rule and another not following it, and
+        the rule is the explicit statement.
+
+        So the catalog rows are moved to where the workbook says they
+        belong, rather than the load being refused until somebody deletes
+        two rows by hand. Asking a human to keep two sheets in sync forever
+        is how they drifted apart in the first place.
+
+        LOUD, NOT SILENT. Every demotion is logged with the ids and the row
+        counts, because "the event count changed and nobody mentioned it"
+        is the failure this whole module is built to avoid. Anything the
+        marker sheet does NOT declare stays in the catalog and the gates
+        deal with it.
+        """
+        ids = {m.get("marker_id") for m in markers
+               if m.get("entry_kind") == "MARKER" and m.get("marker_id") is not None}
+        if not ids:
+            return events, fields
+        in_cat = sorted({e["event_id"] for e in events if e["event_id"] in ids})
+        if not in_cat:
+            return events, fields
+
+        kept_e = [e for e in events if e["event_id"] not in ids]
+        kept_f = [f for f in fields if f.get("event_id") not in ids]
+        log.warning("event360: %s listed in Event_Catalog AND declared a "
+                    "micro-batch marker. The marker sheet says these are not "
+                    "catalog events, so %d catalog row(s) and %d field row(s) "
+                    "were moved out of the event counts. Remove them from "
+                    "Event_Catalog and Field_Level_Details to silence this.",
+                    in_cat, len(events) - len(kept_e), len(fields) - len(kept_f))
+        self.notes.append(
+            f"demoted {len(in_cat)} marker(s) out of the catalog: {in_cat}")
+        return kept_e, kept_f
 
     def _marker_gates(self, markers, events=()):
         """The marker checks, on their own so they can be run on their own.

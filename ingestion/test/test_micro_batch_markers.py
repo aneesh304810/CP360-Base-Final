@@ -181,5 +181,51 @@ ok(EXPECT_MARKERS == 2 and MARKER_IDS == (1000, 1001),
    "the expected shape is stated in the module, not in this test",
    [EXPECT_MARKERS, MARKER_IDS])
 
+# ---- 6. a marker listed in the catalog is moved, not refused ----------
+# The workbook states in one sheet that these are not catalog events and
+# lists them in another as if they were. The explicit statement wins, and
+# the move is logged -- refusing the load until somebody deletes two rows
+# by hand is how the two sheets drifted apart in the first place.
+def cat(i, kind="Business"):
+    return {"event_id": i, "event_type": kind, "_is_marker": kind == "Marker"}
+
+
+EVENTS = [cat(1), cat(2), cat(1000, "Marker"), cat(1001, "Marker")]
+FIELDS = ([{"event_id": 1, "field_category": "PAYLOAD"}] * 4
+          + [{"event_id": 2, "field_category": "PAYLOAD"}] * 4
+          + [{"event_id": 1000, "field_category": "PAYLOAD"}] * 4
+          + [{"event_id": 1001, "field_category": "PAYLOAD"}] * 4)
+
+c = Event360Connector("unused")
+ev2, fl2 = c._demote_markers(EVENTS, FIELDS, out)
+ok([e["event_id"] for e in ev2] == [1, 2],
+   "the two markers leave the event count", [e["event_id"] for e in ev2])
+ok(len(fl2) == 8, "and their field rows leave with them", len(fl2))
+ok(not any(f["event_id"] in (1000, 1001) for f in fl2),
+   "no orphan field row is left pointing at a demoted event")
+ok(any("demoted" in n for n in c.notes), "and the move is recorded", c.notes)
+ok(c._marker_gates(out, ev2) is None and not c.gate_failures,
+   "after the move the collision gate is quiet", c.gate_failures)
+
+# nothing to demote leaves both lists untouched, by identity
+c2 = Event360Connector("unused")
+ev3, fl3 = c2._demote_markers([cat(1)], FIELDS[:4], out)
+ok(len(ev3) == 1 and len(fl3) == 4, "a clean catalog is unchanged",
+   [len(ev3), len(fl3)])
+ok(c2.notes == [], "and nothing is logged about it", c2.notes)
+
+# only DECLARED markers are demoted -- an id the sheet does not name stays
+c3 = Event360Connector("unused")
+ev4, _ = c3._demote_markers([cat(1), cat(1002, "Marker")], [], out)
+ok([e["event_id"] for e in ev4] == [1, 1002],
+   "an undeclared marker id stays in the catalog for the gates to judge",
+   [e["event_id"] for e in ev4])
+
+# no marker sheet at all -- nothing is demoted on a guess
+c4 = Event360Connector("unused")
+ev5, fl5 = c4._demote_markers(EVENTS, FIELDS, [])
+ok(len(ev5) == 4 and len(fl5) == 16,
+   "with no marker sheet nothing is demoted", [len(ev5), len(fl5)])
+
 print(f"\n{BAD} assertion(s) failed" if BAD else "\nmicro-batch marker assertions pass")
 sys.exit(1 if BAD else 0)

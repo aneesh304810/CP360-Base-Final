@@ -203,15 +203,28 @@ Two different things are in that list.
 
 ### 1. The markers are in Event_Catalog as well as their own sheet
 
-`107 = 105 + 2`, and the warnings name ids 1000 and 1001. Take them out of
-`Event_Catalog`, `Field_Level_Details` and `Consumption_Guidance` and leave
-them only in `Micro_Batch_Markers`.
+`107 = 105 + 2`, and the warnings name ids 1000 and 1001.
 
-The workbook currently contradicts itself: the marker sheet says
-**Catalog event: No** and the catalog contains them. Leaving them in makes
-every "how many events are there" answer wrong by two, and
-`duplicate sections: ['2.3']` is the same collision seen from the section
-index.
+**The loader now handles this itself.** The workbook already answered the
+question — `Micro_Batch_Markers` carries a column reading *Catalog event:
+No* for exactly these ids — so a catalog row that a marker row declares is
+moved out of the event counts rather than the load being refused until
+somebody deletes two rows by hand. That move is logged with the ids and the
+row counts every time it happens:
+
+```
+event360: [1000, 1001] listed in Event_Catalog AND declared a micro-batch
+marker. The marker sheet says these are not catalog events, so 2 catalog
+row(s) and 8 field row(s) were moved out of the event counts.
+```
+
+It clears `event count`, `field count`, `duplicate sections` and the marker
+collision in one go. Tidying the workbook silences the warning, and is
+still worth doing — but the load no longer waits on it.
+
+Only ids the marker sheet **declares** are moved. An id the sheet does not
+name stays in the catalog for the gates to judge, and with no marker sheet
+at all nothing is moved on a guess.
 
 ### 2. The specification moved
 
@@ -223,10 +236,14 @@ That is a decision, not a bug, and the right response is not to edit the
 constants in a hurry. Declare the new shape, and the run log records it:
 
 ```powershell
-$env:CP_EVENT360_EXPECT_EVENTS   = "105"     # after the markers come out
-$env:CP_EVENT360_EXPECT_FIELDS   = "575"
 $env:CP_EVENT360_PAYLOAD_BY_TYPE = "System=3"
 ```
+
+The counts need no override once the markers are demoted — 105 and 575 are
+reached again on their own. Declare the width, re-run, and read what the
+arithmetic gate says next: it recomputes the expected total from the
+declared widths, so if a gap remains it will name the size of it rather
+than repeating the old number.
 
 Every override logs at WARNING with the old value beside the new. **An
 override is an expectation, not an exemption** — a declared width that is
