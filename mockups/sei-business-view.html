@@ -1,0 +1,606 @@
+<title>Can SEI Deliver This</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500;700&display=swap">
+<style>
+/* Layout: three answers across the top, the fields behind each one below,
+   then one field's whole case. Tokens are Lineage 360's own — a screen
+   inside the app, not a separate document. */
+:root{
+  --bg:#f5f8f8; --panel:#fff; --panel2:#dfe6e9; --line:#c9d4dc; --sunk:#eef3f5;
+  --ink:#10193b; --sub:#4a5a68; --muted:#7b8894;
+  --accent:#0f4775; --ok:#159943; --warn:#e67e22; --bad:#c1113a; --info:#0091bf;
+  --star:#b5651d; --uaf:#0b7d7d; --sei:#0091bf;
+  --v-none:#c1113a; --v-diff:#e67e22; --v-open:#6b7c8a; --v-ready:#159943;
+  --f-ui:"Roboto","Helvetica Neue",Arial,sans-serif;
+  --f-mono:"Roboto Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1419; --panel:#161e26; --panel2:#24303a; --line:#2e3b47; --sunk:#111922;
+  --ink:#e8eef4; --sub:#a9b8c6; --muted:#7d8d9c;
+  --accent:#5aa8e0; --ok:#3ec27a; --warn:#f0993f; --bad:#ef6b7f; --info:#4fb8e8;
+  --star:#d08a3f; --uaf:#3ecfcf; --sei:#4fb8e8;
+  --v-none:#ef6b7f; --v-diff:#f0993f; --v-open:#8b9aa8; --v-ready:#3ec27a;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1419; --panel:#161e26; --panel2:#24303a; --line:#2e3b47; --sunk:#111922;
+  --ink:#e8eef4; --sub:#a9b8c6; --muted:#7d8d9c;
+  --accent:#5aa8e0; --ok:#3ec27a; --warn:#f0993f; --bad:#ef6b7f; --info:#4fb8e8;
+  --star:#d08a3f; --uaf:#3ecfcf; --sei:#4fb8e8;
+  --v-none:#ef6b7f; --v-diff:#f0993f; --v-open:#8b9aa8; --v-ready:#3ec27a;
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-ui);
+  font-size:13.5px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{padding-block:18px;padding-inline:16px;max-width:1500px;margin:0 auto}
+h1{font-size:20px;font-weight:500;margin:0;letter-spacing:-.01em;text-wrap:balance}
+h2{font-size:16px;font-weight:500;margin:0;text-wrap:balance}
+.eyebrow{font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted)}
+.mono{font-family:var(--f-mono)}
+.sub{color:var(--sub)} .mut{color:var(--muted)}
+
+.views{display:inline-flex;background:var(--ink);border-radius:999px;padding:3px;gap:2px}
+.views button{font:inherit;font-size:11.5px;padding:4px 14px;border-radius:999px;
+  border:0;background:none;color:#c7d3de;cursor:pointer}
+.views button[aria-pressed="true"]{background:#2b9fe0;color:#fff;font-weight:500}
+.lane{display:inline-flex;gap:0;border:1px solid var(--panel2);border-radius:999px;
+  overflow:hidden;background:var(--panel)}
+.lane button{font:inherit;font-size:11.5px;padding:5px 15px;border:0;cursor:pointer;
+  background:none;color:var(--sub)}
+.lane button[aria-pressed="true"]{color:#fff;font-weight:500}
+.lane button.star[aria-pressed="true"]{background:var(--star)}
+.lane button.uaf[aria-pressed="true"]{background:var(--uaf)}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0 8px}
+.crumb{display:flex;gap:7px;align-items:center;flex-wrap:wrap;font-size:12px;
+  color:var(--muted);margin:10px 0 16px}
+.crumb button{font:inherit;font-size:12px;background:none;border:0;padding:0;
+  color:var(--accent);cursor:pointer}
+.crumb button:hover{text-decoration:underline}
+.ghost{font:inherit;font-size:11px;padding:4px 11px;border-radius:3px;cursor:pointer;
+  border:1px solid var(--panel2);background:var(--panel);color:var(--accent)}
+
+.ceiling{display:flex;gap:12px;background:var(--panel);border:1px solid var(--panel2);
+  border-left:4px solid var(--warn);border-radius:5px;padding:13px 16px;margin-bottom:16px}
+.ceiling b{color:var(--warn)}
+.ceiling p{margin:0;font-size:12.5px;line-height:1.6;color:var(--sub);max-width:88ch}
+
+.answers{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  margin-bottom:14px}
+.ans{background:var(--panel);border:1px solid var(--panel2);border-top:3px solid var(--c);
+  border-radius:5px;padding:14px 16px;text-align:left;font:inherit;color:inherit;
+  cursor:pointer;width:100%;display:block}
+.ans:hover{border-color:var(--c)}
+.ans:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ans .q{font-size:11.5px;color:var(--muted);margin-bottom:6px}
+.ans .n{font-size:30px;font-weight:500;letter-spacing:-.02em;line-height:1.1;
+  color:var(--c);font-variant-numeric:tabular-nums}
+.ans .n small{font-size:13px;font-weight:400;color:var(--muted);margin-left:5px}
+.ans .a{font-size:13px;margin-top:4px;line-height:1.5}
+.ans .w{font-size:11px;color:var(--muted);margin-top:7px;line-height:1.5}
+
+.bars{display:flex;height:9px;border-radius:5px;overflow:hidden;background:var(--sunk);
+  margin:4px 0 0}
+.bars i{display:block}
+.legend{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:10.5px;color:var(--sub);
+  margin-top:8px;align-items:center}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;
+  vertical-align:-1px}
+
+.split{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+.card{background:var(--panel);border:1px solid var(--panel2);border-radius:5px;
+  padding:13px 15px;text-align:left;font:inherit;color:inherit;cursor:pointer;width:100%}
+.card:hover{border-color:var(--accent)}
+.card .t{font-size:13.5px;font-weight:500}
+.card .n{font-size:20px;font-weight:500;color:var(--c);font-variant-numeric:tabular-nums}
+.card .d{font-size:11.5px;color:var(--sub);margin-top:4px;line-height:1.5}
+
+.rows{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.row{display:flex;gap:13px;align-items:center;width:100%;text-align:left;font:inherit;
+  color:inherit;background:var(--panel);border:1px solid var(--panel2);border-radius:5px;
+  padding:10px 14px;cursor:pointer}
+.row:hover{border-color:var(--accent)}
+.row .nm{font-size:13px;font-weight:500}
+.row .cd{font-family:var(--f-mono);font-size:10.5px;color:var(--muted);margin-left:7px}
+.row .df{font-size:11.5px;color:var(--sub);margin-top:2px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.grow{flex:1;min-width:0}
+.pill{font-size:10px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap;
+  background:color-mix(in srgb,var(--c) 15%,transparent);color:var(--c)}
+
+.detail{display:grid;gap:14px;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);
+  align-items:start}
+@media (max-width:880px){.detail{grid-template-columns:1fr}}
+.box{background:var(--panel);border:1px solid var(--panel2);border-radius:6px;
+  padding:15px 17px}
+.sides{display:grid;gap:12px;grid-template-columns:1fr auto 1fr;align-items:center}
+@media (max-width:620px){.sides{grid-template-columns:1fr}}
+.side{background:var(--sunk);border:1px solid var(--panel2);border-radius:4px;
+  padding:11px 13px;min-width:0}
+.side .w{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--muted)}
+.side .v{font-family:var(--f-mono);font-size:11.5px;margin-top:3px;overflow-wrap:anywhere}
+.side .ty{font-size:11px;color:var(--sub);margin-top:3px}
+.arrow{font-size:17px;color:var(--muted);text-align:center}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12.5px}
+.kv dt{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);padding-top:3px;white-space:nowrap}
+.kv dd{margin:0;color:var(--sub);min-width:0;overflow-wrap:anywhere}
+.clear{background:color-mix(in srgb,var(--ok) 11%,transparent);border-radius:4px;
+  padding:11px 13px;font-size:12.5px;line-height:1.55;color:var(--sub)}
+.clear b{color:var(--ok)}
+.foot{margin-top:20px;font-size:11px;color:var(--muted);line-height:1.65;max-width:92ch}
+.foot b{color:var(--sub)}
+</style>
+
+<div class="wrap">
+  <h1>Can SEI deliver what we have today?</h1>
+  <p class="sub" style="font-size:12.5px;margin:6px 0 0;max-width:84ch">
+    Three questions, for every field the incumbent feed carries into the warehouse:
+    does SEI have a datapoint for it, would the value arrive the same, and who
+    still has to decide. The nine technical verdicts behind these answers are on
+    the Crosswalk screen; this is what they add up to.</p>
+
+  <div class="bar">
+    <span class="views">
+      <button aria-pressed="true">Business view</button>
+      <button aria-pressed="false">Crosswalk</button>
+      <button aria-pressed="false">Readiness</button>
+    </span>
+    <span class="lane">
+      <button class="star" id="p-star" aria-pressed="true">STAR → IMDS</button>
+      <button class="uaf" id="p-uaf" aria-pressed="false">UAF → IMDS</button>
+    </span>
+    <span style="margin-left:auto"><button class="ghost" id="scope">Show what is
+      excluded</button></span>
+  </div>
+
+  <nav class="crumb" id="crumb"></nav>
+  <div id="view"></div>
+
+  <p class="foot"><b>Mockup.</b> The verdict vocabulary, the ordering
+    (first match wins, so a field carries the rule that stopped it) and the
+    evidence ceiling are the crosswalk's own, from
+    <span class="mono">crosswalkGlossary.js</span> and
+    <span class="mono">SEI_VERIFY</span>. Field counts are illustrative until
+    this is wired to <span class="mono">/sei-crosswalk/summary</span>,
+    <span class="mono">/columns</span>, <span class="mono">/divergence</span>
+    and <span class="mono">/exceptions</span>, all of which already return
+    what it needs.</p>
+</div>
+
+<script>
+"use strict";
+/* ------------------------------------------------------------------ data */
+/* The nine verdicts, grouped into the three questions a business audience
+   asks. The grouping is presentation only — a field keeps the verdict the
+   algorithm gave it, and the detail view names that verdict, because a
+   business summary that cannot be traced back to the rule that produced it
+   is a summary nobody can act on. */
+const BUCKET = {
+  ready: { c:"var(--v-ready)", t:"Ready to cut over",
+    verdicts:["PROVEN_MATCH"] },
+  diff:  { c:"var(--v-diff)",  t:"Would arrive different",
+    verdicts:["NOT_COMPARABLE","DECODE_NEEDED","PRECISION_RISK","TYPE_SHIFT"] },
+  open:  { c:"var(--v-open)",  t:"Nobody has decided",
+    verdicts:["UNKNOWN"] },
+  none:  { c:"var(--v-none)",  t:"SEI has nothing",
+    verdicts:["NO_SOURCE"] },
+};
+
+/* What each verdict means to someone who does not read schemas, and the
+   specific thing that changes it. "More analysis" is not an answer. */
+const PLAIN = {
+  PROVEN_MATCH: { t:"Same value, proven",
+    s:"SEI's datapoint and the field we use today are the same shape and the "
+     +"same meaning, and both statements rest on the database rather than on "
+     +"a document describing it.",
+    clear:"Nothing to clear." },
+  NOT_COMPARABLE: { t:"Several things become one",
+    s:"The field we use today is assembled from more than one thing, so there "
+     +"is no single SEI datapoint to compare it against.",
+    clear:"Split the field into its parts, or agree which part SEI supplies "
+     +"and where the rest comes from." },
+  DECODE_NEEDED: { t:"A code needs translating",
+    s:"Both sides hold a code, and nobody has written down which of SEI's "
+     +"codes means which of ours.",
+    clear:"One code list from SEI, agreed against ours. A missing entry does "
+     +"not fail — it produces a valid-looking wrong value." },
+  PRECISION_RISK: { t:"The value would lose detail",
+    s:"It fits the type but not the room — more decimal places than the "
+     +"target holds, or a longer name than it will take.",
+    clear:"Widen the target column, or agree in writing that rounding here is "
+     +"acceptable and who signed that off." },
+  TYPE_SHIFT: { t:"It changes kind",
+    s:"Not a width problem, a kind problem — text where we hold a number, or "
+     +"a date. A conversion has to happen and nobody has specified which.",
+    clear:"Specify the conversion: the format, and what happens to a value "
+     +"that will not convert." },
+  UNKNOWN: { t:"We could not check it",
+    s:"Something the check needs is missing — a type, a length, a unit — or "
+     +"the value we had was assumed rather than read. This is not a pass.",
+    clear:"One extract usually clears hundreds at once: the column list for "
+     +"the target, a copybook or feed workbook for the source." },
+  NO_SOURCE: { t:"SEI has nothing for this",
+    s:"We feed this warehouse column today, the lane is in scope to be "
+     +"replaced, and SEI has proposed no datapoint for it at all. On cutover "
+     +"day the column arrives empty.",
+    clear:"SEI proposes a datapoint, or the business agrees the field is "
+     +"retired and says what depends on it." },
+};
+
+const F = (o) => ({ ...o });
+const LANES = {
+  STAR: {
+    label:"STAR → IMDS", scored:true,
+    scope:{ inScope:612, outOfScope:88, noBaseline:41 },
+    counts:{ PROVEN_MATCH:0, NOT_COMPARABLE:34, DECODE_NEEDED:47,
+             PRECISION_RISK:52, TYPE_SHIFT:35, UNKNOWN:263, NO_SOURCE:181 },
+    open:{ undecided:96, exceptions:23, draftRules:74 },
+    fields:[
+      F({ name:"Book Value", col:"HOLDINGDBO.LOT_LEVEL_POSITION.BOOK_VALUE",
+        contract:"Base_Amortized_Cost_7", sei:"positionAmortizedCostBase",
+        v:"PRECISION_RISK", owner:"Fund Accounting",
+        ours:["NUMBER(28,12)","amount · base currency"],
+        theirs:["decimal(19,4)","amount · base currency"],
+        why:"SEI supplies four decimal places. We hold twelve.",
+        impact:"Unit costs and yields computed from this will differ in the "
+              +"fifth decimal place. On a large position that is visible in "
+              +"a reconciliation." }),
+      F({ name:"Trade Date", col:"HOLDINGDBO.LOT_LEVEL_POSITION.TRADE_DATE",
+        contract:"Trade_Date_128", sei:"lotTradeDate", v:"TYPE_SHIFT",
+        owner:"Custody Ops", ours:["DATE","a date"], theirs:["varchar(10)","text"],
+        why:"SEI sends the date as text. We hold a date.",
+        impact:"Someone has to say which format the text is in. Read the wrong "
+              +"way round, 03/04 becomes 4 March instead of 3 April and "
+              +"nothing fails." }),
+      F({ name:"Investment Type", col:"HOLDINGDBO.LOT_LEVEL_POSITION.INV_TYPE",
+        contract:"Investment_Type_Code_42", sei:"instrumentClassification",
+        v:"DECODE_NEEDED", owner:"Reference Data",
+        ours:["CHAR(4)","our own code set"], theirs:["varchar(8)","SEI's code set"],
+        why:"Both sides hold a code and there is no crosswalk between them.",
+        impact:"Every report that groups by investment type depends on this. "
+              +"A code with no entry comes through unchanged and looks valid." }),
+      F({ name:"Accrued Income", col:"HOLDINGDBO.LOT_LEVEL_POSITION.ACCRUED_INCOME",
+        contract:"Base_Interest_Receivable_9", sei:null, v:"NO_SOURCE",
+        owner:"Fund Accounting", ours:["NUMBER(28,12)","amount · base currency"],
+        theirs:null,
+        why:"SEI has proposed no datapoint for this field.",
+        impact:"The column arrives empty on cutover day. Accrued income appears "
+              +"on client valuations." }),
+      F({ name:"Local FX Rate", col:"HOLDINGDBO.LOT_LEVEL_POSITION.LOCAL_FX_RATE",
+        contract:"FX_Rate_38", sei:"fxRateLocalToBase", v:"UNKNOWN",
+        owner:"Fund Accounting", ours:["NUMBER(28,12)","rate"],
+        theirs:["decimal","rate — precision not stated"],
+        why:"SEI's document does not state the precision, so the comparison "
+           +"could not be made.",
+        impact:"Not a pass. Until SEI states it, we do not know whether rates "
+              +"round the same way." }),
+      F({ name:"Custody Head Account",
+        col:"BBHRPTDBO.BBH_STAR_NAV_TB.cstdy_hd_acct_num",
+        contract:"Custody_Head_Account_Number", sei:"custodyAccountIdentifier",
+        v:"PRECISION_RISK", owner:"Custody Ops",
+        ours:["VARCHAR2(20)","account number"], theirs:["varchar(16)","account number"],
+        why:"SEI's field is four characters shorter than ours.",
+        impact:"Any account number longer than 16 characters is cut short, and "
+              +"a cut account number joins to nothing." }),
+      F({ name:"Position Cost Basis",
+        col:"HOLDINGDBO.POSITION_HIST.COST_BASIS",
+        contract:"BASE_AMORTIZED_COST_7,TRADE_DATE_CASH_136", sei:"positionCostBase",
+        v:"NOT_COMPARABLE", owner:"Fund Accounting",
+        ours:["NUMBER(28,12)","assembled from two fields"],
+        theirs:["decimal(19,4)","one datapoint"],
+        why:"Our field is built from two source fields depending on whether the "
+           +"position is cash. SEI proposes one datapoint.",
+        impact:"There is no like-for-like comparison to make until we agree "
+              +"which of the two SEI's datapoint corresponds to." }),
+      F({ name:"Amortisation Yield",
+        col:"BBHRPTDBO.BBH_STAR_NAV_TB.amt_yld",
+        contract:"Amortization_Yield_135", sei:null, v:"NO_SOURCE",
+        owner:"Fund Accounting", ours:["NUMBER(28,12)","rate"], theirs:null,
+        why:"SEI has proposed no datapoint for this field.",
+        impact:"Yield appears on the trial balance. The column arrives empty." }),
+    ],
+  },
+  UAF: {
+    label:"UAF → IMDS", scored:false,
+    scope:{ inScope:0, outOfScope:147, noBaseline:0 },
+    counts:{}, open:{ undecided:0, exceptions:0, draftRules:0 }, fields:[],
+  },
+};
+
+/* --------------------------------------------------------------- state */
+const el = (s) => document.querySelector(s);
+let lane = "STAR", level = 0, bucket = null, field = null, showScope = false;
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
+  (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const L = () => LANES[lane];
+const countOf = (b) => b === "has"
+  ? L().scope.inScope - (L().counts.NO_SOURCE || 0)
+  : (BUCKET[b] ? BUCKET[b].verdicts : []).reduce(
+      (n, v) => n + (L().counts[v] || 0), 0);
+// "has" is not one of the four buckets — it is everything except the one
+// that means SEI proposed nothing. Treating it as a bucket key threw on the
+// first card anyone would click.
+const fieldsOf = (b) => b === "has"
+  ? L().fields.filter((f) => f.v !== "NO_SOURCE")
+  : L().fields.filter((f) => (BUCKET[b] ? BUCKET[b].verdicts : []).includes(f.v));
+
+/* -------------------------------------------------------------- render */
+function level0() {
+  const d = L();
+  if (!d.scored) {
+    return `<div class="box" style="max-width:74ch">
+      <h2>UAF is not being replaced</h2>
+      <p class="sub" style="margin:8px 0 0;font-size:13px">
+        ${d.scope.outOfScope} fields arrive on this lane and none of them is
+        scored, because nothing about UAF is changing. Scoring it would report
+        100% “SEI has nothing” against a lane nobody is touching, which is the
+        fastest way to have the whole report dismissed.</p>
+      <p class="sub" style="margin:10px 0 0;font-size:13px">
+        UAF is still in the lineage — the Source and Technical views show it in
+        full. It is out of this count, not out of the picture.</p>
+    </div>`;
+  }
+  const total = d.scope.inScope;
+  const has = total - (d.counts.NO_SOURCE || 0);
+  const diff = countOf("diff"), open = countOf("open"), ready = countOf("ready");
+  const none = d.counts.NO_SOURCE || 0;
+
+  const seg = (n, c) => n ? `<i style="width:${(n / total) * 100}%;background:${c}"></i>` : "";
+
+  return `
+    <div class="ceiling">
+      <b style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+        flex-shrink:0;padding-top:2px">Read first</b>
+      <p><b>Nothing can be marked ready yet, and that is not a failure of the
+        mapping.</b> Proving two fields deliver the same value needs both sides'
+        shape read from the database. For the target we have a data dictionary —
+        a document describing the database, which cannot prove what the database
+        holds. Until one column-list extract is taken, the best any field can
+        reach is “would arrive different” or “could not check”. That single
+        extract is the highest-value action on this page.</p>
+    </div>
+
+    <div class="answers">
+      <button class="ans" style="--c:var(--sei)" data-b="has">
+        <div class="q">Does SEI have a datapoint for it?</div>
+        <div class="n">${has}<small>of ${total} fields</small></div>
+        <div class="a">SEI has proposed something for ${Math.round((has / total) * 100)}%
+          of what the incumbent feed carries.</div>
+        <div class="bars">${seg(ready, "var(--v-ready)")}${seg(diff, "var(--v-diff)")}${seg(open, "var(--v-open)")}${seg(none, "var(--v-none)")}</div>
+        <div class="w">A proposal is not a delivery. The two answers beside this
+          one say what the ${has} are actually worth.</div>
+      </button>
+
+      <button class="ans" style="--c:var(--v-diff)" data-b="diff">
+        <div class="q">Would the value arrive the same?</div>
+        <div class="n">${diff}<small>would not</small></div>
+        <div class="a">Rounded, cut short, changed in kind, or needing a code
+          list nobody has written.</div>
+        <div class="w">These are the ones that pass a mapping review and fail a
+          reconciliation, because the field is populated and the number is
+          different.</div>
+      </button>
+
+      <button class="ans" style="--c:var(--v-open)" data-b="open">
+        <div class="q">What is still nobody's decision?</div>
+        <div class="n">${open}<small>unchecked</small></div>
+        <div class="a">Plus ${d.open.undecided} mappings with no disposition,
+          ${d.open.exceptions} open exceptions and ${d.open.draftRules} rules
+          drafted but not reviewed.</div>
+        <div class="w">Unchecked is not a pass. Most of these clear in one
+          extract rather than one at a time.</div>
+      </button>
+    </div>
+
+    <div class="legend">
+      <span><i style="background:var(--v-ready)"></i>ready (${ready})</span>
+      <span><i style="background:var(--v-diff)"></i>would arrive different (${diff})</span>
+      <span><i style="background:var(--v-open)"></i>could not check (${open})</span>
+      <span><i style="background:var(--v-none)"></i>SEI has nothing (${none})</span>
+      <span style="margin-left:auto" class="mut">Every field carries exactly one
+        of these — the first rule that stopped it.</span>
+    </div>
+
+    <h2 style="margin-top:20px">The gap that does not close by itself</h2>
+    <div class="split" style="margin-top:9px">
+      <button class="card" style="--c:var(--v-none)" data-b="none">
+        <div class="n">${none}</div>
+        <div class="t">SEI has nothing for these</div>
+        <div class="d">We feed these columns today and SEI has proposed no
+          datapoint at all. Each one arrives empty on cutover day unless SEI
+          proposes something or the business agrees to retire it.</div>
+      </button>
+      ${["NOT_COMPARABLE", "DECODE_NEEDED", "PRECISION_RISK", "TYPE_SHIFT"]
+        .map((v) => `
+        <button class="card" style="--c:var(--v-diff)" data-v="${v}">
+          <div class="n">${d.counts[v] || 0}</div>
+          <div class="t">${esc(PLAIN[v].t)}</div>
+          <div class="d">${esc(PLAIN[v].s)}</div>
+        </button>`).join("")}
+    </div>
+
+    ${showScope ? `
+      <h2 style="margin-top:20px">What is excluded, and why</h2>
+      <div class="split" style="margin-top:9px">
+        <div class="card" style="--c:var(--muted);cursor:default">
+          <div class="n">${d.scope.outOfScope}</div>
+          <div class="t">Out of scope</div>
+          <div class="d">On a lane nobody is replacing, or a column the
+            programme has agreed is not in the cutover.</div>
+        </div>
+        <div class="card" style="--c:var(--muted);cursor:default">
+          <div class="n">${d.scope.noBaseline}</div>
+          <div class="t">No baseline to compare against</div>
+          <div class="d">Nothing feeds this column today either, so there is no
+            incumbent behaviour for SEI to match. Not a SEI finding.</div>
+        </div>
+      </div>
+      <p class="mut" style="font-size:11.5px;margin-top:9px;max-width:80ch">
+        These are counted and shown rather than dropped. A denominator that
+        quietly excludes ${d.scope.outOfScope + d.scope.noBaseline} fields is
+        the fastest way to lose an audience's trust in the other numbers.</p>` : ""}`;
+}
+
+function level1() {
+  const list = bucket.v ? L().fields.filter((f) => f.v === bucket.v)
+                        : fieldsOf(bucket.b);
+  const title = bucket.v ? PLAIN[bucket.v].t
+    : bucket.b === "has" ? "Every field SEI has proposed something for"
+    : BUCKET[bucket.b].t;
+  const n = bucket.v ? (L().counts[bucket.v] || 0)
+    : bucket.b === "has" ? L().scope.inScope - (L().counts.NO_SOURCE || 0)
+    : countOf(bucket.b);
+
+  return `
+    <h2>${esc(title)}</h2>
+    <p class="sub" style="font-size:12.5px;margin:4px 0 0">
+      ${n} field${n === 1 ? "" : "s"}.
+      ${bucket.v ? esc(PLAIN[bucket.v].s) : ""}</p>
+    ${bucket.v ? `<div class="clear" style="margin-top:11px;max-width:78ch">
+      <b>What clears it:</b> ${esc(PLAIN[bucket.v].clear)}</div>` : ""}
+    <div class="rows">
+      ${list.map((f, i) => `
+        <button class="row" data-f="${i}" data-src="${esc(f.name)}">
+          <span class="grow">
+            <span class="nm">${esc(f.name)}</span>
+            <span class="cd">${esc(f.col)}</span>
+            <div class="df">${esc(f.why)}</div>
+          </span>
+          <span class="mut" style="font-size:11px;flex-shrink:0">${esc(f.owner)}</span>
+          <span class="pill" style="--c:${
+            BUCKET.diff.verdicts.includes(f.v) ? "var(--v-diff)"
+            : f.v === "NO_SOURCE" ? "var(--v-none)" : "var(--v-open)"}"
+            >${esc(PLAIN[f.v].t)}</span>
+        </button>`).join("")}
+    </div>
+    ${list.length < n ? `<p class="mut" style="font-size:11.5px;margin-top:10px">
+      Showing ${list.length} of ${n}. The rest load as you scroll.</p>` : ""}`;
+}
+
+function level2() {
+  const f = field;
+  if (!f) return "";
+  const p = PLAIN[f.v];
+  return `
+    <div class="detail">
+      <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+        <div class="box">
+          <div style="font-size:21px;font-weight:500;letter-spacing:-.015em">
+            ${esc(f.name)}</div>
+          <div class="mono" style="font-size:11.5px;color:var(--muted);margin-top:3px">
+            ${esc(f.col)}</div>
+          <div style="margin-top:10px">
+            <span class="pill" style="--c:${
+              BUCKET.diff.verdicts.includes(f.v) ? "var(--v-diff)"
+              : f.v === "NO_SOURCE" ? "var(--v-none)" : "var(--v-open)"}"
+              >${esc(p.t)}</span>
+            <span class="mut" style="font-size:11px;margin-left:9px">
+              crosswalk verdict <span class="mono">${esc(f.v)}</span> —
+              the first rule that stopped this field</span>
+          </div>
+          <p class="sub" style="margin:11px 0 0;font-size:13px;max-width:68ch">
+            ${esc(p.s)}</p>
+        </div>
+
+        <div class="box">
+          <div class="eyebrow" style="margin-bottom:11px">What each side holds</div>
+          <div class="sides">
+            <div class="side">
+              <div class="w">What we use today</div>
+              <div class="v">${esc(f.contract)}</div>
+              <div class="ty">${esc((f.ours || []).join(" · "))}</div>
+            </div>
+            <div class="arrow">→</div>
+            <div class="side">
+              <div class="w">What SEI proposes</div>
+              <div class="v">${f.sei ? esc(f.sei)
+                : "<span style='color:var(--v-none)'>— nothing proposed —</span>"}</div>
+              <div class="ty">${f.theirs ? esc(f.theirs.join(" · ")) : "&nbsp;"}</div>
+            </div>
+          </div>
+          <p class="sub" style="margin:12px 0 0;font-size:12.5px">
+            <b style="color:var(--ink)">Why they differ:</b> ${esc(f.why)}</p>
+        </div>
+
+        <div class="box">
+          <div class="eyebrow" style="margin-bottom:8px">What it would mean</div>
+          <p class="sub" style="margin:0;font-size:13px;line-height:1.6">
+            ${esc(f.impact)}</p>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+        <div class="box">
+          <div class="eyebrow" style="margin-bottom:9px">What clears it</div>
+          <div class="clear"><b>Do this:</b> ${esc(p.clear)}</div>
+          <dl class="kv" style="margin-top:12px">
+            <dt>Owner</dt><dd>${esc(f.owner)}</dd>
+            <dt>Lane</dt><dd>${esc(L().label)}</dd>
+            <dt>Verdict</dt><dd class="mono">${esc(f.v)}</dd>
+          </dl>
+        </div>
+        <div class="box">
+          <div class="eyebrow" style="margin-bottom:8px">Why not “proven”</div>
+          <p class="sub" style="margin:0;font-size:12.5px;line-height:1.6">
+            Even if the shapes agreed, this field could not read “ready” today.
+            The target's type comes from a data dictionary, and a document
+            describing a database is not evidence of what the database holds.
+            One column-list extract lifts that ceiling for every field at once.</p>
+        </div>
+      </div>
+    </div>`;
+}
+
+function crumb() {
+  const p = [`<button data-go="0">${esc(L().label)}</button>`];
+  if (level >= 1) {
+    const t = bucket ? (bucket.v ? PLAIN[bucket.v].t
+      : bucket.b === "has" ? "SEI has a datapoint" : BUCKET[bucket.b].t) : "";
+    p.push("<span>›</span>", level === 1 ? `<span>${esc(t)}</span>`
+      : `<button data-go="1">${esc(t)}</button>`);
+  }
+  if (level === 2 && field) p.push(`<span>›</span><span>${esc(field.name)}</span>`);
+  el("#crumb").innerHTML = p.join(" ");
+}
+function draw() {
+  crumb();
+  el("#view").innerHTML = level === 0 ? level0() : level === 1 ? level1() : level2();
+}
+
+document.addEventListener("click", (e) => {
+  const g = e.target.closest("[data-go]");
+  if (g) { level = +g.dataset.go; if (level === 0) bucket = null; field = null;
+           draw(); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+  const b = e.target.closest("[data-b]");
+  if (b) { bucket = { b: b.dataset.b }; level = 1; field = null;
+           draw(); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+  const v = e.target.closest("[data-v]");
+  if (v) { bucket = { v: v.dataset.v }; level = 1; field = null;
+           draw(); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+  const r = e.target.closest("[data-f]");
+  if (r) {
+    const list = bucket.v ? L().fields.filter((x) => x.v === bucket.v)
+                          : fieldsOf(bucket.b);
+    field = list[+r.dataset.f]; level = 2;
+    draw(); window.scrollTo({ top: 0, behavior: "smooth" }); return;
+  }
+});
+el("#p-star").onclick = () => pick("STAR");
+el("#p-uaf").onclick = () => pick("UAF");
+function pick(l) {
+  lane = l; level = 0; bucket = null; field = null;
+  el("#p-star").setAttribute("aria-pressed", String(l === "STAR"));
+  el("#p-uaf").setAttribute("aria-pressed", String(l === "UAF"));
+  draw();
+}
+el("#scope").onclick = () => {
+  showScope = !showScope;
+  el("#scope").textContent = showScope ? "Hide what is excluded"
+                                       : "Show what is excluded";
+  if (level === 0) draw();
+};
+draw();
+</script>
