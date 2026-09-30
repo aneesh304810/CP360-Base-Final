@@ -175,3 +175,11 @@ happened rather than months later.
 bbhrepo is on the BBH network and this session cannot see it. I cannot
 tell you what is missing — but paste the step 1B output and I can write
 the port for each item, in the order above.
+
+If it is easier to get both trees in front of **enterprise Claude** as
+zips than to run the tool yourself,
+[`docs/PROMPT-bbhrepo-gap-report.md`](PROMPT-bbhrepo-gap-report.md) is the
+prompt to paste there. It asks for the same report in two rounds — the
+map first, then the contents of only the files we decide to port — and
+carries the rule that no credential, hostname or piece of production data
+comes back in the answer.

@@ -161,6 +161,62 @@ def tests(root):
     return out
 
 
+# Files whose content is worth fingerprinting. Everything else -- docs,
+# mockups, sample artifacts -- differs constantly and tells you nothing
+# about whether the two applications behave the same.
+_SRC_TREES = (("api/app", (".py",)), ("ingestion", (".py",)),
+              ("ui/src", (".jsx", ".js")), ("sql", (".sql",)),
+              ("tools", (".py", ".mjs")))
+
+# The registries. Several features each write one line into these, so a
+# whole-file copy in either direction silently deletes whatever the other
+# side registered. They are called out separately wherever they differ.
+REGISTRIES = {
+    "api/app/main.py", "ingestion/run.py", "ui/src/App.jsx",
+    "ui/src/AppShell.jsx", "ui/src/LineageHome.jsx",
+    "ui/src/CrosswalkDashboard.jsx", "ui/src/Event360.jsx",
+    "ui/src/SourceLineage.jsx", "ui/src/BizLineage.jsx",
+    "ui/src/LineageGraph.jsx", "ui/src/LegacyLineage.jsx",
+    "api/app/routers_legacy_source.py", "api/app/routers_legacy_graph.py",
+    "api/app/routers_event360.py",
+}
+
+
+def source_hashes(root):
+    """sha256 per source file, so "same" and "differs" are facts.
+
+    Only the hash goes in the inventory -- never the content. The file
+    this produces is meant to be pasted into a chat, and a CP 360
+    checkout holds connect strings and hostnames.
+    """
+    import hashlib
+    out = {}
+    for sub, exts in _SRC_TREES:
+        base = os.path.join(root, *sub.split("/"))
+        if not os.path.isdir(base):
+            continue
+        for dirpath, dirnames, filenames in os.walk(base):
+            dirnames[:] = [x for x in dirnames
+                           if x not in ("__pycache__", "node_modules")]
+            for fn in sorted(filenames):
+                if not fn.endswith(exts):
+                    continue
+                full = os.path.join(dirpath, fn)
+                rel = os.path.relpath(full, root).replace(os.sep, "/")
+                try:
+                    with open(full, "rb") as fh:
+                        data = fh.read()
+                except OSError:
+                    continue
+                # Line endings differ between a Windows checkout and a
+                # zip extracted elsewhere. Normalising them stops every
+                # single file reading as "differs".
+                norm = data.replace(b"\r\n", b"\n")
+                out[rel] = {"sha": hashlib.sha256(norm).hexdigest()[:16],
+                            "lines": norm.count(b"\n") + 1}
+    return out
+
+
 def inventory(root):
     root = os.path.abspath(root)
     return {
@@ -173,6 +229,7 @@ def inventory(root):
         "sql": sql_files(root),
         "env_vars": env_vars(root),
         "tests": tests(root),
+        "source_hashes": source_hashes(root),
     }
 
 
@@ -235,6 +292,49 @@ def compare(a, b, name_a, name_b, verbose=False):
                           "sidebar entry has no screen behind it")):
             for r in inv["ui"][key]:
                 warn.append(f"  [{nm}] {msg}: {r}")
+
+    # ---- file level: same, differs, only one side ----------------------
+    ha = a.get("source_hashes") or {}
+    hb = b.get("source_hashes") or {}
+    if ha and hb:
+        shared = sorted(set(ha) & set(hb))
+        differ = [f for f in shared if ha[f]["sha"] != hb[f]["sha"]]
+        same = len(shared) - len(differ)
+        lines.append("\n## Source files")
+        lines.append(f"  {same} identical, {len(differ)} differ, "
+                     f"{len(set(ha) - set(hb))} only in {name_a}, "
+                     f"{len(set(hb) - set(ha))} only in {name_b}")
+
+        reg = [f for f in differ if f in REGISTRIES]
+        if reg:
+            lines.append("")
+            lines.append("  REGISTRIES that differ -- NEVER copy these whole "
+                         "in either direction.")
+            lines.append("  Several features each write one line into them; a "
+                         "whole-file copy")
+            lines.append("  deletes whatever the other side registered. Merge "
+                         "them line by line:")
+            for f in reg:
+                lines.append(f"      ! {f:<44} "
+                             f"{ha[f]['lines']:>5} vs {hb[f]['lines']:>5} lines")
+
+        rest = [f for f in differ if f not in REGISTRIES]
+        if rest:
+            lines.append("")
+            lines.append(f"  Other files that differ ({len(rest)}), biggest "
+                         f"line-count gap first:")
+            rest.sort(key=lambda f: -abs(ha[f]["lines"] - hb[f]["lines"]))
+            for f in rest[:60]:
+                la, lb = ha[f]["lines"], hb[f]["lines"]
+                gap = lb - la
+                flag = ("  <- " + name_b + " is "
+                        + str(abs(gap)) + " lines longer" if gap > 0 else
+                        "  <- " + name_a + " is "
+                        + str(abs(gap)) + " lines longer" if gap < 0 else
+                        "  <- same length, different content")
+                lines.append(f"      ~ {f:<44} {la:>5} vs {lb:>5}{flag}")
+            if len(rest) > 60:
+                lines.append(f"      ... and {len(rest) - 60} more")
 
     head = [f"# {name_a}  vs  {name_b}",
             f"  {name_a}: {a['root']}",
