@@ -331,7 +331,15 @@ class LegacyDictionaryConnector:
         target-table column, and matching it here would load 2,700 lineage
         rows as table descriptions."""
         if self.catalog_sheet:
-            return wb[self.catalog_sheet] if self.catalog_sheet in wb.sheetnames else None
+            if self.catalog_sheet in wb.sheetnames:
+                return wb[self.catalog_sheet]
+            # Named and absent. Returning None quietly loads no business
+            # names at all, and the Business view then shows physical
+            # names for a reason nobody can see.
+            log.warning("CP_LEGACY_TABLE_CATALOG_SHEET=%r is not a sheet in "
+                        "this workbook (has: %s) -- no table catalog loaded",
+                        self.catalog_sheet, ", ".join(wb.sheetnames))
+            return None
         for name in wb.sheetnames:
             if name in (self.lineage_sheet, self.dict_sheet, self.rich_sheet):
                 continue

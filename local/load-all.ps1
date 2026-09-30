@@ -89,8 +89,12 @@ $env:CP_LEGACY_DICT_XLSX         = "$Artifacts\CP_LEGACY_DICT_XLSX\ADDVMapping.x
 
 # TABLE CATALOG: what each warehouse TABLE is, in business words. This is
 # what the Lineage Business view reads for its headings -- without it the
-# view falls back to physical names like DIM_ACCOUNT. Auto-detected in
-# the dictionary workbook; name the sheet only to override.
+# view falls back to physical names like DIM_ACCOUNT.
+#
+# LEFT UNSET ON PURPOSE. The sheet is found by its headers, which is more
+# reliable than a name somebody typed: set this to a sheet the workbook
+# does not have and nothing is loaded. Set it only if auto-detect picks
+# the wrong sheet, and check the log line it prints either way.
 # $env:CP_LEGACY_TABLE_CATALOG_SHEET = "TABLE CATALOG"
 
 # ---- SEI CROSSWALK ---------------------------------------------------
@@ -146,7 +150,7 @@ $env:CP_VAR_IMDS_SCHEMA_SRC  = "IMDS_SRC"    # -- EDIT
 $env:CP_VAR_IMDS_SCHEMA_STG1 = "IMDS_STG"    # -- EDIT
 $env:CP_VAR_IMDS_SCHEMA_STG2 = "IMDS_STG"    # -- EDIT
 $env:CP_VAR_IMDS_SCHEMA_DWH  = "IMDS"        # -- EDIT
-# $env:CP_VAR_PARALLEL   = "4"
+$env:CP_VAR_PARALLEL         = "4"
 # Variance is NOT part of `python -m ingestion.run`; run it separately.
 
 # ---- optional supporting features (skip cleanly if absent) -----------
@@ -157,38 +161,98 @@ $env:DBT_DIALECT            = "oracle"
 $env:AIRFLOW_DSN            = "file:///$($Artifacts -replace '\\','/')/airflow-sim/airflow_metadata.json"
 $env:GLOSSARY_AUTHORED_PATH = "$Artifacts\GLOSSARY\business-glossary.md"
 $env:PII_ATTRIBUTES_PATH    = "$Artifacts\OVERLAY\PII_Attributes_List.xlsx"
-# $env:DBT_CATALOG_PATH     = "$Artifacts\dbt-artifacts\catalog.json"
-# $env:NON_SEI_SPEC_ROOT    = "$Artifacts\API-SPEC-NONSEI"
-# $env:AIRFLOW_DAGS_FILTER  = ""
+$env:DBT_CATALOG_PATH       = "$Artifacts\dbt-artifacts\catalog.json"
+$env:NON_SEI_SPEC_ROOT      = "$Artifacts\API-SPEC-NONSEI"
+$env:AIRFLOW_DAGS_FILTER    = ""     # empty = every DAG
 
 # ---- SIGN-IN AND ENTITLEMENT -----------------------------------------
-# OFF. No login screen, the full sidebar, every endpoint open -- how CP 360
-# has always run. See docs\security\README.md before changing it.
+# Read by the API, not by ingestion. Set here so one file describes the
+# whole deployment. Full guide: docs\security\README.md
+#
+# OFF. No login screen, the full sidebar, every endpoint open -- how
+# CP 360 has always run.
 #
 # It must be exactly "on". Not truthiness: "1", "true" and "yes" are NOT
 # read as on, and the API says so at startup rather than pretending to be
-# enabled. This variable is read by the API, not by ingestion -- it is set
-# here so one file describes the whole deployment.
+# enabled.
 $env:CP_SECURITY = "off"
 
-# Before switching to "on", all three or nobody can sign in:
-#   1. run sql\64_security.sql          (creates the tables, seeds modules)
-#   2. seed the first administrator     (the INSERT at the foot of that file)
-#   3. fill in the directory below
-# $env:CP_AD_HOST    = "dc01.bbh.com"
-# $env:CP_AD_PORT    = "636"
-# $env:CP_AD_USE_SSL = "1"          # 0 needs CP_AD_ALLOW_INSECURE=1 -- labs only
-# $env:CP_AD_DOMAIN  = "bbh.com"    # bind is <account>@<domain>
-# $env:CP_AD_BASE_DN = "DC=bbh,DC=com"   # optional: display name + e-mail
-# $env:CP_AD_TIMEOUT = "8"
+# The identity every request is served as while CP_SECURITY is off. It
+# shows in the audit trail and in /auth/me, flagged insecure.
+$env:CP_SECURITY_OPEN_USER = "local.user"
+
+# ---- Active Directory ------------------------------------------------
+# CP 360 asks AD one question -- "are these credentials yours" -- and
+# answers everything else itself. It never stores a password, and there
+# is no password to put here: the bind uses what the person types.
 #
-# $env:CP_SESSION_HOURS        = "10"
-# $env:CP_SESSION_IDLE_MINUTES = "120"
-# $env:CP_COOKIE_INSECURE      = "1"   # UI on plain HTTP in dev
+# LEFT EMPTY ON PURPOSE. An empty CP_AD_HOST is how /security/health
+# knows to report ad_configured: false. Filling it with a placeholder
+# would make the health check claim a directory that is not there. Put
+# your real domain controller in and it starts telling the truth.
+$env:CP_AD_HOST    = ""                 # e.g. dc01.bbh.com
+$env:CP_AD_PORT    = "636"              # 636 = LDAPS, 389 = plaintext
+$env:CP_AD_USE_SSL = "1"                # 1 = LDAPS. See the warning below.
+$env:CP_AD_DOMAIN  = ""                 # e.g. bbh.com -- bind is <account>@<domain>
+$env:CP_AD_BASE_DN = ""                 # e.g. DC=bbh,DC=com -- optional,
+                                        # only for display name and e-mail
+$env:CP_AD_TIMEOUT = "8"                # seconds to connect
+
+# CP_AD_USE_SSL=0 puts the password on the wire in clear text, so the
+# login refuses to attempt it. This override exists for a lab and must
+# not be set anywhere else. Deliberately left commented.
+# $env:CP_AD_ALLOW_INSECURE = "1"
+
+# ---- Sessions --------------------------------------------------------
+# How long a sign-in lasts, and how long it may sit idle. The session is
+# the cached answer from AD; a user disabled in CP 360 is stopped on
+# their next click regardless, because status is re-read every request.
+$env:CP_SESSION_HOURS        = "10"
+$env:CP_SESSION_IDLE_MINUTES = "120"
+
+# The session cookie is marked Secure, so a browser will not send it over
+# plain HTTP. Uncomment only if you run the UI on http:// in dev.
+# $env:CP_COOKIE_INSECURE = "1"
+
+# ---- CORS ------------------------------------------------------------
+# DELIBERATELY NOT SET. Leaving it unset means the API allows any origin,
+# which is what it does today. Setting it RESTRICTS the API to exactly
+# the origins listed -- for every request, whether or not CP_SECURITY is
+# on -- so a browser opening the UI at any other address stops working.
 #
-# Only when the UI and API are on different origins AND CP_SECURITY=on.
-# The vite dev server proxies /api, so it is already same-origin.
+# You need it only when the UI and API are on different origins AND
+# CP_SECURITY=on: a browser will not send the session cookie
+# cross-origin unless the API names the origin, and the spec forbids
+# naming it alongside "*". The vite dev server proxies /api, so the
+# normal laptop setup is already same-origin and needs nothing here.
+# List every address the UI is opened at, comma-separated.
 # $env:CP_CORS_ORIGINS = "http://localhost:5173"
+
+# ---- Before switching CP_SECURITY to "on" ----------------------------
+#   1. run sql\64_security.sql        (creates the tables, seeds modules)
+#   2. seed the first administrator   (the INSERT at the foot of that file)
+#   3. fill in CP_AD_HOST and CP_AD_DOMAIN above
+# Miss any one and nobody can sign in. Check with:
+#   curl http://localhost:8000/security/health
+
+# ---- what this run is configured to do -------------------------------
+Write-Host "`n=== Configuration ===" -ForegroundColor Cyan
+# Greedy .* up to the LAST @, so a password containing an @ cannot end up
+# on screen. Only the host and service are printed.
+$dsnHost = if ($env:CP_CATALOG_DB_DSN -match '^.*@(.+)$') { $Matches[1] } else { "(unset)" }
+Write-Host ("  {0,-26} {1}" -f "Catalog DB", $dsnHost)     # host only, never the password
+Write-Host ("  {0,-26} {1}" -f "Artifacts", $Artifacts)
+if ($env:CP_SECURITY -eq "on") {
+  if ($env:CP_AD_HOST) {
+    Write-Host ("  {0,-26} on - AD {1}" -f "Sign-in", $env:CP_AD_HOST) -ForegroundColor Green
+  } else {
+    Write-Host ("  {0,-26} on, but CP_AD_HOST is empty - NOBODY CAN SIGN IN" -f "Sign-in") -ForegroundColor Red
+  }
+} elseif ($env:CP_SECURITY -eq "off" -or -not $env:CP_SECURITY) {
+  Write-Host ("  {0,-26} off - no login, every request has full rights" -f "Sign-in") -ForegroundColor Yellow
+} else {
+  Write-Host ("  {0,-26} CP_SECURITY='{1}' is not understood - treated as OFF" -f "Sign-in", $env:CP_SECURITY) -ForegroundColor Red
+}
 
 # ---- show which input files actually exist ---------------------------
 Write-Host "`n=== Input files ===" -ForegroundColor Cyan
