@@ -74,8 +74,20 @@ $env:SEI_ORACLE_SCHEMAS = "SEI_RAW,SEI_STAGE"
 
 # --- 7. Runtime flags -------------------------------------------------
 $env:ENVIRONMENT             = "dev"
-$env:CATALOG_DISABLE_SECURITY = "true"
-$env:CORS_ORIGINS            = "http://localhost:5173"
+
+# Sign-in and entitlement. Off = no login screen, full sidebar, every
+# endpoint open, which is how CP 360 has always run. Change to "on" when
+# you are ready; see docs\security\README.md for the three things that
+# must be in place first (schema, a seeded administrator, a directory).
+# It must be exactly "on" -- "1", "true" and "yes" are not read as on, and
+# the API says so at startup rather than pretending to be enabled.
+$env:CP_SECURITY             = "off"
+
+# Only when the UI and API are on different origins AND CP_SECURITY=on.
+# $env:CP_CORS_ORIGINS       = "http://localhost:5173"
+
+# CATALOG_DISABLE_SECURITY and CORS_ORIGINS used to be set here. Nothing
+# ever read either of them; they are gone rather than left looking live.
 
 # --- Optional sources (leave unset locally; ingestion skips them) -----
 # $env:ORACLE_PROD_DSN     = "oracle://reader:pwd@oraprod:1521/PROD"
@@ -87,7 +99,7 @@ Write-Host ">>> Environment set:" -ForegroundColor Green
   "CP_CATALOG_DB_DSN","CP_CATALOG_ROOT","INTERFACE360_XLSX_PATH",
   "DATA360_FEED_DICTIONARY_PATH","PII_ATTRIBUTES_PATH","API_SPEC_ROOT",
   "POSTMAN_ROOT","DBT_MANIFEST_PATH","DBT_DIALECT","AIRFLOW_DSN",
-  "SEI_ORACLE_SCHEMAS","ENVIRONMENT","CATALOG_DISABLE_SECURITY",
+  "SEI_ORACLE_SCHEMAS","ENVIRONMENT","CP_SECURITY",
   "CP_EVENT360_XLSX","CP_EVENT_SUB_DIR","CP_SDC_COMPUTE_XLSX"
 ) | ForEach-Object {
   $val = [Environment]::GetEnvironmentVariable($_, "Process")

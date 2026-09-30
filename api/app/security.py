@@ -61,6 +61,11 @@ OPEN_USER = os.environ.get("CP_SECURITY_OPEN_USER", "local.user")
 _warned_at = [0.0]
 _WARN_EVERY = 300.0
 
+# Values that plainly mean "leave it off". Anything outside this set, and
+# outside "on", is a value somebody typed meaning something -- and the one
+# thing it must not do is quietly mean the opposite of what they meant.
+_OFF_WORDS = {"", "off", "0", "false", "no", "none", "disabled"}
+
 
 def mode() -> str:
     """Exactly "on" enables enforcement. Every other value is off.
@@ -68,9 +73,43 @@ def mode() -> str:
     Not truthiness: "0", "false" and "no" all read as true to a careless
     check, and a security control must not depend on which of those a
     deployment happened to type.
+
+    WHY AN UNRECOGNISED VALUE IS OFF AND NOT ON. "true", "yes", "enabled"
+    and "1" are all things somebody would write meaning to switch this on,
+    and reading them as off is the dangerous direction -- it is how a
+    system ends up unprotected while its config says otherwise. The other
+    direction is worse in practice: enforcing on a typo locks every user
+    out of an instance whose AD is not configured yet, with no way back in
+    through the app. So an unrecognised value stays off and shouts about
+    it -- at startup, on every /security/health, and in the log -- rather
+    than failing a way nobody can undo from a browser.
     """
-    return MODE_ON if (os.environ.get("CP_SECURITY") or "").strip().lower() \
-        == MODE_ON else MODE_OFF
+    return MODE_ON if _raw() == MODE_ON else MODE_OFF
+
+
+def _raw() -> str:
+    return (os.environ.get("CP_SECURITY") or "").strip().lower()
+
+
+def misconfigured() -> str:
+    """The CP_SECURITY value that is neither "on" nor a plain "off", or ""."""
+    raw = _raw()
+    return "" if raw == MODE_ON or raw in _OFF_WORDS else raw
+
+
+def describe() -> str:
+    """One line for a startup banner and for an operator asking."""
+    bad = misconfigured()
+    if bad:
+        return (f"CP_SECURITY={bad!r} is not understood — enforcement is OFF. "
+                f"Use exactly 'on' to enforce, or 'off' to be explicit.")
+    if enforcing():
+        host = (_ad_config()[0] or "").strip()
+        return (f"CP_SECURITY=on — AD sign-in required"
+                + (f", directory {host}" if host else
+                   ", but CP_AD_HOST is not set: no one can sign in"))
+    return ("CP_SECURITY is off — no sign-in, every request served with "
+            "full rights. Set CP_SECURITY=on in local/.env to enforce.")
 
 
 def enforcing() -> bool:
@@ -82,9 +121,7 @@ def _warn_off():
     if now - _warned_at[0] < _WARN_EVERY:
         return
     _warned_at[0] = now
-    log.warning("CP_SECURITY is not 'on' — every request is served as %s "
-                "with full rights and no authentication. Set CP_SECURITY=on "
-                "once AD is configured.", OPEN_USER)
+    log.warning("%s Requests are served as %s.", describe(), OPEN_USER)
 
 
 def open_user() -> dict:

@@ -155,8 +155,11 @@ description search where CTXAPP is available; falls back to LIKE otherwise.
 - **UI pending for**: Data 360 Business Glossary tab, Data 360 Pipeline Builder UI,
   Datapoint 360 screen wired to /datapoints (currently borrows PII data as stand-in).
   All three have working backends + APIs.
-- **Auth**: write endpoints (flow builder, pipeline builder) have no auth gate in dev
-  (CATALOG_DISABLE_SECURITY=true). Add auth before shared/prod use.
+- **Auth**: AD sign-in plus per-user module entitlement exists and is **off by
+  default** (`CP_SECURITY=off`); see docs/security/README.md. With it on, the
+  navigation and `/security/*` are enforced — the data and write endpoints
+  (flow builder, pipeline builder) still need `require_module` wired per router
+  before shared/prod use.
 - **Airflow metastore**: cannot be Oracle for live status — use a file export or
   Postgres metastore.
 - **Column lineage** depends on sqlglot parsing compiled SQL; complex SQL yields

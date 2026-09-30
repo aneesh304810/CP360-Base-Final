@@ -58,6 +58,16 @@ for _mod in ("routers_projects", "routers_data360",
         log.warning("could not mount %s: %s", _mod, e)
 
 
+# Posture on the startup banner. The per-request warning only appears once
+# somebody loads a page; an operator starting the API deserves to read what
+# it is doing before that.
+try:
+    from .security import describe as _sec_describe
+    log.warning("SECURITY: %s", _sec_describe())
+except Exception as e:  # noqa: BLE001
+    log.warning("SECURITY: could not determine posture: %s", e)
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}

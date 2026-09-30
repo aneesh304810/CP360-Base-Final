@@ -5,12 +5,22 @@ see".** Neither does the other's job: CP 360 never stores a password and
 never writes to the directory, and AD has no say in which modules
 somebody can open.
 
-Nothing changes until you turn it on. `CP_SECURITY` is unset by default,
-and with it unset the app behaves exactly as it did before this module
-existed — no login screen, the full sidebar, every endpoint open. That is
-deliberate: an authentication control that switches itself on during a
-deployment is an outage, not a security posture. It is also never quiet —
-see [Is it on?](#is-it-on) below.
+**It ships off.** `local/.env` carries `CP_SECURITY=off`, and with it off
+the app behaves exactly as it did before this module existed — no login
+screen, the full sidebar, every endpoint open. That is deliberate: an
+authentication control that switches itself on during a deployment is an
+outage, not a security posture. It is also never quiet — see
+[Is it on?](#is-it-on) below.
+
+**The one line that changes it** is in `local/.env` (copy it from
+`local/.env.example` if you have not):
+
+```ini
+CP_SECURITY=off     # -> on, once the three steps below are done
+```
+
+Read the rest of this page before flipping it: with `on` and no seeded
+administrator, nobody can reach the entitlement screen through the app.
 
 ---
 
@@ -66,13 +76,35 @@ the wire in clear text, so the login raises rather than attempting it.
 
 ### 4. Turn it on
 
-```bash
-export CP_SECURITY=on
+In `local/.env` (read by `local/start.ps1` and `local/start.sh`):
+
+```ini
+CP_SECURITY=on
 ```
 
-Exactly the string `on`. Not truthiness: `0`, `false` and `no` are all
+Restart the API. The startup banner states the posture:
+
+```
+WARNING cp.api SECURITY: CP_SECURITY=on — AD sign-in required, directory dc01.bbh.com
+```
+
+**Exactly the string `on`.** Not truthiness: `0`, `false` and `no` are all
 non-empty strings and a careless check would read every one of them as
 true.
+
+Anything the API does not recognise — `1`, `true`, `yes`, a typo — stays
+**off** and says so, on the startup banner, in `/security/health` and in
+the log:
+
+```
+WARNING cp.api SECURITY: CP_SECURITY='true' is not understood —
+        enforcement is OFF. Use exactly 'on' to enforce.
+```
+
+Off is the safer answer to an unrecognised value in practice, even though
+it is the less secure one: enforcing on a typo locks every user out of an
+instance whose AD is not configured, with no way back in through the
+browser. The shouting is what stops it being a silent failure.
 
 ### 5. If the UI is served from a different origin than the API
 
@@ -203,7 +235,7 @@ yet — that is a per-router change and is listed below.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `CP_SECURITY` | *(unset)* | `on` enforces. Anything else does not. |
+| `CP_SECURITY` | `off` in `local/.env` | `on` enforces. Anything else does not, and an unrecognised value is reported at startup. |
 | `CP_AD_HOST` | — | Domain controller. Required when enforcing. |
 | `CP_AD_PORT` | `636` | |
 | `CP_AD_USE_SSL` | `1` | `0` needs `CP_AD_ALLOW_INSECURE=1` |

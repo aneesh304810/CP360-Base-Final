@@ -118,7 +118,7 @@ $env:PII_ATTRIBUTES_PATH = "C:\SEI\CPcatalog\sample-artifacts\OVERLAY\PII_Attrib
 # $env:ORACLE_PLATFORM_ID  = "EXADATA"
 
 # ---- DEV flags ----
-$env:CATALOG_DISABLE_SECURITY = "true"   # no auth gate on write endpoints in dev
+$env:CP_SECURITY = "off"   # no sign-in; set to "on" to require AD login
 ```
 
 > Start with the **sample-artifacts paths** (above) to prove the stack end-to-end,
@@ -277,8 +277,12 @@ Repoint these vars at your real files, re-run ingestion:
 - `CP_CATALOG_ROOT` → folder with real interfaces.xlsx
 - `PII_ATTRIBUTES_PATH` → real PII attribute list
 
-Then before prod: set `CATALOG_DISABLE_SECURITY=false` and put auth in front of the
-write endpoints (flow builder, pipeline builder).
+Then before prod: set `CP_SECURITY=on` and follow
+[docs/security/README.md](docs/security/README.md) — AD sign-in, and per-user
+module grants under **Admin · Security Entitlement**. Note that entitlement
+currently governs the navigation and the `/security/*` routes; the data and write
+endpoints (flow builder, pipeline builder) still need `Depends(require_module(...))`
+added per router.
 
 ---
 

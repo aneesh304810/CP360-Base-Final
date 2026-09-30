@@ -75,6 +75,42 @@ p = with_env(CP_SECURITY="on")
 ok(S.enforcing() is True, "enforcing() follows mode()")
 restore(p)
 
+# ---- a value meant to enable it must not silently disable it ----------
+# "1", "true" and "yes" are all what somebody writes meaning ON. They stay
+# OFF -- enforcing on a typo locks everybody out of an instance with no AD
+# and no way back in through a browser -- but they must never do it
+# quietly.
+print("\n-- unrecognised values")
+for val in ("true", "yes", "1", "enable", "enabled", "TRUE", " Yes "):
+    p = with_env(CP_SECURITY=val)
+    ok(S.mode() == "off", f"CP_SECURITY={val!r} does not enforce", S.mode())
+    ok(S.misconfigured() == val.strip().lower(),
+       f"and {val!r} is reported as not understood", S.misconfigured())
+    ok("not understood" in S.describe() and "OFF" in S.describe(),
+       f"and describe() says so for {val!r}", S.describe())
+    restore(p)
+
+for val in ("off", "0", "false", "no", "none", "disabled", "OFF", " off ",
+            "", None):
+    p = with_env(CP_SECURITY=val)
+    ok(S.mode() == "off", f"CP_SECURITY={val!r} is off", S.mode())
+    ok(S.misconfigured() == "",
+       f"and {val!r} is a plain off, not a misconfiguration",
+       S.misconfigured())
+    restore(p)
+
+p = with_env(CP_SECURITY="on", CP_AD_HOST=None)
+ok(S.misconfigured() == "", "on is not a misconfiguration")
+ok("CP_AD_HOST is not set" in S.describe(),
+   "but describe() flags enforcement with no directory -- nobody could "
+   "sign in", S.describe())
+restore(p)
+
+p = with_env(CP_SECURITY="on", CP_AD_HOST="dc01.bbh.com")
+ok("dc01.bbh.com" in S.describe(), "and names the directory when there is one",
+   S.describe())
+restore(p)
+
 # ---- one spelling per person -------------------------------------------
 print("\n-- user normalisation")
 for raw, want in [("ana", "ANA"), ("Ana", "ANA"), ("  ana  ", "ANA"),

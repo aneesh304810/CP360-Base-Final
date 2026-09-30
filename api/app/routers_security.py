@@ -135,7 +135,14 @@ def security_health():
     st["mode"] = sec.mode()
     st["enforcing"] = sec.enforcing()
     st["ad_configured"] = bool((sec._ad_config()[0] or "").strip())
-    if not st["enforcing"]:
+    st["summary"] = sec.describe()
+    bad = sec.misconfigured()
+    if bad:
+        # The dangerous case: somebody set the switch believing they had
+        # turned it on. Say so first, before anything else on this page.
+        st["misconfigured"] = bad
+        st["warning"] = sec.describe()
+    elif not st["enforcing"]:
         st["warning"] = ("CP_SECURITY is not 'on'. Every request is served "
                          "with full rights and no authentication.")
     elif not st["admins"]:
