@@ -1,6 +1,6 @@
 # =====================================================================
-# CP Catalog — set local dev environment variables (PowerShell)
-# Usage:  . .\local\set-env.ps1      (note the leading dot + space —
+# CP Catalog -- set local dev environment variables (PowerShell)
+# Usage:  . .\local\set-env.ps1      (note the leading dot + space --
 #         this "dot-sources" the script so the vars persist in your shell)
 # =====================================================================
 
@@ -36,9 +36,9 @@ $env:REFERENCE_DATA_XLSX          = Join-Path $env:CP_CATALOG_ROOT "REFERENCE\SW
 
 # --- Event 360 -------------------------------------------------------------
 # Three steps, three sources, kept apart on purpose:
-#   event360           the CONTRACT       — what SEI says an event is
-#   event_subscription OUR decisions      — who consumes it (CSV you maintain)
-#   sdc_compute        the MEASURED bill  — warehouse time per SDC view
+#   event360           the CONTRACT       -- what SEI says an event is
+#   event_subscription OUR decisions      -- who consumes it (CSV you maintain)
+#   sdc_compute        the MEASURED bill  -- warehouse time per SDC view
 # All three default to these same paths, so you can leave every one of these
 # unset and the commands still work from the repo root. They are set here so
 # the load runs the same from any working directory.
@@ -46,7 +46,7 @@ $env:CP_EVENT360_XLSX     = Join-Path $env:CP_CATALOG_ROOT "EVENT-360"
 $env:CP_EVENT_SUB_DIR     = Join-Path $env:CP_CATALOG_ROOT "EVENT-360"
 $env:CP_SDC_COMPUTE_XLSX  = Join-Path $env:CP_CATALOG_ROOT "SDC-COMPUTE"
 
-# The folder may hold ONE workbook at a time — two are two different clients or
+# The folder may hold ONE workbook at a time -- two are two different clients or
 # periods, and guessing between them is worse than refusing. Point at the file
 # directly when you have several:
 # $env:CP_SDC_COMPUTE_XLSX = "D:\drops\SDC Client compute sizing reference.xlsx"
@@ -55,7 +55,7 @@ $env:CP_SDC_COMPUTE_XLSX  = Join-Path $env:CP_CATALOG_ROOT "SDC-COMPUTE"
 
 # Gates are hard by default and that is the point: a load that is four rows
 # short looks right on screen and quietly under-reports. 0/false/no downgrades
-# a failure to a logged ERROR and writes the rows ANYWAY — for inspecting a
+# a failure to a logged ERROR and writes the rows ANYWAY -- for inspecting a
 # workbook you know is mid-revision, not for getting past a gate.
 # $env:CP_EVENT360_STRICT     = "0"
 # $env:CP_SDC_COMPUTE_STRICT  = "0"
@@ -65,7 +65,7 @@ $env:CP_SDC_COMPUTE_XLSX  = Join-Path $env:CP_CATALOG_ROOT "SDC-COMPUTE"
 $env:DBT_MANIFEST_PATH = Join-Path $env:CP_CATALOG_ROOT "dbt-artifacts\manifest.json"
 $env:DBT_DIALECT       = "oracle"
 
-# --- 5. Airflow (simulated metadata FILE — note file:/// + forward slashes)
+# --- 5. Airflow (simulated metadata FILE -- note file:/// + forward slashes)
 $AirflowJson = (Join-Path $env:CP_CATALOG_ROOT "airflow-sim\airflow_metadata.json") -replace '\\','/'
 $env:AIRFLOW_DSN = "file:///$AirflowJson"
 

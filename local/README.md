@@ -28,6 +28,18 @@ and runs `npm install` for the UI.
 cp local/.env.example local/.env      # Windows: copy local\.env.example local\.env
 ```
 
+If you load with `local\load-all.ps1` rather than `.env`, do the same for
+the credentials it needs:
+
+```powershell
+copy local\secrets.ps1.example local\secrets.ps1
+```
+
+Both files are in `.gitignore`. Passwords used to sit inline in
+`load-all.ps1`, which put them in every clone and every commit that ever
+touched it; if yours was ever pushed, deleting the line does not remove
+it from the history -- rotate it.
+
 Edit `local/.env` and set two things:
 
 1. **`CP_CATALOG_DB_DSN`** — your Oracle connect string:

@@ -13,7 +13,8 @@ outage, not a security posture. It is also never quiet — see
 [Is it on?](#is-it-on) below.
 
 **The one line that changes it** is in `local/.env` (copy it from
-`local/.env.example` if you have not):
+`local/.env.example` if you have not), or in `local/load-all.ps1` if that
+is how you set your environment -- both carry it:
 
 ```ini
 CP_SECURITY=off     # -> on, once the three steps below are done

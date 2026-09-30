@@ -1,256 +1,240 @@
 # =====================================================================
-# load-all.ps1 - set env, run ingestion in order, print per-feature status.
-# Tailored to: C:\SEI\bbhcatalog\CP360-Base-Final  (venv: C:\SEI\seiml)
-# Usage: C:\SEI\seiml\Scripts\Activate.ps1 ; .\local\load-all.ps1
+# load-all.ps1 -- set every environment variable CP 360 reads, run the
+#                ingestion steps in dependency order, then report what
+#                actually landed.
 #
-# CHANGED FROM YOUR COPY - three fixes and one addition, all called out
-# where they happen:
-#   1. $Root said "CC:\..." (doubled C). Every Test-Path then reported
-#      [ -- ], Set-Location failed silently, and ingestion ran from
-#      whatever directory the shell happened to be in.
-#   2. The status probe parsed the DSN by hand and got user='oracle:'
-#      password='/' out of oracle://@host:port/service. It could never
-#      connect. It now uses the same parser the API uses.
-#   3. Nothing checked that the ingestion package Python imports is the
-#      one in $Root. With PYTHONPATH pointing at another checkout, it
-#      may not be - so the script now prints which one it resolved.
-#   4. Event 360's three steps and their row counts.
+#   C:\SEI\seiml\Scripts\Activate.ps1
+#   .\local\load-all.ps1
+#
+# PASSWORDS ARE NOT IN THIS FILE. They live in local\secrets.ps1, which
+# is in .gitignore. Copy local\secrets.ps1.example to local\secrets.ps1
+# and fill it in once; this script dot-sources it below and stops with
+# instructions if it is missing.
+#
+# EVERY VARIABLE HERE IS ONE THE CODE ACTUALLY READS. Ones that are
+# commented out are real and optional. Two that used to be set here --
+# CATALOG_DISABLE_SECURITY and CORS_ORIGINS -- were read by nothing at
+# all and have been removed rather than left looking live.
 # =====================================================================
 
-# ---- paths ----
-$Root      = "C:\SEI\bbhcatalog\CP360-Base-Final"
-$Artifacts = "$Root\sample-artifacts"
+$ErrorActionPreference = "Stop"
 
-# A wrong root used to fail silently: Set-Location errored, the script
-# carried on, and ingestion ran somewhere else entirely. Stop here instead.
-if (-not (Test-Path $Root)) {
-  Write-Error "Root not found: $Root  - fix `$Root at the top of this script"
-  exit 1
-}
-Set-Location $Root
-if (-not (Test-Path (Join-Path $Root "ingestion\run.py"))) {
-  Write-Error "$Root does not contain ingestion\run.py - wrong folder?"
-  exit 1
+# ---- paths -----------------------------------------------------------
+# Derived from this script's own location: local\ is one level under the
+# repo root. A hard-coded path breaks the moment the folder is renamed or
+# cloned somewhere else, and the failure is a confusing one -- ingestion
+# runs against the wrong tree rather than refusing.
+$Root      = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$Artifacts = Join-Path $Root "sample-artifacts"
+Write-Host ">>> Repo root: $Root" -ForegroundColor Cyan
+
+# PYTHONPATH must point at THIS repo, or `python -m ingestion.run` can
+# import a different checkout's ingestion package and load with code you
+# are not looking at.
+$env:PYTHONPATH = $Root
+
+# ---- secrets ---------------------------------------------------------
+$Secrets = Join-Path $PSScriptRoot "secrets.ps1"
+if (Test-Path $Secrets) {
+  . $Secrets
+  Write-Host ">>> Loaded credentials from local\secrets.ps1" -ForegroundColor Green
+} else {
+  Write-Host ""
+  Write-Host "!!! local\secrets.ps1 not found." -ForegroundColor Red
+  Write-Host "    copy local\secrets.ps1.example local\secrets.ps1" -ForegroundColor Yellow
+  Write-Host "    then edit it and put your Oracle passwords in." -ForegroundColor Yellow
+  Write-Host "    (It is in .gitignore, so it stays on this machine.)" -ForegroundColor Yellow
+  Write-Host ""
+  if (-not $env:CP_CATALOG_DB_DSN) {
+    throw "CP_CATALOG_DB_DSN is not set and local\secrets.ps1 is missing -- nothing to load into."
+  }
+  Write-Host ">>> Using CP_CATALOG_DB_DSN already set in this shell." -ForegroundColor Yellow
 }
 
-# ---- DATABASE (edit to your Oracle) ----
-$env:CP_CATALOG_DB_DSN = "oracle://@dvlpbdb1.testbbh.com:2483/pbdwhdbt"
-$env:CP_CATALOG_DB_DSN_VAR = "@dvlpbdb1.testbbh.com:2483/pbdwhdbt"
-$env:SEI_ORACLE_SCHEMAS = "SEI_RAW,SEI_STAGE"
-$env:CP_CATALOG_ROOT = $Artifacts
-$env:CP_SECURITY = "off"   # sign-in disabled; see docs\security\README.md
-$env:ORACLE_PROD_DSN = "oracle://PBDWAPP:dev_pass123#@dvlpbdb1.testbbh.com:2483/pbdwhdbt"
+# ---- database --------------------------------------------------------
+# CP_CATALOG_DB_DSN, ORACLE_PROD_DSN, CP_VAR_*_DSN come from secrets.ps1.
+$env:SEI_ORACLE_SCHEMAS  = "SEI_RAW,SEI_STAGE"
+$env:CP_CATALOG_ROOT     = $Artifacts
 $env:ORACLE_PROD_SCHEMAS = "PBDWAPP"
-$env:ORACLE_PLATFORM_ID = "PBDWAPP"
+$env:ORACLE_PLATFORM_ID  = "PBDWAPP"
+$env:ORACLE_CLIENT_DIR   = "C:\instantclient_23_0"
 
-# ---- DATA-FEEDS (rich feed dictionary + reference list) ----
-$env:CP_LEGACY_LINEAGE_XLSX = "$Artifacts\LEGACY_LINEAGE\legacy_lineage.xlsx"
-$env:CP_LEGACY_SOURCES = "PBDW=$Artifacts\CP_LEGACY_DICT_XLSX\ADDVMapping.xlsx"
+# ---- DATA-FEEDS (rich feed dictionary + reference list) --------------
 $env:DATA360_FEED_DICTIONARY_PATH = "$Artifacts\DATA-FEEDS\SWP_EOD_Data_Feeds.xlsx"
-$env:REFERENCE_DATA_XLSX = "$Artifacts\DATA-FEEDS\SWP_EOD_Data_Feeds-Reference.xlsx"
+$env:REFERENCE_DATA_XLSX          = "$Artifacts\DATA-FEEDS\SWP_EOD_Data_Feeds-Reference.xlsx"
 
-# NOTE: this points at a DIFFERENT checkout from $Root. If that folder also
-# contains an `ingestion` package, Python may import THAT one and your
-# changes here will appear to do nothing. The check below prints which one
-# actually won; if it is not under $Root, that is your answer.
-$env:PYTHONPATH = "C:\SEI\bbhcatalog\Aneesh360catalog"
-
-$env:CP_ENV_WORKBOOK="$Artifacts\INFRAINVENTORY\cp_env_infrastructure_v3.csv"
-$env:CP_LEGACY_DICT_XLSX = "$Artifacts\CP_LEGACY_DICT_XLSX\ADDVMapping.xlsx"
-$env:CP_LEGACY_LINEAGE_FROM_XLSX = 1
-
-#--------------------------------Variance Configuration-----------------------------#
-# ---- PBDW source warehouse (where the stage tables are profiled) ----------
-$env:CP_VAR_PBDW_DSN = "A041327:bbhpass123@qclpbdb1.testbbh.com:2483/PBDWHDBQ"
-$env:ORACLE_CLIENT_DIR="C:\instantclient_23_0"
-# Actual schema owners: staging chain in PBDWSTG, final tables in PBDWAPP.
-$env:CP_VAR_PBDW_SCHEMA_SRC = "PBDWSTG"
-$env:CP_VAR_PBDW_SCHEMA_STG1 = "PBDWSTG"
-$env:CP_VAR_PBDW_SCHEMA_STG2 = "PBDWSTG"
-$env:CP_VAR_PBDW_SCHEMA_DWH = "PBDWAPP"
-
-# ---- IMDS source warehouse ------------------------------------------------
-$env:CP_VAR_IMDS_DSN = "imds_ro:CHANGE_ME@imds-host:1521/imdssvc"   # -- EDIT
-$env:CP_VAR_IMDS_SCHEMA_SRC = "IMDS_SRC"                            # -- EDIT
-$env:CP_VAR_IMDS_SCHEMA_STG1 = "IMDS_STG"                           # -- EDIT
-$env:CP_VAR_IMDS_SCHEMA_STG2 = "IMDS_STG"                           # -- EDIT
-$env:CP_VAR_IMDS_SCHEMA_DWH = "IMDS"                                # -- EDIT
-
-# ---- FEED-CATALOG (simple feeds + rich loaders + business flows) ----
-$env:INBOUND_FEEDS_XLSX = "$Artifacts\FEED-CATALOG\inbound_feeds_full.xlsx"
-$env:OUTBOUND_FEEDS_XLSX = "$Artifacts\FEED-CATALOG\outbound_feeds_full.xlsx"
-$env:LOADER_CATALOG_XLSX = "$Artifacts\FEED-CATALOG\loaders_full.xlsx"
+# ---- FEED-CATALOG (simple feeds + rich loaders + business flows) -----
+$env:INBOUND_FEEDS_XLSX   = "$Artifacts\FEED-CATALOG\inbound_feeds_full.xlsx"
+$env:OUTBOUND_FEEDS_XLSX  = "$Artifacts\FEED-CATALOG\outbound_feeds_full.xlsx"
+$env:LOADER_CATALOG_XLSX  = "$Artifacts\FEED-CATALOG\loaders_full.xlsx"
 $env:LOADER_WORKBOOK_XLSX = "$Artifacts\FEED-CATALOG\CP_Catalog_SEI_Loaders.xlsx"
-$env:BUSINESS_FLOWS_XLSX = "$Artifacts\FEED-CATALOG\CP_Catalog_Business_Flows_v20_Compressed.xlsx"
+$env:BUSINESS_FLOWS_XLSX  = "$Artifacts\FEED-CATALOG\CP_Catalog_Business_Flows_v20_Compressed.xlsx"
 $env:INTERFACE360_XLSX_PATH = "$Artifacts\INTERFACE-SYSTEM\interfaces.xlsx"
 
-# ---- EVENT 360 -------------------------------------------------------------
+# ---- LEGACY LINEAGE + DICTIONARY -------------------------------------
+$env:CP_LEGACY_LINEAGE_XLSX      = "$Artifacts\LEGACY_LINEAGE\legacy_lineage.xlsx"
+$env:CP_LEGACY_LINEAGE_FROM_XLSX = 1
+$env:CP_LEGACY_SOURCES           = "PBDW=$Artifacts\CP_LEGACY_DICT_XLSX\ADDVMapping.xlsx"
+$env:CP_LEGACY_DICT_XLSX         = "$Artifacts\CP_LEGACY_DICT_XLSX\ADDVMapping.xlsx"
+# Sheet names are auto-detected. Name one only when the workbook has two
+# that could both be it and you want to be sure which is read.
+# $env:CP_LEGACY_LINEAGE_SHEET      = "lineage"
+# $env:CP_LEGACY_LINEAGE_SHEET_RICH = "lineage_rich"
+# $env:CP_LEGACY_DICT_SHEET         = "dictionary"
+# $env:CP_LEGACY_DEPENDENCY_SHEET   = "dependencies"
+# $env:CP_LEGACY_PROOF_SHEET        = "proof"
+# $env:CP_LEGACY_SOURCE_FILE_SHEET  = "CP_SOURCE_FILE"
+# $env:CP_LEGACY_DICT_SYSTEM        = "ADDVANTAGE"
+# $env:CP_LEGACY_DATA_SOURCE        = "PBDW"
+
+# TABLE CATALOG: what each warehouse TABLE is, in business words. This is
+# what the Lineage Business view reads for its headings -- without it the
+# view falls back to physical names like DIM_ACCOUNT. Auto-detected in
+# the dictionary workbook; name the sheet only to override.
+# $env:CP_LEGACY_TABLE_CATALOG_SHEET = "TABLE CATALOG"
+
+# ---- SEI CROSSWALK ---------------------------------------------------
+$env:CP_SEI_XLSX         = "$Artifacts\LEGACY_LINEAGE\STAR_IMDS_SEI_Lineage_Catalog_Verified-Final-With-Transformations.xlsx"
+$env:CP_SEI_DATA_SOURCE  = "IMDS"
+$env:CP_SEI_LINEAGE_MODE = "load"
+# $env:CP_SEI_RELOAD     = "1"   # replace the lane instead of merging into it
+
+# ---- ENVIRONMENT 360 -------------------------------------------------
+$env:CP_ENV_WORKBOOK = "$Artifacts\INFRAINVENTORY\cp_env_infrastructure_v3.csv"
+
+# ---- EVENT 360 -------------------------------------------------------
 # Three steps, three sources, kept apart on purpose:
-#   event360            the CONTRACT      - what SEI says an event is
-#   event_subscription  OUR decisions     - who consumes it (CSVs you maintain)
-#   sdc_compute         the MEASURED bill - warehouse time per SDC view
-# A folder may hold ONE workbook at a time; two are two different clients or
-# periods and the connector refuses to guess. Point at the file when you have
-# several.
-$env:CP_EVENT360_XLSX    = "$Artifacts\EVENT-360"
-$env:CP_EVENT_SUB_DIR    = "$Artifacts\EVENT-360"          # consumers.csv + subscriptions.csv
+#   event360           the CONTRACT      -- what SEI says an event is
+#   event_subscription OUR decisions     -- who consumes it (CSVs you keep)
+#   sdc_compute        the MEASURED bill -- warehouse time per SDC view
+# A folder may hold ONE workbook at a time; two are two different clients
+# or periods and the connector refuses to guess. Name the file when you
+# have several.
+$env:CP_EVENT360_XLSX    = "$Artifacts\EVENT-360\CP360_SEI_Event_360_Complete_Event_Catalog_v1.1_With_Marker_Events.xlsx"
+$env:CP_EVENT_SUB_DIR    = "$Artifacts\EVENT-360"   # consumers.csv + subscriptions.csv
 $env:CP_SDC_COMPUTE_XLSX = "$Artifacts\SDC-COMPUTE"
-# $env:CP_SDC_COMPUTE_XLSX   = "D:\drops\SDC Client compute sizing reference.xlsx"
-# $env:CP_SDC_COMPUTE_CLIENT = "CLIENT_A"   # only if the Summary sheet's name
-#                                           # is not the code you want stored
-# Gates are hard by default and that is the point: a load four rows short looks
-# right on screen and quietly under-reports. 0/false/no downgrades a failure to
-# a logged ERROR and writes the rows ANYWAY - for inspecting a workbook you know
-# is mid-revision, not for getting past a gate.
+
+# v1.1 declares a System event whose payload is 3 wide, where every other
+# type is 4. The arithmetic gate is told, rather than loosened.
+$env:CP_EVENT360_PAYLOAD_BY_TYPE = "System=3"
+
+# Micro-batch markers (1000 / 1001) are read from the marker sheet of the
+# same workbook. The sheet is found by name -- micro_batch_markers,
+# batch_markers and a couple of spellings besides -- so there is nothing
+# to set. Markers listed in Event_Catalog as well are demoted, not
+# counted twice.
+
+# $env:CP_SDC_COMPUTE_CLIENT = "CLIENT_A"  # only when the Summary sheet's
+#                                          # name is not the code to store
+#
+# Gates are hard by default and that is the point: a load four rows short
+# looks right on screen and quietly under-reports. 0/false/no downgrades
+# a failure to a logged ERROR and writes the rows ANYWAY -- for inspecting
+# a workbook you know is mid-revision, not for getting past a gate.
 # $env:CP_EVENT360_STRICT    = "0"
 # $env:CP_SDC_COMPUTE_STRICT = "0"
 # $env:CP_EVENT_SUB_STRICT   = "0"
 
-# ---- optional supporting features (skip cleanly if file absent) ----
-$env:API_SPEC_ROOT = "$Artifacts\API-SPEC"
-$env:POSTMAN_ROOT = "$Artifacts\POSTMAN"
-$env:DBT_MANIFEST_PATH = "$Artifacts\dbt-artifacts\manifest.json"
-$env:DBT_DIALECT = "oracle"
-$env:AIRFLOW_DSN = "file:///$($Artifacts -replace '\\','/')/airflow-sim/airflow_metadata.json"
+# ---- VARIANCE 360 ----------------------------------------------------
+# DSNs come from secrets.ps1. Schema owners are not secret.
+# Staging chain lives in PBDWSTG, the final tables in PBDWAPP.
+$env:CP_VAR_PBDW_SCHEMA_SRC  = "PBDWSTG"
+$env:CP_VAR_PBDW_SCHEMA_STG1 = "PBDWSTG"
+$env:CP_VAR_PBDW_SCHEMA_STG2 = "PBDWSTG"
+$env:CP_VAR_PBDW_SCHEMA_DWH  = "PBDWAPP"
+$env:CP_VAR_IMDS_SCHEMA_SRC  = "IMDS_SRC"    # -- EDIT
+$env:CP_VAR_IMDS_SCHEMA_STG1 = "IMDS_STG"    # -- EDIT
+$env:CP_VAR_IMDS_SCHEMA_STG2 = "IMDS_STG"    # -- EDIT
+$env:CP_VAR_IMDS_SCHEMA_DWH  = "IMDS"        # -- EDIT
+# $env:CP_VAR_PARALLEL   = "4"
+# Variance is NOT part of `python -m ingestion.run`; run it separately.
+
+# ---- optional supporting features (skip cleanly if absent) -----------
+$env:API_SPEC_ROOT          = "$Artifacts\API-SPEC"
+$env:POSTMAN_ROOT           = "$Artifacts\POSTMAN"
+$env:DBT_MANIFEST_PATH      = "$Artifacts\dbt-artifacts\manifest.json"
+$env:DBT_DIALECT            = "oracle"
+$env:AIRFLOW_DSN            = "file:///$($Artifacts -replace '\\','/')/airflow-sim/airflow_metadata.json"
 $env:GLOSSARY_AUTHORED_PATH = "$Artifacts\GLOSSARY\business-glossary.md"
-$env:PII_ATTRIBUTES_PATH = "$Artifacts\OVERLAY\PII_Attributes_List.xlsx"
+$env:PII_ATTRIBUTES_PATH    = "$Artifacts\OVERLAY\PII_Attributes_List.xlsx"
+# $env:DBT_CATALOG_PATH     = "$Artifacts\dbt-artifacts\catalog.json"
+# $env:NON_SEI_SPEC_ROOT    = "$Artifacts\API-SPEC-NONSEI"
+# $env:AIRFLOW_DAGS_FILTER  = ""
 
-# ---- which `ingestion` package will Python actually import? ----
-# PYTHONPATH above points at another checkout. If the answer is not under
-# $Root, that is why an edit here changes nothing.
-Write-Host "`n=== Code that will run ===" -ForegroundColor Cyan
-python -c "import ingestion, os; p=os.path.dirname(ingestion.__file__); print('  ingestion ->', p)" 2>$null
-if ($LASTEXITCODE -ne 0) { Write-Host "  (could not import ingestion - is the venv active?)" -ForegroundColor Yellow }
+# ---- SIGN-IN AND ENTITLEMENT -----------------------------------------
+# OFF. No login screen, the full sidebar, every endpoint open -- how CP 360
+# has always run. See docs\security\README.md before changing it.
+#
+# It must be exactly "on". Not truthiness: "1", "true" and "yes" are NOT
+# read as on, and the API says so at startup rather than pretending to be
+# enabled. This variable is read by the API, not by ingestion -- it is set
+# here so one file describes the whole deployment.
+$env:CP_SECURITY = "off"
 
-# ---- show which input files actually exist ----
+# Before switching to "on", all three or nobody can sign in:
+#   1. run sql\64_security.sql          (creates the tables, seeds modules)
+#   2. seed the first administrator     (the INSERT at the foot of that file)
+#   3. fill in the directory below
+# $env:CP_AD_HOST    = "dc01.bbh.com"
+# $env:CP_AD_PORT    = "636"
+# $env:CP_AD_USE_SSL = "1"          # 0 needs CP_AD_ALLOW_INSECURE=1 -- labs only
+# $env:CP_AD_DOMAIN  = "bbh.com"    # bind is <account>@<domain>
+# $env:CP_AD_BASE_DN = "DC=bbh,DC=com"   # optional: display name + e-mail
+# $env:CP_AD_TIMEOUT = "8"
+#
+# $env:CP_SESSION_HOURS        = "10"
+# $env:CP_SESSION_IDLE_MINUTES = "120"
+# $env:CP_COOKIE_INSECURE      = "1"   # UI on plain HTTP in dev
+#
+# Only when the UI and API are on different origins AND CP_SECURITY=on.
+# The vite dev server proxies /api, so it is already same-origin.
+# $env:CP_CORS_ORIGINS = "http://localhost:5173"
+
+# ---- show which input files actually exist ---------------------------
 Write-Host "`n=== Input files ===" -ForegroundColor Cyan
 $inputs = [ordered]@{
- "Feed dictionary (rich)"   = $env:DATA360_FEED_DICTIONARY_PATH
- "Reference list"           = $env:REFERENCE_DATA_XLSX
- "Inbound feeds (simple)"   = $env:INBOUND_FEEDS_XLSX
- "Outbound feeds (simple)"  = $env:OUTBOUND_FEEDS_XLSX
- "Loaders (simple)"         = $env:LOADER_CATALOG_XLSX
- "Loaders (rich 10-sheet)"  = $env:LOADER_WORKBOOK_XLSX
- "Business flows v20"       = $env:BUSINESS_FLOWS_XLSX
- "Swagger (API-SPEC)"       = $env:API_SPEC_ROOT
- "dbt manifest"             = $env:DBT_MANIFEST_PATH
- "Glossary"                 = $env:GLOSSARY_AUTHORED_PATH
- "PII attributes"           = $env:PII_ATTRIBUTES_PATH
+  "Feed dictionary (rich)"   = $env:DATA360_FEED_DICTIONARY_PATH
+  "Reference list"           = $env:REFERENCE_DATA_XLSX
+  "Inbound feeds (simple)"   = $env:INBOUND_FEEDS_XLSX
+  "Outbound feeds (simple)"  = $env:OUTBOUND_FEEDS_XLSX
+  "Loaders (simple)"         = $env:LOADER_CATALOG_XLSX
+  "Loaders (rich 10-sheet)"  = $env:LOADER_WORKBOOK_XLSX
+  "Business flows v20"       = $env:BUSINESS_FLOWS_XLSX
+  "Interfaces"               = $env:INTERFACE360_XLSX_PATH
+  "Legacy lineage"           = $env:CP_LEGACY_LINEAGE_XLSX
+  "Legacy dictionary"        = $env:CP_LEGACY_DICT_XLSX
+  "SEI crosswalk"            = $env:CP_SEI_XLSX
+  "Event 360 catalog"        = $env:CP_EVENT360_XLSX
+  "Event consumers.csv"      = (Join-Path $env:CP_EVENT_SUB_DIR "consumers.csv")
+  "Event subscriptions.csv"  = (Join-Path $env:CP_EVENT_SUB_DIR "subscriptions.csv")
+  "SDC compute"              = $env:CP_SDC_COMPUTE_XLSX
+  "Environment inventory"    = $env:CP_ENV_WORKBOOK
+  "Swagger (API-SPEC)"       = $env:API_SPEC_ROOT
+  "dbt manifest"             = $env:DBT_MANIFEST_PATH
+  "Glossary"                 = $env:GLOSSARY_AUTHORED_PATH
+  "PII attributes"           = $env:PII_ATTRIBUTES_PATH
 }
 foreach ($k in $inputs.Keys) {
- $exists = Test-Path $inputs[$k]
- $mark  = if ($exists) { "[OK ]" } else { "[ -- ]" }
- $color = if ($exists) { "Green" } else { "DarkGray" }
- Write-Host (" {0} {1}" -f $mark, $k) -ForegroundColor $color
+  $exists = $inputs[$k] -and (Test-Path $inputs[$k])
+  $mark   = if ($exists) { "[OK]" } else { "[--]" }
+  $color  = if ($exists) { "Green" } else { "DarkGray" }
+  Write-Host ("  {0} {1}" -f $mark, $k) -ForegroundColor $color
 }
 
-# ---- Event 360 sources (reported separately) ----
-# A missing one is not a broken setup: the three steps are independent, and
-# "no subscriptions yet" is a real state the screens show honestly.
-Write-Host "`n=== Event 360 sources ===" -ForegroundColor Cyan
-@(
-  @{ n = "event360 workbook";    p = $env:CP_EVENT360_XLSX;    f = "*.xlsx" },
-  @{ n = "sdc_compute workbook"; p = $env:CP_SDC_COMPUTE_XLSX; f = "*.xlsx" },
-  @{ n = "consumers.csv";        p = $env:CP_EVENT_SUB_DIR;    f = "consumers.csv" },
-  @{ n = "subscriptions.csv";    p = $env:CP_EVENT_SUB_DIR;    f = "subscriptions.csv" }
-) | ForEach-Object {
-  # capture before the inner pipeline: $_ is rebound inside Where-Object
-  $src  = $_
-  $hits = @()
-  if (Test-Path $src.p) {
-    $hits = @(Get-ChildItem -Path $src.p -Filter $src.f -File -ErrorAction SilentlyContinue |
-              Where-Object { $_.Name -notlike '~$*' })
-  }
-  if     ($hits.Count -eq 1) { Write-Host ("  [OK ]  {0,-22} {1}" -f $src.n, $hits[0].Name) -ForegroundColor Green }
-  elseif ($hits.Count -gt 1) { Write-Host ("  [!!]   {0,-22} {1} files - name one with the *_XLSX var" -f $src.n, $hits.Count) -ForegroundColor Yellow }
-  else                       { Write-Host ("  [ -- ] {0,-22} nothing in {1}" -f $src.n, $src.p) -ForegroundColor DarkGray }
-}
-
-# ---- run ingestion in dependency order ----
+# ---- run ingestion in dependency order -------------------------------
 Write-Host "`n=== Running ingestion (full, ordered) ===" -ForegroundColor Cyan
+Set-Location $Root
 python -m ingestion.run
 if ($LASTEXITCODE -ne 0) {
- Write-Host "Ingestion returned a non-zero exit code; check the log above." -ForegroundColor Yellow
+  Write-Host "Ingestion returned a non-zero exit code; check the log above." -ForegroundColor Yellow
 }
 
-# ---- per-feature status (row counts via a tiny python probe) ----
+# ---- what actually landed --------------------------------------------
+# A file, not an inline here-string: the terminator has to sit at column 0
+# and every leading space survives into the Python, so one stray indent
+# used to break the whole status block after a load that worked.
 Write-Host "`n=== Feature status (row counts) ===" -ForegroundColor Cyan
-$probe = @'
-import os, sys, oracledb
-# Use the SAME parser the API uses. The hand-rolled split that used to be here
-# turned "oracle://@host:port/service" into user="oracle:" password="/" and
-# could never connect - a second copy of a rule that drifted from the first.
-sys.path.insert(0, os.path.join(os.getcwd(), "api"))
-try:
-    from app.db import _parse_dsn
-except Exception:
-    def _parse_dsn(dsn):
-        s = dsn[len("oracle://"):] if dsn.startswith("oracle://") else dsn
-        if "@" in s:
-            creds, host = s.split("@", 1)
-            if ":" in creds:   u, p = creds.split(":", 1)
-            elif "/" in creds: u, p = creds.split("/", 1)
-            else:              u, p = creds, ""
-            return u, p, host
-        return None, None, s
+python tools\catalog_status.py
 
-user, pwd, host = _parse_dsn(os.environ["CP_CATALOG_DB_DSN"])
-try:
-    if user:
-        c = oracledb.connect(user=user, password=pwd, dsn=host)
-    else:
-        c = oracledb.connect(dsn=host)          # external / wallet auth
-except Exception as e:
-    print("  (could not connect to Oracle:", str(e)[:120], ")")
-    raise SystemExit
-cur = c.cursor()
-
-def count(label, sql):
-    try:
-        cur.execute(sql); n = cur.fetchone()[0]
-        print(f"  {label:<44} {n}")
-    except Exception as e:
-        print(f"  {label:<44} (n/a: {str(e)[:40]})")
-
-count("Data 360: feeds (feed_catalog)",        "SELECT COUNT(*) FROM feed_catalog")
-count("Data 360: feed fields (columns)",       "SELECT COUNT(*) FROM columns")
-count("Data 360: loaders rich (ldr_catalog)",  "SELECT COUNT(*) FROM ldr_catalog")
-count("Data 360: loaders simple",              "SELECT COUNT(*) FROM loader_catalog")
-count("Data 360/API 360: pipelines (bf)",      "SELECT COUNT(*) FROM bf_pipelines")
-count("API 360: business flows (bf)",          "SELECT COUNT(*) FROM bf_api_flows")
-count("API 360: endpoints (Swagger)",          "SELECT COUNT(*) FROM api_endpoints")
-count("Interface 360 (bf)",                    "SELECT COUNT(*) FROM bf_interfaces")
-count("Datapoint 360: data points",            "SELECT COUNT(*) FROM dp_registry")
-count("Datapoint 360: reference rows",         "SELECT COUNT(*) FROM reference_data")
-count("Compression marts",                     "SELECT COUNT(*) FROM bf_compression_plan")
-count("Search index documents",                "SELECT COUNT(*) FROM search_index")
-print()
-count("Event 360: events (contract)",          "SELECT COUNT(*) FROM meta_event_definition")
-count("Event 360: field rows",                 "SELECT COUNT(*) FROM meta_event_field")
-count("Event 360: consumers",                  "SELECT COUNT(*) FROM ref_event_consumer")
-count("Event 360: live subscriptions",
-      "SELECT COUNT(*) FROM ctl_event_subscription WHERE status='ACTIVE'")
-count("Event 360: compute periods",            "SELECT COUNT(*) FROM meta_sdc_compute_period")
-count("Event 360: compute view-days",          "SELECT COUNT(*) FROM meta_sdc_compute_view")
-print()
-count("** GAP: unresolved flow datapoints",
-      "SELECT COUNT(*) FROM bf_flow_datapoint_map WHERE resolved='N'")
-count("** GAP: unresolved reference fields",
-      "SELECT COUNT(*) FROM reference_data WHERE resolved='N'")
-count("** GAP: pipelines w/o linked API flow",
-      "SELECT COUNT(*) FROM bf_pipelines WHERE linked_api_flow_id IS NULL")
-# Event 360's own gaps. The last one matters most: a compute extract covering
-# part of the traffic makes every cost figure a floor, not a total.
-count("** GAP: events nobody subscribes to",
-      "SELECT COUNT(*) FROM meta_event_definition d WHERE NOT EXISTS "
-      "(SELECT 1 FROM ctl_event_subscription s WHERE s.event_id=d.event_id "
-      "AND s.status='ACTIVE')")
-count("** GAP: subscriptions to unknown events",
-      "SELECT COUNT(*) FROM ctl_event_subscription s WHERE NOT EXISTS "
-      "(SELECT 1 FROM meta_event_definition d WHERE d.event_id=s.event_id)")
-count("** GAP: compute periods under 97% coverage",
-      "SELECT COUNT(*) FROM meta_sdc_compute_period WHERE view_coverage_pct < 97")
-c.close()
-'@
-$probe | python -
-Write-Host "`nDone. Start the API: uvicorn app.main:app --app-dir api --port 8000" -ForegroundColor Cyan
+Write-Host "`nDone. Start the API and UI:  .\local\start.ps1" -ForegroundColor Cyan
+Write-Host "Or the API alone:  uvicorn app.main:app --app-dir api --port 8000" -ForegroundColor DarkGray
