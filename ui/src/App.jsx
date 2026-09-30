@@ -23,6 +23,7 @@ import Environment360 from "./Environment360.jsx";
 import HubDesign from "./HubDesign.jsx";
 import Integration360Design from "./Integration360Design.jsx";
 import SecurityAdmin from "./SecurityAdmin.jsx";
+import Compare from "./Compare.jsx";
 import Login from "./Login.jsx";
 import { securityApi, allowed } from "./securityApi.js";
 
@@ -86,6 +87,7 @@ export default function App() {
  hub: <HubDesign t={t} />,
  integration360: <Integration360Design t={t} />,
  security: <SecurityAdmin t={t} />,
+ compare: <Compare t={t} />,
  };
 
  const signOut = async () => {

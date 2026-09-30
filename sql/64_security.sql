@@ -125,6 +125,7 @@ MERGE INTO sec_module t USING (SELECT 'home' k, 'Home' n, NULL g,
   UNION ALL SELECT 'lineage','Lineage','Lineage','End-to-end lineage, business and technical','N',20 FROM dual
   UNION ALL SELECT 'event360','Event 360','Events','The event contract, subscriptions and cost','N',30 FROM dual
   UNION ALL SELECT 'mapper','Auto Mapper','Utilities','Suggested mappings between sources and targets','N',40 FROM dual
+  UNION ALL SELECT 'compare','Compare','Utilities','Twinpane: compare two folders or two files side by side','N',41 FROM dual
   UNION ALL SELECT 'pii','PII Explorer','Governance','Where personal data sits and how it is classified','N',50 FROM dual
   UNION ALL SELECT 'guardrails','Quality Guardrails','Governance','Data quality rules and the events they raise','N',51 FROM dual
   UNION ALL SELECT 'impact','Impact Analysis','Governance','What breaks if this changes','N',52 FROM dual

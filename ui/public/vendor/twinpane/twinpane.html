@@ -1,0 +1,1058 @@
+<!doctype html>
+<!-- Vendored from https://github.com/aneesh304810/Compare.git at bf6228308b1a194f04d66fab6c76821d560e28fd.
+     DO NOT EDIT HERE. Change it upstream and re-run
+     python tools/vendor_twinpane.py
+     CP360-PATCH hunks are applied on the way in; see that
+     script for what they are and why. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body>
+<title>Twinpane Compare</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: toolbar, two side headers, then one working surface (folder table or line-by-line diff) filling the window */
+:root{
+  --bg:#eceff4; --panel:#ffffff; --panel-2:#f5f7fa; --line:#d6dce6; --fg:#17202c; --muted:#5b6778;
+  --accent:#2c58cf; --accent-soft:#e3eafb; --accent-fg:#ffffff;
+  --chg:#b0262e; --chg-bg:#fcecea; --chg-mark:#f4bfba; --gap:#e3e7ee;
+  --lonly:#6a3cbd; --lonly-bg:#f0e9fb; --ronly:#0d6f80; --ronly-bg:#e1f2f4; --ok:#2b7543;
+  --f-ui:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11151c; --panel:#171c25; --panel-2:#1c2230; --line:#2a3242; --fg:#e2e7ef; --muted:#8f9bad;
+  --accent:#7ea3ff; --accent-soft:#1f2b47; --accent-fg:#0d1320;
+  --chg:#ff8f86; --chg-bg:#351d22; --chg-mark:#6c2b31; --gap:#202634;
+  --lonly:#bd97ff; --lonly-bg:#2a2140; --ronly:#5ecbdc; --ronly-bg:#15313a; --ok:#6fcf8e; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11151c; --panel:#171c25; --panel-2:#1c2230; --line:#2a3242; --fg:#e2e7ef; --muted:#8f9bad;
+  --accent:#7ea3ff; --accent-soft:#1f2b47; --accent-fg:#0d1320;
+  --chg:#ff8f86; --chg-bg:#351d22; --chg-mark:#6c2b31; --gap:#202634;
+  --lonly:#bd97ff; --lonly-bg:#2a2140; --ronly:#5ecbdc; --ronly-bg:#15313a; --ok:#6fcf8e; color-scheme:dark}
+
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 var(--f-ui)}
+[hidden]{display:none!important}
+*{box-sizing:border-box}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+.app{height:100%;display:flex;flex-direction:column;gap:10px;padding:12px 16px}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
+.brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px;letter-spacing:.01em;margin-right:6px}
+.brand svg{flex:none}
+.opts{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;color:var(--muted);font-size:13px}
+.opts label{display:flex;align-items:center;gap:5px;cursor:pointer}
+.opts input[type=text]{width:15rem;max-width:100%;padding:3px 7px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);font:12px var(--f-mono)}
+.spacer{flex:1}
+
+.btn{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);font-size:13px;white-space:nowrap}
+.btn:hover:not(:disabled){border-color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:500}
+.btn.ghost{background:transparent}
+.btn kbd{font:11px var(--f-mono);color:var(--muted)}
+
+.sides{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.side{min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:9px 12px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;transition:border-color .12s,background .12s}
+.side.drop{border-color:var(--accent);background:var(--accent-soft)}
+.side-id{min-width:0;flex:1 1 12rem;display:flex;flex-direction:column}
+.side-tag{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.side-name{font:500 13px var(--f-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.side-meta{font-size:12px;color:var(--muted)}
+.side-meta b{color:var(--chg);font-weight:500}
+.side-actions{display:flex;flex-wrap:wrap;gap:6px}
+
+.view{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.vhead{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+
+/* summary chips */
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel);font-size:12.5px;font-variant-numeric:tabular-nums}
+.chip i{width:8px;height:8px;border-radius:2px;background:var(--muted)}
+.chip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.chip.c-diff i{background:var(--chg)} .chip.c-left i{background:var(--lonly)} .chip.c-right i{background:var(--ronly)} .chip.c-same i{background:var(--ok)}
+.chip b{font-weight:600}
+
+/* folder table */
+.tscroll{flex:1;min-height:0;overflow:auto}
+.thead,.row{display:grid;grid-template-columns:minmax(0,1fr) 5.2rem minmax(0,1fr)}
+.thead{position:sticky;top:0;z-index:2;background:var(--panel-2);border-bottom:1px solid var(--line);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.thead>div{display:flex;gap:8px;padding:5px 10px}
+.thead .nmh{flex:1}
+.sz,.dt{flex:none;text-align:right;font-variant-numeric:tabular-nums;color:var(--muted);font-size:12px}
+.sz{width:5.2em} .dt{width:9.6em}
+.row{border-bottom:1px solid color-mix(in srgb,var(--line) 55%,transparent);cursor:pointer}
+.row:hover{background:var(--panel-2)}
+.cell{min-width:0;display:flex;align-items:center;gap:8px;padding:3px 10px;min-height:28px}
+.cell.empty{background:repeating-linear-gradient(135deg,var(--gap) 0 3px,transparent 3px 8px);opacity:.7}
+.nm{flex:1;min-width:0;display:flex;align-items:center;gap:6px}
+.nmt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row.dir .nmt{font-weight:500}
+.cell.st-diff .nmt{color:var(--chg)}
+.cell.st-left .nmt{color:var(--lonly)}
+.cell.st-right .nmt{color:var(--ronly)}
+.caret{flex:none;width:14px;height:14px;display:grid;place-items:center;color:var(--muted);transition:transform .12s}
+.row.dir.open .caret{transform:rotate(90deg)}
+.ico{flex:none;color:var(--muted)}
+.row.dir .ico{color:var(--accent)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--chg);flex:none}
+.mid{display:flex;align-items:center;justify-content:center;gap:2px;border-inline:1px solid color-mix(in srgb,var(--line) 55%,transparent);background:var(--panel-2)}
+.eqs{color:var(--ok);font:500 13px var(--f-mono)}
+.ib{border:1px solid transparent;background:transparent;border-radius:4px;padding:0 6px;height:22px;font:600 13px var(--f-mono);color:var(--muted);display:inline-grid;place-items:center}
+.ib:hover{border-color:var(--accent);color:var(--accent);background:var(--panel)}
+.ib.del{padding:0 4px;opacity:0}
+.row:hover .ib.del,.ib.del:focus-visible{opacity:1}
+@media (hover:none){.ib.del{opacity:1}}
+.tempty{padding:40px 16px;text-align:center;color:var(--muted)}
+
+/* file diff */
+.fv-title{display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 16rem}
+.fv-path{font:500 13px var(--f-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pill{flex:none;font-size:11.5px;padding:1px 8px;border-radius:999px;border:1px solid currentColor}
+.pill.st-diff{color:var(--chg)} .pill.st-same{color:var(--ok)} .pill.st-left{color:var(--lonly)} .pill.st-right{color:var(--ronly)}
+.grp{display:flex;align-items:center;gap:4px}
+.pos{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:4.5em;text-align:center}
+.dwrap{flex:1;min-height:0;display:flex;position:relative}
+.dscroll{flex:1;min-width:0;overflow:auto}
+.minimap{flex:none;width:12px;position:relative;border-left:1px solid var(--line);background:var(--panel-2);cursor:pointer}
+.minimap i{position:absolute;left:2px;right:2px;background:var(--chg);border-radius:1px;opacity:.75}
+.minimap i.cur{background:var(--accent);opacity:1}
+.dh,.dr{display:grid;grid-template-columns:3.4em minmax(0,1fr) 3.6em 3.4em minmax(0,1fr)}
+.dh{position:sticky;top:0;z-index:2;background:var(--panel-2);border-bottom:1px solid var(--line)}
+.dh>div{grid-column:span 2;display:flex;align-items:center;gap:6px;padding:5px 10px;min-width:0}
+.dh>div:nth-child(2){grid-column:span 1}
+.dh .hn{flex:1;min-width:0;font:500 12px var(--f-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dh .btn{padding:2px 8px;font-size:12px}
+.dr{font:12.5px/1.55 var(--f-mono);tab-size:4}
+.ln{padding:0 8px;text-align:right;color:var(--muted);user-select:none;font-size:11.5px;font-variant-numeric:tabular-nums;border-right:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
+.tx{padding:0 10px;white-space:pre-wrap;overflow-wrap:anywhere;min-height:1.55em}
+.mg{display:flex;align-items:flex-start;justify-content:center;gap:1px;background:var(--panel-2);border-inline:1px solid var(--line)}
+.dr.ch .tx,.dr.ch .ln{background:var(--chg-bg)}
+.dr.ch .ln{color:var(--chg)}
+.dr.ch .tx.gap,.dr.ch .ln.gap{background:repeating-linear-gradient(135deg,var(--gap) 0 3px,transparent 3px 8px)}
+.tx mark{background:var(--chg-mark);color:inherit;border-radius:2px}
+.dr.ch.cur.first{box-shadow:inset 0 2px 0 var(--accent)}
+.dr.ch.cur.last{box-shadow:inset 0 -2px 0 var(--accent)}
+.dr.ch.cur.first.last{box-shadow:inset 0 2px 0 var(--accent),inset 0 -2px 0 var(--accent)}
+.dr.ch.cur .mg{background:var(--accent-soft)}
+.mb{border:1px solid var(--line);background:var(--panel);border-radius:3px;width:20px;height:19px;margin-top:1px;padding:0;font:600 12px/1 var(--f-mono);color:var(--chg)}
+.mb:hover{border-color:var(--accent);color:var(--accent)}
+.dr.fold{display:block;padding:3px 12px;text-align:center;font:12px var(--f-ui);color:var(--muted);background:var(--panel-2);border-block:1px dashed var(--line);cursor:pointer}
+.dr.fold:hover{color:var(--accent)}
+.bin{padding:28px 20px;max-width:40rem}
+.bin h3{margin:0 0 6px;font-size:15px}
+.bin table{border-collapse:collapse;margin:12px 0;font-variant-numeric:tabular-nums}
+.bin td,.bin th{padding:4px 14px 4px 0;text-align:left;font-size:13px}
+.bin th{color:var(--muted);font-weight:500}
+
+.editor{flex:1;min-height:0;display:flex;flex-direction:column}
+.edhead{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line);font-size:13px}
+.edhead span{flex:1;min-width:0}
+.editor textarea{flex:1;min-height:0;resize:none;border:0;padding:10px 12px;background:var(--panel);font:12.5px/1.55 var(--f-mono);tab-size:4;outline:none}
+
+.foot{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 16px}
+.foot kbd{font:11px var(--f-mono);border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:0 4px;background:var(--panel)}
+
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:var(--r);font-size:13px;max-width:calc(100% - 32px);box-shadow:0 6px 24px rgba(0,0,0,.2);z-index:20}
+.toast.err{background:var(--chg);color:#fff}
+dialog{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--fg);max-width:min(30rem,calc(100% - 32px));padding:18px 20px}
+dialog::backdrop{background:rgba(10,14,20,.45)}
+dialog h3{margin:0 0 8px;font-size:15px}
+dialog p{margin:0 0 10px;color:var(--muted);font-size:13.5px}
+dialog .row-btns{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-top:14px}
+
+@media (max-width:760px){
+  .app{padding:10px 16px;gap:8px}
+  .sides{grid-template-columns:1fr}
+  .sz,.dt,.thead .sz,.thead .dt{display:none}
+  .thead,.row{grid-template-columns:minmax(0,1fr) 4.2rem minmax(0,1fr)}
+  .dh,.dr{grid-template-columns:2.6em minmax(0,1fr) 2.9em 2.6em minmax(0,1fr)}
+  .dr{font-size:11px}
+  .ln{padding:0 4px;font-size:10px}
+  .tx{padding:0 5px}
+  .opts input[type=text]{width:10rem}
+  .foot{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="app">
+  <header class="bar">
+    <div class="brand">
+      <svg width="20" height="18" viewBox="0 0 20 18" aria-hidden="true"><rect x="1" y="1" width="8" height="16" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="11" y="1" width="8" height="16" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3.5 6h3M3.5 9h3M13.5 6h3M13.5 12h3" stroke="var(--chg)" stroke-width="1.6"/></svg>
+      Twinpane
+    </div>
+    <div class="opts">
+      <label><input type="checkbox" id="optWS"> Ignore whitespace</label>
+      <label><input type="checkbox" id="optCase"> Ignore case</label>
+      <label title="Comma-separated names or wildcards to skip when reading folders">Skip <input type="text" id="optEx" spellcheck="false"></label>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn ghost" id="btnSwap" title="Swap left and right">⇄ Swap</button>
+    <button class="btn ghost" id="btnUndo" disabled title="Undo (Ctrl+Z)">↶ Undo</button>
+    <button class="btn ghost" id="btnSample">Load example</button>
+  </header>
+
+  <section class="sides">
+    <div class="side" id="side0" data-side="0">
+      <div class="side-id"><span class="side-tag">Left</span><span class="side-name" id="name0">No folder yet</span><span class="side-meta" id="meta0">Open or drop a folder or file here</span></div>
+      <div class="side-actions"><button class="btn" data-open="dir">Open folder</button><button class="btn" data-open="file">Open file</button><button class="btn primary" data-save disabled>Save</button></div>
+    </div>
+    <div class="side" id="side1" data-side="1">
+      <div class="side-id"><span class="side-tag">Right</span><span class="side-name" id="name1">No folder yet</span><span class="side-meta" id="meta1">Open or drop a folder or file here</span></div>
+      <div class="side-actions"><button class="btn" data-open="dir">Open folder</button><button class="btn" data-open="file">Open file</button><button class="btn primary" data-save disabled>Save</button></div>
+    </div>
+  </section>
+
+  <section class="view" id="treeView">
+    <div class="vhead">
+      <div class="chips" id="chips"></div>
+      <div class="spacer"></div>
+      <button class="btn ghost" id="btnExpand">Expand all</button>
+      <button class="btn ghost" id="btnCollapse">Collapse all</button>
+    </div>
+    <div class="tscroll">
+      <div class="thead"><div><span class="nmh" id="thL">Left</span><span class="sz">Size</span><span class="dt">Modified</span></div><div></div><div><span class="nmh" id="thR">Right</span><span class="sz">Size</span><span class="dt">Modified</span></div></div>
+      <div id="treeBody"></div>
+    </div>
+  </section>
+
+  <section class="view" id="fileView" hidden>
+    <div class="vhead">
+      <button class="btn" id="btnBack" title="Back to folders (Esc)">← Folders</button>
+      <div class="fv-title"><span class="fv-path" id="fvPath"></span><span class="pill" id="fvPill"></span></div>
+      <div class="grp">
+        <button class="btn" id="btnPrevD" title="Previous difference (Alt+↑)">↑</button>
+        <span class="pos" id="fvPos"></span>
+        <button class="btn" id="btnNextD" title="Next difference (Alt+↓)">↓</button>
+      </div>
+      <div class="grp">
+        <button class="btn" id="btnAllR" title="Replace the right file with the left file">Copy file →</button>
+        <button class="btn" id="btnAllL" title="Replace the left file with the right file">← Copy file</button>
+      </div>
+      <label class="opts"><input type="checkbox" id="optOnly"> Differences only</label>
+      <div class="grp">
+        <button class="btn ghost" id="btnPrevF" title="Previous changed file">‹ File</button>
+        <button class="btn ghost" id="btnNextF" title="Next changed file">File ›</button>
+      </div>
+    </div>
+    <div class="dwrap" id="dwrap">
+      <div class="dscroll" id="dscroll"><div id="diff"></div></div>
+      <div class="minimap" id="minimap" title="Click to jump"></div>
+    </div>
+    <div class="editor" id="editor" hidden>
+      <div class="edhead"><span id="edLabel"></span><button class="btn" id="edCancel">Cancel</button><button class="btn primary" id="edApply">Apply edit</button></div>
+      <textarea id="edText" spellcheck="false" wrap="off"></textarea>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span><kbd>Alt</kbd>+<kbd>↓</kbd>/<kbd>↑</kbd> next / previous difference</span>
+    <span><kbd>Alt</kbd>+<kbd>→</kbd>/<kbd>←</kbd> copy current difference right / left</span>
+    <span><kbd>Ctrl</kbd>+<kbd>Z</kbd> undo</span>
+    <span><kbd>Esc</kbd> back to folders</span>
+  </footer>
+</div>
+
+<input type="file" id="dir0" webkitdirectory multiple hidden>
+<input type="file" id="dir1" webkitdirectory multiple hidden>
+<input type="file" id="file0" hidden>
+<input type="file" id="file1" hidden>
+<div class="toast" id="toast" hidden></div>
+<dialog id="dlgSave">
+  <h3>Saving is not available here</h3>
+  <p>This page runs inside a protected preview that can't write to your disk or start downloads.</p>
+  <p>To save merges straight into your folders, open the standalone <b>twinpane.html</b> file in Chrome or Edge. In other browsers it saves your changes as a download.</p>
+  <p id="dlgCopyNote">You can still copy the merged text of the open file.</p>
+  <div class="row-btns"><button class="btn" id="dlgCopy">Copy open file's text</button><button class="btn primary" id="dlgClose">Close</button></div>
+</dialog>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const enc = new TextEncoder(), dec = new TextDecoder('utf-8');
+const KEYFILE = '(file)', MAXREAD = 64 * 1024 * 1024, CTX = 3;
+const inFrame = (() => { try { return window.self !== window.top; } catch { return true; } })();
+/* CP360-PATCH 1: upstream disables the File System Access API in any
+   iframe, which is right for a cross-origin artifact and wrong for a
+   same-origin embed. Same-origin frames keep it; anything else, including
+   a frame whose top we cannot read, still loses it. */
+const sameOrigin = (() => {
+  try { return window.top.location.origin === location.origin; }
+  catch { return false; }        /* cross-origin: reading top throws */
+})();
+const canFS = (!inFrame || sameOrigin) && 'showDirectoryPicker' in window;
+
+const newSide = () => ({ name: '', mode: 'empty', files: new Map(), deleted: new Set(), root: null, fileHandle: null });
+const S = {
+  sides: [newSide(), newSide()],
+  opts: { ws: false, ci: false, exclude: '.git, node_modules, .DS_Store, Thumbs.db, __pycache__' },
+  filter: 'all', collapsed: new Set(), view: 'tree', current: null,
+  undo: [], hunks: [], hunk: 0, diffOnly: false, editing: null, tree: null, nodes: new Map(), st: new Map(),
+};
+const side = i => S.sides[i];
+
+/* ---------- helpers ---------- */
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function fmtSize(n) { if (n == null) return ''; if (n < 1024) return n + ' B'; if (n < 1048576) return (n / 1024).toFixed(1) + ' KB'; return (n / 1048576).toFixed(1) + ' MB'; }
+function fmtDate(ms) { if (!ms) return ''; const d = new Date(ms), p = x => String(x).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
+let toastT;
+function toast(msg, kind) { const t = $('#toast'); t.textContent = msg; t.className = 'toast' + (kind ? ' ' + kind : ''); t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, kind === 'err' ? 6000 : 2600); }
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); toast('Copied to clipboard'); }
+  catch { const ta = document.createElement('textarea'); ta.value = text; document.body.append(ta); ta.select(); try { document.execCommand('copy'); toast('Copied to clipboard'); } catch { toast('Copy failed. Select the text in the editor instead.', 'err'); } ta.remove(); }
+}
+function globRx(p) { return new RegExp('^' + p.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$', 'i'); }
+let exRx = [];
+function setExclude(v) { S.opts.exclude = v; exRx = v.split(',').map(s => s.trim()).filter(Boolean).map(globRx); }
+const skipName = n => exRx.some(r => r.test(n));
+const skipPath = p => p !== KEYFILE && p.split('/').some(skipName);
+
+/* ---------- entries ---------- */
+function isBinary(b) { const n = Math.min(b.length, 8000); for (let i = 0; i < n; i++) if (b[i] === 0) return true; return false; }
+function entryFromBytes(path, bytes, mtime, extra) {
+  const e = { path, name: path.split('/').pop(), size: bytes.length, mtime, binary: isBinary(bytes), bytes: null, dirty: false, onDisk: true, ...extra };
+  if (e.binary) e.bytes = bytes;
+  else {
+    let t = dec.decode(bytes);
+    if (t.charCodeAt(0) === 0xFEFF) { t = t.slice(1); e.bom = true; }
+    e.eol = /\r\n/.test(t) ? '\r\n' : '\n';
+    e.text = t.replace(/\r\n/g, '\n');
+  }
+  return e;
+}
+async function makeEntry(path, file, handle) {
+  if (file.size > MAXREAD) return { path, name: file.name, size: file.size, mtime: file.lastModified, binary: true, tooBig: true, bytes: null, dirty: false, onDisk: true, handle };
+  return entryFromBytes(path, new Uint8Array(await file.arrayBuffer()), file.lastModified, { handle, name: file.name });
+}
+function entryBytes(e) {
+  if (e.binary) return e.bytes;
+  const t = e.eol === '\r\n' ? e.text.replace(/\n/g, '\r\n') : e.text;
+  return enc.encode((e.bom ? '﻿' : '') + t);
+}
+function bytesEq(a, b) { if (!a || !b || a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; }
+const normOn = () => S.opts.ws || S.opts.ci;
+function normLine(l) { if (S.opts.ws) l = l.replace(/\s+/g, ' ').trim(); if (S.opts.ci) l = l.toLowerCase(); return l; }
+function status(p) {
+  if (S.st.has(p)) return S.st.get(p);
+  const a = side(0).files.get(p), b = side(1).files.get(p);
+  let r;
+  if (a && !b) r = 'left'; else if (b && !a) r = 'right'; else if (!a) r = 'none';
+  else if (a.binary !== b.binary) r = 'diff';
+  else if (a.binary) r = (a.tooBig || b.tooBig) ? (a.size === b.size ? 'same' : 'diff') : (bytesEq(a.bytes, b.bytes) ? 'same' : 'diff');
+  else if (a.text === b.text) r = 'same';
+  else if (!normOn()) r = 'diff';
+  else r = a.text.split('\n').map(normLine).join('\n') === b.text.split('\n').map(normLine).join('\n') ? 'same' : 'diff';
+  S.st.set(p, r); return r;
+}
+const invalidate = () => S.st.clear();
+
+/* ---------- diff (Myers O(ND)) ---------- */
+function myers(A, B, limit) {
+  const N = A.length, M = B.length, max = N + M, off = max + 1;
+  const v = new Int32Array(2 * max + 4), trace = [];
+  let D = -1;
+  outer: for (let d = 0; d <= max; d++) {
+    if (d > limit) return null;
+    trace.push(v.slice(off - d - 1, off + d + 2));
+    for (let k = -d; k <= d; k += 2) {
+      let x = (k === -d || (k !== d && v[off + k - 1] < v[off + k + 1])) ? v[off + k + 1] : v[off + k - 1] + 1;
+      let y = x - k;
+      while (x < N && y < M && A[x] === B[y]) { x++; y++; }
+      v[off + k] = x;
+      if (x >= N && y >= M) { D = d; break outer; }
+    }
+  }
+  const ops = []; let x = N, y = M;
+  for (let d = D; d >= 0; d--) {
+    const V = trace[d], g = k => V[k + d + 1], k = x - y;
+    const pk = (k === -d || (k !== d && g(k - 1) < g(k + 1))) ? k + 1 : k - 1;
+    const px = g(pk), py = px - pk;
+    while (x > px && y > py) { ops.push(0); x--; y--; }
+    if (d > 0) ops.push(x === px ? 2 : 1);
+    x = px; y = py;
+  }
+  return ops.reverse();
+}
+// returns chunks: {t:'e',a0,b0,n} | {t:'c',a0,an,b0,bn}
+function diffSeq(a, b, limit) {
+  const ids = new Map(), id = s => { let v = ids.get(s); if (v === undefined) { v = ids.size; ids.set(s, v); } return v; };
+  const ia = Int32Array.from(a, id), ib = Int32Array.from(b, id);
+  const out = []; let cur = null;
+  const eq = (ai, bi) => { if (cur && cur.t === 'e') cur.n++; else out.push(cur = { t: 'e', a0: ai, b0: bi, n: 1 }); };
+  const del = (ai, bi) => { if (cur && cur.t === 'c') cur.an++; else out.push(cur = { t: 'c', a0: ai, an: 1, b0: bi, bn: 0 }); };
+  const ins = (ai, bi) => { if (cur && cur.t === 'c') cur.bn++; else out.push(cur = { t: 'c', a0: ai, an: 0, b0: bi, bn: 1 }); };
+  let s = 0; while (s < ia.length && s < ib.length && ia[s] === ib[s]) { eq(s, s); s++; }
+  let ea = ia.length, eb = ib.length;
+  while (ea > s && eb > s && ia[ea - 1] === ib[eb - 1]) { ea--; eb--; }
+  const A = ia.subarray(s, ea), B = ib.subarray(s, eb);
+  const ops = (A.length && B.length) ? myers(A, B, limit) : null;
+  let ai = s, bi = s;
+  if (ops) for (const o of ops) { if (o === 0) { eq(ai, bi); ai++; bi++; } else if (o === 1) { del(ai, bi); ai++; } else { ins(ai, bi); bi++; } }
+  else { while (ai < ea) { del(ai, bi); ai++; } while (bi < eb) { ins(ai, bi); bi++; } }
+  for (; ai < ia.length; ai++, bi++) eq(ai, bi);
+  return out;
+}
+const TOK = /\s+|[\p{L}\p{N}_]+|[^\s\p{L}\p{N}_]/gu;
+function inline(a, b) {
+  if (a.length > 4000 || b.length > 4000) return [esc(a), esc(b)];
+  const ta = a.match(TOK) || [], tb = b.match(TOK) || [];
+  const tka = normOn() ? ta.map(normLine) : ta, tkb = normOn() ? tb.map(normLine) : tb;
+  let ha = '', hb = '';
+  for (const c of diffSeq(tka, tkb, 500)) {
+    if (c.t === 'e') { ha += esc(ta.slice(c.a0, c.a0 + c.n).join('')); hb += esc(tb.slice(c.b0, c.b0 + c.n).join('')); }
+    else {
+      if (c.an) ha += '<mark>' + esc(ta.slice(c.a0, c.a0 + c.an).join('')) + '</mark>';
+      if (c.bn) hb += '<mark>' + esc(tb.slice(c.b0, c.b0 + c.bn).join('')) + '</mark>';
+    }
+  }
+  return [ha, hb];
+}
+
+/* ---------- loading ---------- */
+async function buildEntries(list) {
+  const out = new Map(); let i = 0;
+  await Promise.all(Array.from({ length: 16 }, async () => {
+    while (i < list.length) { const [p, f, h] = list[i++]; try { out.set(p, await makeEntry(p, f, h)); } catch (err) { console.warn('Could not read', p, err); } }
+  }));
+  return out;
+}
+async function readDirHandle(dh, prefix, out) {
+  for await (const [name, h] of dh.entries()) {
+    if (skipName(name)) continue;
+    const p = prefix ? prefix + '/' + name : name;
+    if (h.kind === 'directory') await readDirHandle(h, p, out); else out.push([p, await h.getFile(), h]);
+  }
+}
+async function readEntryDir(de, prefix, out) {
+  const reader = de.createReader(); let batch;
+  do {
+    batch = await new Promise((res, rej) => reader.readEntries(res, rej));
+    for (const en of batch) {
+      if (skipName(en.name)) continue;
+      const p = prefix ? prefix + '/' + en.name : en.name;
+      if (en.isDirectory) await readEntryDir(en, p, out);
+      else out.push([p, await new Promise((res, rej) => en.file(res, rej)), null]);
+    }
+  } while (batch.length);
+}
+function setSide(i, o) {
+  const dirtyOther = S.undo.length;
+  S.sides[i] = Object.assign(newSide(), o);
+  S.undo = []; invalidate(); S.collapsed.clear();
+  if (side(0).mode === 'file' && side(1).mode === 'file') { openFileView(KEYFILE); }
+  else { if (S.view === 'file') closeFileView(false); render(); }
+  const n = o.files.size;
+  toast(`Loaded ${n} file${n === 1 ? '' : 's'} on the ${i ? 'right' : 'left'}` + (dirtyOther ? '. Undo history cleared.' : ''));
+}
+async function loadList(i, name, list, extra) {
+  toast(`Reading ${list.length} files…`);
+  const files = await buildEntries(list);
+  setSide(i, { name, mode: 'dir', files, ...extra });
+}
+async function loadDirHandle(i, h) { const list = []; toast('Scanning folder…'); await readDirHandle(h, '', list); await loadList(i, h.name, list, { root: h }); }
+async function loadFileObj(i, f, h) {
+  const e = await makeEntry(KEYFILE, f, h); e.name = f.name;
+  setSide(i, { name: f.name, mode: 'file', files: new Map([[KEYFILE, e]]), fileHandle: h || null });
+  if (side(1 - i).mode !== 'file') toast('Now open a file on the other side to compare');
+}
+async function openDir(i) {
+  if (canFS) {
+    try { await loadDirHandle(i, await window.showDirectoryPicker({ mode: 'readwrite', id: 'twinpane' + i })); }
+    /* CP360-PATCH 2: a browser that refuses the picker here must not leave a
+       dead button -- fall through to the <input> the unpatched build uses. */
+    catch (err) {
+      if (err.name === 'SecurityError' || err.name === 'NotAllowedError') { $('#dir' + i).click(); return; }
+      if (err.name !== 'AbortError') toast(err.message, 'err');
+    }
+  } else $('#dir' + i).click();
+}
+async function openFile(i) {
+  if (canFS && 'showOpenFilePicker' in window) {
+    try { const [h] = await window.showOpenFilePicker({ id: 'twinpanef' + i }); await loadFileObj(i, await h.getFile(), h); }
+    /* CP360-PATCH 2 */
+    catch (err) {
+      if (err.name === 'SecurityError' || err.name === 'NotAllowedError') { $('#file' + i).click(); return; }
+      if (err.name !== 'AbortError') toast(err.message, 'err');
+    }
+  } else $('#file' + i).click();
+}
+for (const i of [0, 1]) {
+  $('#dir' + i).addEventListener('change', async ev => {
+    const fs = [...ev.target.files]; ev.target.value = '';
+    if (!fs.length) return;
+    const root = fs[0].webkitRelativePath.split('/')[0];
+    const list = [];
+    for (const f of fs) { const p = f.webkitRelativePath.split('/').slice(1).join('/'); if (p && !skipPath(p)) list.push([p, f, null]); }
+    await loadList(i, root, list, {});
+  });
+  $('#file' + i).addEventListener('change', async ev => { const f = ev.target.files[0]; ev.target.value = ''; if (f) await loadFileObj(i, f, null); });
+  const card = $('#side' + i);
+  card.addEventListener('click', ev => {
+    const b = ev.target.closest('button'); if (!b) return;
+    if (b.dataset.open === 'dir') openDir(i); else if (b.dataset.open === 'file') openFile(i); else if ('save' in b.dataset) saveSide(i);
+  });
+  card.addEventListener('dragover', ev => { ev.preventDefault(); card.classList.add('drop'); });
+  card.addEventListener('dragleave', () => card.classList.remove('drop'));
+  card.addEventListener('drop', async ev => {
+    ev.preventDefault(); card.classList.remove('drop');
+    const it = [...ev.dataTransfer.items].find(x => x.kind === 'file'); if (!it) return;
+    const hp = (!inFrame && it.getAsFileSystemHandle) ? it.getAsFileSystemHandle() : null;
+    const en = it.webkitGetAsEntry ? it.webkitGetAsEntry() : null;
+    const file = it.getAsFile();
+    try {
+      if (hp) { const h = await hp; if (h) return h.kind === 'directory' ? loadDirHandle(i, h) : loadFileObj(i, await h.getFile(), h); }
+      if (en && en.isDirectory) { const list = []; toast('Scanning folder…'); await readEntryDir(en, '', list); return loadList(i, en.name, list, {}); }
+      if (file) return loadFileObj(i, file, null);
+    } catch (err) { toast('Could not read what was dropped: ' + err.message, 'err'); }
+  });
+}
+
+/* ---------- changes & undo ---------- */
+function applyChanges(changes, label) {
+  const rec = [];
+  for (const c of changes) {
+    const sd = side(c.side);
+    rec.push({ side: c.side, path: c.path, prev: sd.files.get(c.path), prevDel: sd.deleted.has(c.path) });
+    if (c.entry) { sd.files.set(c.path, c.entry); sd.deleted.delete(c.path); }
+    else { const old = sd.files.get(c.path); sd.files.delete(c.path); if (old && old.onDisk) sd.deleted.add(c.path); }
+  }
+  if (rec.length) S.undo.push({ label, rec });
+  invalidate();
+}
+function undo() {
+  const u = S.undo.pop(); if (!u) return;
+  for (const r of u.rec.reverse()) {
+    const sd = side(r.side);
+    if (r.prev) sd.files.set(r.path, r.prev); else sd.files.delete(r.path);
+    if (r.prevDel) sd.deleted.add(r.path); else sd.deleted.delete(r.path);
+  }
+  invalidate(); toast('Undid ' + u.label); render(true);
+}
+function copyEntry(src, dstOld) {
+  return { ...src, name: dstOld ? dstOld.name : src.name, dirty: true, onDisk: dstOld ? dstOld.onDisk : false, handle: null, mtime: Date.now() };
+}
+function filesUnder(node) { if (!node.dir) return [node.path]; const r = []; for (const k of node.kids.values()) r.push(...filesUnder(k)); return r; }
+function copyPaths(paths, dir) {
+  const src = dir > 0 ? 0 : 1, dst = 1 - src, ch = [];
+  for (const p of paths) { const e = side(src).files.get(p); if (e && status(p) !== 'same') ch.push({ side: dst, path: p, entry: copyEntry(e, side(dst).files.get(p)) }); }
+  if (!ch.length) { toast('Nothing to copy'); return 0; }
+  applyChanges(ch, `copy of ${ch.length} file${ch.length > 1 ? 's' : ''} ${dir > 0 ? 'to the right' : 'to the left'}`);
+  toast(`Copied ${ch.length} file${ch.length > 1 ? 's' : ''} ${dir > 0 ? '→ right' : '← left'}`);
+  return ch.length;
+}
+function deletePaths(paths, i) {
+  const ch = paths.filter(p => side(i).files.has(p)).map(p => ({ side: i, path: p }));
+  if (!ch.length) return;
+  applyChanges(ch, `delete of ${ch.length} file${ch.length > 1 ? 's' : ''}`);
+  toast(`Marked ${ch.length} file${ch.length > 1 ? 's' : ''} for deletion on the ${i ? 'right' : 'left'}. Save to apply.`);
+}
+function setTextSide(i, text, label) {
+  const p = S.current, old = side(i).files.get(p), other = side(1 - i).files.get(p);
+  if (old && old.text === text) return;
+  const base = old || { path: p, name: other.name, binary: false, eol: other.eol || '\n', bom: !!other.bom, onDisk: false };
+  applyChanges([{ side: i, path: p, entry: { ...base, text, size: enc.encode(text).length, mtime: Date.now(), dirty: true } }], label);
+}
+
+/* ---------- saving ---------- */
+const pending = i => { let n = side(i).deleted.size; for (const e of side(i).files.values()) if (e.dirty) n++; return n; };
+async function saveSide(i) {
+  const sd = side(i);
+  const dirty = [...sd.files.values()].filter(e => e.dirty), dels = [...sd.deleted];
+  if (!dirty.length && !dels.length) return;
+  const h = sd.root || sd.fileHandle;
+  if (h) {
+    try {
+      if (h.queryPermission && await h.queryPermission({ mode: 'readwrite' }) !== 'granted' && await h.requestPermission({ mode: 'readwrite' }) !== 'granted') throw new Error('Write permission was not granted.');
+      for (const e of dirty) {
+        let fh = sd.fileHandle;
+        if (!fh) { const parts = e.path.split('/'); let d = sd.root; for (const x of parts.slice(0, -1)) d = await d.getDirectoryHandle(x, { create: true }); fh = await d.getFileHandle(parts.at(-1), { create: true }); }
+        const w = await fh.createWritable(); await w.write(entryBytes(e)); await w.close();
+        sd.files.set(e.path, { ...e, dirty: false, onDisk: true });
+      }
+      for (const p of dels) {
+        if (sd.root) { const parts = p.split('/'); try { let d = sd.root; for (const x of parts.slice(0, -1)) d = await d.getDirectoryHandle(x); await d.removeEntry(parts.at(-1)); } catch (err) { if (err.name !== 'NotFoundError') throw err; } }
+        sd.deleted.delete(p);
+      }
+      toast(`Saved ${dirty.length + dels.length} change${dirty.length + dels.length > 1 ? 's' : ''} to ${sd.name}`);
+    } catch (err) { toast('Could not save: ' + err.message, 'err'); }
+    render(true); return;
+  }
+  let dl = null;
+  if (inFrame) { try { dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch { dl = null; } }
+  if (inFrame && !dl) { $('#dlgCopy').hidden = $('#dlgCopyNote').hidden = !(S.view === 'file' && sd.files.get(S.current) && !sd.files.get(S.current).binary); $('#dlgSave').dataset.side = i; $('#dlgSave').showModal(); return; }
+  const deliver = async (blob, name) => { if (dl) await dl.save({ filename: name, data: blob }); else download(blob, name); };
+  try {
+    if (dirty.length === 1 && !dels.length && !dl) download(new Blob([entryBytes(dirty[0])]), dirty[0].name);
+    else {
+      if (!window.JSZip) await new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; s.onload = res; s.onerror = () => rej(new Error('Could not load the zip library. Check your connection.')); document.head.append(s); });
+      const zip = new JSZip();
+      for (const e of dirty) zip.file(e.path === KEYFILE ? e.name : e.path, entryBytes(e));
+      if (dels.length) zip.file('DELETED-FILES.txt', 'Delete these files from ' + sd.name + ':\n' + dels.join('\n') + '\n');
+      await deliver(await zip.generateAsync({ type: 'blob' }), (sd.name || 'changes').replace(/[\\/]/g, '-') + '-changes.zip');
+    }
+    for (const e of dirty) sd.files.set(e.path, { ...e, dirty: false, onDisk: true });
+    sd.deleted.clear();
+    toast(dl ? 'Saved your changes as a zip. Unzip it over the folder to apply them.' : 'Downloaded. This browser can\'t write into the folder directly; use Chrome or Edge for that.');
+  } catch (err) { toast(err && err.code === 'declined' ? 'Save cancelled.' : 'Could not save: ' + (err && err.message || err), 'err'); }
+  render(true);
+}
+function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
+$('#dlgClose').onclick = () => $('#dlgSave').close();
+$('#dlgCopy').onclick = () => { const e = side(+$('#dlgSave').dataset.side).files.get(S.current); if (e) copyText(e.text); };
+
+/* ---------- folder view ---------- */
+function buildTree() {
+  const root = { name: '', path: '', dir: true, kids: new Map() }; S.nodes = new Map();
+  const paths = new Set([...side(0).files.keys(), ...side(1).files.keys()]);
+  for (const p of paths) {
+    if (skipPath(p)) continue;
+    const parts = p === KEYFILE ? [p] : p.split('/'); let n = root;
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (!n.kids.has(parts[i])) { const dn = { name: parts[i], path: parts.slice(0, i + 1).join('/'), dir: true, kids: new Map() }; n.kids.set(parts[i], dn); S.nodes.set(dn.path, dn); }
+      n = n.kids.get(parts[i]);
+    }
+    const fn = { name: parts.at(-1), path: p, dir: false }; n.kids.set(fn.name, fn); S.nodes.set(p, fn);
+  }
+  (function agg(n) {
+    if (!n.dir) { n.st = status(n.path); n.inL = n.st !== 'right'; n.inR = n.st !== 'left'; return; }
+    const c = { same: 0, diff: 0, left: 0, right: 0 }; let inL = false, inR = false;
+    for (const k of n.kids.values()) { agg(k); inL ||= k.inL; inR ||= k.inR; if (k.dir) for (const x in c) c[x] += k.c[x]; else c[k.st]++; }
+    Object.assign(n, { c, inL, inR, st: !inR ? 'left' : !inL ? 'right' : (c.diff + c.left + c.right) ? 'diff' : 'same' });
+  })(root);
+  return S.tree = root;
+}
+const kidsSorted = n => [...n.kids.values()].sort((a, b) => (b.dir - a.dir) || a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+function visible(n) {
+  const f = S.filter; if (f === 'all') return true;
+  if (!n.dir) return f === 'diff' ? n.st !== 'same' : n.st === f;
+  return f === 'diff' ? (n.c.diff + n.c.left + n.c.right) > 0 : n.c[f] > 0;
+}
+const IC = {
+  caret: '<svg width="10" height="10" viewBox="0 0 10 10"><path d="M3 1.5 7 5l-4 3.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>',
+  dir: '<svg class="ico" width="16" height="14" viewBox="0 0 16 14"><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3.3l1.6 1.8h6.1A1.5 1.5 0 0 1 15 4.3v7.2a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 11.5z" fill="currentColor" fill-opacity=".18" stroke="currentColor" stroke-width="1.1"/></svg>',
+  file: '<svg class="ico" width="13" height="15" viewBox="0 0 13 15"><path d="M1.5 1h6.3L11.5 4.7v8.8a.5.5 0 0 1-.5.5H1.5a.5.5 0 0 1-.5-.5V1.5a.5.5 0 0 1 .5-.5z M7.5 1v4h4" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>',
+  del: '<svg width="11" height="11" viewBox="0 0 11 11"><path d="M2 2l7 7M9 2 2 9" stroke="currentColor" stroke-width="1.5"/></svg>',
+};
+function rowHtml(k, d) {
+  const a = k.dir ? null : side(0).files.get(k.path), b = k.dir ? null : side(1).files.get(k.path);
+  const nm = k.path === KEYFILE ? (a || b).name : k.name;
+  const cell = (i, present, e) => {
+    if (!present) return '<div class="cell empty"></div>';
+    const orphan = k.st === (i ? 'right' : 'left');
+    return `<div class="cell ${k.st === 'same' ? '' : 'st-' + k.st}"><span class="nm" style="padding-left:${d * 1.15}rem">${k.dir ? '<span class="caret">' + IC.caret + '</span>' + IC.dir : '<span class="caret"></span>' + IC.file}<span class="nmt" title="${esc(k.path)}">${esc(nm)}</span>${e && e.dirty ? '<i class="dot" title="Unsaved change"></i>' : ''}</span>${orphan ? `<button class="ib del" data-act="del" data-side="${i}" title="Delete from ${i ? 'right' : 'left'}">${IC.del}</button>` : ''}<span class="sz">${e ? fmtSize(e.size) : ''}</span><span class="dt">${e ? fmtDate(e.mtime) : ''}</span></div>`;
+  };
+  let mid = '';
+  if (k.st === 'same') mid = '<span class="eqs" title="Identical">=</span>';
+  else {
+    if (k.inL) mid += `<button class="ib" data-act="cp" data-dir="1" title="Copy ${k.dir ? 'differing files' : 'file'} to the right">→</button>`;
+    if (k.inR) mid += `<button class="ib" data-act="cp" data-dir="-1" title="Copy ${k.dir ? 'differing files' : 'file'} to the left">←</button>`;
+  }
+  const open = k.dir && !S.collapsed.has(k.path) ? ' open' : '';
+  return `<div class="row ${k.dir ? 'dir' : 'file'}${open}" data-path="${esc(k.path)}" tabindex="0">${cell(0, k.inL, a)}<div class="mid">${mid}</div>${cell(1, k.inR, b)}</div>`;
+}
+function renderTree() {
+  const root = buildTree(), c = root.c, total = c.same + c.diff + c.left + c.right;
+  const chip = (f, label, n, cls) => `<button class="chip ${cls}" data-f="${f}" aria-pressed="${S.filter === f}"><i></i>${label} <b>${n}</b></button>`;
+  $('#chips').innerHTML = chip('all', 'All files', total, 'c-all') + chip('diff', 'Differences', c.diff + c.left + c.right, 'c-diff') + chip('same', 'Identical', c.same, 'c-same') + chip('left', 'Left only', c.left, 'c-left') + chip('right', 'Right only', c.right, 'c-right');
+  const rows = [];
+  (function walk(n, d) { for (const k of kidsSorted(n)) { if (!visible(k)) continue; rows.push(rowHtml(k, d)); if (k.dir && !S.collapsed.has(k.path)) walk(k, d + 1); } })(root, 0);
+  $('#treeBody').innerHTML = rows.join('') || `<div class="tempty">${total ? 'No files match this filter.' : 'Open a folder on each side, or drop folders onto the Left and Right boxes above.'}</div>`;
+  $('#thL').textContent = side(0).name || 'Left'; $('#thR').textContent = side(1).name || 'Right';
+}
+$('#chips').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (b) { S.filter = b.dataset.f; renderTree(); } });
+$('#treeBody').addEventListener('click', e => {
+  const row = e.target.closest('.row'); if (!row) return;
+  const node = S.nodes.get(row.dataset.path); if (!node) return;
+  const btn = e.target.closest('button[data-act]');
+  if (btn) { if (btn.dataset.act === 'cp') copyPaths(filesUnder(node), +btn.dataset.dir); else deletePaths(filesUnder(node), +btn.dataset.side); render(true); return; }
+  if (node.dir) { S.collapsed.has(node.path) ? S.collapsed.delete(node.path) : S.collapsed.add(node.path); renderTree(); }
+  else openFileView(node.path);
+});
+$('#treeBody').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('row')) e.target.click(); });
+$('#btnExpand').onclick = () => { S.collapsed.clear(); renderTree(); };
+$('#btnCollapse').onclick = () => { for (const [p, n] of S.nodes) if (n.dir) S.collapsed.add(p); renderTree(); };
+
+/* ---------- file view ---------- */
+function sideLines(i) {
+  const e = side(i).files.get(S.current);
+  if (!e || e.binary) return { e, lines: [], nl: true };
+  const nl = e.text.endsWith('\n');
+  return { e, nl, lines: e.text === '' ? [] : (nl ? e.text.slice(0, -1) : e.text).split('\n') };
+}
+function openFileView(p) { S.view = 'file'; S.current = p; S.hunk = 0; closeEditor(); render(); scrollToHunk(0, false); }
+function closeFileView(r = true) { S.view = 'tree'; S.current = null; closeEditor(); if (r) render(true); }
+const STL = { diff: 'Different', same: 'Identical', left: 'Left only', right: 'Right only' };
+function renderDiff() {
+  const p = S.current, a = side(0).files.get(p), b = side(1).files.get(p);
+  if (!a && !b) { closeFileView(); return; }
+  const st = status(p);
+  $('#fvPath').textContent = p === KEYFILE ? `${a ? a.name : '—'}  ↔  ${b ? b.name : '—'}` : p;
+  $('#fvPath').title = $('#fvPath').textContent;
+  $('#fvPill').textContent = STL[st]; $('#fvPill').className = 'pill st-' + st;
+  $('#btnAllR').disabled = !a || st === 'same'; $('#btnAllL').disabled = !b || st === 'same';
+  const head = i => { const e = i ? b : a, nm = side(i).name; return `<div><span class="hn" title="${esc(nm)}">${i ? 'Right' : 'Left'} · ${esc(e ? e.name : 'missing')}</span>${e && !e.binary ? `<button class="btn ghost" data-edit="${i}">Edit</button><button class="btn ghost" data-copy="${i}">Copy text</button>` : ''}</div>`; };
+  const hdr = `<div class="dh">${head(0)}<div></div>${head(1)}</div>`;
+  if ((a && a.binary) || (b && b.binary)) {
+    S.hunks = [];
+    const tr = (l, x, y) => `<tr><th>${l}</th><td>${x}</td><td>${y}</td></tr>`;
+    $('#diff').innerHTML = hdr + `<div class="bin"><h3>${a && b && a.binary !== b.binary ? 'One side is binary' : 'Binary file'}</h3><p>${st === 'same' ? 'The two files are byte-for-byte identical.' : st === 'diff' ? 'The two files have different contents. Use Copy file to replace one with the other.' : 'This file exists on one side only.'}</p><table>${tr('', 'Left', 'Right')}${tr('Size', a ? fmtSize(a.size) : '—', b ? fmtSize(b.size) : '—')}${tr('Modified', a ? fmtDate(a.mtime) : '—', b ? fmtDate(b.mtime) : '—')}</table></div>`;
+    $('#minimap').innerHTML = ''; updatePos(); return;
+  }
+  const A = sideLines(0), B = sideLines(1);
+  const chunks = diffSeq(normOn() ? A.lines.map(normLine) : A.lines, normOn() ? B.lines.map(normLine) : B.lines, 3000);
+  S.hunks = chunks.filter(c => c.t === 'c');
+  if (S.hunk >= S.hunks.length) S.hunk = Math.max(0, S.hunks.length - 1);
+  const out = [hdr], marks = []; let row = 0, h = -1;
+  const eqRow = (i, j) => `<div class="dr"><span class="ln">${i + 1}</span><span class="tx">${esc(A.lines[i])}</span><span class="mg"></span><span class="ln">${j + 1}</span><span class="tx">${esc(B.lines[j])}</span></div>`;
+  chunks.forEach((c, ci) => {
+    if (c.t === 'e') {
+      const head = ci === 0 ? 0 : CTX, tail = ci === chunks.length - 1 ? 0 : CTX;
+      if (S.diffOnly && c.n > head + tail + 1) {
+        for (let j = 0; j < head; j++) { out.push(eqRow(c.a0 + j, c.b0 + j)); row++; }
+        out.push(`<div class="dr fold" data-fold title="Show all lines">⋯ ${c.n - head - tail} identical lines</div>`); row++;
+        for (let j = c.n - tail; j < c.n; j++) { out.push(eqRow(c.a0 + j, c.b0 + j)); row++; }
+      } else for (let j = 0; j < c.n; j++) { out.push(eqRow(c.a0 + j, c.b0 + j)); row++; }
+      return;
+    }
+    h++; const n = Math.max(c.an, c.bn); marks.push([row, n, h]);
+    for (let j = 0; j < n; j++) {
+      const hasA = j < c.an, hasB = j < c.bn, la = hasA ? A.lines[c.a0 + j] : '', lb = hasB ? B.lines[c.b0 + j] : '';
+      const [ha, hb] = hasA && hasB ? inline(la, lb) : [esc(la), esc(lb)];
+      const mg = j === 0 ? `<button class="mb" data-m="1" data-h="${h}" title="Copy this difference to the right (Alt+→)">→</button><button class="mb" data-m="-1" data-h="${h}" title="Copy this difference to the left (Alt+←)">←</button>` : '';
+      out.push(`<div class="dr ch${h === S.hunk ? ' cur' : ''}${j === 0 ? ' first' : ''}${j === n - 1 ? ' last' : ''}" data-h="${h}"><span class="ln${hasA ? '' : ' gap'}">${hasA ? c.a0 + j + 1 : ''}</span><span class="tx${hasA ? '' : ' gap'}">${ha}</span><span class="mg">${mg}</span><span class="ln${hasB ? '' : ' gap'}">${hasB ? c.b0 + j + 1 : ''}</span><span class="tx${hasB ? '' : ' gap'}">${hb}</span></div>`);
+      row++;
+    }
+  });
+  if (!chunks.length) out.push('<div class="tempty">Both files are empty.</div>');
+  $('#diff').innerHTML = out.join('');
+  $('#minimap').innerHTML = marks.map(([r, n, hh]) => `<i data-h="${hh}" class="${hh === S.hunk ? 'cur' : ''}" style="top:${r / row * 100}%;height:max(3px,${n / row * 100}%)"></i>`).join('');
+  updatePos();
+}
+function updatePos() {
+  const n = S.hunks.length;
+  $('#fvPos').textContent = n ? `${S.hunk + 1} of ${n}` : 'No diffs';
+  $('#btnPrevD').disabled = !n || S.hunk <= 0; $('#btnNextD').disabled = !n || S.hunk >= n - 1;
+  const fl = changedFiles(), i = fl.indexOf(S.current), order = allFiles(), oi = order.indexOf(S.current);
+  $('#btnPrevF').disabled = !order.slice(0, oi).some(p => fl.includes(p));
+  $('#btnNextF').disabled = !order.slice(oi + 1).some(p => fl.includes(p));
+  void i;
+}
+function setHunk(h, scroll) {
+  if (!S.hunks.length) return;
+  S.hunk = Math.max(0, Math.min(S.hunks.length - 1, h));
+  document.querySelectorAll('#diff .dr.cur, #minimap i.cur').forEach(el => el.classList.remove('cur'));
+  document.querySelectorAll(`#diff .dr[data-h="${S.hunk}"], #minimap i[data-h="${S.hunk}"]`).forEach(el => el.classList.add('cur'));
+  updatePos(); if (scroll) scrollToHunk(S.hunk, true);
+}
+function scrollToHunk(h, smooth) {
+  const el = document.querySelector(`#diff .dr[data-h="${h}"]`); if (!el) return;
+  const sc = $('#dscroll'), top = el.offsetTop - sc.clientHeight / 3;
+  sc.scrollTo({ top: Math.max(0, top), behavior: smooth && !matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'auto' });
+}
+function mergeHunk(h, dir) {
+  const c = S.hunks[h]; if (!c) return;
+  const src = dir > 0 ? 0 : 1, dst = 1 - src, SL = sideLines(src), DL = sideLines(dst);
+  const s0 = src ? c.b0 : c.a0, sn = src ? c.bn : c.an, d0 = dst ? c.b0 : c.a0, dn = dst ? c.bn : c.an;
+  const lines = [...DL.lines.slice(0, d0), ...SL.lines.slice(s0, s0 + sn), ...DL.lines.slice(d0 + dn)];
+  const nl = DL.e ? DL.nl : SL.nl;
+  S.hunk = h;
+  setTextSide(dst, lines.length ? lines.join('\n') + (nl ? '\n' : '') : '', `copy of a difference ${dir > 0 ? 'to the right' : 'to the left'}`);
+  render(true);
+}
+function allFiles() { if (!S.tree) buildTree(); const r = []; (function w(n) { for (const k of kidsSorted(n)) k.dir ? w(k) : r.push(k.path); })(S.tree); return r; }
+function changedFiles() { return allFiles().filter(p => status(p) !== 'same'); }
+function stepFile(d) {
+  const order = allFiles(), oi = order.indexOf(S.current), fl = new Set(changedFiles());
+  const cand = d > 0 ? order.slice(oi + 1).find(p => fl.has(p)) : order.slice(0, oi).reverse().find(p => fl.has(p));
+  if (cand) openFileView(cand);
+}
+$('#diff').addEventListener('click', e => {
+  const m = e.target.closest('button[data-m]'); if (m) { mergeHunk(+m.dataset.h, +m.dataset.m); return; }
+  const ed = e.target.closest('[data-edit]'); if (ed) { openEditor(+ed.dataset.edit); return; }
+  const cp = e.target.closest('[data-copy]'); if (cp) { const x = side(+cp.dataset.copy).files.get(S.current); if (x) copyText(x.text); return; }
+  if (e.target.closest('[data-fold]')) { S.diffOnly = false; $('#optOnly').checked = false; render(true); return; }
+  const r = e.target.closest('.dr.ch'); if (r) setHunk(+r.dataset.h, false);
+});
+$('#minimap').addEventListener('click', e => {
+  const i = e.target.closest('i[data-h]');
+  if (i) { setHunk(+i.dataset.h, true); return; }
+  const r = e.currentTarget.getBoundingClientRect(), sc = $('#dscroll');
+  sc.scrollTop = (e.clientY - r.top) / r.height * sc.scrollHeight - sc.clientHeight / 2;
+});
+$('#btnBack').onclick = () => closeFileView();
+$('#btnPrevD').onclick = () => setHunk(S.hunk - 1, true);
+$('#btnNextD').onclick = () => setHunk(S.hunk + 1, true);
+$('#btnPrevF').onclick = () => stepFile(-1);
+$('#btnNextF').onclick = () => stepFile(1);
+$('#btnAllR').onclick = () => { copyPaths([S.current], 1); render(true); };
+$('#btnAllL').onclick = () => { copyPaths([S.current], -1); render(true); };
+$('#optOnly').onchange = e => { S.diffOnly = e.target.checked; render(); scrollToHunk(S.hunk, false); };
+
+function openEditor(i) {
+  const e = side(i).files.get(S.current); if (!e || e.binary) return;
+  S.editing = i; $('#edLabel').textContent = `Editing the ${i ? 'right' : 'left'} file: ${e.name}`;
+  $('#edText').value = e.text; $('#dwrap').hidden = true; $('#editor').hidden = false; $('#edText').focus();
+}
+function closeEditor() { S.editing = null; $('#editor').hidden = true; $('#dwrap').hidden = false; }
+$('#edCancel').onclick = () => closeEditor();
+$('#edApply').onclick = () => { const i = S.editing; setTextSide(i, $('#edText').value, `edit on the ${i ? 'right' : 'left'}`); closeEditor(); render(); };
+$('#edText').addEventListener('keydown', e => {
+  if (e.key === 'Tab') { e.preventDefault(); const t = e.target, s = t.selectionStart; t.setRangeText('\t', s, t.selectionEnd, 'end'); }
+});
+
+/* ---------- top-level render ---------- */
+function renderSides() {
+  for (const i of [0, 1]) {
+    const sd = side(i), n = pending(i), fc = sd.files.size;
+    $('#name' + i).textContent = sd.name || 'No folder yet'; $('#name' + i).title = sd.name;
+    $('#meta' + i).innerHTML = sd.mode === 'empty' ? 'Open or drop a folder or file here' : `${sd.mode === 'file' ? 'Single file' : fc + ' file' + (fc === 1 ? '' : 's')}${sd.root || sd.fileHandle ? ' · saves in place' : ''}${n ? ` · <b>${n} unsaved</b>` : ''}`;
+    const sb = $(`#side${i} [data-save]`); sb.disabled = !n; sb.textContent = n ? `Save ${n}` : 'Save';
+  }
+  $('#btnUndo').disabled = !S.undo.length;
+  $('#btnUndo').title = S.undo.length ? `Undo ${S.undo.at(-1).label} (Ctrl+Z)` : 'Nothing to undo';
+}
+function render(keepScroll) {
+  const sc = S.view === 'file' ? $('#dscroll') : $('.tscroll'), top = sc.scrollTop;
+  renderSides();
+  $('#treeView').hidden = S.view !== 'tree'; $('#fileView').hidden = S.view !== 'file';
+  if (S.view === 'tree') renderTree(); else { buildTree(); renderDiff(); }
+  if (keepScroll) sc.scrollTop = top;
+}
+
+/* ---------- options & global keys ---------- */
+$('#optWS').onchange = e => { S.opts.ws = e.target.checked; invalidate(); render(true); };
+$('#optCase').onchange = e => { S.opts.ci = e.target.checked; invalidate(); render(true); };
+$('#optEx').value = S.opts.exclude; setExclude(S.opts.exclude);
+$('#optEx').addEventListener('change', e => { setExclude(e.target.value); render(); toast('Skip list updated. Folders you open next will skip these too.'); });
+$('#btnUndo').onclick = undo;
+$('#btnSwap').onclick = () => { S.sides.reverse(); for (const u of S.undo) for (const r of u.rec) r.side = 1 - r.side; invalidate(); render(true); };
+$('#btnSample').onclick = () => loadSample();
+document.addEventListener('keydown', e => {
+  const typing = /^(INPUT|TEXTAREA)$/.test(e.target.tagName);
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && !typing) { e.preventDefault(); undo(); return; }
+  if (S.view !== 'file' || typing || S.editing != null) return;
+  if (e.key === 'Escape') closeFileView();
+  else if (e.altKey && e.key === 'ArrowDown') { e.preventDefault(); setHunk(S.hunk + 1, true); }
+  else if (e.altKey && e.key === 'ArrowUp') { e.preventDefault(); setHunk(S.hunk - 1, true); }
+  else if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); mergeHunk(S.hunk, 1); }
+  else if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); mergeHunk(S.hunk, -1); }
+});
+window.addEventListener('beforeunload', e => { if (pending(0) + pending(1)) { e.preventDefault(); e.returnValue = ''; } });
+
+/* ---------- example data ---------- */
+function loadSample() {
+  const common = {
+    'src/index.js': `const express = require('express');
+const config = require('../config/default.json');
+const { buildInvoice } = require('./invoice');
+
+const app = express();
+app.use(express.json());
+
+app.post('/invoices', (req, res) => {
+  const { account, items, period } = req.body;
+  res.json(buildInvoice(account, items, period));
+});
+
+app.listen(config.port, () => console.log(\`billing-service on :\${config.port}\`));
+`,
+    'test/invoice.test.js': `const test = require('node:test');
+const assert = require('node:assert');
+const { buildInvoice } = require('../src/invoice');
+
+test('totals a single line', () => {
+  const inv = buildInvoice({ id: 'a1', region: 'us-ny' }, [{ unitPrice: '10.00', quantity: 3 }], '2026-08');
+  assert.strictEqual(inv.subtotal, '30.00');
+});
+`,
+  };
+  const L = {
+    ...common,
+    'README.md': `# billing-service
+
+Generates monthly invoices for customer accounts and posts them to the ledger.
+
+## Running locally
+
+    npm install
+    npm start
+
+The service listens on port 8080 by default.
+
+## Configuration
+
+Settings live in \`config/default.json\`. Override any value with an
+environment variable of the same name in upper case.
+`,
+    'package.json': `{
+  "name": "billing-service",
+  "version": "1.4.2",
+  "private": true,
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "decimal.js": "^10.4.3",
+    "express": "^4.18.2"
+  }
+}
+`,
+    'config/default.json': `{
+  "port": 8080,
+  "ledgerUrl": "http://ledger.internal:9000",
+  "retryCount": 3
+}
+`,
+    'src/invoice.js': `const Decimal = require('decimal.js');
+const { taxFor } = require('./tax');
+
+function lineTotal(item) {
+  return new Decimal(item.unitPrice).times(item.quantity);
+}
+
+function buildInvoice(account, items, period) {
+  const subtotal = items.reduce((sum, item) => sum.plus(lineTotal(item)), new Decimal(0));
+  const tax = taxFor(account.region, subtotal);
+  return {
+    accountId: account.id,
+    period,
+    lines: items.map((item) => ({ ...item, total: lineTotal(item).toFixed(2) })),
+    subtotal: subtotal.toFixed(2),
+    tax: tax.toFixed(2),
+    total: subtotal.plus(tax).toFixed(2),
+    currency: 'USD',
+  };
+}
+
+module.exports = { buildInvoice };
+`,
+    'src/tax.js': `const RATES = { 'us-ca': 0.0725, 'us-ny': 0.04, 'eu-de': 0.19, 'eu-fr': 0.2 };
+
+function taxFor(region, amount) {
+  const rate = RATES[region] || 0;
+  return amount.times(rate);
+}
+
+module.exports = { taxFor };
+`,
+  };
+  const R = {
+    ...common,
+    'README.md': `# billing-service
+
+Generates monthly invoices for customer accounts and posts them to the ledger.
+
+## Running locally
+
+    npm install
+    npm start
+
+The service listens on port 8080 by default. Logs are written as JSON.
+
+## Configuration
+
+Settings live in \`config/default.json\`. Override any value with an
+environment variable of the same name in upper case.
+
+## Tax rules
+
+Rates are loaded from \`src/tax/rates.js\` and can change by billing period.
+`,
+    'package.json': `{
+  "name": "billing-service",
+  "version": "1.5.0",
+  "private": true,
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "lint": "eslint src",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "decimal.js": "^10.4.3",
+    "express": "^4.19.2",
+    "pino": "^9.1.0"
+  }
+}
+`,
+    'config/default.json': `{
+  "port": 8080,
+  "ledgerUrl": "http://ledger.internal:9000",
+  "retryCount": 5,
+  "logLevel": "info"
+}
+`,
+    'src/invoice.js': `const Decimal = require('decimal.js');
+const { taxFor } = require('./tax');
+const log = require('./log');
+
+function lineTotal(item) {
+  const price = new Decimal(item.unitPrice);
+  const discount = new Decimal(item.discountPct || 0).dividedBy(100);
+  return price.times(item.quantity).times(Decimal.sub(1, discount));
+}
+
+function buildInvoice(account, items, period) {
+  const subtotal = items.reduce((sum, item) => sum.plus(lineTotal(item)), new Decimal(0));
+  const tax = taxFor(account.region, subtotal, period);
+  log.info({ accountId: account.id, period }, 'invoice built');
+  return {
+    accountId: account.id,
+    period,
+    lines: items.map((item) => ({ ...item, total: lineTotal(item).toFixed(2) })),
+    subtotal: subtotal.toFixed(2),
+    tax: tax.toFixed(2),
+    total: subtotal.plus(tax).toFixed(2),
+    currency: account.currency || 'USD',
+  };
+}
+
+module.exports = { buildInvoice, lineTotal };
+`,
+    'src/log.js': `module.exports = require('pino')({ level: process.env.LOG_LEVEL || 'info' });
+`,
+    'src/tax/index.js': `const { ratesFor } = require('./rates');
+
+function taxFor(region, amount, period) {
+  const rate = ratesFor(period)[region] || 0;
+  return amount.times(rate);
+}
+
+module.exports = { taxFor };
+`,
+    'src/tax/rates.js': `const HISTORY = [
+  { from: '2000-01', rates: { 'us-ca': 0.0725, 'us-ny': 0.04, 'eu-de': 0.19, 'eu-fr': 0.2 } },
+  { from: '2026-07', rates: { 'us-ca': 0.0725, 'us-ny': 0.04, 'eu-de': 0.19, 'eu-fr': 0.2, 'eu-nl': 0.21 } },
+];
+
+function ratesFor(period = '9999-12') {
+  return HISTORY.filter((h) => h.from <= period).at(-1).rates;
+}
+
+module.exports = { ratesFor };
+`,
+  };
+  const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 16, 0, 0, 0, 16, 8, 6, 0, 0, 0, 31, 243, 255, 97]);
+  const t0 = Date.parse('2026-06-12T09:41:00'), t1 = Date.parse('2026-09-24T16:05:00');
+  const mk = (obj, t, name) => {
+    const files = new Map();
+    Object.keys(obj).forEach((p, k) => files.set(p, entryFromBytes(p, enc.encode(obj[p]), (p in common) ? t0 : t + k * 60000)));
+    files.set('assets/logo.png', entryFromBytes('assets/logo.png', png, t0));
+    return { name, mode: 'dir', files };
+  };
+  S.sides = [Object.assign(newSide(), mk(L, t0, 'example/billing-service-1.4')), Object.assign(newSide(), mk(R, t1, 'example/billing-service-1.5'))];
+  S.undo = []; S.view = 'tree'; S.filter = 'all'; S.collapsed.clear(); invalidate();
+  render();
+}
+
+loadSample();
+})();
+</script>
+</body></html>

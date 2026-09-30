@@ -23,6 +23,7 @@ const NAV_GROUPS = [
  ] },
  { group: 'Utilities', items: [
  ['mapper', 'Auto Mapper', '\u21F2'],
+ ['compare', 'Compare', '\u29C9'],
  ] },
  {
  group: 'Governance',

@@ -22,7 +22,7 @@ see [Is it on?](#is-it-on) below.
 @sql/64_security.sql
 ```
 
-Creates five tables and seeds the module list from the sidebar. Safe to
+Creates five tables and seeds the module list from the sidebar. Re-run it whenever a new module is added to the sidebar — the module `MERGE` is idempotent and exists for that. Safe to
 re-run: the DDL swallows ORA-00955 and the module seed is a `MERGE`.
 
 | Table | Holds | Note |
@@ -101,7 +101,7 @@ or grant appears in the payload.
 
 ```json
 { "mode": "on", "enforcing": true, "ready": true,
-  "admins": 1, "users": 14, "modules": 21, "ad_configured": true }
+  "admins": 1, "users": 14, "modules": 22, "ad_configured": true }
 ```
 
 When enforcement is off it says so, and so does every other surface: the
