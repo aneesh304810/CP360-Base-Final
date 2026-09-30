@@ -22,6 +22,16 @@ shared folder, the API, and the UI.
 This creates a Python venv (`.venv`), installs the API + ingestion requirements,
 and runs `npm install` for the UI.
 
+**Diagrams are optional.** `mermaid` is an optional dependency: if your
+registry has it, `npm install` picks it up and the Doc Drill screens
+render their diagrams. If it cannot be fetched, the install still
+succeeds, the dev server prints one line saying so, and those blocks show
+the diagram source instead. Nothing else is affected. To add it later:
+
+```bash
+cd ui && npm install mermaid
+```
+
 ## Configure
 
 ```bash
