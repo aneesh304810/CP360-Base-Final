@@ -92,6 +92,37 @@ except Exception as e:  # noqa: BLE001
     log.warning("SECURITY: could not determine posture: %s", e)
 
 
+# ---- synonym expansion -------------------------------------------------
+# ON by default, because the module was written to be on and a catalogue
+# that cannot find "ccy" is not doing its job. The kill switch exists
+# because widening recall is a judgement, not a fact: "account" also
+# pulls in "number", and if that turns out to be noise on real content
+# somebody needs to stop it in one restart rather than wait for a release.
+def _synonyms_on() -> bool:
+    return (os.environ.get("CP_SEARCH_SYNONYMS") or "on").strip().lower() \
+        not in ("off", "0", "false", "no")
+
+
+def _build_ctx(words):
+    """Oracle Text expression with synonym OR-groups, or the plain one."""
+    try:
+        from .search_synonyms import build_contains_expr
+        return build_contains_expr(words)
+    except Exception as e:                                    # noqa: BLE001
+        # Never let the thesaurus take search down. A missing or broken
+        # map degrades to the expression that worked before it existed.
+        log.warning("synonym expansion unavailable, using plain terms: %s", e)
+        return " & ".join(f"(stem({w}) | {w})" for w in words)
+
+
+def _expand_like(q):
+    try:
+        from .search_synonyms import expand_for_like
+        return expand_for_like(q)
+    except Exception:                                         # noqa: BLE001
+        return []
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -252,12 +283,28 @@ def search(q: str = "", project_id: str | None = None, module: str | None = None
 
     rows = []
     if has_text_index():
-        # build an Oracle Text expression: stem(word) | word, ANDed across words
+        # SYNONYM EXPANSION. Users search for the word they know, not the
+        # word the catalogue happens to use: "ccy" for currency, "customer"
+        # for client, "money owed" for balance/accrual/payable. The map in
+        # search_synonyms turns each query word into an OR-group and the
+        # groups are ANDed, so recall widens without precision collapsing.
+        #
+        # This wiring existed in an earlier main.py and was LOST when
+        # /search was rewritten to add the ds:/master:/is: filters and
+        # field-code detection: the rewrite kept "(stem(w) | w)" and
+        # dropped the call. Nothing failed, so nothing was reported -- a
+        # search for "ccy" simply returned nothing and read as an empty
+        # catalogue.
         import re as _re
         words = [w for w in _re.split(r"\s+", q) if _re.match(r"^[A-Za-z0-9_]+$", w)]
         if code_norm:
-            words = [code_norm]
-        ctx = " & ".join(f"(stem({w}) | {w})" for w in words) if words else None
+            # A field code has no synonyms and must not acquire any:
+            # BI/2-1 is BI_2_1 and nothing else.
+            ctx = f"(stem({code_norm}) | {code_norm})"
+        elif words and _synonyms_on():
+            ctx = _build_ctx(words)
+        else:
+            ctx = " & ".join(f"(stem({w}) | {w})" for w in words) if words else None
         if ctx:
             params["ctx"] = ctx
             try:
@@ -273,18 +320,29 @@ def search(q: str = "", project_id: str | None = None, module: str | None = None
                 rows = []
 
     if not rows:
-        # LIKE fallback (no text index, or CONTAINS failed)
+        # LIKE fallback (no text index, or CONTAINS failed). The synonyms
+        # matter MORE here, not less: a deployment without Oracle Text has
+        # no stemming either, so without help "balances" would not even
+        # find "balance".
         params["q"] = f"%{(code_norm or q).lower()}%"
         params["q2"] = f"%{q.lower()}%"
+        like = ["LOWER(name) LIKE :q", "LOWER(subtitle) LIKE :q",
+                "LOWER(body_text) LIKE :q", "LOWER(name) LIKE :q2",
+                "LOWER(subtitle) LIKE :q2", "LOWER(body_text) LIKE :q2"]
+        if not code_norm and _synonyms_on():
+            # Bounded at 12. Each term adds two more OR predicates, and an
+            # unbounded expansion turns a one-word search into a scan with
+            # fifty of them.
+            for _i, _term in enumerate(_expand_like(q)[:12]):
+                params[f"t{_i}"] = f"%{_term}%"
+                like.append(f"LOWER(body_text) LIKE :t{_i}")
+                like.append(f"LOWER(name) LIKE :t{_i}")
         try:
             rows = query(f"""
                 SELECT artifact_key, module, kind, name, subtitle, project_id,
                        is_pii, nav_module, nav_tab, nav_id, nav_extra, 1 AS score
                 FROM search_index
-                WHERE (LOWER(name) LIKE :q OR LOWER(subtitle) LIKE :q
-                       OR LOWER(body_text) LIKE :q
-                       OR LOWER(name) LIKE :q2 OR LOWER(subtitle) LIKE :q2
-                       OR LOWER(body_text) LIKE :q2){extra_sql}
+                WHERE ({' OR '.join(like)}){extra_sql}
                 FETCH FIRST :lim ROWS ONLY""", params)
         except Exception:
             rows = []
@@ -336,6 +394,12 @@ def search_diag():
     if out["row_count"] == 0:
         out["hint"] = ("search_index is EMPTY. Run sql/20_search_index.sql, then "
                        "the ingestion step: python -m ingestion.run search_index")
+    out["synonyms"] = _synonyms_on()
+    try:
+        from .search_synonyms import SYNONYMS
+        out["synonym_terms"] = len(SYNONYMS)
+    except Exception:                                         # noqa: BLE001
+        out["synonym_terms"], out["synonyms"] = 0, False
     return out
 
 
