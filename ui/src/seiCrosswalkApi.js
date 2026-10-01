@@ -202,6 +202,28 @@ export const VERDICT_ORDER = ["PROVEN_MATCH", "UNKNOWN", "DECODE_NEEDED",
   "PRECISION_RISK", "TYPE_SHIFT", "NOT_COMPARABLE", "NO_SOURCE",
   "NO_BASELINE", "OUT_OF_SCOPE"];
 
+// ---- STAR field usage ----------------------------------------------
+// Which published STAR fields anybody actually reads. Its own tab rather
+// than a column on the verdict table, because usage decides nothing: a
+// field nobody reads today is still a field the contract publishes, and
+// putting it beside a verdict would invite the reader to subtract it.
+export const starUsage = {
+  health: (data_source) =>
+    _get(`/sei-crosswalk/star-usage/health${_qs({ data_source })}`,
+      () => ({ data_source, loaded: false, tables: {}, families: 0,
+               disagreements: [] })),
+  summary: (data_source) =>
+    _get(`/sei-crosswalk/star-usage/summary${_qs({ data_source })}`,
+      () => ({ data_source, families: [], totals: { families: 0, published: 0,
+               used: 0, unused: 0, used_percent: null, unknown: 0 } })),
+  fields: (data_source, feed_family, status, limit) =>
+    _get(`/sei-crosswalk/star-usage/fields${_qs({ data_source, feed_family, status, limit })}`,
+      () => ({ fields: [] })),
+  recon: (data_source, recon_type) =>
+    _get(`/sei-crosswalk/star-usage/recon${_qs({ data_source, recon_type })}`,
+      () => ({ by_type: [], rows: [] })),
+};
+
 export const LANE_C = { STAR: "#b5651d", UAF: "#0b7d7d", SEI: "#0091bf",
                         ADDVANTAGE: "#6d3ac0", CRD: "#0b7d7d" };
 

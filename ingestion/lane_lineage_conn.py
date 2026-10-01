@@ -122,6 +122,59 @@ def _nz(v):
     return None if _isna(v) else _s(v)
 
 
+def _num(v):
+    """A count, or None. Never 0 for "could not read it".
+
+    openpyxl hands back a real int for a numeric cell and a string for one
+    somebody typed with a comma or a space. Both have to land as the same
+    number, and anything that is neither has to come back as None -- a
+    zero would read on screen as "this family publishes no fields", which
+    is a statement, and a wrong one.
+    """
+    if v is None or isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return int(v)
+    t = str(v).strip().replace(",", "").replace(" ", "")
+    if not t or _isna(t):
+        return None
+    try:
+        return int(float(t))
+    except ValueError:
+        return None
+
+
+def _pct(v):
+    """A percentage out of 100 -- the LAST resort, and ambiguous by nature.
+
+    Sheet.get() stringifies every cell, so the type that would have told
+    a fraction from a number is gone by the time this is called. Excel
+    stores a cell formatted "7.1%" as 0.071 and one typed as text as
+    "7.1%", and both arrive here as a string. Worse, "1" is 100% from a
+    percent-formatted cell and 1% from a hand-typed one, and nothing in
+    the value says which.
+
+    So this applies the only rule available -- a bare value below 1 is
+    read as a fraction -- and _usagesum prefers to DERIVE the percentage
+    from used/total, which has no ambiguity at all. This is used only
+    when those two are missing.
+    """
+    if v is None or isinstance(v, bool):
+        return None
+    t = str(v).strip().rstrip("%").strip()
+    if not t or _isna(t):
+        return None
+    try:
+        f = float(t)
+    except ValueError:
+        return None
+    # An explicit "%" says the number is already out of 100: "0.5%" is
+    # half a percent and must not become 50%.
+    if "%" in str(v):
+        return round(f, 2)
+    return round(f * 100, 2) if 0 < f < 1 else round(f, 2)
+
+
 _CHAIN_COLS = ("src_source_table", "src_source_column",
                "stg1_source_table", "stg1_source_column",
                "stg2_source_table", "stg2_source_column")
@@ -199,6 +252,13 @@ class SeiCrosswalkConnector:
         "recon":    ("NEW_EVIDENCE_RECON",),
         "enums":    ("ENUMS",),
         "lotmap":   ("LOT_LEVEL_POSITION_MAP",),
+        # STAR field usage: which published fields anybody actually reads.
+        # Three sheets rather than one because the summary carries counts
+        # from the layout side that the matrix has no rows for -- which is
+        # why the workbook also ships the reconciliation.
+        "usage":      ("STAR_FIELD_USAGE_MATRIX",),
+        "usagesum":   ("STAR_FIELD_USAGE_SUMMARY",),
+        "usagerecon": ("STAR_FIELD_USAGE_RECON",),
     }
 
     # Three sheets share one shape — (name, value, explanation) with a
@@ -275,6 +335,9 @@ class SeiCrosswalkConnector:
             "recon":    self._recon(sheets.get("recon")),
             "enums":    self._enums(sheets.get("enums")),
             "lotmap":   self._lotmap(sheets.get("lotmap")),
+            "usage":      self._usage(sheets.get("usage")),
+            "usagesum":   self._usagesum(sheets.get("usagesum")),
+            "usagerecon": self._usagerecon(sheets.get("usagerecon")),
             "control":  [],
         }
         # the three summary sheets, into one table, tagged by origin
@@ -301,7 +364,9 @@ class SeiCrosswalkConnector:
                        "seicat": "seicat", "seifeed": "seifeed",
                        "map": "map", "lineage": "lineage", "verify": "verify",
                        "code": "code", "disp": "disp", "xwalk": "xwalk",
-                       "exc": "exc", "lane": "lane"}
+                       "exc": "exc", "lane": "lane",
+                       "usage": "usage", "usagesum": "usagesum",
+                       "usagerecon": "usagerecon"}
         for key, role in role_of_key.items():
             sheet = sheets.get(role)
             if sheet is not None and not out.get(key):
@@ -1173,6 +1238,221 @@ class SeiCrosswalkConnector:
             })
         return out
 
+    # ---- STAR field usage -------------------------------------------
+    # The headers below were taken from a screenshot of the workbook, and
+    # several were cut off by the column width. Every one is therefore
+    # matched through a list of spellings, and _unconsumed() logs any
+    # header in the sheet that no parser asked for. A column read under
+    # the wrong name is bad; a column silently dropped is worse, because
+    # the load succeeds and the number is just quietly missing.
+
+    @staticmethod
+    def _unconsumed(sh, role, *consumed):
+        """Warn about headers this parser never asked for."""
+        if not sh:
+            return
+        want = {_hkey(n) for n in consumed}
+        extra = sorted(k for k in sh.idx if k and k not in want)
+        if extra:
+            log.warning("%s: sheet has column(s) nothing reads: %s. If one of "
+                        "these matters, add it to the parser.", role,
+                        ", ".join(extra))
+
+    @staticmethod
+    def _used_flag(status, matrix_value=None):
+        """Y / N / None. None is a real answer and is kept.
+
+        Folding an unrecognised status to "not used" would turn a workbook
+        typo into ninety fields that look out of scope.
+        """
+        for v in (status, matrix_value):
+            t = (v or "").strip().lower()
+            if t in ("used", "y", "yes", "true", "1", "in use", "active"):
+                return "Y"
+            if t in ("unused", "n", "no", "false", "0", "not used"):
+                return "N"
+        return None
+
+    def _usage(self, sh):
+        """STAR_FIELD_USAGE_MATRIX -- one row per published field, used or not.
+
+        WHAT IT IS FOR. STAR_LAYOUT_DETAIL says what a feed family
+        publishes; it does not say what anybody reads. The crosswalk has
+        been treating every published field as something that must be
+        accounted for, so a family publishing 139 fields of which 49 are
+        read shows 90 apparent gaps that nothing consumes. This is the
+        column that tells those apart.
+
+        IT DOES NOT DECIDE ANYTHING. "Unused" is a statement about today's
+        consumers, not about the contract, so no verdict is changed here.
+        It is recorded and shown beside the verdict; a human decides what
+        it means for scope.
+        """
+        if not sh:
+            return []
+        cols = ("FEED_FAMILY", "FEED_NAME", "FEED", "FIELD_NAME", "FIELD",
+                "STAR_FIELD", "USAGE_STATUS", "STATUS", "USED",
+                "MATRIX_VALUE", "VALUE", "SOURCE_SHEET", "SHEET",
+                "SOURCE_ROW", "ROW", "ROW_NUMBER",
+                "SOURCE_DOCUMENT", "SOURCE_DOC", "DOCUMENT",
+                "NORMALIZED_KEY", "NORMALISED_KEY", "NOTES", "NOTE")
+        self._unconsumed(sh, "star_field_usage", *cols)
+        out, seen = [], set()
+        for i, row in enumerate(sh.rows(), 1):
+            fld = sh.get(row, "FIELD_NAME", "FIELD", "STAR_FIELD")
+            if not fld:
+                continue
+            fam = sh.get(row, "FEED_FAMILY", "FEED_NAME", "FEED") or "NA"
+            status = sh.get(row, "USAGE_STATUS", "STATUS", "USED")
+            mval = sh.get(row, "MATRIX_VALUE", "VALUE")
+            uid = f"{self.data_source}:{_file_key(fam)}:{_norm_code(fld)}"
+            if uid in seen:
+                # The same field twice in one family is the workbook
+                # disagreeing with itself. Both rows are kept -- dropping
+                # the second hides it -- and the duplicate is reported.
+                log.warning("star_field_usage: %s/%s appears more than once; "
+                            "keeping both rows", fam, fld)
+                uid = f"{uid}:{i}"
+            seen.add(uid)
+            out.append({
+                "usage_id": uid,
+                "data_source": self.data_source,
+                "feed_family": fam,
+                "field_name": fld,
+                "field_norm": _norm_code(fld),
+                "usage_status": _nz(status),
+                "is_used": self._used_flag(status, mval),
+                "matrix_value": _nz(mval),
+                "source_sheet": sh.get(row, "SOURCE_SHEET", "SHEET"),
+                "source_row": _num(sh.get(row, "SOURCE_ROW", "ROW",
+                                          "ROW_NUMBER")),
+                "source_document": sh.get(row, "SOURCE_DOCUMENT",
+                                          "SOURCE_DOC", "DOCUMENT"),
+                # The workbook's own key, stored as given. It is a
+                # DIFFERENT rule from _norm_code -- FAMILY|FIELDNOSPACES
+                # against ENTITY_NUMBER -- and it is the one the
+                # reconciliation sheet was computed with, so it is the
+                # only way to reproduce that finding here.
+                "normalized_key": sh.get(row, "NORMALIZED_KEY",
+                                         "NORMALISED_KEY"),
+                "notes": sh.get(row, "NOTES", "NOTE"),
+            })
+        return out
+
+    @staticmethod
+    def _used_pct(declared, used, total, fam=""):
+        """used/total, and the declared cell only when that is impossible.
+
+        DERIVED, NOT READ, because the stored percentage is ambiguous --
+        see _pct. used/total is not: 3 of 42 is 7.14%, whatever Excel put
+        in the cell. The declared value is still compared against it, and
+        a real disagreement is logged: the two differing by more than
+        rounding means the workbook contradicts itself, which is worth
+        knowing and is not something to silently pick a side on.
+        """
+        want = _pct(declared)
+        if total:
+            got = round((used or 0) * 100.0 / total, 2)
+            if want is not None and abs(got - want) > 0.15:
+                log.warning("star_field_usage_summary[%s]: declared %s%% but "
+                            "%s/%s is %s%%. Using the computed value.",
+                            fam, want, used, total, got)
+            return got
+        # No total to divide by. 0 of 0 is not 0% -- it is unanswerable.
+        if total == 0:
+            return None
+        return want
+
+    def _usagesum(self, sh):
+        """STAR_FIELD_USAGE_SUMMARY -- the workbook's own totals per family.
+
+        STORED AS DECLARED, NOT RECOMPUTED. The summary carries two counts
+        the matrix has no rows for -- the layout side -- and they do not
+        always agree with it: one family shows 0 fields in the matrix and
+        42 on the layout side, another 73 against 74. That disagreement is
+        the finding, not a rounding error, which is why the workbook ships
+        a reconciliation sheet as well. Recomputing these from the matrix
+        would erase it.
+        """
+        if not sh:
+            return []
+        cols = ("FEED_FAMILY", "FEED_NAME", "FEED", "TOTAL_FIELDS", "TOTAL",
+                "USED_FIELDS", "UNUSED_FIELDS", "USED_PERCENT", "USED_PCT",
+                "PERCENT_USED", "CATALOG_LAYOUT_FIELDS", "LAYOUT_FIELDS",
+                "STAR_LAYOUT_FIELDS", "PUBLISHED_FIELDS",
+                "MATRIX_MATCHED_LAYOUT_FIELDS", "MATCHED_FIELDS",
+                "MATRIX_UNMATCHED_LAYOUT_FIELDS", "UNMATCHED_FIELDS",
+                "NOTES", "NOTE")
+        self._unconsumed(sh, "star_field_usage_summary", *cols)
+        out = []
+        for row in sh.rows():
+            fam = sh.get(row, "FEED_FAMILY", "FEED_NAME", "FEED")
+            if not fam:
+                continue
+            out.append({
+                "summary_id": f"{self.data_source}:{_file_key(fam)}",
+                "data_source": self.data_source,
+                "feed_family": fam,
+                "total_fields": _num(sh.get(row, "TOTAL_FIELDS", "TOTAL")),
+                "used_fields": _num(sh.get(row, "USED_FIELDS")),
+                "unused_fields": _num(sh.get(row, "UNUSED_FIELDS")),
+                "used_percent": self._used_pct(
+                    sh.get(row, "USED_PERCENT", "USED_PCT", "PERCENT_USED"),
+                    _num(sh.get(row, "USED_FIELDS")),
+                    _num(sh.get(row, "TOTAL_FIELDS", "TOTAL")), fam),
+                "catalog_layout_fields": _num(sh.get(
+                    row, "CATALOG_LAYOUT_FIELDS", "LAYOUT_FIELDS",
+                    "STAR_LAYOUT_FIELDS", "PUBLISHED_FIELDS")),
+                "matrix_matched_layout_fields": _num(sh.get(
+                    row, "MATRIX_MATCHED_LAYOUT_FIELDS", "MATCHED_FIELDS")),
+                # How many published fields the usage study never reached.
+                # The one number here with no equivalent anywhere else.
+                "matrix_unmatched_layout_fields": _num(sh.get(
+                    row, "MATRIX_UNMATCHED_LAYOUT_FIELDS", "UNMATCHED_FIELDS")),
+                "notes": sh.get(row, "NOTES", "NOTE"),
+            })
+        return out
+
+    def _usagerecon(self, sh):
+        """STAR_FIELD_USAGE_RECON -- why the two sides disagree.
+
+        RECON_TYPE is the workbook's own classification and is stored as
+        given. Inventing our own vocabulary for somebody else's finding is
+        how two systems end up describing the same row differently and
+        nobody can join them again.
+        """
+        if not sh:
+            return []
+        cols = ("RECON_TYPE", "TYPE", "FEED_FAMILY", "FEED_NAME", "FEED",
+                "FIELD_NAME", "FIELD", "USAGE_STATUS", "STATUS", "DETAIL",
+                "DETAILS", "NOTE", "SOURCE_DOCUMENT", "SOURCE_DOC")
+        self._unconsumed(sh, "star_field_usage_recon", *cols)
+        out, seen = [], set()
+        for i, row in enumerate(sh.rows(), 1):
+            rtype = sh.get(row, "RECON_TYPE", "TYPE")
+            fld = sh.get(row, "FIELD_NAME", "FIELD")
+            if not rtype and not fld:
+                continue
+            fam = sh.get(row, "FEED_FAMILY", "FEED_NAME", "FEED") or "NA"
+            rid = (f"{self.data_source}:{_file_key(rtype or 'NA')}:"
+                   f"{_file_key(fam)}:{_norm_code(fld or '')}")
+            if rid in seen:
+                rid = f"{rid}:{i}"
+            seen.add(rid)
+            out.append({
+                "recon_id": rid,
+                "data_source": self.data_source,
+                "recon_type": _nz(rtype),
+                "feed_family": fam,
+                "field_name": fld,
+                "field_norm": _norm_code(fld or "") or None,
+                "usage_status": _nz(sh.get(row, "USAGE_STATUS", "STATUS")),
+                "detail": sh.get(row, "DETAIL", "DETAILS", "NOTE"),
+                "source_document": sh.get(row, "SOURCE_DOCUMENT",
+                                          "SOURCE_DOC"),
+            })
+        return out
+
     def _control(self, sh, sheet_label):
         """_MANIFEST, FINAL_VERIFICATION and TRANSFORMATION_SUMMARY.
 
@@ -1229,6 +1509,9 @@ class SeiCrosswalkConnector:
         ("enums",     "sei_enum",           ("enum_id",)),
         ("lotmap",    "lot_level_position_map", ("map_row_id",)),
         ("control",   "sei_control",        ("control_id",)),
+        ("usage",      "star_field_usage",         ("usage_id",)),
+        ("usagesum",   "star_field_usage_summary", ("summary_id",)),
+        ("usagerecon", "star_field_usage_recon",   ("recon_id",)),
     ]
 
     # legacy_lineage and legacy_source_file are SHARED with whatever loaded the
@@ -1394,6 +1677,9 @@ class SeiCrosswalkConnector:
             ("sei_enum", "data_source = :ds"),
             ("lot_level_position_map", "data_source = :ds"),
             ("sei_control", "data_source = :ds"),
+            ("star_field_usage", "data_source = :ds"),
+            ("star_field_usage_summary", "data_source = :ds"),
+            ("star_field_usage_recon", "data_source = :ds"),
         ]
         for table, where in scoped:
             if mode == "attach" and table in shared:

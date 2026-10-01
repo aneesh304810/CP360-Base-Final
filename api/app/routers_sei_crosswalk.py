@@ -1994,3 +1994,266 @@ def business_summary(data_source: str | None = None):
         "scored": in_scope > 0,
     }
 
+
+
+# ========================= STAR field usage ==============================
+# WHAT THIS ADDS TO THE PICTURE. STAR_LAYOUT_DETAIL says what a feed family
+# publishes. Until now nothing said what anybody READS, so the crosswalk
+# counted every published field as something that must be accounted for: a
+# family publishing 139 fields of which 49 are read showed 90 apparent gaps
+# that nothing consumes.
+#
+# IT CHANGES NO VERDICT, AND THESE ENDPOINTS DELIBERATELY DO NOT TRY. Usage
+# is a fact about today's consumers; a field nobody reads is still a field
+# the contract publishes, and whether that puts it out of scope is somebody's
+# decision, not a join. So usage is returned ALONGSIDE the verdicts, never
+# folded into them, and /coverage reports the overlap without ranking it.
+
+_USAGE_TABLES = ("star_field_usage", "star_field_usage_summary",
+                 "star_field_usage_recon")
+
+
+@router.get("/star-usage/health")
+def star_usage_health(data_source: str | None = None):
+    """Is it loaded, and does it agree with itself?
+
+    The failure this is most likely to hit is not an exception: it is three
+    empty tables, which look exactly like a working screen with nothing to
+    say. This reports row counts, and the one check worth making at load
+    time -- whether the declared totals match what the matrix rows actually
+    add up to.
+    """
+    ds = (data_source or "IMDS").upper()
+    out = {"data_source": ds, "tables": {}}
+    for t in _USAGE_TABLES:
+        r = _safe(f"SELECT COUNT(*) AS n FROM {t} WHERE data_source = :ds",
+                  {"ds": ds})
+        out["tables"][t] = int(r[0]["n"]) if r else 0
+    out["loaded"] = out["tables"]["star_field_usage"] > 0
+
+    # Declared vs counted, per family. A difference is not an error -- it is
+    # what the reconciliation sheet exists to explain -- but a difference
+    # with NO recon rows behind it is unexplained, and that is worth saying.
+    rows = _safe("""
+        SELECT s.feed_family, s.total_fields AS declared, s.used_fields AS declared_used,
+               (SELECT COUNT(*) FROM star_field_usage u
+                 WHERE u.data_source = s.data_source
+                   AND u.feed_family = s.feed_family) AS counted,
+               (SELECT COUNT(*) FROM star_field_usage u
+                 WHERE u.data_source = s.data_source
+                   AND u.feed_family = s.feed_family AND u.is_used = 'Y') AS counted_used,
+               (SELECT COUNT(*) FROM star_field_usage_recon r
+                 WHERE r.data_source = s.data_source
+                   AND r.feed_family = s.feed_family) AS recon_rows
+        FROM   star_field_usage_summary s
+        WHERE  s.data_source = :ds
+        ORDER  BY s.feed_family""", {"ds": ds})
+    mismatch = [r for r in rows
+                if (r.get("declared") or 0) != (r.get("counted") or 0)]
+    out["families"] = len(rows)
+    out["disagreements"] = [
+        {**r, "explained": bool(r.get("recon_rows"))} for r in mismatch]
+    unexplained = [r for r in mismatch if not r.get("recon_rows")]
+    if unexplained:
+        out["warning"] = (
+            f"{len(unexplained)} family/families where the declared total and "
+            f"the matrix rows differ with no reconciliation rows to explain it: "
+            + ", ".join(r["feed_family"] for r in unexplained[:6]))
+    return out
+
+
+@router.get("/star-usage/summary")
+def star_usage_summary(data_source: str | None = None):
+    """Per family: published, used, unused, and the layout-side counts.
+
+    Both numbers are returned -- what the workbook DECLARED and what its own
+    matrix rows COUNT -- because they do not always agree and the screen
+    should not have to pick. One family declares 0 fields against 42 on the
+    layout side; another 73 against 74.
+    """
+    ds = (data_source or "IMDS").upper()
+    rows = _safe("""
+        SELECT s.feed_family, s.total_fields, s.used_fields, s.unused_fields,
+               s.used_percent, s.catalog_layout_fields,
+               s.matrix_matched_layout_fields, s.matrix_unmatched_layout_fields,
+               s.notes,
+               (SELECT COUNT(*) FROM star_field_usage u
+                 WHERE u.data_source = s.data_source
+                   AND u.feed_family = s.feed_family) AS matrix_rows,
+               (SELECT COUNT(*) FROM star_field_usage u
+                 WHERE u.data_source = s.data_source
+                   AND u.feed_family = s.feed_family
+                   AND u.is_used = 'Y') AS matrix_used,
+               (SELECT COUNT(*) FROM star_field_usage u
+                 WHERE u.data_source = s.data_source
+                   AND u.feed_family = s.feed_family
+                   AND u.is_used IS NULL) AS matrix_unknown,
+               (SELECT COUNT(*) FROM star_field_usage_recon r
+                 WHERE r.data_source = s.data_source
+                   AND r.feed_family = s.feed_family) AS recon_rows
+        FROM   star_field_usage_summary s
+        WHERE  s.data_source = :ds
+        ORDER  BY s.feed_family""", {"ds": ds})
+
+    tot = sum(r.get("total_fields") or 0 for r in rows)
+    used = sum(r.get("used_fields") or 0 for r in rows)
+    return {
+        "data_source": ds,
+        "families": rows,
+        "totals": {
+            "families": len(rows),
+            "published": tot,
+            "used": used,
+            "unused": sum(r.get("unused_fields") or 0 for r in rows),
+            # Rolled up from the counts, not averaged from the per-family
+            # percentages: a mean of percentages weights a 42-field family
+            # the same as a 196-field one and is simply a different number.
+            "used_percent": round(used * 100.0 / tot, 1) if tot else None,
+            "unknown": sum(r.get("matrix_unknown") or 0 for r in rows),
+        },
+    }
+
+
+@router.get("/star-usage/fields")
+def star_usage_fields(data_source: str | None = None,
+                      feed_family: str | None = None,
+                      status: str | None = None, limit: int = 500):
+    """The field-level rows, for one family or all of them.
+
+    `status` accepts used / unused / unknown. "unknown" is a real bucket:
+    a usage value the workbook spelled in a way nothing recognised is kept
+    as NULL rather than folded into "unused", because folding it would turn
+    a typo into a field that looks out of scope.
+    """
+    ds = (data_source or "IMDS").upper()
+    where, params = ["data_source = :ds"], {"ds": ds,
+                                            "lim": max(1, min(int(limit or 500), 5000))}
+    if feed_family:
+        where.append("feed_family = :fam"); params["fam"] = feed_family
+    st = (status or "").strip().lower()
+    if st in ("used", "y"):
+        where.append("is_used = 'Y'")
+    elif st in ("unused", "n"):
+        where.append("is_used = 'N'")
+    elif st == "unknown":
+        where.append("is_used IS NULL")
+    return {"data_source": ds, "feed_family": feed_family, "status": status,
+            "fields": _safe(f"""
+        SELECT feed_family, field_name, field_norm, usage_status, is_used,
+               matrix_value, source_sheet, source_row, source_document
+        FROM   star_field_usage
+        WHERE  {' AND '.join(where)}
+        ORDER  BY feed_family, field_name
+        FETCH FIRST :lim ROWS ONLY""", params)}
+
+
+@router.get("/star-usage/recon")
+def star_usage_recon(data_source: str | None = None,
+                     recon_type: str | None = None, limit: int = 500):
+    """Why the usage matrix and the published layout disagree.
+
+    Grouped counts come back with the rows, because the first question is
+    always how many of each kind there are and the second is which ones.
+    """
+    ds = (data_source or "IMDS").upper()
+    where, params = ["data_source = :ds"], {"ds": ds,
+                                            "lim": max(1, min(int(limit or 500), 5000))}
+    if recon_type:
+        where.append("recon_type = :rt"); params["rt"] = recon_type
+    return {
+        "data_source": ds,
+        "by_type": _safe("""
+            SELECT recon_type, COUNT(*) AS n FROM star_field_usage_recon
+            WHERE data_source = :ds GROUP BY recon_type ORDER BY COUNT(*) DESC""",
+                         {"ds": ds}),
+        "rows": _safe(f"""
+            SELECT recon_type, feed_family, field_name, usage_status, detail,
+                   source_document
+            FROM   star_field_usage_recon
+            WHERE  {' AND '.join(where)}
+            ORDER  BY recon_type, feed_family, field_name
+            FETCH FIRST :lim ROWS ONLY""", params),
+    }
+
+
+@router.get("/star-usage/coverage")
+def star_usage_coverage(data_source: str | None = None):
+    """Does the usage matrix line up with the published layout?
+
+    THE JOIN IS ON FIELD_NORM, and only between the two tables that both
+    carry it. `_norm_code` is not a simple upper-case -- it folds
+    separators to underscores and rewrites `_L12` to `_12` -- so
+    reimplementing it in SQL would be a second copy of the rule, free to
+    drift from the one the loader used. Both of these columns were written
+    by that one function, so the join is exact.
+
+    WHAT IS NOT HERE, AND WHY. The number people will want is "how many
+    OPEN crosswalk items are fields nobody reads", because that part of
+    the backlog may not be work at all. It cannot be computed yet:
+    SEI_VERIFY stores CONTRACT_FIELD as written and carries no normalised
+    key, so there is nothing to join to that would not be a guess. A
+    wrong join here would not look wrong -- it would return a confident
+    zero. Adding CONTRACT_FIELD_NORM to sei_verify in the loader is the
+    small change that unlocks it; until then this says so rather than
+    answering.
+    """
+    ds = (data_source or "IMDS").upper()
+
+    def _one(sql):
+        r = _safe(sql, {"ds": ds})
+        return int(r[0]["n"]) if r else 0
+
+    usage = _one("SELECT COUNT(*) AS n FROM star_field_usage WHERE data_source = :ds")
+    layout = _one("SELECT COUNT(*) AS n FROM star_layout_field WHERE data_source = :ds")
+    matched = _one("""
+        SELECT COUNT(*) AS n FROM star_field_usage u
+         WHERE u.data_source = :ds
+           AND EXISTS (SELECT 1 FROM star_layout_field f
+                        WHERE f.data_source = u.data_source
+                          AND f.feed_family = u.feed_family
+                          AND f.field_norm  = u.field_norm)""")
+    layout_unmatched = _one("""
+        SELECT COUNT(*) AS n FROM star_layout_field f
+         WHERE f.data_source = :ds
+           AND NOT EXISTS (SELECT 1 FROM star_field_usage u
+                            WHERE u.data_source = f.data_source
+                              AND u.feed_family = f.feed_family
+                              AND u.field_norm  = f.field_norm)""")
+    return {
+        "data_source": ds,
+        "usage_rows": usage,
+        "layout_rows": layout,
+        "matched": matched,
+        # The two directions are different findings. A usage row with no
+        # layout field is a field somebody reads that the published
+        # dictionary does not describe; a layout field with no usage row
+        # is a published field the usage study never looked at. The
+        # workbook's own recon sheet names the first kind.
+        "usage_not_in_layout": usage - matched,
+        "layout_not_in_usage": layout_unmatched,
+        "recon_rows": _one("SELECT COUNT(*) AS n FROM star_field_usage_recon "
+                           "WHERE data_source = :ds"),
+        # The workbook did this join too, with ITS normalisation
+        # (FAMILY|FIELDNOSPACES) rather than _norm_code. Where the two
+        # totals differ, the two rules disagree about what counts as the
+        # same field name -- which is worth knowing before anyone trusts
+        # either number.
+        "declared_layout_not_in_usage": _one(
+            "SELECT NVL(SUM(matrix_unmatched_layout_fields),0) AS n "
+            "FROM star_field_usage_summary WHERE data_source = :ds"),
+        "open_items_on_unused_fields": None,
+        "open_items_note": (
+            "Not computed. SEI_VERIFY stores CONTRACT_FIELD as written and "
+            "has no normalised key to join on, and a guessed join would "
+            "return a confident wrong number rather than fail. Add "
+            "CONTRACT_FIELD_NORM to sei_verify in the loader to enable it."),
+        "normalisation_note": (
+            "layout_not_in_usage is computed with _norm_code; "
+            "declared_layout_not_in_usage is the workbook's own count, made "
+            "with its own key (FAMILY|FIELDNOSPACES). A difference between "
+            "them is the two rules disagreeing about what is the same field "
+            "name, not a data problem."),
+        "note": ("Usage changes no verdict. A field nobody reads today is "
+                 "still a field the contract publishes; whether that puts "
+                 "it out of scope is a decision about the contract."),
+    }

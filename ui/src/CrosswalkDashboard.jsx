@@ -7,6 +7,7 @@ import { FlowDiagram, EvidencePanel, Waffle, TransformationPanel, LogicCompare }
 import { useFeedNames, feedName } from "./feedNames.js";
 import ChainRules from "./ChainRules.jsx";
 import SeiBusinessSummary from "./SeiBusinessSummary.jsx";
+import StarFieldUsage from "./StarFieldUsage.jsx";
 
 // =====================================================================
 // CrosswalkDashboard — mapping, analysis and divergence for one warehouse.
@@ -512,7 +513,13 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
         marginBottom: 12, flexWrap: "wrap" }}>
         <span style={{ display: "inline-flex", borderRadius: 999, padding: 3, gap: 2,
           background: t.navy || "#10193b" }}>
-          {[["biz", "Business"], ["detail", "Detail"]].map(([k, label]) => (
+          {/* "Usage" is a third face of the same estate, not a filter on
+              the other two: it answers what anybody READS, which no
+              verdict knows. Kept as its own view so an "unused" badge
+              never sits next to a verdict and invites a subtraction
+              nobody decided on. */}
+          {[["biz", "Business"], ["detail", "Detail"],
+            ["usage", "Field usage"]].map(([k, label]) => (
             <button key={k} type="button" onClick={() => setLook(k)}
               aria-pressed={look === k}
               style={{ font: "inherit", fontSize: 11.5, padding: "4px 14px",
@@ -526,6 +533,8 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
       {look === "biz" && (
         <SeiBusinessSummary t={t} dataSource={ds} onDrill={drill}
           onGlossary={openGlossary} />)}
+
+      {look === "usage" && <StarFieldUsage t={t} dataSource={ds} />}
 
       {look === "detail" && (<>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(168px,1fr))",
