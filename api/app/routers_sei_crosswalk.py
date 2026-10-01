@@ -21,7 +21,7 @@ touching, which is the fastest way to have the whole report dismissed.
 from __future__ import annotations
 import logging
 import re
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from pydantic import BaseModel
 
@@ -497,6 +497,142 @@ def waffle(data_source: str | None = None, limit_tables: int = 40):
             "cells": sum(len(t["cells"]) for t in out)}
 
 
+# ---- field usage, resolved for a grid of crosswalk rows ----------------
+# WHY THIS IS NOT A SQL JOIN. Three things have to happen between
+# SEI_VERIFY.CONTRACT_FIELD and STAR_FIELD_USAGE, and none of them is
+# comfortable in Oracle:
+#
+#   1. CONTRACT_FIELD carries a POSITIONAL SUFFIX -- Base_Market_Value_10,
+#      Trade_Date_128 -- and the usage matrix does not. Measured against
+#      the delivered data: 0 of 19 contract-field parts match as written,
+#      19 of 19 match once the trailing _<digits> is removed. Without
+#      this step the column is empty on every row, which looks like
+#      "no usage data" rather than "the key did not line up".
+#   2. One warehouse column is often fed by SEVERAL contract fields, comma
+#      joined. Its usage is then a question, not a value: both unused is
+#      unused, both used is used, and one of each is MIXED -- which is a
+#      real answer and the one most worth seeing, because dropping that
+#      column loses something somebody reads.
+#   3. The suffix strip is a heuristic. A field genuinely ending in a
+#      number would be mangled by it, so the exact match is tried FIRST
+#      and the strip is a fallback, and each row says which rung answered.
+
+_ORD = re.compile(r"_\d+$")
+
+
+def _ukey(s):
+    """The workbook's normalisation: upper case, nothing but letters and
+    digits. Must stay identical to ingestion's _usage_key."""
+    return re.sub(r"[^A-Z0-9]", "", str(s or "").upper())
+
+
+def _usage_index(ds, families=None):
+    """field key -> 'Y'/'N'/None, both family-qualified and bare."""
+    rows = _safe("""SELECT feed_family, field_name, is_used
+                    FROM star_field_usage WHERE data_source = :ds""",
+                 {"ds": ds})
+    by_fam, by_field = {}, {}
+    for r in rows:
+        k = _ukey(r.get("field_name"))
+        if not k:
+            continue
+        fam = _ukey(r.get("feed_family"))
+        u = r.get("is_used")
+        by_fam[f"{fam}|{k}"] = u
+        # A bare field name shared by two families with DIFFERENT answers
+        # cannot be resolved without the family. Record the clash as None
+        # rather than letting whichever row loaded last decide.
+        if k in by_field and by_field[k] != u:
+            by_field[k] = "?"
+        else:
+            by_field.setdefault(k, u)
+    return by_fam, by_field
+
+
+def _resolve_usage(contract_feed, contract_field, by_fam, by_field):
+    """One grid row -> {status, parts, matched_on}.
+
+    status: used | unused | mixed | unknown | None (nothing matched)
+    """
+    raw = (contract_field or "").strip()
+    if not raw:
+        return {"usage": None, "usage_detail": None, "usage_matched_on": None}
+    fam = _ukey(contract_feed)
+    flags, rungs, parts = [], [], []
+    for piece in [x.strip() for x in raw.split(",") if x.strip()]:
+        exact, stripped = _ukey(piece), _ukey(_ORD.sub("", piece))
+        got, rung = None, None
+        for key, r in ((f"{fam}|{exact}", "exact"),
+                       (f"{fam}|{stripped}", "ordinal_stripped")):
+            if fam and key in by_fam:
+                got, rung = by_fam[key], r
+                break
+        if rung is None:
+            for key, r in ((exact, "field_only"),
+                           (stripped, "field_only_ordinal_stripped")):
+                if key in by_field:
+                    got, rung = by_field[key], r
+                    break
+        if rung:
+            rungs.append(rung)
+            flags.append(got)
+            parts.append({"field": piece,
+                          "used": {"Y": "used", "N": "unused",
+                                   "?": "ambiguous"}.get(got, "unknown")})
+        else:
+            parts.append({"field": piece, "used": None})
+
+    if not rungs:
+        return {"usage": None, "usage_detail": parts, "usage_matched_on": None}
+    known = [f for f in flags if f in ("Y", "N")]
+    if not known:
+        status = "unknown"
+    elif all(f == "Y" for f in known):
+        status = "used"
+    elif all(f == "N" for f in known):
+        status = "unused"
+    else:
+        # Fed by several STAR fields, some read and some not. Dropping this
+        # column would lose something somebody reads.
+        status = "mixed"
+    # If any part found no usage row at all, the answer is partial. Say so
+    # rather than reporting the status of the parts that did match.
+    if any(p["used"] is None for p in parts):
+        status = "partial" if status != "unknown" else "unknown"
+    return {"usage": status, "usage_detail": parts,
+            "usage_matched_on": sorted(set(rungs))[0] if rungs else None}
+
+
+def _attach_usage(ds, rows):
+    """Add usage to each row, and report how the join went overall."""
+    if not rows:
+        return {"loaded": False, "matched": 0, "rows": 0}
+    by_fam, by_field = _usage_index(ds)
+    if not by_fam and not by_field:
+        for r in rows:
+            r["usage"] = None
+            r["usage_matched_on"] = None
+        return {"loaded": False, "matched": 0, "rows": len(rows),
+                "note": ("STAR_FIELD_USAGE is empty for this lane. Run "
+                         "sql/65_star_field_usage.sql and the sei_crosswalk "
+                         "ingestion step.")}
+    matched, rungs = 0, {}
+    for r in rows:
+        got = _resolve_usage(r.get("contract_feed"), r.get("contract_field"),
+                             by_fam, by_field)
+        r.update(got)
+        if got["usage"]:
+            matched += 1
+            rungs[got["usage_matched_on"]] = rungs.get(got["usage_matched_on"], 0) + 1
+    out = {"loaded": True, "rows": len(rows), "matched": matched,
+           "unmatched": len(rows) - matched, "matched_on": rungs}
+    if matched and all(k and "stripped" in k for k in rungs):
+        out["note"] = ("Every match needed the trailing _<number> removed "
+                       "from the contract field. That ordinal is positional "
+                       "and the usage matrix does not carry it.")
+    return out
+
+
 @router.get("/columns")
 def columns(data_source: str | None = None, verdict: str | None = None,
             lane: str | None = None, group: str | None = None,
@@ -553,7 +689,154 @@ def columns(data_source: str | None = None, verdict: str | None = None,
         FROM   sei_verify WHERE {' AND '.join(where)}
         ORDER  BY dwh_target_table, dwh_target_column
         FETCH FIRST {int(limit)} ROWS ONLY""", p)
-    return {"columns": rows, "count": len(rows)}
+    usage = _attach_usage(ds, rows)
+    return {"columns": rows, "count": len(rows), "usage": usage}
+
+
+@router.get("/columns.xlsx")
+def columns_xlsx(data_source: str | None = None, verdict: str | None = None,
+                 lane: str | None = None, group: str | None = None,
+                 table: str | None = None, feed: str | None = None,
+                 sei_feed: str | None = None, limit: int = 20000):
+    """The same grid, as a workbook. Every filter the screen can apply.
+
+    THE WHOLE SET, NOT THE PAGE. The screen fetches 500 rows because that
+    is what a person scrolls; an export that silently stopped at 500 would
+    be worse than no export, because the file looks complete. The default
+    here is 20,000 and the sheet records the row count and the filters it
+    was taken under, so a file found on somebody's desktop in three months
+    can still say what it is.
+
+    A SECOND SHEET CARRIES THE PROVENANCE: when it was taken, from which
+    lane, under which filters, and how the usage column was resolved. A
+    spreadsheet that leaves its own origin behind becomes a number nobody
+    can defend.
+    """
+    from fastapi.responses import StreamingResponse
+    try:
+        import openpyxl                                        # noqa: F401
+    except ImportError as e:                                  # pragma: no cover
+        raise HTTPException(501, "openpyxl is not installed on the API host "
+                                 "- `pip install openpyxl`") from e
+
+    payload = columns(data_source=data_source, verdict=verdict, lane=lane,
+                      group=group, table=table, feed=feed, sei_feed=sei_feed,
+                      limit=max(1, min(int(limit or 20000), 100000)))
+    buf, name = _columns_workbook(
+        payload, _ds(data_source),
+        {"verdict": verdict, "lane": lane, "group": group, "table": table,
+         "feed": feed, "sei_feed": sei_feed}, limit)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument."
+                   "spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+def _columns_workbook(payload, ds, filters, limit):
+    """Build the workbook. Separate from the route so a test can open the
+    real file and read it back, rather than trusting that it was written."""
+    from io import BytesIO
+    from datetime import datetime, timezone
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.utils import get_column_letter
+
+    rows = payload["columns"]
+
+    HEAD = [("dwh_target_table", "Warehouse table", 28),
+            ("dwh_target_column", "Warehouse column", 30),
+            ("lane_id", "Lane", 14),
+            ("functional_group", "Business grouping", 24),
+            ("contract_feed", "Contract feed", 16),
+            ("contract_field", "Contract field", 42),
+            ("usage", "STAR field usage", 16),
+            ("usage_matched_on", "Usage matched on", 24),
+            ("sei_datapoints", "SEI datapoints", 40),
+            ("sei_datapoint_count", "SEI datapoint count", 12),
+            ("map_kind", "Map kind", 14),
+            ("match_verdict", "Verdict", 18),
+            ("failed_checks", "Analysis", 30),
+            ("blocks_cutover", "Blocks cutover", 12),
+            ("verdict_reason", "Why", 60),
+            ("what_would_clear_it", "What would clear it", 60)]
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Columns"
+    hdr = Font(bold=True, color="FFFFFF")
+    fill = PatternFill("solid", fgColor="10193B")
+    for i, (_, label, w) in enumerate(HEAD, 1):
+        c = ws.cell(row=1, column=i, value=label)
+        c.font, c.fill = hdr, fill
+        c.alignment = Alignment(vertical="center", wrap_text=True)
+        ws.column_dimensions[get_column_letter(i)].width = w
+    for r, row in enumerate(rows, 2):
+        for i, (key, _, _) in enumerate(HEAD, 1):
+            v = row.get(key)
+            # Everything goes in as text except the one genuine number.
+            # Excel turning a contract field into a date is a classic way
+            # to lose data between two people.
+            ws.cell(row=r, column=i,
+                    value=v if key == "sei_datapoint_count" else
+                    (None if v is None else str(v)))
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = f"A1:{get_column_letter(len(HEAD))}{max(len(rows) + 1, 2)}"
+
+    about = wb.create_sheet("About")
+    u = payload.get("usage") or {}
+    for k, v in [
+        ("Exported", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")),
+        ("Source", "CP 360 - SEI crosswalk, mapping and divergence"),
+        ("Warehouse (data_source)", ds),
+        ("Rows", len(rows)),
+        ("Row limit applied", limit),
+        ("", ""),
+        ("Filter: verdict", filters.get("verdict") or "(all)"),
+        ("Filter: lane", filters.get("lane") or "(all)"),
+        ("Filter: business grouping", filters.get("group") or "(all)"),
+        ("Filter: warehouse table", filters.get("table") or "(all)"),
+        ("Filter: contract feed", filters.get("feed") or "(all)"),
+        ("Filter: SEI feed", filters.get("sei_feed") or "(all)"),
+        ("", ""),
+        ("STAR field usage loaded", "yes" if u.get("loaded") else "no"),
+        ("Rows with a usage answer", u.get("matched", 0)),
+        ("Rows with none", u.get("unmatched", len(rows))),
+        ("Matched on", ", ".join(f"{k2}={v2}" for k2, v2
+                                 in sorted((u.get("matched_on") or {}).items()))
+                       or "(none)"),
+        ("", ""),
+        ("Usage values", "used / unused / mixed / partial / unknown / blank"),
+        ("mixed", "the warehouse column is fed by several contract fields, "
+                  "some read and some not - dropping it loses something "
+                  "somebody reads"),
+        ("partial", "at least one contract field had no usage row at all"),
+        ("blank", "no usage row matched this column"),
+        ("", ""),
+        ("Usage is evidence, not a decision",
+         "A field nobody reads today is still a field the contract "
+         "publishes. Nothing here is subtracted from the denominator; to "
+         "take a column out of scope, record a disposition against it."),
+    ]:
+        about.append([k, v])
+    about.column_dimensions["A"].width = 30
+    about.column_dimensions["B"].width = 96
+    for row in about.iter_rows(min_col=1, max_col=1):
+        for c in row:
+            c.font = Font(bold=True)
+    for row in about.iter_rows(min_col=2, max_col=2):
+        for c in row:
+            c.alignment = Alignment(wrap_text=True, vertical="top")
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M")
+    bits = [b for b in (ds, filters.get("table"), filters.get("verdict"),
+                        filters.get("lane")) if b]
+    name = "cp360-crosswalk-" + "-".join(
+        re.sub(r"[^A-Za-z0-9]+", "_", b) for b in bits) + f"-{stamp}.xlsx"
+    return buf, name
 
 
 @router.get("/column")

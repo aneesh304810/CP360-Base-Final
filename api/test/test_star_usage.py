@@ -234,5 +234,89 @@ try:
 finally:
     R._safe = _o2
 
-print(f"\n{BAD} assertion(s) failed" if BAD else "\nladder assertions pass")
+# ---- usage resolved onto the crosswalk grid -----------------------------
+# THE JOIN THAT ALMOST DID NOT WORK. SEI_VERIFY.CONTRACT_FIELD carries a
+# positional suffix -- Base_Market_Value_10, Trade_Date_128 -- that the
+# usage matrix does not. Measured against the delivered rows: 0 of 19
+# contract-field parts match as written, 19 of 19 once the trailing
+# _<digits> is removed. Without that step the column is blank on every
+# row, which reads as "no usage data" rather than "the key did not line
+# up" -- so the strip is asserted, and so is the fact that the exact
+# match is tried first (the strip is a heuristic and would mangle a field
+# genuinely ending in a number).
+print("\n-- usage on the grid")
+
+USAGE_ROWS = [
+    {"feed_family": "PEDDIFI1", "field_name": "Base Market Value", "is_used": "Y"},
+    {"feed_family": "PEDDIFI1", "field_name": "Trade Date Cash", "is_used": "N"},
+    {"feed_family": "PEDDIFI1", "field_name": "Local Accrued Interest", "is_used": "N"},
+    {"feed_family": "PEDDIFI1", "field_name": "Base Total Unrealized Gain", "is_used": "N"},
+    {"feed_family": "PEDDIFI1", "field_name": "Base Total Unrealized Loss", "is_used": "N"},
+    {"feed_family": "PEDDIFI1", "field_name": "CPI Index Ratio", "is_used": None},
+]
+
+_o3 = R._safe
+try:
+    R._safe = lambda sql, p=None: (USAGE_ROWS if "star_field_usage" in sql else [])
+    fam, fld = R._usage_index("IMDS")
+
+    r = R._resolve_usage("PEDDIFI1", "Base_Market_Value_10", fam, fld)
+    ok(r["usage"] == "used", "Base_Market_Value_10 -> used", r["usage"])
+    ok(r["usage_matched_on"] == "ordinal_stripped",
+       "and the row records that the _10 had to come off", r["usage_matched_on"])
+
+    r = R._resolve_usage("PEDDIFI1", "Base_Market_Value_10,Trade_Date_Cash_136",
+                         fam, fld)
+    ok(r["usage"] == "mixed",
+       "one part read and one not is MIXED -- calling it unused and "
+       "dropping the column would lose something somebody reads", r["usage"])
+
+    ok(R._resolve_usage("PEDDIFI1",
+                        "Base_Total_Unrealized_Gain_15,Base_Total_Unrealized_Loss_16",
+                        fam, fld)["usage"] == "unused",
+       "both parts unused is unused")
+    ok(R._resolve_usage("PEDDIFI1", "Nothing_Like_This_99", fam, fld)["usage"] is None,
+       "no usage row at all is blank, NOT unused")
+    ok(R._resolve_usage("PEDDIFI1", "Base_Market_Value_10,Nothing_99",
+                        fam, fld)["usage"] == "partial",
+       "half an answer is reported as partial, not as the half that answered")
+    ok(R._resolve_usage("PEDDIFI1", "CPI_Index_Ratio_12", fam, fld)["usage"]
+       == "unknown",
+       "a usage word nothing recognised stays unknown")
+
+    # the exact match must win, so a field that really ends in a number is
+    # not quietly truncated into a different field
+    R._safe = lambda sql, p=None: ([
+        {"feed_family": "X", "field_name": "Level 2", "is_used": "Y"},
+        {"feed_family": "X", "field_name": "Level", "is_used": "N"}]
+        if "star_field_usage" in sql else [])
+    fam2, fld2 = R._usage_index("IMDS")
+    r = R._resolve_usage("X", "Level_2", fam2, fld2)
+    ok(r["usage"] == "used" and r["usage_matched_on"] == "exact",
+       "a field genuinely ending in a number matches exactly and is NOT "
+       "stripped down to a different field", (r["usage"], r["usage_matched_on"]))
+
+    # and the whole-grid report
+    R._safe = lambda sql, p=None: (USAGE_ROWS if "star_field_usage" in sql else [])
+    grid = [{"contract_feed": "PEDDIFI1", "contract_field": "Base_Market_Value_10"},
+            {"contract_feed": "PEDDIFI1", "contract_field": "Nothing_99"}]
+    rep = R._attach_usage("IMDS", grid)
+    ok(rep["matched"] == 1 and rep["unmatched"] == 1,
+       "the grid reports how many rows got an answer", rep)
+    ok("_<number>" in (rep.get("note") or ""),
+       "and says so when every match needed the ordinal removed",
+       rep.get("note"))
+
+    R._safe = lambda sql, p=None: []
+    grid = [{"contract_feed": "PEDDIFI1", "contract_field": "Base_Market_Value_10"}]
+    rep = R._attach_usage("IMDS", grid)
+    ok(rep["loaded"] is False and grid[0]["usage"] is None,
+       "with nothing loaded the cells are blank and the grid says WHY -- "
+       "'no usage column' and 'usage not loaded' look identical otherwise",
+       rep)
+    ok("sql/65" in (rep.get("note") or ""), "naming what to run", rep.get("note"))
+finally:
+    R._safe = _o3
+
+print(f"\n{BAD} assertion(s) failed" if BAD else "\ngrid-usage assertions pass")
 sys.exit(1 if BAD else 0)

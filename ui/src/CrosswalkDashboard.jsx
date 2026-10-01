@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { crosswalkApi, VERDICT, VERDICT_ORDER, LANE_C } from "./seiCrosswalkApi.js";
+import { columnsXlsxUrl, crosswalkApi, VERDICT, VERDICT_ORDER, LANE_C } from "./seiCrosswalkApi.js";
 import { GLOSSARY_SECTIONS, VERDICT_INFO, SHAPE_INFO, verdictShort }
   from "./crosswalkGlossary.js";
 import { FlowDiagram, EvidencePanel, Waffle, TransformationPanel, LogicCompare }
@@ -161,6 +161,10 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
   const [stack, setStack] = useState([]);
   const [list, setList] = useState(null);
   const [detail, setDetail] = useState(null);
+  // How the usage join went for the list currently shown. Reported next to
+  // the grid rather than inferred from blanks: "no usage column" and "usage
+  // not loaded" look identical in the cells and are different problems.
+  const [listUsage, setListUsage] = useState(null);
   const [chain, setChain] = useState(null);
   // Bumped after a review saves, so the chain refetches and the panel
   // shows the decision that was just recorded rather than the one before.
@@ -189,7 +193,11 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
     if (!top || top.kind !== "list") return;
     let live = true;
     crosswalkApi.columns({ data_source: ds, ...top.filter })
-      .then((r) => { if (live) setList(r.columns || []); });
+      .then((r) => {
+        if (!live) return;
+        setList(r.columns || []);
+        setListUsage(r.usage || null);
+      });
     return () => { live = false; };
   }, [ds, top]);
 
@@ -457,6 +465,28 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
       </div>);
   }
 
+  /* Usage is a FIFTH state, not a yes/no. "mixed" is the one that earns
+     its place: a warehouse column fed by several contract fields, some
+     read and some not. Reading it as "unused" and dropping the column
+     would lose something somebody reads. */
+  const USAGE_STYLE = {
+    used:    { label: "used",    c: "#1a8f4c", bg: "rgba(26,143,76,.1)" },
+    unused:  { label: "unused",  c: "#6b7c8a", bg: "#eef2f5" },
+    mixed:   { label: "mixed",   c: "#e8a33d", bg: "rgba(232,163,61,.16)" },
+    partial: { label: "partial", c: "#e8a33d", bg: "rgba(232,163,61,.16)" },
+    unknown: { label: "unknown", c: "#8a93a0", bg: "#f3f5f7" },
+  };
+
+  const UsageTag = ({ v, how }) => {
+    if (!v) return <span style={{ color: "#bbb" }}>—</span>;
+    const st = USAGE_STYLE[v] || USAGE_STYLE.unknown;
+    return (
+      <span title={how ? `matched on ${how.replace(/_/g, " ")}` : ""}
+        style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px",
+          borderRadius: 999, whiteSpace: "nowrap",
+          color: st.c, background: st.bg }}>{st.label}</span>);
+  };
+
   /* --------------------------------------------------- drill: the list --- */
   if (top && top.kind === "list") {
     return (
@@ -464,11 +494,44 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
         <Crumbs t={t} stack={stack} onBack={back} onHome={() => setStack([])} />
         <div style={card}>
           <div style={head}><h2 style={h2}>{top.title}</h2>
-            <span style={note}>{list ? `${list.length} columns` : "loading…"}</span></div>
+            <span style={note}>{list ? `${list.length} columns` : "loading…"}</span>
+            <span style={{ marginLeft: "auto", display: "flex", gap: 9,
+              alignItems: "center", flexWrap: "wrap" }}>
+              {listUsage && (
+                <span style={{ fontSize: 10.5, color: t.muted || "#999" }}>
+                  {listUsage.loaded
+                    ? `usage: ${listUsage.matched} of ${listUsage.rows} matched`
+                    : "usage not loaded"}
+                </span>)}
+              {/* A link, not a fetch: the browser does the download, the
+                  progress and the Save dialog, and a 20,000-row workbook
+                  never has to sit in a JavaScript string. The export takes
+                  the SAME filters as the grid and is NOT capped at the
+                  grid's 500 -- an export that silently stopped short
+                  would be worse than none, because the file looks whole. */}
+              <a href={columnsXlsxUrl({ data_source: ds, ...top.filter })}
+                style={{ fontSize: 11.5, textDecoration: "none",
+                  border: `1px solid ${t.border || "#b5b6b6"}`,
+                  borderRadius: 3, padding: "4px 11px", color: t.accent,
+                  background: t.panel, whiteSpace: "nowrap" }}>
+                Export to Excel
+              </a>
+            </span></div>
+          {listUsage && !listUsage.loaded && (
+            <div style={{ padding: "7px 14px", fontSize: 11.5,
+              color: t.muted || "#999", borderTop: `1px solid ${t.panel2 || "#dfe6e9"}` }}>
+              {listUsage.note || "STAR field usage is not loaded for this lane."}
+            </div>)}
+          {listUsage && listUsage.loaded && listUsage.note && (
+            <div style={{ padding: "7px 14px", fontSize: 11.5,
+              color: t.muted || "#999", borderTop: `1px solid ${t.panel2 || "#dfe6e9"}` }}>
+              {listUsage.note}
+            </div>)}
           <div style={{ overflowX: "auto" }}>
             <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12, minWidth: 720 }}>
-              <thead><tr>{["Warehouse column", "Lane", "Contract field", "SEI datapoints",
-                "Verdict", "Analysis"].map((h) => <th key={h} style={th(t)}>{h}</th>)}</tr></thead>
+              <thead><tr>{["Warehouse column", "Lane", "Contract field", "Usage",
+                "SEI datapoints", "Verdict", "Analysis"].map((h) =>
+                  <th key={h} style={th(t)}>{h}</th>)}</tr></thead>
               <tbody>
                 {(list || []).map((r, i) => (
                   <tr key={i} onClick={() => openCol(g(r, "dwh_target_table", "DWH_TARGET_TABLE"),
@@ -481,6 +544,8 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
                     <td style={td}><LaneTag lane={g(r, "lane_id", "LANE_ID")} /></td>
                     <td style={{ ...td, fontFamily: MONO, fontSize: 11 }}>
                       {g(r, "contract_field", "CONTRACT_FIELD") || "—"}</td>
+                    <td style={td}><UsageTag v={g(r, "usage", "USAGE")}
+                      how={g(r, "usage_matched_on", "USAGE_MATCHED_ON")} /></td>
                     <td style={{ ...td, fontFamily: MONO, fontSize: 11 }}>
                       {g(r, "sei_datapoints", "SEI_DATAPOINTS") || "—"}</td>
                     <td style={td}><Pill v={g(r, "match_verdict", "MATCH_VERDICT")}
@@ -489,7 +554,7 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
                       {g(r, "failed_checks", "FAILED_CHECKS") || "—"}</td>
                   </tr>))}
                 {list && !list.length && (
-                  <tr><td colSpan={6} style={{ ...td, textAlign: "center", color: t.muted || "#999" }}>
+                  <tr><td colSpan={7} style={{ ...td, textAlign: "center", color: t.muted || "#999" }}>
                     Nothing matches this filter.</td></tr>)}
               </tbody>
             </table>

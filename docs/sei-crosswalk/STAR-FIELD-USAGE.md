@@ -156,3 +156,74 @@ number is just quietly missing.
 python ingestion/test/test_star_field_usage.py   # the three parsers
 python api/test/test_star_usage.py               # the five endpoints
 ```
+
+
+---
+
+## On the Mapping & divergence grid
+
+The drill list (**Lineage → Technical view → Mapping & divergence → a
+feed**) now carries a **Usage** column and an **Export to Excel** button.
+
+### The join needed one more step than expected
+
+`SEI_VERIFY.CONTRACT_FIELD` carries a **positional suffix** that the usage
+matrix does not: `Base_Market_Value_10`, `Trade_Date_128`,
+`Local_Accrued_Interest_134`. Measured against the delivered rows:
+
+| | |
+|---|---|
+| contract-field parts matching **as written** | **0 of 19** |
+| matching once the trailing `_<digits>` is removed | **19 of 19** |
+
+Without that strip the column would be blank on every row — which reads as
+*"no usage data"* rather than *"the key did not line up"*.
+
+The strip is a **heuristic**, so the exact match is tried first: a field
+that genuinely ends in a number (`Level_2`) matches as written and is not
+truncated into a different field. Each row records which rung answered,
+shown on hover.
+
+### Five states, because a composite has no yes/no answer
+
+A warehouse column is often fed by several contract fields, comma joined
+(`Base_Market_Value_10,Trade_Date_Cash_136`).
+
+| Value | Means |
+|---|---|
+| `used` | every contract field behind it is read |
+| `unused` | none of them is |
+| **`mixed`** | **some are and some are not** — dropping this column loses something somebody reads |
+| `partial` | at least one contract field had no usage row at all |
+| `unknown` | the usage word was one nothing recognised |
+| *blank* | nothing matched |
+
+`mixed` is the one that earns its place. Folding it into "unused" is the
+mistake this column exists to prevent.
+
+The grid header reports how the join went (`usage: 41 of 53 matched`), and
+when nothing is loaded it says so rather than leaving cells blank — *"no
+usage column"* and *"usage not loaded"* look identical in the cells and
+are different problems.
+
+### Export
+
+`GET /sei-crosswalk/columns.xlsx` — the same filters as the grid.
+
+* **The whole filtered set, not the page.** The screen fetches 500 rows
+  because that is what a person scrolls; the export defaults to 20,000. An
+  export that silently stopped at 500 would be worse than none, because
+  the file looks complete.
+* **Two sheets.** `Columns` is the grid with the usage column and how each
+  row was matched, frozen header and autofilter on. `About` records when
+  it was taken, from which lane, under which filters, how many rows got a
+  usage answer, and what each usage value means. A spreadsheet that leaves
+  its own origin behind becomes a number nobody can defend.
+* **Everything is written as text** except the one genuine number
+  (`sei_datapoint_count`). Excel turning a contract field into a date is a
+  classic way to lose data between two people.
+* It is a link, not a fetch, so the browser does the download and a
+  20,000-row workbook never sits in a JavaScript string.
+
+Needs `openpyxl` on the API host — already in `requirements.txt`. If it is
+missing the endpoint returns 501 saying so, rather than a 500.

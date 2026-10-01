@@ -202,6 +202,13 @@ export const VERDICT_ORDER = ["PROVEN_MATCH", "UNKNOWN", "DECODE_NEEDED",
   "PRECISION_RISK", "TYPE_SHIFT", "NOT_COMPARABLE", "NO_SOURCE",
   "NO_BASELINE", "OUT_OF_SCOPE"];
 
+// The export. A URL rather than a fetch: the browser's own download
+// machinery handles the file, the progress and the Save dialog, and
+// nothing has to buffer a 20,000-row workbook in a JavaScript string.
+export function columnsXlsxUrl(params) {
+  return `${API_BASE}/sei-crosswalk/columns.xlsx${_qs(params || {})}`;
+}
+
 // ---- STAR field usage ----------------------------------------------
 // Which published STAR fields anybody actually reads. Its own tab rather
 // than a column on the verdict table, because usage decides nothing: a
