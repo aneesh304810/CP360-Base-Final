@@ -35,21 +35,45 @@ else:
 # ---- mount module routers (each defines its own prefix) ----------------
 # Guarded so a single import error doesn't take the whole API down; any that
 # fail to import are logged and skipped.
-for _mod in ("routers_projects", "routers_data360",
-             "routers_data360_pipelines", "routers_api360",
-             "routers_api360_console", "routers_interface360", "routers_pii",
-             "routers_interdependency", "routers_guardrails",
-             "routers_impact", "routers_mapper", "routers_legacy_lineage",
-             "routers_legacy_graph", "routers_legacy_source",
-             "routers_legacy_profile", "routers_legacy_matrix",
-             "routers_reference_legacy",
-             "routers_variance360",
-             "routers_recon360", "routers_admin_datasources",
-             "routers_environment360", "routers_env_infra",
-             "routers_event360",
-             "routers_sei_crosswalk",
-             "routers_business_catalog",
-             "routers_security"):
+for _mod in (
+        # Core routers
+        "routers_projects",
+        "routers_data360",
+        "routers_data360_pipelines",
+        "routers_api360",
+        "routers_api360_console",
+        "routers_interface360",
+        "routers_pii",
+        "routers_interdependency",
+        "routers_guardrails",
+        "routers_impact",
+        "routers_mapper",
+        "routers_variance360",
+        # Not present in this tree yet — the guarded loop below logs and
+        # skips it. Bring api/app/routers_design_status.py across from the
+        # working copy and it mounts with no further change.
+        "routers_design_status",
+        "routers_environment360",
+        "routers_env_infra",
+        "routers_event360",
+
+        # Legacy routers
+        "routers_legacy_lineage",
+        "routers_legacy_graph",
+        "routers_legacy_source",
+        "routers_legacy_profile",
+        "routers_legacy_matrix",
+        "routers_reference_legacy",
+
+        # Additional routers
+        "routers_recon360",
+        "routers_admin_datasources",
+
+        # New catalog/security routers
+        "routers_sei_crosswalk",
+        "routers_business_catalog",
+        "routers_security",
+        ):
     try:
         _m = __import__(f"app.{_mod}", fromlist=["router"])
         app.include_router(_m.router)
@@ -281,6 +305,74 @@ def search(q: str = "", project_id: str | None = None, module: str | None = None
     return {"results": rows, "query": raw_q, "total": len(rows),
             "full_text": has_text_index(), "understood": understood,
             "counts": {m: sum(1 for x in rows if x.get("module") == m) for m in mods}}
+
+
+@app.get("/search/diag")
+def search_diag():
+    """One-call diagnosis for 'search returns nothing'. Tells you whether the
+    search_index table exists, how many rows it holds, whether the Oracle Text
+    index is present, and a per-module row breakdown."""
+    out = {"table_exists": False, "row_count": 0, "text_index": False,
+           "by_module": {}}
+    try:
+        r = query("SELECT COUNT(*) AS n FROM search_index")
+        out["table_exists"] = True
+        out["row_count"] = r[0]["n"] if r else 0
+    except Exception as e:
+        out["error"] = str(e)
+        return out
+    try:
+        r = query("""SELECT COUNT(*) AS n FROM user_indexes
+                     WHERE index_name = 'IX_SEARCH_BODY'""")
+        out["text_index"] = bool(r and (r[0]["n"] or 0) > 0)
+    except Exception:
+        pass
+    try:
+        for r in query("""SELECT module, COUNT(*) AS n FROM search_index
+                          GROUP BY module"""):
+            out["by_module"][r["module"]] = r["n"]
+    except Exception:
+        pass
+    if out["row_count"] == 0:
+        out["hint"] = ("search_index is EMPTY. Run sql/20_search_index.sql, then "
+                       "the ingestion step: python -m ingestion.run search_index")
+    return out
+
+
+@app.get("/search/suggest")
+def search_suggest(q: str = "", limit: int = 8):
+    """Autocomplete for the search bar. Returns suggestions matching the typed
+    text on name OR body_text (body_text is always populated, so suggestions
+    never come back empty when names are sparse). Also powers 'did you mean'."""
+    if not q or len(q.strip()) < 2:
+        return {"suggestions": []}
+    ql = q.strip().lower()
+    try:
+        rows = query("""
+            SELECT name, module, kind, nav_module, nav_tab, nav_id,
+                   CASE WHEN LOWER(name) LIKE :pfx THEN 0
+                        WHEN LOWER(name) LIKE :any THEN 1
+                        ELSE 2 END AS rnk
+            FROM   search_index
+            WHERE  (LOWER(name) LIKE :any OR LOWER(body_text) LIKE :any)
+              AND  name IS NOT NULL
+            ORDER  BY rnk, LENGTH(name)
+            FETCH FIRST :lim ROWS ONLY""",
+                     {"pfx": ql + "%", "any": "%" + ql + "%", "lim": limit * 3})
+    except Exception:
+        rows = []
+    seen, out = set(), []
+    for r in rows:
+        nm = r.get("name")
+        if not nm or nm.lower() in seen:
+            continue
+        seen.add(nm.lower())
+        out.append({"name": nm, "module": r.get("module"), "kind": r.get("kind"),
+                    "nav": {"module": r.get("nav_module"), "tab": r.get("nav_tab"),
+                            "id": r.get("nav_id")}})
+        if len(out) >= limit:
+            break
+    return {"suggestions": out}
 
 
 # ============ Business Flow workbook (CP_Catalog_Business_Flows.xlsx) ============
