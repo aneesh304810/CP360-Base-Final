@@ -14,6 +14,12 @@ log = logging.getLogger("cp.api")
 
 app = FastAPI(title="CP Catalog API", version="1.0.0")
 
+# PUT is allowed because /design/status/{id} writes. It is the only
+# write in the catalogue, and until it existed the list was GET and POST
+# only -- a PUT from another origin fails its CORS preflight and surfaces
+# in the browser as a network error rather than a 405, which is the kind
+# of thing found late and blamed on the network.
+#
 # CORS AND THE SESSION COOKIE. A browser will not send a cookie to another
 # origin unless the response says allow_credentials, and the spec forbids
 # allow_credentials together with "*". So: the open wildcard stays the
@@ -26,11 +32,11 @@ _origins = [o.strip() for o in
 if _origins:
     app.add_middleware(CORSMiddleware, allow_origins=_origins,
                        allow_credentials=True,
-                       allow_methods=["GET", "POST"], allow_headers=["*"])
+                       allow_methods=["GET", "POST", "PUT"], allow_headers=["*"])
     log.info("CORS restricted to %s (credentials allowed)", _origins)
 else:
     app.add_middleware(CORSMiddleware, allow_origins=["*"],
-                       allow_methods=["GET", "POST"], allow_headers=["*"])
+                       allow_methods=["GET", "POST", "PUT"], allow_headers=["*"])
 
 # ---- mount module routers (each defines its own prefix) ----------------
 # Guarded so a single import error doesn't take the whole API down; any that

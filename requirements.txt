@@ -1,4 +1,8 @@
 fastapi>=0.110
+# Required by routers_env_infra's UploadFile endpoint. Without it FastAPI
+# raises at import, the guarded mount loop in main.py skips the whole
+# router, and Environment 360's infra import quietly is not there.
+python-multipart>=0.0.9
 uvicorn[standard]>=0.27
 oracledb>=2.0
 openpyxl>=3.1

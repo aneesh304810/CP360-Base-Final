@@ -139,6 +139,7 @@ MERGE INTO sec_module t USING (SELECT 'home' k, 'Home' n, NULL g,
   UNION ALL SELECT 'environment','Environment 360','Admin','Environments, hosts and infrastructure','N',64 FROM dual
   UNION ALL SELECT 'security','Security Entitlement','Admin','Who may see which module. Admin only.','N',65 FROM dual
   UNION ALL SELECT 'system','System Design','Architecture','Design documents and diagrams','N',70 FROM dual
+  UNION ALL SELECT 'designstatus','Design Status','Architecture','Set and track hub component design status. The only screen that WRITES.','N',71 FROM dual
 ) s ON (t.module_key = s.k)
 WHEN MATCHED THEN UPDATE SET module_name = s.n, nav_group = s.g,
   description = s.d, open_to_all = s.o, sort_order = s.s
