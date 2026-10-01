@@ -219,6 +219,11 @@ export const starUsage = {
   fields: (data_source, feed_family, status, limit) =>
     _get(`/sei-crosswalk/star-usage/fields${_qs({ data_source, feed_family, status, limit })}`,
       () => ({ fields: [] })),
+  coverage: (data_source) =>
+    _get(`/sei-crosswalk/star-usage/coverage${_qs({ data_source })}`,
+      () => ({ data_source, open_items: 0,
+               open_items_on_unused_fields: null, matched_on: null,
+               open_items_note: "The API did not answer." })),
   recon: (data_source, recon_type) =>
     _get(`/sei-crosswalk/star-usage/recon${_qs({ data_source, recon_type })}`,
       () => ({ by_type: [], rows: [] })),

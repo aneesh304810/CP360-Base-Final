@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { starUsage } from "./seiCrosswalkApi.js";
+import { starUsage, crosswalkApi } from "./seiCrosswalkApi.js";
 
 // SEI crosswalk · STAR field usage.
 //
@@ -33,6 +33,7 @@ export default function StarFieldUsage({ t, dataSource }) {
   const [sum, setSum] = useState(null);
   const [health, setHealth] = useState(null);
   const [recon, setRecon] = useState(null);
+  const [cov, setCov] = useState(null);
   const [open, setOpen] = useState(null);      // feed_family drilled into
   const [rows, setRows] = useState(null);
   const [filter, setFilter] = useState("unused");
@@ -40,8 +41,10 @@ export default function StarFieldUsage({ t, dataSource }) {
   useEffect(() => {
     let live = true;
     Promise.all([starUsage.summary(ds), starUsage.health(ds),
-                 starUsage.recon(ds)])
-      .then(([s, h, r]) => { if (live) { setSum(s); setHealth(h); setRecon(r); } });
+                 starUsage.recon(ds), starUsage.coverage(ds)])
+      .then(([s, h, r, c]) => {
+        if (live) { setSum(s); setHealth(h); setRecon(r); setCov(c); }
+      });
     return () => { live = false; };
   }, [ds]);
 
@@ -107,6 +110,8 @@ export default function StarFieldUsage({ t, dataSource }) {
             sub="a usage word nothing recognised" />)}
       </div>
 
+      {cov && <Backlog t={t} cov={cov} />}
+
       <Table t={t} fams={fams} odd={odd} open={open} setOpen={setOpen} />
 
       {open && (
@@ -115,6 +120,46 @@ export default function StarFieldUsage({ t, dataSource }) {
 
       {recon && recon.by_type && recon.by_type.length > 0 && (
         <Recon t={t} recon={recon} />)}
+    </div>
+  );
+}
+
+// The one number this whole feature exists to produce, and the only place
+// it is allowed to touch the crosswalk's own figures: how much of the open
+// backlog sits on fields nobody reads. It is SIZED here and decided
+// elsewhere -- the button goes to the disposition screen rather than
+// quietly moving anything out of the denominator.
+function Backlog({ t, cov }) {
+  const n = cov.open_items_on_unused_fields;
+  const of = cov.open_items;
+  if (n === undefined) return null;
+  const unknown = n === null;
+  const share = (!unknown && of) ? Math.round((n / of) * 100) : null;
+  const weak = cov.matched_on === "field_only";
+  return (
+    <div style={{ background: t.panel, border: `1px solid ${t.border}`,
+      borderLeft: `4px solid ${unknown ? "#e8a33d" : t.accent}`,
+      borderRadius: t.radius.md, padding: "12px 15px", marginBottom: 18 }}>
+      {unknown ? (
+        <div style={{ fontSize: 12.5, lineHeight: 1.55, color: t.text }}>
+          <b>Not linked to the verdicts yet.</b>{" "}
+          <span style={{ color: t.sub }}>{cov.open_items_note}</span>
+        </div>
+      ) : (
+        <div style={{ fontSize: 12.5, lineHeight: 1.6, color: t.text }}>
+          <b style={{ fontSize: 17, color: t.accent }}>{n}</b> of{" "}
+          <b>{of}</b> open crosswalk items{share != null && ` (${share}%)`} sit
+          on a STAR field the usage study found <b>nothing reading</b>.
+          <div style={{ color: t.sub, marginTop: 5, fontSize: 11.5 }}>
+            Reported, not subtracted. These are still published contract
+            fields — to take them out of scope, record a disposition
+            against them and the denominator follows.
+            {weak && " Matched on the field name alone: the feed names did "
+                   + "not line up, so this holds only if no two families "
+                   + "share a field name."}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

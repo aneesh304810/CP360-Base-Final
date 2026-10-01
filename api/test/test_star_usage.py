@@ -117,10 +117,12 @@ try:
                   "star_field_usage_recon": 5})
     c = R.star_usage_coverage()
     ok(c["open_items_on_unused_fields"] is None,
-       "the figure that needs a key SEI_VERIFY does not have comes back "
-       "None, not a confident zero", c["open_items_on_unused_fields"])
-    ok("CONTRACT_FIELD_NORM" in c["open_items_note"],
-       "and the note names the change that would enable it")
+       "with no CONTRACT_KEY populated the figure is None, not a "
+       "confident zero -- 'nothing matched' and 'the key was never "
+       "written' produce the same count and must not read the same",
+       c["open_items_on_unused_fields"])
+    ok("sql/66" in c["open_items_note"],
+       "and the note names what to run", c["open_items_note"])
     ok("usage_not_in_layout" in c and "layout_not_in_usage" in c,
        "both directions are reported: a field read but not published is a "
        "different finding from one published but never studied")
@@ -169,5 +171,68 @@ try:
 finally:
     R._safe = _orig
 
-print(f"\n{BAD} assertion(s) failed" if BAD else "\nstar-usage API assertions pass")
+# ---- the open-items ladder ---------------------------------------------
+# Three states that all produce a number and must not be confused:
+# matched on the strong key, matched only on the weak one, and never keyed.
+print("\n-- open items on unused fields")
+
+
+class Ladder:
+    def __init__(self, strong=0, weak=0, keyed=1, open_items=100):
+        self.strong, self.weak = strong, weak
+        self.keyed, self.open_items = keyed, open_items
+
+    def __call__(self, sql, p=None):
+        low = " ".join(sql.lower().split())
+        if "contract_key is not null" in low:
+            return [{"n": self.keyed}]
+        if "u.normalized_key = v.contract_key" in low:
+            return [{"n": self.strong}]
+        if "= v.contract_field_key" in low:
+            return [{"n": self.weak}]
+        if "match_verdict not in" in low:
+            return [{"n": self.open_items}]
+        if "count(*)" in low:
+            return [{"n": 0}]
+        return []
+
+
+_o2 = R._safe
+try:
+    R._safe = Ladder(strong=37, weak=61)
+    c = R.star_usage_coverage()
+    ok(c["open_items_on_unused_fields"] == 37,
+       "the strong key answers when it can, even though the weak one "
+       "would return more", c["open_items_on_unused_fields"])
+    ok(c["matched_on"] == "feed_and_field", "and says so", c["matched_on"])
+    ok("not subtracted" in c["open_items_note"],
+       "the note says it is reported, not applied")
+
+    R._safe = Ladder(strong=0, weak=61)
+    c = R.star_usage_coverage()
+    ok(c["open_items_on_unused_fields"] == 61, "falls back to the field name")
+    ok(c["matched_on"] == "field_only", "and names the weaker rung",
+       c["matched_on"])
+    ok("field name alone" in c["open_items_note"],
+       "with the caveat that it is right only if no two families share a "
+       "field name -- a silent fallback would overstate confidence")
+
+    R._safe = Ladder(strong=0, weak=0, keyed=900)
+    c = R.star_usage_coverage()
+    ok(c["open_items_on_unused_fields"] == 0,
+       "keyed and nothing matched is a real zero", 
+       c["open_items_on_unused_fields"])
+    ok("No open item" in c["open_items_note"], "and reads as good news")
+
+    R._safe = Ladder(strong=0, weak=0, keyed=0)
+    c = R.star_usage_coverage()
+    ok(c["open_items_on_unused_fields"] is None,
+       "never keyed is None, NOT the same zero -- the two are "
+       "indistinguishable by count and opposite in meaning",
+       c["open_items_on_unused_fields"])
+    ok(c["matched_on"] is None, "with no rung claimed")
+finally:
+    R._safe = _o2
+
+print(f"\n{BAD} assertion(s) failed" if BAD else "\nladder assertions pass")
 sys.exit(1 if BAD else 0)

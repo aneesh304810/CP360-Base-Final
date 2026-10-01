@@ -9,10 +9,14 @@ read showed 90 apparent gaps that nothing consumes.
 ## Load it
 
 ```sql
-@sql/65_star_field_usage.sql
+@sql/65_star_field_usage.sql      -- the three usage tables
+@sql/66_sei_verify_usage_key.sql  -- the column that links them to verdicts
 ```
 
-Then re-run the `sei_crosswalk` ingestion step. No new environment
+Then re-run the `sei_crosswalk` ingestion step. **Both** files matter:
+without sql/66 the usage loads and shows, but the one number that makes
+it worth having — how much of the open backlog sits on unread fields —
+cannot be computed, and the screen says so rather than guessing. No new environment
 variable — the sheets are found inside the workbook `CP_SEI_XLSX` already
 points at.
 
@@ -58,18 +62,45 @@ about the contract — not something a join should make. So **Field usage**
 is its own tab on the SEI crosswalk dashboard rather than a badge beside
 a verdict, and nothing is subtracted from the denominator.
 
-The number people will ask for is *how many open crosswalk items are
-fields nobody reads*. `/star-usage/coverage` deliberately returns `null`
-for it: `SEI_VERIFY` stores `CONTRACT_FIELD` as written and has no
-normalised key, and `_norm_code` is not a plain upper-case (it folds
-separators to underscores and rewrites `_L12` to `_12`), so
-reimplementing it in SQL would be a second copy of the rule free to drift
-from the loader's. A guessed join would not look wrong — it would return
-a confident zero.
+## The number this is for
 
-**To enable it:** add `contract_field_norm` to `sei_verify`, populated by
-`_norm_code(contract_field)` in the loader, and the join becomes exact.
-One column and one line.
+*How many open crosswalk items are fields nobody reads?* That is the part
+of the backlog that may not be work at all, and it is now answered —
+`GET /sei-crosswalk/star-usage/coverage`, and the band across the top of
+the Field usage tab.
+
+`sql/66` adds `CONTRACT_KEY` and `CONTRACT_FIELD_KEY` to `SEI_VERIFY`,
+written by the loader with `_usage_key` — **the same function that writes
+`NORMALIZED_KEY` on the usage rows**. There is deliberately no `UPDATE`
+in that file: an UPDATE would be a second implementation of the rule, in
+SQL, and a join that silently stops matching does not raise. It returns a
+smaller number, and a smaller number here reads as good news.
+
+**It is a ladder, and it says which rung answered.** `CONTRACT_FEED` is
+sometimes the bare family and sometimes a longer label, so the
+family-qualified key is tried first and the field name alone second. A
+match on the weaker key is still a match — but it is right only if no two
+families share a field name, so `matched_on` is in the payload and the
+caveat is on the screen.
+
+**Three outcomes that all produce a number** and must not be confused:
+
+| | |
+|---|---|
+| matched, strong key | `matched_on: "feed_and_field"` |
+| matched, weak key | `matched_on: "field_only"`, with the caveat |
+| never keyed | `null`, **not** 0 — run sql/66 and re-ingest |
+
+The last one matters most: "nothing matched" and "the key was never
+written" produce the same count and mean opposite things.
+
+## It is still not subtracted
+
+The number is **sized here and decided elsewhere**. These are published
+contract fields; to take them out of scope, record a **disposition**
+against them and the denominator follows — through the mechanism that
+already exists for scope decisions, with an owner and a date against it.
+Nothing on this screen moves a column out of the denominator on its own.
 
 ## Two normalisations, both stored
 

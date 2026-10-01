@@ -2176,6 +2176,85 @@ def star_usage_recon(data_source: str | None = None,
     }
 
 
+def _open_on_unused(ds):
+    """How many OPEN crosswalk items sit on fields nobody reads.
+
+    A SCOPING LADDER, NOT A SINGLE JOIN, and it says which rung answered.
+    CONTRACT_FEED is sometimes the bare family and sometimes a longer
+    label, so the family-qualified key can miss where the field name
+    alone would match. A match on the weaker key is still a match -- but
+    silently falling back to it would overstate confidence, so the rung
+    is in the payload.
+
+    The number is REPORTED, NEVER SUBTRACTED. An unused field is still a
+    published field; whether that puts it out of scope is a decision
+    about the contract, and this endpoint's job is to size the question,
+    not answer it.
+    """
+    def _n(sql):
+        r = _safe(sql, {"ds": ds})
+        return int(r[0]["n"]) if r else 0
+
+    open_items = _n("""SELECT COUNT(*) AS n FROM sei_verify
+                        WHERE data_source = :ds
+                          AND match_verdict NOT IN ('PROVEN_MATCH','OUT_OF_SCOPE')""")
+    rungs = [
+        ("feed_and_field", """
+            SELECT COUNT(*) AS n FROM sei_verify v
+             WHERE v.data_source = :ds
+               AND v.match_verdict NOT IN ('PROVEN_MATCH','OUT_OF_SCOPE')
+               AND EXISTS (SELECT 1 FROM star_field_usage u
+                            WHERE u.data_source = v.data_source
+                              AND u.normalized_key = v.contract_key
+                              AND u.is_used = 'N')"""),
+        ("field_only", """
+            SELECT COUNT(*) AS n FROM sei_verify v
+             WHERE v.data_source = :ds
+               AND v.match_verdict NOT IN ('PROVEN_MATCH','OUT_OF_SCOPE')
+               AND EXISTS (SELECT 1 FROM star_field_usage u
+                            WHERE u.data_source = v.data_source
+                              AND u.field_name IS NOT NULL
+                              AND SUBSTR(u.normalized_key,
+                                         INSTR(u.normalized_key, '|') + 1)
+                                  = v.contract_field_key
+                              AND u.is_used = 'N')"""),
+    ]
+    for rung, sql in rungs:
+        n = _n(sql)
+        if n:
+            return {"open_items": open_items,
+                    "open_items_on_unused_fields": n,
+                    "matched_on": rung,
+                    "open_items_note": (
+                        "Reported, not subtracted. These are open items "
+                        "whose STAR field the usage study found nothing "
+                        "reading. Whether that puts them out of scope is a "
+                        "decision about the contract -- record it as a "
+                        "DISPOSITION, and the denominator follows."
+                        + ("" if rung == "feed_and_field" else
+                           " Matched on the field name alone: the feed name "
+                           "on the two sides did not line up, so these are "
+                           "right only if no two families share a field "
+                           "name."))}
+    # Nothing matched. That is either "no unused field has an open item" --
+    # good news -- or the key was never populated, which is not. They look
+    # identical from a count, so the second is checked for explicitly.
+    keyed = _n("""SELECT COUNT(*) AS n FROM sei_verify
+                   WHERE data_source = :ds AND contract_key IS NOT NULL""")
+    if not keyed:
+        return {"open_items": open_items,
+                "open_items_on_unused_fields": None,
+                "matched_on": None,
+                "open_items_note": (
+                    "Not computed: SEI_VERIFY.CONTRACT_KEY is empty. Run "
+                    "sql/66_sei_verify_usage_key.sql and re-run the "
+                    "sei_crosswalk ingestion step, which populates it.")}
+    return {"open_items": open_items, "open_items_on_unused_fields": 0,
+            "matched_on": "feed_and_field",
+            "open_items_note": ("No open item sits on a field the usage "
+                                "study found unused.")}
+
+
 @router.get("/star-usage/coverage")
 def star_usage_coverage(data_source: str | None = None):
     """Does the usage matrix line up with the published layout?
@@ -2241,18 +2320,15 @@ def star_usage_coverage(data_source: str | None = None):
         "declared_layout_not_in_usage": _one(
             "SELECT NVL(SUM(matrix_unmatched_layout_fields),0) AS n "
             "FROM star_field_usage_summary WHERE data_source = :ds"),
-        "open_items_on_unused_fields": None,
-        "open_items_note": (
-            "Not computed. SEI_VERIFY stores CONTRACT_FIELD as written and "
-            "has no normalised key to join on, and a guessed join would "
-            "return a confident wrong number rather than fail. Add "
-            "CONTRACT_FIELD_NORM to sei_verify in the loader to enable it."),
+        # The workbook did this join too, with its own key. A difference
+        # between the two counts is the two normalisation rules
+        # disagreeing about what is the same field name, not a data
+        # problem -- and the reader should not have to guess which.
         "normalisation_note": (
             "layout_not_in_usage is computed with _norm_code; "
             "declared_layout_not_in_usage is the workbook's own count, made "
-            "with its own key (FAMILY|FIELDNOSPACES). A difference between "
-            "them is the two rules disagreeing about what is the same field "
-            "name, not a data problem."),
+            "with its own key (FAMILY|FIELDNOSPACES)."),
+        **_open_on_unused(ds),
         "note": ("Usage changes no verdict. A field nobody reads today is "
                  "still a field the contract publishes; whether that puts "
                  "it out of scope is a decision about the contract."),

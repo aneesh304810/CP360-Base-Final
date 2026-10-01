@@ -91,6 +91,36 @@ except Exception:                                              # pragma: no cove
 # The r"" on the replacement is load-bearing: in a plain string Python turns
 # \1 into chr(1) and BI_2_L1 silently stops collapsing. _legacy_groups.py
 # carries the same warning about the same backreference.
+def _usage_key(family, field):
+    """The workbook's own normalisation: FAMILY|FIELDNOSPACES.
+
+    This is NOT _norm_code. The usage matrix ships NORMALIZED_KEY shaped
+    ACDDIFI1|ENTITYNUMBER, where _norm_code would give ENTITY_NUMBER --
+    it folds separators to underscores rather than removing them. Both
+    rules are legitimate and both are in use, so the one that joins the
+    usage tables has to be the one that built them.
+
+    Written once, here, and used for both sides of that join: the usage
+    rows on the way in and SEI_VERIFY.CONTRACT_KEY. A second copy in SQL
+    would be free to drift, and a join that silently stops matching does
+    not raise -- it returns a smaller number, which here reads as good
+    news.
+    """
+    f = re.sub(r"[^A-Z0-9]", "", str(field or "").upper())
+    if not f:
+        return None
+    fam = re.sub(r"[^A-Z0-9]", "", str(family or "").upper())
+    return f"{fam}|{f}" if fam else f
+
+
+def _usage_field_key(field):
+    """The field half alone -- the fallback when the feed name does not
+    line up. CONTRACT_FEED is sometimes the bare family and sometimes a
+    longer label; the field name is the dependable half."""
+    f = re.sub(r"[^A-Z0-9]", "", str(field or "").upper())
+    return f or None
+
+
 def _norm_code(code):
     if not code:
         return ""
@@ -681,6 +711,14 @@ class SeiCrosswalkConnector:
                 "functional_group": sh.get(row, "FUNCTIONAL_GROUP", "SUBJECT_AREA"),
                 "contract_feed": _nz(sh.get(row, "CONTRACT_FEED", "STAR_FEED")),
                 "contract_field": _nz(sh.get(row, "CONTRACT_FIELD", "STAR_FIELD")),
+                # The join to STAR_FIELD_USAGE. Computed here by the same
+                # function that wrote NORMALIZED_KEY on the usage rows, so
+                # the two sides can never be normalised by two rules.
+                "contract_key": _usage_key(
+                    _nz(sh.get(row, "CONTRACT_FEED", "STAR_FEED")),
+                    _nz(sh.get(row, "CONTRACT_FIELD", "STAR_FIELD"))),
+                "contract_field_key": _usage_field_key(
+                    _nz(sh.get(row, "CONTRACT_FIELD", "STAR_FIELD"))),
                 "sei_datapoint_count": n,
                 "sei_datapoints": _nz(sh.get(row, "SEI_DATAPOINTS")),
                 "map_kind": _nz(sh.get(row, "MAP_KIND")),
@@ -1333,8 +1371,13 @@ class SeiCrosswalkConnector:
                 # against ENTITY_NUMBER -- and it is the one the
                 # reconciliation sheet was computed with, so it is the
                 # only way to reproduce that finding here.
-                "normalized_key": sh.get(row, "NORMALIZED_KEY",
-                                         "NORMALISED_KEY"),
+                # The sheet's own key where it has one, computed the same
+                # way where it does not. Taking it as given keeps us
+                # faithful to the reconciliation; computing the fallback
+                # means a workbook without the column still joins.
+                "normalized_key": (sh.get(row, "NORMALIZED_KEY",
+                                          "NORMALISED_KEY")
+                                   or _usage_key(fam, fld)),
                 "notes": sh.get(row, "NOTES", "NOTE"),
             })
         return out
