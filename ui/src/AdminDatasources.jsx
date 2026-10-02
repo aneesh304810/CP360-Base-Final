@@ -48,7 +48,11 @@ export default function AdminDatasources({ t }) {
   const [saving, setSaving] = useState('');
 
   const refresh = () => api.dsList().then((d) => setSources(d.sources || []));
-  useEffect(refresh, []);
+  // Braces, not `useEffect(refresh, [])`: refresh returns the fetch
+  // promise, React takes an effect's return value as its CLEANUP function,
+  // and calling a promise throws "destroy is not a function" on unmount --
+  // which takes the whole screen down, not just the effect.
+  useEffect(() => { refresh(); }, []);
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   const runTest = (name) => {

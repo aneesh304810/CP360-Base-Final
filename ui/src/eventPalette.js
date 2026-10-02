@@ -21,5 +21,10 @@ export const P = {
 // normal-vision 24.0). Never cycled, never reused for anything else.
 export const TC = { Business: '#2a78d6', Technical: '#eb6834', Marker: '#1baf7a' };
 // ordered severity, not categories; every chip carries its word as well
-const BC = { Critical: '#c1113a', High: '#e67e22', Moderate: '#3a6f9e', Low: '#7b8894' };
+// NOT EXPORTED, and three chips in Event360 read it -- "BC is not
+// defined", at runtime, on the Estate tab. The commit that lifted this
+// palette out of Event360.jsx carried P and TC across with `export` and
+// carried BC across without it, which is a private constant in a module
+// nobody can reach.
+export const BC = { Critical: '#c1113a', High: '#e67e22', Moderate: '#3a6f9e', Low: '#7b8894' };
 

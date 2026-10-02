@@ -84,8 +84,16 @@ export default function Data360({ t, selection }) {
         {[["all", "All"], ["sei", "SEI"], ["nonsei", "Non-SEI"]].map(([k, label], i) => (
           <button key={k} onClick={() => setScope(k)} style={{ fontSize: 12, fontWeight: 700,
             padding: "7px 20px", cursor: "pointer", fontFamily: t.font,
-            border: `1px solid ${scope === k ? t.accent : (t.border || t.disabled)}`,
-            borderLeft: i === 0 ? undefined : 0,
+            // Longhand on all four sides. `border` + `borderLeft` is a
+            // shorthand and an override of part of it, which React warns
+            // about and resolves unpredictably across re-renders -- and the
+            // joined button group needs the shared edge collapsed, so the
+            // override cannot simply go.
+            borderTop: `1px solid ${scope === k ? t.accent : (t.border || t.disabled)}`,
+            borderRight: `1px solid ${scope === k ? t.accent : (t.border || t.disabled)}`,
+            borderBottom: `1px solid ${scope === k ? t.accent : (t.border || t.disabled)}`,
+            borderLeft: i === 0
+              ? `1px solid ${scope === k ? t.accent : (t.border || t.disabled)}` : 0,
             borderRadius: i === 0 ? "3px 0 0 3px" : i === 2 ? "0 3px 3px 0" : 0,
             background: scope === k ? t.accent : t.panel,
             color: scope === k ? "#fff" : (t.sub || t.textMuted) }}>{label}</button>))}

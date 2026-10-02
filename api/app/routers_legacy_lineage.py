@@ -296,6 +296,40 @@ def business_def(code: str, system: str | None = None):
             "others": rows[1:] if len(rows) > 1 else []}
 
 
+@router.get("/data-sources")
+def data_sources():
+    """The target warehouses lineage has been loaded for.
+
+    api.js has called this since the Lineage screen was written and it has
+    never existed: a 404 on every page load. The UI's fallback swallows it
+    and shows a one-item list hard-coded to PBDW, so the warehouse picker
+    has been silently wrong for anyone with more than one lane -- IMDS
+    rows were there and unreachable from the picker.
+
+    NULL is a real value here and is NOT a warehouse. Most PBDW rows carry
+    no data_source at all, which is why /tables scopes with
+    "(data_source = :ds OR data_source IS NULL)". Counting NULL as its own
+    entry would put a blank row in the picker; leaving it out entirely
+    would hide a warehouse that has nothing but NULL rows. So the lanes
+    are the authority where they exist, and bare DISTINCT is the fallback.
+    """
+    rows = _safe("""SELECT data_source,
+                           COUNT(*) AS rows_
+                    FROM   legacy_lineage
+                    WHERE  data_source IS NOT NULL
+                    GROUP  BY data_source
+                    ORDER  BY COUNT(*) DESC""")
+    if not rows:
+        # No row carries one. Fall back to the lane register, which names
+        # the warehouse for every lane whether or not the lineage rows
+        # were stamped.
+        rows = _safe("""SELECT DISTINCT data_source, 0 AS rows_
+                        FROM   legacy_lane
+                        WHERE  data_source IS NOT NULL
+                        ORDER  BY data_source""")
+    return {"data_sources": rows}
+
+
 @router.get("/systems")
 def systems():
     """Legacy source systems present in the dictionary, with counts — drives the

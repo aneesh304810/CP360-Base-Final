@@ -44,8 +44,12 @@ export default function Datapoint360({ t, selection, onOpen }) {
         {[["sei", "SEI"], ["nonsei", "Non-SEI"]].map(([k, label]) => (
           <button key={k} onClick={() => setScope(k)} style={{ fontSize: 12, fontWeight: 700,
             padding: "7px 20px", cursor: "pointer", fontFamily: t.font,
-            border: `1px solid ${scope === k ? t.accent : t.border}`,
-            borderLeft: k === "sei" ? undefined : 0,
+            // Longhand on all four sides -- see the same group in Data360.
+            borderTop: `1px solid ${scope === k ? t.accent : t.border}`,
+            borderRight: `1px solid ${scope === k ? t.accent : t.border}`,
+            borderBottom: `1px solid ${scope === k ? t.accent : t.border}`,
+            borderLeft: k === "sei"
+              ? `1px solid ${scope === k ? t.accent : t.border}` : 0,
             borderRadius: k === "sei" ? "3px 0 0 3px" : "0 3px 3px 0",
             background: scope === k ? t.accent : t.panel,
             color: scope === k ? "#fff" : (t.sub || t.textMuted) }}>{label}</button>))}

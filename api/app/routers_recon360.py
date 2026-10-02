@@ -1,11 +1,14 @@
 """routers_recon360.py — Recon 360 parallel-run reconciliation API."""
 from __future__ import annotations
 
+import logging
+
 import threading
 
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+log = logging.getLogger("cp.api.recon360")
 router = APIRouter(prefix="/recon", tags=["recon360"])
 
 
@@ -15,6 +18,24 @@ def _cat():
 
 
 def _safe(sql, binds=None):
+    """Rows, or [] -- and the reason goes to the log, not to the caller.
+
+    THIS RETURNED AN ERROR ROW, AND THAT WAS THE 500. The old line was
+
+        return [{"_error": str(e)[:200]}] if "_error" else []
+
+    and `if "_error"` is a non-empty string literal, so it is ALWAYS true:
+    every failure returned [{"_error": ...}] and the `else []` was
+    unreachable. _latest then did `rows[0]["run_id"] if rows else None` --
+    a one-element list is truthy, the key is not there, KeyError, 500.
+    So a missing recon table or an unreachable variance catalogue, which
+    should read as "no runs yet", took /recon/summary and /recon/schema
+    down instead.
+
+    Nothing consumes the error shape; the UI reads `runs`, `tables` and
+    `drifts`. So: [] on failure, like every other _safe in this codebase,
+    and the exception in the log where somebody can act on it.
+    """
     try:
         conn = _cat()
         cur = conn.cursor()
@@ -22,7 +43,9 @@ def _safe(sql, binds=None):
         cols = [c[0].lower() for c in cur.description]
         return [dict(zip(cols, r)) for r in cur.fetchall()]
     except Exception as e:                                  # noqa: BLE001
-        return [{"_error": str(e)[:200]}] if "_error" else []
+        log.warning("recon query failed (returning no rows): %s",
+                    str(e).splitlines()[0][:200])
+        return []
 
 
 @router.get("/sources")
@@ -83,7 +106,9 @@ def _latest(run_id):
     rows = _safe("""SELECT run_id FROM recon_pr_runs
                     WHERE status IN ('COMPLETE','RUNNING')
                     ORDER BY started_at DESC FETCH FIRST 1 ROWS ONLY""")
-    return rows[0]["run_id"] if rows else None
+    # .get, not ["run_id"]: a row that came back without the column is a
+    # bug somewhere else and must not become a KeyError here.
+    return (rows[0].get("run_id") if rows else None) or None
 
 
 @router.get("/summary")

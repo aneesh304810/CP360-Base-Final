@@ -142,3 +142,32 @@ ok(!/from\s+["']\.\/Event360\.jsx["']/.test(
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\nimport assertions pass");
 if (bad) process.exit(1);
+
+// ---------------------------------------------------------------------
+// WHAT THIS DOES NOT CATCH, AND WHY IT IS NOT TRIED HERE.
+//
+// The check above walks JSX TAGS. It would not have caught the next bug of
+// the same family: `BC` — a colour map — was read in three places in
+// Event360.jsx and defined nowhere. The commit that lifted that palette
+// into its own module carried P and TC across with `export` and carried BC
+// across WITHOUT it, so the constant existed, privately, in a module
+// nothing could reach. "BC is not defined", on mount, on the Estate tab.
+//
+// A bare-identifier version of this check was written and thrown away.
+// Three passes:
+//   * every SCREAMING_CASE word   -> ~100 false positives, acronyms out of
+//                                    JSX prose (SEI, PII, INBOUND...)
+//   * narrowed to `NAME[`         -> 6, from `var a=1,B=2`, `import X, {Y}`
+//                                    and regex literals
+//   * those three gaps closed     -> 1, a regex literal the stripper could
+//                                    not lex
+// The last one is not a gap to patch. A regular expression cannot tokenize
+// JavaScript, so each pass trades one class of false positive for another,
+// and a check that cries wolf is a check the next person skips — including
+// the part above, which is reliable because a capitalised JSX tag is
+// unambiguous.
+//
+// The right tool is `eslint` with `no-undef`, which does real scope
+// analysis. That is a dependency and a config, not a regex, and it is
+// worth adding the day somebody wants it. Until then this file guards
+// tags, and says plainly that it does not guard constants.

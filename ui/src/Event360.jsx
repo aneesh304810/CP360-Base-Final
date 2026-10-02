@@ -22,8 +22,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { evt360 } from './event360_api_additions.js';
 import EventMicroBatch from './EventMicroBatch.jsx';
 // Re-exported so anything already importing them from here keeps working.
-import { P, TC } from './eventPalette.js';
-export { P, TC } from './eventPalette.js';
+import { P, TC, BC } from './eventPalette.js';
+export { P, TC, BC } from './eventPalette.js';
 
 const num = (v) => (v == null ? '—' : Math.round(Number(v)).toLocaleString());
 const title = (s) => String(s || '').split('_').map(
