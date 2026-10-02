@@ -49,6 +49,11 @@ export default function LineageHome({ t, focus }) {
  // data_source, so it returned the same three everywhere — which is why IMDS
  // offered AddVantage and defaulted to it.
  const [dsSystems, setDsSystems] = useState(null);
+ // The whole answer, not just the names. `route` says WHICH signal
+ // attributed a system to this warehouse, and that is the only way a wrong
+ // register row becomes findable: "IMDS offers AddVantage" is a symptom,
+ // "IMDS offers AddVantage because legacy_lane declares it" is a bug report.
+ const [laneInfo, setLaneInfo] = useState(null);
  const [techFocus, setTechFocus] = useState(null);
  const [scopeOpen, setScopeOpen] = useState(false);
  const [stats, setStats] = useState({});
@@ -56,7 +61,7 @@ export default function LineageHome({ t, focus }) {
  const enter = (d, v) => { setDs(d); setView(v); };
 
  useEffect(() => {
-  if (!ds) { setDsSystems(null); return; }
+  if (!ds) { setDsSystems(null); setLaneInfo(null); return; }
   let live = true;
   crosswalkApi.laneSystems(ds).then((r) => {
    if (!live) return;
@@ -64,6 +69,7 @@ export default function LineageHome({ t, focus }) {
                                   .filter(Boolean);
    // resolved=false means the question could not be answered, not that the
    // answer is none. Only then do we fall back to the global list.
+   setLaneInfo(r);
    setDsSystems(r.resolved ? names : null);
    if (r.resolved && names.length && !names.includes(curSys)) setCurSys(names[0]);
   });
@@ -327,19 +333,36 @@ export default function LineageHome({ t, focus }) {
            .map(([k, m]) => {
            const present = (dsSystems && dsSystems.includes(k))
             || systems.find((x) => x.source_system === k);
+           // ATTRIBUTED means this warehouse's own lanes, feeds or verify
+           // rows name the system. When the question could not be answered
+           // at all, every known system is listed -- and a listed system is
+           // NOT a claim that it feeds this warehouse. IMDS offering
+           // AddVantage came from exactly that silence, so the chip now
+           // looks different from one the data stands behind.
+           const attributed = Boolean(dsSystems && dsSystems.includes(k));
+           const cols = ((laneInfo && laneInfo.systems) || [])
+            .find((x) => (x.source_system || "").toUpperCase() === k);
            const on = curSys === k;
            return (
             <span key={k}
              onClick={present ? () => setCurSys(k) : undefined}
-             title={present ? `${present.def_count || ""} definitions`
-                            : `${m.label} workbook pending`}
+             title={!present ? `${m.label} workbook pending`
+              : attributed
+                ? `${m.label} feeds ${ds}: ${(cols && cols.columns_) || 0} `
+                  + `column(s) attributed via ${(laneInfo && laneInfo.route) || "?"}`
+                : `Nothing attributes ${m.label} to ${ds}. Listed because the `
+                  + `question could not be answered, not because it feeds it.`}
              style={{ display: "flex", alignItems: "center", gap: 5,
               fontSize: 11, fontWeight: 700, padding: "4px 11px",
               borderRadius: 999,
               border: `1.5px solid ${on ? m.c : (t.panel2 || "#dfe6e9")}`,
               background: on ? m.c : "#fff",
               color: on ? "#fff" : (t.sub || "#666"),
-              opacity: present ? 1 : 0.5,
+              // a system nothing attributes to this warehouse is drawn as
+              // a guess: dashed, not solid.
+              borderStyle: present && !attributed && dsSystems === null
+               ? "dashed" : "solid",
+              opacity: present ? (attributed || dsSystems === null ? 1 : 0.5) : 0.5,
               cursor: present ? "pointer" : "not-allowed" }}>
              <span style={{ width: 7, height: 7, borderRadius: "50%",
               background: on ? "#fff" : m.c }} />
@@ -348,6 +371,19 @@ export default function LineageHome({ t, focus }) {
               {present.def_count}</span>}
             </span>);
           })}
+          {/* AN UNANSWERED QUESTION IS NOT A LIST OF ANSWERS. When no lane,
+              feed or verify row attributes a system to this warehouse, the
+              row above is every system CP 360 knows about rather than the
+              ones that feed this one -- and saying so is the difference
+              between a picker and a claim. */}
+          <div style={{ flexBasis: "100%", fontSize: 10, lineHeight: 1.5,
+           color: t.muted || "#999", marginTop: 2 }}>
+           {dsSystems === null
+            ? `Nothing in ${ds} attributes a source system yet, so every known `
+              + `system is listed. This is not a statement that each one feeds `
+              + `${ds}.`
+            : `Attributed to ${ds} from ${(laneInfo && laneInfo.route) || "?"}.`}
+          </div>
          </div>)}
         {/* setDs(null) used to live on the old warehouse chip, and it is the
             ONLY route back to the landing page — removing that chip without

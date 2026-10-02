@@ -4,15 +4,60 @@ import ProjectSwitcher from "./ProjectSwitcher.jsx";
 import ProjectBadge from "./ProjectBadge.jsx";
 import { api } from "./api.js";
 
-const LEGACY_SYS_D360 = {
+// The incumbent systems. UAF was absent here while LineageHome has carried
+// it since it was found feeding IMDS through PDPA009/PDBA016 — two lists of
+// the same thing, and the shorter one silently decided that a whole source
+// system did not exist on this screen.
+export const LEGACY_SYS_D360 = {
   ADDVANTAGE: { c: "#6d3ac0", label: "AddVantage", re: /addvantage|advantage/i },
   CRD: { c: "#0b7d7d", label: "CRD", re: /\bcrd\b|charles\s*river/i },
   STAR: { c: "#b5651d", label: "STAR", re: /\bstar\b/i },
+  UAF: { c: "#0b7d7d", label: "UAF", re: /\buaf\b/i },
 };
 
 import { LAYER_STRIPE, HEADER_H, COL_ROW_H, COL_PAD } from "./mockData.js";
 import LineageCanvas from "./LineageCanvas.jsx";
 import Interdependency from "./Interdependency.jsx";
+import { legacyFeedApi } from "./data360_api_additions.js";
+
+// Which tabs exist in which scope. Compression is the 444-pipelines-into-
+// shared-dbt-marts count and the Lineage Graph is the SEI platform graph;
+// both are SEI statements with no legacy equivalent, so Non-SEI does not
+// offer them. Returned as a function rather than two constants so the tab
+// bar and the "is this tab still valid" check cannot disagree.
+export const D360_TABS = (scope) => scope === "nonsei"
+  ? ["Pipelines", "Inbound Feeds", "Loaders", "Interdependency"]
+  : ["Pipelines", "Inbound Feeds", "Loaders", "Interdependency",
+     "Compression", "Lineage Graph"];
+
+/* A tab that has no data for the selected legacy system.
+   NOT an empty list, and not the SEI rows either. It names the table the
+   answer would come from, so "nothing is loaded" and "nothing exists" stay
+   different claims and the reader knows which ingestion to run. */
+export function NotLoadedForSystem({ t, sys, what, table, run }) {
+  const m = LEGACY_SYS_D360[sys] || { label: sys, c: "#5a6472" };
+  return (
+    <div style={{ border: `1px solid ${t.panel2 || t.border}`,
+      borderLeft: `3px solid ${m.c}`, borderRadius: 6, background: t.panel,
+      padding: "18px 20px", maxWidth: 780 }}>
+      <div style={{ fontSize: 14.5, fontWeight: 600, color: t.navy || t.text }}>
+        No {what} loaded for {m.label}
+      </div>
+      <p style={{ fontSize: 12.5, lineHeight: 1.65, color: t.sub || t.textMuted,
+        margin: "8px 0 0" }}>
+        This screen is showing nothing rather than showing the SEI {what},
+        which is what it used to do — the legacy badge was decorative and the
+        rows underneath never changed. {table ? <>The answer would come from{" "}
+        <code style={{ fontFamily: "ui-monospace, monospace", fontSize: 11.5 }}>
+          {table}</code>, which holds no {m.label} row for this scope.</> : null}
+      </p>
+      {run && (
+        <div style={{ fontFamily: "ui-monospace, monospace", fontSize: 11.5,
+          marginTop: 10, padding: "8px 11px", borderRadius: 4,
+          background: t.bg || "#f5f8f8", color: t.sub || t.textMuted }}>
+          {run}</div>)}
+    </div>);
+}
 
 const PLANES = ["Data", "Transform", "Orchestration"];
 const NODE_W = 190, COL_W = 230, COL_GAP = 110, ROW_GAP = 40, PAD = 30;
@@ -29,6 +74,13 @@ export default function Data360({ t, selection }) {
   const [colEdges, setColEdges] = useState([]);
   const [selCol, setSelCol] = useState(null);
   const [drawer, setDrawer] = useState(null);
+
+  // A tab that does not exist in the new scope cannot stay selected. Without
+  // this, switching to Non-SEI while on Compression left the bar with nothing
+  // highlighted and the Compression panel still rendered underneath it.
+  useEffect(() => {
+    if (!D360_TABS(scope).includes(d360tab)) setD360tab("Pipelines");
+  }, [scope]);
 
   // deep-link from global search: switch to the target tab (and the item id is
   // passed down so the sub-view can auto-select it)
@@ -115,10 +167,15 @@ export default function Data360({ t, selection }) {
             {LEGACY_SYS_D360[legacySys].label} · legacy source scope</span>
         </div>)}
 
-      {/* top-level tabs: Pipelines (business processes) vs Lineage Graph */}
+      {/* TABS ARE SCOPE-AWARE. Compression counts 444 bf_pipelines collapsing
+          into shared dbt gold marts, and the Lineage Graph draws the SEI
+          platform graph; both are statements about the SEI programme and
+          neither has a legacy equivalent. Leaving them on the Non-SEI bar
+          offered the reader two tabs that answer a question they did not
+          ask, in a scope where the answer is not about their system. */}
       <div style={{ display: "flex", gap: 2, borderBottom: `1px solid ${t.border || t.disabled}`,
         margin: "18px 0 20px" }}>
-        {["Pipelines", "Inbound Feeds", "Loaders", "Interdependency", "Compression", "Lineage Graph"].map((tb) => (
+        {D360_TABS(scope).map((tb) => (
           <button key={tb} onClick={() => setD360tab(tb)} style={{
             background: "none", border: "none", fontSize: 13, fontWeight: 500,
             padding: "10px 18px", cursor: "pointer", fontFamily: t.font,
@@ -129,15 +186,17 @@ export default function Data360({ t, selection }) {
 
       {d360tab === "Pipelines" && <PipelinesTab t={t} project={project} scope={scope} legacySys={legacySys} />}
 
-      {d360tab === "Inbound Feeds" && <InboundFeedsView t={t} target={selection?.tab === "Inbound Feeds" ? selection.id : null} />}
+      {d360tab === "Inbound Feeds" && <InboundFeedsView t={t} scope={scope}
+        legacySys={legacySys}
+        target={selection?.tab === "Inbound Feeds" ? selection.id : null} />}
 
-      {d360tab === "Loaders" && <LoadersView t={t} />}
+      {d360tab === "Loaders" && <LoadersView t={t} scope={scope} legacySys={legacySys} />}
 
-      {d360tab === "Interdependency" && <InterdependencyTab t={t} />}
+      {d360tab === "Interdependency" && <InterdependencyTab t={t} scope={scope} legacySys={legacySys} />}
 
-      {d360tab === "Compression" && <CompressionView t={t} />}
+      {d360tab === "Compression" && scope !== "nonsei" && <CompressionView t={t} />}
 
-      {d360tab === "Lineage Graph" && (
+      {d360tab === "Lineage Graph" && scope !== "nonsei" && (
       <div>
       <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
         {["Detail", "Canvas"].map((lv) => (
@@ -544,7 +603,211 @@ function ModelDetail({ t, m, LAYER, onBack, embedded }) {
 // ===================================================================
 // Inbound Feed Catalog — SWP EOD feeds (searchable + workstream groups)
 // ===================================================================
-function InboundFeedsView({ t, target }) {
+function InboundFeedsView({ t, target, scope = "all", legacySys = "ADDVANTAGE" }) {
+  // Non-SEI reads a DIFFERENT TABLE, not a filtered view of the same one.
+  // See data360_api_additions.js: the SWP EOD dictionary has no legacy row
+  // in it at all, so there was nothing here for a filter to narrow.
+  if (scope === "nonsei") return <LegacyFeedsView t={t} sys={legacySys} />;
+  return <SwpInboundFeeds t={t} target={target} />;
+}
+
+/* The incumbent systems' feeds, from legacy_source_file — the one table in
+   the schema that records which system a feed belongs to. */
+function LegacyFeedsView({ t, sys }) {
+  const [reg, setReg] = useState(null);     // per-system registered counts
+  const [feeds, setFeeds] = useState(null);
+  const [q, setQ] = useState("");
+  const [sel, setSel] = useState(null);
+  const [fields, setFields] = useState(null);
+
+  useEffect(() => { legacyFeedApi.systems().then(setReg); }, []);
+  useEffect(() => {
+    let live = true;
+    setFeeds(null); setSel(null); setFields(null);
+    legacyFeedApi.feeds(sys, null, null).then((r) => {
+      if (!live) return;
+      setFeeds(r);
+      const first = (r.feeds || [])[0];
+      if (first) setSel(first);
+    });
+    return () => { live = false; };
+  }, [sys]);
+  useEffect(() => {
+    if (!sel) { setFields(null); return; }
+    let live = true;
+    legacyFeedApi.fields(sel.src_file, sel.data_source)
+      .then((r) => { if (live) setFields(r); });
+    return () => { live = false; };
+  }, [sel && sel.src_file, sel && sel.data_source]);
+
+  const m = LEGACY_SYS_D360[sys] || { label: sys, c: "#5a6472" };
+  const list = (feeds?.feeds || []).filter((f) => {
+    if (!q) return true;
+    const n = `${f.dataset || ""} ${f.src_file || ""}`.toLowerCase();
+    return n.includes(q.toLowerCase());
+  });
+
+  // What the register knows about every system, so "CRD has nothing" is a
+  // statement the screen can make rather than an absence the reader has to
+  // infer from a blank panel.
+  const perSys = {};
+  (reg?.systems || []).forEach((r) => {
+    const k = String(r.source_system || "").toUpperCase();
+    perSys[k] = (perSys[k] || 0) + Number(r.registered || 0);
+  });
+
+  if (feeds && !feeds.feeds.length) {
+    return (
+      <div>
+        <RegisterNote t={t} reg={reg} perSys={perSys} />
+        <NotLoadedForSystem t={t} sys={sys} what="inbound feeds"
+          table="legacy_source_file"
+          run={reg && reg.table_present
+            ? `The register holds ${reg.registered_total} feed(s), none of them ${m.label}.`
+            : "legacy_source_file is empty or absent — run sql/50_legacy_source_file.sql, then the legacy feed ingestion."} />
+      </div>);
+  }
+
+  return (
+    <div>
+      <p style={{ fontSize: 13, color: t.sub || t.textMuted, margin: "0 0 14px",
+        lineHeight: 1.6, maxWidth: 860 }}>
+        Inbound feed register — the files <b style={{ color: m.c }}>{m.label}</b>{" "}
+        sends into BBH, from <code style={{ fontFamily: "ui-monospace, monospace",
+        fontSize: 11.5 }}>legacy_source_file</code>. Field counts come from the
+        lineage rows each file resolves to; a registered file with no lineage
+        yet shows zero rather than being hidden.
+      </p>
+      <RegisterNote t={t} reg={reg} perSys={perSys} />
+
+      <input value={q} onChange={(e) => setQ(e.target.value)}
+        placeholder={`Search ${m.label} feeds…`}
+        style={{ width: 320, padding: "8px 12px", fontSize: 13, fontFamily: t.font,
+          border: `1px solid ${t.border}`, borderRadius: 6, marginBottom: 14 }} />
+
+      <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 18 }}>
+        <div style={{ border: `1px solid ${t.panel2 || t.border}`, borderRadius: 6,
+          background: t.panel, maxHeight: 520, overflow: "auto" }}>
+          {!feeds && <div style={{ padding: 16, fontSize: 12.5,
+            color: t.sub || t.textMuted }}>Loading…</div>}
+          {list.map((f) => {
+            const on = sel && sel.src_file === f.src_file;
+            return (
+              <button key={f.src_file} type="button" onClick={() => setSel(f)}
+                style={{ display: "block", width: "100%", textAlign: "left",
+                  font: "inherit", cursor: "pointer", border: 0,
+                  borderTop: `1px solid ${t.panel2 || t.border}`,
+                  padding: "10px 13px", background: on ? (t.tint || "#eef3f8") : "transparent",
+                  color: t.navy || t.text }}>
+                <div style={{ fontSize: 13, fontWeight: on ? 700 : 500 }}>
+                  {f.dataset || f.src_file}</div>
+                <div style={{ fontSize: 11, color: t.sub || t.textMuted, marginTop: 2,
+                  fontFamily: "ui-monospace, monospace" }}>{f.src_file}</div>
+                <div style={{ fontSize: 11, color: t.sub || t.textMuted, marginTop: 3 }}>
+                  {f.data_source} · {f.field_count} field{f.field_count === 1 ? "" : "s"}
+                  {f.target_tables ? ` · ${f.target_tables} target table${f.target_tables === 1 ? "" : "s"}` : ""}
+                </div>
+              </button>);
+          })}
+          {feeds && !list.length && (
+            <div style={{ padding: 16, fontSize: 12.5, color: t.sub || t.textMuted }}>
+              No {m.label} feed matches “{q}”.</div>)}
+        </div>
+
+        <div style={{ border: `1px solid ${t.panel2 || t.border}`, borderRadius: 6,
+          background: t.panel, padding: "16px 18px", maxHeight: 520, overflow: "auto" }}>
+          {!sel ? (
+            <div style={{ fontSize: 12.5, color: t.sub || t.textMuted }}>
+              Pick a feed to see the fields it carries.</div>
+          ) : (<>
+            <div style={{ display: "flex", gap: 10, alignItems: "baseline",
+              flexWrap: "wrap" }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0,
+                color: t.navy || t.text }}>{sel.dataset || sel.src_file}</h3>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: .4,
+                textTransform: "uppercase", padding: "3px 9px", borderRadius: 3,
+                background: m.c, color: "#fff" }}>{m.label}</span>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: .4,
+                textTransform: "uppercase", padding: "3px 9px", borderRadius: 3,
+                background: t.navy || "#10193b", color: "#fff" }}>
+                INBOUND · {m.label} → {sel.data_source}</span>
+            </div>
+            <div style={{ fontSize: 11.5, color: t.sub || t.textMuted, marginTop: 5,
+              fontFamily: "ui-monospace, monospace" }}>{sel.src_file}</div>
+
+            {!fields ? (
+              <div style={{ fontSize: 12.5, color: t.sub || t.textMuted,
+                marginTop: 14 }}>Loading fields…</div>
+            ) : !fields.fields.length ? (
+              <p style={{ fontSize: 12.5, color: t.sub || t.textMuted,
+                marginTop: 14, lineHeight: 1.6, maxWidth: "70ch" }}>
+                This file is in the register but no lineage row names it yet, so
+                the catalogue cannot say what it carries. That is a gap in the
+                lineage workbook, not an empty feed.
+              </p>
+            ) : (
+              <table style={{ borderCollapse: "collapse", width: "100%",
+                marginTop: 14 }}>
+                <thead><tr>
+                  {["#", "Field", "Staging type", "Lands in"].map((h) => (
+                    <th key={h} style={{ textAlign: "left", padding: "6px 9px",
+                      fontSize: 9.5, fontWeight: 700, letterSpacing: .4,
+                      textTransform: "uppercase", color: t.sub || t.textMuted,
+                      borderBottom: `1px solid ${t.panel2 || t.border}` }}>{h}</th>))}
+                </tr></thead>
+                <tbody>
+                  {fields.fields.map((f, i) => (
+                    <tr key={f.field}>
+                      <td style={ltd(t)}>{i + 1}</td>
+                      <td style={{ ...ltd(t), fontFamily: "ui-monospace, monospace" }}>
+                        {f.field}</td>
+                      <td style={ltd(t)}>{f.stg1_type || "—"}</td>
+                      <td style={ltd(t)}>
+                        {f.lands_in ? `${f.lands_in} warehouse column${f.lands_in === 1 ? "" : "s"}`
+                                    : "no agreed target yet"}</td>
+                    </tr>))}
+                </tbody>
+              </table>)}
+          </>)}
+        </div>
+      </div>
+    </div>);
+}
+
+const ltd = (t) => ({ textAlign: "left", padding: "6px 9px", fontSize: 12,
+  color: t.text || "#333", borderBottom: `1px solid ${t.panel2 || "#edf1f4"}` });
+
+/* What the register holds for EVERY system, always visible. Without it, a
+   system with no rows is indistinguishable from a screen that failed to
+   load — and the reader cannot tell whether to run an ingestion or raise a
+   bug. */
+function RegisterNote({ t, reg, perSys }) {
+  if (!reg) return null;
+  const keys = Object.keys(LEGACY_SYS_D360);
+  return (
+    <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center",
+      fontSize: 11.5, color: t.sub || t.textMuted, marginBottom: 14,
+      padding: "8px 12px", borderRadius: 4, background: t.bg || "#f5f8f8" }}>
+      <span style={{ fontWeight: 700, letterSpacing: .4, textTransform: "uppercase",
+        fontSize: 9.5 }}>Register</span>
+      {keys.map((k) => {
+        const n = perSys[k] || 0;
+        return (
+          <span key={k} style={{ display: "flex", alignItems: "center", gap: 5,
+            opacity: n ? 1 : 0.55 }}>
+            <i style={{ width: 8, height: 8, borderRadius: 2,
+              background: LEGACY_SYS_D360[k].c }} />
+            {LEGACY_SYS_D360[k].label} <b style={{ color: t.navy || t.text }}>{n}</b>
+          </span>);
+      })}
+      <span style={{ marginLeft: "auto" }}>
+        feeds registered in legacy_source_file
+        {reg.unreachable ? " · the register did not answer" : ""}
+      </span>
+    </div>);
+}
+
+function SwpInboundFeeds({ t, target }) {
   const [workstreams, setWorkstreams] = useState([]);
   const [ws, setWs] = useState(null);
   const [q, setQ] = useState("");
@@ -868,7 +1131,20 @@ function KV({ t, rows }) {
 // ===================================================================
 // Loaders view — rich loader catalog (ldr_catalog)
 // ===================================================================
-function LoadersView({ t }) {
+function LoadersView({ t, scope = "all", legacySys = "ADDVANTAGE" }) {
+  // ldr_catalog comes from CP_Catalog_SEI_Loaders.xlsx and has no
+  // source_system column, because there are no legacy loaders in it — the
+  // loader catalogue is an SEI artefact. Under Non-SEI this tab used to
+  // render those SEI loaders unchanged beneath an AddVantage badge.
+  if (scope === "nonsei") {
+    return <NotLoadedForSystem t={t} sys={legacySys} what="loader catalogue"
+      table="ldr_catalog"
+      run="The loader workbook is CP_Catalog_SEI_Loaders.xlsx — an SEI artefact with no legacy equivalent ingested." />;
+  }
+  return <LoadersCatalog t={t} />;
+}
+
+function LoadersCatalog({ t }) {
   const [loaders, setLoaders] = useState([]);
   const [detail, setDetail] = useState(null);
   const [ltab, setLtab] = useState("attrs");
@@ -1077,8 +1353,16 @@ function CompressionView({ t }) {
 
 // Interdependency tab wrapper — toggles the shared Interdependency graph
 // between Inbound Feeds and Loaders.
-function InterdependencyTab({ t }) {
+function InterdependencyTab({ t, scope = "all", legacySys = "ADDVANTAGE" }) {
   const [kind, setKind] = React.useState("feed");
+  // Both graphs are shared-key edges over feed_catalog and ldr_catalog, which
+  // are the SEI feed and loader registers. Neither carries a legacy row, so
+  // under Non-SEI this drew the SEI graph with a legacy badge above it.
+  if (scope === "nonsei") {
+    return <NotLoadedForSystem t={t} sys={legacySys} what="interdependency graph"
+      table="feed_catalog / ldr_catalog"
+      run="Both graphs are built from the SEI feed and loader registers; no legacy feed keys have been ingested for them." />;
+  }
   return (
     <div>
       <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>

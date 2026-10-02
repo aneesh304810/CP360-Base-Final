@@ -513,3 +513,124 @@ def inbound_feed_detail(feed: str):
         ORDER BY position_order""",
         {"p": out["platform_id"], "s": out["schema_name"], "o": out["feed"]})
     return out
+
+
+# ===================================================================
+# Legacy inbound feeds — the Non-SEI side of the Inbound Feeds tab
+# ===================================================================
+# WHY A SEPARATE ENDPOINT. /inbound-feeds reads datasets WHERE
+# object_type='FEED', which is SWP_EOD_Data_Feeds.xlsx — SWP feeds coming
+# into BBH under the SEI programme. There is no AddVantage, STAR or UAF row
+# in it, and there never will be: those are the incumbent systems the SEI
+# programme replaces, and their feeds are registered in a different table.
+#
+# So the Non-SEI tab was not "unfiltered", it was reading the wrong table
+# entirely. Selecting AddVantage and being shown the SWP Account feed is not
+# a filter that failed to apply — it is the SEI answer wearing a legacy
+# badge, which is worse than no answer because it looks like one.
+#
+# legacy_source_file is the register that carries SOURCE_SYSTEM. It is the
+# only table in the schema that can answer "which feeds does AddVantage
+# send", so it is what Non-SEI reads.
+
+# The feed key, spelled exactly as /sei-crosswalk/lane-systems spells it.
+# Two copies of a join key is how a join silently stops matching and returns
+# a smaller number that reads as good news.
+_FEED_KEY = ("REGEXP_REPLACE(UPPER(TRIM('_' FROM "
+             "REGEXP_REPLACE({col},'[[:space:]/.-]+','_'))),'_{{2,}}','_')")
+
+
+@router.get("/legacy-feed-systems")
+def legacy_feed_systems():
+    """How many feeds each legacy system has registered, per warehouse.
+
+    This is what lets the UI tell "CRD sends no feeds" apart from "CRD has
+    not been ingested yet" — it cannot, and neither can this endpoint, so
+    both say `registered: 0` and the screen says the honest thing: nothing
+    is loaded for it. A tab that renders another system's rows in that
+    situation is the bug this replaces.
+    """
+    rows = _safe("""SELECT source_system, data_source, COUNT(*) AS registered
+        FROM legacy_source_file
+        WHERE source_system IS NOT NULL
+        GROUP BY source_system, data_source
+        ORDER BY source_system, data_source""", {})
+    table = _safe("""SELECT COUNT(*) AS n FROM legacy_source_file""", {})
+    return {"systems": rows,
+            # An empty list means "asked, and the register holds nothing",
+            # which is a different claim from "could not ask".
+            "table_present": bool(table),
+            "registered_total": (table[0]["n"] if table else 0)}
+
+
+@router.get("/legacy-feeds")
+def legacy_feeds(system: str | None = None, data_source: str | None = None,
+                 q: str | None = None):
+    """One legacy system's inbound feeds, with how many fields each carries.
+
+    Field counts come from legacy_lineage through the normalised feed key.
+    A feed with no lineage rows still appears, with a count of zero: it is
+    registered, and hiding it would make the register look smaller than it
+    is.
+    """
+    where, params = ["f.source_system IS NOT NULL"], {}
+    if system:
+        where.append("UPPER(f.source_system) = :sys")
+        params["sys"] = system.strip().upper()
+    if data_source:
+        where.append("UPPER(f.data_source) = :ds")
+        params["ds"] = data_source.strip().upper()
+    if q:
+        where.append("(UPPER(f.src_file) LIKE :q OR UPPER(f.dataset) LIKE :q)")
+        params["q"] = f"%{q.strip().upper()}%"
+
+    key_l = _FEED_KEY.format(col="l.src_source_table")
+    rows = _safe(f"""
+        SELECT f.src_file, f.src_file_key, f.dataset, f.source_system,
+               f.data_source,
+               NVL(x.field_count, 0)   AS field_count,
+               NVL(x.target_tables, 0) AS target_tables
+        FROM   legacy_source_file f
+        LEFT JOIN (
+            SELECT {key_l} AS k, l.data_source AS ds,
+                   COUNT(DISTINCT l.src_source_column) AS field_count,
+                   COUNT(DISTINCT l.dwh_target_table)  AS target_tables
+            FROM   legacy_lineage l
+            WHERE  l.src_source_table IS NOT NULL
+            GROUP  BY {key_l}, l.data_source
+        ) x ON x.k = f.src_file_key AND x.ds = f.data_source
+        WHERE  {' AND '.join(where)}
+        ORDER  BY f.dataset NULLS LAST, f.src_file""", params)
+    return {"system": (system or "").upper() or None,
+            "data_source": (data_source or "").upper() or None,
+            "feeds": rows, "count": len(rows)}
+
+
+@router.get("/legacy-feed-fields")
+def legacy_feed_fields(src_file: str, data_source: str | None = None):
+    """Every field one legacy feed carries, and where each one lands."""
+    params = {"f": src_file.strip().upper()}
+    ds = ""
+    if data_source:
+        ds = " AND UPPER(l.data_source) = :ds"
+        params["ds"] = data_source.strip().upper()
+    key_l = _FEED_KEY.format(col="l.src_source_table")
+    rows = _safe(f"""
+        SELECT l.src_source_column AS field,
+               -- legacy_lineage records no type on the SOURCE side; the
+               -- first type it knows is staging's. Reporting stg1_type as
+               -- "the field's type" would be a claim the table cannot make.
+               MIN(l.stg1_type)      AS stg1_type,
+               MIN(l.stg1_source_table) AS stg1,
+               MIN(l.stg2_source_table) AS stg2,
+               COUNT(DISTINCT l.dwh_target_table || '.' || l.dwh_target_column)
+                   AS lands_in
+        FROM   legacy_lineage l
+        WHERE  (UPPER(l.src_source_table) = :f OR {key_l} = :f){ds}
+        GROUP  BY l.src_source_column
+        ORDER  BY l.src_source_column""", params)
+    head = _safe("""SELECT src_file, dataset, source_system, data_source
+        FROM legacy_source_file WHERE UPPER(src_file) = :f
+           OR UPPER(src_file_key) = :f""", {"f": src_file.strip().upper()})
+    return {"feed": (head[0] if head else {"src_file": src_file}),
+            "fields": rows, "field_count": len(rows)}
