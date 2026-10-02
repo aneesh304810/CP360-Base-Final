@@ -6,6 +6,16 @@ import { api } from "./api.js";
 // it since it was found feeding IMDS through PDPA009/PDBA016 — two lists of
 // the same thing, and the shorter one silently decided that a whole source
 // system did not exist on this screen.
+// The Non-SEI default: every legacy system, including the ones that match
+// none of the four named below.
+export const ALL_SYS = "__ALL__";
+
+// Meta for any system key INCLUDING ALL_SYS, so no caller has to special-
+// case it and none can render the sentinel as a label.
+export const sysMeta = (k) => (k === ALL_SYS
+  ? { c: "#10193b", label: "All legacy", all: true }
+  : LEGACY_SYS_D360[k] || { c: "#5a6472", label: String(k || "—") });
+
 export const LEGACY_SYS_D360 = {
   ADDVANTAGE: { c: "#6d3ac0", label: "AddVantage", re: /addvantage|advantage/i },
   CRD: { c: "#0b7d7d", label: "CRD", re: /\bcrd\b|charles\s*river/i },
@@ -47,7 +57,7 @@ export const D360_TAB_DEFAULT = D360_TABS()[0];
    construction names the incumbent system it routes away from. */
 function NoPipelinesInScope({ t, scope, curSys, total, shown, q, dom }) {
   if (!total) return null;
-  const m = LEGACY_SYS_D360[curSys] || { label: curSys, c: "#5a6472" };
+  const m = sysMeta(curSys);
   let head, body;
   if (shown && (q || dom)) {
     head = "No pipeline matches the filter";
@@ -61,11 +71,16 @@ function NoPipelinesInScope({ t, scope, curSys, total, shown, q, dom }) {
       construction rather than unloaded. The SEI side of these pipelines is
       the <b>SEI Target</b> and <b>Compressed Routing</b> on each row; switch
       to <b>All</b> to read them.</>;
+  } else if (scope === "nonsei" && m.all) {
+    head = `None of the ${total} pipelines names a legacy system`;
+    body = <>Every row would have to carry one to appear here. If the
+      register is loaded, this means the legacy system column is blank
+      throughout — which is a gap in the workbook, not a filter.</>;
   } else if (scope === "nonsei") {
     head = `No pipeline is routed from ${m.label}`;
     body = <>{total} pipelines are loaded and none names {m.label} in its
-      legacy system. Pick another system, or <b>All</b> to see every
-      pipeline.</>;
+      legacy system. Pick another system, or <b>All legacy</b> to see every
+      pipeline that names one.</>;
   } else {
     head = "No pipeline matches";
     body = <>{total} are loaded.</>;
@@ -84,7 +99,7 @@ function NoPipelinesInScope({ t, scope, curSys, total, shown, q, dom }) {
 const MONO_C = { fontFamily: "ui-monospace, monospace", fontSize: 11.5 };
 
 export function NotLoadedForSystem({ t, sys, what, table, run }) {
-  const m = LEGACY_SYS_D360[sys] || { label: sys, c: "#5a6472" };
+  const m = sysMeta(sys);
   return (
     <div style={{ border: `1px solid ${t.panel2 || t.border}`,
       borderLeft: `3px solid ${m.c}`, borderRadius: 6, background: t.panel,
@@ -111,8 +126,18 @@ export function NotLoadedForSystem({ t, sys, what, table, run }) {
 
 export default function Data360({ t, selection }) {
   const [d360tab, setD360tab] = useState(D360_TAB_DEFAULT);
-  const [scope, setScope] = useState("all");            // all | sei | nonsei (page-level)
-  const [legacySys, setLegacySys] = useState("ADDVANTAGE");
+  // sei | nonsei. "All" is gone: it was the only option that showed SEI and
+  // legacy rows interleaved, and on every tab here those are different
+  // catalogues answering different questions rather than one list with a
+  // flag on it. Non-SEI defaults to every legacy system (see ALL_SYS) so
+  // dropping "All" loses no row.
+  const [scope, setScope] = useState("sei");
+  // Removing the page's "All" would have hidden every pipeline whose legacy
+  // system is none of the four named ones — PB Data Warehouse, ACBS and the
+  // rest. So Non-SEI starts at ALL_SYS, meaning "every legacy system", and
+  // the chips narrow from there. The two-way toggle is the ask; losing rows
+  // was not part of it.
+  const [legacySys, setLegacySys] = useState(ALL_SYS);
 
   // A tab that no longer exists cannot stay selected — a deep link or a
   // stale state that names a removed tab would leave the bar with nothing
@@ -133,7 +158,7 @@ export default function Data360({ t, selection }) {
 
       {/* page-level scope: All | SEI | Non-SEI, with legacy-system badges under Non-SEI */}
       <div style={{ display: "flex", marginTop: 14 }}>
-        {[["all", "All"], ["sei", "SEI"], ["nonsei", "Non-SEI"]].map(([k, label], i) => (
+        {[["sei", "SEI"], ["nonsei", "Non-SEI"]].map(([k, label], i) => (
           <button key={k} onClick={() => setScope(k)} style={{ fontSize: 12, fontWeight: 700,
             padding: "7px 20px", cursor: "pointer", fontFamily: t.font,
             // Longhand on all four sides. `border` + `borderLeft` is a
@@ -146,7 +171,7 @@ export default function Data360({ t, selection }) {
             borderBottom: `1px solid ${scope === k ? t.accent : (t.border || t.disabled)}`,
             borderLeft: i === 0
               ? `1px solid ${scope === k ? t.accent : (t.border || t.disabled)}` : 0,
-            borderRadius: i === 0 ? "3px 0 0 3px" : i === 2 ? "0 3px 3px 0" : 0,
+            borderRadius: i === 0 ? "3px 0 0 3px" : "0 3px 3px 0",
             background: scope === k ? t.accent : t.panel,
             color: scope === k ? "#fff" : (t.sub || t.textMuted) }}>{label}</button>))}
       </div>
@@ -155,7 +180,8 @@ export default function Data360({ t, selection }) {
           background: "#fbfcfe", border: `1px solid ${t.border || t.disabled}`, borderRadius: 3 }}>
           <span style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".5px",
             color: t.muted || t.textMuted, marginRight: 4 }}>Legacy system</span>
-          {Object.entries(LEGACY_SYS_D360).map(([k, v]) => (
+          {[[ALL_SYS, { c: t.navy || "#10193b", label: "All legacy" }],
+            ...Object.entries(LEGACY_SYS_D360)].map(([k, v]) => (
             <span key={k} onClick={() => setLegacySys(k)} style={{ display: "flex", alignItems: "center",
               gap: 7, fontSize: 12, fontWeight: 700, padding: "6px 14px", borderRadius: 999,
               cursor: "pointer", border: `1.5px solid ${legacySys === k ? v.c : (t.border || t.disabled)}`,
@@ -164,7 +190,9 @@ export default function Data360({ t, selection }) {
               <span style={{ width: 9, height: 9, borderRadius: "50%",
                 background: legacySys === k ? "#fff" : v.c }} />{v.label}</span>))}
           <span style={{ marginLeft: "auto", fontSize: 10.5, color: t.muted || t.textMuted }}>
-            {LEGACY_SYS_D360[legacySys].label} · legacy source scope</span>
+            {legacySys === ALL_SYS
+              ? "every legacy system, including ones not named here"
+              : `${sysMeta(legacySys).label} · legacy source scope`}</span>
         </div>)}
 
       {/* ONE scope toggle. There used to be two, stacked: this one, bound to
@@ -417,7 +445,7 @@ function ModelDetail({ t, m, LAYER, onBack, embedded }) {
 // ===================================================================
 // Inbound Feed Catalog — SWP EOD feeds (searchable + workstream groups)
 // ===================================================================
-function InboundFeedsView({ t, target, scope = "all", legacySys = "ADDVANTAGE" }) {
+function InboundFeedsView({ t, target, scope = "sei", legacySys = ALL_SYS }) {
   // Non-SEI reads a DIFFERENT TABLE, not a filtered view of the same one.
   // See data360_api_additions.js: the SWP EOD dictionary has no legacy row
   // in it at all, so there was nothing here for a filter to narrow.
@@ -438,7 +466,10 @@ function LegacyFeedsView({ t, sys }) {
   useEffect(() => {
     let live = true;
     setFeeds(null); setSel(null); setFields(null);
-    legacyFeedApi.feeds(sys, null, null).then((r) => {
+    // ALL_SYS is a UI sentinel, not a value legacy_source_file holds.
+    // Sending it would filter SOURCE_SYSTEM = '__ALL__' and return nothing,
+    // which the screen would then report as "nothing ingested".
+    legacyFeedApi.feeds(sys === ALL_SYS ? null : sys, null, null).then((r) => {
       if (!live) return;
       setFeeds(r);
       const first = (r.feeds || [])[0];
@@ -454,7 +485,7 @@ function LegacyFeedsView({ t, sys }) {
     return () => { live = false; };
   }, [sel && sel.src_file, sel && sel.data_source]);
 
-  const m = LEGACY_SYS_D360[sys] || { label: sys, c: "#5a6472" };
+  const m = sysMeta(sys);
   const list = (feeds?.feeds || []).filter((f) => {
     if (!q) return true;
     const n = `${f.dataset || ""} ${f.src_file || ""}`.toLowerCase();
@@ -518,9 +549,16 @@ function LegacyFeedsView({ t, sys }) {
                 <div style={{ fontSize: 11, color: t.sub || t.textMuted, marginTop: 2,
                   fontFamily: "ui-monospace, monospace" }}>{f.src_file}</div>
                 <div style={{ fontSize: 11, color: t.sub || t.textMuted, marginTop: 3 }}>
-                  {f.data_source} · {f.field_count} field{f.field_count === 1 ? "" : "s"}
+                  {f.source_system} → {f.data_source} · {f.field_count} field
+                  {f.field_count === 1 ? "" : "s"}
                   {f.target_tables ? ` · ${f.target_tables} target table${f.target_tables === 1 ? "" : "s"}` : ""}
+                  {f.described != null && f.field_count
+                    ? ` · ${f.described} described` : ""}
                 </div>
+                {f.pii > 0 && (
+                  <div style={{ fontSize: 10, fontWeight: 700, marginTop: 3,
+                    color: t.danger || "#c1113a" }}>
+                    {f.pii} field{f.pii === 1 ? "" : "s"} flagged personal</div>)}
               </button>);
           })}
           {feeds && !list.length && (
@@ -549,6 +587,29 @@ function LegacyFeedsView({ t, sys }) {
             <div style={{ fontSize: 11.5, color: t.sub || t.textMuted, marginTop: 5,
               fontFamily: "ui-monospace, monospace" }}>{sel.src_file}</div>
 
+            {/* THE STAGING SPINE AND WHAT THE DICTIONARY COVERS. Both were
+                already ingested — the staging tables by the lineage load,
+                the descriptions by the dictionary load — and neither was
+                on this screen. */}
+            {(sel.stg1 || sel.stg2) && (
+              <div style={{ fontSize: 11.5, color: t.sub || t.textMuted,
+                marginTop: 8 }}>
+                Lands in <code style={MONO_C}>{sel.stg1 || "—"}</code>
+                {sel.stg2 && <> then <code style={MONO_C}>{sel.stg2}</code></>}
+                , on the way to {sel.data_source}.
+              </div>)}
+            {fields && fields.field_count > 0 && (
+              <div style={{ fontSize: 11.5, marginTop: 8, padding: "7px 11px",
+                borderRadius: 4, background: t.bg || "#f5f8f8",
+                color: t.sub || t.textMuted, lineHeight: 1.5 }}>
+                The {m.label} dictionary describes{" "}
+                <b style={{ color: t.navy || t.text }}>{fields.described}</b> of{" "}
+                {fields.field_count} field{fields.field_count === 1 ? "" : "s"}
+                {fields.undescribed > 0 && <> — the other {fields.undescribed}{" "}
+                  carry no entry, so a blank meaning below is a gap in the
+                  dictionary rather than a field without one</>}.
+              </div>)}
+
             {!fields ? (
               <div style={{ fontSize: 12.5, color: t.sub || t.textMuted,
                 marginTop: 14 }}>Loading fields…</div>
@@ -563,7 +624,7 @@ function LegacyFeedsView({ t, sys }) {
               <table style={{ borderCollapse: "collapse", width: "100%",
                 marginTop: 14 }}>
                 <thead><tr>
-                  {["#", "Field", "Staging type", "Lands in"].map((h) => (
+                  {["#", "Field", "Business meaning", "Type", "Lands in"].map((h) => (
                     <th key={h} style={{ textAlign: "left", padding: "6px 9px",
                       fontSize: 9.5, fontWeight: 700, letterSpacing: .4,
                       textTransform: "uppercase", color: t.sub || t.textMuted,
@@ -572,13 +633,50 @@ function LegacyFeedsView({ t, sys }) {
                 <tbody>
                   {fields.fields.map((f, i) => (
                     <tr key={f.field}>
-                      <td style={ltd(t)}>{i + 1}</td>
-                      <td style={{ ...ltd(t), fontFamily: "ui-monospace, monospace" }}>
-                        {f.field}</td>
-                      <td style={ltd(t)}>{f.stg1_type || "—"}</td>
-                      <td style={ltd(t)}>
+                      <td style={{ ...ltd(t), color: t.muted || t.textMuted,
+                        width: 28 }}>{i + 1}</td>
+                      <td style={{ ...ltd(t), verticalAlign: "top" }}>
+                        <div style={{ fontFamily: "ui-monospace, monospace",
+                          fontWeight: 600 }}>{f.field}</div>
+                        {f.business_function && (
+                          <div style={{ fontSize: 10.5, color: t.muted || t.textMuted,
+                            marginTop: 2 }}>{f.business_function}</div>)}
+                        <div style={{ display: "flex", gap: 5, marginTop: 4,
+                          flexWrap: "wrap" }}>
+                          {f.is_pii === "Y" && <Flag t={t} c={t.danger || "#c1113a"}>PII</Flag>}
+                          {f.is_required === "Y" && <Flag t={t} c={t.accent}>required</Flag>}
+                          {f.is_unique === "Y" && <Flag t={t} c={t.accent}>unique</Flag>}
+                          {f.privacy_class && <Flag t={t} c={t.muted}>{f.privacy_class}</Flag>}
+                          {f.regulatory_class && <Flag t={t} c={t.muted}>{f.regulatory_class}</Flag>}
+                        </div>
+                      </td>
+                      <td style={{ ...ltd(t), verticalAlign: "top", maxWidth: 420 }}>
+                        {f.business_term
+                          ? <div style={{ fontWeight: 600 }}>{f.business_term}</div>
+                          : <span style={{ color: t.muted || t.textMuted }}>
+                              not in the {m.label} dictionary</span>}
+                        {f.short_desc && (
+                          <div style={{ fontSize: 11.5, color: t.sub || t.textMuted,
+                            marginTop: 3, lineHeight: 1.5 }}>{f.short_desc}</div>)}
+                        {f.pb_field_mapping && (
+                          <div style={{ fontSize: 10.5, color: t.muted || t.textMuted,
+                            marginTop: 3 }}>PB mapping: {f.pb_field_mapping}</div>)}
+                      </td>
+                      <td style={{ ...ltd(t), verticalAlign: "top", whiteSpace: "nowrap" }}>
+                        {f.dict_type || f.stg1_type || "—"}
+                        {f.max_length ? <span style={{ color: t.muted || t.textMuted }}>
+                          {" "}({f.max_length})</span> : null}
+                        {f.date_format && (
+                          <div style={{ fontSize: 10.5, color: t.muted || t.textMuted }}>
+                            {f.date_format}</div>)}
+                      </td>
+                      <td style={{ ...ltd(t), verticalAlign: "top" }}>
                         {f.lands_in ? `${f.lands_in} warehouse column${f.lands_in === 1 ? "" : "s"}`
-                                    : "no agreed target yet"}</td>
+                                    : "no agreed target yet"}
+                        {f.lineage_status && (
+                          <div style={{ fontSize: 10.5, color: t.muted || t.textMuted,
+                            marginTop: 2 }}>{f.lineage_status}</div>)}
+                      </td>
                     </tr>))}
                 </tbody>
               </table>)}
@@ -586,6 +684,12 @@ function LegacyFeedsView({ t, sys }) {
         </div>
       </div>
     </div>);
+}
+
+function Flag({ t, c, children }) {
+  return <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: .3,
+    textTransform: "uppercase", padding: "1px 6px", borderRadius: 3,
+    border: `1px solid ${c || t.border}`, color: c || t.sub }}>{children}</span>;
 }
 
 const ltd = (t) => ({ textAlign: "left", padding: "6px 9px", fontSize: 12,
@@ -781,7 +885,7 @@ function PipelinesTab({ t, scope, legacySys }) {
 
 // Business pipelines: the 444 from the v20 workbook, with the migration
 // routing story (Routing Pattern / Legacy / Compressed / Action / Rationale).
-function BfPipelinesView({ t, scope = "all", curSys = "ADDVANTAGE" }) {
+function BfPipelinesView({ t, scope = "sei", curSys = ALL_SYS }) {
   const [pipes, setPipes] = useState([]);
   const [detail, setDetail] = useState(null);
   const [q, setQ] = useState("");
@@ -811,9 +915,13 @@ function BfPipelinesView({ t, scope = "all", curSys = "ADDVANTAGE" }) {
     && !/^(n\/a|none|-+)$/i.test(String(p.legacy_system).trim());
   const sysRe = (LEGACY_SYS_D360[curSys] || {}).re;
   const inScope = (p) =>
-    scope === "all" ? true :
     scope === "sei" ? !hasLegacy(p) :
-    hasLegacy(p) && (!sysRe || sysRe.test(String(p.legacy_system)));
+    // ALL_SYS has no regex, so every pipeline with a legacy system
+    // qualifies — including the ones whose system is not one of the four
+    // named chips. Those used to be reachable only through the page's
+    // "All", and would have vanished with it.
+    hasLegacy(p) && (curSys === ALL_SYS || !sysRe
+                     || sysRe.test(String(p.legacy_system)));
   const filtered = pipes.filter((p) => inScope(p) &&
     (!dom || p.business_domain === dom) &&
     (!q || (p.pipeline_id + " " + (p.pipeline_name || "")).toLowerCase().includes(q.toLowerCase())));
@@ -875,7 +983,7 @@ function BfPipelinesView({ t, scope = "all", curSys = "ADDVANTAGE" }) {
                     <span style={{ fontSize: 9, color: t.muted || t.textMuted }}>
                       {grpOpen(k, i) ? "▾" : "▶"}</span>
                     <span style={{ fontSize: 12, fontWeight: 700,
-                      color: (LEGACY_SYS_D360[curSys] || {}).c || t.navy }}>{k}</span>
+                      color: sysMeta(curSys).c || t.navy }}>{k}</span>
                     <span style={{ fontSize: 9.5, color: t.muted || t.textMuted }}>
                       · {grouped[k].length} pipeline{grouped[k].length > 1 ? "s" : ""}</span>
                   </div>
@@ -963,7 +1071,7 @@ function KV({ t, rows }) {
 // ===================================================================
 // Loaders view — rich loader catalog (ldr_catalog)
 // ===================================================================
-function LoadersView({ t, scope = "all", legacySys = "ADDVANTAGE" }) {
+function LoadersView({ t, scope = "sei", legacySys = ALL_SYS }) {
   // ldr_catalog comes from CP_Catalog_SEI_Loaders.xlsx and has no
   // source_system column, because there are no legacy loaders in it — the
   // loader catalogue is an SEI artefact. Under Non-SEI this tab used to
@@ -1139,7 +1247,7 @@ function LoadersCatalog({ t }) {
 
 // Interdependency tab wrapper — toggles the shared Interdependency graph
 // between Inbound Feeds and Loaders.
-function InterdependencyTab({ t, scope = "all", legacySys = "ADDVANTAGE" }) {
+function InterdependencyTab({ t, scope = "sei", legacySys = ALL_SYS }) {
   const [kind, setKind] = React.useState("feed");
   // Both graphs are shared-key edges over feed_catalog and ldr_catalog, which
   // are the SEI feed and loader registers. Neither carries a legacy row, so

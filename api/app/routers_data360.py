@@ -539,6 +539,14 @@ def inbound_feed_detail(feed: str):
 _FEED_KEY = ("REGEXP_REPLACE(UPPER(TRIM('_' FROM "
              "REGEXP_REPLACE({col},'[[:space:]/.-]+','_'))),'_{{2,}}','_')")
 
+# The source code canonicalised to the dictionary's join key, spelled as
+# routers_legacy_source._CANON_SRC spells it. Same rule, including the
+# _L12 -> _12 rewrite: a second spelling of a join key is how a join
+# silently stops matching and returns a smaller number that reads as good
+# news.
+_CANON_SRC = (r"REGEXP_REPLACE(UPPER(TRIM('_' FROM REGEXP_REPLACE("
+              r"l.src_source_column,'[[:space:]/.-]+','_'))),'_L([0-9]+)','_\1')")
+
 
 @router.get("/legacy-feed-systems")
 def legacy_feed_systems():
@@ -585,22 +593,66 @@ def legacy_feeds(system: str | None = None, data_source: str | None = None,
         params["q"] = f"%{q.strip().upper()}%"
 
     key_l = _FEED_KEY.format(col="l.src_source_table")
+    canon = _CANON_SRC
     rows = _safe(f"""
         SELECT f.src_file, f.src_file_key, f.dataset, f.source_system,
                f.data_source,
                NVL(x.field_count, 0)   AS field_count,
-               NVL(x.target_tables, 0) AS target_tables
+               NVL(x.target_tables, 0) AS target_tables,
+               x.described, x.pii, x.stg1, x.stg2
         FROM   legacy_source_file f
         LEFT JOIN (
             SELECT {key_l} AS k, l.data_source AS ds,
                    COUNT(DISTINCT l.src_source_column) AS field_count,
-                   COUNT(DISTINCT l.dwh_target_table)  AS target_tables
+                   COUNT(DISTINCT l.dwh_target_table)  AS target_tables,
+                   MIN(l.stg1_source_table) AS stg1,
+                   MIN(l.stg2_source_table) AS stg2,
+                   -- What the dictionary already knows about this file:
+                   -- how many of its fields carry a description, and how
+                   -- many are flagged personal. Both ingested; neither was
+                   -- reaching this screen.
+                   --
+                   -- Counts, not LISTAGG: LISTAGG(DISTINCT ...) is 19c and
+                   -- later only, and _safe turns a syntax error into an
+                   -- empty list — which on this screen reads as "this
+                   -- system sends no feeds". The masters are on the detail
+                   -- rows, where the UI can collect them itself.
+                   COUNT(DISTINCT CASE WHEN d.short_desc IS NOT NULL
+                         THEN l.src_source_column END) AS described,
+                   COUNT(DISTINCT CASE WHEN d.is_pii = 'Y'
+                         THEN l.src_source_column END) AS pii
             FROM   legacy_lineage l
+            LEFT JOIN legacy_dictionary d
+                   ON d.field_code_norm = {canon}
             WHERE  l.src_source_table IS NOT NULL
             GROUP  BY {key_l}, l.data_source
         ) x ON x.k = f.src_file_key AND x.ds = f.data_source
         WHERE  {' AND '.join(where)}
         ORDER  BY f.dataset NULLS LAST, f.src_file""", params)
+    if not rows:
+        # Without the dictionary (sql/27 not run) the statement above fails
+        # as a whole and _safe hands back [], which this screen would print
+        # as "no feeds registered". The register is the answer; the
+        # dictionary is enrichment, and enrichment may not cost the answer.
+        rows = _safe(f"""
+            SELECT f.src_file, f.src_file_key, f.dataset, f.source_system,
+                   f.data_source,
+                   NVL(x.field_count, 0)   AS field_count,
+                   NVL(x.target_tables, 0) AS target_tables,
+                   x.stg1, x.stg2
+            FROM   legacy_source_file f
+            LEFT JOIN (
+                SELECT {key_l} AS k, l.data_source AS ds,
+                       COUNT(DISTINCT l.src_source_column) AS field_count,
+                       COUNT(DISTINCT l.dwh_target_table)  AS target_tables,
+                       MIN(l.stg1_source_table) AS stg1,
+                       MIN(l.stg2_source_table) AS stg2
+                FROM   legacy_lineage l
+                WHERE  l.src_source_table IS NOT NULL
+                GROUP  BY {key_l}, l.data_source
+            ) x ON x.k = f.src_file_key AND x.ds = f.data_source
+            WHERE  {' AND '.join(where)}
+            ORDER  BY f.dataset NULLS LAST, f.src_file""", params)
     return {"system": (system or "").upper() or None,
             "data_source": (data_source or "").upper() or None,
             "feeds": rows, "count": len(rows)}
@@ -617,20 +669,60 @@ def legacy_feed_fields(src_file: str, data_source: str | None = None):
     key_l = _FEED_KEY.format(col="l.src_source_table")
     rows = _safe(f"""
         SELECT l.src_source_column AS field,
+               {_CANON_SRC}         AS code_norm,
                -- legacy_lineage records no type on the SOURCE side; the
                -- first type it knows is staging's. Reporting stg1_type as
                -- "the field's type" would be a claim the table cannot make.
                MIN(l.stg1_type)      AS stg1_type,
                MIN(l.stg1_source_table) AS stg1,
                MIN(l.stg2_source_table) AS stg2,
+               MIN(l.lineage_status) AS lineage_status,
                COUNT(DISTINCT l.dwh_target_table || '.' || l.dwh_target_column)
-                   AS lands_in
+                   AS lands_in,
+               -- THE DICTIONARY. All of this was ingested by the lineage
+               -- load and none of it was on this screen: a field list with
+               -- no meaning on it is a list of codes.
+               MAX(d.business_term)     AS business_term,
+               MAX(d.business_function) AS business_function,
+               MAX(d.master_name)       AS master_name,
+               MAX(d.data_type)         AS dict_type,
+               MAX(d.max_length)        AS max_length,
+               MAX(d.date_format)       AS date_format,
+               MAX(d.is_required)       AS is_required,
+               MAX(d.is_unique)         AS is_unique,
+               MAX(d.is_pii)            AS is_pii,
+               MAX(d.privacy_class)     AS privacy_class,
+               MAX(d.regulatory_class)  AS regulatory_class,
+               MAX(d.status)            AS dict_status,
+               MAX(d.pb_field_mapping)  AS pb_field_mapping,
+               MAX(d.short_desc)        AS short_desc
         FROM   legacy_lineage l
+        LEFT JOIN legacy_dictionary d ON d.field_code_norm = {_CANON_SRC}
         WHERE  (UPPER(l.src_source_table) = :f OR {key_l} = :f){ds}
-        GROUP  BY l.src_source_column
+        GROUP  BY l.src_source_column, {_CANON_SRC}
         ORDER  BY l.src_source_column""", params)
+    if not rows:
+        # Same reason as above: no dictionary must not mean no fields.
+        rows = _safe(f"""
+            SELECT l.src_source_column AS field,
+                   MIN(l.stg1_type)      AS stg1_type,
+                   MIN(l.stg1_source_table) AS stg1,
+                   MIN(l.stg2_source_table) AS stg2,
+                   MIN(l.lineage_status) AS lineage_status,
+                   COUNT(DISTINCT l.dwh_target_table || '.' || l.dwh_target_column)
+                       AS lands_in
+            FROM   legacy_lineage l
+            WHERE  (UPPER(l.src_source_table) = :f OR {key_l} = :f){ds}
+            GROUP  BY l.src_source_column
+            ORDER  BY l.src_source_column""", params)
     head = _safe("""SELECT src_file, dataset, source_system, data_source
         FROM legacy_source_file WHERE UPPER(src_file) = :f
            OR UPPER(src_file_key) = :f""", {"f": src_file.strip().upper()})
+    described = sum(1 for r in rows if r.get("short_desc"))
     return {"feed": (head[0] if head else {"src_file": src_file}),
-            "fields": rows, "field_count": len(rows)}
+            "fields": rows, "field_count": len(rows),
+            # Say how much of the file the dictionary actually covers. A
+            # description column that is blank on half the rows looks like a
+            # rendering fault unless the screen states the coverage.
+            "described": described,
+            "undescribed": len(rows) - described}

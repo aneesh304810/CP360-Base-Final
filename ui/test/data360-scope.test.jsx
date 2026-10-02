@@ -24,7 +24,7 @@ import React from "react";
 import fs from "node:fs";
 import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { LEGACY_SYS_D360, D360_TABS, D360_TAB_DEFAULT,
+import { LEGACY_SYS_D360, D360_TABS, D360_TAB_DEFAULT, ALL_SYS, sysMeta,
   NotLoadedForSystem } from "../src/Data360.jsx";
 import { tLight } from "../src/bbhTheme.js";
 
@@ -91,7 +91,7 @@ ok(!/<ProjectSwitcher/.test(D360), "ProjectSwitcher is not rendered here", "");
 // ProjectSwitcher to explain what was removed and why, and a bare-name
 // search would read that explanation as the bug.
 ok(!/^import .*ProjectSwitcher/m.test(D360), "and not imported", "");
-ok((D360.match(/\["all", "All"\], \["sei", "SEI"\], \["nonsei", "Non-SEI"\]/g) || []).length === 1,
+ok((D360.match(/\["sei", "SEI"\], \["nonsei", "Non-SEI"\]/g) || []).length === 1,
    "exactly one scope toggle is declared", "");
 ok(!/\bsetProject\b/.test(D360), "the project state went with the dropdown", "");
 
@@ -186,6 +186,77 @@ ok(/const shown = P && inScope\(P\) \? P : null;/.test(D360),
 ok(/\{shown && \(/.test(D360), "and renders on that, not on the raw fetch", "");
 ok(/\}, \[pipes, scope, curSys\]\)/.test(D360),
    "changing scope re-opens the first pipeline the new scope admits", "");
+
+// ---- the toggle is two-way, and loses nothing -------------------------
+// Dropping "All" would have hidden every pipeline whose legacy system is
+// none of the four named ones — PB Data Warehouse, ACBS and the rest were
+// reachable ONLY through it. Non-SEI therefore starts at "all legacy".
+ok(!/\["all", "All"\]/.test(D360), "the All scope is gone", "");
+ok(!/scope === "all"/.test(D360), "and nothing still branches on it",
+   (D360.match(/.*scope === "all".*/) || [])[0]);
+ok(/useState\("sei"\)/.test(D360), "the page opens on SEI", "");
+ok(typeof ALL_SYS === "string" && ALL_SYS.length > 0,
+   "there is an all-legacy sentinel", ALL_SYS);
+ok(!LEGACY_SYS_D360[ALL_SYS],
+   "which is deliberately not one of the real systems", "");
+ok(/useState\(ALL_SYS\)/.test(D360),
+   "and Non-SEI starts there, so removing All loses no pipeline", "");
+ok(/curSys === ALL_SYS \|\| !sysRe/.test(D360),
+   "a pipeline whose legacy system matches none of the four chips still "
+   + "appears under all-legacy — it had nowhere else to go once All went",
+   "");
+// The sentinel is a UI value. Sent as a system name it would filter
+// SOURCE_SYSTEM = '__ALL__', return nothing, and be reported as "nothing
+// ingested" — a fabricated fact about the register.
+ok(/sys === ALL_SYS \? null : sys/.test(D360),
+   "the sentinel is never sent to the API as a system name", "");
+ok(sysMeta(ALL_SYS).label && !sysMeta(ALL_SYS).label.includes("_"),
+   "and never renders as its own raw value", sysMeta(ALL_SYS).label);
+for (const k of Object.keys(LEGACY_SYS_D360)) {
+  ok(sysMeta(k).label === LEGACY_SYS_D360[k].label,
+     `sysMeta agrees with the table for ${k}`, sysMeta(k));
+}
+
+// ---- the dictionary the lineage load already ingested -----------------
+// legacy_dictionary carries the business term, function, master, type,
+// length, date format, required/unique/PII flags, privacy and regulatory
+// class and a description for every AddVantage, CRD and STAR field. None
+// of it was on this screen: a field list with no meaning on it is a list
+// of codes.
+const API = fs.readFileSync(path.join(SRC, "..", "..", "api", "app",
+  "routers_data360.py"), "utf8");
+for (const col of ["business_term", "business_function", "master_name",
+                   "short_desc", "is_pii", "privacy_class",
+                   "regulatory_class", "pb_field_mapping", "date_format"]) {
+  ok(new RegExp(`d\\.${col}`).test(API),
+     `the field endpoint returns ${col}`, "");
+}
+for (const col of ["business_term", "short_desc", "is_pii", "privacy_class"]) {
+  ok(new RegExp(`f\\.${col}`).test(D360), `and the pane renders ${col}`, "");
+}
+// A description column blank on half the rows looks like a rendering fault
+// unless the screen states the coverage.
+ok(/described/.test(API) && /fields\.described/.test(D360),
+   "the pane says how much of the file the dictionary actually covers", "");
+ok(/not in the \{m\.label\} dictionary/.test(D360),
+   "and a field with no entry says so rather than showing an empty cell", "");
+// The dictionary is enrichment. A checkout without sql/27 must still get
+// its feeds: _safe turns a failed join into [], which this screen would
+// print as "nothing registered".
+ok((API.match(/if not rows:/g) || []).length >= 2,
+   "both enriched queries fall back when legacy_dictionary is absent — "
+   + "enrichment may not cost the answer", "");
+// Comments stripped first: the note explaining why LISTAGG was removed
+// names it, and a bare search would read that explanation as the bug.
+const API_SQL = API.split("\n")
+  .filter((l) => !/^\s*(#|--)/.test(l)).join("\n");
+ok(!/LISTAGG\(DISTINCT/.test(API_SQL),
+   "no LISTAGG(DISTINCT ...): it is 19c and later only, and _safe would "
+   + "turn the syntax error into an empty feed list", "");
+// One spelling of the join key, not two.
+ok(/_CANON_SRC/.test(API) && /_L\(\[0-9\]\+\)/.test(API),
+   "the dictionary join key is canonicalised the same way "
+   + "routers_legacy_source spells it, _L12 rewrite included", "");
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\ndata360-scope assertions pass");
 if (bad) process.exit(1);
