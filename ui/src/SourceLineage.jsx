@@ -154,9 +154,10 @@ export default function SourceLineage({ t, system, dictSystem,
     let dead = false;
     setSrcsRaw(null); setLevel(0); setFile(null); setTarget(null);
     setGroup(null); setQ("");
-    lineageApi.lineageSources(ds).then((d) => { if (!dead) setSrcsRaw(d); });
+    lineageApi.lineageSources(ds, undefined, system)
+      .then((d) => { if (!dead) setSrcsRaw(d); });
     return () => { dead = true; };
-  }, [ds]);
+  }, [ds, system]);
 
   // Which files belong to the selected system. Without this the badge only
   // relabelled the spine: STAR and UAF listed the same files, with the same
@@ -179,9 +180,17 @@ export default function SourceLineage({ t, system, dictSystem,
     const keep = new Set(lane.src_tables || []);
     const files = (srcsRaw.sources || []).filter((f) =>
       keep.has(f.src_source_table));
-    // A filter that removes everything is a failed join, not an answer. The
-    // names came from two queries over the same column, so a zero here means
-    // they disagree — show the warehouse rather than an empty screen.
+    // A filter that removes everything is USUALLY a failed join — the names
+    // come from two queries over the same column, so a zero means they
+    // disagree, and an empty screen would be a lie about the warehouse.
+    //
+    // BUT NOT ALWAYS, AND THAT WAS THE BUG. IMDS receives no AddVantage feed
+    // at all, so zero is the correct answer there, and this guard turned it
+    // into the whole warehouse: picking AddVantage showed every STAR file
+    // IMDS has. Where the server could filter by the register and did,
+    // zero is a positive statement and is kept.
+    // (Where the server filtered by the register, srcsRaw is already this
+    //  system's files, so returning it here loses nothing either way.)
     if (!files.length) return srcsRaw;
     // rebuild the buckets from the files that survived, or their counts keep
     // describing the whole warehouse while the list shows one lane
@@ -395,9 +404,25 @@ export default function SourceLineage({ t, system, dictSystem,
   const renderSources = () => {
     if (!srcs) return <div style={{ padding: 20, color: muted }}>Loading sources…</div>;
     const buckets = srcs.groups || srcs.masters || [];
-    if (!buckets.length)
-      return <div style={{ padding: 20, color: muted }}>
-        No source files in {ds} — check ingestion for this warehouse.</div>;
+    if (!buckets.length) {
+      // "NONE FOR THIS SYSTEM" IS NOT "NONE AT ALL", and the old line said
+      // the second for both. IMDS receives no AddVantage feed; being told to
+      // check the ingestion for IMDS sends the reader after a problem that
+      // does not exist.
+      const sf = srcs.system_filter || {};
+      return (
+        <div style={{ padding: 20, color: muted, lineHeight: 1.65,
+                      maxWidth: "72ch" }}>
+          {sf.applied && system
+            ? <><b style={{ color: navy }}>{system} sends no files into {ds}.</b>
+                {" "}The feed register holds {sf.register_rows} file
+                {sf.register_rows === 1 ? "" : "s"} for this warehouse and none
+                of them is attributed to {system}. This is an answer, not a
+                gap — pick another system.</>
+            : <>No source files in {ds} — check ingestion for this warehouse.
+                {sf.reason ? <> {sf.reason}.</> : null}</>}
+        </div>);
+    }
     const T = srcs.totals || {};
 
     // ---- L0a · the groups ------------------------------------------------

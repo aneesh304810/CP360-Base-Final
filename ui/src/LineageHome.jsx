@@ -342,14 +342,26 @@ export default function LineageHome({ t, focus }) {
            const attributed = Boolean(dsSystems && dsSystems.includes(k));
            const cols = ((laneInfo && laneInfo.systems) || [])
             .find((x) => (x.source_system || "").toUpperCase() === k);
+           // DECLARED IS NOT OBSERVED. A system that appears in the lane or
+           // feed register but has not one lineage column behind it in this
+           // warehouse is an entry someone typed, not a feed anyone has
+           // seen. IMDS listed AddVantage on exactly that basis, and the
+           // badge gave no way to tell it from STAR.
+           const declaredOnly = Boolean(cols && cols.evidence === "declaration_only");
            const on = curSys === k;
            return (
             <span key={k}
              onClick={present ? () => setCurSys(k) : undefined}
              title={!present ? `${m.label} workbook pending`
+              : declaredOnly
+                ? `${m.label} is DECLARED against ${ds} by `
+                  + `${(cols.routes || []).join(" + ") || "a register"} but has `
+                  + `no lineage column behind it. Either the feed is not loaded `
+                  + `yet, or the register row is wrong.`
               : attributed
                 ? `${m.label} feeds ${ds}: ${(cols && cols.columns_) || 0} `
-                  + `column(s) attributed via ${(laneInfo && laneInfo.route) || "?"}`
+                  + `column(s), attributed via `
+                  + `${((cols && cols.routes) || []).join(" + ") || "?"}`
                 : `Nothing attributes ${m.label} to ${ds}. Listed because the `
                   + `question could not be answered, not because it feeds it.`}
              style={{ display: "flex", alignItems: "center", gap: 5,
@@ -360,15 +372,19 @@ export default function LineageHome({ t, focus }) {
               color: on ? "#fff" : (t.sub || "#666"),
               // a system nothing attributes to this warehouse is drawn as
               // a guess: dashed, not solid.
-              borderStyle: present && !attributed && dsSystems === null
+              borderStyle: declaredOnly
+               || (present && !attributed && dsSystems === null)
                ? "dashed" : "solid",
               opacity: present ? (attributed || dsSystems === null ? 1 : 0.5) : 0.5,
               cursor: present ? "pointer" : "not-allowed" }}>
              <span style={{ width: 7, height: 7, borderRadius: "50%",
               background: on ? "#fff" : m.c }} />
              {m.label}
-             {present && <span style={{ fontSize: 8.5, opacity: 0.8 }}>
-              {present.def_count}</span>}
+             {declaredOnly
+              ? <span title="declared, no lineage behind it"
+                 style={{ fontSize: 8.5, opacity: 0.85 }}>0</span>
+              : present && <span style={{ fontSize: 8.5, opacity: 0.8 }}>
+                 {present.def_count}</span>}
             </span>);
           })}
           {/* AN UNANSWERED QUESTION IS NOT A LIST OF ANSWERS. When no lane,
@@ -382,7 +398,17 @@ export default function LineageHome({ t, focus }) {
             ? `Nothing in ${ds} attributes a source system yet, so every known `
               + `system is listed. This is not a statement that each one feeds `
               + `${ds}.`
-            : `Attributed to ${ds} from ${(laneInfo && laneInfo.route) || "?"}.`}
+            : (() => {
+              const dec = ((laneInfo && laneInfo.systems) || [])
+               .filter((x) => x.evidence === "declaration_only")
+               .map((x) => x.source_system);
+              return dec.length
+               ? `${dec.join(", ")} ${dec.length === 1 ? "is" : "are"} declared `
+                 + `against ${ds} with no lineage column behind `
+                 + `${dec.length === 1 ? "it" : "them"} — check the lane and `
+                 + `feed registers before trusting the badge.`
+               : `Attributed to ${ds} from ${(laneInfo && laneInfo.route) || "?"}.`;
+            })()}
           </div>
          </div>)}
         {/* setDs(null) used to live on the old warehouse chip, and it is the
