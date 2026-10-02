@@ -172,8 +172,16 @@ export default function Event360() {
               <button key={k} onClick={() => setTab(k)} aria-pressed={tab === k}
                 style={{ font: 'inherit', fontSize: 11.5, fontWeight: 600,
                   padding: '6px 13px', cursor: 'pointer',
-                  border: `1px solid ${tab === k ? P.accent : P.rule}`,
-                  borderLeftWidth: i === 0 ? 1 : 0,
+                  // Longhand on all four sides. `border` plus a
+                  // borderLeftWidth override is a shorthand and a piece of
+                  // it, which React resolves unpredictably across
+                  // re-renders -- and this joined group needs the shared
+                  // edge collapsed, so the override cannot simply go.
+                  borderTop: `1px solid ${tab === k ? P.accent : P.rule}`,
+                  borderRight: `1px solid ${tab === k ? P.accent : P.rule}`,
+                  borderBottom: `1px solid ${tab === k ? P.accent : P.rule}`,
+                  borderLeft: i === 0
+                    ? `1px solid ${tab === k ? P.accent : P.rule}` : 0,
                   borderRadius: i === 0 ? '4px 0 0 4px'
                     : i === TABS.length - 1 ? '0 4px 4px 0' : 0,
                   background: tab === k ? P.accent : '#fff',
@@ -186,7 +194,14 @@ export default function Event360() {
             onTech={() => setAud('tech')} />}
           {tab === 'dep' && <Interdep onOpen={setDet} />}
           {tab === 'sub' && <SubsCost onOpen={setDet} />}
-          {tab === 'mb' && <EventMicroBatch t={T} />}
+          {/* No prop: Event360 takes none and EventMicroBatch reads
+              none -- both get their colours from eventPalette. This said
+              this passed a capital-T identifier that has never existed
+              in this module, so selecting the Commit boundary tab threw.
+              JSX short-circuits, so it only threw for somebody who opened
+              THAT tab -- which is why a render of the default tab, in a
+              test, went green. */}
+          {tab === 'mb' && <EventMicroBatch />}
         </>}
     </div>);
 }

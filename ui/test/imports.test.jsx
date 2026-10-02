@@ -144,6 +144,89 @@ console.log(bad ? `\n${bad} assertion(s) failed` : "\nimport assertions pass");
 if (bad) process.exit(1);
 
 // ---------------------------------------------------------------------
+// PART TWO: a JSX attribute whose value is a name nothing defines.
+//
+//     {tab === 'mb' && <EventMicroBatch t={T} />}
+//
+// T had never existed in Event360.jsx. JSX short-circuits, so this threw
+// only for somebody who opened that one tab -- and a test that rendered
+// the screen's DEFAULT tab went green. The third bug of this family in
+// this module, after a circular import and a constant that moved without
+// its `export`.
+//
+// WHY THIS SHAPE AND NOT A GENERAL ONE. `attr={Name}` is syntactically
+// unambiguous: it is a reference, never prose, never a string, never the
+// inside of a regex literal. Those three are exactly what sank the
+// general version (see the note at the foot of this file), and this one
+// runs clean across every file in src/ with no exceptions list.
+//
+// It is narrow on purpose. It does NOT catch a bare `BC[c.band]` in a
+// style, and does not pretend to: that one is guarded by actually
+// rendering, in event360-render.test.jsx.
+
+const JSX_GLOBALS = new Set(["Math", "JSON", "Object", "Array", "String",
+  "Number", "Boolean", "Date", "Map", "Set", "Promise", "RegExp", "Error",
+  "Intl", "React", "Infinity", "NaN"]);
+
+function namesInScope(src) {
+  const out = new Set();
+  const add = (re) => {
+    let m;
+    const r = new RegExp(re.source, "g");
+    while ((m = r.exec(src))) {
+      String(m[1] || "").split(",").forEach((raw) => {
+        const n = raw.split(":").pop().split("=")[0].replace(/[{}\s]/g, "");
+        if (n) out.add(n);
+      });
+    }
+  };
+  // `var cur="DEV",tick=0,ST={}` declares three names; a non-greedy match
+  // to the first `=` sees only the first.
+  src.split("\n").forEach((line) => {
+    if (!/^\s*(?:const|let|var)\s/.test(line)) return;
+    let d;
+    const DECL = /([A-Za-z0-9_$]+)\s*=/g;
+    while ((d = DECL.exec(line))) out.add(d[1]);
+  });
+  add(/(?:const|let|var)\s+([A-Za-z0-9_$,{}\s:]+?)\s*=/);
+  add(/function\s+([A-Za-z0-9_$]+)/);
+  add(/class\s+([A-Za-z0-9_$]+)/);
+  // `import DocDrill, { DOCS } from …` — the default binding before the
+  // brace means a plain /import\s+\{/ never matches.
+  add(/import\s+(?:[A-Za-z0-9_$]+\s*,\s*)?\{([^}]+)\}/);
+  add(/import\s+([A-Za-z0-9_$]+)\s*(?:,|from)/);
+  add(/\(([A-Za-z0-9_$,\s{}:.]*)\)\s*=>/);
+  add(/function\s*[A-Za-z0-9_$]*\s*\(([^)]*)\)/);
+  return out;
+}
+
+let loose = 0;
+for (const f of files) {
+  const code = fs.readFileSync(path.join(SRC, f), "utf8")
+    .split("\n")
+    .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
+    .join("\n");
+  const scope = namesInScope(code);
+  const missing = new Set();
+  let m;
+  const ATTR = /\s[a-zA-Z_$][\w$]*=\{([A-Z][A-Za-z0-9_$]*)\s*(?:\}|\.|\[)/g;
+  while ((m = ATTR.exec(code))) {
+    if (!JSX_GLOBALS.has(m[1]) && !scope.has(m[1])) missing.add(m[1]);
+  }
+  if (missing.size) {
+    loose++;
+    ok(false, `${f} passes ${[...missing].join(", ")} as a JSX prop value, `
+       + `but nothing in the file defines or imports ${
+         missing.size > 1 ? "them" : "it"}`);
+  }
+}
+ok(loose === 0,
+   "every capitalised name passed as a JSX prop value is one the file can "
+   + "see. A typo here throws only on the branch that renders it, so it "
+   + "reaches whoever opens that tab rather than whoever runs the tests.",
+   loose);
+
+// ---------------------------------------------------------------------
 // WHAT THIS DOES NOT CATCH, AND WHY IT IS NOT TRIED HERE.
 //
 // The check above walks JSX TAGS. It would not have caught the next bug of
