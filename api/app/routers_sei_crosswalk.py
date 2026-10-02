@@ -168,13 +168,6 @@ def lane_systems(data_source: str | None = None):
     total = 0
     routes: list[str] = []
 
-    # WHICH route found WHICH system, not just which routes fired at all.
-    # The old `route` string was a union across every system, so a badge
-    # attributed by one weak signal with no columns behind it looked
-    # identical to one with real lineage — and "IMDS offers AddVantage"
-    # could not be traced to the row that says so.
-    by_system: dict[str, list[str]] = {}
-
     def take(rows, route, count_unattributed=False):
         nonlocal unresolved, total
         hit = False
@@ -190,7 +183,6 @@ def lane_systems(data_source: str | None = None):
             if sysname == "SEI":
                 continue
             found[sysname] = max(found.get(sysname, 0), n)
-            by_system.setdefault(sysname, []).append(route)
             hit = True
         if hit:
             routes.append(route)
@@ -233,12 +225,7 @@ def lane_systems(data_source: str | None = None):
         WHERE  data_source = :ds AND source_system IS NOT NULL""",
         {"ds": ds}), "lane_declared")
 
-    systems = [{"source_system": k, "columns_": v,
-                "routes": by_system.get(k, []),
-                # A system no route can put a single column behind is a
-                # register entry, not an observed feed. Named here so the
-                # badge can say so instead of looking like the others.
-                "evidence": ("lineage" if v else "declaration_only")}
+    systems = [{"source_system": k, "columns_": v}
                for k, v in sorted(found.items(), key=lambda kv: (-kv[1], kv[0]))]
     return {
         "data_source": ds,

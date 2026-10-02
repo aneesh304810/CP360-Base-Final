@@ -64,17 +64,10 @@ export const lineageApi = {
   // ---- source-first drill ----
   // spine is optional — "group" | "master" | "flat". Omitted, /sources picks
   // the best populated one and says which in the payload.
-  // `system` IS NOT OPTIONAL DECORATION. It was never sent, so the endpoint
-  // fell back to its own default and returned every file in the warehouse
-  // whichever badge was lit — IMDS answered an AddVantage request with its
-  // STAR feeds. Omitting it here is what made the badge a label.
-  lineageSources: (data_source, spine, system) =>
-    _get(`/legacy-lineage/sources?${_qs({ data_source, spine, system })}`,
+  lineageSources: (data_source, spine) =>
+    _get(`/legacy-lineage/sources?${_qs({ data_source, spine })}`,
       () => ({ spine: "flat", spine_label: "Source", groups: [], masters: [],
-               sources: [], system: system || null,
-               system_filter: { applied: false, register_rows: 0,
-                 files_for_system: 0, excluded: 0,
-                 reason: "The lineage service did not answer." },
+               sources: [],
                totals: { files: 0, groups: 0, masters: 0, field_count: 0,
                          mapped: 0, unmapped: 0 } })),
 

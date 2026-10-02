@@ -108,47 +108,12 @@ def _hop_class(r: dict) -> str:
 @router.get("/sources")
 def sources(data_source: str | None = None, spine: str | None = None,
             system: str = "ADDVANTAGE"):
-    """One source system's extract files, bucketed by a RESOLVED group, with
-    how far their fields get. The entry point of the source-first drill.
+    """Every AddVantage extract file, bucketed by a RESOLVED group, with how
+    far its fields get. The entry point of the source-first drill.
 
     spine=<source name> forces one resolver (see /group-sources); omitted, the
     resolvers run in order until every file has a group.
-
-    `system` USED TO STEER ONLY THE GROUP RESOLVER. The file list itself was
-    every file in the warehouse, so picking AddVantage and picking STAR
-    returned the same files — IMDS, which receives no AddVantage feed at all,
-    answered an AddVantage request with its STAR feeds. The badge looked like
-    a filter and was a label.
-
-    It filters now, through legacy_source_file on the normalised feed key —
-    the same join /sei-crosswalk/lane-systems uses for route B.
-
-    THE REGISTER MAY NOT BE ABLE TO ANSWER, and that is not the same as an
-    answer of none. If it holds no row for this warehouse at all, nothing is
-    filtered and `system_filter` says so; a screen that empties because an
-    optional table is missing is worse than one that does not filter. If it
-    does hold rows for this warehouse but none for this system, the answer
-    IS none, and the empty list is the truth.
     """
-    # --- which files this system actually sends -----------------------------
-    sysname = (system or "").strip().upper()
-    ds_up = (data_source or "").strip().upper()
-    # Built conditionally rather than as `:ds IS NULL OR ...`: an untyped
-    # NULL bind compared with IS NULL is the kind of thing that works on one
-    # Oracle and raises on another, and _safe would turn that into "this
-    # system sends nothing".
-    ds_and = " AND UPPER(data_source) = :ds" if ds_up else ""
-    ds_p = {"ds": ds_up} if ds_up else {}
-    reg_any = _safe("SELECT COUNT(*) AS n FROM legacy_source_file "
-                    f"WHERE 1=1{ds_and}", dict(ds_p))
-    register_rows = (reg_any[0]["n"] if reg_any else 0)
-    keys = _safe("SELECT DISTINCT src_file_key FROM legacy_source_file "
-                 f"WHERE UPPER(source_system) = :sys{ds_and}",
-                 {"sys": sysname, **ds_p})
-    sys_keys = {r["src_file_key"] for r in keys if r.get("src_file_key")}
-    # "applied" only when the register can speak for this warehouse.
-    filter_on = bool(register_rows) and bool(sysname)
-
     # --- per file: the authoritative field counts (no double counting) ------
     files = _ds_scoped(f"""
         SELECT src_source_table,
@@ -178,20 +143,6 @@ def sources(data_source: str | None = None, spine: str | None = None,
             by_key.setdefault(r["src_file_key"], r["dataset"])
         if r.get("src_file"):
             by_name.setdefault(str(r["src_file"]).strip().upper(), r["dataset"])
-
-    # Apply it here rather than in SQL: the key is already computed on every
-    # row above, and doing it in Python keeps the one feed-key expression in
-    # one place instead of repeating it inside a NOT EXISTS.
-    excluded = 0
-    if filter_on:
-        kept = []
-        for f in files:
-            k = f.get("src_file_key") or ""
-            if k in sys_keys or _peel_feed_key(k) in sys_keys:
-                kept.append(f)
-            else:
-                excluded += 1
-        files = kept
 
     names = [f.get("src_source_table") for f in files]
     res = resolve_groups(names, data_source=data_source, system=system,
@@ -240,19 +191,6 @@ def sources(data_source: str | None = None, spine: str | None = None,
     tot_f = sum(b["field_count"] for b in groups)
     tot_m = sum(b["mapped"] for b in groups)
     return {"data_source": (data_source or "").upper() or None,
-            "system": sysname or None,
-            # Whether the badge actually narrowed anything, and on what
-            # evidence. A caller that cannot tell "filtered to none" from
-            # "could not filter" will print one as the other.
-            "system_filter": {
-                "applied": filter_on,
-                "register_rows": register_rows,
-                "files_for_system": len(sys_keys),
-                "excluded": excluded,
-                "reason": None if filter_on else
-                    ("legacy_source_file holds no row for this warehouse, so "
-                     "the files below are every file in it, not this "
-                     "system's")},
             # which resolver(s) actually produced the buckets, and what each
             # one managed to cover. When L0 still reads as one bucket, this
             # says why without another round trip to the database.
