@@ -21,6 +21,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { evt360 } from './event360_api_additions.js';
 import EventMicroBatch from './EventMicroBatch.jsx';
+import EventFlowSim from './EventFlowSim.jsx';
 // Re-exported so anything already importing them from here keeps working.
 import { P, TC, BC } from './eventPalette.js';
 export { P, TC, BC } from './eventPalette.js';
@@ -98,7 +99,7 @@ const mtd = { ...td, fontFamily: P.mono, fontSize: 11 };
 
 const TABS = [['est', 'Estate'], ['swm', 'Swimlanes'], ['lnk', 'Link view'],
   ['dep', 'Interdependence'], ['sub', 'Subscriptions & cost'],
-  ['mb', 'Commit boundary']];
+  ['mb', 'Commit boundary'], ['run', 'Run-through']];
 
 export default function Event360() {
   const [tab, setTab] = useState('est');
@@ -202,6 +203,13 @@ export default function Event360() {
               THAT tab -- which is why a render of the default tab, in a
               test, went green. */}
           {tab === 'mb' && <EventMicroBatch />}
+          {/* Also prop-less, and for the same reason: its palette comes
+              from eventPalette and its content is the published contract,
+              not the catalogue. Everything else on this screen refuses to
+              render when meta_event_definition is empty; this one is
+              hand-written from SEI's own answers and says so in its first
+              paragraph rather than borrowing the estate's authority. */}
+          {tab === 'run' && <EventFlowSim />}
         </>}
     </div>);
 }
