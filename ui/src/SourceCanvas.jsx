@@ -32,6 +32,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { crosswalkApi } from "./seiCrosswalkApi.js";
 import { classifyLink, summarise, OP_META, OP_ORDER } from "./linkOps.js";
 import { buildRuleGraph } from "./ruleGraph.js";
+import SourceReading from "./SourceReading.jsx";
 
 const MONO = "'Roboto Mono', ui-monospace, Menlo, monospace";
 const SRC_C = "#6d3ac0", DWH_C = "#0f4775";
@@ -64,6 +65,11 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
   const [onlyX, setOnlyX] = useState(false);  // only transformed
   const [z, setZ] = useState({ k: 1, x: 0, y: 0 });
   const [full, setFull] = useState(false);
+  // picture | reading. THE SAME PAYLOAD, READ TWO WAYS. The reading view
+  // lives behind this toggle rather than in its own tab because it is not
+  // other data — it is this data in sentences, and a second tab would
+  // fetch it a second time and be free to disagree with the drawing.
+  const [mode, setMode] = useState("picture");
   // The canvas box measures itself. Everything below sizes from this rather
   // than from a constant, which is the difference between a drawing that
   // uses a laptop screen and one that sits in the middle of it.
@@ -282,6 +288,43 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
       </div>);
   }
 
+  // The toggle. Rendered in both modes and in the same place, so switching
+  // back is where switching away was.
+  const modeBar = (
+    <span role="group" aria-label="How to read this"
+      style={{ display: "inline-flex", borderRadius: 3, overflow: "hidden",
+        border: `1px solid ${t.panel2 || "#dfe6e9"}`, flexShrink: 0 }}>
+      {[["picture", "Picture"], ["reading", "Reading"]].map(([k, label]) => (
+        <button key={k} type="button" aria-pressed={mode === k}
+          onClick={() => { setMode(k); if (k === "reading") setFull(false); }}
+          title={k === "picture"
+            ? "The wiring: which columns each table takes, and what is computed"
+            : "The same mapping in sentences — what arrives, and what happens to it"}
+          style={{ font: "inherit", fontSize: 10.5, padding: "3px 11px",
+            border: 0, cursor: "pointer",
+            background: mode === k ? (t.accent || "#0f4775")
+                                   : (t.panel || "#fff"),
+            color: mode === k ? "#fff" : (t.accent || "#0f4775") }}>
+          {label}</button>))}
+    </span>);
+
+  // The reading view takes the payload this component already fetched. It
+  // sits after the diagnostics branch above on purpose: when nothing maps,
+  // the reason why is the answer in either mode.
+  if (mode === "reading") {
+    return (
+      <div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center",
+          flexWrap: "wrap", marginBottom: 12 }}>
+          {modeBar}
+          <span style={{ fontSize: 10.5, color: t.muted || "#999" }}>
+            In sentences. Switch to Picture for the wiring.</span>
+        </div>
+        <SourceReading t={t} data={data} feedName={feedName}
+          dataSource={dataSource} onOpenTarget={onOpenTarget} />
+      </div>);
+  }
+
   // ---- anchors: the mechanic ---------------------------------------------
   const anchorSrc = (name) => {
     if (view.src.open) {
@@ -393,6 +436,7 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
           and registered rules are blank rather than wrong.</div>)}
       <div style={{ display: "flex", gap: 8, alignItems: "center",
         flexWrap: "wrap", marginBottom: 9 }}>
+        {modeBar}
         <span style={eyebrow}>Where it lands</span>
         <span style={{ fontSize: 10.5, color: t.sub || "#666" }}>
           {targets.length} table{targets.length === 1 ? "" : "s"} ·{" "}
