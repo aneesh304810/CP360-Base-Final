@@ -24,7 +24,8 @@ import React from "react";
 import fs from "node:fs";
 import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { LEGACY_SYS_D360, D360_TABS, NotLoadedForSystem } from "../src/Data360.jsx";
+import { LEGACY_SYS_D360, D360_TABS, D360_TAB_DEFAULT,
+  NotLoadedForSystem } from "../src/Data360.jsx";
 import { tLight } from "../src/bbhTheme.js";
 
 let bad = 0;
@@ -49,29 +50,50 @@ const strip = (f) => fs.readFileSync(path.join(SRC, f), "utf8")
   .split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
 const D360 = strip("Data360.jsx");
 
-// ---- the two SEI-only tabs are gone from Non-SEI ----------------------
-const nonsei = D360_TABS("nonsei");
+// ---- Compression and the Lineage Graph are gone, in every scope -------
+const tabs = D360_TABS();
 for (const gone of ["Compression", "Lineage Graph"]) {
-  ok(!nonsei.includes(gone),
-     `Non-SEI does not offer ${gone} — it is an SEI statement with no legacy equivalent`,
-     nonsei);
+  ok(!tabs.includes(gone), `${gone} is not a tab`, tabs);
+  // A removed tab must also stop RENDERING. Dropping the button while
+  // leaving the panel mounted is the half-fix that looks right.
+  ok(!new RegExp(`d360tab === "${gone}"`).test(D360),
+     `and its panel is gone too, not merely unreachable`, "");
 }
+// AND its machinery. The graph fetched /data360/graph and column-lineage on
+// every Data 360 mount regardless of tab; leaving that behind a deleted tab
+// is two API calls a page load that nothing can render.
+for (const dead of ["LineageCanvas", "layoutNodes", "LAYER_STRIPE", "PLANES",
+                    "colAnchor", "setColEdges"]) {
+  ok(!new RegExp(`\\b${dead}\\b`).test(D360),
+     `${dead} went with it — dead code that still does network I/O is worse `
+     + `than dead code`, (D360.match(new RegExp(`.*\\b${dead}\\b.*`)) || [])[0]);
+}
+ok(!/api\.graph\(|api\.columnLineage\(/.test(D360),
+   "Data 360 no longer fetches the platform graph on mount", "");
+
 for (const kept of ["Pipelines", "Inbound Feeds", "Loaders", "Interdependency"]) {
-  ok(nonsei.includes(kept), `Non-SEI keeps ${kept}`, nonsei);
+  ok(tabs.includes(kept), `${kept} is kept`, tabs);
 }
-for (const sc of ["all", "sei"]) {
-  ok(D360_TABS(sc).includes("Compression") && D360_TABS(sc).includes("Lineage Graph"),
-     `${sc} scope keeps both — removing them there would delete a working feature`,
-     D360_TABS(sc));
-}
-// A tab dropped from the bar must also stop RENDERING. Hiding the button
-// while leaving the panel mounted is the half-fix that looks right.
-for (const gone of ["Compression", "Lineage Graph"]) {
-  ok(new RegExp(`d360tab === "${gone}" && scope !== "nonsei"`).test(D360),
-     `the ${gone} panel is gated on scope too, not just its button`, "");
-}
-ok(/if \(!D360_TABS\(scope\)\.includes\(d360tab\)\) setD360tab\("Pipelines"\)/.test(D360),
-   "switching scope off a tab that no longer exists reselects a real one", "");
+ok(tabs[tabs.length - 1] === "Pipelines", "Pipelines is the last tab", tabs);
+ok(D360_TAB_DEFAULT === tabs[0],
+   "and the default is the first tab, not a tab that moved to the end",
+   D360_TAB_DEFAULT);
+ok(/if \(!D360_TABS\(\)\.includes\(d360tab\)\) setD360tab\(D360_TAB_DEFAULT\)/.test(D360),
+   "a deep link naming a removed tab lands on a real one", "");
+
+// ---- one scope toggle, and no dead project dropdown -------------------
+// There were two stacked All/SEI/Non-SEI rows: this screen's own, bound to
+// `scope`, and ProjectSwitcher's, bound to `project`. Identical to look at,
+// different state underneath. The dropdown beside it never received a
+// project list, so it only ever offered "All projects".
+ok(!/<ProjectSwitcher/.test(D360), "ProjectSwitcher is not rendered here", "");
+// The import, specifically: the prose above the toggle still names
+// ProjectSwitcher to explain what was removed and why, and a bare-name
+// search would read that explanation as the bug.
+ok(!/^import .*ProjectSwitcher/m.test(D360), "and not imported", "");
+ok((D360.match(/\["all", "All"\], \["sei", "SEI"\], \["nonsei", "Non-SEI"\]/g) || []).length === 1,
+   "exactly one scope toggle is declared", "");
+ok(!/\bsetProject\b/.test(D360), "the project state went with the dropdown", "");
 
 // ---- UAF exists here, as it already does in Lineage 360 ---------------
 ok(Boolean(LEGACY_SYS_D360.UAF),
@@ -149,6 +171,21 @@ ok(/This is not a statement that each one feeds/.test(LH),
 ok(/laneInfo && laneInfo\.route/.test(LH),
    "it surfaces WHICH signal attributed a system — the only way a wrong "
    + "register row becomes findable rather than just wrong", "");
+
+// ---- an empty list explains itself ------------------------------------
+// SEI scope on business pipelines shows nothing, and "0 OF 444" cannot tell
+// a reader whether the rows failed to load, were filtered, or cannot exist.
+ok(/function NoPipelinesInScope/.test(D360),
+   "an empty pipeline list says why in words, not as the number 0", "");
+ok(/bf_pipelines/.test(D360),
+   "and names the register, so the SEI case reads as by-construction rather "
+   + "than as a gap", "");
+ok(/const shown = P && inScope\(P\) \? P : null;/.test(D360),
+   "the detail pane obeys the scope — the list read 0 of 444 while the pane "
+   + "beside it still showed an excluded pipeline", "");
+ok(/\{shown && \(/.test(D360), "and renders on that, not on the raw fetch", "");
+ok(/\}, \[pipes, scope, curSys\]\)/.test(D360),
+   "changing scope re-opens the first pipeline the new scope admits", "");
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\ndata360-scope assertions pass");
 if (bad) process.exit(1);

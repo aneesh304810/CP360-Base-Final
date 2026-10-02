@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { SectionHeader } from "./AppShell.jsx";
-import ProjectSwitcher from "./ProjectSwitcher.jsx";
-import ProjectBadge from "./ProjectBadge.jsx";
 import { api } from "./api.js";
 
 // The incumbent systems. UAF was absent here while LineageHome has carried
@@ -15,25 +13,76 @@ export const LEGACY_SYS_D360 = {
   UAF: { c: "#0b7d7d", label: "UAF", re: /\buaf\b/i },
 };
 
-import { LAYER_STRIPE, HEADER_H, COL_ROW_H, COL_PAD } from "./mockData.js";
-import LineageCanvas from "./LineageCanvas.jsx";
 import Interdependency from "./Interdependency.jsx";
 import { legacyFeedApi } from "./data360_api_additions.js";
 
-// Which tabs exist in which scope. Compression is the 444-pipelines-into-
-// shared-dbt-marts count and the Lineage Graph is the SEI platform graph;
-// both are SEI statements with no legacy equivalent, so Non-SEI does not
-// offer them. Returned as a function rather than two constants so the tab
-// bar and the "is this tab still valid" check cannot disagree.
-export const D360_TABS = (scope) => scope === "nonsei"
-  ? ["Pipelines", "Inbound Feeds", "Loaders", "Interdependency"]
-  : ["Pipelines", "Inbound Feeds", "Loaders", "Interdependency",
-     "Compression", "Lineage Graph"];
+// COMPRESSION AND THE LINEAGE GRAPH ARE GONE from this screen. Compression
+// counted 444 bf_pipelines collapsing into shared dbt gold marts, and the
+// Lineage Graph drew the platform graph that Lineage 360 draws properly and
+// at length. Neither had a legacy equivalent, so the Non-SEI pass hid them;
+// removing them outright is the same judgement carried through.
+//
+// Deleting the tab deleted its machinery too. The graph fetched
+// /data360/graph and /data360/column-lineage on every Data 360 mount, for
+// any tab — leaving that behind a removed tab is two API calls a page load
+// that nothing can ever render.
+//
+// PIPELINES IS LAST. It is the heaviest tab and the least often the reason
+// someone opens this screen; the feed and loader catalogues are. Still a
+// function rather than a constant, so the tab bar and the "is this tab
+// still valid" check cannot disagree.
+export const D360_TABS = () =>
+  ["Inbound Feeds", "Loaders", "Interdependency", "Pipelines"];
+export const D360_TAB_DEFAULT = D360_TABS()[0];
 
 /* A tab that has no data for the selected legacy system.
    NOT an empty list, and not the SEI rows either. It names the table the
    answer would come from, so "nothing is loaded" and "nothing exists" stay
    different claims and the reader knows which ingestion to run. */
+/* Why the pipeline list is empty — in words, not as the number 0.
+   "0 OF 444" is a count, and a count cannot tell a reader whether the rows
+   exist and failed to load, were filtered out, or cannot exist at all. The
+   SEI case is the third, and it is a property of the register rather than
+   a gap: bf_pipelines is the migration routing workbook, so every row by
+   construction names the incumbent system it routes away from. */
+function NoPipelinesInScope({ t, scope, curSys, total, shown, q, dom }) {
+  if (!total) return null;
+  const m = LEGACY_SYS_D360[curSys] || { label: curSys, c: "#5a6472" };
+  let head, body;
+  if (shown && (q || dom)) {
+    head = "No pipeline matches the filter";
+    body = <>The scope holds {shown} pipeline{shown === 1 ? "" : "s"}; none of
+      them matches {q ? <>“{q}”</> : "this domain"}.</>;
+  } else if (scope === "sei") {
+    head = `All ${total} business pipelines name a legacy system`;
+    body = <>Every row in <code style={MONO_C}>bf_pipelines</code> describes how
+      an incumbent feed is routed under SEI, so a pipeline with no legacy
+      system is a row this register does not hold — the SEI scope is empty by
+      construction rather than unloaded. The SEI side of these pipelines is
+      the <b>SEI Target</b> and <b>Compressed Routing</b> on each row; switch
+      to <b>All</b> to read them.</>;
+  } else if (scope === "nonsei") {
+    head = `No pipeline is routed from ${m.label}`;
+    body = <>{total} pipelines are loaded and none names {m.label} in its
+      legacy system. Pick another system, or <b>All</b> to see every
+      pipeline.</>;
+  } else {
+    head = "No pipeline matches";
+    body = <>{total} are loaded.</>;
+  }
+  return (
+    <div style={{ border: `1px solid ${t.panel2 || t.border}`,
+      borderLeft: `3px solid ${scope === "nonsei" ? m.c : (t.accent || "#0f4775")}`,
+      borderRadius: 6, background: t.panel, padding: "18px 20px", maxWidth: 720 }}>
+      <div style={{ fontSize: 14.5, fontWeight: 600, color: t.navy || t.text }}>
+        {head}</div>
+      <p style={{ fontSize: 12.5, lineHeight: 1.65, color: t.sub || t.textMuted,
+        margin: "8px 0 0" }}>{body}</p>
+    </div>);
+}
+
+const MONO_C = { fontFamily: "ui-monospace, monospace", fontSize: 11.5 };
+
 export function NotLoadedForSystem({ t, sys, what, table, run }) {
   const m = LEGACY_SYS_D360[sys] || { label: sys, c: "#5a6472" };
   return (
@@ -59,77 +108,28 @@ export function NotLoadedForSystem({ t, sys, what, table, run }) {
     </div>);
 }
 
-const PLANES = ["Data", "Transform", "Orchestration"];
-const NODE_W = 190, COL_W = 230, COL_GAP = 110, ROW_GAP = 40, PAD = 30;
 
 export default function Data360({ t, selection }) {
-  const [project, setProject] = useState("all");
-  const [d360tab, setD360tab] = useState("Pipelines");
+  const [d360tab, setD360tab] = useState(D360_TAB_DEFAULT);
   const [scope, setScope] = useState("all");            // all | sei | nonsei (page-level)
   const [legacySys, setLegacySys] = useState("ADDVANTAGE");
-  const [lineageView, setLineageView] = useState("Detail");
-  const [plane, setPlane] = useState("Data");
-  const [g, setG] = useState({ nodes: [], edges: [] });
-  const [expanded, setExpanded] = useState({});
-  const [colEdges, setColEdges] = useState([]);
-  const [selCol, setSelCol] = useState(null);
-  const [drawer, setDrawer] = useState(null);
 
-  // A tab that does not exist in the new scope cannot stay selected. Without
-  // this, switching to Non-SEI while on Compression left the bar with nothing
-  // highlighted and the Compression panel still rendered underneath it.
+  // A tab that no longer exists cannot stay selected — a deep link or a
+  // stale state that names a removed tab would leave the bar with nothing
+  // highlighted and no panel underneath it.
   useEffect(() => {
-    if (!D360_TABS(scope).includes(d360tab)) setD360tab("Pipelines");
-  }, [scope]);
+    if (!D360_TABS().includes(d360tab)) setD360tab(D360_TAB_DEFAULT);
+  }, [d360tab]);
 
   // deep-link from global search: switch to the target tab (and the item id is
   // passed down so the sub-view can auto-select it)
   useEffect(() => {
     if (selection?.tab) setD360tab(selection.tab);
   }, [selection]);
-  const [sql, setSql] = useState(null);
-
-  useEffect(() => {
-    const pid = project === "all" ? null : project;
-    api.graph(pid, plane).then((r) => setG({ nodes: r.nodes || [], edges: r.edges || [] }));
-    api.columnLineage(null).then((r) => setColEdges(r.column_edges || []));
-  }, [project, plane]);
-
-  // layout: place by col/row, compute height from expansion
-  const laid = layoutNodes(g.nodes, expanded);
-  const byId = Object.fromEntries(laid.map((n) => [n.id, n]));
-
-  // anchor position for a column (for column-lineage edges)
-  const colAnchor = (nodeId, colName, side) => {
-    const n = byId[nodeId];
-    if (!n || !expanded[nodeId]) return null;
-    const idx = (n.columns || []).findIndex((c) => (c.name || "").toLowerCase() === colName.toLowerCase());
-    if (idx < 0) return null;
-    const y = n.y + HEADER_H + COL_PAD + idx * COL_ROW_H + COL_ROW_H / 2;
-    return { x: side === "out" ? n.x + NODE_W : n.x, y };
-  };
-
-  const openNode = (n) => {
-    setDrawer(n); setSql(null);
-    if (n.type === "MODEL") api.transformation(n.id).then((r) => setSql(r.compiled_sql));
-  };
-
-  const visibleColEdges = colEdges.map((e) => {
-    const fromNode = e.from_column.split(".").slice(0, -1).join(".");
-    const fromCol = e.from_column.split(".").pop();
-    const toNode = e.to_column.split(".").slice(0, -1).join(".");
-    const toCol = e.to_column.split(".").pop();
-    const a = colAnchor(fromNode, fromCol, "out");
-    const b = colAnchor(toNode, toCol, "in");
-    return a && b ? { ...e, a, b, fromCol, toCol } : null;
-  }).filter(Boolean);
-
-  const height = Math.max(440, ...laid.map((n) => n.y + n.h + 40));
 
   return (
     <div>
       <SectionHeader t={t}>Data 360</SectionHeader>
-      <ProjectSwitcher t={t} value={project} onChange={setProject} />
 
       {/* page-level scope: All | SEI | Non-SEI, with legacy-system badges under Non-SEI */}
       <div style={{ display: "flex", marginTop: 14 }}>
@@ -167,15 +167,15 @@ export default function Data360({ t, selection }) {
             {LEGACY_SYS_D360[legacySys].label} · legacy source scope</span>
         </div>)}
 
-      {/* TABS ARE SCOPE-AWARE. Compression counts 444 bf_pipelines collapsing
-          into shared dbt gold marts, and the Lineage Graph draws the SEI
-          platform graph; both are statements about the SEI programme and
-          neither has a legacy equivalent. Leaving them on the Non-SEI bar
-          offered the reader two tabs that answer a question they did not
-          ask, in a scope where the answer is not about their system. */}
+      {/* ONE scope toggle. There used to be two, stacked: this one, bound to
+          `scope`, and ProjectSwitcher's own All/SEI/Non-SEI bound to
+          `project` — identical to look at, different state underneath, and
+          no way for a reader to tell which one they had just changed. The
+          project dropdown beside it was dead in this screen: Data360 never
+          passed it a project list, so it only ever offered "All projects". */}
       <div style={{ display: "flex", gap: 2, borderBottom: `1px solid ${t.border || t.disabled}`,
         margin: "18px 0 20px" }}>
-        {D360_TABS(scope).map((tb) => (
+        {D360_TABS().map((tb) => (
           <button key={tb} onClick={() => setD360tab(tb)} style={{
             background: "none", border: "none", fontSize: 13, fontWeight: 500,
             padding: "10px 18px", cursor: "pointer", fontFamily: t.font,
@@ -184,7 +184,7 @@ export default function Data360({ t, selection }) {
             marginBottom: -1 }}>{tb}</button>))}
       </div>
 
-      {d360tab === "Pipelines" && <PipelinesTab t={t} project={project} scope={scope} legacySys={legacySys} />}
+      {d360tab === "Pipelines" && <PipelinesTab t={t} scope={scope} legacySys={legacySys} />}
 
       {d360tab === "Inbound Feeds" && <InboundFeedsView t={t} scope={scope}
         legacySys={legacySys}
@@ -194,195 +194,9 @@ export default function Data360({ t, selection }) {
 
       {d360tab === "Interdependency" && <InterdependencyTab t={t} scope={scope} legacySys={legacySys} />}
 
-      {d360tab === "Compression" && scope !== "nonsei" && <CompressionView t={t} />}
 
-      {d360tab === "Lineage Graph" && scope !== "nonsei" && (
-      <div>
-      <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
-        {["Detail", "Canvas"].map((lv) => (
-          <button key={lv} onClick={() => setLineageView(lv)} style={{
-            height: t.height.btnSm, padding: "0 16px", border: `1px solid ${t.border}`,
-            borderRadius: t.radius.sm, cursor: "pointer", fontFamily: t.font, fontSize: 13,
-            fontWeight: 600,
-            background: lineageView === lv ? t.accent : t.panel,
-            color: lineageView === lv ? "#fff" : t.text }}>{lv}</button>
-        ))}
-        <span style={{ fontSize: 12, color: t.textMuted, marginLeft: 8, alignSelf: "center" }}>
-          {lineageView === "Detail" ? "dbt models + Airflow + column-transform graph"
-            : "Interactive graph \u2014 drag nodes, pan, zoom, expand columns"}
-        </span>
-      </div>
-
-      {lineageView === "Canvas" && <LineageCanvas t={t} projectId={project} />}
-
-      {lineageView === "Detail" && (
-      <div>
-      <div style={{ display: "flex", gap: 6, margin: "0 0 20px", alignItems: "center" }}>
-        {PLANES.map((p) => (
-          <button key={p} onClick={() => setPlane(p)} style={{
-            height: t.height.btnSm, padding: "0 14px", border: `1px solid ${t.border}`,
-            borderRadius: t.radius.sm, cursor: "pointer", fontFamily: t.font, fontSize: 13,
-            background: plane === p ? t.navy : t.panel, color: plane === p ? "#fff" : t.text }}>
-            {p}</button>
-        ))}
-        <span style={{ fontSize: 12, color: t.textMuted, marginLeft: 10 }}>
-          {plane === "Data" && "Tables, views & feeds \u2014 what flows where"}
-          {plane === "Transform" && "dbt models inserted \u2014 expand a node for column lineage"}
-          {plane === "Orchestration" && "Airflow DAG overlay \u2014 which DAG runs which model"}
-        </span>
-      </div>
-
-      <div style={{ display: "flex", gap: 0 }}>
-        <div style={{ flex: 1, background: t.panel, border: `1px solid ${t.disabled}`,
-          borderRadius: t.radius.md, height: 480, position: "relative", overflow: "auto" }}>
-          <svg width={PAD + 4 * (NODE_W + COL_GAP)} height={height}
-            style={{ position: "absolute", top: 0, left: 0 }}>
-            <defs>
-              <marker id="d360a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-                <path d="M0 0 L6 3 L0 6 Z" fill={t.border} /></marker>
-              <marker id="d360c" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
-                <path d="M0 0 L5 3 L0 6 Z" fill={t.hover} /></marker>
-            </defs>
-            {/* table-level edges */}
-            {g.edges.map((e, i) => {
-              const a = byId[e.from_key], b = byId[e.to_key];
-              if (!a || !b) return null;
-              const ax = a.x + NODE_W, ay = a.y + HEADER_H / 2, bx = b.x, by = b.y + HEADER_H / 2;
-              const dx = (bx - ax) * 0.5;
-              const cross = a.project_id !== b.project_id;
-              const orch = e.from_type === "dag";
-              return <path key={"e" + i}
-                d={`M${ax} ${ay} C${ax + dx} ${ay} ${bx - dx} ${by} ${bx} ${by}`}
-                fill="none" stroke={orch ? t.modDatapoint : cross ? t.hover : t.border}
-                strokeWidth={cross || orch ? 2 : 1.5}
-                strokeDasharray={cross ? "5 3" : orch ? "2 3" : "none"}
-                markerEnd="url(#d360a)" opacity="0.8" />;
-            })}
-            {/* column-level edges (when expanded) */}
-            {visibleColEdges.map((e, i) => {
-              const hl = selCol && (e.from_column === selCol || e.to_column === selCol);
-              const dx = (e.b.x - e.a.x) * 0.5;
-              return <g key={"c" + i}>
-                <path d={`M${e.a.x} ${e.a.y} C${e.a.x + dx} ${e.a.y} ${e.b.x - dx} ${e.b.y} ${e.b.x} ${e.b.y}`}
-                  fill="none" stroke={hl ? t.accent : t.hover}
-                  strokeWidth={hl ? 2.5 : 1.3} markerEnd="url(#d360c)" opacity={hl ? 1 : 0.55} />
-                {hl && <text x={(e.a.x + e.b.x) / 2} y={(e.a.y + e.b.y) / 2 - 4}
-                  fontSize="10" fill={t.accent} textAnchor="middle"
-                  style={{ fontWeight: 700 }}>{e.transform_expr}</text>}
-              </g>;
-            })}
-          </svg>
-
-          {laid.map((n) => (
-            <div key={n.id} style={{ position: "absolute", left: n.x, top: n.y, width: NODE_W,
-              background: t.panel, border: `1px solid ${t.border}`, borderRadius: t.radius.md,
-              boxShadow: t.shadow.reg }}>
-              <div onClick={() => openNode(n)} style={{ height: HEADER_H, display: "flex",
-                alignItems: "center", gap: 8, padding: "0 8px 0 12px", position: "relative",
-                borderBottom: expanded[n.id] ? `1px solid ${t.bg}` : "none", cursor: "pointer" }}>
-                <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 4,
-                  background: LAYER_STRIPE[n.layer] || t.layerNone }} />
-                {(n.columns || []).length > 0 && (
-                  <span onClick={(ev) => { ev.stopPropagation();
-                    setExpanded((x) => ({ ...x, [n.id]: !x[n.id] })); }}
-                    style={{ cursor: "pointer", fontSize: 10, color: t.sub }}>
-                    {expanded[n.id] ? "\u25BE" : "\u25B8"}</span>)}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap",
-                    overflow: "hidden", textOverflow: "ellipsis" }}>{n.name}</div>
-                  <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase",
-                    color: t.textMuted }}>{n.type}</div>
-                </div>
-                <span style={{ position: "absolute", top: 4, right: 5 }}>
-                  <ProjectBadge projectId={n.project_id} t={t} /></span>
-              </div>
-              {expanded[n.id] && (
-                <div style={{ padding: `${COL_PAD}px 0` }}>
-                  {(n.columns || []).map((c) => {
-                    const cid = `${n.id}.${c.name}`;
-                    const on = selCol === cid;
-                    return (
-                      <div key={c.name} onClick={() => setSelCol(on ? null : cid)}
-                        style={{ height: COL_ROW_H, display: "flex", alignItems: "center",
-                          gap: 6, padding: "0 12px", fontSize: 11, cursor: "pointer",
-                          background: on ? t.infoBg : "transparent",
-                          color: c.is_pii ? t.danger : t.text }}>
-                        <span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden",
-                          textOverflow: "ellipsis" }}>{c.name}</span>
-                        {c.is_pk === "Y" && <span style={{ fontSize: 9, color: t.accent,
-                          fontWeight: 700 }}>PK</span>}
-                        {c.is_pii && <span style={{ fontSize: 9, color: t.danger,
-                          fontWeight: 700 }}>PII</span>}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {drawer && (
-          <div style={{ width: 360, background: t.panel, border: `1px solid ${t.disabled}`,
-            borderLeft: "none", padding: 20, overflow: "auto", height: 480 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
-              <div>
-                <ProjectBadge projectId={drawer.project_id} t={t} />
-                <div style={{ fontSize: 18, fontWeight: 500, marginTop: 8 }}>{drawer.name}</div>
-                <div style={{ fontSize: 12, color: t.textMuted }}>{drawer.type} \u00b7 {drawer.layer || "\u2014"}</div>
-              </div>
-              <button onClick={() => setDrawer(null)} style={{ border: `1px solid ${t.border}`,
-                background: t.panel2, borderRadius: t.radius.sm, width: 28, height: 28,
-                cursor: "pointer" }}>\u2715</button>
-            </div>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase",
-              letterSpacing: 0.5, color: t.textMuted, margin: "16px 0 6px" }}>Columns</div>
-            {(drawer.columns || []).map((c) => (
-              <div key={c.name} style={{ display: "flex", justifyContent: "space-between",
-                padding: "5px 0", borderBottom: `1px solid ${t.bg}`, fontSize: 12 }}>
-                <span style={{ color: c.is_pii ? t.danger : t.text }}>{c.name}</span>
-                <span style={{ color: t.textMuted }}>{c.type || ""}</span>
-              </div>
-            ))}
-            {sql && (
-              <>
-                <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase",
-                  letterSpacing: 0.5, color: t.textMuted, margin: "16px 0 6px" }}>
-                  Transformation (compiled SQL)</div>
-                <pre style={{ background: "#0b1f3a", color: "#e6edf6", padding: 12,
-                  borderRadius: t.radius.md, fontSize: 11, overflow: "auto",
-                  whiteSpace: "pre-wrap" }}>{sql}</pre>
-              </>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div style={{ display: "flex", gap: 15, marginTop: 15, fontSize: 12,
-        color: t.sub, alignItems: "center", flexWrap: "wrap" }}>
-        {["bronze", "silver", "gold"].map((l) => (
-          <span key={l} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 2, background: LAYER_STRIPE[l] }} />{l}
-          </span>))}
-        <span style={{ color: t.hover }}>\u2014 click a column to trace its lineage + see the transform expression</span>
-        <span style={{ color: t.modDatapoint }}>\u00b7 \u00b7 \u00b7 dotted = DAG orchestration (Orchestration plane)</span>
-      </div>
-      </div>
-      )}
-      </div>
-      )}
     </div>
   );
-}
-
-function layoutNodes(nodes, expanded) {
-  // group by column, stack rows, account for expanded height
-  return nodes.map((n) => {
-    const cols = (n.columns || []).length;
-    const h = expanded[n.id] ? HEADER_H + COL_PAD * 2 + cols * COL_ROW_H : HEADER_H;
-    return { ...n, x: PAD + n.col * (NODE_W + COL_GAP),
-      y: PAD + n.row * (HEADER_H + ROW_GAP + 90), h, w: NODE_W };
-  });
 }
 
 // ===================================================================
@@ -944,7 +758,7 @@ const chip = (t, on) => ({ fontSize: 12, padding: "6px 12px", cursor: "pointer",
 // Pipelines tab — Business (bf_pipelines, 444 w/ v20 routing) is primary;
 // Technical (dbt/Airflow) preserved behind a toggle.
 // ===================================================================
-function PipelinesTab({ t, project, scope, legacySys }) {
+function PipelinesTab({ t, scope, legacySys }) {
   const [mode, setMode] = useState("business");
   return (
     <div>
@@ -960,7 +774,7 @@ function PipelinesTab({ t, project, scope, legacySys }) {
           background: "#0091bf", padding: "3px 10px", borderRadius: 3, alignSelf: "center" }}>BATCH</span>
       </div>
       {mode === "business" ? <BfPipelinesView t={t} scope={scope} curSys={legacySys} />
-        : <PipelinesView t={t} project={project} />}
+        : <PipelinesView t={t} project="all" />}
     </div>
   );
 }
@@ -975,12 +789,22 @@ function BfPipelinesView({ t, scope = "all", curSys = "ADDVANTAGE" }) {
   const [openGrp, setOpenGrp] = useState({});
 
   useEffect(() => {
-    api.bfPipelines({ limit: 500 }).then((r) => {
-      const list = r.pipelines || [];
-      setPipes(list);
-      if (list[0]) api.bfPipeline(list[0].pipeline_id).then(setDetail);
-    });
+    api.bfPipelines({ limit: 500 }).then((r) => setPipes(r.pipelines || []));
   }, []);
+
+  // Open the first pipeline the CURRENT scope admits, not the first of all
+  // 444. Loading list[0] unconditionally is how the pane came to show an
+  // AddVantage pipeline under the SEI scope that excludes it.
+  useEffect(() => {
+    if (!pipes.length) return;
+    const open = detail && detail.pipeline && detail.pipeline.pipeline_id;
+    const ok = pipes.filter(inScope);
+    if (open && ok.some((x) => x.pipeline_id === open)) return;
+    if (!ok.length) { setDetail(null); return; }
+    let live = true;
+    api.bfPipeline(ok[0].pipeline_id).then((d) => { if (live) setDetail(d); });
+    return () => { live = false; };
+  }, [pipes, scope, curSys]);
 
   const domains = [...new Set(pipes.map((p) => p.business_domain).filter(Boolean))].sort();
   const hasLegacy = (p) => !!String(p.legacy_system || "").trim()
@@ -1001,6 +825,12 @@ function BfPipelinesView({ t, scope = "all", curSys = "ADDVANTAGE" }) {
   const grpKeys = grouped ? Object.keys(grouped).sort() : [];
   const grpOpen = (k, i) => (openGrp[k] === undefined ? i < 2 : openGrp[k]);
   const P = detail?.pipeline;
+  // THE PANE HAS TO OBEY THE FILTER TOO. The list read "0 OF 444" while the
+  // detail beside it still showed the pipeline loaded on mount — a reader
+  // was looking at a row the scope had just excluded, with nothing on screen
+  // saying so. Scope governs the pane; the text and domain filters narrow
+  // only the list, so typing does not blank what you are reading.
+  const shown = P && inScope(P) ? P : null;
   const RP = { Direct_Keep: "#159943", Reroute: "#e67e22", Consolidate: "#7c3aed" };
 
   return (
@@ -1057,7 +887,9 @@ function BfPipelinesView({ t, scope = "all", curSys = "ADDVANTAGE" }) {
       </div>
 
       <div style={{ flex: 1 }}>
-        {P && (
+        {!shown && <NoPipelinesInScope t={t} scope={scope} curSys={curSys}
+          total={pipes.length} shown={filtered.length} q={q} dom={dom} />}
+        {shown && (
           <div>
             <div style={{ fontSize: 20, fontWeight: 600, color: t.navy, marginBottom: 2 }}>{P.pipeline_name || P.pipeline_id}</div>
             <div style={{ fontSize: 12, color: t.sub || t.textMuted, marginBottom: 14 }}>
@@ -1304,52 +1136,6 @@ function LoadersCatalog({ t }) {
   );
 }
 
-// ===================================================================
-// Compression view — 444 pipelines -> shared dbt gold marts (the 12x story)
-// ===================================================================
-function CompressionView({ t }) {
-  const [plan, setPlan] = useState([]);
-  const [summary, setSummary] = useState([]);
-  useEffect(() => {
-    api.bfCompression().then((r) => {
-      setPlan(r.plan || []);
-      const s = r.summary || [];
-      setSummary(Array.isArray(s) ? s : Object.entries(s).map(([metric, value]) => ({ metric, value })));
-    });
-  }, []);
-  const maxN = Math.max(1, ...plan.map((p) => p.number_of_pipelines || 0));
-  const sm = Object.fromEntries(summary.map((s) => [s.metric, s.value]));
-  return (
-    <div>
-      <div style={{ display: "flex", gap: 14, marginBottom: 20, flexWrap: "wrap" }}>
-        {[["total_business_pipelines", "Business pipelines"], ["unique_linked_api_flows", "Linked API flows"],
-          ["unique_dbt_gold_marts", "dbt gold marts"], ["dbt_compression_ratio", "Compression"]].map(([k, label]) => (
-          <div key={k} style={{ flex: "1 1 160px", background: t.panel, border: `1px solid ${t.border}`,
-            borderRadius: 10, padding: "14px 18px" }}>
-            <div style={{ fontSize: 24, fontWeight: 700, color: t.accent }}>{sm[k] ?? "—"}</div>
-            <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase",
-              color: t.muted || t.textMuted, marginTop: 2 }}>{label}</div>
-          </div>))}
-      </div>
-      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase",
-        color: t.muted || t.textMuted, marginBottom: 8 }}>Marts ({plan.length}) — pipelines sharing each gold mart</div>
-      {plan.map((p) => (
-        <div key={p.dbt_gold_mart} style={{ background: t.panel, border: `1px solid ${t.border}`,
-          borderRadius: 8, padding: "12px 16px", marginBottom: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 700, color: "#c8a13a" }}>{p.dbt_gold_mart}</span>
-            <span style={{ fontSize: 11, color: t.sub || t.textMuted }}>← {p.api_flow_id}</span>
-            <span style={{ marginLeft: "auto", fontSize: 13, fontWeight: 700, color: t.navy }}>{p.number_of_pipelines} pipelines</span>
-          </div>
-          <div style={{ height: 8, background: t.bg, borderRadius: 4, marginTop: 8, overflow: "hidden" }}>
-            <div style={{ height: "100%", width: `${Math.round(100 * (p.number_of_pipelines || 0) / maxN)}%`,
-              background: "linear-gradient(90deg,#0091bf,#c8a13a)", borderRadius: 4 }} />
-          </div>
-          {p.compression_ratio && <div style={{ fontSize: 11, color: t.sub || t.textMuted, marginTop: 6 }}>{p.compression_ratio} · {p.dag_pattern || ""}</div>}
-        </div>))}
-    </div>
-  );
-}
 
 // Interdependency tab wrapper — toggles the shared Interdependency graph
 // between Inbound Feeds and Loaders.
