@@ -32,6 +32,7 @@ STEPS = [
     "business_flow",     # after datapoint_index (resolves Flow_Datapoint_Map vs dp_registry)
     "reference_data",    # after datapoint_index (enriches data points by category+field)
     "guardrails",        # synthetic quality guardrail events (failed jobs + bad data)
+    "guardrails_promotion",  # synthetic SIT/UAT gate runs per release candidate
     "legacy_lineage",    # legacy DWH end-to-end lineage (SRC->STG1->STG2->DWH) + proof
     "legacy_dictionary", # legacy business definitions (AddVantage/CRD/STAR) keyed by field code
     "legacy_source_file",# CP_SOURCE_FILE: the business name of each AddVantage EOD feed
@@ -187,6 +188,11 @@ def _run_step(step, conn, loader, resolver) -> None:
         from .guardrails_synth import GuardrailsSynth
         n = GuardrailsSynth().load(loader)
         log.info("guardrails: merged %s events", n)
+
+    if step == "guardrails_promotion":
+        from .guardrails_promotion_synth import GuardrailsPromotionSynth
+        nr, ng = GuardrailsPromotionSynth().load(loader)
+        log.info("guardrails_promotion: merged %s releases, %s gate runs", nr, ng)
         return
     if step == "legacy_lineage":
         from .legacy_lineage_conn import LegacyLineageConnector
