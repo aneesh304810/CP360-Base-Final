@@ -57,11 +57,56 @@ const strip = (f) => fs.readFileSync(path.join(ROOT, f), "utf8")
   .split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*|#|--)/.test(l)).join("\n");
 const GJSX = strip("ui/src/Guardrails.jsx");
 const ROUTER = strip("api/app/routers_guardrails.py");
-const DDL = fs.readFileSync(path.join(ROOT, "sql/67_guardrail_promotion.sql"), "utf8");
+const DDL = fs.readFileSync(path.join(ROOT, "sql/68_guardrail_deployment.sql"), "utf8");
+const DDL2 = DDL;
+const DDL67 = fs.readFileSync(path.join(ROOT, "sql/67_guardrail_promotion.sql"), "utf8");
+const API_ADDITIONS = strip("ui/src/guardrails_api_additions.js");
 
 // ---- four tabs, and SIT/UAT share one component ----------------------
-ok(/const TABS = \["Overview", "SIT", "UAT", "PROD"\]/.test(GJSX),
-   "Overview, SIT, UAT, PROD", "");
+ok(/const TABS = \["Overview", "Releases", "SIT", "UAT", "PROD"\]/.test(GJSX),
+   "Overview, Releases, SIT, UAT, PROD", "");
+
+// ---- the release dashboard answers the INVERSE question ------------
+// /promotion says how far a release has got; a release dashboard asks
+// what an environment contains. The newest release is usually blocked
+// and therefore deployed nowhere, so one cannot stand in for the other.
+ok(/tab === "Releases" && <Releases/.test(GJSX),
+   "there is a Releases tab", "");
+ok(/promotionApi\.deployments\(\)/.test(GJSX),
+   "fed by deployments, not by the promotion board", "");
+ok(/def deployments\(/.test(ROUTER), "the endpoint exists", "");
+ok(/current\.setdefault\(key, r\)/.test(ROUTER),
+   "current is DERIVED, not read from a flag — a boolean needs updating in "
+   + "two places per deploy and is wrong the first time one half-fails", "");
+// The status filter is the load-bearing half. Without it a rolled-back or
+// failed deployment is reported as what is running, which is the one
+// answer this screen must never give.
+ok(/if r\.get\("status"\) != "deployed":\s*\n\s*continue/.test(ROUTER),
+   "and only a row whose status is 'deployed' can be current — a rolled-back "
+   + "deploy reported as live is worse than no dashboard",
+   (ROUTER.match(/.{0,80}setdefault.{0,40}/) || [])[0]);
+ok(/"lanes_aligned"/.test(ROUTER) && /"schema_ahead"/.test(ROUTER),
+   "and the API states whether the two lanes agree, rather than leaving a "
+   + "reader to compare two build numbers by eye", "");
+ok(/expand step, deployed early/.test(GJSX),
+   "a schema ahead of its application reads as the design it is, not as "
+   + "drift", "");
+
+// ---- three identifiers, kept apart ---------------------------------
+for (const col of ["build_number", "app_tag", "commit_sha", "db_tag"]) {
+  ok(new RegExp(col).test(DDL), `the deployment table carries ${col}`, "");
+}
+ok(/lane\s+VARCHAR2\(10\)/.test(DDL),
+   "and a lane, because the two repositories deploy independently", "");
+
+// ---- QC is an alias, not a rename ----------------------------------
+// Every row already written uses UAT. Renaming the column to match a
+// spoken habit would break all of them.
+ok(/alias: "QC"/.test(API_ADDITIONS),
+   "UAT carries QC as an alias", "");
+ok(/env_alias/.test(DDL2), "and the register stores it", "");
+ok(!/"QC"\s*:/.test(API_ADDITIONS),
+   "QC is never a region code of its own", "");
 ok(/tab === "SIT" \|\| tab === "UAT"\) &&\s*<Environment/.test(GJSX),
    "SIT and UAT mount the SAME component — they ask the same question, and "
    + "two layouts would make a reader re-learn the page on promotion", "");
@@ -187,8 +232,8 @@ ok(renderToStaticMarkup(<SyntheticBanner t={t} payload={{ synthetic: false }} />
 ok(/"synthetic": True/.test(ROUTER), "the API makes the claim", "");
 
 // ---- the schema keeps the two grains apart ---------------------------
-ok(/CREATE TABLE guardrail_release/.test(DDL)
-   && /CREATE TABLE guardrail_gate_run/.test(DDL),
+ok(/CREATE TABLE guardrail_release/.test(DDL67)
+   && /CREATE TABLE guardrail_gate_run/.test(DDL67),
    "release and gate-run tables exist", "");
 ok(/NVL\(region, 'PROD'\)/.test(ROUTER),
    "the runtime filter reads NULL as PROD rather than excluding it", "");

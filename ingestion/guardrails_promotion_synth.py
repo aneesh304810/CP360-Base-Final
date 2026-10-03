@@ -236,9 +236,98 @@ class GuardrailsPromotionSynth:
         runs = build_gate_runs(rels)
         for g in runs:
             loader._merge("guardrail_gate_run", ("gate_run_id",), g)
+        deps = build_deployments()
+        for d in deps:
+            loader._merge("guardrail_deployment", ("deployment_id",), d)
         loader.commit()
-        return len(rels), len(runs)
+        return len(rels), len(runs), len(deps)
 
 
 def run(loader):
     return GuardrailsPromotionSynth().load(loader)
+
+
+# ---------------------------------------------------------------- deploys
+# WHAT IS RUNNING WHERE, which guardrail_release cannot say: its
+# current_region is a release's furthest point, and an environment's
+# contents are a different fact. See sql/68's header.
+#
+# The fixture is shaped to show the three things a release dashboard
+# exists to surface:
+#
+#   1. PROD is a release behind.  App 1184 live while SIT and UAT are on
+#      1201 — normal, and invisible on any screen that only tracks where
+#      the newest release has got to.
+#   2. The newest build is NOT deployed.  1208 is blocked in SIT on a CVE
+#      and 1211 is still running, so SIT is running 1201. A dashboard
+#      reading "latest release" would name a build nobody can use.
+#   3. The two lanes diverge ON PURPOSE.  SIT's schema is at sit-1212
+#      while its application is at 1201: an additive column deployed a
+#      release early, which is exactly what expand-and-contract asks for
+#      and reads as drift on any screen that collapses the lanes.
+DEPLOYMENTS = [
+    # --- PROD ---------------------------------------------------------
+    {"deployment_id": "DEP-PROD-app-1184", "environment": "PROD", "lane": "app",
+     "release_id": "REL-2026.09.28", "build_number": "1184",
+     "app_tag": "v2026.09.28", "commit_sha": "9c41ab7", "db_tag": None,
+     "changesets": None, "status": "deployed", "deployed_by": "jenkins",
+     "duration_s": 412, "notes": "Fee accrual: add tax-lot basis"},
+    {"deployment_id": "DEP-PROD-db-1184", "environment": "PROD", "lane": "schema",
+     "release_id": "REL-2026.09.28", "build_number": "1184",
+     "app_tag": None, "commit_sha": "c1d44f0", "db_tag": "prod-1184",
+     "changesets": 61, "status": "deployed", "deployed_by": "jenkins",
+     "duration_s": 96, "notes": "3 changesets applied"},
+
+    # --- UAT (QC) -----------------------------------------------------
+    {"deployment_id": "DEP-UAT-app-1201", "environment": "UAT", "lane": "app",
+     "release_id": "REL-2026.10.01", "build_number": "1201",
+     "app_tag": "v2026.10.01", "commit_sha": "4f2a9c1", "db_tag": None,
+     "changesets": None, "status": "deployed", "deployed_by": "jenkins",
+     "duration_s": 455, "notes": "Positions: SCD2 — gates failing, not promoted"},
+    {"deployment_id": "DEP-UAT-db-1201", "environment": "UAT", "lane": "schema",
+     "release_id": "REL-2026.10.01", "build_number": "1201",
+     "app_tag": None, "commit_sha": "77ba901", "db_tag": "uat-1201",
+     "changesets": 66, "status": "deployed", "deployed_by": "jenkins",
+     "duration_s": 134, "notes": "5 changesets applied"},
+    {"deployment_id": "DEP-UAT-app-1184", "environment": "UAT", "lane": "app",
+     "release_id": "REL-2026.09.28", "build_number": "1184",
+     "app_tag": "v2026.09.28", "commit_sha": "9c41ab7", "db_tag": None,
+     "changesets": None, "status": "superseded", "deployed_by": "jenkins",
+     "duration_s": 430, "notes": "Superseded by 1201"},
+
+    # --- SIT ----------------------------------------------------------
+    {"deployment_id": "DEP-SIT-app-1201", "environment": "SIT", "lane": "app",
+     "release_id": "REL-2026.10.01", "build_number": "1201",
+     "app_tag": "v2026.10.01", "commit_sha": "4f2a9c1", "db_tag": None,
+     "changesets": None, "status": "deployed", "deployed_by": "jenkins",
+     "duration_s": 388, "notes": "Positions: SCD2 on account attributes"},
+    {"deployment_id": "DEP-SIT-db-1212", "environment": "SIT", "lane": "schema",
+     "release_id": None, "build_number": "1212",
+     "app_tag": None, "commit_sha": "3ae0c88", "db_tag": "sit-1212",
+     "changesets": 68, "status": "deployed", "deployed_by": "jenkins",
+     "duration_s": 88,
+     "notes": "Expand step: nullable column added a release early"},
+    {"deployment_id": "DEP-SIT-app-1184", "environment": "SIT", "lane": "app",
+     "release_id": "REL-2026.09.28", "build_number": "1184",
+     "app_tag": "v2026.09.28", "commit_sha": "9c41ab7", "db_tag": None,
+     "changesets": None, "status": "superseded", "deployed_by": "jenkins",
+     "duration_s": 401, "notes": "Superseded by 1201"},
+]
+
+# Minutes before "now" each deployment happened, newest last per lane so
+# the latest-wins query has something real to order by.
+_DEP_AGE = {
+    "DEP-SIT-app-1184": 7 * 24 * 60, "DEP-UAT-app-1184": 7 * 24 * 60 - 60,
+    "DEP-PROD-app-1184": 7 * 24 * 60 - 180, "DEP-PROD-db-1184": 7 * 24 * 60 - 200,
+    "DEP-SIT-app-1201": 3 * 24 * 60, "DEP-UAT-app-1201": 3 * 24 * 60 - 90,
+    "DEP-UAT-db-1201": 3 * 24 * 60 - 110, "DEP-SIT-db-1212": 40,
+}
+
+
+def build_deployments(now=None):
+    now = now or _dt.datetime.utcnow()
+    out = []
+    for d in DEPLOYMENTS:
+        out.append({**d, "project_id": "cp",
+                    "deployed_at": _ts(now, _DEP_AGE.get(d["deployment_id"], 60))})
+    return out

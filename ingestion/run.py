@@ -191,8 +191,9 @@ def _run_step(step, conn, loader, resolver) -> None:
 
     if step == "guardrails_promotion":
         from .guardrails_promotion_synth import GuardrailsPromotionSynth
-        nr, ng = GuardrailsPromotionSynth().load(loader)
-        log.info("guardrails_promotion: merged %s releases, %s gate runs", nr, ng)
+        nr, ng, nd = GuardrailsPromotionSynth().load(loader)
+        log.info("guardrails_promotion: merged %s releases, %s gate runs, "
+                 "%s deployments", nr, ng, nd)
         return
     if step == "legacy_lineage":
         from .legacy_lineage_conn import LegacyLineageConnector

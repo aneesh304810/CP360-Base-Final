@@ -48,6 +48,19 @@ export const promotionApi = {
     _get(`/guardrails/release/${encodeURIComponent(id)}`,
       () => ({ release: null, gates: [], synthetic: null, unreachable: true })),
 
+  // WHAT IS RUNNING WHERE — the inverse of releases(). That call says
+  // how far a release has got; this says what an environment contains,
+  // and the newest release is often blocked and therefore deployed
+  // nowhere. Two questions, two endpoints.
+  environments: () =>
+    _get("/guardrails/environments",
+      () => ({ environments: [], fallback: true, unreachable: true })),
+
+  deployments: (environment) =>
+    _get(`/guardrails/deployments${_qs({ environment })}`,
+      () => ({ environments: [], history: [], synthetic: null,
+               unreachable: true })),
+
   // The runtime plane, scoped. Region is a filter here, not a different
   // question — PROD is the only region that runs these today, but SIT and
   // UAT will emit them too once their own dbt runs are collected.
@@ -84,10 +97,19 @@ export const GATE_STATUS = {
   skipped: { c: "#7b8894", bg: "#f1f4f7", label: "skipped" },
 };
 
+// UAT is called QC in parts of this estate. The alias travels with the
+// label rather than replacing it: the code, the schema and every row
+// already written use UAT, and renaming the column to match a spoken
+// habit would break all of them.
 export const REGION = {
   SIT:  { c: "#0f4775", label: "SIT",  sub: "developer region" },
-  UAT:  { c: "#b4620f", label: "UAT",  sub: "promotion region" },
+  UAT:  { c: "#b4620f", label: "UAT",  sub: "promotion region", alias: "QC" },
   PROD: { c: "#159943", label: "PROD", sub: "live" },
+};
+
+export const LANE = {
+  app:    { label: "Application", sub: "dbt + Airflow", c: "#0f4775" },
+  schema: { label: "Schema", sub: "Liquibase", c: "#6d3ac0" },
 };
 
 export default promotionApi;

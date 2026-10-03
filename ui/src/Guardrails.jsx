@@ -32,7 +32,7 @@
 import React, { useState, useEffect } from "react";
 import { SectionHeader } from "./AppShell.jsx";
 import { api } from "./api.js";
-import { promotionApi, STAGE, GATE_STATUS, REGION }
+import { promotionApi, STAGE, GATE_STATUS, REGION, LANE }
   from "./guardrails_api_additions.js";
 
 const ENGINE = {
@@ -50,7 +50,7 @@ const engineOf = (k) => ENGINE[k] || { label: k || "Other", color: "#5f6f8f" };
 export const GLYPH = { passed: "✓", failed: "✗", warning: "!",
                        running: "◴", not_run: "·", skipped: "·" };
 
-const TABS = ["Overview", "SIT", "UAT", "PROD"];
+const TABS = ["Overview", "Releases", "SIT", "UAT", "PROD"];
 // The stage columns of the matrix, in pipeline order.
 const STAGE_COLS = ["governance", "performance", "testing", "security", "promotion"];
 
@@ -78,10 +78,13 @@ export default function Guardrails({ t, selection }) {
               background: "none", whiteSpace: "nowrap",
               color: tab === k ? t.accent : t.sub,
               borderBottom: `2px solid ${tab === k ? t.accent : "transparent"}` }}>
-            {k}</button>))}
+            {k}{REGION[k] && REGION[k].alias
+              ? <span style={{ fontWeight: 400, opacity: .65 }}>
+                  {" \u00b7 "}{REGION[k].alias}</span> : null}</button>))}
       </div>
 
       {tab === "Overview" && <Overview t={t} rels={rels} regions={regions} />}
+      {tab === "Releases" && <Releases t={t} />}
       {(tab === "SIT" || tab === "UAT") &&
         <Environment t={t} region={tab} rels={rels} />}
       {tab === "PROD" && <Production t={t} rels={rels} selection={selection} />}
@@ -265,6 +268,154 @@ export function FlowDiagram({ t }) {
         ╌╌ commit status back — the merge waits on this</text>
       <text x="8" y="232" fontSize="9.5" fill={mut}>PROD runs no gates</text>
     </svg>);
+}
+
+/* =================================================== RELEASES ======== */
+// WHAT IS RUNNING WHERE. The inverse of the promotion board: that asks
+// how far a release has got, this asks what an environment contains.
+// They are not the same question and the newest release usually answers
+// the second one wrongly — it is often blocked and deployed nowhere.
+export function Releases({ t }) {
+  const [d, setD] = useState(null);
+  useEffect(() => { promotionApi.deployments().then(setD); }, []);
+  if (!d) return <Loading t={t} />;
+  const envs = d.environments || [];
+  if (!envs.length) {
+    return <Empty t={t}>
+      No deployments recorded.{" "}
+      {d.unreachable ? "The guardrails service did not answer."
+        : <>Run <code>sql/68_guardrail_deployment.sql</code>, then{" "}
+          <code>python -m ingestion.run guardrails_promotion</code>.</>}
+    </Empty>;
+  }
+
+  return (
+    <div>
+      <Eyebrow t={t}>Deployed now · by environment</Eyebrow>
+      <div style={{ display: "grid", gap: 12, marginBottom: 8,
+        gridTemplateColumns: "repeat(auto-fit, minmax(270px, 1fr))" }}>
+        {envs.map((e) => <EnvCard key={e.environment} t={t} e={e} />)}
+      </div>
+      <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 22 }}>
+        Two lanes per environment because the application and the changelog
+        deploy from different repositories. A schema ahead of its application
+        is expand-and-contract working, not drift.
+      </div>
+
+      <Eyebrow t={t}>Deployment history</Eyebrow>
+      <div style={{ border: `1px solid ${t.border}`, borderRadius: t.radius.md,
+        background: t.panel, overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse",
+          minWidth: 760 }}>
+          <thead><tr>
+            <th style={th(t)}>When</th>
+            <th style={th(t)}>Environment</th>
+            <th style={th(t)}>Lane</th>
+            <th style={th(t)}>Build</th>
+            <th style={th(t)}>Tag</th>
+            <th style={th(t)}>Commit</th>
+            <th style={{ ...th(t), textAlign: "right" }}>Status</th>
+          </tr></thead>
+          <tbody>
+            {(d.history || []).map((h) => {
+              const sup = h.status !== "deployed";
+              const lm = LANE[h.lane] || { label: h.lane, c: t.sub };
+              return (
+                <tr key={h.deployment_id} style={{ borderTop: `1px solid ${t.bg}`,
+                  opacity: sup ? .55 : 1 }}>
+                  <td style={{ ...td(t), whiteSpace: "nowrap", fontSize: 11.5,
+                    color: t.sub }}>{h.deployed_at}</td>
+                  <td style={td(t)}>
+                    <span style={{ fontSize: 11, fontWeight: 700,
+                      color: (REGION[h.environment] || {}).c }}>
+                      {h.environment}</span></td>
+                  <td style={{ ...td(t), fontSize: 11.5, color: lm.c }}>
+                    {lm.label}</td>
+                  <td style={{ ...td(t), fontFamily: "monospace",
+                    fontSize: 11.5 }}>{h.build_number || "\u2014"}</td>
+                  <td style={{ ...td(t), fontFamily: "monospace",
+                    fontSize: 11.5 }}>{h.app_tag || h.db_tag || "\u2014"}</td>
+                  <td style={{ ...td(t), fontFamily: "monospace",
+                    fontSize: 11.5, color: t.sub }}>{h.commit_sha || "\u2014"}</td>
+                  <td style={{ ...td(t), textAlign: "right" }}>
+                    <span style={{ fontSize: 9.5, fontWeight: 700,
+                      letterSpacing: .3, textTransform: "uppercase",
+                      padding: "2px 7px", borderRadius: 3,
+                      background: sup ? GATE_STATUS.not_run.bg : GATE_STATUS.passed.bg,
+                      color: sup ? GATE_STATUS.not_run.c : GATE_STATUS.passed.c }}>
+                      {sup ? GLYPH.not_run : GLYPH.passed} {h.status}</span></td>
+                </tr>);
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>);
+}
+
+function EnvCard({ t, e }) {
+  const m = REGION[e.environment] || { c: t.sub, label: e.environment };
+  return (
+    <div style={{ background: t.panel, border: `1px solid ${t.border}`,
+      borderTop: `3px solid ${m.c}`, borderRadius: t.radius.md,
+      padding: "13px 15px" }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
+        <b style={{ fontSize: 14, color: m.c }}>{m.label}</b>
+        {m.alias && <span style={{ fontSize: 10.5, color: t.textMuted }}>
+          also {m.alias}</span>}
+      </div>
+      <LaneRow t={t} lane="app" d={e.app} />
+      <LaneRow t={t} lane="schema" d={e.schema} />
+      {/* Said rather than left for the reader to spot by comparing two
+          build numbers. Under expand and contract the schema leading is
+          the design, so it is reported as such and not as a fault. */}
+      <div style={{ fontSize: 10.5, marginTop: 10, padding: "6px 9px",
+        borderRadius: 3,
+        background: e.lanes_aligned ? t.bg : t.warningBg,
+        color: e.lanes_aligned ? t.textMuted : "#b4620f", lineHeight: 1.45 }}>
+        {e.lanes_aligned
+          ? "Application and schema on the same build."
+          : e.schema_ahead
+            ? "Schema is ahead of the application — the expand step, deployed early."
+            : "Application and schema are on different builds."}
+      </div>
+    </div>);
+}
+
+function LaneRow({ t, lane, d }) {
+  const m = LANE[lane];
+  if (!d) {
+    return (
+      <div style={{ marginTop: 11, paddingTop: 9,
+        borderTop: `1px solid ${t.bg}` }}>
+        <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: .4,
+          textTransform: "uppercase", color: m.c }}>{m.label}</div>
+        <div style={{ fontSize: 11.5, color: t.textMuted, marginTop: 4 }}>
+          nothing recorded</div>
+      </div>);
+  }
+  return (
+    <div style={{ marginTop: 11, paddingTop: 9,
+      borderTop: `1px solid ${t.bg}` }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
+        <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: .4,
+          textTransform: "uppercase", color: m.c }}>{m.label}</span>
+        <span style={{ fontSize: 9.5, color: t.textMuted }}>{m.sub}</span>
+      </div>
+      <div style={{ fontSize: 17, fontWeight: 500, color: t.navy, marginTop: 4,
+        fontFamily: "monospace" }}>
+        {d.app_tag || d.db_tag || `build ${d.build_number}`}</div>
+      <div style={{ fontSize: 11, color: t.sub, marginTop: 3,
+        fontFamily: "monospace" }}>
+        build {d.build_number || "\u2014"}
+        {d.commit_sha ? ` · ${d.commit_sha}` : ""}
+        {d.changesets ? ` · ${d.changesets} changesets` : ""}
+      </div>
+      <div style={{ fontSize: 10.5, color: t.textMuted, marginTop: 3 }}>
+        {d.deployed_at} · {d.deployed_by}
+        {d.duration_s ? ` · ${d.duration_s}s` : ""}</div>
+      {d.notes && <div style={{ fontSize: 10.5, color: t.sub, marginTop: 3,
+        lineHeight: 1.4 }}>{d.notes}</div>}
+    </div>);
 }
 
 /* ================================================ ENVIRONMENT ======== */

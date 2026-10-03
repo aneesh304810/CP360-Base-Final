@@ -296,3 +296,87 @@ def regions():
          "gates": 0, "failed": 0, "blocking_failures": 0, "running": 0,
          **events_for("PROD")},
     ], "synthetic": True}
+
+
+# ===================================================================
+# The release dashboard — what is deployed where
+# ===================================================================
+# THE INVERSE QUESTION. /promotion answers "how far has this release
+# got"; this answers "what is running in this environment". A furthest-
+# point column cannot do the second: the newest release is often blocked
+# and therefore not deployed anywhere.
+
+_LANES = ("app", "schema")
+
+
+@router.get("/environments")
+def environments():
+    """The environments, in promotion order, from the register."""
+    rows = _safe("""SELECT env_code, env_alias, display_name, env_order,
+        gated, purpose FROM guardrail_environment ORDER BY env_order""")
+    if not rows:
+        # Pre-68 database. The three are still the truth of this estate;
+        # returning [] would blank the dashboard rather than degrade it.
+        rows = [
+            {"env_code": "SIT", "env_alias": None, "env_order": 1,
+             "display_name": "System Integration Test", "gated": "Y",
+             "purpose": None},
+            {"env_code": "UAT", "env_alias": "QC", "env_order": 2,
+             "display_name": "User Acceptance Test", "gated": "Y",
+             "purpose": None},
+            {"env_code": "PROD", "env_alias": None, "env_order": 3,
+             "display_name": "Production", "gated": "N", "purpose": None},
+        ]
+    return {"environments": rows, "fallback": not _safe(
+        "SELECT 1 AS x FROM guardrail_environment WHERE ROWNUM = 1")}
+
+
+@router.get("/deployments")
+def deployments(environment: str | None = None, limit: int = 60):
+    """What is live in each environment, per lane, plus the history.
+
+    `current` is derived — the newest row with status 'deployed' for each
+    (environment, lane) — rather than read from a flag. A boolean would
+    need updating in two places on every deploy and would be wrong the
+    first time one half-failed.
+    """
+    rows = _safe("""SELECT deployment_id, environment, lane, release_id,
+        build_number, app_tag, commit_sha, db_tag, changesets, status,
+        deployed_at, deployed_by, duration_s, notes
+        FROM guardrail_deployment ORDER BY deployed_at DESC""")
+    env = _region(environment)
+    if env:
+        rows = [r for r in rows if (r.get("environment") or "") == env]
+
+    # Latest deployed per (environment, lane). Rows arrive newest first,
+    # so the first one seen for a key is the current one.
+    current: dict[str, dict] = {}
+    for r in rows:
+        if r.get("status") != "deployed":
+            continue
+        key = f"{r.get('environment')}|{r.get('lane')}"
+        current.setdefault(key, r)
+
+    envs = [e["env_code"] for e in environments()["environments"]]
+    out = []
+    for e in envs:
+        if env and e != env:
+            continue
+        app = current.get(f"{e}|app")
+        sch = current.get(f"{e}|schema")
+        out.append({
+            "environment": e,
+            "app": app, "schema": sch,
+            # The two lanes are allowed to differ — under expand and
+            # contract the schema is SUPPOSED to lead by a release. Said
+            # here so the screen can show it as designed rather than as
+            # drift, and so nobody has to compare two build numbers by eye.
+            "lanes_aligned": bool(app and sch
+                                  and app.get("build_number") == sch.get("build_number")),
+            "schema_ahead": bool(app and sch and app.get("build_number")
+                                 and sch.get("build_number")
+                                 and str(sch["build_number"]) > str(app["build_number"])),
+        })
+
+    return {"environments": out, "history": rows[:max(1, min(int(limit or 60), 500))],
+            "synthetic": True}
