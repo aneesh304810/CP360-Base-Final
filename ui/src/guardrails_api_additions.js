@@ -71,6 +71,7 @@ export const promotionApi = {
                schema: { ahead: [], ahead_count: 0, behind_count: 0 },
                risk: { no_rollback: 0, rollback_not_data_safe: 0,
                        destructive: 0, headline: "" },
+               ladder: [], changelog_total: 0,
                unreachable: true })),
 
   // The runtime plane, scoped. Region is a filter here, not a different

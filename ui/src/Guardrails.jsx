@@ -354,10 +354,18 @@ export function Releases({ t }) {
     </div>);
 }
 
-// WHAT IS IN ONE AND NOT THE OTHER. Defaults to PROD -> UAT, which is
-// the promotion somebody is about to approve. Both lanes, because the
-// application and the schema are different distances apart and a single
-// "version" comparison hides whichever one matters.
+// WHAT IS IN ONE AND NOT THE OTHER, tabular first. Defaults to
+// PROD -> UAT, which is the promotion somebody is about to approve. Both
+// lanes, because the application and the schema are different distances
+// apart and a single "version" comparison hides whichever one matters. The question is "what is in the gap, and is
+// any of it something we could not take back", and the answer is a list
+// of changesets with two flags each. Pictures earn their place by
+// locating that list: the ladder says HOW FAR apart, the reversibility
+// bar says HOW MUCH of the gap is a problem, and the tables say which.
+//
+// Status colour never travels alone. Green and red do not separate under
+// deuteranopia, so every verdict carries a glyph and a word, the
+// irreversible bar segment is hatched, and the table is the authority.
 export function Compare({ t }) {
   const [from, setFrom] = useState("PROD");
   const [to, setTo] = useState("UAT");
@@ -374,14 +382,17 @@ export function Compare({ t }) {
     <select value={v} onChange={(e) => on(e.target.value)}
       style={{ font: "inherit", fontSize: 12, padding: "4px 8px",
         border: `1px solid ${t.border}`, borderRadius: t.radius.md,
-        background: t.panel, color: t.navy }}>
+        background: t.panel, color: t.text }}>
       {["SIT", "UAT", "PROD"].map((k) => (
         <option key={k} value={k}>{k}{REGION[k].alias
           ? ` · ${REGION[k].alias}` : ""}</option>))}
     </select>);
 
   const risk = (d && d.risk) || {};
-  const stop = (risk.no_rollback || 0) + (risk.rollback_not_data_safe || 0);
+  const nrb = risk.no_rollback || 0;
+  const lossy = risk.rollback_not_data_safe || 0;
+  const stop = nrb + lossy;
+  const n = d ? (d.schema.ahead || []).length : 0;
 
   return (
     <div style={{ marginBottom: 26 }}>
@@ -398,98 +409,312 @@ export function Compare({ t }) {
 
       {!d ? <Loading t={t} /> : from === to ? (
         <Empty t={t}>Pick two different environments.</Empty>
-      ) : (
+      ) : (<>
+        {/* ---- the verdict, and the two counts that make it up ------- */}
         <div style={{ border: `1px solid ${t.border}`,
-          borderLeft: `3px solid ${stop ? t.danger : "#159943"}`,
-          borderRadius: t.radius.md, background: t.panel, padding: "14px 16px" }}>
-
-          <div style={{ fontSize: 12.5, marginBottom: 12, lineHeight: 1.55 }}>
-            <b style={{ color: stop ? t.danger : "#159943" }}>
+          borderLeft: `3px solid ${stop ? t.danger : OKC}`,
+          borderRadius: t.radius.md, background: t.bg, padding: "12px 15px",
+          display: "flex", gap: 15, alignItems: "center", flexWrap: "wrap",
+          marginBottom: 20 }}>
+          <div style={{ fontSize: 13, color: t.text, flex: "1 1 280px",
+            minWidth: 0, lineHeight: 1.5 }}>
+            <b style={{ color: stop ? t.danger : OKC }}>
               {GLYPH[stop ? "failed" : "passed"]}</b>{" "}
-            {risk.headline || "\u2014"}
+            {risk.headline || "—"}
           </div>
-
-          <div style={{ display: "grid", gap: 14,
-            gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))" }}>
-
-            <div>
-              <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: .4,
-                textTransform: "uppercase", color: LANE.app.c,
-                marginBottom: 6 }}>
-                Application · {d.app.from_tag || "\u2014"} →{" "}
-                {d.app.to_tag || "\u2014"}</div>
-              <div style={{ fontSize: 10, color: t.textMuted,
-                fontFamily: "monospace", marginBottom: 6 }}>
-                build {d.app.from_build || "\u2014"} → {d.app.to_build || "\u2014"}</div>
-              {!d.app.releases.length
-                ? <div style={{ fontSize: 12, color: t.textMuted }}>
-                    Same application build.</div>
-                : d.app.releases.map((r) => (
-                    <div key={r.release_id} style={{ padding: "7px 0",
-                      borderTop: `1px solid ${t.bg}` }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 600,
-                        color: t.navy }}>{r.title}</div>
-                      <div style={{ fontSize: 10.5, color: t.textMuted,
-                        fontFamily: "monospace", marginTop: 2 }}>
-                        build {r.build_number} · {r.commit_sha} · PR
-                        #{r.pr_number} · {r.author}</div>
-                      <div style={{ fontSize: 10.5, color: t.sub, marginTop: 2,
-                        fontFamily: "monospace" }}>{r.datasets}</div>
-                    </div>))}
-            </div>
-
-            <div>
-              <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: .4,
-                textTransform: "uppercase", color: LANE.schema.c,
-                marginBottom: 6 }}>
-                Schema · {d.schema.from_tag || "\u2014"} →{" "}
-                {d.schema.to_tag || "\u2014"}</div>
-              <div style={{ fontSize: 10, color: t.textMuted,
-                fontFamily: "monospace", marginBottom: 6 }}>
-                {d.schema.ahead_count} ahead
-                {d.schema.behind_count ? ` · ${d.schema.behind_count} behind` : ""}
-                </div>
-              {!d.schema.ahead.length
-                ? <div style={{ fontSize: 12, color: t.textMuted }}>
-                    Same changesets applied.</div>
-                : d.schema.ahead.map((c) => {
-                    const ct = CHANGE_TYPE[c.change_type] || CHANGE_TYPE.other;
-                    const noRb = (c.rollback_declared || "N") !== "Y";
-                    const lossy = !noRb && (c.data_safe || "Y") !== "Y";
-                    return (
-                      <div key={c.changeset_id} style={{ padding: "7px 0",
-                        borderTop: `1px solid ${t.bg}` }}>
-                        <div style={{ display: "flex", gap: 7,
-                          alignItems: "baseline", flexWrap: "wrap" }}>
-                          <span style={{ fontSize: 9, fontWeight: 700,
-                            letterSpacing: .3, textTransform: "uppercase",
-                            padding: "1px 6px", borderRadius: 3,
-                            border: `1px solid ${ct.c}`, color: ct.c }}>
-                            {ct.label}</span>
-                          <span style={{ fontSize: 12.5, minWidth: 0 }}>
-                            {c.description}</span>
-                        </div>
-                        {/* The two rollback questions, answered separately
-                            and only when the answer is bad. */}
-                        {(noRb || lossy) && (
-                          <div style={{ fontSize: 10.5, marginTop: 3,
-                            color: t.danger, fontWeight: 600 }}>
-                            {GLYPH.failed}{" "}
-                            {noRb ? "no rollback block"
-                                  : "rolls back without the data"}</div>)}
-                        <div style={{ fontSize: 10, color: t.textMuted,
-                          marginTop: 2, fontFamily: "monospace" }}>
-                          {c.author} · {c.filename}</div>
-                      </div>);
-                  })}
-              {d.schema.behind_count > 0 && (
-                <div style={{ fontSize: 11, color: t.warning, marginTop: 8 }}>
-                  {GLYPH.warning} {d.schema.behind_count} changeset
-                  {d.schema.behind_count === 1 ? "" : "s"} applied in {from} and
-                  not in {to} — the target is behind as well as ahead.</div>)}
-            </div>
+          <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+            <Count t={t} k="No rollback" v={nrb} bad={nrb > 0} />
+            <Count t={t} k="Rolls back lossy" v={lossy} bad={lossy > 0} />
+            <Count t={t} k="Reversible" v={Math.max(0, n - stop)} />
           </div>
-        </div>)}
+        </div>
+
+        {/* ---- the versions, as a matrix ----------------------------- */}
+        <SubHead t={t} label="Versions"
+          hint="tag first — the build is the pipeline run, the tag is what
+                you check out" />
+        <Tbl t={t} head={["Lane", from, to + (REGION[to].alias
+          ? ` · ${REGION[to].alias}` : ""), "Difference"]} right={[3]}>
+          <VersionRow t={t} lane="app"
+            a={d.app.from_tag} asub={`build ${d.app.from_build || "—"}`}
+            b={d.app.to_tag} bsub={`build ${d.app.to_build || "—"}`}
+            diff={!d.app.count ? <Tag t={t} k="same">same build</Tag>
+              : <Tag t={t} k="ok">{d.app.count} release
+                  {d.app.count === 1 ? "" : "s"}</Tag>} />
+          <VersionRow t={t} lane="schema"
+            a={d.schema.from_tag} asub={appliedOf(d, from)}
+            b={d.schema.to_tag} bsub={appliedOf(d, to)}
+            diff={<>
+              <Tag t={t} k={d.schema.ahead_count ? "no" : "same"}>
+                {d.schema.ahead_count} ahead</Tag>
+              {/* A target BEHIND as well as ahead is the case a one-way
+                  diff hides, so it is printed even when it is zero. */}
+              <div style={{ fontSize: 10.5, color: t.textMuted, marginTop: 3,
+                fontFamily: "monospace" }}>
+                {d.schema.behind_count} behind</div></>} />
+        </Tbl>
+
+        {/* ---- how far apart, as one bar per environment ------------- */}
+        {d.ladder && d.ladder.length > 0 && (<>
+          <SubHead t={t} label="Changesets applied"
+            hint={`against the ${d.changelog_total} in the changelog`} />
+          <Ladder t={t} rows={d.ladder} from={from} />
+        </>)}
+
+        {/* ---- the application lane, where it has moved -------------- */}
+        {d.app.releases.length > 0 && (<>
+          <SubHead t={t} label="Releases in the gap"
+            hint="deployed to the target, not merely merged" />
+          <Tbl t={t} head={["Build", "Release", "Author · PR", "Datasets"]}>
+            {d.app.releases.map((r) => (
+              <tr key={r.release_id}>
+                <Td t={t} mono muted>{r.build_number}</Td>
+                <Td t={t}><b style={{ color: t.text }}>{r.title}</b>
+                  <Sub t={t}>{r.commit_sha} · {r.models_changed} models</Sub></Td>
+                <Td t={t} mono>{r.author}<Sub t={t}>PR #{r.pr_number}</Sub></Td>
+                <Td t={t} mono muted>{r.datasets}</Td>
+              </tr>))}
+          </Tbl>
+        </>)}
+
+        {/* ---- the schema lane: the table this screen exists for ----- */}
+        <SubHead t={t}
+          label={`The ${n === 1 ? "one" : n} in the gap`}
+          hint="in the order Liquibase will run them" />
+        {!n ? <Empty t={t}>Same changesets applied.</Empty> : (<>
+          <Tbl t={t} right={[3, 4, 5]}
+            head={["#", "Type", "Change", "Rollback\ndeclared?",
+                   "Data comes\nback?", "Verdict", "Author · file"]}>
+            {d.schema.ahead.map((c) => {
+              const v = verdict(c);
+              const ct = CHANGE_TYPE[c.change_type] || CHANGE_TYPE.other;
+              return (
+                <tr key={c.changeset_id}>
+                  <Td t={t} mono muted>{c.position_order}</Td>
+                  <Td t={t}><span style={{ fontSize: 8.5, fontWeight: 800,
+                    letterSpacing: .35, textTransform: "uppercase",
+                    padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap",
+                    border: `1px solid ${ct.c}`, color: ct.c }}>
+                    {ct.label}</span></Td>
+                  <Td t={t}>{c.description}</Td>
+                  <Td t={t} c={v.rollback ? OKC : t.danger} bold>
+                    {v.rollback ? "Y" : "N"}</Td>
+                  <Td t={t} c={v.recovers ? OKC : t.danger} bold>
+                    {v.recovers ? "Y" : "N"}</Td>
+                  <Td t={t}><Tag t={t} k={v.bad ? "no" : "ok"}>
+                    {GLYPH[v.bad ? "failed" : "passed"]} {v.label}</Tag></Td>
+                  <Td t={t} mono muted>{c.author}
+                    <Sub t={t}>{c.filename}</Sub></Td>
+                </tr>);
+            })}
+          </Tbl>
+          <div style={{ marginTop: 16 }}>
+            <Eyebrow t={t}>Reversibility</Eyebrow>
+            <RiskBar t={t} good={Math.max(0, n - stop)} bad={stop} />
+          </div>
+        </>)}
+      </>)}
+    </div>);
+}
+
+const OKC = "#159943";
+
+// THE TWO KINDS OF IRREVERSIBLE, AS DIFFERENT WORDS. A changeset with no
+// rollback block and one whose rollback does not bring the data back are
+// both "cannot be taken back" and are NOT the same problem: the first is
+// reversible only from a restore, the second will run a rollback that
+// succeeds and leaves an empty column. Collapsing them is how a
+// promotion is approved on the strength of the second.
+//
+// Pure and exported so a test can call it with rows, rather than assert
+// that some string appears in the file.
+export function verdict(c) {
+  const rollback = ((c || {}).rollback_declared || "N") === "Y";
+  const recovers = rollback && ((c || {}).data_safe || "Y") === "Y";
+  if (!rollback) return { rollback, recovers: false, bad: true,
+    label: "restore only", why: "no rollback block" };
+  if (!recovers) return { rollback, recovers, bad: true,
+    label: "column back, data gone", why: "rolls back without the data" };
+  return { rollback, recovers, bad: false, label: "reversible", why: "" };
+}
+
+// What this environment has applied, for the version matrix — pulled from
+// the ladder so the table and the bars cannot print different numbers.
+function appliedOf(d, env) {
+  const r = (d.ladder || []).find((x) => x.environment === env);
+  return r ? `${r.applied} changesets applied` : null;
+}
+
+function SubHead({ t, label, hint }) {
+  return (
+    <div style={{ display: "flex", alignItems: "baseline", gap: 10,
+      flexWrap: "wrap", margin: "20px 0 8px" }}>
+      <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: .6,
+        textTransform: "uppercase", color: t.textMuted }}>{label}</div>
+      {hint && <div style={{ fontSize: 11.5, color: t.textMuted }}>{hint}</div>}
+    </div>);
+}
+
+function Count({ t, k, v, bad }) {
+  return (
+    <div style={{ border: `1px solid ${bad ? t.danger : t.border}`,
+      borderRadius: t.radius.md, padding: "6px 11px", background: t.panel,
+      minWidth: 92 }}>
+      <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: .4,
+        textTransform: "uppercase", color: t.textMuted,
+        whiteSpace: "nowrap" }}>{k}</div>
+      <div style={{ fontSize: 21, fontWeight: 600, lineHeight: 1.2,
+        color: bad ? t.danger : t.text }}>{v}</div>
+    </div>);
+}
+
+const TAGC = { ok: [OKC, "#e8f6ed"], no: ["#c1113a", "#fdeaee"],
+               same: ["#7b8894", "#f1f4f7"] };
+function Tag({ t, k, children }) {
+  const [c, bg] = TAGC[k] || TAGC.same;
+  return <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px",
+    borderRadius: 3, whiteSpace: "nowrap", display: "inline-block",
+    color: c, background: bg }}>{children}</span>;
+}
+
+function Tbl({ t, head, right, children }) {
+  const r = new Set(right || []);
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ borderCollapse: "collapse", width: "100%",
+        fontSize: 12.5 }}>
+        <thead><tr>{head.map((h, i) => (
+          <th key={i} style={{ textAlign: r.has(i) ? "center" : "left",
+            fontSize: 9.5, fontWeight: 800, letterSpacing: .4,
+            textTransform: "uppercase", color: t.textMuted, lineHeight: 1.35,
+            borderBottom: `1px solid ${t.border}`, verticalAlign: "bottom",
+            whiteSpace: "pre-line", padding: "0 10px 6px 0" }}>{h}</th>))}
+        </tr></thead>
+        <tbody>{children}</tbody>
+      </table>
+    </div>);
+}
+
+function Td({ t, mono, muted, c, bold, children }) {
+  return <td style={{ padding: "8px 10px 8px 0", verticalAlign: "top",
+    borderBottom: `1px solid ${t.bg}`,
+    textAlign: c ? "center" : "left",
+    fontWeight: bold ? 700 : 400,
+    color: c || (muted ? t.textMuted : t.text),
+    fontFamily: mono ? "monospace" : "inherit",
+    fontSize: mono ? 11.5 : undefined }}>{children}</td>;
+}
+
+function Sub({ t, children }) {
+  return <div style={{ fontSize: 10.5, color: t.textMuted,
+    fontFamily: "monospace", marginTop: 2 }}>{children}</div>;
+}
+
+function VersionRow({ t, lane, a, asub, b, bsub, diff }) {
+  const L = LANE[lane];
+  return (
+    <tr>
+      <td style={{ padding: "8px 10px 8px 11px", verticalAlign: "top",
+        borderBottom: `1px solid ${t.bg}`, whiteSpace: "nowrap",
+        boxShadow: `inset 3px 0 0 ${L.c}` }}>
+        <b style={{ color: t.text }}>{L.label}</b>
+        <Sub t={t}>{L.sub}</Sub>
+      </td>
+      <Td t={t}><span style={{ fontFamily: "monospace", fontSize: 11.5 }}>
+        {a || "—"}</span><Sub t={t}>{asub}</Sub></Td>
+      <Td t={t}><span style={{ fontFamily: "monospace", fontSize: 11.5 }}>
+        {b || "—"}</span><Sub t={t}>{bsub}</Sub></Td>
+      <td style={{ padding: "8px 0 8px 10px", verticalAlign: "top",
+        textAlign: "center", borderBottom: `1px solid ${t.bg}`,
+        width: "1%", whiteSpace: "nowrap" }}>{diff}</td>
+    </tr>);
+}
+
+// One bar per environment against the SAME denominator — the whole
+// changelog — so their lengths compare. A per-environment denominator
+// would draw three full bars out of three different positions.
+export function Ladder({ t, rows, from }) {
+  const total = Math.max(1, rows[0].total || 1);
+  const COMMON = "#6b7884";
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 11,
+        color: t.sub, marginBottom: 10 }}>
+        <Key c={COMMON}>Applied in {from}</Key>
+        <Key c={LANE.schema.c}>Ahead of {from}</Key>
+        <Key c={t.bg} ring={t.border}>Not applied</Key>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto",
+        gap: "4px 12px", alignItems: "center" }}>
+        {rows.map((r) => {
+          const m = REGION[r.environment] || {};
+          return (<React.Fragment key={r.environment}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: t.text,
+              whiteSpace: "nowrap" }}>{r.environment}
+              {m.alias && <span style={{ fontWeight: 400, fontSize: 10,
+                color: t.textMuted }}> · {m.alias}</span>}</div>
+            <div title={`${r.environment}: ${r.shared} shared with ${from}, `
+              + `${r.ahead} ahead, ${r.total} in the changelog`}
+              style={{ height: 19, background: t.bg, borderRadius: 3,
+                // The unfilled track carries meaning — it is how far short
+                // of the tip this environment is — so it needs an edge.
+                // Unbounded, a bar that is 7 behind reads as a bar that
+                // happens to stop there.
+                border: `1px solid ${t.border}`, boxSizing: "border-box",
+                display: "flex", overflow: "hidden" }}>
+              {r.shared > 0 && (
+                <div style={{ width: `${100 * r.shared / total}%`,
+                  background: COMMON, borderRadius: r.ahead ? "3px 0 0 3px" : 3,
+                  display: "flex", alignItems: "center", paddingLeft: 7,
+                  fontSize: 9.5, fontWeight: 700, color: "#fff",
+                  boxSizing: "border-box", overflow: "hidden" }}>
+                  {r.shared}</div>)}
+              {/* 2px of SURFACE between segments, never a rule: a line
+                  between two fills reads as a third category. */}
+              {r.ahead > 0 && (
+                <div style={{ width: `${100 * r.ahead / total}%`,
+                  background: LANE.schema.c, marginLeft: r.shared ? 2 : 0,
+                  borderRadius: r.shared ? "0 3px 3px 0" : 3,
+                  display: "flex", alignItems: "center",
+                  justifyContent: "center", fontSize: 9.5, fontWeight: 700,
+                  color: "#fff", boxSizing: "border-box",
+                  overflow: "hidden" }}>+{r.ahead}</div>)}
+            </div>
+            <div style={{ fontSize: 11, fontFamily: "monospace",
+              color: t.textMuted, whiteSpace: "nowrap" }}>
+              {r.applied} / {r.total}</div>
+          </React.Fragment>);
+        })}
+      </div>
+    </div>);
+}
+
+function Key({ c, ring, children }) {
+  return <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+    <i style={{ width: 13, height: 9, borderRadius: 2, background: c,
+      border: ring ? `1px solid ${ring}` : "none", flex: "none" }} />
+    {children}</span>;
+}
+
+// Two segments only. The table above says WHICH kind of irreversible each
+// one is; splitting the bar three ways would put amber beside red, and
+// those two do not separate for a reader who cannot see red. The bad
+// segment is hatched so it survives greyscale and print.
+export function RiskBar({ t, good, bad }) {
+  const tot = Math.max(1, good + bad);
+  const seg = (w, c, label, hatch) => w <= 0 ? null : (
+    <div style={{ width: `calc(${100 * w / tot}% - 1px)`, height: "100%",
+      background: c, display: "flex", alignItems: "center",
+      justifyContent: "center", fontSize: 10.5, fontWeight: 700,
+      color: "#fff", whiteSpace: "nowrap", overflow: "hidden",
+      backgroundImage: hatch ? "repeating-linear-gradient(45deg,"
+        + "rgba(255,255,255,.26) 0 3px,transparent 3px 7px)" : undefined }}>
+      {label}</div>);
+  return (
+    <div style={{ height: 24, display: "flex", gap: 2, borderRadius: 3,
+      overflow: "hidden" }}>
+      {seg(good, OKC, `${good} reversible`, false)}
+      {seg(bad, "#c1113a", `${bad} not`, true)}
     </div>);
 }
 

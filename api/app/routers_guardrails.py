@@ -415,15 +415,27 @@ def _risk(ahead):
         "no_rollback": len(no_rb),
         "rollback_not_data_safe": len(lossy),
         "destructive": len(destructive),
-        # Spelled out rather than left as numbers for a reader to add up.
-        "headline": ("Nothing in this gap is irreversible."
-                     if not (no_rb or lossy) else
-                     "; ".join(filter(None, [
-                         f"{len(no_rb)} changeset(s) with no rollback block"
-                         if no_rb else None,
-                         f"{len(lossy)} that roll back without the data"
-                         if lossy else None]))),
+        # A SENTENCE, not a pair of fragments. It leads with the number
+        # that decides the promotion and then says what the two kinds
+        # are, so it still stands alone for a caller that is not drawing
+        # the tiles beside it.
+        "headline": _headline(len(ahead), no_rb, lossy),
     }
+
+
+def _headline(total, no_rb, lossy):
+    bad = len(no_rb) + len(lossy)
+    if not bad:
+        return "Nothing in this gap is irreversible."
+    parts = []
+    if no_rb:
+        parts.append(f"{len(no_rb)} with no rollback block")
+    if lossy:
+        parts.append(f"{len(lossy)} that rolls back without the data"
+                     if len(lossy) == 1 else
+                     f"{len(lossy)} that roll back without the data")
+    return (f"{bad} of these {total} cannot be taken back: "
+            + " and ".join(parts) + ".")
 
 
 def _bnum(v):
@@ -480,11 +492,16 @@ def compare(from_env: str = "PROD", to_env: str = "UAT"):
     # ---- schema lane --------------------------------------------------
     # A set difference over what each environment has applied, which is
     # what Liquibase itself compares.
-    applied = _safe("""SELECT changeset_id, environment FROM
-        guardrail_changeset_applied WHERE environment IN (:a, :b)""",
-        {"a": a, "b": b})
-    in_a = {r["changeset_id"] for r in applied if r.get("environment") == a}
-    in_b = {r["changeset_id"] for r in applied if r.get("environment") == b}
+    # Every environment, not only the two being compared: the ladder
+    # below the table shows how far each one has got through the same
+    # changelog, and a reader who can see that PROD is seven short of the
+    # tip does not have to run the comparison twice to find it out.
+    applied = _safe("""SELECT changeset_id, environment
+        FROM guardrail_changeset_applied""")
+    by_env = {}
+    for r in applied:
+        by_env.setdefault(r.get("environment"), set()).add(r["changeset_id"])
+    in_a, in_b = by_env.get(a, set()), by_env.get(b, set())
     ahead_ids, behind_ids = sorted(in_b - in_a), sorted(in_a - in_b)
 
     def changesets(ids):
@@ -508,6 +525,26 @@ def compare(from_env: str = "PROD", to_env: str = "UAT"):
 
     risk = _risk(ahead)
 
+    # ---- the ladder ---------------------------------------------------
+    # One bar per environment against the WHOLE changelog, split at what
+    # the FROM side has. Every bar is measured against the same total, so
+    # their lengths are comparable; a per-environment denominator would
+    # make three full bars out of three different positions.
+    total = ((_safe("SELECT COUNT(*) AS n FROM guardrail_changeset")
+              or [{}])[0].get("n")) or 0
+    order = {r.get("env_code"): r.get("env_order") for r in
+             _safe("SELECT env_code, env_order FROM guardrail_environment")}
+    ladder = [{"environment": e,
+               "applied": len(ids),
+               "shared": len(ids & in_a),
+               "ahead": len(ids - in_a),
+               "total": total}
+              for e, ids in by_env.items()]
+    # Furthest behind first, so the bars grow down the list. Falls back to
+    # the name when the register has not been seeded.
+    ladder.sort(key=lambda r: (-(order.get(r["environment"]) or 0),
+                               r["environment"]))
+
     return {
         "from": side["from"], "to": side["to"],
         # Both lanes name their TAG first and their build second. The tag
@@ -524,5 +561,7 @@ def compare(from_env: str = "PROD", to_env: str = "UAT"):
                    "from_tag": (side["from"]["schema"] or {}).get("db_tag"),
                    "to_tag": (side["to"]["schema"] or {}).get("db_tag")},
         "risk": risk,
+        "ladder": ladder,
+        "changelog_total": total,
         "synthetic": True,
     }

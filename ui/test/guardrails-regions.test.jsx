@@ -30,7 +30,8 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { renderToStaticMarkup } from "react-dom/server";
 import Guardrails, { SyntheticBanner, FlowDiagram, StageCell, GateBar,
-  GateList, Gate, Evidence, GLYPH } from "../src/Guardrails.jsx";
+  GateList, Gate, Evidence, GLYPH, verdict, Ladder,
+  RiskBar } from "../src/Guardrails.jsx";
 import { STAGE, GATE_STATUS, REGION } from "../src/guardrails_api_additions.js";
 import { tLight } from "../src/bbhTheme.js";
 
@@ -266,15 +267,20 @@ ok(/from_b < n <= to_b/.test(ROUTER),
 // matrix is keyed by.
 ok(/"from_tag": \(side\["from"\]\["app"\] or \{\}\)\.get\("app_tag"\)/.test(ROUTER),
    "the application lane carries its tag, not only its build", "");
-ok(/Application · \{d\.app\.from_tag/.test(GJSX)
-   && /Schema · \{d\.schema\.from_tag/.test(GJSX),
-   "and both lane headings lead with the tag", "");
+ok(/a=\{d\.app\.from_tag\}/.test(GJSX) && /b=\{d\.app\.to_tag\}/.test(GJSX)
+   && /a=\{d\.schema\.from_tag\}/.test(GJSX),
+   "and both lanes lead with their tag in the version matrix, build "
+   + "underneath", "");
 ok(/in_b - in_a/.test(ROUTER),
    "and the schema delta is a set difference over what each environment has "
    + "APPLIED, which is what Liquibase itself compares", "");
-ok(/behind_count/.test(ROUTER) && /the target is behind as well as ahead/.test(GJSX),
-   "a target that is behind as well as ahead is reported — a one-way diff "
-   + "hides a changeset the source has and the target lost", "");
+ok(/behind_count/.test(ROUTER)
+   && /\{d\.schema\.behind_count\} behind/.test(GJSX)
+   && !/behind_count > 0 &&/.test(GJSX),
+   "a target that is behind as well as ahead is reported, and printed even "
+   + "when it is zero — a one-way diff hides a changeset the source has and "
+   + "the target lost, and so does a line that only appears when it does",
+   "");
 
 // ---- the two pure helpers are RUN, not read -------------------------
 // Both of the assertions this replaces checked that a line of source
@@ -352,8 +358,64 @@ ok(/rollback_declared/.test(DDL3) && /data_safe/.test(DDL3),
 ok(/"risk": risk/.test(ROUTER),
    "and the comparison carries that classification rather than leaving each "
    + "caller to re-derive it from the flags", "");
-ok(/no rollback block/.test(GJSX) && /rolls back without the data/.test(GJSX),
-   "the screen says which of the two it is", "");
+// RUN, not read. The two kinds of irreversible must reach the screen as
+// DIFFERENT WORDS; a file that merely contains both strings proves
+// nothing about which row gets which.
+const NO_RB = verdict({ rollback_declared: "N", data_safe: "N" });
+const LOSSY = verdict({ rollback_declared: "Y", data_safe: "N" });
+const FINE  = verdict({ rollback_declared: "Y", data_safe: "Y" });
+ok(NO_RB.bad && LOSSY.bad && !FINE.bad,
+   "both kinds of irreversible are flagged and the additive one is not",
+   JSON.stringify([NO_RB.bad, LOSSY.bad, FINE.bad]));
+ok(NO_RB.label !== LOSSY.label && NO_RB.why !== LOSSY.why,
+   "and they reach the screen as DIFFERENT words — a drop that recreates "
+   + "an empty column is not the same problem as a back-fill with nothing "
+   + "to run", `${NO_RB.label} / ${LOSSY.label}`);
+ok(LOSSY.rollback === true && LOSSY.recovers === false,
+   "the drop answers Y to 'is there a rollback' and N to 'will it help' — "
+   + "one flag cannot hold that", JSON.stringify(LOSSY));
+ok(verdict({}).bad === true && verdict({}).rollback === false,
+   "a changeset that declares nothing is treated as having no rollback, "
+   + "not as safe", JSON.stringify(verdict({})));
+
+// ---- the two pictures render, and are not colour alone ---------------
+const LAD = renderToStaticMarkup(<Ladder t={t} from="PROD" rows={[
+  { environment: "PROD", applied: 61, shared: 61, ahead: 0, total: 68 },
+  { environment: "UAT", applied: 66, shared: 61, ahead: 5, total: 68 },
+]} />);
+ok(/61/.test(LAD) && /\+5/.test(LAD),
+   "each ladder segment is direct-labelled with its own count", "");
+ok(/66 \/ 68/.test(LAD) && /61 \/ 68/.test(LAD),
+   "and carries its own position against the changelog in figures", "");
+// THE DENOMINATOR, CHECKED AS GEOMETRY. Printing "61 / 68" beside a bar
+// says nothing about how long the bar is. Both rows share 61 changesets
+// with PROD, so their shared segments must come out the SAME length, and
+// no segment may exceed the track — which is what a per-environment
+// denominator breaks first.
+const W = [...LAD.matchAll(/width:\s*([\d.]+)%/g)].map((m) => +m[1]);
+ok(W.length === 3, "three segments are drawn: PROD shared, UAT shared, "
+   + "UAT ahead", JSON.stringify(W));
+ok(W.every((w) => w > 0 && w <= 100),
+   "no segment runs past the end of its track", JSON.stringify(W));
+ok(Math.abs(W[0] - W[1]) < 0.01,
+   "the same 61 shared changesets are the same length on both bars — a "
+   + "per-environment denominator would draw three full bars out of three "
+   + "different positions", JSON.stringify(W));
+ok(Math.abs(W[1] + W[2] - 100 * 66 / 68) < 0.01,
+   "and UAT's two segments together are its 66 of 68", JSON.stringify(W));
+ok(/margin-left:2px/.test(LAD),
+   "stacked segments are separated by a 2px surface gap, not a rule", LAD.slice(0, 200));
+ok(!/NaN|undefined/.test(LAD), "the ladder is clean", LAD);
+
+const RB = renderToStaticMarkup(<RiskBar t={t} good={3} bad={2} />);
+ok(/3 reversible/.test(RB) && /2 not/.test(RB),
+   "the reversibility bar labels both segments — green and red do not "
+   + "separate under deuteranopia", "");
+ok(/repeating-linear-gradient/.test(RB),
+   "and the irreversible segment is hatched, so it survives greyscale, "
+   + "print and forced colours", "");
+ok(!/reversible/.test(renderToStaticMarkup(<RiskBar t={t} good={0} bad={2} />)),
+   "a segment with nothing in it is not drawn as an empty label", "");
 ok(/CREATE TABLE guardrail_changeset_applied/.test(DDL3),
    "applied-per-environment mirrors DATABASECHANGELOG, so a real ingester "
    + "has somewhere to put the rows unreshaped", "");
