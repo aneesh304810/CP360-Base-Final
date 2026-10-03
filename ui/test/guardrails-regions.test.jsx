@@ -107,6 +107,18 @@ cells.forEach((h, i) => {
 });
 ok(renderToStaticMarkup(<StageCell t={t} c={null} />).includes("—"),
    "a stage the region does not run shows an em-dash, not a zero", "");
+// A PARTIALLY RUN STAGE MUST NOT READ AS FULLY PASSED. One gate passed
+// and one still to run printed the stage total beside a tick — "2" reads
+// as "2 passed", the inverse of the truth. The UAT testing stage of the
+// blocked positions release is exactly that case.
+const partial = renderToStaticMarkup(<StageCell t={t}
+  c={{ status: "passed", total: 2, passed: 1, failed: 0, warning: 0,
+       running: 0, not_run: 1 }} />);
+ok(partial.includes("1/2"),
+   "a stage with 1 of 2 gates passed renders the fraction, not the total",
+   partial);
+ok(!/>\s*2\s*<\/span><\/span>/.test(partial),
+   "and never the bare gate count beside a tick", partial);
 ok(/title=\{detail\}/.test(GJSX),
    "and carries its counts on hover rather than crowding the grid", "");
 

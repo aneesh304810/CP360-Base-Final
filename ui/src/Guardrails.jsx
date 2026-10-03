@@ -365,9 +365,15 @@ function Environment({ t, region, rels }) {
     </div>);
 }
 
-// One stage, one cell: a glyph, a colour, and the counts on hover. The
-// glyph is not decoration — it is what carries the state when the colour
-// cannot.
+// One stage, one cell: a glyph for the worst outcome, and PASSED OF
+// TOTAL beside it.
+//
+// The fraction is not decoration either. The first version printed the
+// stage's gate count — so a stage with one gate passed and one still to
+// run rendered "✓ 2", which reads as "2 passed" and is the opposite of
+// what it means. The UAT testing stage of the blocked positions release
+// is exactly that case. "✓ 1/2" cannot be misread, and the hover still
+// carries the full breakdown.
 export function StageCell({ t, c }) {
   if (!c) return <span style={{ color: t.textMuted, fontSize: 11 }}>—</span>;
   const s = GATE_STATUS[c.status] || GATE_STATUS.not_run;
@@ -375,11 +381,11 @@ export function StageCell({ t, c }) {
     .filter((k) => c[k]).map((k) => `${c[k]} ${GATE_STATUS[k].label}`).join(" · ");
   return (
     <span title={detail} style={{ display: "inline-flex", alignItems: "center",
-      justifyContent: "center", gap: 4, minWidth: 54, padding: "3px 8px",
+      justifyContent: "center", gap: 4, minWidth: 58, padding: "3px 8px",
       borderRadius: 3, background: s.bg, color: s.c, fontSize: 11,
       fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-      <span>{GLYPH[c.status] || "·"}</span>
-      <span>{c.total}</span>
+      <span>{GLYPH[c.status] || "\u00B7"}</span>
+      <span>{c.passed || 0}/{c.total}</span>
     </span>);
 }
 
