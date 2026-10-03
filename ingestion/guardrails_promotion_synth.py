@@ -239,8 +239,14 @@ class GuardrailsPromotionSynth:
         deps = build_deployments()
         for d in deps:
             loader._merge("guardrail_deployment", ("deployment_id",), d)
+        for c in build_changesets():
+            loader._merge("guardrail_changeset", ("changeset_id",), c)
+        applied = build_changeset_applied()
+        for a in applied:
+            loader._merge("guardrail_changeset_applied",
+                          ("changeset_id", "environment"), a)
         loader.commit()
-        return len(rels), len(runs), len(deps)
+        return len(rels), len(runs), len(deps), len(applied)
 
 
 def run(loader):
@@ -330,4 +336,90 @@ def build_deployments(now=None):
     for d in DEPLOYMENTS:
         out.append({**d, "project_id": "cp",
                     "deployed_at": _ts(now, _DEP_AGE.get(d["deployment_id"], 60))})
+    return out
+
+
+# ------------------------------------------------------------ changesets
+# The changelog, and which environment has applied what. Shaped so a
+# PROD -> UAT comparison surfaces the two changesets that would actually
+# stop a promotion, rather than reporting "5 changesets" and leaving the
+# reader to open Liquibase.
+#
+#   61 baseline      applied everywhere, the history before this window
+#   + 5 in UAT       the positions release — including one back-fill with
+#                    no rollback block and one DROP COLUMN whose rollback
+#                    recreates the column and not the data
+#   + 2 more in SIT  the expand step, additive and safe
+_BASELINE = 61
+
+# author, file, description, type, rollback_declared, data_safe, release, build
+_UAT_AHEAD = [
+    ("j.tandel", "2026.10.01-positions.sql", "Add CHANGE_HASH to SLV_POSITIONS",
+     "ddl_add", "Y", "Y", "REL-2026.10.01", "1201"),
+    ("j.tandel", "2026.10.01-positions.sql", "Index SLV_POSITIONS(CHANGE_HASH) ONLINE",
+     "index", "Y", "Y", "REL-2026.10.01", "1201"),
+    ("j.tandel", "2026.10.01-positions.sql", "Add VALID_FROM / VALID_TO to GLD_POSITIONS",
+     "ddl_add", "Y", "Y", "REL-2026.10.01", "1201"),
+    # No rollback block: an UPDATE cannot be auto-reversed, and nobody
+    # wrote one. Reversible only by restoring from backup.
+    ("j.tandel", "2026.10.01-positions.sql", "Back-fill CHANGE_HASH for 4.2M rows",
+     "dml", "N", "N", "REL-2026.10.01", "1201"),
+    # Rollback declared AND not data-safe: Liquibase will recreate the
+    # column; what was in it is gone. The pair of flags exists for this.
+    ("j.tandel", "2026.10.01-positions.sql", "Drop GLD_POSITIONS.LEGACY_SCD_FLAG",
+     "ddl_drop", "Y", "N", "REL-2026.10.01", "1201"),
+]
+_SIT_AHEAD = [
+    ("s.mehta", "2026.10.02-ca-events.sql", "Add EVENT_TYPE_CODE to SLV_CORPORATE_ACTIONS",
+     "ddl_add", "Y", "Y", None, "1212"),
+    ("a.nair", "2026.10.03-cash-fx.sql", "Add FX_FALLBACK_CCY to SLV_CASH",
+     "ddl_add", "Y", "Y", None, "1212"),
+]
+
+
+def build_changesets():
+    rows, pos = [], 0
+    for i in range(1, _BASELINE + 1):
+        pos += 1
+        rows.append({
+            "changeset_id": f"bbh:baseline.sql::{i:03d}", "author": "bbh",
+            "filename": "baseline.sql",
+            "description": f"Baseline changeset {i:03d}",
+            "change_type": "other", "rollback_declared": "Y", "data_safe": "Y",
+            "release_id": None, "build_number": None, "labels": None,
+            "contexts": None, "position_order": pos, "project_id": "cp"})
+    for group in (_UAT_AHEAD, _SIT_AHEAD):
+        for n, (au, fn, desc, ct, rb, ds, rel, bld) in enumerate(group, 1):
+            pos += 1
+            rows.append({
+                "changeset_id": f"{au}:{fn}::{n}", "author": au, "filename": fn,
+                "description": desc, "change_type": ct,
+                "rollback_declared": rb, "data_safe": ds, "release_id": rel,
+                "build_number": bld, "labels": None, "contexts": None,
+                "position_order": pos, "project_id": "cp"})
+    return rows
+
+
+def build_changeset_applied(now=None):
+    now = now or _dt.datetime.utcnow()
+    cs = build_changesets()
+    base = [c for c in cs if c["filename"] == "baseline.sql"]
+    uat = [c for c in cs if c["build_number"] == "1201"]
+    sit = [c for c in cs if c["build_number"] == "1212"]
+    out = []
+
+    def add(group, env, tag, age):
+        for c in group:
+            out.append({"changeset_id": c["changeset_id"], "environment": env,
+                        "tag": tag, "applied_at": _ts(now, age),
+                        "exec_type": "EXECUTED",
+                        "checksum": f"9:{abs(hash(c['changeset_id'])) % 10**12:012d}"})
+
+    # The baseline is everywhere; the release window is not.
+    add(base, "PROD", "prod-1184", 7 * 24 * 60 - 200)
+    add(base, "UAT", "uat-1201", 7 * 24 * 60 - 150)
+    add(base, "SIT", "sit-1212", 7 * 24 * 60 - 100)
+    add(uat, "UAT", "uat-1201", 3 * 24 * 60 - 110)
+    add(uat, "SIT", "sit-1212", 3 * 24 * 60 - 200)
+    add(sit, "SIT", "sit-1212", 40)
     return out

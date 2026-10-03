@@ -61,6 +61,18 @@ export const promotionApi = {
       () => ({ environments: [], history: [], synthetic: null,
                unreachable: true })),
 
+  // The gap between two environments, both lanes. Named by environment
+  // rather than by tag because a tag identifies ONE lane, and the point
+  // of the call is that the application and the schema move separately.
+  compare: (from_env, to_env) =>
+    _get(`/guardrails/compare${_qs({ from_env, to_env })}`,
+      () => ({ from: null, to: null,
+               app: { releases: [], count: 0 },
+               schema: { ahead: [], ahead_count: 0, behind_count: 0 },
+               risk: { no_rollback: 0, rollback_not_data_safe: 0,
+                       destructive: 0, headline: "" },
+               unreachable: true })),
+
   // The runtime plane, scoped. Region is a filter here, not a different
   // question — PROD is the only region that runs these today, but SIT and
   // UAT will emit them too once their own dbt runs are collected.
@@ -105,6 +117,20 @@ export const REGION = {
   SIT:  { c: "#0f4775", label: "SIT",  sub: "developer region" },
   UAT:  { c: "#b4620f", label: "UAT",  sub: "promotion region", alias: "QC" },
   PROD: { c: "#159943", label: "PROD", sub: "live" },
+};
+
+// What a changeset does, and how reversible it is. Two flags rather
+// than one "rollbackable": a DROP COLUMN declares a rollback AND cannot
+// bring the data back, and collapsing those is how a promotion is
+// approved on a rollback that restores an empty column.
+export const CHANGE_TYPE = {
+  ddl_add:    { label: "add", c: "#159943" },
+  ddl_alter:  { label: "alter", c: "#0091bf" },
+  ddl_drop:   { label: "drop", c: "#c1113a" },
+  index:      { label: "index", c: "#0091bf" },
+  constraint: { label: "constraint", c: "#6d3ac0" },
+  dml:        { label: "data", c: "#b4620f" },
+  other:      { label: "other", c: "#7b8894" },
 };
 
 export const LANE = {

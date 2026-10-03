@@ -32,7 +32,7 @@
 import React, { useState, useEffect } from "react";
 import { SectionHeader } from "./AppShell.jsx";
 import { api } from "./api.js";
-import { promotionApi, STAGE, GATE_STATUS, REGION, LANE }
+import { promotionApi, STAGE, GATE_STATUS, REGION, LANE, CHANGE_TYPE }
   from "./guardrails_api_additions.js";
 
 const ENGINE = {
@@ -302,6 +302,8 @@ export function Releases({ t }) {
         is expand-and-contract working, not drift.
       </div>
 
+      <Compare t={t} />
+
       <Eyebrow t={t}>Deployment history</Eyebrow>
       <div style={{ border: `1px solid ${t.border}`, borderRadius: t.radius.md,
         background: t.panel, overflowX: "auto" }}>
@@ -349,6 +351,145 @@ export function Releases({ t }) {
           </tbody>
         </table>
       </div>
+    </div>);
+}
+
+// WHAT IS IN ONE AND NOT THE OTHER. Defaults to PROD -> UAT, which is
+// the promotion somebody is about to approve. Both lanes, because the
+// application and the schema are different distances apart and a single
+// "version" comparison hides whichever one matters.
+export function Compare({ t }) {
+  const [from, setFrom] = useState("PROD");
+  const [to, setTo] = useState("UAT");
+  const [d, setD] = useState(null);
+
+  useEffect(() => {
+    let live = true;
+    setD(null);
+    promotionApi.compare(from, to).then((x) => { if (live) setD(x); });
+    return () => { live = false; };
+  }, [from, to]);
+
+  const sel = (v, on) => (
+    <select value={v} onChange={(e) => on(e.target.value)}
+      style={{ font: "inherit", fontSize: 12, padding: "4px 8px",
+        border: `1px solid ${t.border}`, borderRadius: t.radius.md,
+        background: t.panel, color: t.navy }}>
+      {["SIT", "UAT", "PROD"].map((k) => (
+        <option key={k} value={k}>{k}{REGION[k].alias
+          ? ` · ${REGION[k].alias}` : ""}</option>))}
+    </select>);
+
+  const risk = (d && d.risk) || {};
+  const stop = (risk.no_rollback || 0) + (risk.rollback_not_data_safe || 0);
+
+  return (
+    <div style={{ marginBottom: 26 }}>
+      <div style={{ display: "flex", gap: 9, alignItems: "center",
+        marginBottom: 10, flexWrap: "wrap" }}>
+        <Eyebrow t={t}>Compare</Eyebrow>
+        <div style={{ display: "flex", gap: 7, alignItems: "center",
+          marginTop: -9 }}>
+          {sel(from, setFrom)}
+          <span style={{ fontSize: 12, color: t.textMuted }}>→</span>
+          {sel(to, setTo)}
+        </div>
+      </div>
+
+      {!d ? <Loading t={t} /> : from === to ? (
+        <Empty t={t}>Pick two different environments.</Empty>
+      ) : (
+        <div style={{ border: `1px solid ${t.border}`,
+          borderLeft: `3px solid ${stop ? t.danger : "#159943"}`,
+          borderRadius: t.radius.md, background: t.panel, padding: "14px 16px" }}>
+
+          <div style={{ fontSize: 12.5, marginBottom: 12, lineHeight: 1.55 }}>
+            <b style={{ color: stop ? t.danger : "#159943" }}>
+              {GLYPH[stop ? "failed" : "passed"]}</b>{" "}
+            {risk.headline || "\u2014"}
+          </div>
+
+          <div style={{ display: "grid", gap: 14,
+            gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))" }}>
+
+            <div>
+              <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: .4,
+                textTransform: "uppercase", color: LANE.app.c,
+                marginBottom: 6 }}>
+                Application · {d.app.from_tag || "\u2014"} →{" "}
+                {d.app.to_tag || "\u2014"}</div>
+              <div style={{ fontSize: 10, color: t.textMuted,
+                fontFamily: "monospace", marginBottom: 6 }}>
+                build {d.app.from_build || "\u2014"} → {d.app.to_build || "\u2014"}</div>
+              {!d.app.releases.length
+                ? <div style={{ fontSize: 12, color: t.textMuted }}>
+                    Same application build.</div>
+                : d.app.releases.map((r) => (
+                    <div key={r.release_id} style={{ padding: "7px 0",
+                      borderTop: `1px solid ${t.bg}` }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 600,
+                        color: t.navy }}>{r.title}</div>
+                      <div style={{ fontSize: 10.5, color: t.textMuted,
+                        fontFamily: "monospace", marginTop: 2 }}>
+                        build {r.build_number} · {r.commit_sha} · PR
+                        #{r.pr_number} · {r.author}</div>
+                      <div style={{ fontSize: 10.5, color: t.sub, marginTop: 2,
+                        fontFamily: "monospace" }}>{r.datasets}</div>
+                    </div>))}
+            </div>
+
+            <div>
+              <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: .4,
+                textTransform: "uppercase", color: LANE.schema.c,
+                marginBottom: 6 }}>
+                Schema · {d.schema.from_tag || "\u2014"} →{" "}
+                {d.schema.to_tag || "\u2014"}</div>
+              <div style={{ fontSize: 10, color: t.textMuted,
+                fontFamily: "monospace", marginBottom: 6 }}>
+                {d.schema.ahead_count} ahead
+                {d.schema.behind_count ? ` · ${d.schema.behind_count} behind` : ""}
+                </div>
+              {!d.schema.ahead.length
+                ? <div style={{ fontSize: 12, color: t.textMuted }}>
+                    Same changesets applied.</div>
+                : d.schema.ahead.map((c) => {
+                    const ct = CHANGE_TYPE[c.change_type] || CHANGE_TYPE.other;
+                    const noRb = (c.rollback_declared || "N") !== "Y";
+                    const lossy = !noRb && (c.data_safe || "Y") !== "Y";
+                    return (
+                      <div key={c.changeset_id} style={{ padding: "7px 0",
+                        borderTop: `1px solid ${t.bg}` }}>
+                        <div style={{ display: "flex", gap: 7,
+                          alignItems: "baseline", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: 9, fontWeight: 700,
+                            letterSpacing: .3, textTransform: "uppercase",
+                            padding: "1px 6px", borderRadius: 3,
+                            border: `1px solid ${ct.c}`, color: ct.c }}>
+                            {ct.label}</span>
+                          <span style={{ fontSize: 12.5, minWidth: 0 }}>
+                            {c.description}</span>
+                        </div>
+                        {/* The two rollback questions, answered separately
+                            and only when the answer is bad. */}
+                        {(noRb || lossy) && (
+                          <div style={{ fontSize: 10.5, marginTop: 3,
+                            color: t.danger, fontWeight: 600 }}>
+                            {GLYPH.failed}{" "}
+                            {noRb ? "no rollback block"
+                                  : "rolls back without the data"}</div>)}
+                        <div style={{ fontSize: 10, color: t.textMuted,
+                          marginTop: 2, fontFamily: "monospace" }}>
+                          {c.author} · {c.filename}</div>
+                      </div>);
+                  })}
+              {d.schema.behind_count > 0 && (
+                <div style={{ fontSize: 11, color: t.warning, marginTop: 8 }}>
+                  {GLYPH.warning} {d.schema.behind_count} changeset
+                  {d.schema.behind_count === 1 ? "" : "s"} applied in {from} and
+                  not in {to} — the target is behind as well as ahead.</div>)}
+            </div>
+          </div>
+        </div>)}
     </div>);
 }
 

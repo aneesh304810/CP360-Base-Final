@@ -27,6 +27,7 @@
 import React from "react";
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { renderToStaticMarkup } from "react-dom/server";
 import Guardrails, { SyntheticBanner, FlowDiagram, StageCell, GateBar,
   GateList, Gate, Evidence, GLYPH } from "../src/Guardrails.jsx";
@@ -61,6 +62,7 @@ const DDL = fs.readFileSync(path.join(ROOT, "sql/68_guardrail_deployment.sql"), 
 const DDL2 = DDL;
 const DDL67 = fs.readFileSync(path.join(ROOT, "sql/67_guardrail_promotion.sql"), "utf8");
 const API_ADDITIONS = strip("ui/src/guardrails_api_additions.js");
+const DDL3 = fs.readFileSync(path.join(ROOT, "sql/69_guardrail_changeset.sql"), "utf8");
 
 // ---- four tabs, and SIT/UAT share one component ----------------------
 ok(/const TABS = \["Overview", "Releases", "SIT", "UAT", "PROD"\]/.test(GJSX),
@@ -239,6 +241,126 @@ ok(/NVL\(region, 'PROD'\)/.test(ROUTER),
    "the runtime filter reads NULL as PROD rather than excluding it", "");
 ok((ROUTER.match(/if not rows:/g) || []).length >= 2,
    "and both runtime endpoints fall back on a pre-67 database", "");
+
+// ---- comparing two environments -------------------------------------
+// "5 changesets ahead" is not a fact anyone can act on. One of them may
+// be a DROP COLUMN and one a back-fill with no rollback block, and that
+// is the difference between a promotion somebody signs and one they stop.
+ok(/def compare\(/.test(ROUTER), "there is a compare endpoint", "");
+ok(/<Compare t=\{t\} \/>/.test(GJSX), "and the Releases tab renders it", "");
+ok(/useState\("PROD"\)[\s\S]{0,120}useState\("UAT"\)/.test(GJSX),
+   "defaulting to PROD to UAT — the promotion somebody is about to approve",
+   "");
+
+// Both lanes, because they are different distances apart.
+ok(/"app": \{"releases": app_rows/.test(ROUTER)
+   && /"schema": \{"ahead": ahead/.test(ROUTER),
+   "it compares the application and the schema separately", "");
+ok(/from_b < n <= to_b/.test(ROUTER),
+   "the application delta is bounded by the two deployed builds", "");
+
+// BOTH LANES ARE NAMED BY THEIR TAG. A build number is the pipeline run;
+// the tag is what somebody checks out to reproduce the version, and two
+// environments can share a build number and sit on different tags after
+// a re-tag. The build stays, underneath, because it is what the gate
+// matrix is keyed by.
+ok(/"from_tag": \(side\["from"\]\["app"\] or \{\}\)\.get\("app_tag"\)/.test(ROUTER),
+   "the application lane carries its tag, not only its build", "");
+ok(/Application · \{d\.app\.from_tag/.test(GJSX)
+   && /Schema · \{d\.schema\.from_tag/.test(GJSX),
+   "and both lane headings lead with the tag", "");
+ok(/in_b - in_a/.test(ROUTER),
+   "and the schema delta is a set difference over what each environment has "
+   + "APPLIED, which is what Liquibase itself compares", "");
+ok(/behind_count/.test(ROUTER) && /the target is behind as well as ahead/.test(GJSX),
+   "a target that is behind as well as ahead is reported — a one-way diff "
+   + "hides a changeset the source has and the target lost", "");
+
+// ---- the two pure helpers are RUN, not read -------------------------
+// Both of the assertions this replaces checked that a line of source
+// EXISTED. Both were re-broken on purpose -- `lossy = []` three lines
+// above `len(lossy)`, and `_bnum` left in the file after its call sites
+// switched to string comparison -- and neither fired. A guard that
+// cannot fail is worse than no guard, because it is counted. So the
+// functions are lifted out of the router and executed against rows.
+const PYSRC = fs.readFileSync(path.join(ROOT, "api/app/routers_guardrails.py"), "utf8");
+const HELPERS = PYSRC.slice(PYSRC.indexOf("def _risk(ahead):"),
+                            PYSRC.indexOf('@router.get("/compare")'));
+ok(/def _risk\(ahead\)/.test(HELPERS) && /def _bnum\(v\)/.test(HELPERS),
+   "both helpers are pure and module-level, so a test can call them",
+   HELPERS.slice(0, 80));
+
+const py = (expr) => JSON.parse(execFileSync("python3",
+  ["-c", `${HELPERS}\nimport json\nprint(json.dumps(${expr}))`],
+  { encoding: "utf8" }));
+const rows = (v) => `json.loads(${JSON.stringify(JSON.stringify(v))})`;
+
+// Build numbers sort numerically. As text "984" > "1201".
+const bn = py(`[_bnum("984") < _bnum("1201"), _bnum(" 1201 "), _bnum(None), _bnum("rc-7")]`);
+ok(bn[0] === true,
+   "build 984 sorts below 1201 -- compared as text it does not, and the "
+   + "application delta would silently contain the wrong releases", bn[0]);
+ok(bn[1] === 1201, "a padded build number still parses", bn[1]);
+ok(bn[2] === -1 && bn[3] === -1,
+   "and one that cannot parse sorts below every real build rather than "
+   + "throwing mid-request", bn.slice(2));
+
+// ---- rollback is two questions, so two counts -----------------------
+// The row that matters is the DROP COLUMN: it DECLARES a rollback and
+// running it does not bring the data back. If the two questions are
+// collapsed into one "rollbackable" flag, that row joins the no-rollback
+// count and reads as the same problem as a missing block -- which is how
+// a promotion is approved on a rollback that restores an empty column.
+const GAP = [
+  { changeset_id: "c1", change_type: "ddl_add", rollback_declared: "Y", data_safe: "Y" },
+  { changeset_id: "c2", change_type: "dml", rollback_declared: "N", data_safe: "N" },
+  { changeset_id: "c3", change_type: "ddl_drop", rollback_declared: "Y", data_safe: "N" },
+];
+const risk = py(`_risk(${rows(GAP)})`);
+ok(risk.no_rollback === 1,
+   "only the changeset with no rollback block is counted as having none",
+   JSON.stringify(risk));
+ok(risk.rollback_not_data_safe === 1,
+   "and the drop -- rollback declared, data not recoverable -- is counted "
+   + "separately, not folded in with it", JSON.stringify(risk));
+ok(risk.destructive === 1, "the drop is also flagged destructive by type",
+   risk.destructive);
+ok(/no rollback block/.test(risk.headline)
+   && /without the data/.test(risk.headline),
+   "and the headline names both problems rather than leaving a reader to "
+   + "add two numbers up", risk.headline);
+
+// Defaults are the cautious direction: an unanswered "is there a
+// rollback" is no rollback, and an unanswered "is it safe" is safe only
+// once a rollback exists to be safe about.
+const dflt = py(`_risk(${rows([{ changeset_id: "c4", change_type: "dml" }])})`);
+ok(dflt.no_rollback === 1 && dflt.rollback_not_data_safe === 0,
+   "a changeset that declares nothing counts as having no rollback, and is "
+   + "not double-counted as a lossy one", JSON.stringify(dflt));
+
+const clean = py(`_risk(${rows([GAP[0]])})`);
+ok(clean.no_rollback === 0 && clean.rollback_not_data_safe === 0
+   && /Nothing in this gap is irreversible/.test(clean.headline),
+   "a gap with nothing irreversible in it says so, rather than showing "
+   + "three zeroes and leaving the reader to interpret them",
+   JSON.stringify(clean));
+
+// ---- rollback is two questions, so two flags ------------------------
+ok(/rollback_declared/.test(DDL3) && /data_safe/.test(DDL3),
+   "the changeset table asks both whether a rollback exists AND whether it "
+   + "returns the data", "");
+ok(/"risk": risk/.test(ROUTER),
+   "and the comparison carries that classification rather than leaving each "
+   + "caller to re-derive it from the flags", "");
+ok(/no rollback block/.test(GJSX) && /rolls back without the data/.test(GJSX),
+   "the screen says which of the two it is", "");
+ok(/CREATE TABLE guardrail_changeset_applied/.test(DDL3),
+   "applied-per-environment mirrors DATABASECHANGELOG, so a real ingester "
+   + "has somewhere to put the rows unreshaped", "");
+
+// An IN list is bounded at 1000 and a promotion window can exceed it.
+ok(/range\(0, len\(ids\), 500\)/.test(ROUTER),
+   "the changeset lookup is chunked", "");
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\nguardrails-regions assertions pass");
 if (bad) process.exit(1);

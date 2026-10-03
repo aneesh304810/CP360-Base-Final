@@ -380,3 +380,149 @@ def deployments(environment: str | None = None, limit: int = 60):
 
     return {"environments": out, "history": rows[:max(1, min(int(limit or 60), 500))],
             "synthetic": True}
+
+
+# ===================================================================
+# Comparing two environments
+# ===================================================================
+# "What is in UAT that is not in production" — the question asked before
+# every promotion, and the one a pair of version strings cannot answer.
+
+def _risk(ahead):
+    """What in this gap cannot be taken back.
+
+    TWO COUNTS, NOT ONE, because they are two different problems:
+
+      no_rollback             nothing to run. Reversible only from backup.
+      rollback_not_data_safe  a rollback exists and running it does not
+                              bring the data back — a DROP COLUMN is the
+                              usual case, and it answers Y to "is there a
+                              rollback" and N to "will it help".
+
+    A single "rollbackable" flag collapses those, and that is how a
+    promotion gets approved on the strength of a rollback that restores
+    an empty column.
+
+    Pure, and separate from the endpoint, so it can be exercised with
+    rows rather than inferred from the source.
+    """
+    no_rb = [c for c in ahead if (c.get("rollback_declared") or "N") != "Y"]
+    lossy = [c for c in ahead
+             if (c.get("rollback_declared") or "N") == "Y"
+             and (c.get("data_safe") or "Y") != "Y"]
+    destructive = [c for c in ahead if c.get("change_type") == "ddl_drop"]
+    return {
+        "no_rollback": len(no_rb),
+        "rollback_not_data_safe": len(lossy),
+        "destructive": len(destructive),
+        # Spelled out rather than left as numbers for a reader to add up.
+        "headline": ("Nothing in this gap is irreversible."
+                     if not (no_rb or lossy) else
+                     "; ".join(filter(None, [
+                         f"{len(no_rb)} changeset(s) with no rollback block"
+                         if no_rb else None,
+                         f"{len(lossy)} that roll back without the data"
+                         if lossy else None]))),
+    }
+
+
+def _bnum(v):
+    """Build numbers sort numerically. '1201' > '984' is false as text."""
+    try:
+        return int(str(v).strip())
+    except (TypeError, ValueError):
+        return -1
+
+
+@router.get("/compare")
+def compare(from_env: str = "PROD", to_env: str = "UAT"):
+    """Both lanes of the gap between two environments.
+
+    Named by ENVIRONMENT rather than by tag: a tag identifies one lane,
+    and the whole point of this call is that the application and the
+    schema move separately. The tags of both sides are in the payload.
+    """
+    a, b = _region(from_env, "PROD"), _region(to_env, "UAT")
+
+    deps = _safe("""SELECT environment, lane, release_id, build_number,
+        app_tag, commit_sha, db_tag, changesets, status, deployed_at
+        FROM guardrail_deployment WHERE status = 'deployed'
+        ORDER BY deployed_at DESC""")
+    cur = {}
+    for d in deps:
+        cur.setdefault(f"{d.get('environment')}|{d.get('lane')}", d)
+
+    side = {k: {"environment": v,
+                "app": cur.get(f"{v}|app"), "schema": cur.get(f"{v}|schema")}
+            for k, v in (("from", a), ("to", b))}
+
+    # ---- application lane -------------------------------------------
+    # Grounded in what was actually DEPLOYED to the target, not in which
+    # releases happen to exist: a release blocked in SIT has a build
+    # number in the range and has shipped nowhere.
+    from_b = _bnum((side["from"]["app"] or {}).get("build_number"))
+    to_b = _bnum((side["to"]["app"] or {}).get("build_number"))
+    rel_ids, app_rows = [], []
+    for d in deps:
+        if d.get("environment") != b or d.get("lane") != "app":
+            continue
+        n = _bnum(d.get("build_number"))
+        if from_b < n <= to_b and d.get("release_id") not in rel_ids:
+            rel_ids.append(d.get("release_id"))
+    if rel_ids:
+        marks = ", ".join(f":r{i}" for i in range(len(rel_ids)))
+        app_rows = _safe(f"""SELECT release_id, title, author, pr_number,
+            build_number, commit_sha, models_changed, datasets
+            FROM guardrail_release WHERE release_id IN ({marks})
+            ORDER BY build_number DESC""",
+            {f"r{i}": v for i, v in enumerate(rel_ids)})
+
+    # ---- schema lane --------------------------------------------------
+    # A set difference over what each environment has applied, which is
+    # what Liquibase itself compares.
+    applied = _safe("""SELECT changeset_id, environment FROM
+        guardrail_changeset_applied WHERE environment IN (:a, :b)""",
+        {"a": a, "b": b})
+    in_a = {r["changeset_id"] for r in applied if r.get("environment") == a}
+    in_b = {r["changeset_id"] for r in applied if r.get("environment") == b}
+    ahead_ids, behind_ids = sorted(in_b - in_a), sorted(in_a - in_b)
+
+    def changesets(ids):
+        if not ids:
+            return []
+        out = []
+        # Chunked: an IN list is bounded at 1000 and a promotion window
+        # can be larger than anyone expects.
+        for i in range(0, len(ids), 500):
+            chunk = ids[i:i + 500]
+            marks = ", ".join(f":c{j}" for j in range(len(chunk)))
+            out += _safe(f"""SELECT changeset_id, author, filename, description,
+                change_type, rollback_declared, data_safe, release_id,
+                build_number, position_order
+                FROM guardrail_changeset WHERE changeset_id IN ({marks})
+                ORDER BY position_order""",
+                {f"c{j}": v for j, v in enumerate(chunk)})
+        return out
+
+    ahead = changesets(ahead_ids)
+
+    risk = _risk(ahead)
+
+    return {
+        "from": side["from"], "to": side["to"],
+        # Both lanes name their TAG first and their build second. The tag
+        # is what somebody checks out to reproduce a version; the build is
+        # the pipeline run that produced it, and two environments can share
+        # a build number while sitting on different tags after a re-tag.
+        "app": {"releases": app_rows, "count": len(app_rows),
+                "from_tag": (side["from"]["app"] or {}).get("app_tag"),
+                "to_tag": (side["to"]["app"] or {}).get("app_tag"),
+                "from_build": (side["from"]["app"] or {}).get("build_number"),
+                "to_build": (side["to"]["app"] or {}).get("build_number")},
+        "schema": {"ahead": ahead, "ahead_count": len(ahead_ids),
+                   "behind_count": len(behind_ids),
+                   "from_tag": (side["from"]["schema"] or {}).get("db_tag"),
+                   "to_tag": (side["to"]["schema"] or {}).get("db_tag")},
+        "risk": risk,
+        "synthetic": True,
+    }
