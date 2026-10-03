@@ -1,27 +1,29 @@
-// Quality Guardrails across SIT, UAT and PROD.
+// Quality Guardrails: one board, three regions, two grains.
 //
-// THE REFACTOR THIS PINS. The screen was one flat list of failed jobs with
-// no notion of where they ran. BBH promotes through three regions that do
-// genuinely different work, and the trap is to model that as one list with
-// a region filter. It is not:
+// THE DESIGN THIS PINS. The first pass put SIT, UAT and PROD behind a
+// region picker. That answers "did my build pass" and "did last night's
+// data land", and fails the question the screen mostly exists for —
+// "where is everything, and what is stuck" — which is only answerable by
+// seeing all three regions at once. Behind a picker it becomes three
+// clicks and a memory test.
 //
-//   a GATE RUN belongs to a commit   — can this change ship?
-//   a GUARDRAIL EVENT belongs to a run on a business date — is today right?
+// So the board shows every region in one view, and the release detail
+// puts SIT and UAT side by side stage for stage. That alignment is the
+// point: the positions release passes the performance stage in SIT at
+// 20K rows and fails it in UAT at 4.2M, and those two facts belong on one
+// line. A picker cannot draw that comparison at all.
 //
-// PROD runs no gates at all. Drawing it with an empty gate list would read
-// as a gap rather than as the design, so the region switch picks between
-// two screens rather than narrowing one.
-//
-// Rendering every gate state matters because they are not interchangeable:
-// a failing NON-BLOCKING gate is a report, and counting it as a stop is how
-// a board teaches people that red means nothing.
+// The two grains still do not merge. A gate run belongs to a commit; a
+// guardrail event belongs to a run on a business date. They are two
+// sections of one page, so the ops reader never navigates past a release
+// board to check last night.
 
 import React from "react";
 import fs from "node:fs";
 import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { SyntheticBanner, RegionLanes, ReleaseGates, Gate, Evidence, GateBar }
-  from "../src/Guardrails.jsx";
+import { SyntheticBanner, PromotionBoard, BoardCell, ReleaseDetail, Gate,
+  Evidence, GateBar } from "../src/Guardrails.jsx";
 import { STAGE, GATE_STATUS, REGION } from "../src/guardrails_api_additions.js";
 import { tLight } from "../src/bbhTheme.js";
 
@@ -30,7 +32,7 @@ const ok = (cond, msg, got) => {
   console.log(`${cond ? "ok  " : "FAIL"} ${msg}${cond ? "" : `  -> ${String(got).slice(0, 300)}`}`);
   if (!cond) bad++;
 };
-const t = { ...tLight, radius: tLight.radius, height: tLight.height };
+const t = tLight;
 
 function findSrc() {
   let dir = process.cwd();
@@ -52,89 +54,125 @@ const ROUTER = strip("api/app/routers_guardrails.py");
 const SYNTH = strip("ingestion/guardrails_promotion_synth.py");
 const DDL = fs.readFileSync(path.join(ROOT, "sql/67_guardrail_promotion.sql"), "utf8");
 
-// ---- the two planes are two screens, not one with a filter ------------
-ok(/region === "PROD"[\s\S]{0,80}RuntimePlane/.test(GJSX),
-   "PROD mounts the runtime plane", "");
-ok(/:\s*<PromotionPlane/.test(GJSX),
-   "SIT and UAT mount the promotion plane instead", "");
-ok(/no gate runs in \{region\}/i.test(GJSX),
-   "and PROD says it is not gated, rather than showing an empty gate list",
-   "");
+const REL = (o) => ({
+  release_id: "REL-1", title: "Positions SCD2", branch: "feature/x",
+  commit_sha: "4f2a9c1", pr_number: "418", build_number: "1201",
+  author: "j.t", current_region: "UAT", status: "blocked", models_changed: 11,
+  datasets: "gld_positions",
+  regions: {
+    SIT: { total: 14, passed: 14, failed: 0, warning: 0, running: 0,
+           not_run: 0, blocking_failures: 0, blocker: null, state: "passed" },
+    UAT: { total: 6, passed: 1, failed: 1, warning: 1, running: 0, not_run: 3,
+           blocking_failures: 1, blocker: "SLA at 10K-5M rows", state: "blocked" },
+  }, ...o });
+
+// ---- all three regions are visible at once, with no picker -----------
+let board = "";
+try {
+  board = renderToStaticMarkup(
+    <PromotionBoard t={t} onOpen={() => {}}
+      rels={{ releases: [REL({})], synthetic: true }} />);
+  ok(board.length > 0, "the board renders", "");
+} catch (e) { ok(false, "the board renders", e && e.stack); }
+for (const k of ["SIT", "UAT", "PROD"]) {
+  ok(board.includes(`>${k}<`), `${k} is a column on the same view`, "");
+}
+ok(!/aria-pressed/.test(board),
+   "there is no region toggle — all three are on screen together, which is "
+   + "the question a picker could not answer", "");
+ok(!/NaN|undefined/.test(board), "and nothing renders as NaN or undefined",
+   (board.match(/.{0,60}(NaN|undefined).{0,60}/) || [])[0]);
+
+// ---- a blocked cell names the gate, not a count ----------------------
+ok(board.includes("SLA at 10K-5M rows"),
+   "a blocked cell names the gate holding the release — “1 failed” "
+   + "sends the reader looking for what the cell could have told them", "");
+
+// ---- a region not yet reached is blank, not green --------------------
+const sitOnly = REL({ current_region: "SIT", status: "in_flight",
+  regions: { SIT: { total: 14, passed: 2, failed: 0, warning: 0, running: 1,
+                    not_run: 11, blocking_failures: 0, state: "running" },
+             UAT: { total: 6, passed: 0, failed: 0, warning: 0, running: 0,
+                    not_run: 6, blocking_failures: 0, state: "pending" } } });
+const uatCell = renderToStaticMarkup(
+  <BoardCell t={t} r={sitOnly} region="UAT" />);
+ok(uatCell.includes("—") && !/queued|passed|blocked/.test(uatCell),
+   "a release still in SIT shows nothing in the UAT column — its UAT gates "
+   + "exist as not_run, and drawing them would say somebody promoted it",
+   uatCell);
+
+// ---- PROD answers a different question -------------------------------
+// It is not a gate column: a release is live there or it is not.
+const prodNo = renderToStaticMarkup(<BoardCell t={t} r={sitOnly} region="PROD" />);
+const prodYes = renderToStaticMarkup(
+  <BoardCell t={t} r={REL({ current_region: "PROD", status: "released" })}
+    region="PROD" />);
+ok(prodYes.includes("live"), "PROD says live when the change shipped", prodYes);
+ok(prodNo.includes("—") && !/passed|gates/.test(prodNo),
+   "and never reports gates, because PROD runs none", prodNo);
 ok(/"region": "PROD", "kind": "runtime"/.test(ROUTER),
    "the API types PROD as runtime, so the UI is not guessing from a name", "");
-for (const rg of ["SIT", "UAT"]) {
-  ok(new RegExp(`"region": "${rg}", "kind": "gates"`).test(ROUTER),
-     `and ${rg} as gated`, "");
-}
 
-// ---- every region and every gate state renders ------------------------
-const META = {
-  SIT: { region: "SIT", kind: "gates", gates: 14, failed: 1, blocking_failures: 1,
-         running: 0, events: 0, critical: 0, trigger: "every push",
-         covers: "governance, tests, security" },
-  UAT: { region: "UAT", kind: "gates", gates: 6, failed: 1, blocking_failures: 1,
-         running: 0, events: 0, critical: 0, trigger: "on promotion",
-         covers: "SLA at realistic volumes" },
-  PROD: { region: "PROD", kind: "runtime", gates: 0, failed: 0,
-          blocking_failures: 0, running: 0, events: 7, critical: 2,
-          trigger: "every scheduled run", covers: "data quality on the date" },
-};
-let lanes = "";
+// ---- the detail aligns SIT and UAT stage for stage --------------------
+const g = (o) => ({ gate_run_id: Math.random().toString(36).slice(2),
+  region: "SIT", stage: "testing", stage_order: 3, gate_key: "k",
+  gate_name: "A gate", status: "passed", severity: "low", blocking: "Y", ...o });
+const gates = [
+  g({ region: "SIT", stage: "security", stage_order: 4, gate_name: "CVE scanning" }),
+  g({ region: "SIT", stage: "governance", stage_order: 1, gate_name: "Schema validation" }),
+  g({ region: "SIT", stage: "performance", stage_order: 2, gate_name: "EXPLAIN PLAN" }),
+  g({ region: "UAT", stage: "performance", stage_order: 2, gate_name: "SLA at volume",
+      status: "failed", observed_value: "1,284s at 4.2M rows",
+      threshold: "<= 900s at 5M rows" }),
+];
+let det = "";
 try {
-  lanes = renderToStaticMarkup(
-    <RegionLanes t={t} cur="SIT" onPick={() => {}} meta={(k) => META[k]} />);
-  ok(lanes.length > 0, "the three region lanes render", "");
-} catch (e) { ok(false, "the three region lanes render", e && e.stack); }
-for (const k of ["SIT", "UAT", "PROD"]) {
-  ok(lanes.includes(REGION[k].label), `${k} appears`, "");
-}
-ok(!/NaN|undefined/.test(lanes), "with no NaN or undefined", lanes.slice(0, 200));
-// PROD's trouble signal is a critical EVENT; SIT's is a blocking GATE.
-// One badge word for both would be wrong about one of them.
-ok(/2 critical/.test(lanes),
-   "PROD's badge counts critical runtime events, not gates", "");
-ok(/1 blocking/.test(lanes),
-   "a gated region's badge counts blocking gate failures", "");
+  det = renderToStaticMarkup(
+    <ReleaseDetail t={t} id="REL-1" onBack={() => {}} />);
+  ok(true, "the detail renders before its fetch resolves", "");
+} catch (e) { ok(false, "the detail renders before its fetch resolves", e && e.stack); }
 
-// ---- every gate status renders, and non-blocking is marked ------------
-const mkGate = (o) => ({ gate_run_id: "g1", region: "SIT", stage: "testing",
-  stage_order: 3, gate_key: "dbt_tests", gate_name: "dbt tests",
-  status: "passed", severity: "low", blocking: "Y", ...o });
+// The fetch does not resolve under SSR, so the aligned grid is asserted
+// against the source: the structure is what matters and it is static.
+ok(/\["SIT", "UAT"\]\.map\(\(rg\) => \{[\s\S]{0,400}g\.stage === s && g\.region === rg/.test(GJSX),
+   "each stage row renders SIT and UAT beside each other, filtered to that "
+   + "stage — the alignment IS the comparison", "");
+ok(/does not run this stage/.test(GJSX),
+   "and a region that does not run a stage says so rather than showing a "
+   + "blank box, which would read as a gate that failed to report", "");
+ok(/\(STAGE\[a\]\?\.order \?\? 99\) - \(STAGE\[b\]\?\.order \?\? 99\)/.test(GJSX),
+   "stages read in CI/CD order, not in the order rows came back", "");
+
+// ---- every gate state renders, and non-blocking is marked ------------
 for (const st of Object.keys(GATE_STATUS)) {
   let h = "";
   try {
-    h = renderToStaticMarkup(<Gate t={t} g={mkGate({ status: st })} first />);
-    ok(h.includes(GATE_STATUS[st].label), `a ${st} gate renders its own word`, h.slice(0, 160));
+    h = renderToStaticMarkup(<Gate t={t} g={g({ status: st })} first />);
+    ok(h.includes(GATE_STATUS[st].label), `a ${st} gate renders its own word`,
+       h.slice(0, 140));
   } catch (e) { ok(false, `a ${st} gate renders`, e && e.stack); }
   ok(!/NaN|undefined/.test(h), `a ${st} gate is clean`, h);
 }
-const nb = renderToStaticMarkup(
-  <Gate t={t} g={mkGate({ status: "failed", blocking: "N" })} first />);
-ok(/non-blocking/.test(nb),
-   "a failing gate that does not block says so — counting it as a stop is how "
-   + "a board teaches people that red means nothing", nb.slice(0, 200));
-ok(!/non-blocking/.test(
-     renderToStaticMarkup(<Gate t={t} g={mkGate({ status: "failed" })} first />)),
+ok(/non-blocking/.test(renderToStaticMarkup(
+     <Gate t={t} g={g({ status: "failed", blocking: "N" })} first />)),
+   "a failing gate that does not block says so — drawing both the same "
+   + "way is how a board teaches people that red means nothing", "");
+ok(!/non-blocking/.test(renderToStaticMarkup(
+     <Gate t={t} g={g({ status: "failed" })} first />)),
    "and a blocking one does not carry the chip", "");
-// Only a BLOCKING failure counts as a blocker, server-side too.
-ok(/x\.get\("status"\) in _BAD\s*$|status"\) in _BAD[\s\S]{0,60}blocking"\) == "Y"/m.test(ROUTER),
+ok(/blocking"\) == "Y"/.test(ROUTER),
    "the API counts a blocker as failed AND blocking", "");
 
-// ---- a release only appears on a board it has reached -----------------
-ok(/\["UAT", "PROD"\]\.includes\(r\.current_region\)/.test(GJSX),
-   "the UAT board excludes a release still sitting in SIT — its UAT gates "
-   + "exist as not_run, and listing it would say somebody promoted it", "");
-
-// ---- the gate bar shows what is still to run --------------------------
-const barHtml = renderToStaticMarkup(
-  <GateBar t={t} d={{ total: 14, passed: 2, failed: 0, warning: 0,
-                      running: 1, not_run: 11 }} />);
-ok(barHtml.length > 0 && !/NaN/.test(barHtml),
-   "the gate bar renders a mostly-unrun release without NaN", barHtml.slice(0, 200));
+// ---- the bar shows what is still to run -------------------------------
+const bar = renderToStaticMarkup(<GateBar t={t}
+  d={{ total: 14, passed: 2, failed: 0, warning: 0, running: 1, not_run: 11 }} />);
+ok(bar.length > 0 && !/NaN/.test(bar),
+   "the bar renders a mostly-unrun release — two passes out of fourteen "
+   + "is not “doing well” and two green chips would say it was", bar.slice(0, 140));
 ok(renderToStaticMarkup(<GateBar t={t} d={{ total: 0 }} />) === "",
    "and draws nothing rather than an empty bar when there are no gates", "");
 
-// ---- evidence survives a payload that is not what we expected ---------
+// ---- evidence survives a payload that is not what we expected --------
 ok(/CVE-2026-21714/.test(renderToStaticMarkup(
      <Evidence t={t} raw='{"cve":"CVE-2026-21714","severity":"CRITICAL"}' />)),
    "JSON evidence renders as key and value", "");
@@ -142,34 +180,22 @@ ok(/not json/.test(renderToStaticMarkup(<Evidence t={t} raw="not json at all" />
    "and evidence that will not parse is shown as text rather than dropped "
    + "for being the wrong shape", "");
 
-// ---- stages render in pipeline order ----------------------------------
-const gates = [
-  mkGate({ gate_run_id: "a", stage: "security", stage_order: 4, gate_name: "CVE scanning" }),
-  mkGate({ gate_run_id: "b", stage: "governance", stage_order: 1, gate_name: "Schema validation" }),
-  mkGate({ gate_run_id: "c", stage: "performance", stage_order: 2, gate_name: "EXPLAIN PLAN" }),
-];
-const rg = renderToStaticMarkup(
-  <ReleaseGates t={t} region="SIT"
-    detail={{ release: { title: "T", branch: "b", commit_sha: "abc1234",
-                         pr_number: "1", build_number: "2", models_changed: 3,
-                         datasets: "x" }, gates }} />);
-const iGov = rg.indexOf("Governance"), iPerf = rg.indexOf("Performance"),
-      iSec = rg.indexOf("Security");
-ok(iGov > -1 && iPerf > iGov && iSec > iPerf,
-   "stages read in CI/CD order, not in the order the rows came back",
-   [iGov, iPerf, iSec]);
-ok(!/NaN|undefined/.test(rg), "the gate list is clean", rg.slice(0, 200));
+// ---- the runtime section is never behind the board -------------------
+ok(/<RuntimeSection t=\{t\} selection=\{selection\} \/>/.test(GJSX),
+   "the runtime section is always on the page", "");
+// A SIBLING of the conditional, not a child of either arm. Asserted as
+// "follows the ternary's closing brace", because a looser search matches
+// just as happily when the section has been moved inside one arm, which
+// is exactly the regression it is meant to catch.
+ok(/\/>\}\s*<RuntimeSection/.test(GJSX),
+   "and sits outside the branch that swaps the board for a release \u2014 the "
+   + "7am question does not depend on what is in flight",
+   (GJSX.match(/.{0,80}<RuntimeSection.{0,40}/) || [])[0]);
+ok(/promotionApi\.stats\("PROD"\)/.test(GJSX)
+   && /promotionApi\.attention\(engine, "PROD"\)/.test(GJSX),
+   "it asks for PROD explicitly rather than inheriting a selection", "");
 
-// ---- performance runs in BOTH regions, at different depths ------------
-// The slide puts benchmarking in the Jenkins run; the real split is cheap
-// checks on every push and volume SLA where volume exists.
-ok(/"performance", 2, "explain_plan"/.test(SYNTH),
-   "SIT runs EXPLAIN PLAN — no data volume needed", "");
-ok(/"performance", 2, "sla_volume"/.test(SYNTH),
-   "UAT runs the volume SLA — the half that needs realistic data", "");
-// Checked against the SIT block itself. The first draft searched forward
-// from sla_volume for the string "SIT_GATES", which appears again further
-// down in build_gate_runs — so it matched whatever the truth was.
+// ---- performance runs in BOTH regions, at different depths -----------
 const SIT_BLOCK = (SYNTH.match(/SIT_GATES = \[([\s\S]*?)\]/) || ["", ""])[1];
 const UAT_BLOCK = (SYNTH.match(/UAT_GATES = \[([\s\S]*?)\]/) || ["", ""])[1];
 ok(SIT_BLOCK.includes("explain_plan") && !SIT_BLOCK.includes("sla_volume"),
@@ -177,18 +203,16 @@ ok(SIT_BLOCK.includes("explain_plan") && !SIT_BLOCK.includes("sla_volume"),
 ok(UAT_BLOCK.includes("sla_volume") && !UAT_BLOCK.includes("explain_plan"),
    "UAT has the volume SLA and does not repeat EXPLAIN PLAN", UAT_BLOCK);
 
-// ---- the banner is driven by the payload, never by a constant ---------
-ok(renderToStaticMarkup(
-     <SyntheticBanner t={t} payload={{ synthetic: true }} />).includes("Illustrative"),
+// ---- the banner is driven by the payload, never by a constant --------
+ok(renderToStaticMarkup(<SyntheticBanner t={t} payload={{ synthetic: true }} />)
+     .includes("Illustrative"),
    "the banner shows while the data is synthetic", "");
-ok(renderToStaticMarkup(
-     <SyntheticBanner t={t} payload={{ synthetic: false }} />) === "",
-   "and disappears on its own once a real connector reports synthetic=false — "
-   + "a hard-coded banner would still be apologising a year later", "");
+ok(renderToStaticMarkup(<SyntheticBanner t={t} payload={{ synthetic: false }} />) === "",
+   "and disappears on its own once a real connector reports synthetic=false "
+   + "— a hard-coded banner would still be apologising a year later", "");
 ok(renderToStaticMarkup(<SyntheticBanner t={t} payload={null} />) === "",
-   "and says nothing at all when the service did not answer", "");
-ok(/"synthetic": True/.test(ROUTER),
-   "the API is what makes the claim", "");
+   "and says nothing when the service did not answer", "");
+ok(/"synthetic": True/.test(ROUTER), "the API is what makes the claim", "");
 
 // ---- the schema keeps the two grains apart ----------------------------
 ok(/CREATE TABLE guardrail_release/.test(DDL), "there is a release table", "");
@@ -196,13 +220,10 @@ ok(/CREATE TABLE guardrail_gate_run/.test(DDL), "and a gate-run table", "");
 ok(/ALTER TABLE guardrail_events ADD \(region/.test(DDL),
    "and the runtime table gains a region rather than being replaced", "");
 ok(/-1430/.test(DDL),
-   "ORA-01430 is tolerated, so re-running the script after the column exists "
-   + "is not an error", "");
+   "ORA-01430 is tolerated, so re-running after the column exists is not an "
+   + "error", "");
 ok(/UPDATE guardrail_events SET region = ''PROD'' WHERE region IS NULL/.test(DDL),
-   "existing events are backfilled as PROD — they always were runtime events",
-   "");
-// A filter that drops NULL regions would empty the screen on a database
-// where sql/67 has run but the backfill has not.
+   "existing events backfill as PROD — they always were runtime events", "");
 ok(/NVL\(region, 'PROD'\)/.test(ROUTER),
    "the region filter reads NULL as PROD rather than excluding it", "");
 ok((ROUTER.match(/if not rows:/g) || []).length >= 2,
