@@ -136,6 +136,37 @@ _REGIONS = ("SIT", "UAT", "PROD")
 _BAD = ("failed",)
 
 
+# The four CI/CD stages plus promotion, in pipeline order. Named here so
+# the API and the screen cannot disagree about what a stage is called.
+_STAGES = ("governance", "performance", "testing", "security", "promotion")
+
+
+def _stage_rollup(gates):
+    """One cell per stage: its worst outcome, and the counts behind it.
+
+    Worst-first, because a stage with nine passes and one failure is a
+    failed stage. A cell that showed the majority would be green on the
+    build that is blocked.
+    """
+    out = {}
+    for st in _STAGES:
+        g = [x for x in gates if (x.get("stage") or "") == st]
+        if not g:
+            continue
+        counts = {k: sum(1 for x in g if x.get("status") == k)
+                  for k in ("passed", "failed", "warning", "running", "not_run")}
+        blocking_fail = any(x.get("status") in _BAD and x.get("blocking") == "Y"
+                            for x in g)
+        worst = ("failed" if counts["failed"] else
+                 "running" if counts["running"] else
+                 "warning" if counts["warning"] else
+                 "not_run" if counts["not_run"] == len(g) else
+                 "passed" if counts["passed"] else "not_run")
+        out[st] = {"status": worst, "total": len(g), "blocking": blocking_fail,
+                   **counts}
+    return out
+
+
 def _region(v, default=None):
     v = (v or "").strip().upper()
     return v if v in _REGIONS else default
@@ -187,6 +218,12 @@ def promotion():
                           "running" if any(x.get("status") == "running" for x in g) else
                           "pending" if g and all(x.get("status") == "not_run" for x in g) else
                           "passed" if g else "none"),
+                # PER-STAGE ROLLUP, so the screen can draw a build x stage
+                # matrix from this one call. Folding it here rather than in
+                # the UI keeps the cell and the lane counting the same rows:
+                # two passes over the same list in two languages is how a
+                # matrix ends up disagreeing with the summary above it.
+                "stages": _stage_rollup(g),
             }
         out.append({**r, "regions": regions, "gate_count": len(mine)})
 
