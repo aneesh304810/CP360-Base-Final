@@ -50,7 +50,207 @@ export const isSeedId = (id) => typeof id === "string" && id.startsWith(SEED_PRE
 
 export const SEED_AUTHOR = "CP360 · drafted from the codebase";
 
+const QUOTE_STAGE2 =
+  "Stage 2 serves as the core transformation and metadata management layer, handling business transformations, source-to-target mappings, reference data, lineage tracking, audit information, and data quality controls.";
+const QUOTE_NOT_CANONICAL =
+  "Stage 2 is specifically designed to meet IMDS Staging and PBDW data delivery requirements. It is not intended to function as an enterprise-wide canonical data model; instead, it focuses on preparing, validating, and structuring SWP data for IMDS Stage and PBDW tables.";
+const REF_ARCH = "SEI Architecture p.6 — Stage 2 Design Principles";
+
 export const SEED_ANSWERS = [
+
+// ---- extracted from the SEI pack, 2026-10 ---------------------------
+// Fifteen questions were put to the documents; one came back NO DATA and
+// is deliberately absent below, because an answer reading "NO DATA" on
+// screen looks like the question was dealt with.
+//
+// Two were corrected before loading, and both corrections are the same
+// mistake: the quote sat NEAR the claim rather than carrying it. Q1 was
+// returned as a definition of "enriched" behind a quote that never uses
+// the word, and q6 behind a sentence that does not say what its body
+// says. The quotes are the reason that was visible at all.
+
+{ n: 1, conf: "document",
+  body:
+"The document does not use the word “enriched”. What it describes in that "
++ "position is STAGE 2, defined as the core transformation and metadata "
++ "management layer: business transformations, source-to-target mappings, "
++ "reference data, lineage tracking, audit information and data quality "
++ "controls.\n\n"
++ "So the answerable form of this question is “what is Stage 2”, and that "
++ "is the scope. Reading “enriched” and “Stage 2” as the same thing is "
++ "BBH's inference, not a statement in the pack.",
+  gap:
+"Two things. The pack never uses the word the question is built on, so "
++ "somebody should get SEI to confirm in one line that the enriched layer "
++ "IS Stage 2 — this is cheap to settle and expensive to assume. And "
++ "“business transformations” is a category, not a list: no enrichment "
++ "operation is enumerated per interface or domain.",
+  quote: QUOTE_STAGE2, ev: [REF_ARCH] },
+
+{ n: 2, conf: "document",
+  body:
+"No. The layer handles business transformations and source-to-target "
++ "mappings, which is more than normalisation.",
+  gap:
+"The AddVantage half of the question is unanswered. The quote supports "
++ "“more than normalisation” and nothing more — the pack neither includes "
++ "nor excludes AddVantage-specific transformation, and does not break "
++ "transformations down per feed.",
+  quote: QUOTE_STAGE2, ev: [REF_ARCH] },
+
+{ n: 3, conf: "absence",
+  body:
+"The pack describes Stage 2 as a delivery-oriented layer and does not "
++ "state that it is a reusable enterprise schema equivalent to today's PB "
++ "DWH. Searched for: reusable, published contract, stable schema, consumer "
++ "model, enterprise model, PB DWH replacement.",
+  gap:
+"So the question stands, and it is a decision rather than a lookup: "
++ "nothing says whether consumers may build against Stage 2 as a long-term "
++ "contract. Read together with question 4, the pack leans against it.",
+  ev: ["SEI Architecture p.6–7"] },
+
+{ n: 4, conf: "document",
+  body:
+"No — and this one the document settles outright. Stage 2 is explicitly "
++ "NOT intended as an enterprise-wide canonical model. It is scoped to "
++ "preparing, validating and structuring SWP data for IMDS Stage and PBDW "
++ "tables.\n\n"
++ "That is the clearest statement in the pack, and it answers more than "
++ "question 4: it is the reason questions 3 and 10 matter.",
+  gap:
+"It says what Stage 2 is not. It does not say what BBH should use "
++ "instead, or whether a further model is expected downstream.",
+  quote: QUOTE_NOT_CANONICAL, ev: [REF_ARCH] },
+
+{ n: 5, conf: "document",
+  body:
+"It includes normalisation-style work — source-to-target mappings and "
++ "reference data handling are both named. The pack does not state that "
++ "Stage 2 transforms into the existing PB DWH dimensional model.",
+  gap:
+"The second half of that is an absence, not a denial: the pack is silent "
++ "on PB DWH modelling rather than ruling it out. The boundary between "
++ "enrichment and PBDW-specific modelling is undefined, which is the same "
++ "gap question 16 asks about from the other side.",
+  quote: QUOTE_STAGE2, ev: [REF_ARCH] },
+
+{ n: 6, conf: "document",
+  body:
+"Stage 2 is the central transformation and metadata management layer of "
++ "the inbound architecture, scoped specifically to IMDS Staging and PBDW "
++ "delivery.",
+  gap:
+"No row-level processing flow inside Stage 2 is given. More importantly "
++ "for this review, the pack does not place Stage 2 against BBH's own "
++ "Stage/INT layers — two naming schemes, reconciled nowhere, and question "
++ "7 is the other half of the same problem.",
+  quote: QUOTE_STAGE2 + " " + QUOTE_NOT_CANONICAL, ev: [REF_ARCH] },
+
+{ n: 7, conf: "document",
+  body:
+"INT is a persisted layer. It consumes only PASS rows, applies code "
++ "mappings, is keyed on the natural business key plus BUSINESS_DATE, and "
++ "feeds the DIM and FACT models. Purge is by partition drop.",
+  gap:
+"The relationship between SEI's Stage 2 and BBH's INT is not mapped in "
++ "any one document, so whether they overlap, abut or duplicate is still "
++ "open — see questions 6 and 9.",
+  quote: "INT reads only PASS rows... map codes (ACCOUNT_TYPE, SITUS_CODE); "
+       + "keyed on natural key + BUSINESS_DATE; partition-drop purge.",
+  ev: ["Transformation TDD p.10"] },
+
+{ n: 8, conf: "document",
+  body:
+"Yes, that reading holds. STG is a non-persisted view that standardises "
++ "columns and computes the source DQ flag; INT reads only the PASS rows "
++ "and applies mappings before DIM and FACT are built.",
+  gap:
+"No single sentence in the pack states the end-to-end sequence — this is "
++ "two statements read together. It holds, but it is a synthesis, and if "
++ "one layer later changes the summary will not obviously be wrong.",
+  quote: "Silver STG is a non-persisted view... computes the Source DQ flag "
+       + "DQ_STATUS_CD / DQ_FAIL_REASON_CDS. … INT reads only PASS rows and "
+       + "is keyed on the natural business key plus BUSINESS_DATE.",
+  ev: ["Transformation TDD p.5", "Transformation TDD p.12"] },
+
+{ n: 9, conf: "document",
+  body:
+"STG — a non-persisted view: standardise columns, compute DQ status and "
++ "fail reasons. INT — persisted: PASS rows only, code mapping. Gold DIM — "
++ "direct-compare atomic MERGE. Gold FACT — loads only "
++ "dimension-resolved transactions.\n\n"
++ "The last of those is the load-bearing one for this review: a "
++ "transaction whose dimension does not resolve does not reach FACT, which "
++ "is where questions 34 and 47 land.",
+  gap:
+"The pack does not give a complete matrix of which business rule lives in "
++ "which layer — only the shape of each layer.",
+  quote: "STG (view)... Non-persisted view: standardize columns; compute "
+       + "DQ_STATUS_CD / DQ_FAIL_REASON_CDS. … INT... Reads only PASS rows; "
+       + "map codes. … Gold DIM... Direct-compare atomic MERGE. … Gold "
+       + "FACT... loads only dimension-resolved transactions.",
+  ev: ["Transformation TDD p.10", "Transformation TDD p.12–15"] },
+
+{ n: 10, conf: "absence",
+  body:
+"The pack does not say whether downstream applications may read Stage 2 "
++ "or INT directly, or only the approved models. Searched for: downstream "
++ "applications, direct access, read Stage 2, read INT, consumer access, "
++ "approved models.",
+  gap:
+"This is the question question 4 makes urgent: Stage 2 is explicitly not "
++ "a canonical model, so if consumers may read it directly they are "
++ "building on something SEI has said is not a contract. It needs an "
++ "answer before any consumer is pointed at it.",
+  ev: ["SEI Architecture", "Transformation TDD"] },
+
+{ n: 11, conf: "absence",
+  body:
+"The pack describes dbt replacing ODI logic but assigns nobody to the "
++ "conversion. Searched for: ODI ownership, conversion ownership, "
++ "responsible, accountable, Professional Services responsibility.",
+  gap:
+"This confirms the SEI pack is silent; it does NOT answer who owns it. "
++ "Ownership here is a contract and SOW question, not an architecture one "
++ "— it will not be found in any document and has to be decided.",
+  ev: ["Transformation TDD p.5–7"] },
+
+{ n: 12, conf: "absence",
+  body:
+"Nothing states whether Professional Services reverse-engineers the ODI "
++ "jobs or whether BBH supplies detailed requirements. Searched for: "
++ "reverse engineer, requirements, ODI review, migration responsibility.",
+  gap:
+"Same standing as question 11: the search is done, the answer is a "
++ "commercial decision. The two readings differ by a large amount of BBH "
++ "analyst effort, which is why it is worth closing early.",
+  ev: ["Transformation TDD", "SEI Architecture"] },
+
+{ n: 14, conf: "absence",
+  body:
+"No document assigns ownership of the like-for-like Stage → INT → "
++ "Approved Dim/Fact mapping, or of the ODI-to-dbt conversion. Searched "
++ "for: ownership, accountable, responsible, conversion, mapping ownership.",
+  gap:
+"The search is recorded so nobody repeats it. The answer is a RACI line, "
++ "and it belongs with questions 11, 12 and 15 as one decision rather than "
++ "four.",
+  ev: ["Transformation TDD", "SEI Architecture"] },
+
+{ n: 15, conf: "absence",
+  body:
+"Nothing identifies who confirms that the new Dim/Fact tables behave as "
++ "the current implementation does — DATEROLL and AUTOPOST included. "
++ "Searched for: validation owner, parity testing, acceptance owner, "
++ "DATEROLL, AUTOPOST.",
+  gap:
+"Note this is not only an ownership gap. Question 107's answer says the "
++ "tooling to PROVE parity exists — Recon 360 and Variance 360, with the "
++ "hops and the eleven metrics — and that the ODI-side run has not been "
++ "done. So the method is available and both the owner and the run are "
++ "missing.",
+  ev: ["Transformation TDD", "SEI Architecture"] },
 { n: 21, conf: "codebase", fig: "envs",
   body:
 "BBH. Airflow runs inside the CP Integration Hub OpenShift namespace, "

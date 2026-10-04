@@ -17,12 +17,17 @@ So the buckets below are the point of this document, not the prompts.
 
 ---
 
-## Bucket A — the SEI document should answer these (25)
+## Bucket A — the SEI document should answer these (15)
+
+> **Topics 1 and 2 are done.** Questions 1–10 were put to the SEI pack in
+> October 2026 and now carry drafts: eight answered from the document, two
+> recorded as absences. Prompts A1 and A2 have been removed because they
+> have been run. The strongest result was question 4 — Stage 2 is explicitly
+> *not* an enterprise-wide canonical model, which is the sentence that makes
+> questions 3 and 10 matter.
 
 | Topic | Questions |
 |---|---|
-| 1 · SEI data structure / enriched data | 1, 2, 3, 4, 5 |
-| 2 · Stage 2 / INT layer | 6, 7, 8, 9, 10 |
 | 4 · "unchanged except for how they are populated" | 18, 19 |
 | 6 · SDC vs SFTP | 26 |
 | 7 · How SEI data feeds the framework | 28 |
@@ -34,7 +39,7 @@ So the buckets below are the point of this document, not the prompts.
 ### How to run these
 
 Paste one prompt at a time into enterprise Claude **with the SEI PDF
-attached**. One prompt per topic, not all four at once — a single long prompt
+attached**. One prompt per topic, not both at once — a single long prompt
 produces summary, and what is wanted here is citation.
 
 Every prompt below ends with the same two rules. Keep them:
@@ -54,46 +59,6 @@ questions the document never addressed, and those are worse than no answers,
 because they will be read as SEI's position.
 
 ---
-
-### A1 · Enriched data (questions 1–5)
-
-```
-Attached is SEI's design document. Answer only from it.
-
-1. What does "enriched" mean in this architecture? List each enrichment
-   operation the document describes.
-2. Is the enriched layer normalised SEI data only, or does it include
-   transformation into a target model? Quote the sentence that decides it.
-3. Does the document describe a reusable, stable data structure consumers can
-   build against — i.e. is the enriched layer a published contract, or an
-   internal staging artefact?
-4. The document reportedly states this layer is "not a canonical model". Quote
-   that statement in full and whatever surrounds it.
-5. Does mapping/enrichment include reference-data mapping? List the reference
-   data sets named.
-
-<the two rules above>
-```
-
-### A2 · Stage 2 and INT (questions 6–10)
-
-```
-Attached is SEI's design document. Answer only from it.
-
-1. Define Stage 2 as the document defines it, and list every diagram or
-   section it appears in.
-2. Define the INT layer. What processing happens in INT that does not happen
-   in Stage 2?
-3. Confirm or correct this reading: Stage standardises source data and applies
-   source DQ; INT does further mapping/enrichment; Dim/Fact are built from
-   INT. Quote what supports or contradicts it.
-4. For each of Stage / INT / Approved Dim-Fact, state: what transformation
-   occurs, whether it is persisted, and whether business logic lives there.
-5. Does the document say whether downstream applications may read Stage 2 or
-   INT directly, or only approved Dim/Fact?
-
-<the two rules above>
-```
 
 ### A3 · Transfer mechanism and delivery contract (questions 26, 52–56, 91, 92)
 
@@ -189,6 +154,12 @@ blind spot in the drafts I was able to write.
 ---
 
 ## Bucket C — no document answers these (23)
+
+> Questions 11, 12, 14 and 15 now carry an **absence** draft: the SEI pack
+> was searched and is silent. That records the search so nobody repeats it;
+> it does **not** answer who owns the work, which is still a decision. They
+> stay in this bucket for that reason. Question 13 came back `no_data` and
+> has no draft at all.
 
 They are decisions nobody has recorded, or numbers nobody has measured. A
 document search will not find them and should not be attempted.

@@ -206,10 +206,18 @@ if (fs.existsSync(PDOC)) {
      classes.filter((c) => c !== "no_data" && !CONF[c]).join(","));
 }
 
-ok(fromDoc.length === 0,
-   "no draft is sourced from a document yet — nothing has been extracted "
-   + "from the SEI PDF, and this is the line that will change when it is",
-   fromDoc.map((a) => a.n));
+// This used to assert that nothing had been extracted yet. The first
+// extraction arrived, so it is now the standing rule that replaces it: a
+// document answer names WHERE in the document, not just which document.
+// "SEI Architecture" is not checkable; "SEI Architecture p.6" is.
+ok(fromDoc.every((a) => (a.ev || []).some((e) => /p\.\s?\d|§|page|sheet|tab/i.test(e))),
+   "every document answer cites a page or section — a citation nobody can "
+   + "turn to is the same as no citation",
+   fromDoc.filter((a) => !(a.ev || []).some((e) => /p\.\s?\d|§/i.test(e)))
+     .map((a) => a.n));
+ok(fromDoc.every((a) => a.quote.length >= 40 && /[a-z]{4}/.test(a.quote)),
+   "and the quote is a sentence rather than a fragment", 
+   fromDoc.filter((a) => a.quote.length < 40).map((a) => a.n));
 
 // A draft is an answer, never a resolution.
 const fresh = emptyStore();
@@ -505,10 +513,24 @@ if (fs.existsSync(DOC)) {
      "every unanswered question is bucketed — an unbucketed one is a question "
      + "nobody has been told how to source",
      openQs.filter((n) => !bucketed.has(n)).join(","));
-  ok(![...bucketed].some((n) => answered.has(n)),
-     "and no bucketed question already has a draft — otherwise the document "
-     + "sends someone to extract an answer that is already on the screen",
-     [...bucketed].filter((n) => answered.has(n)).join(","));
+  // Buckets A and B say "a document should answer this", so a question
+  // with a draft has to leave them. Bucket C says "no document answers
+  // this; a person decides" — an absence draft there records that the
+  // search was done and changes nothing about who decides, so it stays.
+  const sourceable = new Set([...buckets[0], ...buckets[1]]);
+  ok(![...sourceable].some((n) => answered.has(n)),
+     "no question in bucket A or B already has a draft — otherwise the "
+     + "document sends someone to extract an answer that is on the screen",
+     [...sourceable].filter((n) => answered.has(n)).join(","));
+  const cDrafts = [...buckets[2]].filter((n) => answered.has(n));
+  ok(cDrafts.every((n) => {
+       const a = SEED_ANSWERS.find((x) => x.n === n);
+       return a && a.conf === "absence";
+     }),
+     "and a bucket C question may only carry an ABSENCE draft — anything "
+     + "else would be answering a decision nobody has made",
+     cDrafts.filter((n) => (SEED_ANSWERS.find((x) => x.n === n) || {}).conf
+       !== "absence").join(","));
   const dup = [];
   for (let i = 0; i < buckets.length; i++)
     for (let j = i + 1; j < buckets.length; j++)
