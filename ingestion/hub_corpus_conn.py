@@ -72,13 +72,96 @@ PLAN = [("owners", OWNER_SQL), ("topics", TOPIC_SQL),
         ("questions", QUESTION_SQL), ("answers", ANSWER_SQL)]
 
 
+# What each MERGE inserts IS what the table must have, so the preflight
+# below is derived from the statements rather than typed out beside them
+# and left to drift.
+def _required_columns():
+    req = {}
+    for _key, sql in PLAN:
+        one = " ".join(sql.split())
+        table = one.split("MERGE INTO ", 1)[1].split(" ", 1)[0].upper()
+        cols = one.split("INSERT (", 1)[1].split(")", 1)[0]
+        req[table] = {c.strip().upper() for c in cols.split(",")}
+    return req
+
+
+# Needed by the API rather than by this loader, but a schema that is half
+# applied is worth reporting in one go.
+EXTRA_TABLES = ("HUB_ATTACHMENT", "HUB_EVENT")
+
+FIX = {
+    "HUB_QUESTION": "sql/70_hub_discussion.sql",
+    "HUB_ANSWER": "sql/70_hub_discussion.sql",
+    "HUB_ATTACHMENT": "sql/70_hub_discussion.sql",
+    "HUB_EVENT": "sql/70_hub_discussion.sql",
+    "HUB_TOPIC": "sql/71_hub_discussion_corpus.sql",
+    "HUB_OWNER": "sql/71_hub_discussion_corpus.sql",
+}
+# Columns 71_ adds to tables 70_ created. A table that exists without
+# them means 71_ was run first, swallowed ORA-00942 and added nothing.
+FROM_71 = {"SEEDED", "NOTE", "CONF", "GAP", "QUOTE", "FIG", "EV", "IS_DRAFT"}
+
+
+def preflight(conn):
+    """What is missing, in plain words. Empty list means ready.
+
+    ORA-00942 from a MERGE names no table and arrives three steps from
+    the cause. This runs first and says which object is absent and which
+    script creates it.
+    """
+    want = _required_columns()
+    for t in EXTRA_TABLES:
+        want.setdefault(t, set())
+
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT table_name FROM user_tables WHERE table_name IN "
+                    "('HUB_QUESTION','HUB_ANSWER','HUB_TOPIC','HUB_OWNER',"
+                    "'HUB_ATTACHMENT','HUB_EVENT')")
+        present = {r[0].upper() for r in cur.fetchall()}
+        cols = {}
+        if present:
+            binds = {f"t{i}": t for i, t in enumerate(sorted(present))}
+            inlist = ", ".join(f":{k}" for k in binds)
+            cur.execute("SELECT table_name, column_name FROM user_tab_columns "
+                        f"WHERE table_name IN ({inlist})", binds)
+            for tbl, col in cur.fetchall():
+                cols.setdefault(tbl.upper(), set()).add(col.upper())
+    finally:
+        cur.close()
+
+    problems = []
+    for table in sorted(want):
+        if table not in present:
+            problems.append(f"{table} does not exist — run {FIX.get(table, '?')}")
+            continue
+        missing = want[table] - cols.get(table, set())
+        if missing:
+            which = ("sql/71_hub_discussion_corpus.sql"
+                     if missing & FROM_71 else FIX.get(table, "?"))
+            problems.append(
+                f"{table} is missing {', '.join(sorted(missing))} — run {which}"
+                + (" (it was probably run BEFORE 70_, which silently added "
+                   "nothing; re-running it now is safe)" if missing & FROM_71 else ""))
+    return problems
+
+
+class NotReady(RuntimeError):
+    """The schema is not in place. The message names the script to run."""
+
+
 def read_corpus(path=DEFAULT_FILE):
     with open(path, encoding="utf-8") as fh:
         return json.load(fh)
 
 
-def load(conn, corpus):
+def load(conn, corpus, check=True):
     """Apply the corpus. Returns {section: rows attempted}."""
+    if check:
+        problems = preflight(conn)
+        if problems:
+            raise NotReady("the Hub Discussion schema is not ready:\n  - "
+                           + "\n  - ".join(problems))
     counts = {}
     cur = conn.cursor()
     try:
@@ -101,6 +184,8 @@ def main(argv=None):
     ap.add_argument("--file", default=DEFAULT_FILE)
     ap.add_argument("--dry-run", action="store_true",
                     help="parse and report, touch no database")
+    ap.add_argument("--check", action="store_true",
+                    help="report what the schema is missing and change nothing")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
@@ -113,7 +198,18 @@ def main(argv=None):
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from api.app.db import get_pool  # noqa: PLC0415  (optional dependency)
     with get_pool().acquire() as conn:
-        counts = load(conn, corpus)
+        if a.check:
+            problems = preflight(conn)
+            for pr in problems:
+                log.info("  MISSING  %s", pr)
+            log.info("schema is ready" if not problems
+                     else f"{len(problems)} thing(s) to fix")
+            return 1 if problems else 0
+        try:
+            counts = load(conn, corpus)
+        except NotReady as e:
+            log.error("%s", e)
+            return 2
     log.info("loaded — %s", ", ".join(f"{k} {v}" for k, v in counts.items()))
     return 0
 

@@ -94,12 +94,23 @@ def _run_step(step, conn, loader, resolver) -> None:
         #
         # Safe on every run: it refreshes a row ONLY WHILE IT IS PRISTINE,
         # so an edited question or an accepted answer is left alone.
-        from .hub_corpus_conn import read_corpus, load as load_corpus, DEFAULT_FILE
+        from .hub_corpus_conn import (read_corpus, load as load_corpus,
+                                       preflight, DEFAULT_FILE)
         path = os.getenv("HUB_CORPUS_PATH") or DEFAULT_FILE
         if not os.path.exists(path):
             log.info("  skipping (not generated): %s", path)
             return
-        counts = load_corpus(conn, read_corpus(path))
+        # ORA-00942 out of a MERGE names no table and arrives a long way
+        # from the cause. Say which object is absent and which script
+        # creates it, then skip like any unconfigured step.
+        problems = preflight(conn)
+        if problems:
+            for pr in problems:
+                log.warning("  MISSING  %s", pr)
+            log.info("  skipping (schema not ready) — "
+                     "python -m ingestion.hub_corpus_conn --check")
+            return
+        counts = load_corpus(conn, read_corpus(path), check=False)
         log.info("  %s", ", ".join(f"{k} {v}" for k, v in counts.items()))
         return
 

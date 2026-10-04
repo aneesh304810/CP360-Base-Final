@@ -21,12 +21,39 @@
 -- =====================================================================
 SET DEFINE OFF;
 DECLARE
+  n NUMBER;
+
+  -- CREATE: tolerate "already exists". The usual guard.
   PROCEDURE ddl(p VARCHAR2) IS
   BEGIN EXECUTE IMMEDIATE p;
   EXCEPTION WHEN OTHERS THEN
     IF SQLCODE NOT IN (-955, -942, -1408, -1430) THEN RAISE; END IF;
   END;
+
+  -- ALTER: tolerate "column already exists" and NOTHING ELSE.
+  --
+  -- The first version of this file used ddl() for the two ALTERs below,
+  -- and ddl() swallows ORA-00942. Run this script before 70_ and it
+  -- reported success while adding no columns at all -- then the loader
+  -- failed with ORA-00942 or ORA-00904 somewhere else entirely, which
+  -- is a long way from the cause. A missing prerequisite is not a
+  -- condition to tolerate.
+  PROCEDURE alt(p VARCHAR2) IS
+  BEGIN EXECUTE IMMEDIATE p;
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLCODE NOT IN (-1430, -1442, -1451) THEN RAISE; END IF;
+  END;
 BEGIN
+
+  -- Say so plainly rather than failing later and elsewhere.
+  SELECT COUNT(*) INTO n FROM user_tables
+   WHERE table_name IN ('HUB_QUESTION', 'HUB_ANSWER');
+  IF n < 2 THEN
+    raise_application_error(-20071,
+      'sql/70_hub_discussion.sql has not been run in this schema: '
+      || 'HUB_QUESTION and HUB_ANSWER must exist before this script '
+      || 'can add columns to them. Run 70_ first, then re-run this.');
+  END IF;
 
   ddl('CREATE TABLE hub_topic (
     topic_no      NUMBER        NOT NULL,
@@ -47,13 +74,13 @@ BEGIN
 
   -- hub_question gains the corpus columns. It previously held only
   -- overrides, so BODY was null unless edited; it is now always set.
-  ddl('ALTER TABLE hub_question ADD (
+  alt('ALTER TABLE hub_question ADD (
     seeded      CHAR(1) DEFAULT ''N'',
     note        VARCHAR2(400))');
 
   -- hub_answer gains everything a drafted answer carries. These were
   -- derived from the bundle and are now columns.
-  ddl('ALTER TABLE hub_answer ADD (
+  alt('ALTER TABLE hub_answer ADD (
     -- codebase | absence | document | inference
     conf        VARCHAR2(20),
     gap         CLOB,

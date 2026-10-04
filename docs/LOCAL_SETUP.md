@@ -297,6 +297,19 @@ are rows in Oracle. The copy in the UI bundle is a cold start only: if the
 API is unreachable or the loader has not run, the screen renders the shipped
 corpus read-only and says **bundled copy** rather than **from the database**.
 
+**ORA-00942: table or view does not exist** — run the preflight; it names
+the object and the script that creates it:
+
+```bash
+python -m ingestion.hub_corpus_conn --check
+```
+
+Almost always one of two things. Either `70_` has not been run in this
+schema, or **`71_` was run before `70_`**: the first version of `71_`
+tolerated ORA-00942 on its two `ALTER TABLE` statements, so it reported
+success while adding no columns at all. Re-running `71_` now fixes it and
+is safe. `71_` refuses outright if `70_` has not run.
+
 Order matters once, on first setup:
 
 ```bash

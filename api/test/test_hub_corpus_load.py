@@ -9,7 +9,8 @@ import sys, os, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from ingestion.hub_corpus_conn import (                      # noqa: E402
     QUESTION_SQL, ANSWER_SQL, OWNER_SQL, TOPIC_SQL, PLAN,
-    QUESTION_PRISTINE, ANSWER_PRISTINE, read_corpus, load, DEFAULT_FILE)
+    QUESTION_PRISTINE, ANSWER_PRISTINE, read_corpus, load, DEFAULT_FILE,
+    preflight, NotReady, _required_columns)
 
 BAD = 0
 
@@ -91,6 +92,7 @@ for key, sql in PLAN:
 class FakeCur:
     def __init__(self, sink): self.sink = sink
     def execute(self, sql, params=None): self.sink.append((sql, params))
+    def fetchall(self): return []
     def close(self): pass
 
 
@@ -101,14 +103,59 @@ class FakeConn:
     def rollback(self): self.rollbacks += 1
 
 
-c1 = FakeConn()
+# ---- ORA-00942 is reported before it happens ------------------------
+#
+# A MERGE against a table that is not there raises ORA-00942, which names
+# no object and arrives a long way from the cause. These cases are the
+# four ways the schema is actually found half-applied.
+ALL_TABLES = ["HUB_QUESTION", "HUB_ANSWER", "HUB_TOPIC", "HUB_OWNER",
+              "HUB_ATTACHMENT", "HUB_EVENT"]
+
+
+class SchemaConn(FakeConn):
+    """A database with exactly the tables and columns it is told to have."""
+
+    def __init__(self, tables=None, drop_cols=()):
+        super().__init__()
+        self.tables = ALL_TABLES if tables is None else list(tables)
+        self.drop = {c.upper() for c in drop_cols}
+        self.cols = dict(_required_columns())
+        self.cols.setdefault("HUB_ATTACHMENT", set())
+        self.cols.setdefault("HUB_EVENT", set())
+
+    def cursor(self):
+        outer = self
+
+        class C(FakeCur):
+            def __init__(self, sink):
+                super().__init__(sink)
+                self.rows = []
+
+            def execute(self, sql, params=None):
+                one = " ".join(sql.split())
+                if "FROM user_tables" in one:
+                    self.rows = [(t,) for t in outer.tables]
+                elif "FROM user_tab_columns" in one:
+                    self.rows = [(t, c) for t in outer.tables
+                                 for c in outer.cols.get(t, set())
+                                 if c not in outer.drop]
+                else:
+                    outer.sent.append((sql, params))
+
+            def fetchall(self):
+                return self.rows
+
+        return C(self.sent)
+
+
+c1 = SchemaConn()
 counts = load(c1, corpus)
 ok(counts == {"owners": 5, "topics": 17, "questions": 108, "answers": 49},
    "the loader applies every section", counts)
 ok(len(c1.sent) == 179 and c1.commits == 1,
    "in one committed transaction", f"{len(c1.sent)} statements, {c1.commits} commits")
 
-c2 = FakeConn()
+c2 = SchemaConn()
 load(c2, corpus)
 ok([s for s, _ in c1.sent] == [s for s, _ in c2.sent],
    "and a second run issues exactly the same statements — idempotency here "
@@ -119,11 +166,23 @@ ok(all("MERGE INTO" in s for s, _ in c1.sent),
    [s[:40] for s, _ in c1.sent if "MERGE INTO" not in s][:2])
 
 
-class Boom(FakeConn):
+class Boom(SchemaConn):
+    """Preflight passes; the MERGE then fails partway through."""
+
     def cursor(self):
-        class C(FakeCur):
-            def execute(self, sql, params=None): raise RuntimeError("ORA-00942")
-        return C(self.sent)
+        inner = SchemaConn.cursor(self)
+        outer = self
+
+        class C:
+            def execute(self, sql, params=None):
+                if "MERGE INTO" in sql:
+                    raise RuntimeError("ORA-00942")
+                inner.execute(sql, params)
+
+            def fetchall(self): return inner.fetchall()
+            def close(self): pass
+
+        return C()
 
 
 b = Boom()
@@ -134,6 +193,52 @@ except RuntimeError:
 ok(b.rollbacks == 1 and b.commits == 0,
    "a failure rolls back rather than leaving half a corpus", 
    f"{b.rollbacks} rollbacks, {b.commits} commits")
+
+ok(preflight(SchemaConn()) == [],
+   "a complete schema reports no problems", preflight(SchemaConn()))
+
+# 70_ never run.
+p70 = preflight(SchemaConn(tables=["HUB_TOPIC", "HUB_OWNER"]))
+ok(any("HUB_QUESTION does not exist" in x for x in p70)
+   and all("70_hub_discussion.sql" in x for x in p70 if "does not exist" in x),
+   "a missing table names the table AND the script that creates it — "
+   "ORA-00942 names neither", p70)
+
+# 71_ run before 70_: the tables exist, the ALTERs silently added nothing.
+p71 = preflight(SchemaConn(tables=["HUB_QUESTION", "HUB_ANSWER",
+                                   "HUB_ATTACHMENT", "HUB_EVENT"],
+                           drop_cols=("CONF", "GAP", "QUOTE", "FIG", "EV",
+                                      "IS_DRAFT", "SEEDED", "NOTE")))
+ok(any("HUB_TOPIC does not exist" in x for x in p71),
+   "71_ not having run is reported", p71)
+ok(any("HUB_ANSWER is missing" in x and "CONF" in x for x in p71),
+   "and so is the subtler case — the table is there but without the "
+   "columns 71_ was supposed to add", p71)
+ok(any("BEFORE 70_" in x for x in p71),
+   "with the actual cause named: 71_ was run first, swallowed ORA-00942 "
+   "and added nothing. That is the failure this file was written after",
+   p71)
+ok(any("re-running it now is safe" in x for x in p71),
+   "and the operator is told the fix is safe to apply", p71)
+
+# The loader refuses rather than part-loading.
+try:
+    load(SchemaConn(tables=[]), corpus)
+    ok(False, "load refuses when the schema is not ready", "it did not")
+except NotReady as e:
+    ok("does not exist" in str(e) and "sql/70" in str(e),
+       "load refuses up front, naming the script — not after writing "
+       "owners and topics into a half-built schema", str(e)[:90])
+nothing = SchemaConn(tables=[])
+try:
+    load(nothing, corpus)
+except NotReady:
+    pass
+ok(len(nothing.sent) == 0 and nothing.commits == 0,
+   "and it writes nothing at all before refusing", len(nothing.sent))
+
+ok(load(SchemaConn(), corpus) and True,
+   "while a ready schema loads normally", "")
 
 # ---- it is reachable from the real entry point ----------------------
 #
@@ -150,7 +255,7 @@ ok(RUN.STEPS[-1] == "search_index",
 ok(RUN.STEPS.index("hub_corpus") < RUN.STEPS.index("search_index"),
    "so hub_corpus runs before it", "")
 
-c3 = FakeConn()
+c3 = SchemaConn()
 RUN._run_step("hub_corpus", c3, None, None)
 ok(len(c3.sent) == 179 and c3.commits == 1,
    "python -m ingestion.run actually loads the corpus — 179 MERGEs in one "
@@ -160,7 +265,7 @@ ok(all("MERGE INTO" in sql for sql, _ in c3.sent),
    "and every one of them is a MERGE", "")
 
 os.environ["HUB_CORPUS_PATH"] = "/nonexistent/hub_corpus.json"
-c4 = FakeConn()
+c4 = SchemaConn()
 raised = None
 try:
     RUN._run_step("hub_corpus", c4, None, None)
@@ -181,6 +286,19 @@ os.environ.pop("HUB_CORPUS_PATH")
 body = open(os.path.join(os.path.dirname(__file__), "..", "..",
                          "ingestion", "run.py"), encoding="utf-8").read()
 blk = body.split('if step == "hub_corpus":', 1)[1].split(chr(10) + "    if step ==", 1)[0]
+# A half-applied schema skips like any unconfigured step rather than
+# raising: one broken step must not abort the other 26.
+c5 = SchemaConn(tables=[])
+r5 = None
+try:
+    RUN._run_step("hub_corpus", c5, None, None)
+except Exception as e:                                        # noqa: BLE001
+    r5 = e
+ok(r5 is None and len(c5.sent) == 0,
+   "ingestion.run SKIPS a half-applied schema and logs what is missing, "
+   "rather than raising ORA-00942 into the orchestrator",
+   f"raised {r5!r}" if r5 else len(c5.sent))
+
 ok("_require_env" not in blk,
    "and it requires no environment variable beyond the DSN every step "
    "needs — the corpus is committed, not configured", blk[:120])
