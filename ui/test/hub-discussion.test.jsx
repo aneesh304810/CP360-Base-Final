@@ -323,6 +323,56 @@ ok(/✎ edit/.test(exH) && /✓ accept/.test(exH),
 ok(!/NaN|undefined/.test(ex(tDark)), "the expanded thread is clean in dark too",
    (ex(tDark).match(/.{0,40}(NaN|undefined)/) || [])[0]);
 
+// ---- the sourcing document stays in step with the drafts ------------
+//
+// docs/PROMPT-review-question-sourcing.md buckets every UNANSWERED
+// question by who can actually answer it. The moment a draft is written
+// the question has to leave those buckets, or the document sends someone
+// to extract an answer that already exists. Counting it by hand got the
+// bucket sizes wrong twice, so it is counted here instead.
+const DOC = path.join(ROOT, "docs", "PROMPT-review-question-sourcing.md");
+if (fs.existsSync(DOC)) {
+  const md = fs.readFileSync(DOC, "utf8");
+  const buckets = md.split("## Bucket").slice(1).map((sec) => {
+    const set = new Set();
+    sec.split("\n")
+      .filter((l) => l.startsWith("|") && !/^\|\s*-/.test(l))
+      .forEach((l) => {
+        const cells = l.split("|");
+        if (cells.length < 4) return;              // questions are column 2
+        (cells[2].match(/\b\d{1,3}\b/g) || []).forEach((n) => {
+          const v = Number(n);
+          if (v >= 1 && v <= 108) set.add(v);
+        });
+      });
+    return set;
+  });
+  const bucketed = new Set(buckets.flatMap((b) => [...b]));
+  const answered = new Set(SEED_ANSWERS.map((a) => a.n));
+  const openQs = QUESTIONS.filter((x) => !answered.has(x.n)).map((x) => x.n);
+  ok(buckets.length === 3, "the document still has three buckets", buckets.length);
+  ok(openQs.every((n) => bucketed.has(n)),
+     "every unanswered question is bucketed — an unbucketed one is a question "
+     + "nobody has been told how to source",
+     openQs.filter((n) => !bucketed.has(n)).join(","));
+  ok(![...bucketed].some((n) => answered.has(n)),
+     "and no bucketed question already has a draft — otherwise the document "
+     + "sends someone to extract an answer that is already on the screen",
+     [...bucketed].filter((n) => answered.has(n)).join(","));
+  const dup = [];
+  for (let i = 0; i < buckets.length; i++)
+    for (let j = i + 1; j < buckets.length; j++)
+      [...buckets[i]].forEach((n) => { if (buckets[j].has(n)) dup.push(n); });
+  ok(dup.length === 0, "the buckets are disjoint — one question, one owner",
+     dup.join(","));
+  const sizes = buckets.map((b) => b.size);
+  const stated = [...md.matchAll(/^## Bucket [ABC][^(]*\((\d+)\)/gm)]
+    .map((m) => Number(m[1]));
+  ok(stated.length === 3 && stated.every((v, i) => v === sizes[i]),
+     "and each heading's count matches the rows under it — I got both of "
+     + "these wrong counting by hand", `${stated.join("/")} vs ${sizes.join("/")}`);
+}
+
 // ---- ADDITIVE: the existing Hub gains lines and loses none ----------
 // Anchored to the commit that INTRODUCED the tab, not to HEAD. The first
 // version of this guard diffed against HEAD, which made it vacuous the

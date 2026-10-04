@@ -1,0 +1,220 @@
+# Sourcing the remaining 73 review questions
+
+35 of the 108 questions now carry a draft answer in the Hub Discussion tab,
+drafted from this codebase. This document is about the other 73: **where each
+one's answer actually lives**, and — for the ones an SEI document can settle —
+paste-ready extraction prompts.
+
+The single most useful finding first:
+
+> **The SEI PDF cannot answer most of them.** By my reading, 25 of the 73 are
+> SEI's to answer, 25 belong to BBH's own ingestion-framework design, and 23
+> are not in any document — they are decisions nobody has made or numbers
+> nobody has measured. Sending all 73 at one PDF will produce 73 confident
+> paragraphs, of which roughly a third will be invention.
+
+So the buckets below are the point of this document, not the prompts.
+
+---
+
+## Bucket A — the SEI document should answer these (25)
+
+| Topic | Questions |
+|---|---|
+| 1 · SEI data structure / enriched data | 1, 2, 3, 4, 5 |
+| 2 · Stage 2 / INT layer | 6, 7, 8, 9, 10 |
+| 4 · "unchanged except for how they are populated" | 18, 19 |
+| 6 · SDC vs SFTP | 26 |
+| 7 · How SEI data feeds the framework | 28 |
+| 8 · Stage 2 DQ behaviour | 32, 33, 34 |
+| 9 · The delivered model | 44 |
+| 10 · Delivery contract | 52, 53, 54, 55, 56 |
+| 15 · Delivery SLA and time zones | 91, 92 |
+
+### How to run these
+
+Paste one prompt at a time into enterprise Claude **with the SEI PDF
+attached**. One prompt per topic, not all four at once — a single long prompt
+produces summary, and what is wanted here is citation.
+
+Every prompt below ends with the same two rules. Keep them:
+
+> **Structure and metadata only.** Never reproduce account numbers, client
+> names, transaction identifiers, positions, balances, credentials, connection
+> strings or hostnames. Code-set *values* are metadata and are in scope; the
+> entities they describe are not.
+>
+> **Cite or decline.** For each question, quote the sentence(s) in the document
+> that answer it and give the section or page. If the document does not answer
+> it, say `NOT IN DOCUMENT` and stop — do not reason towards a likely answer.
+> A question the document does not cover is a finding, not a gap to fill.
+
+That second rule is the one that matters. Without it you get fluent answers to
+questions the document never addressed, and those are worse than no answers,
+because they will be read as SEI's position.
+
+---
+
+### A1 · Enriched data (questions 1–5)
+
+```
+Attached is SEI's design document. Answer only from it.
+
+1. What does "enriched" mean in this architecture? List each enrichment
+   operation the document describes.
+2. Is the enriched layer normalised SEI data only, or does it include
+   transformation into a target model? Quote the sentence that decides it.
+3. Does the document describe a reusable, stable data structure consumers can
+   build against — i.e. is the enriched layer a published contract, or an
+   internal staging artefact?
+4. The document reportedly states this layer is "not a canonical model". Quote
+   that statement in full and whatever surrounds it.
+5. Does mapping/enrichment include reference-data mapping? List the reference
+   data sets named.
+
+<the two rules above>
+```
+
+### A2 · Stage 2 and INT (questions 6–10)
+
+```
+Attached is SEI's design document. Answer only from it.
+
+1. Define Stage 2 as the document defines it, and list every diagram or
+   section it appears in.
+2. Define the INT layer. What processing happens in INT that does not happen
+   in Stage 2?
+3. Confirm or correct this reading: Stage standardises source data and applies
+   source DQ; INT does further mapping/enrichment; Dim/Fact are built from
+   INT. Quote what supports or contradicts it.
+4. For each of Stage / INT / Approved Dim-Fact, state: what transformation
+   occurs, whether it is persisted, and whether business logic lives there.
+5. Does the document say whether downstream applications may read Stage 2 or
+   INT directly, or only approved Dim/Fact?
+
+<the two rules above>
+```
+
+### A3 · Transfer mechanism and delivery contract (questions 26, 52–56, 91, 92)
+
+This is the highest-value prompt in the set. Seven questions, and the answers
+are contractual rather than architectural — they are what BBH is entitled to
+rely on.
+
+```
+Attached is SEI's design document. Answer only from it.
+
+1. Which transfer mechanism does the document specify for SEI → BBH: SDC,
+   SFTP, both, or a migration between them? If both, which is target state and
+   is a cutover described?
+2. Is there an authoritative list of which interfaces are delivered on each
+   business date? Where does it live and who maintains it?
+3. How are holidays, month-end, weekly files and one-off exceptions handled?
+4. Is the expected-file set effective-dated or snapshotted, or can it change
+   for a business date that is already open?
+5. Does the document guarantee exactly ONE physical delivery per logical
+   interface per business date? Quote the guarantee.
+6. If multipart or repeated deliveries are possible, what identifier
+   distinguishes them? Is there a batch key, sequence number or manifest?
+7. What file-readiness signal indicates a file has finished arriving — a
+   trailer record, a sentinel file, a manifest, a marker event, or none?
+8. What delivery cutoff times are committed, in which time zone, and how is
+   multi-currency / multi-region timing handled?
+
+<the two rules above>
+```
+
+### A4 · Stage 2 DQ and the delivered model (questions 32–34, 44, 18, 19, 28)
+
+```
+Attached is SEI's design document. Answer only from it.
+
+1. What happens to records that FAIL Stage 2 DQ checks? Where are they held,
+   in what structure, and for how long?
+2. How are failed records corrected and reprocessed — resubmitted by the
+   source, reprocessed by SEI, or picked up in a later feed?
+3. If records fail DQ, what does the document say about the completeness of
+   the downstream (Gold) layer for that business date?
+4. List every dimension and every fact the document names, with its grain.
+5. Quote in full any statement that existing structures are "unchanged except
+   for how they are populated", and say exactly which structures it refers to.
+6. How does the document describe SEI data feeding a Stage → INT → Dim/Fact
+   framework downstream?
+
+<the two rules above>
+```
+
+### Return format
+
+Ask for this at the end of each prompt. It drops straight into
+`ui/src/hubAnswers.js` with no re-typing:
+
+```json
+[
+  { "n": 1,
+    "body": "<the answer, in plain prose>",
+    "gap": "<what the document does NOT settle, or empty if it fully settles it>",
+    "ev": ["SEI design doc §4.2", "SEI design doc p.17"],
+    "verbatim": "<the quoted sentence(s) the answer rests on>" }
+]
+```
+
+`verbatim` is the field to insist on. An answer whose quote does not actually
+support it is visible in one glance; an answer without a quote is not
+checkable at all.
+
+---
+
+## Bucket B — BBH's ingestion-framework design, not SEI's (25)
+
+These reference `DATE_CONTROL`, `FILE_REGISTRY`, the Airflow DAG structure, the
+worker/pod lifecycle and the Dim/Fact build. **None of that is SEI's to
+describe** — it is the BBH framework Ganender's team designed. Asking the SEI
+PDF will produce plausible fiction.
+
+| Area | Questions | Ask |
+|---|---|---|
+| Business-date control, triggers, recovery | 58, 59, 60, 61, 63, 65, 66, 67, 68, 69, 70, 71 | Ingestion framework design + the DAG code |
+| Restatement and replay | 72, 73, 75, 76 | Same |
+| DIM/FACT build, history, effective dating | 45, 46, 47, 48 | Data modelling |
+| OpenShift scheduling and DB limits | 79, 82, 85 | Platform / Sudhakar |
+| Logging standard, alert routing | 88, 89 | BBH observability standards |
+
+The fastest route for the first two rows is not a document at all: the DDL for
+`DATE_CONTROL` and `FILE_REGISTRY` plus the Airflow DAG source would answer
+most of those twelve directly, the same way the guardrail tables answered
+question 62. **Neither is in this repository** — that is the single biggest
+blind spot in the drafts I was able to write.
+
+---
+
+## Bucket C — no document answers these (23)
+
+They are decisions nobody has recorded, or numbers nobody has measured. A
+document search will not find them and should not be attempted.
+
+| Kind | Questions | Who decides |
+|---|---|---|
+| Ownership of ODI → dbt conversion | 11, 12, 13, 14, 15 | Contract / SOW — Professional Services scope |
+| PB DWH internal logic ownership | 16, 17 | BBH data engineering |
+| BBH vs SEI RACI | 20, 22, 23, 24, 25 | Programme — a RACI, not an architecture |
+| Dual-run period and surviving outputs | 29, 30, 31 | Programme |
+| Mandatory DQ gates before publication | 38 | BBH Data Management |
+| Operational SLAs and ownership | 93, 95, 96, 97 | BBH production support |
+| Retention and compliance | 98 | BBH compliance |
+| Upgrade path and training | 104, 105 | BBH platform / Kartheek |
+
+Several of these are the questions the review exists to force. Marking them
+`blocked` in the Discussion tab, with the named decider, is more honest than
+leaving them open — and the tab supports exactly that.
+
+---
+
+## What I would get first
+
+If only one thing is extracted: **A3, the delivery contract.** Seven questions,
+all contractual, and three drafts already written (50, 51, 57) depend on
+whether SEI guarantees one delivery per interface per business date. If that
+guarantee exists, the file-path design simplifies sharply. If it does not,
+`(FILE_NAME, BUSINESS_DATE)` is the wrong key and that is a schema change, so
+it is worth knowing before the ingestion framework is built rather than after.
