@@ -1,11 +1,16 @@
-// DevOps 360 — the delivery system, drawn the way the Hub is drawn.
+// DevOps 360 — the delivery system, and what it has actually delivered.
 //
-// WHY THIS IS A SCREEN AND NOT A SLIDE. Everything here describes how a
-// change reaches production: the C4 levels of the delivery system, the
-// identifiers that travel through it, a swimlane per pipeline, and what
-// each component becomes in a namespace. It is reference material people
-// look things up in, so it lives next to the thing it describes rather
-// than in a deck that goes stale in a drawer.
+// NOT A DOCUMENTATION PAGE. The map at the top is filled from
+// /guardrails/deployments: an environment box says v2026.10.01 because a
+// row says so, and is blank where no row exists. Under it is the release
+// delivery dashboard — the same shape as the Hub component dashboard, a
+// dark header of derived numbers over a filterable, exportable list of
+// real deployment rows. The design material is still here, but demoted
+// to a Reference row at the bottom, because it is the part that does not
+// change when a build runs.
+//
+// EVERY NUMBER IN THE HEADER IS DERIVED FROM THE ROWS BELOW IT, never
+// stored alongside them, so the summary and the list cannot disagree.
 //
 // WHAT IS DELIBERATELY NOT HERE. The release dashboard and the compare
 // screen are REAL screens with REAL data — they live in Quality
@@ -19,7 +24,8 @@
 // t.accent is NOT safe — it stays #0f4775 in dark, which is a surface
 // there — so the diagram accent is picked here rather than taken from
 // the theme.
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { promotionApi } from "./guardrails_api_additions.js";
 
 export const PAL = (t) => ({
   ink: t.text,
@@ -48,8 +54,6 @@ export const NAMING = [
     perEnv: false, by: "developer" },
 ];
 
-export const TABS = ["Context", "Containers", "Components", "Versions",
-              "Promotion", "Pipelines", "Deployment"];
 
 // Every figure is wrapped the same way: a scroll frame so a wide diagram
 // scrolls inside its own box rather than pushing the page sideways, and
@@ -915,36 +919,471 @@ export function Deployment({ t }) {
   </>);
 }
 
+
+// ===================================================================
+// The live plane
+// ===================================================================
+// Four environment nodes that carry their own tuple, three pipeline
+// nodes, and everything clickable. The diagram is not a drawing of the
+// system — the boxes are filled from /guardrails/deployments, so a node
+// that says v2026.10.01 says it because a row says so.
+const ENV_ORDER = ["DEV", "SIT", "UAT", "PROD"];
+const ENV_LABEL = { DEV: "RD DEV", SIT: "RD SIT", UAT: "QC · UAT", PROD: "PROD" };
+const PIPES = [
+  ["app", "Application data pipeline", "dbt + Airflow · daily", "SwimApp"],
+  ["db", "Database · Liquibase", "per release · ships ahead", "SwimDb"],
+  ["img", "Infrastructure image & security", "CVE / bumps · one digest", "SwimImg"],
+];
+
+export function FlowFig({ t, envs, open, onOpen }) {
+  const C = PAL(t);
+  const EW = 228, EX = (i) => 20 + i * 242;
+  const node = (k) => open === k;
+  const ring = (k, base) => (node(k) ? C.fast : base);
+  const byEnv = {};
+  (envs || []).forEach((e) => { byEnv[e.environment] = e; });
+  return (
+    <Frame t={t} vw={980} vh={410}
+      aria="Interactive delivery map. Three pipelines across the top — the
+        application data pipeline, the Liquibase database pipeline and the
+        infrastructure image pipeline — feed four Hub environments in order:
+        RD DEV, RD SIT, QC which is UAT, and production. Each environment box
+        shows the application tag, build number and database tag currently
+        deployed there. Below, the release store that every pipeline writes to
+        and the guardrail library every pipeline pins. Every box opens a detail
+        panel.">
+      <defs>
+        <marker id="f360a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6"
+          markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill={C.fast} /></marker>
+        <marker id="f360p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6"
+          markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill={C.pin} /></marker>
+      </defs>
+
+      <text x={20} y={20} fontSize={11} fontWeight={800} letterSpacing=".6"
+        fill={C.mut}>PIPELINES</text>
+      <text x={110} y={20} fontSize={9.5} fill={C.mut} opacity={.8}>
+        click any box</text>
+      {PIPES.map(([k, name, sub], i) => (
+        <g key={k} onClick={() => onOpen(node(k) ? null : k)} style={{ cursor: "pointer" }}>
+          <rect x={20 + i * 320} y={30} width={300} height={56} rx={4} fill={t.panel}
+            stroke={ring(k, i === 0 ? C.fast : C.pin)} strokeWidth={node(k) ? 2.6 : i === 0 ? 1.8 : 1.3} />
+          <text x={32 + i * 320} y={50} fontSize={11.5} fontWeight={600}
+            fill={i === 0 ? C.fast : C.pin}>{name}</text>
+          <text x={32 + i * 320} y={65} fontSize={9.5} fill={C.mut}>{sub}</text>
+          <text x={32 + i * 320} y={78} fontSize={9} fill={C.fast}>▾ open swimlane</text>
+        </g>))}
+
+      <text x={20} y={112} fontSize={11} fontWeight={800} letterSpacing=".6"
+        fill={C.mut}>HUB INSTANCES</text>
+      <text x={158} y={112} fontSize={9.5} fill={C.mut} opacity={.8}>
+        live — the tuple each one currently holds</text>
+      {ENV_ORDER.map((e, i) => {
+        const d = byEnv[e] || {};
+        const app = d.app || {}, sch = d.schema || {};
+        const prod = e === "PROD";
+        const warn = d.schema_ahead;
+        return (
+          <g key={e} onClick={() => onOpen(node("env:" + e) ? null : "env:" + e)}
+            style={{ cursor: "pointer" }}>
+            <rect x={EX(i)} y={136} width={EW} height={104} rx={4} fill={t.panel}
+              stroke={ring("env:" + e, prod ? C.ok : C.fast)}
+              strokeWidth={node("env:" + e) ? 2.6 : 1.6} />
+            <text x={EX(i) + 12} y={156} fontSize={12.5} fontWeight={700}
+              fill={prod ? C.ok : C.ink}>{ENV_LABEL[e]}</text>
+            <text x={EX(i) + 12} y={174} fontSize={11} fontFamily="monospace"
+              fill={C.ink}>{app.app_tag || "—"}</text>
+            <text x={EX(i) + 12} y={188} fontSize={9.5} fontFamily="monospace"
+              fill={C.mut}>build {app.build_number || "—"}</text>
+            <text x={EX(i) + 12} y={206} fontSize={11} fontFamily="monospace"
+              fill={C.pin}>{sch.db_tag || "—"}</text>
+            <text x={EX(i) + 12} y={220} fontSize={9.5} fill={warn ? C.wa : C.mut}>
+              {warn ? "schema ahead — by design" : d.lanes_aligned ? "lanes aligned" : "—"}</text>
+            <text x={EX(i) + 12} y={233} fontSize={9} fill={C.fast}>▾ open</text>
+          </g>);
+      })}
+      {[0, 1, 2].map((i) => (
+        <path key={i} d={`M${EX(i) + EW},188 L${EX(i + 1) - 4},188`} fill="none"
+          stroke={C.fast} strokeWidth={1.8} markerEnd="url(#f360a)" />))}
+      {PIPES.map((_, i) => (
+        <path key={i} d={`M${170 + i * 320},90 L${170 + i * 320},126 L${134 + i * 242},126 L${134 + i * 242},132`}
+          fill="none" stroke={C.pin} strokeWidth={1.2} strokeDasharray="4 3"
+          markerEnd="url(#f360p)" />))}
+
+      <g onClick={() => onOpen(node("store") ? null : "store")} style={{ cursor: "pointer" }}>
+        <rect x={20} y={282} width={460} height={56} rx={4} fill={t.panel}
+          stroke={ring("store", C.pin)} strokeWidth={node("store") ? 2.6 : 1.3}
+          strokeDasharray="4 3" />
+        <text x={32} y={302} fontSize={11.5} fontWeight={600} fill={C.pin}>
+          Release store</text>
+        <text x={32} y={317} fontSize={9.5} fill={C.mut}>
+          guardrail_release · gate_run · deployment · changeset — every row below comes from here</text>
+        <text x={32} y={330} fontSize={9} fill={C.fast}>▾ what writes what</text>
+      </g>
+      <g onClick={() => onOpen(node("lib") ? null : "lib")} style={{ cursor: "pointer" }}>
+        <rect x={500} y={282} width={460} height={56} rx={4} fill={t.panel}
+          stroke={ring("lib", C.pin)} strokeWidth={node("lib") ? 2.6 : 1.3}
+          strokeDasharray="4 3" />
+        <text x={512} y={302} fontSize={11.5} fontWeight={600} fill={C.pin}>
+          Guardrail library · versions and tags</text>
+        <text x={512} y={317} fontSize={9.5} fill={C.mut}>
+          semver, pinned per job — and the naming standard for every identifier</text>
+        <text x={512} y={330} fontSize={9} fill={C.fast}>▾ the standard</text>
+      </g>
+      <path d="M250,244 L250,278" fill="none" stroke={C.pin} strokeWidth={1.2}
+        strokeDasharray="4 3" markerEnd="url(#f360p)" />
+      <text x={20} y={378} fontSize={9.5} fill={C.mut}>
+        Solid arrows are promotion — the same artifact moving forward. Dashed arrows are pinned
+        versions and written rows: nothing waits on them.</text>
+      <text x={20} y={396} fontSize={9.5} fill={C.mut}>
+        An environment box is blank where no deployment row exists yet, rather than showing a
+        zero that would read as a real version.</text>
+    </Frame>);
+}
+
+// ---- detail panels, opened by clicking a node ----------------------
+export function Detail({ t, open, envs, hist, onClose }) {
+  if (!open) return null;
+  const C = PAL(t);
+  const head = (title, sub) => (
+    <div style={{ display: "flex", alignItems: "baseline", gap: 10,
+      marginBottom: 10, flexWrap: "wrap" }}>
+      <div style={{ fontSize: 14.5, fontWeight: 700, color: t.text }}>{title}</div>
+      <div style={{ fontSize: 12, color: t.sub, flex: 1 }}>{sub}</div>
+      <span onClick={onClose} style={{ cursor: "pointer", fontSize: 10,
+        fontWeight: 800, color: t.sub, border: `1px solid ${t.border}`,
+        borderRadius: 4, padding: "3px 9px" }}>✕ close</span>
+    </div>);
+
+  if (open.startsWith("env:")) {
+    const code = open.slice(4);
+    const d = (envs || []).find((e) => e.environment === code) || {};
+    const rows = (hist || []).filter((h) => h.environment === code).slice(0, 12);
+    const lane = (nm, o, col) => (
+      <div style={{ flex: "1 1 260px", border: `1px solid ${t.border}`,
+        borderRadius: t.radius.md, padding: "11px 13px", minWidth: 0 }}>
+        <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: .4,
+          textTransform: "uppercase", color: col }}>{nm}</div>
+        {!o ? <div style={{ fontSize: 12, color: t.textMuted, marginTop: 4 }}>
+            Nothing deployed — no row for this lane.</div> : (<>
+          <div style={{ fontSize: 14, fontFamily: "monospace", color: t.text,
+            marginTop: 3 }}>{o.app_tag || o.db_tag || "—"}</div>
+          <div style={{ fontSize: 10.5, fontFamily: "monospace",
+            color: t.textMuted, marginTop: 2 }}>
+            build {o.build_number || "—"}{o.commit_sha ? ` · ${o.commit_sha}` : ""}
+            {o.changesets ? ` · ${o.changesets} changesets` : ""}</div>
+          <div style={{ fontSize: 10.5, color: t.textMuted, marginTop: 2 }}>
+            {o.deployed_at || "—"} · {o.deployed_by || "—"}</div>
+        </>)}
+      </div>);
+    return (
+      <Card t={t}>
+        {head(ENV_LABEL[code] || code, "what this instance is holding, and how it got there")}
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+          {lane("Application", d.app, C.fast)}
+          {lane("Schema", d.schema, C.pin)}
+        </div>
+        {d.schema_ahead && <Note t={t} tone="warn">The schema lane is ahead of
+          the application lane here. Under expand-and-contract that is the
+          design, not drift — the new columns exist and the running code does
+          not use them yet.</Note>}
+        <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: .5,
+          textTransform: "uppercase", color: t.textMuted, margin: "4px 0 6px" }}>
+          Recent deployments here</div>
+        {!rows.length
+          ? <div style={{ fontSize: 12.5, color: t.textMuted }}>
+              No deployment rows for this environment yet.</div>
+          : <Tbl t={t} head={["When", "Lane", "Release", "Build", "Status"]}
+              rows={rows.map((r) => [r.deployed_at || "—", r.lane || "—",
+                r.release_id || "—", <M>{r.build_number || "—"}</M>,
+                <span style={{ color: r.status === "deployed" ? t.success
+                  : r.status === "rolled_back" ? t.danger : t.textMuted,
+                  fontWeight: 600 }}>{r.status || "—"}</span>])} />}
+      </Card>);
+  }
+
+  // Written out rather than looked up in a map: a component held in a
+  // variable and rendered as <Fig /> defeats the repo's own import check,
+  // which cannot tell a dynamic tag from a missing import.
+  const PIPE_TITLE = {
+    app: ["Application data pipeline", "daily — the only chain on the critical path"],
+    db: ["Database · Liquibase", "per release — finishes before the application lane starts"],
+    img: ["Infrastructure image & security", "CVE / bumps — one signed digest for all four"],
+  }[open];
+  if (PIPE_TITLE) {
+    const [title, sub] = PIPE_TITLE;
+    return (
+      <Card t={t}>
+        {head(title, sub)}
+        {open === "app" && <SwimApp t={t} />}
+        {open === "db" && <SwimDb t={t} />}
+        {open === "img" && <SwimImg t={t} />}
+        {open === "app" && <>
+          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: .5,
+            textTransform: "uppercase", color: t.textMuted, margin: "6px 0" }}>
+            Inside the job — and the rows each stage writes</div>
+          <ComponentFig t={t} /></>}
+      </Card>);
+  }
+  if (open === "store") {
+    return (
+      <Card t={t}>
+        {head("Release store", "every row the screens read, and what writes it")}
+        <Tbl t={t} head={["Table", "Written by", "One row per", "Status"]} rows={[
+          [<M>guardrail_release</M>, "application job, at merge", "release",
+            <span style={{ color: t.success }}>in use</span>],
+          [<M>guardrail_gate_run</M>, "application job, per stage", "gate per build per region",
+            <span style={{ color: t.warning }}>needs the full roster incl. not_run</span>],
+          [<M>guardrail_deployment</M>, "application and Liquibase jobs", "deployment event",
+            <span style={{ color: t.warning }}>missing image_digest</span>],
+          [<M>guardrail_changeset</M>, "Liquibase job", "changeset in the changelog",
+            <span style={{ color: t.success }}>in use</span>],
+          [<M>guardrail_changeset_applied</M>, "Liquibase job, per environment", "(changeset, environment)",
+            <span style={{ color: t.success }}>in use</span>],
+          [<M>guardrail_events</M>, "Airflow / dbt — G0 to G6", "gate per run per dataset",
+            <span style={{ color: t.danger, fontWeight: 600 }}>no producer, and no business_date column</span>],
+        ]} />
+        <Note t={t} tone="bad">A screen can only show what something wrote.
+          Three of these six are complete, two are missing a column, and one
+          has no producer at all — which is why the runtime plane is empty
+          rather than wrong.</Note>
+      </Card>);
+  }
+  if (open === "lib") {
+    return (<Card t={t}>{head("Versions, tags and the naming standard",
+      "what each pipeline mints, and the rule that decides the shape")}
+      <Versions t={t} /></Card>);
+  }
+  return null;
+}
+
+function Card({ t, children }) {
+  return (
+    <div style={{ border: `1px solid ${t.border}`, borderRadius: t.radius.md,
+      background: t.panel, padding: "16px 18px", marginBottom: 18 }}>{children}</div>);
+}
+
+// ---- the release delivery dashboard --------------------------------
+// Same shape as the Hub component dashboard: a dark header carrying the
+// numbers, a filter row, then dense rows. The numbers are DERIVED from
+// the rows below rather than stored, so the header and the list cannot
+// disagree.
+const LANE_LABEL = { app: "Application", schema: "Schema" };
+
+export function Dashboard({ t, live, envs, hist, rels, onPick }) {
+  const [fenv, setFenv] = useState("");
+  const [flane, setFlane] = useState("");
+  const [q, setQ] = useState("");
+
+  const rows = (hist || []).filter((r) =>
+    (!fenv || r.environment === fenv) &&
+    (!flane || r.lane === flane) &&
+    (!q || [r.release_id, r.build_number, r.app_tag, r.db_tag, r.deployed_by,
+            r.notes].join(" ").toLowerCase().includes(q.toLowerCase())));
+
+  const deployed = (envs || []).filter((e) => e.app || e.schema).length;
+  const aligned = (envs || []).filter((e) => e.lanes_aligned).length;
+  const blocked = (rels || []).filter((r) => r.status === "blocked").length;
+  const inFlight = (rels || []).filter((r) =>
+    r.status && r.status !== "released").length;
+  const prod = (envs || []).find((e) => e.environment === "PROD");
+  const prodTag = (prod && prod.app && prod.app.app_tag) || "—";
+
+  const exportCsv = () => {
+    const head = ["environment", "lane", "release_id", "build_number", "app_tag",
+                  "db_tag", "commit_sha", "status", "deployed_at", "deployed_by"];
+    const esc = (v) => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`;
+    const lines = [head.join(",")].concat(
+      rows.map((r) => head.map((k) => esc(r[k])).join(",")));
+    const a = document.createElement("a");
+    a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(lines.join("\n"));
+    a.download = "devops360-deployments.csv";
+    a.click();
+  };
+
+  const tile = (n, label, col) => (
+    <div style={{ textAlign: "center", minWidth: 62 }}>
+      <b style={{ fontSize: 25, color: col || "#fff" }}>{n}</b>
+      <div style={{ fontSize: 9, color: "#a9c1de" }}>{label}</div></div>);
+
+  return (<>
+    <div style={{ fontSize: 15, fontWeight: 700, color: t.text,
+      margin: "22px 0 4px" }}>Release delivery dashboard</div>
+    <div style={{ fontSize: 10.5, color: t.sub, marginBottom: 10 }}>
+      what is deployed where · {live
+        ? "● live — guardrail_deployment"
+        : "○ no rows yet — the publisher has not written to guardrail_deployment"}
+      {" "}· CSV export</div>
+
+    <div style={{ background: t.panel, border: `1px solid ${t.border}`,
+      borderRadius: 10, overflow: "hidden" }}>
+      <div style={{ display: "flex", gap: 20, alignItems: "center",
+        flexWrap: "wrap", background: "#10193b", color: "#fff",
+        padding: "13px 18px" }}>
+        {tile(deployed, `of ${(envs || []).length} instances deployed`)}
+        {tile(aligned, "lanes aligned", aligned === (envs || []).length
+          ? "#4cc07c" : "#e5a44a")}
+        {tile(blocked, "blocked", blocked ? "#f08099" : "#fff")}
+        {tile(inFlight, "in flight")}
+        <div style={{ textAlign: "center", minWidth: 110 }}>
+          <b style={{ fontSize: 16, fontFamily: "monospace" }}>{prodTag}</b>
+          <div style={{ fontSize: 9, color: "#a9c1de" }}>live in production</div></div>
+        <div style={{ flex: 1, minWidth: 220, display: "grid",
+          gridTemplateColumns: `repeat(${Math.max(1, (envs || []).length)},1fr)`,
+          gap: 8 }}>
+          {(envs || []).map((e) => {
+            const pct = (e.app ? 50 : 0) + (e.schema ? 50 : 0);
+            return (
+              <div key={e.environment}>
+                <div style={{ fontSize: 8, color: "#a9c1de" }}>
+                  {ENV_LABEL[e.environment] || e.environment}</div>
+                <div style={{ height: 5, background: "#2a3a6a", borderRadius: 99,
+                  marginTop: 3, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${pct}%`,
+                    background: pct === 100 ? "#31bced" : "#e5a44a" }} /></div>
+              </div>);
+          })}
+        </div>
+        <span onClick={exportCsv} style={{ cursor: "pointer", fontSize: 10,
+          fontWeight: 800, background: "#fff", color: "#10193b",
+          borderRadius: 5, padding: "6px 11px" }}>⬇ export CSV</span>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center",
+        padding: "9px 15px", borderBottom: `1px solid ${t.bg}`,
+        flexWrap: "wrap" }}>
+        <select value={fenv} onChange={(e) => setFenv(e.target.value)}
+          style={{ height: 28, border: `1px solid ${t.border}`, borderRadius: 4,
+            fontSize: 11, background: t.panel, color: t.text }}>
+          <option value="">all environments</option>
+          {ENV_ORDER.map((k) => <option key={k} value={k}>{ENV_LABEL[k]}</option>)}
+        </select>
+        <select value={flane} onChange={(e) => setFlane(e.target.value)}
+          style={{ height: 28, border: `1px solid ${t.border}`, borderRadius: 4,
+            fontSize: 11, background: t.panel, color: t.text }}>
+          <option value="">both lanes</option>
+          <option value="app">Application</option>
+          <option value="schema">Schema</option>
+        </select>
+        <span style={{ fontSize: 9.5, color: t.sub }}>{rows.length} shown</span>
+        <input placeholder="Search release, build, tag…" value={q}
+          onChange={(e) => setQ(e.target.value)}
+          style={{ marginLeft: "auto", height: 28, width: 220,
+            border: `1px solid ${t.border}`, borderRadius: 4, fontSize: 11,
+            padding: "0 8px", background: t.panel, color: t.text }} />
+      </div>
+
+      {!rows.length ? (
+        <div style={{ padding: "26px 16px", fontSize: 12.5, color: t.textMuted,
+          textAlign: "center" }}>
+          No deployment rows.{" "}
+          {live ? "Nothing matches this filter."
+                : "Until a Jenkins post-build step writes to guardrail_deployment, "
+                  + "this list stays empty — deliberately, rather than showing "
+                  + "numbers nothing produced."}
+        </div>
+      ) : rows.map((r, i) => (
+        <div key={r.deployment_id || i}
+          onClick={() => onPick("env:" + r.environment)}
+          style={{ display: "grid", cursor: "pointer",
+            gridTemplateColumns: "92px 86px minmax(0,1fr) 110px 92px 108px 96px",
+            gap: 10, padding: "7px 15px", fontSize: 11,
+            borderTop: `1px solid ${t.bg}`, alignItems: "center" }}>
+          <b style={{ color: t.text }}>{ENV_LABEL[r.environment] || r.environment}</b>
+          <span style={{ fontSize: 8.5, fontWeight: 800, borderRadius: 999,
+            padding: "2px 8px", textAlign: "center",
+            background: t.bg, color: r.lane === "schema" ? "#7c3aed" : "#0091bf" }}>
+            {LANE_LABEL[r.lane] || r.lane}</span>
+          <span style={{ color: t.text, overflow: "hidden",
+            textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+            title={r.notes || r.release_id}>{r.release_id || "—"}</span>
+          <span style={{ fontFamily: "monospace", fontSize: 10.5, color: t.text }}>
+            {r.app_tag || r.db_tag || "—"}</span>
+          <span style={{ fontFamily: "monospace", fontSize: 10.5, color: t.textMuted }}>
+            {r.build_number || "—"}</span>
+          <span style={{ fontSize: 10, color: t.textMuted }}>{r.deployed_at || "—"}</span>
+          <span style={{ fontSize: 9, fontWeight: 800, textAlign: "center",
+            borderRadius: 4, padding: "2px 6px",
+            background: r.status === "deployed" ? "#e8f6ed"
+              : r.status === "rolled_back" ? "#fdeaee" : "#f1f4f7",
+            color: r.status === "deployed" ? "#15803d"
+              : r.status === "rolled_back" ? "#c1113a" : "#6b7884" }}>
+            {r.status || "—"}</span>
+        </div>))}
+    </div>
+  </>);
+}
+
 // ===================================================================
 export default function DevOps360({ t }) {
-  const [tab, setTab] = useState("Context");
-  const Panel = { Context, Containers, Components, Versions, Promotion,
-                  Pipelines, Deployment }[tab];
+  const [open, setOpen] = useState(null);
+  const [ref, setRef] = useState(null);
+  const [envs, setEnvs] = useState([]);
+  const [hist, setHist] = useState([]);
+  const [rels, setRels] = useState([]);
+  const [live, setLive] = useState(false);
+
+  useEffect(() => {
+    let on = true;
+    promotionApi.deployments().then((d) => {
+      if (!on) return;
+      setEnvs(d.environments || []);
+      setHist(d.history || []);
+      setLive(!d.unreachable && (d.history || []).length > 0);
+    });
+    promotionApi.releases().then((d) => { if (on) setRels(d.releases || []); });
+    return () => { on = false; };
+  }, []);
+
+
   return (
-    <div style={{ padding: "22px 26px 60px", maxWidth: 1180 }}>
-      <div style={{ fontSize: 22, fontWeight: 500, color: t.text,
-        marginBottom: 4 }}>DevOps 360</div>
-      <div style={{ fontSize: 13.5, color: t.sub, maxWidth: "76ch",
-        lineHeight: 1.6, marginBottom: 16 }}>
-        How a change reaches production — the delivery system in C4, the
-        identifiers that travel through it, a swimlane per pipeline, and what
-        each component becomes in a namespace. For what is running{" "}
-        <i>right now</i>, and for comparing two regions, use{" "}
-        <b style={{ color: t.text }}>Quality Guardrails → Releases</b>; those
-        screens read live rows rather than describing them.
+    <div style={{ padding: "20px 24px 60px", maxWidth: 1260 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10,
+        flexWrap: "wrap" }}>
+        <div style={{ fontSize: 22, fontWeight: 500, color: t.text }}>DevOps 360</div>
+        <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: .5,
+          borderRadius: 999, padding: "2px 9px",
+          background: live ? "#e8f6ed" : "#f1f4f7",
+          color: live ? "#15803d" : "#6b7884" }}>
+          {live ? "● LIVE" : "○ NO ROWS YET"}</span>
+      </div>
+      <div style={{ fontSize: 13, color: t.sub, maxWidth: "80ch",
+        lineHeight: 1.6, margin: "4px 0 16px" }}>
+        The delivery system, and what it has actually delivered. Every box on
+        the map opens; the dashboard underneath is{" "}
+        <b style={{ color: t.text }}>guardrail_deployment</b>, filtered and
+        exportable. For the gate matrix and the changeset-level compare, use{" "}
+        <b style={{ color: t.text }}>Quality Guardrails → Releases</b>.
       </div>
 
-      <div style={{ display: "flex", borderBottom: `1px solid ${t.border}`,
-        marginBottom: 20, overflowX: "auto" }}>
-        {TABS.map((k) => (
-          <div key={k} onClick={() => setTab(k)}
-            style={{ fontSize: 12.5, fontWeight: 600, padding: "9px 16px",
-              cursor: "pointer", whiteSpace: "nowrap",
-              color: tab === k ? t.accent : t.sub,
-              borderBottom: `2px solid ${tab === k ? t.accent : "transparent"}` }}>
-            {k}</div>))}
-      </div>
+      <FlowFig t={t} envs={envs} open={open} onOpen={setOpen} />
+      <Detail t={t} open={open} envs={envs} hist={hist}
+        onClose={() => setOpen(null)} />
 
-      <Panel t={t} />
+      <Dashboard t={t} live={live} envs={envs} hist={hist} rels={rels}
+        onPick={setOpen} />
+
+      <div style={{ fontSize: 15, fontWeight: 700, color: t.text,
+        margin: "26px 0 4px" }}>Reference</div>
+      <div style={{ fontSize: 10.5, color: t.sub, marginBottom: 10 }}>
+        the design behind the map — opens in place, nothing here is live</div>
+      <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
+        {[["Context", "C4 · who uses it"], ["Containers", "C4 · the runnable pieces"],
+          ["Promotion", "what moves between regions"],
+          ["Deployment", "what each component becomes"]].map(([k, label]) => (
+          <span key={k} onClick={() => setRef(ref === k ? null : k)}
+            style={{ cursor: "pointer", fontSize: 11, fontWeight: 600,
+              padding: "6px 12px", borderRadius: 999,
+              border: `1px solid ${ref === k ? t.accent : t.border}`,
+              color: ref === k ? t.accent : t.sub,
+              background: ref === k ? t.bg : t.panel }}>{label}</span>))}
+      </div>
+      {ref && <Card t={t}>
+        {ref === "Context" && <Context t={t} />}
+        {ref === "Containers" && <Containers t={t} />}
+        {ref === "Promotion" && <Promotion t={t} />}
+        {ref === "Deployment" && <Deployment t={t} />}
+      </Card>}
     </div>);
 }
