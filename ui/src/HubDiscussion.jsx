@@ -207,6 +207,9 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
   const actor = me || "local.user";
   const [store, setStore] = useState(emptyStore);
   const [live, setLive] = useState(false);
+  // null until the API answers. Non-null means the questions on screen
+  // came from the database; null means the copy in this bundle.
+  const [corpus, setCorpus] = useState(null);
   const [open, setOpen] = useState(null);
   const [ftopic, setFtopic] = useState("");
   const [fowner, setFowner] = useState("");
@@ -219,8 +222,8 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
 
   useEffect(() => {
     let on = true;
-    discussionApi.load().then(({ store: s, live: l }) => {
-      if (!on) return; setStore(s); setLive(l);
+    discussionApi.load().then(({ store: s, live: l, corpus: c }) => {
+      if (!on) return; setStore(s); setLive(l); setCorpus(c || null);
     });
     return () => { on = false; };
   }, []);
@@ -254,23 +257,32 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
   // of being shadowed by a copy saved on somebody's first visit. The
   // moment anyone accepts or edits one it is materialised and becomes
   // theirs.
+  // When the corpus is in the database the drafted answers are rows
+  // there too, so merging the bundled copy as well would show every
+  // draft twice. The bundle's drafts are the cold start, nothing more.
   const answers = useMemo(() => [
     ...Object.entries(store.a || {}).map(([id, a]) => ({ ...a, id })),
-    ...seedRows(store),
-  ], [store]);
+    ...(corpus ? [] : seedRows(store)),
+  ], [store, corpus]);
 
   // Seeded review questions plus anything raised in the app. The two are
   // kept apart so a redeploy cannot duplicate the first or drop the second.
+  const QS = corpus ? corpus.questions.filter((x) => x.source !== "user")
+                   : QUESTIONS;
+  const TPS = corpus && corpus.topics.length ? corpus.topics : TOPICS;
+  const OWN = corpus && Object.keys(corpus.owners || {}).length
+    ? corpus.owners : OWNERS;
+
   const all = useMemo(() => {
     const extra = Object.values(store.n || {});
-    return [...QUESTIONS, ...extra].map((x) => {
+    return [...QS, ...extra].map((x) => {
       const over = (store.q || {})[x.n] || {};
       return { ...x, ...(over.body ? { body: over.body } : {}),
-        comps: over.comps || compsFor(x), docs: over.docs || x.docs || [],
+        comps: over.comps || x.comps || compsFor(x), docs: over.docs || x.docs || [],
         edited: over.editedAt ? { by: over.editedBy, at: over.editedAt } : null,
         over, status: statusOf(x, answers, over) };
     });
-  }, [store, answers]);
+  }, [store, answers, QS]);
 
   const count = (s) => all.filter((x) => x.status === s).length;
   const unlinked = all.filter((x) => !x.comps.length).length;
@@ -280,7 +292,7 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
     (!fstatus || x.status === fstatus) &&
     (!q || x.body.toLowerCase().includes(q.toLowerCase()) || String(x.n) === q));
 
-  const grouped = TOPICS.map((tp) => [tp, rows.filter((r) => r.topic === tp.no)])
+  const grouped = TPS.map((tp) => [tp, rows.filter((r) => r.topic === tp.no)])
     .filter(([, r]) => r.length);
 
   const addAnswer = (qid, body) => {
@@ -311,9 +323,10 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
 
   // An attachment is written by the server, not by the reducer, so the
   // store has to be re-read rather than guessed at.
-  const refresh = () => discussionApi.load().then(({ store: s2, live: l2 }) => {
-    setStore(s2); setLive(l2);
-  });
+  const refresh = () => discussionApi.load()
+    .then(({ store: s2, live: l2, corpus: c2 }) => {
+      setStore(s2); setLive(l2); setCorpus(c2 || null);
+    });
 
   const S = sty(t);
   return (
@@ -321,6 +334,14 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
       <div style={S.head}>
         <span onClick={onBack} style={S.back}>← Hub</span>
         <b style={{ fontSize: 17, color: t.text }}>Discussion</b>
+        <span style={{ ...S.pill,
+          background: corpus ? "#e8f6ed" : "#fdf2e3",
+          color: corpus ? "#15803d" : "#8c6a1f" }}
+          title={corpus
+            ? "questions, answers and attachments are rows in Oracle"
+            : "the API or the corpus load has not run — showing the copy "
+              + "that ships with this build, and nothing typed here is shared"}>
+          {corpus ? "◆ from the database" : "▲ bundled copy"}</span>
         <span style={{ ...S.pill, background: live ? "#e8f6ed" : "#f1f4f7",
           color: live ? "#15803d" : "#6b7884" }}>
           {live ? "● shared" : "○ local only — this browser"}</span>
@@ -343,7 +364,7 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
       </div>
 
       <div style={S.owners}>
-        {Object.entries(OWNERS).map(([k, o]) => {
+        {Object.entries(OWN).map(([k, o]) => {
           const mine = all.filter((x) => x.owner === k);
           return (
             <span key={k} onClick={() => setFowner(fowner === k ? "" : k)}
@@ -360,7 +381,7 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
       <div style={S.filters}>
         <select value={ftopic} onChange={(e) => setFtopic(e.target.value)} style={S.sel}>
           <option value="">all 17 topics</option>
-          {TOPICS.map((tp) => (
+          {TPS.map((tp) => (
             <option key={tp.no} value={tp.no}>{tp.no} · {tp.title}</option>))}
         </select>
         <select value={fstatus} onChange={(e) => setFstatus(e.target.value)} style={S.sel}>
@@ -380,12 +401,12 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
           <div style={S.askRow}>
             <select style={S.sel} value={draft.topic || 1}
               onChange={(e) => setDraft({ ...draft, topic: e.target.value })}>
-              {TOPICS.map((tp) => <option key={tp.no} value={tp.no}>
+              {TPS.map((tp) => <option key={tp.no} value={tp.no}>
                 {tp.no} · {tp.title}</option>)}
             </select>
             <select style={S.sel} value={draft.owner || "KB"}
               onChange={(e) => setDraft({ ...draft, owner: e.target.value })}>
-              {Object.entries(OWNERS).map(([k, o]) =>
+              {Object.entries(OWN).map(([k, o]) =>
                 <option key={k} value={k}>{o.name}</option>)}
             </select>
             <span style={S.hint}>links default from the topic — open the
@@ -405,14 +426,14 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
               {qs.filter((x) => x.status === "resolved").length} resolved</span></div>
           {qs.map((x) => open === x.n
             ? <Expanded key={x.n} t={t} x={x} S={S} answers={answers}
-                live={live} refresh={refresh}
+                live={live} refresh={refresh} own={OWN}
                 actor={actor} store={store} commit={commit}
                 onClose={() => setOpen(null)} onOpenComponent={onOpenComponent}
                 setStatus={setStatus} addAnswer={addAnswer}
                 saveQuestionEdit={saveQuestionEdit}
                 editing={editing} setEditing={setEditing}
                 text={text} setText={setText} />
-            : <Row key={x.n} t={t} x={x} S={S} answers={answers}
+            : <Row key={x.n} t={t} x={x} S={S} answers={answers} own={OWN}
                 onOpen={() => setOpen(x.n)} />)}
         </div>))}
 
@@ -422,7 +443,7 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
     </div>);
 }
 
-function Row({ t, x, S, answers, onOpen }) {
+function Row({ t, x, S, answers, onOpen, own }) {
   const n = answers.filter((a) => a.qid === x.n).length;
   return (
     <div onClick={onOpen} style={S.row}>
@@ -433,7 +454,7 @@ function Row({ t, x, S, answers, onOpen }) {
         {x.comps.length > 2 && <i style={S.chip}>+{x.comps.length - 2}</i>}
         {!x.comps.length && <i style={{ ...S.chip, borderStyle: "dashed",
           color: "#b4620f" }}>unlinked</i>}</span>
-      <span style={S.own}>{(OWNERS[x.owner] || {}).name || x.owner}</span>
+      <span style={S.own}>{((own || OWNERS)[x.owner] || {}).name || x.owner}</span>
       <Badge S={S} s={x.status} />
       <span style={S.ansN}>{n || ""}</span>
     </div>);
@@ -443,7 +464,7 @@ const Badge = ({ S, s }) => (
   <span style={{ ...S.badge, background: ST[s].bg, color: ST[s].c }}>
     {ST[s].label}</span>);
 
-export function Expanded({ t, x, S, answers, actor, store, commit, onClose, live, refresh,
+export function Expanded({ t, x, S, answers, actor, store, commit, onClose, live, refresh, own,
                     onOpenComponent, setStatus, addAnswer, saveQuestionEdit,
                     editing, setEditing, text, setText }) {
   const [reply, setReply] = useState("");
@@ -465,7 +486,7 @@ export function Expanded({ t, x, S, answers, actor, store, commit, onClose, live
             : <div style={S.qTitle}>{x.body}</div>}
           <div style={S.qMeta}>
             {x.raisedBy ? <>raised by <b>{x.raisedBy}</b> · {x.raisedAt} · </> : null}
-            owner <b>{(OWNERS[x.owner] || {}).name || x.owner}</b> · topic {x.topic}
+            owner <b>{((own || OWNERS)[x.owner] || {}).name || x.owner}</b> · topic {x.topic}
             {x.note ? ` · ${x.note}` : ""}
             {x.edited && <span style={{ color: "#b4620f" }}>
               {" "}· edited {x.edited.at} by {x.edited.by}</span>}

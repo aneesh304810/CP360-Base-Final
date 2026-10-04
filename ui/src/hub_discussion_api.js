@@ -25,6 +25,14 @@ const T = 8000;
 
 export const emptyStore = () => ({ q: {}, a: {}, n: {}, ev: [], atts: {} });
 
+// The corpus — topics, owners, questions — now comes from the database
+// too. The copy that ships in the bundle is a COLD START only: it is
+// used when the API cannot be reached or the loader has not been run,
+// and the screen says which it is showing. A review that renders with no
+// questions because Oracle is down is worse than one that renders the
+// shipped copy and admits it is read-only.
+export const SOURCE = { db: "db", bundled: "bundled" };
+
 export function loadLocal() {
   try {
     const raw = localStorage.getItem(KEY);
@@ -43,9 +51,13 @@ export async function load() {
     const r = await fetch(`${API_BASE}${PATH}`, { signal: AbortSignal.timeout(T) });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const j = await r.json();
-    return { store: { ...emptyStore(), ...(j.store || {}) }, live: true };
+    const seeded = !!j.seeded && !!(j.corpus && (j.corpus.questions || []).length);
+    return { store: { ...emptyStore(), ...(j.store || {}) }, live: true,
+      corpus: seeded ? j.corpus : null,
+      source: seeded ? SOURCE.db : SOURCE.bundled };
   } catch {
-    return { store: loadLocal(), live: false };
+    return { store: loadLocal(), live: false, corpus: null,
+      source: SOURCE.bundled };
   }
 }
 

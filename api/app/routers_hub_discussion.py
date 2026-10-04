@@ -106,6 +106,36 @@ def sniff(raw: bytes):
 
 
 # --------------------------------------------------------------- read
+def _corpus():
+    """Topics, owners and the questions themselves — all from the table.
+
+    "Read the questions from the database" is not satisfied by reading
+    questions and then taking their grouping and their owners' names
+    from a constant in the bundle, so those are rows too.
+    """
+    owners, totals = {}, {}
+    for r in _safe("SELECT owner_code, name, focus, declared_total FROM hub_owner"):
+        owners[r["OWNER_CODE"]] = {"name": r.get("NAME"), "focus": r.get("FOCUS")}
+        if r.get("DECLARED_TOTAL") is not None:
+            totals[r["OWNER_CODE"]] = int(r["DECLARED_TOTAL"])
+
+    topics = [{"no": int(r["TOPIC_NO"]), "title": r.get("TITLE"),
+               "comps": [c for c in (r.get("COMPS") or "").split(",") if c]}
+              for r in _safe("SELECT topic_no, title, comps, sort_order "
+                             "FROM hub_topic ORDER BY sort_order, topic_no")]
+
+    questions = [{"n": int(r["QID"]), "topic": int(r["TOPIC"] or 0),
+                  "owner": r.get("OWNER_CODE") or "KB",
+                  "body": _clob(r.get("BODY")) or "",
+                  "comps": [c for c in (r.get("COMPS") or "").split(",") if c],
+                  "note": r.get("NOTE"),
+                  "source": r.get("SOURCE") or "review"}
+                 for r in _safe("SELECT qid, topic, owner_code, body, comps, "
+                                "note, source FROM hub_question ORDER BY qid")]
+    return {"owners": owners, "ownerTotals": totals,
+            "topics": topics, "questions": questions}
+
+
 def _store():
     out = {"q": {}, "a": {}, "n": {}, "ev": [], "atts": {}}
 
@@ -116,15 +146,14 @@ def _store():
         body = _clob(r.get("BODY"))
         comps = [c for c in (r.get("COMPS") or "").split(",") if c]
         rec = {}
-        if body:
-            rec["body"] = body
         if comps:
             rec["comps"] = comps
         if r.get("STATUS"):
             rec.update(status=r["STATUS"], statusBy=r.get("STATUS_BY"),
                        statusAt=_ts(r.get("STATUS_AT")))
         if r.get("EDITED_AT"):
-            rec.update(editedBy=r.get("EDITED_BY"), editedAt=_ts(r.get("EDITED_AT")))
+            rec.update(editedBy=r.get("EDITED_BY"), editedAt=_ts(r.get("EDITED_AT")),
+                       body=body)
         out["q"][str(qid)] = rec
         if (r.get("SOURCE") or "review") == "user":
             out["n"][str(qid)] = {
@@ -135,8 +164,8 @@ def _store():
             }
 
     for r in _safe("SELECT answer_id, qid, body, author, created_at, updated_by, "
-                   "updated_at, accepted, accepted_by, accepted_at, seed_key "
-                   "FROM hub_answer"):
+                   "updated_at, accepted, accepted_by, accepted_at, seed_key, "
+                   "conf, gap, quote, fig, ev, is_draft FROM hub_answer"):
         a = {"qid": int(r["QID"]), "body": _clob(r.get("BODY")) or "",
              "author": r.get("AUTHOR"), "createdAt": _ts(r.get("CREATED_AT")),
              "accepted": (r.get("ACCEPTED") or "N") == "Y"}
@@ -146,6 +175,14 @@ def _store():
             a.update(acceptedBy=r.get("ACCEPTED_BY"), acceptedAt=_ts(r.get("ACCEPTED_AT")))
         if r.get("SEED_KEY"):
             a["seedKey"] = r["SEED_KEY"]
+        # A drafted answer keeps its draft chrome only while it IS one.
+        # Editing clears the flag, because at that point it is the
+        # editor's answer and labelling it a draft misattributes it.
+        if (r.get("IS_DRAFT") or "N") == "Y" and not r.get("UPDATED_AT"):
+            a["draft"] = True
+            a.update(conf=r.get("CONF"), gap=_clob(r.get("GAP")),
+                     quote=_clob(r.get("QUOTE")), fig=r.get("FIG"),
+                     ev=[e.strip() for e in (r.get("EV") or "").split("|") if e.strip()])
         out["a"][r["ANSWER_ID"]] = a
 
     # Metadata only; the bytes are fetched one at a time by the browser.
@@ -173,7 +210,12 @@ def _store():
 
 @router.get("")
 def get_discussion():
-    return {"store": _store(), "persisted": True}
+    c = _corpus()
+    # An empty corpus means the loader has not been run. Saying so lets
+    # the screen fall back to the shipped copy and SAY it is doing that,
+    # rather than rendering a review with no questions in it.
+    return {"store": _store(), "corpus": c, "persisted": True,
+            "seeded": len(c["questions"]) > 0}
 
 
 # -------------------------------------------------------------- write

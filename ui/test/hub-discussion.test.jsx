@@ -52,6 +52,7 @@ const ROOT = path.join(SRC, "..", "..");
 const strip = (f) => fs.readFileSync(path.join(ROOT, f), "utf8")
   .split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
 const DISC = strip("ui/src/HubDiscussion.jsx");
+const UI_SRC = DISC;
 
 // ---- the corpus matches the review's own published totals -----------
 ok(QUESTIONS.length === 108, "all 108 questions are present", QUESTIONS.length);
@@ -406,6 +407,54 @@ ok(/✎ edit/.test(exH) && /✓ accept/.test(exH),
    "");
 ok(!/NaN|undefined/.test(ex(tDark)), "the expanded thread is clean in dark too",
    (ex(tDark).match(/.{0,40}(NaN|undefined)/) || [])[0]);
+
+// ---- the corpus now lives in the database ---------------------------
+//
+// data/hub_corpus.json is what the Oracle loader reads, generated from
+// these two modules. If it drifts, the screen shows one corpus and the
+// database holds another, and nothing else notices.
+const CORPUS = path.join(ROOT, "data", "hub_corpus.json");
+if (fs.existsSync(CORPUS)) {
+  const c = JSON.parse(fs.readFileSync(CORPUS, "utf8"));
+  ok(c.questions.length === QUESTIONS.length,
+     "the exported corpus has the same number of questions as the module it "
+     + "was generated from — re-run ui/scripts/export_hub_corpus.mjs",
+     `${c.questions.length} vs ${QUESTIONS.length}`);
+  ok(c.answers.length === SEED_ANSWERS.length,
+     "and the same number of answers — adding a draft without re-exporting "
+     + "means it never reaches the database",
+     `${c.answers.length} vs ${SEED_ANSWERS.length}`);
+  const byId = new Map(c.questions.map((q) => [q.qid, q]));
+  ok(QUESTIONS.every((q) => (byId.get(q.n) || {}).body === q.body),
+     "every question body matches, character for character",
+     QUESTIONS.filter((q) => (byId.get(q.n) || {}).body !== q.body)
+       .map((q) => q.n).slice(0, 4));
+  const aById = new Map(c.answers.map((a) => [a.qid, a]));
+  ok(SEED_ANSWERS.every((a) => (aById.get(a.n) || {}).conf === a.conf),
+     "and every answer's evidence class survives the export",
+     SEED_ANSWERS.filter((a) => (aById.get(a.n) || {}).conf !== a.conf)
+       .map((a) => a.n));
+  ok(SEED_ANSWERS.filter((a) => a.conf === "document")
+       .every((a) => (aById.get(a.n) || {}).quote),
+     "a document answer keeps its quote through the export — the rule has "
+     + "to survive the hop into Oracle, not just hold in the bundle", "");
+  ok(c.topics.length === TOPICS.length && c.owners.length === 5,
+     "topics and owners are exported too, so the screen does not read "
+     + "questions from the database and their grouping from the bundle",
+     `${c.topics.length}/${c.owners.length}`);
+}
+
+// With the corpus in the database the bundled drafts must NOT also be
+// merged, or every draft shows twice. The component decides that on
+// whether a corpus came back; this pins the rule it decides by.
+ok(/corpus \? \[\] : seedRows\(store\)/.test(UI_SRC)
+   || /!corpus[\s\S]{0,40}seedRows/.test(UI_SRC),
+   "the bundled drafts are merged only when the database has no corpus — "
+   + "otherwise every drafted answer appears twice", "");
+ok(/from the database/.test(UI_SRC) && /bundled copy/.test(UI_SRC),
+   "and the screen says which corpus it is showing, because a review "
+   + "rendered from a stale bundle looks exactly like one rendered from "
+   + "the database", "");
 
 // ---- persistence: every write names an operation --------------------
 //

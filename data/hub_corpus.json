@@ -1,0 +1,1811 @@
+{
+ "generated_from": "ui/src/hubQuestions.js + ui/src/hubAnswers.js",
+ "owners": [
+  {
+   "owner_code": "KB",
+   "name": "Kelley Barnhardt",
+   "focus": "Data model, Stage/INT, ODI→dbt, ownership, DQ, operating model",
+   "declared_total": 42
+  },
+  {
+   "owner_code": "GL",
+   "name": "Glenn Lasrado",
+   "focus": "Risk controls, recovery states, completeness, restatement, retention",
+   "declared_total": 29
+  },
+  {
+   "owner_code": "GM",
+   "name": "Ganender Middha",
+   "focus": "Ingestion framework, SLAs, retention, DR, go-live",
+   "declared_total": 20
+  },
+  {
+   "owner_code": "SA",
+   "name": "Sudhakar Annam",
+   "focus": "OpenShift storage, concurrency, observability",
+   "declared_total": 12
+  },
+  {
+   "owner_code": "KK",
+   "name": "Kartheek Kollipara",
+   "focus": "Platform support, upskilling, threshold controls",
+   "declared_total": 5
+  }
+ ],
+ "topics": [
+  {
+   "topic_no": 1,
+   "title": "SEI Data Structure / Enriched Data",
+   "comps": "15,40,37",
+   "sort_order": 1
+  },
+  {
+   "topic_no": 2,
+   "title": "Stage 2 / INT Layer",
+   "comps": "14,15,16",
+   "sort_order": 2
+  },
+  {
+   "topic_no": 3,
+   "title": "ODI → dbt Conversion and Ownership",
+   "comps": "15,16,37",
+   "sort_order": 3
+  },
+  {
+   "topic_no": 4,
+   "title": "Existing DWH Logic Outside Stage 1 / Stage 2",
+   "comps": "37,16",
+   "sort_order": 4
+  },
+  {
+   "topic_no": 5,
+   "title": "BBH vs. SEI Responsibilities and Component Ownership",
+   "comps": "6,18,32",
+   "sort_order": 5
+  },
+  {
+   "topic_no": 6,
+   "title": "SDC vs. SFTP",
+   "comps": "8,101",
+   "sort_order": 6
+  },
+  {
+   "topic_no": 7,
+   "title": "Post-SEI / SWP Operating Model",
+   "comps": "15,16,37,38",
+   "sort_order": 7
+  },
+  {
+   "topic_no": 8,
+   "title": "Data Quality, Thresholds and Reconciliation",
+   "comps": "23,24,25,26,27,28,30",
+   "sort_order": 8
+  },
+  {
+   "topic_no": 9,
+   "title": "DIM/FACT Model, History and Validation",
+   "comps": "16,19,31",
+   "sort_order": 9
+  },
+  {
+   "topic_no": 10,
+   "title": "File Ingestion, Completeness and Idempotency",
+   "comps": "9,13,29,33",
+   "sort_order": 10
+  },
+  {
+   "topic_no": 11,
+   "title": "Business-Date Processing, Orchestration and Recovery",
+   "comps": "18,20,21,22,33",
+   "sort_order": 11
+  },
+  {
+   "topic_no": 12,
+   "title": "Restatement, Replay and Corrections",
+   "comps": "17,21,29",
+   "sort_order": 12
+  },
+  {
+   "topic_no": 13,
+   "title": "Storage, OpenShift and Capacity",
+   "comps": "50,52,53,55",
+   "sort_order": 13
+  },
+  {
+   "topic_no": 14,
+   "title": "Observability, Logging and Alerting",
+   "comps": "34,64",
+   "sort_order": 14
+  },
+  {
+   "topic_no": 15,
+   "title": "SLAs",
+   "comps": "20,34,7",
+   "sort_order": 15
+  },
+  {
+   "topic_no": 16,
+   "title": "Retention, Audit and Disaster Recovery",
+   "comps": "31,62,63",
+   "sort_order": 16
+  },
+  {
+   "topic_no": 17,
+   "title": "Platform Support, Release and Go-Live",
+   "comps": "57,59,60",
+   "sort_order": 17
+  }
+ ],
+ "questions": [
+  {
+   "qid": 1,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 1,
+   "owner_code": "KB",
+   "body": "What exactly does \"enriched\" SEI data mean within this model?",
+   "comps": "15,40,37",
+   "note": null
+  },
+  {
+   "qid": 2,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 1,
+   "owner_code": "KB",
+   "body": "Is the enriched layer just normalized SEI data, with no AddVantage-specific transformation?",
+   "comps": "15,40,37",
+   "note": null
+  },
+  {
+   "qid": 3,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 1,
+   "owner_code": "KB",
+   "body": "Will there be a reusable SEI data structure like today's PB DWH schema, or is Stage 2 meant to serve that purpose?",
+   "comps": "40,15",
+   "note": "Kartheek agreed"
+  },
+  {
+   "qid": 4,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 1,
+   "owner_code": "KB",
+   "body": "The documentation says this layer is not a canonical model. Can BBH use it as a consistent data source, or will another transformation/model be needed?",
+   "comps": "15,40,37",
+   "note": null
+  },
+  {
+   "qid": 5,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 1,
+   "owner_code": "KB",
+   "body": "Does mapping/enrichment mean normalization and reference-data mapping, or does it include transformation into the existing PB DWH model?",
+   "comps": "15,40,37",
+   "note": null
+  },
+  {
+   "qid": 6,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 2,
+   "owner_code": "KB",
+   "body": "We need a clearer explanation of Stage 2 and how it relates to the architecture diagrams.",
+   "comps": "14,15,16",
+   "note": null
+  },
+  {
+   "qid": 7,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 2,
+   "owner_code": "KB",
+   "body": "What is the purpose of the INT layer, and what processing happens there versus in Stage 2?",
+   "comps": "14,15,16",
+   "note": null
+  },
+  {
+   "qid": 8,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 2,
+   "owner_code": "KB",
+   "body": "Is this right: Stage standardizes source data and applies source DQ, then INT does further mapping/enrichment before the Dim/Fact models are built?",
+   "comps": "14,15,16",
+   "note": null
+  },
+  {
+   "qid": 9,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 2,
+   "owner_code": "KB",
+   "body": "What separates Stage → INT → Approved Dim/Fact in terms of transformation, persistence, and business logic?",
+   "comps": "14,15,16",
+   "note": null
+  },
+  {
+   "qid": 10,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 2,
+   "owner_code": "KB",
+   "body": "Can downstream applications use Stage 2 or INT data directly, or only the approved Dim/Fact models?",
+   "comps": "14,15,16",
+   "note": null
+  },
+  {
+   "qid": 11,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 3,
+   "owner_code": "KB",
+   "body": "Who is responsible for translating the existing ODI jobs into dbt models?",
+   "comps": "15,16,37",
+   "note": null
+  },
+  {
+   "qid": 12,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 3,
+   "owner_code": "KB",
+   "body": "Will Professional Services review the ODI implementation and rebuild that logic in dbt, or must BBH analysts reverse-engineer each ODI job and write detailed requirements?",
+   "comps": "15,16,37",
+   "note": null
+  },
+  {
+   "qid": 13,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 3,
+   "owner_code": "KB",
+   "body": "\"Understand what the ODI job does and provide requirements\": does that mean BBH confirms the business intent, or documents the detailed technical logic?",
+   "comps": "15,16,37",
+   "note": null
+  },
+  {
+   "qid": 14,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 3,
+   "owner_code": "KB",
+   "body": "Who owns the like-for-like Stage → INT → Approved Dim/Fact mapping and the ODI-to-dbt conversion?",
+   "comps": "15,16,37",
+   "note": null
+  },
+  {
+   "qid": 15,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 3,
+   "owner_code": "KB",
+   "body": "Who confirms that the new Dim/Fact tables behave the same as the current implementation (e.g., DATEROLL, AUTOPOST)?",
+   "comps": "15,16,37",
+   "note": null
+  },
+  {
+   "qid": 16,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 4,
+   "owner_code": "KB",
+   "body": "How will processing that currently runs inside the PB DWH itself be handled?",
+   "comps": "37,16",
+   "note": null
+  },
+  {
+   "qid": 17,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 4,
+   "owner_code": "KB",
+   "body": "Who identifies, documents, and rebuilds in dbt the holdings/fact logic that is built inside the PB DWH?",
+   "comps": "37,16",
+   "note": null
+  },
+  {
+   "qid": 18,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 4,
+   "owner_code": "KB",
+   "body": "What does \"unchanged except for how they are populated\" mean in practice?",
+   "comps": "37,16",
+   "note": null
+  },
+  {
+   "qid": 19,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 4,
+   "owner_code": "KB",
+   "body": "Does \"unchanged\" mean the business logic is recreated as-is in dbt, and only the source/population method changes?",
+   "comps": "37,16",
+   "note": null
+  },
+  {
+   "qid": 20,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 5,
+   "owner_code": "KB",
+   "body": "We need clearer separation of BBH and SEI responsibilities across the architecture.",
+   "comps": "6,18,32",
+   "note": null
+  },
+  {
+   "qid": 21,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 5,
+   "owner_code": "KB",
+   "body": "Where does orchestration physically live and run: at BBH or at SEI?",
+   "comps": "6,18,32",
+   "note": null
+  },
+  {
+   "qid": 22,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 5,
+   "owner_code": "KB",
+   "body": "Which transformations, mappings, DQ checks, and processing does SEI do versus BBH?",
+   "comps": "6,18,32",
+   "note": null
+  },
+  {
+   "qid": 23,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 5,
+   "owner_code": "KB",
+   "body": "At what point does responsibility pass from SEI-delivered data to BBH-managed processing?",
+   "comps": "6,18,32",
+   "note": null
+  },
+  {
+   "qid": 24,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 5,
+   "owner_code": "KB",
+   "body": "Who owns each step of exception management: identify, investigate, correct, reprocess, and sign off?",
+   "comps": "6,18,32",
+   "note": null
+  },
+  {
+   "qid": 25,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 5,
+   "owner_code": "KB",
+   "body": "Can we confirm ownership boundaries across Airflow, dbt, Stage/INT, Dim/Fact loads, reconciliation, and monitoring?",
+   "comps": "6,18,32",
+   "note": null
+  },
+  {
+   "qid": 26,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 6,
+   "owner_code": "KB",
+   "body": "Should the architecture now show SDC replacing SFTP for transfers from SEI to BBH?",
+   "comps": "8,101",
+   "note": null
+  },
+  {
+   "qid": 27,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 6,
+   "owner_code": "KB",
+   "body": "If SDC is the future-state transfer method, should the diagrams be updated so we review the target-state architecture?",
+   "comps": "8,101",
+   "note": null
+  },
+  {
+   "qid": 28,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 7,
+   "owner_code": "KB",
+   "body": "How will SEI data feed into the Stage → INT → Approved Dim/Fact dbt framework?",
+   "comps": "15,16,37,38",
+   "note": null
+  },
+  {
+   "qid": 29,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 7,
+   "owner_code": "KB",
+   "body": "Which existing PB DWH outputs will still be produced from SEI data?",
+   "comps": "15,16,37,38",
+   "note": null
+  },
+  {
+   "qid": 30,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 7,
+   "owner_code": "KB",
+   "body": "How will the architecture support the period when BBH processes both AddVantage and SEI data?",
+   "comps": "15,16,37,38",
+   "note": null
+  },
+  {
+   "qid": 31,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 7,
+   "owner_code": "KB",
+   "body": "How long will that dual state last after Day 1?",
+   "comps": "15,16,37,38",
+   "note": null
+  },
+  {
+   "qid": 32,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 8,
+   "owner_code": "KB",
+   "body": "What happens to records that fail Stage 2 DQ checks, and where are they kept?",
+   "comps": "29,24",
+   "note": null
+  },
+  {
+   "qid": 33,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 8,
+   "owner_code": "KB",
+   "body": "How are failed records corrected and reprocessed: resubmitted, reprocessed from source, or picked up in a later SWP feed?",
+   "comps": "17,29",
+   "note": null
+  },
+  {
+   "qid": 34,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 8,
+   "owner_code": "KB",
+   "body": "How does the Gold layer stay complete when records fail DQ?",
+   "comps": "16,27",
+   "note": null
+  },
+  {
+   "qid": 35,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 8,
+   "owner_code": "KB",
+   "body": "Where are DQ failures shown, and who monitors and resolves the Splunk exceptions?",
+   "comps": "34,28",
+   "note": null
+  },
+  {
+   "qid": 36,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 8,
+   "owner_code": "KB",
+   "body": "Will DQ and reconciliation exceptions be visible in a business tool such as 360, or only in Splunk?",
+   "comps": "34",
+   "note": null
+  },
+  {
+   "qid": 37,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 8,
+   "owner_code": "KB",
+   "body": "What reconciliation controls exist between Raw → Stage → INT → DIM/FACT, especially for completeness and record counts?",
+   "comps": "26,30",
+   "note": null
+  },
+  {
+   "qid": 38,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 8,
+   "owner_code": "GM",
+   "body": "Which DQ controls are mandatory before data goes to final tables or reporting applications?",
+   "comps": "25,28",
+   "note": null
+  },
+  {
+   "qid": 39,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 8,
+   "owner_code": "KK",
+   "body": "We need requirements from the Data Management team for reasonableness and threshold controls (e.g., market value falls from $300M to $30M overnight → alert).",
+   "comps": "24,28",
+   "note": null
+  },
+  {
+   "qid": 40,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 8,
+   "owner_code": "KK",
+   "body": "How will the design catch a full snapshot that loads successfully but has much less data than expected?",
+   "comps": "24,26",
+   "note": null
+  },
+  {
+   "qid": 41,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 8,
+   "owner_code": "KK",
+   "body": "Will threshold controls compare against prior-day values, expected ranges, and historical patterns at account, feed, and portfolio level?",
+   "comps": "24,28",
+   "note": null
+  },
+  {
+   "qid": 42,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 8,
+   "owner_code": "GL",
+   "body": "DQ resolution: A failure could be marked resolved because a FACT with the same transaction ID exists, even if it isn't the failed record. How is resolution tied to the specific incident, source record, business date, and processing run?",
+   "comps": "28,29,31",
+   "note": null
+  },
+  {
+   "qid": 43,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 8,
+   "owner_code": "GL",
+   "body": "False-green reconciliation: Counts can match while values or relationships are wrong. How are keys, duplicates, values/totals, rejects, replay, and relationship validity reconciled?",
+   "comps": "26,27,30",
+   "note": null
+  },
+  {
+   "qid": 44,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 9,
+   "owner_code": "KB",
+   "body": "Can we confirm the full set of dimensions and facts? Are there more than Account, Client/IP, and Transaction?",
+   "comps": "16,19,31",
+   "note": null
+  },
+  {
+   "qid": 45,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 9,
+   "owner_code": "KB",
+   "body": "How will the transformed DIM/FACT data be checked against source/AddVantage results at scale?",
+   "comps": "30,16",
+   "note": null
+  },
+  {
+   "qid": 46,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 9,
+   "owner_code": "SA",
+   "body": "If facts are built through conformed dimensions or depend on other facts, how do we keep grain consistent and stop upstream changes from silently affecting downstream facts?",
+   "comps": "19,16",
+   "note": null
+  },
+  {
+   "qid": 47,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 9,
+   "owner_code": "GL",
+   "body": "Historical accuracy: A Monday transaction replayed after a Wednesday account change could pick up Wednesday's account attributes. Please prove effective-date dimension lookups and revalidation after corrections.",
+   "comps": "19,21,31",
+   "note": null
+  },
+  {
+   "qid": 48,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 9,
+   "owner_code": "GL",
+   "body": "Historical corrections: How are mid-period corrections to closed account history handled (interval splitting, adjacent-period adjustment, handling of affected FACTs)?",
+   "comps": "17,19",
+   "note": null
+  },
+  {
+   "qid": 49,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 10,
+   "owner_code": "GM",
+   "body": "What is the expected-interface calendar, who decides it, and where will it live?",
+   "comps": "33,9",
+   "note": null
+  },
+  {
+   "qid": 50,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 10,
+   "owner_code": "GM",
+   "body": "What file-readiness mechanism guarantees a file was fully delivered?",
+   "comps": "9,8",
+   "note": null
+  },
+  {
+   "qid": 51,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 10,
+   "owner_code": "GM",
+   "body": "Is FILE_NAME + BUSINESS_DATE still enough if a source system resends corrected files?",
+   "comps": "33,13",
+   "note": null
+  },
+  {
+   "qid": 52,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 10,
+   "owner_code": "GL",
+   "body": "What is the authoritative source for which interfaces are expected each BUSINESS_DATE?",
+   "comps": "33",
+   "note": null
+  },
+  {
+   "qid": 53,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 10,
+   "owner_code": "GL",
+   "body": "How are holidays, month-end, weekly files, and one-off exceptions handled?",
+   "comps": "20,33",
+   "note": null
+  },
+  {
+   "qid": 54,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 10,
+   "owner_code": "GL",
+   "body": "Is the expected-file set snapshotted/effective-dated, or can a config change alter completeness for a business date that is already open?",
+   "comps": "33",
+   "note": null
+  },
+  {
+   "qid": 55,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 10,
+   "owner_code": "GL",
+   "body": "Is only one physical delivery per logical interface per business date guaranteed by contract?",
+   "comps": "9,33",
+   "note": null
+  },
+  {
+   "qid": 56,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 10,
+   "owner_code": "GL",
+   "body": "If multipart or multiple deliveries are needed, how does (FILE_NAME, BUSINESS_DATE) remain a valid unique key?",
+   "comps": "33,13",
+   "note": null
+  },
+  {
+   "qid": 57,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 10,
+   "owner_code": "SA",
+   "body": "Can two concurrent worker tasks claim the same landing file? If so, how is that race condition prevented?",
+   "comps": "13,52",
+   "note": null
+  },
+  {
+   "qid": 58,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 11,
+   "owner_code": "KB",
+   "body": "How are weekends and non-business days handled? Will BBH process Saturday/Sunday SWP data?",
+   "comps": "20",
+   "note": null
+  },
+  {
+   "qid": 59,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 11,
+   "owner_code": "KB",
+   "body": "Please confirm the date-control flow: Pending until all data arrives → Trigger → next date seeded only after success.",
+   "comps": "33,18",
+   "note": null
+  },
+  {
+   "qid": 60,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 11,
+   "owner_code": "KB",
+   "body": "If processing fails after the trigger, does it restart from the failed task, and what stops the date from advancing?",
+   "comps": "18,22",
+   "note": null
+  },
+  {
+   "qid": 61,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 11,
+   "owner_code": "GM",
+   "body": "How is the transformation trigger recovered when the downstream DAG call fails?",
+   "comps": "18,21",
+   "note": null
+  },
+  {
+   "qid": 62,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 11,
+   "owner_code": "GL",
+   "body": "Processing-state gap: DATE_CONTROL can show TRIGGER when no Airflow run exists. Add explicit run states, run ownership, heartbeat/timeout, and recovery of abandoned triggers.",
+   "comps": "18,22,33",
+   "note": null
+  },
+  {
+   "qid": 63,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 11,
+   "owner_code": "GL",
+   "body": "What happens if PENDING → TRIGGER commits but Airflow crashes before the Transformation DAG is created?",
+   "comps": "18,33",
+   "note": null
+  },
+  {
+   "qid": 64,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 11,
+   "owner_code": "GL",
+   "body": "Who owns the reconciliation process that detects and fixes this?",
+   "comps": "30,33",
+   "note": null
+  },
+  {
+   "qid": 65,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 11,
+   "owner_code": "GL",
+   "body": "What happens if RAW commits but the worker crashes while FILE_REGISTRY still shows LOADING?",
+   "comps": "13,33",
+   "note": null
+  },
+  {
+   "qid": 66,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 11,
+   "owner_code": "GL",
+   "body": "How can operations prove for certain whether RAW should be reloaded?",
+   "comps": "14,31",
+   "note": null
+  },
+  {
+   "qid": 67,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 11,
+   "owner_code": "GL",
+   "body": "Once DATE_CONTROL = COMPLETE, can ingestion still accept a file for that business date?",
+   "comps": "33,9",
+   "note": null
+  },
+  {
+   "qid": 68,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 11,
+   "owner_code": "GL",
+   "body": "If so, how do we stop RAW from going out of sync with Gold data that is already published?",
+   "comps": "14,16",
+   "note": null
+  },
+  {
+   "qid": 69,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 11,
+   "owner_code": "GL",
+   "body": "What happens if a worker fails after processing but before moving the file to Archive?",
+   "comps": "13,29",
+   "note": null
+  },
+  {
+   "qid": 70,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 11,
+   "owner_code": "SA",
+   "body": "If a pod crashes (OOM, eviction, restart) between processing and the archive move, what state is the file left in, and how is that detected and recovered?",
+   "comps": "13,29,52",
+   "note": null
+  },
+  {
+   "qid": 71,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 11,
+   "owner_code": "SA",
+   "body": "How is asynchronous processing implemented?",
+   "comps": "18,13",
+   "note": null
+  },
+  {
+   "qid": 72,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 12,
+   "owner_code": "GL",
+   "body": "Why does the restatement process delete the existing FILE_REGISTRY record?",
+   "comps": "33,31",
+   "note": null
+  },
+  {
+   "qid": 73,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 12,
+   "owner_code": "GL",
+   "body": "Should we keep the original lifecycle for audit and add a version/restatement state instead?",
+   "comps": "33,31",
+   "note": null
+  },
+  {
+   "qid": 74,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 12,
+   "owner_code": "GL",
+   "body": "Replay durability: A held transaction may be lost if its dependency arrives after the 7-day INT retention. Keep the replay payload or an immutable RAW pointer separately from INT.",
+   "comps": "21,14",
+   "note": null
+  },
+  {
+   "qid": 75,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 12,
+   "owner_code": "GM",
+   "body": "How are retries, replay, and exception processing governed?",
+   "comps": "21,29",
+   "note": null
+  },
+  {
+   "qid": 76,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 12,
+   "owner_code": "GM",
+   "body": "How are business corrections and data restatements handled?",
+   "comps": "17,21",
+   "note": null
+  },
+  {
+   "qid": 77,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 13,
+   "owner_code": "SA",
+   "body": "What access mode is used for the landing, quarantine, and archive volumes, and what storage backend/provisioner sits behind them?",
+   "comps": "50",
+   "note": null
+  },
+  {
+   "qid": 78,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 13,
+   "owner_code": "SA",
+   "body": "If RWX is needed for multi-pod access, has it been tested against our OpenShift storage class?",
+   "comps": "50,52",
+   "note": null
+  },
+  {
+   "qid": 79,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 13,
+   "owner_code": "SA",
+   "body": "What happens if a worker pod lands on a different node from the volume? Is that a documented failure, or does the scheduler prevent it?",
+   "comps": "50,56",
+   "note": null
+  },
+  {
+   "qid": 80,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 13,
+   "owner_code": "SA",
+   "body": "What monitoring and alerts warn that volume usage is nearing capacity before it causes an outage?",
+   "comps": "50,64",
+   "note": null
+  },
+  {
+   "qid": 81,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 13,
+   "owner_code": "SA",
+   "body": "Has PVC sizing been checked against real numbers rather than assumptions?",
+   "comps": "50,65",
+   "note": null
+  },
+  {
+   "qid": 82,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 13,
+   "owner_code": "GL",
+   "body": "Is Landing/Archive/Quarantine storage guaranteed to be visible to all Airflow worker pods?",
+   "comps": "50,51",
+   "note": null
+  },
+  {
+   "qid": 83,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 13,
+   "owner_code": "GL",
+   "body": "What are the confirmed maximum file sizes, peak arrival pattern, Oracle connection limit, and processing window?",
+   "comps": "55,53",
+   "note": null
+  },
+  {
+   "qid": 84,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 13,
+   "owner_code": "GL",
+   "body": "What evidence supports the proposed Airflow pool size of 8–10?",
+   "comps": "52,53",
+   "note": null
+  },
+  {
+   "qid": 85,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 13,
+   "owner_code": "GM",
+   "body": "How will database connection limits and performance be validated?",
+   "comps": "55",
+   "note": null
+  },
+  {
+   "qid": 86,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 13,
+   "owner_code": "GM",
+   "body": "What is the future scaling strategy?",
+   "comps": "52,65",
+   "note": null
+  },
+  {
+   "qid": 87,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 14,
+   "owner_code": "SA",
+   "body": "Is there one correlation ID that tracks a file across ingestion, transformation, and loading in Splunk?",
+   "comps": "34,31",
+   "note": null
+  },
+  {
+   "qid": 88,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 14,
+   "owner_code": "SA",
+   "body": "Which logging standard applies: Dynatrace, or another application-logging standard?",
+   "comps": "34,64",
+   "note": null
+  },
+  {
+   "qid": 89,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 14,
+   "owner_code": "GM",
+   "body": "How are Splunk alerts correlated, escalated, and routed?",
+   "comps": "34,64",
+   "note": null
+  },
+  {
+   "qid": 90,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 14,
+   "owner_code": "GL",
+   "body": "SLA alert state isn't stored in Oracle, so what guarantees duplicate suppression, correlation, recovery closure, and alert delivery in Splunk?",
+   "comps": "34,33",
+   "note": null
+  },
+  {
+   "qid": 91,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 15,
+   "owner_code": "GM",
+   "body": "What is the approved common SLA cutoff and exception process?",
+   "comps": "20,33",
+   "note": null
+  },
+  {
+   "qid": 92,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 15,
+   "owner_code": "GM",
+   "body": "How are time zones handled during file delivery, especially for multi-currency?",
+   "comps": "20,9",
+   "note": null
+  },
+  {
+   "qid": 93,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 15,
+   "owner_code": "GM",
+   "body": "What are the measurable success criteria and operational SLAs for production support?",
+   "comps": "34,7",
+   "note": null
+  },
+  {
+   "qid": 94,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 15,
+   "owner_code": "GM",
+   "body": "What are the API availability and performance SLAs?",
+   "comps": "12,11",
+   "note": null
+  },
+  {
+   "qid": 95,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 15,
+   "owner_code": "SA",
+   "body": "What is the expected SLA for end-user access to data after the Gold layer?",
+   "comps": "16,37",
+   "note": null
+  },
+  {
+   "qid": 96,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 15,
+   "owner_code": "GL",
+   "body": "Who owns the SLA cutoff, time zone, holiday overrides, and exception process?",
+   "comps": "20,33",
+   "note": null
+  },
+  {
+   "qid": 97,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 15,
+   "owner_code": "GL",
+   "body": "What happens operationally when a business date stays PENDING for hours past the SLA?",
+   "comps": "33,34",
+   "note": null
+  },
+  {
+   "qid": 98,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 16,
+   "owner_code": "GM",
+   "body": "What are the retention requirements for raw and archive data, including compliance and audit?",
+   "comps": "14,31",
+   "note": null
+  },
+  {
+   "qid": 99,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 16,
+   "owner_code": "GM",
+   "body": "What are the retention requirements for RAW, Stage 2, and orchestration data?",
+   "comps": "14,15,33",
+   "note": null
+  },
+  {
+   "qid": 100,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 16,
+   "owner_code": "GL",
+   "body": "What are the retention and purge rules for RAW, FILE_REGISTRY, Archive, and Splunk evidence?",
+   "comps": "14,33,31",
+   "note": null
+  },
+  {
+   "qid": 101,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 16,
+   "owner_code": "GL",
+   "body": "How do we make sure purging doesn't remove data needed for audit or restatement?",
+   "comps": "31,21",
+   "note": null
+  },
+  {
+   "qid": 102,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 16,
+   "owner_code": "GM",
+   "body": "Are recovery procedures documented for DB, OpenShift, and storage outages?",
+   "comps": "62,63",
+   "note": null
+  },
+  {
+   "qid": 103,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 16,
+   "owner_code": "GM",
+   "body": "What are the final RTO/RPO requirements?",
+   "comps": "62,63",
+   "note": null
+  },
+  {
+   "qid": 104,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 17,
+   "owner_code": "KK",
+   "body": "What is the long-term plan to keep Airflow, Python, and dbt current and supported? Upgrades may be needed before go-live.",
+   "comps": "51,45",
+   "note": null
+  },
+  {
+   "qid": 105,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 17,
+   "owner_code": "KK",
+   "body": "How will staff be trained on Airflow, Python, and dbt for production support?",
+   "comps": "57",
+   "note": null
+  },
+  {
+   "qid": 106,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 17,
+   "owner_code": "GM",
+   "body": "How are schema changes deployed safely?",
+   "comps": "60,59",
+   "note": null
+  },
+  {
+   "qid": 107,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 17,
+   "owner_code": "GL",
+   "body": "Rollback and cutover: Rolling back the software doesn't undo Gold data already committed by a bad release. Provide a tested data compensation/restore process and evidence of ODI-to-dbt record and value parity.",
+   "comps": "59,63,16",
+   "note": null
+  },
+  {
+   "qid": 108,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 17,
+   "owner_code": "GM",
+   "body": "What are the measurable go-live acceptance criteria?",
+   "comps": "57,30",
+   "note": null
+  }
+ ],
+ "answers": [
+  {
+   "answer_id": "seed1",
+   "qid": 1,
+   "body": "The document does not use the word “enriched”. What it describes in that position is STAGE 2, defined as the core transformation and metadata management layer: business transformations, source-to-target mappings, reference data, lineage tracking, audit information and data quality controls.\n\nSo the answerable form of this question is “what is Stage 2”, and that is the scope. Reading “enriched” and “Stage 2” as the same thing is BBH's inference, not a statement in the pack.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "document",
+   "gap": "Two things. The pack never uses the word the question is built on, so somebody should get SEI to confirm in one line that the enriched layer IS Stage 2 — this is cheap to settle and expensive to assume. And “business transformations” is a category, not a list: no enrichment operation is enumerated per interface or domain.",
+   "quote": "Stage 2 serves as the core transformation and metadata management layer, handling business transformations, source-to-target mappings, reference data, lineage tracking, audit information, and data quality controls.",
+   "fig": null,
+   "ev": "SEI Architecture p.6 — Stage 2 Design Principles"
+  },
+  {
+   "answer_id": "seed2",
+   "qid": 2,
+   "body": "No. The layer handles business transformations and source-to-target mappings, which is more than normalisation.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "document",
+   "gap": "The AddVantage half of the question is unanswered. The quote supports “more than normalisation” and nothing more — the pack neither includes nor excludes AddVantage-specific transformation, and does not break transformations down per feed.",
+   "quote": "Stage 2 serves as the core transformation and metadata management layer, handling business transformations, source-to-target mappings, reference data, lineage tracking, audit information, and data quality controls.",
+   "fig": null,
+   "ev": "SEI Architecture p.6 — Stage 2 Design Principles"
+  },
+  {
+   "answer_id": "seed3",
+   "qid": 3,
+   "body": "The pack describes Stage 2 as a delivery-oriented layer and does not state that it is a reusable enterprise schema equivalent to today's PB DWH. Searched for: reusable, published contract, stable schema, consumer model, enterprise model, PB DWH replacement.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "absence",
+   "gap": "So the question stands, and it is a decision rather than a lookup: nothing says whether consumers may build against Stage 2 as a long-term contract. Read together with question 4, the pack leans against it.",
+   "quote": null,
+   "fig": null,
+   "ev": "SEI Architecture p.6–7"
+  },
+  {
+   "answer_id": "seed4",
+   "qid": 4,
+   "body": "No — and this one the document settles outright. Stage 2 is explicitly NOT intended as an enterprise-wide canonical model. It is scoped to preparing, validating and structuring SWP data for IMDS Stage and PBDW tables.\n\nThat is the clearest statement in the pack, and it answers more than question 4: it is the reason questions 3 and 10 matter.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "document",
+   "gap": "It says what Stage 2 is not. It does not say what BBH should use instead, or whether a further model is expected downstream.",
+   "quote": "Stage 2 is specifically designed to meet IMDS Staging and PBDW data delivery requirements. It is not intended to function as an enterprise-wide canonical data model; instead, it focuses on preparing, validating, and structuring SWP data for IMDS Stage and PBDW tables.",
+   "fig": null,
+   "ev": "SEI Architecture p.6 — Stage 2 Design Principles"
+  },
+  {
+   "answer_id": "seed5",
+   "qid": 5,
+   "body": "It includes normalisation-style work — source-to-target mappings and reference data handling are both named. The pack does not state that Stage 2 transforms into the existing PB DWH dimensional model.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "document",
+   "gap": "The second half of that is an absence, not a denial: the pack is silent on PB DWH modelling rather than ruling it out. The boundary between enrichment and PBDW-specific modelling is undefined, which is the same gap question 16 asks about from the other side.",
+   "quote": "Stage 2 serves as the core transformation and metadata management layer, handling business transformations, source-to-target mappings, reference data, lineage tracking, audit information, and data quality controls.",
+   "fig": null,
+   "ev": "SEI Architecture p.6 — Stage 2 Design Principles"
+  },
+  {
+   "answer_id": "seed6",
+   "qid": 6,
+   "body": "Stage 2 is the central transformation and metadata management layer of the inbound architecture, scoped specifically to IMDS Staging and PBDW delivery.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "document",
+   "gap": "No row-level processing flow inside Stage 2 is given. More importantly for this review, the pack does not place Stage 2 against BBH's own Stage/INT layers — two naming schemes, reconciled nowhere, and question 7 is the other half of the same problem.",
+   "quote": "Stage 2 serves as the core transformation and metadata management layer, handling business transformations, source-to-target mappings, reference data, lineage tracking, audit information, and data quality controls. Stage 2 is specifically designed to meet IMDS Staging and PBDW data delivery requirements. It is not intended to function as an enterprise-wide canonical data model; instead, it focuses on preparing, validating, and structuring SWP data for IMDS Stage and PBDW tables.",
+   "fig": null,
+   "ev": "SEI Architecture p.6 — Stage 2 Design Principles"
+  },
+  {
+   "answer_id": "seed7",
+   "qid": 7,
+   "body": "INT is a persisted layer. It consumes only PASS rows, applies code mappings, is keyed on the natural business key plus BUSINESS_DATE, and feeds the DIM and FACT models. Purge is by partition drop.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "document",
+   "gap": "The relationship between SEI's Stage 2 and BBH's INT is not mapped in any one document, so whether they overlap, abut or duplicate is still open — see questions 6 and 9.",
+   "quote": "INT reads only PASS rows... map codes (ACCOUNT_TYPE, SITUS_CODE); keyed on natural key + BUSINESS_DATE; partition-drop purge.",
+   "fig": null,
+   "ev": "Transformation TDD p.10"
+  },
+  {
+   "answer_id": "seed8",
+   "qid": 8,
+   "body": "Yes, that reading holds. STG is a non-persisted view that standardises columns and computes the source DQ flag; INT reads only the PASS rows and applies mappings before DIM and FACT are built.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "document",
+   "gap": "No single sentence in the pack states the end-to-end sequence — this is two statements read together. It holds, but it is a synthesis, and if one layer later changes the summary will not obviously be wrong.",
+   "quote": "Silver STG is a non-persisted view... computes the Source DQ flag DQ_STATUS_CD / DQ_FAIL_REASON_CDS. … INT reads only PASS rows and is keyed on the natural business key plus BUSINESS_DATE.",
+   "fig": null,
+   "ev": "Transformation TDD p.5 | Transformation TDD p.12"
+  },
+  {
+   "answer_id": "seed9",
+   "qid": 9,
+   "body": "STG — a non-persisted view: standardise columns, compute DQ status and fail reasons. INT — persisted: PASS rows only, code mapping. Gold DIM — direct-compare atomic MERGE. Gold FACT — loads only dimension-resolved transactions.\n\nThe last of those is the load-bearing one for this review: a transaction whose dimension does not resolve does not reach FACT, which is where questions 34 and 47 land.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "document",
+   "gap": "The pack does not give a complete matrix of which business rule lives in which layer — only the shape of each layer.",
+   "quote": "STG (view)... Non-persisted view: standardize columns; compute DQ_STATUS_CD / DQ_FAIL_REASON_CDS. … INT... Reads only PASS rows; map codes. … Gold DIM... Direct-compare atomic MERGE. … Gold FACT... loads only dimension-resolved transactions.",
+   "fig": null,
+   "ev": "Transformation TDD p.10 | Transformation TDD p.12–15"
+  },
+  {
+   "answer_id": "seed10",
+   "qid": 10,
+   "body": "The pack does not say whether downstream applications may read Stage 2 or INT directly, or only the approved models. Searched for: downstream applications, direct access, read Stage 2, read INT, consumer access, approved models.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "absence",
+   "gap": "This is the question question 4 makes urgent: Stage 2 is explicitly not a canonical model, so if consumers may read it directly they are building on something SEI has said is not a contract. It needs an answer before any consumer is pointed at it.",
+   "quote": null,
+   "fig": null,
+   "ev": "SEI Architecture | Transformation TDD"
+  },
+  {
+   "answer_id": "seed11",
+   "qid": 11,
+   "body": "The pack describes dbt replacing ODI logic but assigns nobody to the conversion. Searched for: ODI ownership, conversion ownership, responsible, accountable, Professional Services responsibility.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "absence",
+   "gap": "This confirms the SEI pack is silent; it does NOT answer who owns it. Ownership here is a contract and SOW question, not an architecture one — it will not be found in any document and has to be decided.",
+   "quote": null,
+   "fig": null,
+   "ev": "Transformation TDD p.5–7"
+  },
+  {
+   "answer_id": "seed12",
+   "qid": 12,
+   "body": "Nothing states whether Professional Services reverse-engineers the ODI jobs or whether BBH supplies detailed requirements. Searched for: reverse engineer, requirements, ODI review, migration responsibility.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "absence",
+   "gap": "Same standing as question 11: the search is done, the answer is a commercial decision. The two readings differ by a large amount of BBH analyst effort, which is why it is worth closing early.",
+   "quote": null,
+   "fig": null,
+   "ev": "Transformation TDD | SEI Architecture"
+  },
+  {
+   "answer_id": "seed14",
+   "qid": 14,
+   "body": "No document assigns ownership of the like-for-like Stage → INT → Approved Dim/Fact mapping, or of the ODI-to-dbt conversion. Searched for: ownership, accountable, responsible, conversion, mapping ownership.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "absence",
+   "gap": "The search is recorded so nobody repeats it. The answer is a RACI line, and it belongs with questions 11, 12 and 15 as one decision rather than four.",
+   "quote": null,
+   "fig": null,
+   "ev": "Transformation TDD | SEI Architecture"
+  },
+  {
+   "answer_id": "seed15",
+   "qid": 15,
+   "body": "Nothing identifies who confirms that the new Dim/Fact tables behave as the current implementation does — DATEROLL and AUTOPOST included. Searched for: validation owner, parity testing, acceptance owner, DATEROLL, AUTOPOST.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "absence",
+   "gap": "Note this is not only an ownership gap. Question 107's answer says the tooling to PROVE parity exists — Recon 360 and Variance 360, with the hops and the eleven metrics — and that the ODI-side run has not been done. So the method is available and both the owner and the run are missing.",
+   "quote": null,
+   "fig": null,
+   "ev": "Transformation TDD | SEI Architecture"
+  },
+  {
+   "answer_id": "seed21",
+   "qid": 21,
+   "body": "BBH. Airflow runs inside the CP Integration Hub OpenShift namespace, which the environment sizing sheet lists as BBH-hosted OpenShift in all four environments. SEI delivers to the boundary — SFTP inbound to BBH managed file transfer, and the SEI API proxy outbound from BBH — and everything from the landing share onwards is BBH-run.\n\nOne naming trap worth settling in the same breath: RD is the cluster, not an environment. DEV and SIT are two namespaces on the same shared non-production cluster, UAT is the QC namespace on that same cluster, and production is a separate cluster.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "codebase",
+   "gap": "The production cluster and namespace are both recorded as TBD.",
+   "quote": null,
+   "fig": "envs",
+   "ev": "Environment 360 → Topology (sizing sheet, 4 environments) | DevOps 360"
+  },
+  {
+   "answer_id": "seed27",
+   "qid": 27,
+   "body": "Not yet — and the diagrams are honest about being dual-state rather than target-state. Both paths are modelled at once: the topology still carries inbound SFTP endpoints into BBH managed file transfer, while the event path carries the SDC micro-batch marker protocol (see question 50). Reviewing the target state means picking one and deleting the other from the diagram, which is a decision this codebase cannot make for you.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "codebase",
+   "gap": "No cutover date or dual-run period is recorded for SFTP → SDC.",
+   "quote": null,
+   "fig": null,
+   "ev": "Environment 360 → Topology | Event 360 → Micro-batch"
+  },
+  {
+   "answer_id": "seed35",
+   "qid": 35,
+   "body": "They are shown in Guardrails, read from Oracle rather than from Splunk. Per event the table carries the engine, the rule name, the expectation, the observed value, the threshold, bad and total row counts, a root cause and a sample of the offending data — enough to triage without opening a log tool.\n\nThe 'who' is the gap, and it is a schema gap rather than a process one.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "codebase",
+   "gap": "guardrail_events has severity but no owner, assignee, acknowledged-by or closed-at column. There is therefore no record of who looked at an exception, or whether anyone did. Until that exists, 'who monitors and resolves' cannot be evidenced from the platform.",
+   "quote": null,
+   "fig": null,
+   "ev": "guardrail_events (sql/24) | Guardrails 360"
+  },
+  {
+   "answer_id": "seed36",
+   "qid": 36,
+   "body": "In 360, and not only in Splunk. Three screens already read exception data straight out of Oracle:\n\n• Guardrails reads guardrail_events — rule, expectation, observed value, threshold, bad/total row counts, root cause, bad-data sample.\n• Recon 360 reads recon_pr_break — row-level breaks typed MISSING, EXTRA or MISMATCH, with the primary key and the differing columns.\n• Variance 360 reads recon_summary — per-table variance score, worst hop and a RAG status.\n\nSo the business-tool surface exists today. Splunk is not the only place these land; in this codebase it is not a surface at all.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "codebase",
+   "gap": "What this repo does not contain is the writer. The Jenkins pipeline publishes to the guardrail tables, but the runtime DQ engine that would populate guardrail_events per business date lives outside it.",
+   "quote": null,
+   "fig": null,
+   "ev": "guardrail_events (sql/24) | recon_pr_break (sql/35) | recon_summary (sql/31)"
+  },
+  {
+   "answer_id": "seed37",
+   "qid": 37,
+   "body": "Variance 360 profiles every column at every stage and compares adjacent stages. recon_profile records, per run / lineage id / stage / column, eleven metrics: CNT, NULLS, NDV, SUM, MIN, MAX, AVG, MAXLEN, HASHSUM, MIN_D and MAX_D. recon_summary rolls those into per-table break counts on three named hops, plus the worst hop, a severity-weighted variance score and a RAG status.\n\nCompleteness is CNT compared across a hop. Value integrity is SUM and HASHSUM compared across the same hop — which is the part that catches what record counts cannot.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "codebase",
+   "gap": "The model has THREE hops (SRC→STG1, STG1→STG2, STG2→DWH) and this question names FOUR layers (Raw → Stage → INT → Dim/Fact). STG2→DWH currently collapses the INT layer and the Dim/Fact load into a single hop. If INT is a persisted layer it needs its own hop and its own break counter, otherwise a break introduced in INT is indistinguishable from one introduced by the Dim/Fact load.",
+   "quote": null,
+   "fig": "hops",
+   "ev": "recon_profile (sql/31) | recon_summary (sql/31) | Variance 360"
+  },
+  {
+   "answer_id": "seed39",
+   "qid": 39,
+   "body": "Mechanically this is a SUM metric on a market-value column compared against the prior business date, and half of it already exists: recon_profile captures SUM per column, per stage, per run. A $300M → $30M fall is a 90% movement in that one number.\n\nThree things are missing before it can fire, and only one of them is engineering.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "codebase",
+   "gap": "(1) No business date — see question 42; the string 'business_date' does not appear anywhere in this schema, so 'compared to yesterday' has no key to compare on. (2) No baseline store: nothing persists an expected range or a prior-day value to test against. (3) The tolerance itself is a Data Management input, not an engineering one — which is what this question is actually asking for.",
+   "quote": null,
+   "fig": null,
+   "ev": "recon_profile (sql/31) | Variance 360"
+  },
+  {
+   "answer_id": "seed40",
+   "qid": 40,
+   "body": "Today, it would not — and this is worth stating plainly because the failure is silent. CNT is captured per stage per run, so the drop is computable in principle. But recon_summary derives its RAG status from breaks BETWEEN STAGES WITHIN ONE RUN, not between runs. A snapshot that arrives at 10% of its normal size reconciles perfectly from Stage to INT to Dim/Fact — every row that arrived was carried faithfully — and comes out GREEN.\n\nA uniformly short file is the one shape this design is blind to.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "codebase",
+   "gap": "Needs a run-over-run baseline keyed by (table, metric, business_date), and a volume control that is evaluated at ingestion rather than between stages. Stage-to-stage reconciliation can never detect it by construction.",
+   "quote": null,
+   "fig": null,
+   "ev": "recon_profile (sql/31) | recon_summary (sql/31)"
+  },
+  {
+   "answer_id": "seed41",
+   "qid": 41,
+   "body": "Prior-day and expected-range comparison are both supportable from recon_profile, which already stores the metrics; what is missing is the comparison and the baseline (see questions 39 and 40).\n\nGrain is the harder half of this question. recon_profile is keyed to table and column. Account-, feed- and portfolio-level thresholds are a different grain and cannot be derived from it — they need their own profile rows, which multiplies the metric volume by the cardinality of whichever dimension you pick.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "codebase",
+   "gap": "Decide the grain before building the control: table-level is nearly free, account-level is not, and the two have very different storage and runtime costs.",
+   "quote": null,
+   "fig": null,
+   "ev": "recon_profile (sql/31)"
+  },
+  {
+   "answer_id": "seed42",
+   "qid": 42,
+   "body": "Partially — and the missing piece is exactly the one this question names.\n\nguardrail_events ties a failure to the incident (event_id), to the run (run_id, run_ts) and to what failed (dataset, model, column, rule, expectation, observed value) with a sample of the offending rows. That much is specific.\n\nIt does not carry a business date. The string 'business_date' does not appear in any table in this schema. So an event can be tied to a run, but not to the date the run was processing — and an original run and a replay of the same date are indistinguishable from the event row alone.\n\nThat is also why the failure mode you describe is possible: matching on transaction id alone has no date and no run dimension to disambiguate it, so the first FACT with that id closes the incident.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "codebase",
+   "gap": "Add business_date to guardrail_events, and resolve against the tuple (source record, business_date, run_id) rather than the business key alone.",
+   "quote": null,
+   "fig": null,
+   "ev": "guardrail_events (sql/24)"
+  },
+  {
+   "answer_id": "seed43",
+   "qid": 43,
+   "body": "Counts matching while values are wrong is precisely what the profile metrics are for — CNT alone IS the false green, and the other ten metrics exist because of it:\n\n• HASHSUM — values changed without the count changing.\n• SUM — sign flips and scale errors (units, minor/major currency).\n• NDV — a column collapsing to a single value or to nulls.\n• NULLS — a mapping that silently dropped on one side.\n• MIN_D / MAX_D — a date window that shifted.\n\nAt row level, recon_pr_break types every break as MISSING, EXTRA or MISMATCH and carries the primary key, the differing column list and both sides' values — masked where the column is classified PII. So a mismatch names the key and the columns rather than reporting a delta.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "codebase",
+   "gap": "Three of the six things you list are NOT covered. Duplicates: NDV against CNT hints at them but nothing asserts key uniqueness. Relationship validity: there is no referential check between a FACT and its dimensions. Replay: nothing reconciles a replayed run against the run it replaced. Rejects are covered only insofar as they appear as MISSING.",
+   "quote": null,
+   "fig": "hops",
+   "ev": "recon_profile (sql/31) | recon_pr_break (sql/35) | Recon 360 | Variance 360"
+  },
+  {
+   "answer_id": "seed49",
+   "qid": 49,
+   "body": "Interface 360 is the nearest thing that exists and is the natural home for it: the interface catalogue already carries a frequency and an intraday flag per interface. That is a schedule, though, not a calendar — it says how often an interface runs, not which interfaces are expected on a specific date.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "codebase",
+   "gap": "No calendar exists. Turning the catalogue into one needs an effective-dated expected-set per business date (see questions 52 and 54), holiday and month-end handling (question 53), and a named owner for the content — which is the 'who decides it' half of this question and is not an engineering choice.",
+   "quote": null,
+   "fig": null,
+   "ev": "Interface 360 (frequency, intraday)"
+  },
+  {
+   "answer_id": "seed50",
+   "qid": 50,
+   "body": "Two paths, and they are in very different states.\n\nON THE EVENT / SDC PATH there is an explicit protocol. Each subscribed topic receives a START marker carrying the micro-batch key, then its data events, then its own END marker. The batch is complete only once the last topic has closed — and a topic that receives no data events at all is still a valid, complete topic, which is the case most naive implementations get wrong. Every marker is catalogued with what it means, what a consumer should DO when it sees one, and a citation to the section of the SEI document it came from.\n\nON THE FILE / SFTP PATH there is no equivalent in this codebase. FILE_NAME + BUSINESS_DATE identifies a file; nothing signals that it has finished arriving. A partially-written file is readable.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "codebase",
+   "gap": "For files, pick one: a trailer record with a row count, a .done sentinel written after close, or a manifest per business date. Size-stable polling is the usual fallback and is the weakest of the options.",
+   "quote": null,
+   "fig": "markers",
+   "ev": "ref_micro_batch_marker (sql/63) | Event 360 → Micro-batch"
+  },
+  {
+   "answer_id": "seed51",
+   "qid": 51,
+   "body": "No. A corrected resend collides with the original on (FILE_NAME, BUSINESS_DATE) — the key cannot hold both, so either the resend is rejected as a duplicate or it silently overwrites the record of the original.\n\nWorth noting the event path solved exactly this by adding a micro-batch key, which is what lets a second delivery for the same date be a distinct batch rather than a collision (question 50).",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "codebase",
+   "gap": "The file path needs the same third element — a delivery sequence or batch key — making it (FILE_NAME, BUSINESS_DATE, DELIVERY_SEQ). This is the same underlying issue as questions 55, 56 and 72.",
+   "quote": null,
+   "fig": null,
+   "ev": "ref_micro_batch_marker (sql/63)"
+  },
+  {
+   "answer_id": "seed57",
+   "qid": 57,
+   "body": "Nothing in this codebase prevents it.\n\nThe landing share is a CIFS share mounted into the namespace as an RWX volume, which is drawn explicitly on the Hub topology. RWX means every worker pod sees every file — that is the point of it, and it is also the exposure. There is no claim table, no lease column, no owner field and no rename-on-claim step modelled anywhere.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "absence",
+   "gap": "The two standard fixes: an atomic rename into a per-worker directory before reading (POSIX rename is atomic; over CIFS this needs checking against the storage backend), or an insert into FILE_REGISTRY under a unique constraint on (file_name, business_date) before any read, so the second worker loses the race at the database. FILE_REGISTRY is referenced throughout these questions but its DDL is not in this repository.",
+   "quote": null,
+   "fig": null,
+   "ev": "Environment 360 → Topology (CIFS 445 → RWX PVC)"
+  },
+  {
+   "answer_id": "seed62",
+   "qid": 62,
+   "body": "The state vocabulary is already there; the liveness is not.\n\nguardrail_gate_run.status is one of passed, failed, warning, skipped, RUNNING or NOT_RUN — so 'triggered but nothing is running' is representable. What the row cannot tell you is whether anything is still alive: there is no queued_at, no heartbeat timestamp and no worker id. A pod that dies mid-gate leaves status='running' forever, and nothing reaps it.\n\nOne structural point that this question sits on top of, and that is worth settling before adding columns: a GATE RUN belongs to a COMMIT (release, branch, build — no business date) and a GUARDRAIL EVENT belongs to a RUN ON A BUSINESS DATE (dataset, row counts — no commit). They are separate tables deliberately. They must not be joined on a shared idea of 'run', because they are different grains.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "codebase",
+   "gap": "Add queued_at, heartbeat_at and worker_id, and a reaper that moves stale 'running' rows to a terminal state with a reason. Without the reaper the extra columns only record the stall more precisely.",
+   "quote": null,
+   "fig": "runstate",
+   "ev": "guardrail_gate_run (sql/67)"
+  },
+  {
+   "answer_id": "seed64",
+   "qid": 64,
+   "body": "Nobody, in the sense that matters: no table in this estate has an owner, assignee or acknowledgement column — not guardrail_events, not guardrail_gate_run, not recon_summary. Severity is recorded everywhere; ownership is recorded nowhere.\n\nSo the reconciliation that would detect an orphaned trigger can be built (question 62 says what it needs), but who is accountable for acting on its output is not a fact the platform can currently hold.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "absence",
+   "gap": "Ownership needs to be a column before it can be a process.",
+   "quote": null,
+   "fig": null,
+   "ev": "guardrail_events (sql/24) | guardrail_gate_run (sql/67)"
+  },
+  {
+   "answer_id": "seed74",
+   "qid": 74,
+   "body": "The structural answer is the one the question already contains: the replay payload must not live in a layer that has a retention clock. An immutable RAW pointer or a copy of the payload in a replay store, with its own retention set from the maximum dependency wait rather than from INT's needs.\n\nWhat this codebase adds is a sharper version of the risk. No retention policy is recorded anywhere in this schema — for INT or for anything else (see questions 99 and 100). So the 7-day figure is an operating assumption rather than a declared property, and it could be changed by someone tuning storage without any visibility that replay depends on it.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "inference",
+   "gap": "Retention cannot be set independently of replay. Whoever sets the INT retention needs to know the maximum dependency wait, and today neither number is written down.",
+   "quote": null,
+   "fig": null,
+   "ev": "Environment 360 → Topology (no retention recorded)"
+  },
+  {
+   "answer_id": "seed77",
+   "qid": 77,
+   "body": "The topology models the landing share as a CIFS share reached on port 445 and mounted into the namespace as an RWX persistent volume — that is drawn explicitly on the Hub topology, not inferred.\n\nRecorded capacity: 20 GB for the landing share in every environment, and 10 GB of namespace storage in DEV, SIT and UAT against 25 GB in production.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "codebase",
+   "gap": "The OpenShift storage class and the provisioner behind the PVC are not recorded anywhere in this estate. Quarantine and archive are not sized separately either — the 20 GB is the share as a whole, so the three directories compete for one allocation.",
+   "quote": null,
+   "fig": null,
+   "ev": "Environment 360 → Topology (CIFS 445 → RWX PVC)"
+  },
+  {
+   "answer_id": "seed78",
+   "qid": 78,
+   "body": "There is no evidence of such a test in this estate, and there is a prior problem: the storage class is not named anywhere (question 77), so there is nothing on paper to have tested it against.\n\nRWX is asserted in the topology because the design needs it — multiple worker pods reading one landing share. Whether the backing storage class actually grants ReadWriteMany, and at what concurrency it stays correct, is unrecorded.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "absence",
+   "gap": "Name the storage class, then test it for concurrent access specifically — including whether rename is atomic across pods, which question 57 depends on.",
+   "quote": null,
+   "fig": null,
+   "ev": "Environment 360 → Topology"
+  },
+  {
+   "answer_id": "seed80",
+   "qid": 80,
+   "body": "None today. A probe framework exists — env_probe and env_probe_result — and env_workload records what runs where, so there is somewhere for this to live. But no probe in this repository measures volume utilisation and no threshold is configured.\n\nThe thing that would fill is the 20 GB landing share, which holds landing, quarantine and archive together (question 77). Archive grows monotonically unless something purges it, and no purge rule is recorded (question 100).",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "absence",
+   "gap": "A utilisation probe plus a threshold, and — more urgently — an archive purge rule, because an alert on a volume nobody is allowed to empty only tells you the outage is coming.",
+   "quote": null,
+   "fig": null,
+   "ev": "env_probe / env_probe_result (sql/44) | env_workload (sql/48)"
+  },
+  {
+   "answer_id": "seed81",
+   "qid": 81,
+   "body": "No — and the sizing sheet says so itself rather than this being an inference.\n\nThe environment sizing sheet carries a Growth column. Its value is TBD on EVERY row, in all four environments: the Hub namespace, the landing share, both databases and every consumer. The 20 GB share and the 10 GB / 25 GB namespace figures are allocations somebody chose, not the output of a volumetric calculation.\n\nThere is also nothing to check them against: no file size, arrival volume or row-count estimate is recorded anywhere in this estate (question 83).",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "codebase",
+   "gap": "Volumetrics first — largest file, daily total, archive retention period — then the PVC sizes fall out of them. Doing it the other way round is how a landing share fills on a month-end.",
+   "quote": null,
+   "fig": "sizing",
+   "ev": "Environment 360 → Topology (Growth = TBD on all rows)"
+  },
+  {
+   "answer_id": "seed83",
+   "qid": 83,
+   "body": "None of the four is recorded.\n\nThe databases are sized — 62 GB RAM, 8 CPU, 4–6 TB storage — but that is the server, not the connection limit, and the sheet lists the Oracle JDBC port itself as TBD in every environment. There is no volumetrics table in this estate: no maximum file size, no arrival profile, no processing window.\n\nThese four numbers are load-bearing for several other answers — the pool size in question 84, the PVC sizing in question 81, the SLA cutoff in question 91 — so they are worth getting first rather than in parallel.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "absence",
+   "gap": "All four need to come from the source systems; none is derivable here.",
+   "quote": null,
+   "fig": null,
+   "ev": "Environment 360 → Topology"
+  },
+  {
+   "answer_id": "seed84",
+   "qid": 84,
+   "body": "There is no evidence for it in this repository.\n\nIt is worth reading the proposed number against the namespace sizing, though, because the two are in tension: non-production namespaces are allocated 4 GB of memory and 2 CPU. Eight to ten concurrent worker slots inside 2 CPU is heavy oversubscription whatever evidence is eventually produced for the pool number — the slots will exist and will not have cores to run on.\n\nPool size and namespace request have to be decided together; either one alone is meaningless.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "absence",
+   "gap": "Needs the concurrency the workload actually requires (from question 83's arrival profile), and then a namespace request sized to it — or an explicit decision that non-production runs at reduced concurrency.",
+   "quote": null,
+   "fig": null,
+   "ev": "Environment 360 → Topology (4 GB / 2 CPU non-prod)"
+  },
+  {
+   "answer_id": "seed86",
+   "qid": 86,
+   "body": "What is recorded is a step, not a strategy. Non-production namespaces are 4 GB / 2 CPU; production is 16 GB / 16 CPU — 4× the memory and 8× the CPU — and the Growth column is TBD on every row (question 81).\n\nThe consequence is worth stating because it affects go-live evidence (question 108): performance testing in UAT runs at one-eighth of production CPU. A UAT pass is therefore not evidence of production throughput, and a UAT failure may be an artefact of the namespace rather than of the code.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "codebase",
+   "gap": "Either size a performance environment to production shape for the test window, or state explicitly what UAT timings are and are not evidence for. Scaling beyond that — horizontal pod autoscaling, pool growth — is not addressed anywhere.",
+   "quote": null,
+   "fig": "sizing",
+   "ev": "Environment 360 → Topology"
+  },
+  {
+   "answer_id": "seed87",
+   "qid": 87,
+   "body": "No. There are three different run identifiers in three unrelated tables, and nothing joins them:\n\n• guardrail_events.run_id — a runtime DQ run.\n• recon_profile.run_id / recon_summary.run_id — a variance run.\n• guardrail_gate_run.gate_run_id — a CI gate run, which belongs to a COMMIT and not to a business date at all.\n\nSo a file cannot currently be followed from arrival through transformation to load by any single key, in Splunk or anywhere else.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "codebase",
+   "gap": "Mint a correlation id at file arrival and carry it on every row written downstream, including into the log lines. This depends on question 42's business_date as well — a correlation id without a business date still cannot distinguish a run from its replay.",
+   "quote": null,
+   "fig": null,
+   "ev": "guardrail_events (sql/24) | recon_profile (sql/31) | guardrail_gate_run (sql/67)"
+  },
+  {
+   "answer_id": "seed90",
+   "qid": 90,
+   "body": "Correct, and the codebase confirms the premise: there is no alert-state table anywhere in this schema.\n\nguardrail_events records the FAILURE, not the NOTIFICATION. There is no sent-at, no suppression key, no acknowledgement and no recovery-close column. So duplicate suppression, correlation and recovery closure are whatever the alerting tool does internally, with nothing on the Oracle side to reconcile against — and no way to prove after the fact that an alert was delivered.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "absence",
+   "gap": "If alert delivery needs to be auditable, alert state has to be persisted where the audit lives. A suppression key of (rule, dataset, business_date) would be the natural grain — which again needs business_date (question 42).",
+   "quote": null,
+   "fig": null,
+   "ev": "guardrail_events (sql/24)"
+  },
+  {
+   "answer_id": "seed94",
+   "qid": 94,
+   "body": "Nothing is recorded. API 360 catalogues the APIs in detail, but the catalogue has no availability, latency, throughput or uptime field — I checked the schema for all four.\n\nThe catalogue is the right home for them if they are agreed: adding the targets as columns there would make them visible next to the API they apply to, rather than living only in a document.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "absence",
+   "gap": "The targets themselves are a business decision, not a platform fact.",
+   "quote": null,
+   "fig": null,
+   "ev": "API 360 (no SLA columns in sql/07, sql/36)"
+  },
+  {
+   "answer_id": "seed99",
+   "qid": 99,
+   "body": "None is recorded. No retention period, purge rule or archive policy exists in this schema for any table — RAW, Stage 2, the orchestration tables or the guardrail tables. Several tables carry updated_at, which is enough to implement a purge against, but no policy says what the value should be and no purge job exists.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "absence",
+   "gap": "Two of these are not independent of other answers: orchestration-table retention bounds how far back an incident can be investigated (question 42), and INT retention bounds replay (question 74). Set those two from their dependents, not from storage cost.",
+   "quote": null,
+   "fig": null,
+   "ev": "sql/ (no retention policy in any table)"
+  },
+  {
+   "answer_id": "seed100",
+   "qid": 100,
+   "body": "Same position as question 99: no purge rule exists for RAW, for the registry, for archive or for log evidence. Archive is the one that bites first, because it grows monotonically inside the same 20 GB allocation as landing and quarantine (question 77) with no utilisation alert on it (question 80).",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "absence",
+   "gap": "Needs a retention period per artefact class with its justification recorded — compliance, audit or operational — because the three will give different answers and the longest one wins.",
+   "quote": null,
+   "fig": null,
+   "ev": "Environment 360 → Topology (20 GB shared allocation)"
+  },
+  {
+   "answer_id": "seed101",
+   "qid": 101,
+   "body": "It cannot be guaranteed today, because the dependency is undocumented in both directions: no purge rule exists (questions 99 and 100), and no statement exists of how far back restatement or audit must be able to reach.\n\nThe specific trap is the one in question 74: a replay that depends on data in a layer with a shorter retention than the maximum wait will fail silently, and it will fail long after the retention was set.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "inference",
+   "gap": "Derive every retention period from its longest consumer and record which consumer that was. A purge rule with no stated dependant will be shortened by whoever next needs the space.",
+   "quote": null,
+   "fig": null,
+   "ev": "Environment 360 → Topology"
+  },
+  {
+   "answer_id": "seed102",
+   "qid": 102,
+   "body": "Not in this estate. What exists is the inventory a recovery procedure would be written against — env_infra, env_workload, env_probe and the four-environment topology — but no documented procedure for a database, OpenShift or storage outage.\n\nOne structural fact helps: production is a separate OpenShift cluster from the shared non-production one, so a non-production cluster failure does not take production with it. The converse is also true and less comfortable — a production cluster failure has no warm alternative recorded anywhere.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "absence",
+   "gap": "No procedure, no runbook, and no recorded test of either.",
+   "quote": null,
+   "fig": null,
+   "ev": "env_infra (sql/43) | env_workload (sql/48) | Environment 360"
+  },
+  {
+   "answer_id": "seed103",
+   "qid": 103,
+   "body": "Neither is recorded. I searched the whole schema and the environment screens: no RTO and no RPO value exists for any component, in any environment.\n\nTwo things in these answers depend on the numbers, so they are worth setting early rather than at the end: the compensation/restore process in question 107 has to be sized against an RTO, and retention (questions 99 to 101) has to be at least as long as the RPO window.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "absence",
+   "gap": "Both are business inputs. Nothing here can derive them.",
+   "quote": null,
+   "fig": null,
+   "ev": "sql/ (no RTO/RPO recorded) | Environment 360"
+  },
+  {
+   "answer_id": "seed106",
+   "qid": 106,
+   "body": "Liquibase, running as its own pipeline on its own cadence rather than inside the application build — which is the main structural decision and is already made.\n\nguardrail_changeset records, per change: the author, the filename, a description, the change type, WHETHER A ROLLBACK IS DECLARED, WHETHER IT IS DATA-SAFE, the release and build that carried it, its labels and contexts, and its position in the changelog.\n\nguardrail_changeset_applied records where it actually landed: environment, tag, applied-at, exec type and CHECKSUM.\n\nThe checksum is the safety property that matters most here. A changeset whose checksum differs between two environments has been edited after it was applied somewhere — Liquibase will refuse it, and Compare shows it before the pipeline gets there. Compare also shows, for any two environments, exactly which changesets one is ahead by and what risk each one carries.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "codebase",
+   "gap": "guardrail_deployment has no image_digest, so a database tag cannot currently be tied to the exact application image it was deployed alongside. The digest is the one identifier that is identical in every environment, which makes it the right join key.",
+   "quote": null,
+   "fig": "deploy",
+   "ev": "guardrail_changeset (sql/69) | guardrail_changeset_applied (sql/69) | Guardrails → Compare"
+  },
+  {
+   "answer_id": "seed107",
+   "qid": 107,
+   "body": "You are right, and this is the question the Compare screen was built around. The answer starts by splitting it in two, because rolling back the code and getting the data back are different questions with different answers.\n\nSo guardrail_changeset carries TWO flags, not one:\n\n• rollback_declared — is there a rollback block at all?\n• data_safe — if you run it, do you get the data back?\n\nA DROP COLUMN answers YES to the first and NO to the second. A single 'rollbackable' flag would have reported it as safe, which is exactly the failure this question describes. Compare classifies every changeset an environment is ahead by into no-rollback, rollback-not-data-safe and destructive, and counts the lossy ones separately from the total so the headline cannot hide them in a denominator.\n\nThat gives you DETECTION, on screen, before promotion.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "codebase",
+   "gap": "Two things you asked for do not exist. (1) No tested compensation or restore process is recorded anywhere in this estate, and no RTO to size one against (question 103). Detection without a rehearsed restore is half a control. (2) No ODI-to-dbt parity evidence. Recon 360 and Variance 360 are the right tools to produce it — the hops, the eleven metrics and the row-level break typing are all there (questions 37 and 43) — but the ODI-side run has not been done, and record-and-value parity is a claim until it has.",
+   "quote": null,
+   "fig": "rollback",
+   "ev": "guardrail_changeset (sql/69) | Guardrails → Compare | Recon 360 | Variance 360"
+  },
+  {
+   "answer_id": "seed108",
+   "qid": 108,
+   "body": "Not recorded. But two candidates already exist in a form that could be EVIDENCED rather than asserted, which is the useful property for an acceptance criterion:\n\n• The gate-run stages — governance, performance, testing, security and promotion — where each gate records whether it blocks or merely reports. 'All blocking gates passed in UAT for the release being promoted' is checkable from guardrail_gate_run.\n• A Recon 360 / Variance 360 parity run against the current ODI output: record counts and value sums per table, per hop, with a stated tolerance. That is question 107's parity evidence and question 15's 'behaves the same' confirmation in one artefact.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "absence",
+   "gap": "Anything to do with throughput should be stated carefully: UAT runs at one-eighth of production CPU (question 86), so a UAT timing is not evidence for a production SLA.",
+   "quote": null,
+   "fig": null,
+   "ev": "guardrail_gate_run (sql/67) | Recon 360 | Variance 360"
+  }
+ ]
+}

@@ -289,3 +289,35 @@ cd C:\SEI\CPcatalog\ui; npm run dev
 # To re-ingest after data changes (Window 1, stop API first or use a 3rd window)
 python -m ingestion.run
 ```
+
+## Hub Discussion — putting the corpus in the database
+
+The 108 review questions, their topics and owners, and the drafted answers
+are rows in Oracle. The copy in the UI bundle is a cold start only: if the
+API is unreachable or the loader has not run, the screen renders the shipped
+corpus read-only and says **bundled copy** rather than **from the database**.
+
+Order matters once, on first setup:
+
+```bash
+sqlplus ... @sql/70_hub_discussion.sql          # questions, answers, attachments, events
+sqlplus ... @sql/71_hub_discussion_corpus.sql   # topics, owners, the corpus columns
+python -m ingestion.hub_corpus_conn             # load the corpus
+```
+
+Both SQL files are guarded and idempotent, and the loader is safe to re-run
+after every deploy — **it refreshes a row only while nobody has touched it.**
+A question that has been edited or given a status, and an answer that has
+been edited or accepted, are left exactly as they are. That rule is in the
+MERGE's `UPDATE ... WHERE`, not in a convention.
+
+After changing `ui/src/hubQuestions.js` or `ui/src/hubAnswers.js`:
+
+```bash
+node ui/scripts/export_hub_corpus.mjs           # regenerate data/hub_corpus.json
+python -m ingestion.hub_corpus_conn             # apply it
+```
+
+The suite fails if the export has drifted from those two modules, so a
+forgotten re-export is caught before it becomes a screen that disagrees with
+the database.
