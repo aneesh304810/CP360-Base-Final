@@ -24,7 +24,7 @@ import { QUESTIONS, TOPICS, OWNERS, compsFor } from "./hubQuestions.js";
 import { TRACKER_COMPONENTS } from "./seiDesignTracker.js";
 import { HUB_EVENT_COMPONENTS } from "./hubEventComponents.js";
 import discussionApi, { emptyStore } from "./hub_discussion_api.js";
-import { seedRows, materialise, SEED_ANSWERS } from "./hubAnswers.js";
+import { seedRows, materialise, SEED_ANSWERS, CONF } from "./hubAnswers.js";
 import { FIGS } from "./HubAnswerFigs.jsx";
 
 const ST = {
@@ -497,6 +497,9 @@ export function Expanded({ t, x, S, answers, actor, store, commit, onClose, live
             <div style={S.aHead}>
               {a.accepted && <span style={S.acc}>✓ accepted answer</span>}
               {a.draft && <span style={S.draft}>draft · not agreed</span>}
+              {a.conf && CONF[a.conf] && <span style={{ ...S.conf,
+                background: CONF[a.conf].bg, color: CONF[a.conf].c }}>
+                {CONF[a.conf].label}</span>}
               <b style={{ color: t.text }}>{a.author}</b>
               <span style={S.aMet}>{a.createdAt}
                 {a.updatedAt ? ` · edited ${a.updatedAt}` : ""}
@@ -532,6 +535,7 @@ export function Expanded({ t, x, S, answers, actor, store, commit, onClose, live
                   {a.body}
                   {a.fig && FIGS[a.fig] && (
                     <div style={S.fig}>{React.createElement(FIGS[a.fig])}</div>)}
+                  {a.quote && <blockquote style={S.quote}>“{a.quote}”</blockquote>}
                   {a.gap && <div style={S.gap}>
                     <b style={{ color: "#8c6a1f" }}>What this does not settle · </b>
                     {a.gap}</div>}
@@ -643,6 +647,10 @@ export const sty = (t) => ({
   acc: { fontSize: 9, fontWeight: 800, borderRadius: 3, padding: "2px 7px",
     background: "#e8f6ed", color: "#15803d" },
   aMet: { fontSize: 10.5, color: t.textMuted },
+  conf: { fontSize: 9, fontWeight: 800, borderRadius: 3, padding: "2px 7px" },
+  quote: { margin: "10px 0 0", padding: "7px 12px", fontSize: 12,
+    lineHeight: 1.55, maxWidth: "74ch", fontStyle: "italic",
+    color: t.textMuted, borderLeft: `3px solid ${t.panel2 || "#dfe6e9"}` },
   attach: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap",
     marginTop: 9, paddingTop: 9,
     borderTop: `1px dashed ${t.panel2 || "#dfe6e9"}` },

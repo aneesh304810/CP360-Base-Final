@@ -23,6 +23,27 @@
 // EVERY ANSWER CARRIES ITS GAP. Where the codebase answers half the
 // question, the draft says which half. The gap is usually the useful
 // part: it is the thing to put on a sprint board.
+// What an answer RESTS ON, declared rather than implied.
+//
+//   codebase   what the platform does, verified in the files named in ev.
+//   absence    the substance is that nothing in the estate records this,
+//              established by searching for it. Different from "unknown":
+//              it is a checkable claim, and a wrong one is falsifiable in
+//              one grep.
+//   document   read out of a source document. A verbatim quote is then
+//              REQUIRED -- see the invariant in the test. No answer here
+//              is of this class yet; the class exists so that the first
+//              one extracted from the SEI PDF cannot quietly arrive
+//              looking like a verified one.
+//   inference  reasoned from the above rather than read. The premises
+//              belong in the body, and it is never a settled position.
+export const CONF = {
+  codebase:  { label: "from the codebase", c: "#0f4775", bg: "#e4f0fb" },
+  absence:   { label: "nothing recorded",  c: "#8c6a1f", bg: "#fdf2e3" },
+  document:  { label: "from a document",   c: "#15803d", bg: "#e8f6ed" },
+  inference: { label: "reasoned, not read", c: "#7c3aed", bg: "#f1e9fd" },
+};
+
 export const SEED_PREFIX = "seed";
 export const seedId = (n) => `${SEED_PREFIX}${n}`;
 export const isSeedId = (id) => typeof id === "string" && id.startsWith(SEED_PREFIX);
@@ -30,7 +51,7 @@ export const isSeedId = (id) => typeof id === "string" && id.startsWith(SEED_PRE
 export const SEED_AUTHOR = "CP360 · drafted from the codebase";
 
 export const SEED_ANSWERS = [
-{ n: 21, fig: "envs",
+{ n: 21, conf: "codebase", fig: "envs",
   body:
 "BBH. Airflow runs inside the CP Integration Hub OpenShift namespace, "
 + "which the environment sizing sheet lists as BBH-hosted OpenShift in all "
@@ -44,7 +65,7 @@ export const SEED_ANSWERS = [
   gap: "The production cluster and namespace are both recorded as TBD.",
   ev: ["Environment 360 → Topology (sizing sheet, 4 environments)", "DevOps 360"] },
 
-{ n: 27,
+{ n: 27, conf: "codebase",
   body:
 "Not yet — and the diagrams are honest about being dual-state rather than "
 + "target-state. Both paths are modelled at once: the topology still carries "
@@ -55,7 +76,7 @@ export const SEED_ANSWERS = [
   gap: "No cutover date or dual-run period is recorded for SFTP → SDC.",
   ev: ["Environment 360 → Topology", "Event 360 → Micro-batch"] },
 
-{ n: 35,
+{ n: 35, conf: "codebase",
   body:
 "They are shown in Guardrails, read from Oracle rather than from Splunk. "
 + "Per event the table carries the engine, the rule name, the expectation, "
@@ -70,7 +91,7 @@ export const SEED_ANSWERS = [
 + "resolves' cannot be evidenced from the platform.",
   ev: ["guardrail_events (sql/24)", "Guardrails 360"] },
 
-{ n: 36,
+{ n: 36, conf: "codebase",
   body:
 "In 360, and not only in Splunk. Three screens already read exception data "
 + "straight out of Oracle:\n\n"
@@ -88,7 +109,7 @@ export const SEED_ANSWERS = [
 + "populate guardrail_events per business date lives outside it.",
   ev: ["guardrail_events (sql/24)", "recon_pr_break (sql/35)", "recon_summary (sql/31)"] },
 
-{ n: 37, fig: "hops",
+{ n: 37, conf: "codebase", fig: "hops",
   body:
 "Variance 360 profiles every column at every stage and compares adjacent "
 + "stages. recon_profile records, per run / lineage id / stage / column, "
@@ -108,7 +129,7 @@ export const SEED_ANSWERS = [
 + "introduced by the Dim/Fact load.",
   ev: ["recon_profile (sql/31)", "recon_summary (sql/31)", "Variance 360"] },
 
-{ n: 39,
+{ n: 39, conf: "codebase",
   body:
 "Mechanically this is a SUM metric on a market-value column compared "
 + "against the prior business date, and half of it already exists: "
@@ -125,7 +146,7 @@ export const SEED_ANSWERS = [
 + "is actually asking for.",
   ev: ["recon_profile (sql/31)", "Variance 360"] },
 
-{ n: 40,
+{ n: 40, conf: "codebase",
   body:
 "Today, it would not — and this is worth stating plainly because the "
 + "failure is silent. CNT is captured per stage per run, so the drop is "
@@ -141,7 +162,7 @@ export const SEED_ANSWERS = [
 + "stages. Stage-to-stage reconciliation can never detect it by construction.",
   ev: ["recon_profile (sql/31)", "recon_summary (sql/31)"] },
 
-{ n: 41,
+{ n: 41, conf: "codebase",
   body:
 "Prior-day and expected-range comparison are both supportable from "
 + "recon_profile, which already stores the metrics; what is missing is the "
@@ -157,7 +178,7 @@ export const SEED_ANSWERS = [
 + "costs.",
   ev: ["recon_profile (sql/31)"] },
 
-{ n: 42,
+{ n: 42, conf: "codebase",
   body:
 "Partially — and the missing piece is exactly the one this question names.\n\n"
 + "guardrail_events ties a failure to the incident (event_id), to the run "
@@ -176,7 +197,7 @@ export const SEED_ANSWERS = [
 + "(source record, business_date, run_id) rather than the business key alone.",
   ev: ["guardrail_events (sql/24)"] },
 
-{ n: 43, fig: "hops",
+{ n: 43, conf: "codebase", fig: "hops",
   body:
 "Counts matching while values are wrong is precisely what the profile "
 + "metrics are for — CNT alone IS the false green, and the other ten metrics "
@@ -198,7 +219,7 @@ export const SEED_ANSWERS = [
 + "replaced. Rejects are covered only insofar as they appear as MISSING.",
   ev: ["recon_profile (sql/31)", "recon_pr_break (sql/35)", "Recon 360", "Variance 360"] },
 
-{ n: 49,
+{ n: 49, conf: "codebase",
   body:
 "Interface 360 is the nearest thing that exists and is the natural home for "
 + "it: the interface catalogue already carries a frequency and an intraday "
@@ -213,7 +234,7 @@ export const SEED_ANSWERS = [
 + "engineering choice.",
   ev: ["Interface 360 (frequency, intraday)"] },
 
-{ n: 50, fig: "markers",
+{ n: 50, conf: "codebase", fig: "markers",
   body:
 "Two paths, and they are in very different states.\n\n"
 + "ON THE EVENT / SDC PATH there is an explicit protocol. Each subscribed "
@@ -233,7 +254,7 @@ export const SEED_ANSWERS = [
 + "is the usual fallback and is the weakest of the options.",
   ev: ["ref_micro_batch_marker (sql/63)", "Event 360 → Micro-batch"] },
 
-{ n: 51,
+{ n: 51, conf: "codebase",
   body:
 "No. A corrected resend collides with the original on (FILE_NAME, "
 + "BUSINESS_DATE) — the key cannot hold both, so either the resend is "
@@ -248,7 +269,7 @@ export const SEED_ANSWERS = [
 + "same underlying issue as questions 55, 56 and 72.",
   ev: ["ref_micro_batch_marker (sql/63)"] },
 
-{ n: 57,
+{ n: 57, conf: "absence",
   body:
 "Nothing in this codebase prevents it.\n\n"
 + "The landing share is a CIFS share mounted into the namespace as an RWX "
@@ -265,7 +286,7 @@ export const SEED_ANSWERS = [
 + "throughout these questions but its DDL is not in this repository.",
   ev: ["Environment 360 → Topology (CIFS 445 → RWX PVC)"] },
 
-{ n: 62, fig: "runstate",
+{ n: 62, conf: "codebase", fig: "runstate",
   body:
 "The state vocabulary is already there; the liveness is not.\n\n"
 + "guardrail_gate_run.status is one of passed, failed, warning, skipped, "
@@ -286,7 +307,7 @@ export const SEED_ANSWERS = [
 + "extra columns only record the stall more precisely.",
   ev: ["guardrail_gate_run (sql/67)"] },
 
-{ n: 64,
+{ n: 64, conf: "absence",
   body:
 "Nobody, in the sense that matters: no table in this estate has an owner, "
 + "assignee or acknowledgement column — not guardrail_events, not "
@@ -298,7 +319,7 @@ export const SEED_ANSWERS = [
   gap: "Ownership needs to be a column before it can be a process.",
   ev: ["guardrail_events (sql/24)", "guardrail_gate_run (sql/67)"] },
 
-{ n: 74,
+{ n: 74, conf: "inference",
   body:
 "The structural answer is the one the question already contains: the replay "
 + "payload must not live in a layer that has a retention clock. An immutable "
@@ -316,7 +337,7 @@ export const SEED_ANSWERS = [
 + "number is written down.",
   ev: ["Environment 360 → Topology (no retention recorded)"] },
 
-{ n: 77,
+{ n: 77, conf: "codebase",
   body:
 "The topology models the landing share as a CIFS share reached on port 445 "
 + "and mounted into the namespace as an RWX persistent volume — that is "
@@ -331,7 +352,7 @@ export const SEED_ANSWERS = [
 + "directories compete for one allocation.",
   ev: ["Environment 360 → Topology (CIFS 445 → RWX PVC)"] },
 
-{ n: 78,
+{ n: 78, conf: "absence",
   body:
 "There is no evidence of such a test in this estate, and there is a prior "
 + "problem: the storage class is not named anywhere (question 77), so there "
@@ -346,7 +367,7 @@ export const SEED_ANSWERS = [
 + "on.",
   ev: ["Environment 360 → Topology"] },
 
-{ n: 80,
+{ n: 80, conf: "absence",
   body:
 "None today. A probe framework exists — env_probe and env_probe_result — "
 + "and env_workload records what runs where, so there is somewhere for this "
@@ -362,7 +383,7 @@ export const SEED_ANSWERS = [
 + "tells you the outage is coming.",
   ev: ["env_probe / env_probe_result (sql/44)", "env_workload (sql/48)"] },
 
-{ n: 81, fig: "sizing",
+{ n: 81, conf: "codebase", fig: "sizing",
   body:
 "No — and the sizing sheet says so itself rather than this being an "
 + "inference.\n\n"
@@ -379,7 +400,7 @@ export const SEED_ANSWERS = [
 + "a landing share fills on a month-end.",
   ev: ["Environment 360 → Topology (Growth = TBD on all rows)"] },
 
-{ n: 83,
+{ n: 83, conf: "absence",
   body:
 "None of the four is recorded.\n\n"
 + "The databases are sized — 62 GB RAM, 8 CPU, 4–6 TB storage — but that is "
@@ -393,7 +414,7 @@ export const SEED_ANSWERS = [
   gap: "All four need to come from the source systems; none is derivable here.",
   ev: ["Environment 360 → Topology"] },
 
-{ n: 84,
+{ n: 84, conf: "absence",
   body:
 "There is no evidence for it in this repository.\n\n"
 + "It is worth reading the proposed number against the namespace sizing, "
@@ -410,7 +431,7 @@ export const SEED_ANSWERS = [
 + "explicit decision that non-production runs at reduced concurrency.",
   ev: ["Environment 360 → Topology (4 GB / 2 CPU non-prod)"] },
 
-{ n: 86, fig: "sizing",
+{ n: 86, conf: "codebase", fig: "sizing",
   body:
 "What is recorded is a step, not a strategy. Non-production namespaces are "
 + "4 GB / 2 CPU; production is 16 GB / 16 CPU — 4× the memory and 8× the "
@@ -427,7 +448,7 @@ export const SEED_ANSWERS = [
 + "not addressed anywhere.",
   ev: ["Environment 360 → Topology"] },
 
-{ n: 87,
+{ n: 87, conf: "codebase",
   body:
 "No. There are three different run identifiers in three unrelated tables, "
 + "and nothing joins them:\n\n"
@@ -444,7 +465,7 @@ export const SEED_ANSWERS = [
 + "cannot distinguish a run from its replay.",
   ev: ["guardrail_events (sql/24)", "recon_profile (sql/31)", "guardrail_gate_run (sql/67)"] },
 
-{ n: 90,
+{ n: 90, conf: "absence",
   body:
 "Correct, and the codebase confirms the premise: there is no alert-state "
 + "table anywhere in this schema.\n\n"
@@ -461,7 +482,7 @@ export const SEED_ANSWERS = [
 + "business_date (question 42).",
   ev: ["guardrail_events (sql/24)"] },
 
-{ n: 94,
+{ n: 94, conf: "absence",
   body:
 "Nothing is recorded. API 360 catalogues the APIs in detail, but the "
 + "catalogue has no availability, latency, throughput or uptime field — I "
@@ -472,7 +493,7 @@ export const SEED_ANSWERS = [
   gap: "The targets themselves are a business decision, not a platform fact.",
   ev: ["API 360 (no SLA columns in sql/07, sql/36)"] },
 
-{ n: 99,
+{ n: 99, conf: "absence",
   body:
 "None is recorded. No retention period, purge rule or archive policy exists "
 + "in this schema for any table — RAW, Stage 2, the orchestration tables or "
@@ -486,7 +507,7 @@ export const SEED_ANSWERS = [
 + "their dependents, not from storage cost.",
   ev: ["sql/ (no retention policy in any table)"] },
 
-{ n: 100,
+{ n: 100, conf: "absence",
   body:
 "Same position as question 99: no purge rule exists for RAW, for the "
 + "registry, for archive or for log evidence. Archive is the one that bites "
@@ -499,7 +520,7 @@ export const SEED_ANSWERS = [
 + "different answers and the longest one wins.",
   ev: ["Environment 360 → Topology (20 GB shared allocation)"] },
 
-{ n: 101,
+{ n: 101, conf: "inference",
   body:
 "It cannot be guaranteed today, because the dependency is undocumented in "
 + "both directions: no purge rule exists (questions 99 and 100), and no "
@@ -514,7 +535,7 @@ export const SEED_ANSWERS = [
 + "by whoever next needs the space.",
   ev: ["Environment 360 → Topology"] },
 
-{ n: 102,
+{ n: 102, conf: "absence",
   body:
 "Not in this estate. What exists is the inventory a recovery procedure "
 + "would be written against — env_infra, env_workload, env_probe and the "
@@ -528,7 +549,7 @@ export const SEED_ANSWERS = [
   gap: "No procedure, no runbook, and no recorded test of either.",
   ev: ["env_infra (sql/43)", "env_workload (sql/48)", "Environment 360"] },
 
-{ n: 103,
+{ n: 103, conf: "absence",
   body:
 "Neither is recorded. I searched the whole schema and the environment "
 + "screens: no RTO and no RPO value exists for any component, in any "
@@ -540,7 +561,7 @@ export const SEED_ANSWERS = [
   gap: "Both are business inputs. Nothing here can derive them.",
   ev: ["sql/ (no RTO/RPO recorded)", "Environment 360"] },
 
-{ n: 106, fig: "deploy",
+{ n: 106, conf: "codebase", fig: "deploy",
   body:
 "Liquibase, running as its own pipeline on its own cadence rather than "
 + "inside the application build — which is the main structural decision and "
@@ -564,7 +585,7 @@ export const SEED_ANSWERS = [
 + "environment, which makes it the right join key.",
   ev: ["guardrail_changeset (sql/69)", "guardrail_changeset_applied (sql/69)", "Guardrails → Compare"] },
 
-{ n: 107, fig: "rollback",
+{ n: 107, conf: "codebase", fig: "rollback",
   body:
 "You are right, and this is the question the Compare screen was built "
 + "around. The answer starts by splitting it in two, because rolling back "
@@ -591,7 +612,7 @@ export const SEED_ANSWERS = [
 + "until it has.",
   ev: ["guardrail_changeset (sql/69)", "Guardrails → Compare", "Recon 360", "Variance 360"] },
 
-{ n: 108,
+{ n: 108, conf: "absence",
   body:
 "Not recorded. But two candidates already exist in a form that could be "
 + "EVIDENCED rather than asserted, which is the useful property for an "
@@ -622,7 +643,8 @@ export function seedRows(store) {
   return SEED_ANSWERS
     .filter((s) => !a[seedId(s.n)])
     .map((s) => ({ id: seedId(s.n), qid: s.n, body: s.body, gap: s.gap,
-      fig: s.fig, ev: s.ev, author: SEED_AUTHOR, draft: true, accepted: false }));
+      fig: s.fig, ev: s.ev, conf: s.conf, quote: s.quote,
+      author: SEED_AUTHOR, draft: true, accepted: false }));
 }
 
 // Acting on a seed writes it into the store first, so accept and edit —

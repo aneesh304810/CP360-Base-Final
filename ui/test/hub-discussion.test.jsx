@@ -26,7 +26,7 @@ import HubDiscussion, { statusOf, acceptAnswer, editAnswer, compLabel,
 import { QUESTIONS, TOPICS, OWNERS, OWNER_TOTALS, compsFor }
   from "../src/hubQuestions.js";
 import { emptyStore, attachKindFor } from "../src/hub_discussion_api.js";
-import { SEED_ANSWERS, seedRows, materialise, seedId }
+import { SEED_ANSWERS, seedRows, materialise, seedId, CONF }
   from "../src/hubAnswers.js";
 import { FIGS } from "../src/HubAnswerFigs.jsx";
 import { tLight, tDark } from "../src/bbhTheme.js";
@@ -151,6 +151,65 @@ ok(SEED_ANSWERS.every((a) => a.ev && a.ev.length),
    "and every draft cites where it came from — an answer with no evidence "
    + "is an opinion in a document that is meant to settle things",
    SEED_ANSWERS.filter((a) => !(a.ev || []).length).map((a) => a.n));
+
+// Every answer declares WHAT IT RESTS ON, and the class is load-bearing
+// rather than decorative: a claim read out of a document has to carry
+// the sentence it was read from. Without that rule the first answer
+// extracted from the SEI PDF arrives looking exactly like one verified
+// against a table in this repository.
+ok(SEED_ANSWERS.every((a) => a.conf && CONF[a.conf]),
+   "every draft declares its evidence class",
+   SEED_ANSWERS.filter((a) => !CONF[a.conf]).map((a) => `${a.n}:${a.conf}`));
+const fromDoc = SEED_ANSWERS.filter((a) => a.conf === "document");
+ok(fromDoc.every((a) => a.quote && a.quote.length > 25),
+   "an answer taken FROM A DOCUMENT carries the verbatim sentence it was "
+   + "taken from — an uncited document claim is indistinguishable from one "
+   + "that was invented, and reads as the vendor's position",
+   fromDoc.filter((a) => !a.quote).map((a) => a.n));
+ok(SEED_ANSWERS.filter((a) => a.conf === "codebase")
+     .every((a) => (a.ev || []).some((e) => /sql\/|\.js|\.jsx|360|Compare/.test(e))),
+   "and an answer from the CODEBASE names a file, table or screen, not just "
+   + "a topic", SEED_ANSWERS.filter((a) => a.conf === "codebase"
+     && !(a.ev || []).some((e) => /sql\/|\.js|\.jsx|360|Compare/.test(e)))
+     .map((a) => a.n));
+ok(!SEED_ANSWERS.some((a) => a.conf === "no_data" || /^NO DATA$/.test(a.body)),
+   "a NO DATA answer is never loaded as a draft — on screen it would read as "
+   + "the question having been dealt with, which is worse than showing no "
+   + "answer at all",
+   SEED_ANSWERS.filter((a) => a.conf === "no_data").map((a) => a.n));
+
+// The prompt in docs/ tells people what JSON to send back. If its field
+// names drift from the ones the screen reads, the answers load silently
+// missing their quote or their gap.
+const PDOC = path.join(ROOT, "docs", "PROMPT-answer-open-questions.md");
+if (fs.existsSync(PDOC)) {
+  const md = fs.readFileSync(PDOC, "utf8");
+  const asked = [...md.matchAll(/^\s*"(\w+)":/gm)].map((m) => m[1]);
+  const known = new Set(["n", "conf", "body", "gap", "quote", "ev", "fig"]);
+  ok(asked.length >= 5, "the prompt specifies a return shape", asked.join(","));
+  ok(asked.every((k) => known.has(k)),
+     "and every field it asks for is one the screen actually reads — a field "
+     + "the prompt invents is data that arrives and is silently dropped",
+     asked.filter((k) => !known.has(k)).join(","));
+  for (const k of ["conf", "quote", "gap", "ev"]) {
+    ok(asked.includes(k),
+       `the prompt asks for ${k}, which the screen renders`, asked.join(","));
+  }
+  const classes = [...md.matchAll(/^ {2}(document|absence|inference|no_data) {2,}\S/gm)]
+    .map((m) => m[1]);
+  ok(new Set(classes).size === 4,
+     "the prompt defines all four evidence classes, including no_data — the "
+     + "one that makes refusing an expected outcome rather than a failure",
+     [...new Set(classes)].join(","));
+  ok(classes.filter((c) => c !== "no_data").every((c) => CONF[c]),
+     "and each class it can return is one the screen can render a badge for",
+     classes.filter((c) => c !== "no_data" && !CONF[c]).join(","));
+}
+
+ok(fromDoc.length === 0,
+   "no draft is sourced from a document yet — nothing has been extracted "
+   + "from the SEI PDF, and this is the line that will change when it is",
+   fromDoc.map((a) => a.n));
 
 // A draft is an answer, never a resolution.
 const fresh = emptyStore();
@@ -308,6 +367,23 @@ const exH = ex(tLight);
 ok(/draft · not agreed/.test(exH),
    "a drafted answer is labelled on screen, in words and not only in "
    + "amber — colour alone is not a signal", "");
+// Q103 is an "absence" answer, chosen deliberately: "from the codebase"
+// also appears in the author line, so asserting on THAT label passes with
+// the badge deleted. It did.
+const q103 = { ...QUESTIONS.find((x) => x.n === 103),
+  comps: compsFor(QUESTIONS.find((x) => x.n === 103)), over: {}, status: "answered" };
+const absH = renderToStaticMarkup(
+  <Expanded t={tLight} x={q103} S={sty(tLight)} answers={seedRows(emptyStore())}
+    actor="tester" store={emptyStore()} commit={() => {}} onClose={() => {}}
+    onOpenComponent={() => {}} setStatus={() => {}} addAnswer={() => {}}
+    saveQuestionEdit={() => {}} />);
+ok(/nothing recorded/.test(absH),
+   "the evidence class is on screen beside the draft badge, so a reader can "
+   + "see what an answer rests on without opening the file it cites", "");
+ok((exH.match(/from the codebase/g) || []).length === 2,
+   "and a codebase answer shows it twice — once as the author, once as the "
+   + "class; one occurrence means the badge is gone",
+   (exH.match(/from the codebase/g) || []).length);
 ok(/What this does not settle/.test(exH),
    "and its gap is on screen next to it, not in a footnote", "");
 ok(/rollback_declared/.test(exH) && /<svg/.test(exH),
