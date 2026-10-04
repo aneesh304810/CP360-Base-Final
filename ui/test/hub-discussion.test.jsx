@@ -21,11 +21,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { renderToStaticMarkup } from "react-dom/server";
-import HubDiscussion, { statusOf, acceptAnswer, editAnswer, compLabel }
-  from "../src/HubDiscussion.jsx";
+import HubDiscussion, { statusOf, acceptAnswer, editAnswer, compLabel,
+  Expanded, sty, onAnswer } from "../src/HubDiscussion.jsx";
 import { QUESTIONS, TOPICS, OWNERS, OWNER_TOTALS, compsFor }
   from "../src/hubQuestions.js";
 import { emptyStore } from "../src/hub_discussion_api.js";
+import { SEED_ANSWERS, seedRows, materialise, seedId }
+  from "../src/hubAnswers.js";
+import { FIGS } from "../src/HubAnswerFigs.jsx";
 import { tLight, tDark } from "../src/bbhTheme.js";
 
 let bad = 0;
@@ -129,6 +132,149 @@ ok(plain.ev.length === 1,
 ok(plain.a.a2.updatedAt && plain.a.a2.body === "two, revised",
    "but does stamp updatedAt, which is what renders the “edited” marker", "");
 
+// ---- the drafted answers --------------------------------------------
+//
+// The danger with seeding answers is not that one is wrong — it is that
+// a draft reads as a decision. So: drafts never resolve anything, they
+// always say what they do NOT settle, and they never carry a hostname.
+const QN = new Set(QUESTIONS.map((x) => x.n));
+ok(SEED_ANSWERS.every((a) => QN.has(a.n)),
+   "every draft answers a question that exists",
+   SEED_ANSWERS.filter((a) => !QN.has(a.n)).map((a) => a.n));
+ok(new Set(SEED_ANSWERS.map((a) => a.n)).size === SEED_ANSWERS.length,
+   "and no question has two drafts", "");
+ok(SEED_ANSWERS.every((a) => a.gap && a.gap.length > 20),
+   "EVERY draft states what it does not settle — the gap is the half a "
+   + "reader must not mistake for a complete answer",
+   SEED_ANSWERS.filter((a) => !a.gap).map((a) => a.n));
+ok(SEED_ANSWERS.every((a) => a.ev && a.ev.length),
+   "and every draft cites where it came from — an answer with no evidence "
+   + "is an opinion in a document that is meant to settle things",
+   SEED_ANSWERS.filter((a) => !(a.ev || []).length).map((a) => a.n));
+
+// A draft is an answer, never a resolution.
+const fresh = emptyStore();
+const seeded = seedRows(fresh);
+ok(seeded.length === SEED_ANSWERS.length, "drafts reach the thread",
+   seeded.length);
+ok(seeded.every((r) => r.draft === true && r.accepted === false),
+   "every drafted row is marked draft and NOT accepted", "");
+const freshStatus = QUESTIONS.map((x) => statusOf(x, seeded, {}));
+ok(!freshStatus.includes("resolved"),
+   "so a fresh screen shows ZERO resolved questions — 35 drafts must not "
+   + "read as 35 settled decisions",
+   freshStatus.filter((v) => v === "resolved").length);
+ok(freshStatus.filter((v) => v === "answered").length === SEED_ANSWERS.length,
+   "they land on ANSWERED, which is exactly what they are",
+   freshStatus.filter((v) => v === "answered").length);
+
+// Nothing in the environment sheet leaks: the sizing numbers are in the
+// answers, the hostnames must not be.
+const HOST = /\b[a-z0-9-]+\.(?:com|net|org|local)\b|testbbh|\bnjl|\bqcl|\bdvl|\brdl/i;
+const leaks = SEED_ANSWERS.filter((a) => HOST.test(a.body + " " + a.gap));
+ok(leaks.length === 0,
+   "no draft reproduces a hostname from the topology sheet — the capacity "
+   + "figures are the answer, the hosts are not",
+   leaks.map((a) => a.n));
+
+// Acting on a draft materialises it, and the question id survives.
+const mats = materialise(fresh, seeded.find((r) => r.qid === 107));
+ok(mats.a[seedId(107)] && mats.a[seedId(107)].qid === 107,
+   "materialising a draft keeps its question id — accept and edit both "
+   + "read store.a[id] and would otherwise orphan it",
+   JSON.stringify(Object.keys(mats.a)));
+ok(materialise(mats, seeded.find((r) => r.qid === 107)) === mats,
+   "and materialising twice is a no-op, so an edit cannot be reverted by a "
+   + "later render", "");
+ok(seedRows(mats).every((r) => r.qid !== 107),
+   "once materialised the draft is no longer re-emitted — otherwise the "
+   + "edited copy and the original would both show",
+   seedRows(mats).filter((r) => r.qid === 107).length);
+
+// Both call sites go through onAnswer, so this is the composition the
+// screen actually performs — starting from a store where the draft has
+// NOT been materialised, which is the state a real first click is in.
+const r107 = seeded.find((r) => r.qid === 107);
+const viaAccept = onAnswer(fresh, r107, (st) => acceptAnswer(st, 107, seedId(107), "GL"));
+ok(viaAccept.a[seedId(107)].accepted && viaAccept.a[seedId(107)].qid === 107,
+   "accepting a draft straight from an empty store works and keeps the "
+   + "question id — this is the first click anyone makes",
+   JSON.stringify(viaAccept.a[seedId(107)]));
+const viaEdit = onAnswer(fresh, r107, (st) => editAnswer(st, seedId(107), "redone", "KB"));
+ok(viaEdit.a[seedId(107)].body === "redone" && viaEdit.a[seedId(107)].qid === 107,
+   "and so does editing one", JSON.stringify(viaEdit.a[seedId(107)]));
+ok(statusOf({ n: 107 }, [...Object.entries(viaAccept.a).map(([id, a]) => ({ ...a, id })),
+              ...seedRows(viaAccept)], {}) === "resolved",
+   "once a human accepts the draft the question IS resolved — a draft is "
+   + "not a decision until somebody makes it one", "");
+
+const acc = acceptAnswer(mats, 107, seedId(107), "Glenn Lasrado");
+ok(acc.a[seedId(107)].accepted && acc.a[seedId(107)].acceptedBy === "Glenn Lasrado",
+   "a draft can be accepted, which is how it becomes the component's "
+   + "documentation", JSON.stringify(acc.a[seedId(107)].acceptedBy));
+const edt = editAnswer(mats, seedId(107), "rewritten", "K. Barnhardt");
+ok(edt.a[seedId(107)].body === "rewritten" && edt.a[seedId(107)].qid === 107
+   && edt.a[seedId(107)].updatedAt,
+   "and a draft can be edited, keeping its question id and stamping the "
+   + "edit", JSON.stringify(edt.a[seedId(107)]));
+
+// Figures.
+const figNames = [...new Set(SEED_ANSWERS.filter((a) => a.fig).map((a) => a.fig))];
+ok(figNames.length > 0 && figNames.every((f) => FIGS[f]),
+   "every figure a draft names exists — a missing one renders nothing and "
+   + "the answer silently loses its picture",
+   figNames.filter((f) => !FIGS[f]));
+const FIGSRC = strip("ui/src/HubAnswerFigs.jsx");
+ok(!/t\.navy|t\.accent/.test(FIGSRC),
+   "the figures use neither t.navy nor t.accent — both are SURFACES in the "
+   + "dark theme", "");
+// Labels that collide. Rendered SVG has no layout engine behind it, so
+// two <text> elements on the same baseline can overlap and nothing
+// complains — which is exactly what happened to the runstate figure: an
+// annotation ran straight through the worker_id pill and only a
+// screenshot showed it. Width is estimated, so the threshold is
+// deliberately slack: this catches a label sitting ON another one, not
+// a tight fit.
+function overlaps(svg) {
+  const out = [];
+  const re = /<text([^>]*)>([\s\S]*?)<\/text>/g;
+  const items = [];
+  let m;
+  while ((m = re.exec(svg))) {
+    const at = m[1];
+    const g = (k) => { const r = new RegExp(`${k}="([^"]*)"`).exec(at); return r && r[1]; };
+    const txt = m[2].replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+    if (!txt) continue;
+    const x = Number(g("x")), y = Number(g("y"));
+    const fs = Number(g("font-size") || 10);
+    const anchor = g("text-anchor") || "start";
+    const w = txt.length * fs * 0.5;              // conservative
+    const x0 = anchor === "middle" ? x - w / 2 : anchor === "end" ? x - w : x;
+    items.push({ txt, y, x0, x1: x0 + w });
+  }
+  for (let i = 0; i < items.length; i++)
+    for (let j = i + 1; j < items.length; j++) {
+      const a = items[i], b = items[j];
+      if (Math.abs(a.y - b.y) > 5) continue;
+      const ov = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0);
+      if (ov > 6) out.push(`"${a.txt.slice(0, 22)}" / "${b.txt.slice(0, 22)}" (${ov.toFixed(0)}px)`);
+    }
+  return out;
+}
+for (const [name, F] of Object.entries(FIGS)) {
+  const h = renderToStaticMarkup(React.createElement(F));
+  ok(/<svg/.test(h) && !/NaN|undefined/.test(h), `figure ${name} renders clean`,
+     (h.match(/.{0,40}(NaN|undefined)/) || [])[0]);
+  const ov = overlaps(h);
+  ok(ov.length === 0, `figure ${name} has no labels sitting on top of each other`,
+     ov.slice(0, 2).join(" · "));
+  const vb = /viewBox="0 0 (\d+) (\d+)"/.exec(h);
+  const ys = [...h.matchAll(/<text[^>]*\sy="(\d+(?:\.\d+)?)"/g)].map((r) => Number(r[1]));
+  ok(vb && ys.every((y) => y <= Number(vb[2]) - 2),
+     `figure ${name} keeps every label inside its viewBox`,
+     vb ? `${Math.max(...ys)} vs ${vb[2]}` : "no viewBox");
+}
+
 // ---- the dark-theme surface trap ------------------------------------
 ok(!/t\.navy/.test(DISC),
    "t.navy is never used in this file — it is #0a0f24 in the dark theme, a "
@@ -149,15 +295,56 @@ ok(/local only/.test(html),
    + "that is quietly private is worse than one that is openly local", "");
 ok(/Ask a question/.test(html),
    "anyone can raise one, not just the five review owners", "");
+// The thread itself only renders when a question is open, so drive the
+// expanded view directly rather than asserting against the collapsed list.
+const q107 = { ...QUESTIONS.find((x) => x.n === 107), comps: compsFor({ n: 107,
+  topic: 17, comps: ["59", "63", "16"] }), over: {}, status: "answered" };
+const ex = (t) => renderToStaticMarkup(
+  <Expanded t={t} x={q107} S={sty(t)} answers={seedRows(emptyStore())}
+    actor="tester" store={emptyStore()} commit={() => {}} onClose={() => {}}
+    onOpenComponent={() => {}} setStatus={() => {}} addAnswer={() => {}}
+    saveQuestionEdit={() => {}} />);
+const exH = ex(tLight);
+ok(/draft · not agreed/.test(exH),
+   "a drafted answer is labelled on screen, in words and not only in "
+   + "amber — colour alone is not a signal", "");
+ok(/What this does not settle/.test(exH),
+   "and its gap is on screen next to it, not in a footnote", "");
+ok(/rollback_declared/.test(exH) && /<svg/.test(exH),
+   "the figure the draft names is drawn in the thread", "");
+ok(/guardrail_changeset/.test(exH),
+   "and the evidence it cites is on screen, so the claim is checkable", "");
+ok(!/✓ accepted answer/.test(exH),
+   "a draft is NOT rendered as an accepted answer", "");
+ok(/✎ edit/.test(exH) && /✓ accept/.test(exH),
+   "and it is editable and acceptable like any other answer — which is the "
+   + "whole point of drafting it rather than writing it into the document",
+   "");
+ok(!/NaN|undefined/.test(ex(tDark)), "the expanded thread is clean in dark too",
+   (ex(tDark).match(/.{0,40}(NaN|undefined)/) || [])[0]);
 
 // ---- ADDITIVE: the existing Hub gains lines and loses none ----------
-const diff = execFileSync("git",
-  ["-C", ROOT, "diff", "HEAD", "--numstat", "--", "ui/src/HubDesign.jsx"],
-  { encoding: "utf8" }).trim();
+// Anchored to the commit that INTRODUCED the tab, not to HEAD. The first
+// version of this guard diffed against HEAD, which made it vacuous the
+// moment the work was committed: added dropped to 0 and the assertion
+// failed for the wrong reason, and had it been written as `removed === 0`
+// alone it would have passed forever while saying nothing.
+const git = (...a) => execFileSync("git", ["-C", ROOT, ...a], { encoding: "utf8" }).trim();
+let base = "";
+try {
+  const adds = git("log", "--diff-filter=A", "--format=%H", "--",
+                   "ui/src/HubDiscussion.jsx").split("\n").filter(Boolean);
+  if (adds.length) base = `${adds[adds.length - 1]}^`;
+} catch { /* not committed yet — fall through to HEAD */ }
+const diff = git("diff", base || "HEAD", "--numstat", "--", "ui/src/HubDesign.jsx");
 const [added, removed] = diff ? diff.split(/\s+/).map(Number) : [0, 0];
+ok(base !== "",
+   "the guard is anchored to the commit that introduced the Discussion tab, "
+   + "so it keeps meaning something after the work is committed",
+   base || "no such commit — falling back to HEAD");
 ok(removed === 0,
-   "HubDesign.jsx has NO removed lines — the brief was to add a tab, not to "
-   + "change the Hub", `+${added} -${removed}`);
+   "HubDesign.jsx has NO removed lines since before the tab existed — the "
+   + "brief was to add a tab, not to change the Hub", `+${added} -${removed}`);
 ok(added > 0 && added < 25,
    "and only a handful of added ones: an import, a branch and a pill",
    `+${added}`);

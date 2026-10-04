@@ -24,6 +24,8 @@ import { QUESTIONS, TOPICS, OWNERS, compsFor } from "./hubQuestions.js";
 import { TRACKER_COMPONENTS } from "./seiDesignTracker.js";
 import { HUB_EVENT_COMPONENTS } from "./hubEventComponents.js";
 import discussionApi, { emptyStore } from "./hub_discussion_api.js";
+import { seedRows, materialise, SEED_ANSWERS } from "./hubAnswers.js";
+import { FIGS } from "./HubAnswerFigs.jsx";
 
 const ST = {
   open:       { label: "open",        c: "#6b7884", bg: "#f1f4f7" },
@@ -65,6 +67,12 @@ export function acceptAnswer(store, qid, aid, actor) {
     ev: [...store.ev, { qid, to: "resolved", at: now(), actor, note: `accepted answer ${aid}` }] };
 }
 
+// ONE place that materialises a draft, not two. Accept and edit both
+// read store.a[id], so a drafted row has to be written in before either
+// runs — and when that was a separate call at each call site, removing
+// it from one of them broke nothing that the suite could see.
+export const onAnswer = (store, row, fn) => fn(materialise(store, row));
+
 // Editing an accepted answer withdraws the acceptance — the acceptor has
 // to look again at what they are agreeing to.
 export function editAnswer(store, aid, body, actor) {
@@ -102,8 +110,15 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
   }, []);
   const commit = (next) => { setStore(next); discussionApi.save(next); };
 
-  const answers = useMemo(() =>
-    Object.entries(store.a || {}).map(([id, a]) => ({ ...a, id })), [store.a]);
+  // Drafted answers are merged in as rows rather than written into the
+  // store, so a better draft in a later deploy reaches everyone instead
+  // of being shadowed by a copy saved on somebody's first visit. The
+  // moment anyone accepts or edits one it is materialised and becomes
+  // theirs.
+  const answers = useMemo(() => [
+    ...Object.entries(store.a || {}).map(([id, a]) => ({ ...a, id })),
+    ...seedRows(store),
+  ], [store]);
 
   // Seeded review questions plus anything raised in the app. The two are
   // kept apart so a redeploy cannot duplicate the first or drop the second.
@@ -277,7 +292,7 @@ const Badge = ({ S, s }) => (
   <span style={{ ...S.badge, background: ST[s].bg, color: ST[s].c }}>
     {ST[s].label}</span>);
 
-function Expanded({ t, x, S, answers, actor, store, commit, onClose,
+export function Expanded({ t, x, S, answers, actor, store, commit, onClose,
                     onOpenComponent, setStatus, addAnswer, saveQuestionEdit,
                     editing, setEditing, text, setText }) {
   const [reply, setReply] = useState("");
@@ -330,6 +345,7 @@ function Expanded({ t, x, S, answers, actor, store, commit, onClose,
             borderLeftColor: a.accepted ? "#15803d" : t.panel2 || "#dfe6e9" }}>
             <div style={S.aHead}>
               {a.accepted && <span style={S.acc}>✓ accepted answer</span>}
+              {a.draft && <span style={S.draft}>draft · not agreed</span>}
               <b style={{ color: t.text }}>{a.author}</b>
               <span style={S.aMet}>{a.createdAt}
                 {a.updatedAt ? ` · edited ${a.updatedAt}` : ""}
@@ -337,7 +353,8 @@ function Expanded({ t, x, S, answers, actor, store, commit, onClose,
               {!ed && <span onClick={() => { setEditing(a.id); setText(a.body); }}
                 style={S.ghostSm}>✎ edit</span>}
               {!a.accepted && <span
-                onClick={() => commit(acceptAnswer(store, x.n, a.id, actor))}
+                onClick={() => commit(onAnswer(store, a,
+                  (st) => acceptAnswer(st, x.n, a.id, actor)))}
                 style={S.okSm}>✓ accept &amp; resolve</span>}
             </div>
             {ed ? (<>
@@ -347,11 +364,21 @@ function Expanded({ t, x, S, answers, actor, store, commit, onClose,
                 acceptance — the question goes back to answered and the
                 acceptor has to look again.</div>}
               <div style={{ marginTop: 6 }}>
-                <span onClick={() => { commit(editAnswer(store, a.id, text, actor));
+                <span onClick={() => { commit(onAnswer(store, a,
+                  (st) => editAnswer(st, a.id, text, actor)));
                   setEditing(null); }} style={S.primarySm}>Save</span>{" "}
                 <span onClick={() => setEditing(null)} style={S.ghostSm}>Cancel</span>
               </div></>)
-              : <div style={S.aBody}>{a.body}</div>}
+              : <div style={S.aBody}>
+                  {a.body}
+                  {a.fig && FIGS[a.fig] && (
+                    <div style={S.fig}>{React.createElement(FIGS[a.fig])}</div>)}
+                  {a.gap && <div style={S.gap}>
+                    <b style={{ color: "#8c6a1f" }}>What this does not settle · </b>
+                    {a.gap}</div>}
+                  {a.ev && a.ev.length > 0 && <div style={S.ev}>
+                    {a.ev.map((e) => <i key={e} style={S.evChip}>{e}</i>)}</div>}
+                </div>}
             {a.accepted && x.comps.length > 0 && (
               <div style={S.aFoot}>→ this answer is the documentation for{" "}
                 {x.comps.map((c) => <i key={c} style={{ ...S.chip,
@@ -379,7 +406,7 @@ function Expanded({ t, x, S, answers, actor, store, commit, onClose,
 }
 
 // Inline styles, house pattern. No stylesheet, no class names.
-const sty = (t) => ({
+export const sty = (t) => ({
   head: { display: "flex", gap: 10, alignItems: "center", marginBottom: 12,
     flexWrap: "wrap" },
   back: { fontSize: 11.5, fontWeight: 700, cursor: "pointer",
@@ -455,6 +482,20 @@ const sty = (t) => ({
   acc: { fontSize: 9, fontWeight: 800, borderRadius: 3, padding: "2px 7px",
     background: "#e8f6ed", color: "#15803d" },
   aMet: { fontSize: 10.5, color: t.textMuted },
+  // Amber, worded, and never only a colour: a draft that reads as an
+  // agreed answer is the one failure this whole screen exists to avoid.
+  draft: { fontSize: 9, fontWeight: 800, borderRadius: 3, padding: "2px 7px",
+    background: "#fdf2e3", color: "#8c6a1f", border: "1px solid #e8c88f" },
+  fig: { margin: "12px 0 4px", maxWidth: 640, background: "#ffffff",
+    border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderRadius: 8,
+    padding: "10px 12px" },
+  gap: { fontSize: 12, lineHeight: 1.55, marginTop: 10, maxWidth: "78ch",
+    background: "#fdf2e3", border: "1px solid #e8c88f", borderRadius: 6,
+    padding: "9px 12px", color: "#6d5518", whiteSpace: "pre-wrap" },
+  ev: { display: "flex", gap: 5, flexWrap: "wrap", marginTop: 9 },
+  evChip: { fontStyle: "normal", fontSize: 9.5, padding: "2px 8px",
+    borderRadius: 3, background: t.hoverBg || "#f1f4f7", color: t.textMuted,
+    border: `1px solid ${t.panel2 || "#dfe6e9"}` },
   aBody: { fontSize: 13, color: t.text, lineHeight: 1.6, maxWidth: "78ch",
     whiteSpace: "pre-wrap" },
   aFoot: { fontSize: 10.5, color: "#15803d", marginTop: 6, display: "flex",
