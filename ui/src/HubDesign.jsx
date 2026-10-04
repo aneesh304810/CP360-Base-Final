@@ -4,6 +4,7 @@ import { TRACKER_COMPONENTS } from "./seiDesignTracker.js";
 import DocDrill, { DOCS, DEFAULT_DOC, docFor } from "./DocDrill.jsx";
 import SeiDesignPack from "./SeiDesignPack.jsx";
 import { HUB_EVENT_COMPONENTS } from "./hubEventComponents.js";
+import HubDiscussion from "./HubDiscussion.jsx";
 import { AR_FINDINGS, AR_VERDICTS, AR_ASSUMPTIONS, AR_BOTTLENECKS, AR_ERRORS,
  AR_COVERAGE, AR_SEI_COVER, AR_OWNER, AR_PLANE_REC } from "./hubArchitectReview.js";
 import { FM_SUMMARY, FM_AREAS, FM_STATE, FM_PROVIDED, FM_TABLES, FM_REC }
@@ -825,6 +826,17 @@ export default function HubDesign({ t }) {
    </div>);
  }
 
+ /* ---------- Discussion (additive tab) ---------- */
+ if (view === "DISC") {
+  return <HubDiscussion t={t}
+   onBack={() => setView("L1")}
+   onOpenComponent={(id) => {
+    const c = COMPS.find((x) => x.id === id);
+    if (!c) return;
+    setCont(c.container); setExpand(id); setView("L3");
+   }} />;
+ }
+
  /* ---------- L1: context + dashboard ---------- */
  const o = overall(null);
  const rows = COMPS.filter((c) =>
@@ -842,6 +854,10 @@ export default function HubDesign({ t }) {
      fontWeight: 700, padding: "5px 14px", borderRadius: 999, cursor: "pointer",
      background: "#eef3f8", color: t.accent || "#0f4775" }}>
      ☰ all components (flat tracker)</span>
+    <span onClick={() => setView("DISC")} style={{ fontSize: 10.5,
+     fontWeight: 700, padding: "5px 14px", borderRadius: 999, cursor: "pointer",
+     background: "#eef3f8", color: t.accent || "#0f4775" }}>
+     💬 discussion · 108 questions</span>
    </div>
    <div style={{ background: "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
     borderRadius: 10, padding: 16, overflowX: "auto" }}>
