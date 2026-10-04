@@ -51,6 +51,7 @@ const NAV_GROUPS = [
  group: 'Architecture',
  items: [
  ['system', 'System Design', '⛬'],
+ ['devops360', 'DevOps 360', '⚙'],
  ]
 },
 ];

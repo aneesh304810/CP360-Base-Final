@@ -11,6 +11,7 @@ import Datapoint360 from "./Datapoint360.jsx";
 import SearchResults from "./SearchResults.jsx";
 import PiiExplorer from "./PiiExplorer.jsx";
 import Guardrails from "./Guardrails.jsx";
+import DevOps360 from "./DevOps360.jsx";
 import LineageHome from "./LineageHome.jsx";
 import Event360 from "./Event360.jsx";
 import ImpactAnalysis from "./ImpactAnalysis.jsx";
@@ -74,6 +75,7 @@ export default function App() {
  datapoint: <Datapoint360 t={t} selection={route === "datapoint" ? selection : null} onOpen={navTo} />,
  pii: <PiiExplorer t={t} selection={route === "pii" ? selection : null} />,
  guardrails: <Guardrails t={t} selection={route === "guardrails" ? selection : null} />,
+ devops360: <DevOps360 t={t} />,
  variance: <Variance360 t={t} />,
  datasources: <AdminDatasources t={t} />,
  recon: <Recon360 t={t} />,
