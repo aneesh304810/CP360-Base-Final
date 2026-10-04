@@ -302,8 +302,12 @@ Order matters once, on first setup:
 ```bash
 sqlplus ... @sql/70_hub_discussion.sql          # questions, answers, attachments, events
 sqlplus ... @sql/71_hub_discussion_corpus.sql   # topics, owners, the corpus columns
-python -m ingestion.hub_corpus_conn             # load the corpus
+python -m ingestion.run                         # the corpus loads as the hub_corpus step
 ```
+
+The loader is a registered ingestion step, so the normal run picks it up.
+`python -m ingestion.hub_corpus_conn` runs that one step on its own, and
+`--dry-run` reports what it would load without opening a connection.
 
 Both SQL files are guarded and idempotent, and the loader is safe to re-run
 after every deploy — **it refreshes a row only while nobody has touched it.**
@@ -315,9 +319,43 @@ After changing `ui/src/hubQuestions.js` or `ui/src/hubAnswers.js`:
 
 ```bash
 node ui/scripts/export_hub_corpus.mjs           # regenerate data/hub_corpus.json
-python -m ingestion.hub_corpus_conn             # apply it
+python -m ingestion.run                         # or just: -m ingestion.hub_corpus_conn
 ```
 
 The suite fails if the export has drifted from those two modules, so a
 forgotten re-export is caught before it becomes a screen that disagrees with
 the database.
+
+### Environment variables
+
+**`hub_corpus` needs none of its own.** The corpus is committed at
+`data/hub_corpus.json`, so it is code rather than configuration. Set
+`HUB_CORPUS_PATH` only to load a copy from somewhere else; if the file is
+missing the step logs a skip and the other steps carry on.
+
+The one variable every step needs is the connection:
+
+| Variable | Needed by | Notes |
+|---|---|---|
+| `CP_CATALOG_DB_DSN` | **everything** | The catalogue database. Accepts `oracle://user:pwd@host:port/service`, `user/pwd@host:port/service`, `user:pwd@host:port/service`, or `host:port/service` for external auth. |
+
+Every other variable gates one step, and a step whose variable is unset
+logs `skipping (not configured)` and is passed over — so a partial
+configuration runs the steps it can:
+
+| Variable | Step |
+|---|---|
+| `ORACLE_PROD_DSN`, `ORACLE_PROD_SCHEMAS` | `oracle` — harvest real schemas |
+| `DATA360_FEED_DICTIONARY_PATH` | `feed_dictionary` |
+| `INTERFACE360_XLSX_PATH` | `interface360` |
+| `CP_CATALOG_ROOT` | `api360` |
+| `PII_ATTRIBUTES_PATH` | `pii_classification` |
+| `DBT_MANIFEST_PATH` | `dbt`, `glossary` |
+| `AIRFLOW_DSN` | `airflow` |
+
+The remaining steps — `hub_corpus`, `guardrails`, `legacy_lineage`,
+`event360`, `sei_crosswalk`, `search_index` and the rest — read committed
+files or tables already loaded, and need nothing configured.
+
+**Never put a password in a tracked file.** `local/secrets.ps1` is
+gitignored for this; `local/load-all.ps1` is not, and once did carry one.

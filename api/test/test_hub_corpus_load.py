@@ -135,6 +135,56 @@ ok(b.rollbacks == 1 and b.commits == 0,
    "a failure rolls back rather than leaving half a corpus", 
    f"{b.rollbacks} rollbacks, {b.commits} commits")
 
+# ---- it is reachable from the real entry point ----------------------
+#
+# A loader nobody runs is a loader that does not exist. This drives
+# ingestion.run's own dispatcher rather than asserting the step name
+# appears in a list.
+import ingestion.run as RUN                                   # noqa: E402
+
+ok("hub_corpus" in RUN.STEPS, "the step is registered with ingestion.run",
+   RUN.STEPS)
+ok(RUN.STEPS[-1] == "search_index",
+   "and search_index is still last — it indexes everything, so a step added "
+   "after it is a step nothing can find", RUN.STEPS[-1])
+ok(RUN.STEPS.index("hub_corpus") < RUN.STEPS.index("search_index"),
+   "so hub_corpus runs before it", "")
+
+c3 = FakeConn()
+RUN._run_step("hub_corpus", c3, None, None)
+ok(len(c3.sent) == 179 and c3.commits == 1,
+   "python -m ingestion.run actually loads the corpus — 179 MERGEs in one "
+   "transaction, reached through the real dispatcher",
+   f"{len(c3.sent)} statements, {c3.commits} commits")
+ok(all("MERGE INTO" in sql for sql, _ in c3.sent),
+   "and every one of them is a MERGE", "")
+
+os.environ["HUB_CORPUS_PATH"] = "/nonexistent/hub_corpus.json"
+c4 = FakeConn()
+raised = None
+try:
+    RUN._run_step("hub_corpus", c4, None, None)
+except Exception as e:                                        # noqa: BLE001
+    raised = e
+# Reported as a failure rather than allowed to abort this file: a test
+# that dies on the thing it is testing says "crashed", not what broke.
+ok(raised is None and len(c4.sent) == 0 and c4.commits == 0,
+   "a missing corpus file SKIPS rather than raising — run.py guards each "
+   "step, so this would only be a logged traceback, but a clean skip is "
+   "what tells an operator the step is simply not configured",
+   f"raised {raised!r}" if raised else len(c4.sent))
+os.environ.pop("HUB_CORPUS_PATH")
+
+# The step needs no new environment variable. If someone adds a
+# _require_env to it, that is a deployment change and should be a
+# deliberate one.
+body = open(os.path.join(os.path.dirname(__file__), "..", "..",
+                         "ingestion", "run.py"), encoding="utf-8").read()
+blk = body.split('if step == "hub_corpus":', 1)[1].split(chr(10) + "    if step ==", 1)[0]
+ok("_require_env" not in blk,
+   "and it requires no environment variable beyond the DSN every step "
+   "needs — the corpus is committed, not configured", blk[:120])
+
 print()
 print(f"{BAD} assertion(s) failed" if BAD else "hub corpus loader assertions pass")
 sys.exit(1 if BAD else 0)
