@@ -87,6 +87,122 @@ export function editAnswer(store, aid, body, actor) {
   return { ...store, a, ev };
 }
 
+// Attaching a diagram.
+//
+// TWO PATHS, AND THE DIFFERENCE IS WORTH EXPLAINING ON SCREEN. An SVG
+// exported from draw.io, Visio, Lucidchart or Figma stays crisp at any
+// size, is a few kB, and is text the sanitiser can inspect. A screenshot
+// is a raster and stays one -- auto-tracing it to SVG produces a file
+// BIGGER than the PNG, with the text turned into unselectable outlines,
+// and it looks worse. So the control offers both and says which is
+// which, rather than pretending there is a convert button that helps.
+export function Attach({ t, S, target, live, onDone }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [paste, setPaste] = useState(false);
+  const [svg, setSvg] = useState("");
+
+  if (!live) {
+    return <div style={S.attachOff}>
+      Attachments need the API — this browser&rsquo;s local copy has nowhere to
+      put the bytes. Everything else on this screen still works.
+    </div>;
+  }
+
+  const send = async (payload) => {
+    setBusy(true); setErr("");
+    const r = await discussionApi.uploadAttachment({ ...target, ...payload });
+    setBusy(false);
+    if (r.error) { setErr(r.error); return; }
+    setSvg(""); setPaste(false);
+    if (onDone) onDone(r.id);
+  };
+
+  const pick = (file) => {
+    if (!file) return;
+    const kind = discussionApi.attachKindFor(file);
+    if (!kind) { setErr(`${file.name} is not an image`); return; }
+    const fr = new FileReader();
+    fr.onload = () => send(kind === "svg"
+      ? { kind: "svg", filename: file.name, svgText: String(fr.result) }
+      : { kind: "image", filename: file.name, dataBase64: String(fr.result) });
+    fr.onerror = () => setErr("could not read that file");
+    if (kind === "svg") fr.readAsText(file); else fr.readAsDataURL(file);
+  };
+
+  return (
+    <div style={S.attach}>
+      <label style={S.attachBtn}>
+        {busy ? "uploading…" : "📎 attach image or SVG"}
+        <input type="file" accept="image/*,.svg" style={{ display: "none" }}
+          disabled={busy}
+          onChange={(e) => { pick(e.target.files && e.target.files[0]);
+            e.target.value = ""; }} />
+      </label>
+      <span onClick={() => setPaste(!paste)} style={S.ghostSm}>
+        {paste ? "✕ cancel" : "⌨ paste SVG markup"}</span>
+      <div style={S.attachHint}>
+        A diagram exported as <b>SVG</b> stays sharp and themeable. A
+        screenshot stays a raster — tracing one to SVG makes it larger and
+        blurrier, so it is kept as it is.
+      </div>
+      {paste && <div style={{ width: "100%" }}>
+        <textarea style={{ ...S.ta, fontFamily: "monospace", fontSize: 11 }}
+          value={svg} onChange={(e) => setSvg(e.target.value)}
+          placeholder="Paste the contents of an .svg file here — export from draw.io, Visio, Lucidchart or Figma." />
+        <span onClick={() => svg.trim() && send({ kind: "svg",
+          filename: "pasted.svg", svgText: svg })}
+          style={{ ...S.primarySm, opacity: svg.trim() ? 1 : .45 }}>
+          Attach SVG</span>
+      </div>}
+      {err && <div style={S.attachErr}>✕ {err}</div>}
+    </div>
+  );
+}
+
+// Script, event handlers and external references are stripped server
+// side before an SVG is stored, and the server refuses to serve a row
+// that did not go through that. Rendering in an <img> rather than inline
+// is the second layer: an <img> does not execute an SVG's script even if
+// one survived.
+// A missing attachment says so. The browser's broken-image glyph says
+// nothing about whether the row is gone, the API is down or the bytes
+// were refused for not being sanitised — and this screen is a record, so
+// "there was a diagram here" matters.
+function AttImg({ t, S, a }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return <div style={S.attGone}>
+      ⚠ could not load {a.filename || a.kind}
+      <div style={{ fontSize: 9, marginTop: 2 }}>
+        the API may be unreachable, or the file was refused as unsanitised
+      </div>
+    </div>;
+  }
+  return <img src={discussionApi.attachmentUrl(a.id)} style={S.attImg}
+    alt={a.caption || a.filename || "attachment"}
+    onError={() => setFailed(true)} />;
+}
+
+export function Attachments({ t, S, items, onRemove }) {
+  if (!items || !items.length) return null;
+  return (
+    <div style={S.attRow}>
+      {items.map((a) => (
+        <figure key={a.id} style={S.attFig}>
+          <AttImg t={t} S={S} a={a} />
+          <figcaption style={S.attCap}>
+            {a.filename || a.kind}
+            {a.kind === "svg" && a.note && a.note !== "clean"
+              && <span style={S.attNote} title={a.note}> · sanitised</span>}
+            {onRemove && <span onClick={() => onRemove(a.id)}
+              style={S.attDel}>remove</span>}
+          </figcaption>
+        </figure>))}
+    </div>
+  );
+}
+
 export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
   const actor = me || "local.user";
   const [store, setStore] = useState(emptyStore);
@@ -108,7 +224,30 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
     });
     return () => { on = false; };
   }, []);
-  const commit = (next) => { setStore(next); discussionApi.save(next); };
+  // Optimistic locally, authoritative from the server. Every write names
+  // the operation it performed so the server can apply it to ONE row --
+  // a whole-store save loses whatever the other person typed meanwhile.
+  // Without an API the optimistic copy is all there is, and the header
+  // already says so.
+  const commit = (next, op) => {
+    setStore(next);
+    if (!op) { discussionApi.save(next); return; }
+    // A drafted answer has no row until somebody acts on it, so the
+    // first accept or edit has to create it before the operation that
+    // assumes it exists. answer.seed is idempotent: two people opening
+    // the same question cannot make two rows.
+    const { seed, ...rest } = op;
+    const first = seed
+      ? discussionApi.applyOp({ actor, op: "answer.seed", qid: rest.qid,
+          answerId: rest.answerId, body: seed.body })
+      : Promise.resolve(true);
+    first
+      .then(() => discussionApi.applyOp({ actor, ...rest }))
+      .then((fromServer) => {
+        if (fromServer) { setStore(fromServer); setLive(true); }
+        else discussionApi.save(next);
+      });
+  };
 
   // Drafted answers are merged in as rows rather than written into the
   // store, so a better draft in a later deploy reaches everyone instead
@@ -147,23 +286,34 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
   const addAnswer = (qid, body) => {
     const id = `a${Date.now()}`;
     commit({ ...store, a: { ...store.a,
-      [id]: { qid, body, author: actor, createdAt: now() } } });
+      [id]: { qid, body, author: actor, createdAt: now() } } },
+      { op: "answer.add", qid, body });
   };
   const setStatus = (qid, status, note) => commit({ ...store,
     q: { ...store.q, [qid]: { ...(store.q[qid] || {}), status,
       statusBy: actor, statusAt: now() } },
-    ev: [...store.ev, { qid, to: status, at: now(), actor, note: note || "" }] });
-  const saveQuestionEdit = (qid, body) => commit({ ...store,
+    ev: [...store.ev, { qid, to: status, at: now(), actor, note: note || "" }] },
+    { op: "question.status", qid, status, note });
+  const saveQuestionEdit = (qid, body, comps) => commit({ ...store,
     q: { ...store.q, [qid]: { ...(store.q[qid] || {}), body,
-      editedBy: actor, editedAt: now() } } });
+      editedBy: actor, editedAt: now() } } },
+    { op: "question.edit", qid, body, comps });
   const postQuestion = () => {
     const n = Math.max(FIRST_USER_ID - 1,
       ...Object.keys(store.n || {}).map(Number)) + 1;
     commit({ ...store, n: { ...store.n, [n]: { n, topic: Number(draft.topic) || 1,
       owner: draft.owner || "KB", body: draft.body, raisedBy: actor,
-      raisedAt: now(), comps: draft.comps || [] } } });
+      raisedAt: now(), comps: draft.comps || [] } } },
+      { op: "question.add", topic: Number(draft.topic) || 1,
+        owner: draft.owner || "KB", body: draft.body, comps: draft.comps || [] });
     setAsking(false); setDraft({});
   };
+
+  // An attachment is written by the server, not by the reducer, so the
+  // store has to be re-read rather than guessed at.
+  const refresh = () => discussionApi.load().then(({ store: s2, live: l2 }) => {
+    setStore(s2); setLive(l2);
+  });
 
   const S = sty(t);
   return (
@@ -255,6 +405,7 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
               {qs.filter((x) => x.status === "resolved").length} resolved</span></div>
           {qs.map((x) => open === x.n
             ? <Expanded key={x.n} t={t} x={x} S={S} answers={answers}
+                live={live} refresh={refresh}
                 actor={actor} store={store} commit={commit}
                 onClose={() => setOpen(null)} onOpenComponent={onOpenComponent}
                 setStatus={setStatus} addAnswer={addAnswer}
@@ -292,7 +443,7 @@ const Badge = ({ S, s }) => (
   <span style={{ ...S.badge, background: ST[s].bg, color: ST[s].c }}>
     {ST[s].label}</span>);
 
-export function Expanded({ t, x, S, answers, actor, store, commit, onClose,
+export function Expanded({ t, x, S, answers, actor, store, commit, onClose, live, refresh,
                     onOpenComponent, setStatus, addAnswer, saveQuestionEdit,
                     editing, setEditing, text, setText }) {
   const [reply, setReply] = useState("");
@@ -354,7 +505,9 @@ export function Expanded({ t, x, S, answers, actor, store, commit, onClose,
                 style={S.ghostSm}>✎ edit</span>}
               {!a.accepted && <span
                 onClick={() => commit(onAnswer(store, a,
-                  (st) => acceptAnswer(st, x.n, a.id, actor)))}
+                  (st) => acceptAnswer(st, x.n, a.id, actor)),
+                  { op: "answer.accept", qid: x.n, answerId: a.id,
+                    seed: a.draft ? { body: a.body } : null })}
                 style={S.okSm}>✓ accept &amp; resolve</span>}
             </div>
             {ed ? (<>
@@ -363,9 +516,15 @@ export function Expanded({ t, x, S, answers, actor, store, commit, onClose,
               {a.accepted && <div style={S.warn}>Saving this withdraws the
                 acceptance — the question goes back to answered and the
                 acceptor has to look again.</div>}
+              <Attachments t={t} S={S} items={(store.atts || {})[a.id]}
+                onRemove={(id) => discussionApi.deleteAttachment(id).then(refresh)} />
+              <Attach t={t} S={S} live={live} onDone={refresh}
+                target={{ answerId: a.id, qid: x.n }} />
               <div style={{ marginTop: 6 }}>
                 <span onClick={() => { commit(onAnswer(store, a,
-                  (st) => editAnswer(st, a.id, text, actor)));
+                  (st) => editAnswer(st, a.id, text, actor)),
+                  { op: "answer.edit", qid: x.n, answerId: a.id, body: text,
+                    seed: a.draft ? { body: a.body } : null });
                   setEditing(null); }} style={S.primarySm}>Save</span>{" "}
                 <span onClick={() => setEditing(null)} style={S.ghostSm}>Cancel</span>
               </div></>)
@@ -378,6 +537,8 @@ export function Expanded({ t, x, S, answers, actor, store, commit, onClose,
                     {a.gap}</div>}
                   {a.ev && a.ev.length > 0 && <div style={S.ev}>
                     {a.ev.map((e) => <i key={e} style={S.evChip}>{e}</i>)}</div>}
+                  <Attachments t={t} S={S}
+                    items={(store.atts || {})[a.id]} />
                 </div>}
             {a.accepted && x.comps.length > 0 && (
               <div style={S.aFoot}>→ this answer is the documentation for{" "}
@@ -482,6 +643,29 @@ export const sty = (t) => ({
   acc: { fontSize: 9, fontWeight: 800, borderRadius: 3, padding: "2px 7px",
     background: "#e8f6ed", color: "#15803d" },
   aMet: { fontSize: 10.5, color: t.textMuted },
+  attach: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap",
+    marginTop: 9, paddingTop: 9,
+    borderTop: `1px dashed ${t.panel2 || "#dfe6e9"}` },
+  attachBtn: { fontSize: 10.5, fontWeight: 700, padding: "4px 11px",
+    borderRadius: 4, cursor: "pointer", background: t.hoverBg || "#f1f4f7",
+    color: t.text, border: `1px solid ${t.panel2 || "#dfe6e9"}` },
+  attachHint: { fontSize: 10.5, color: t.textMuted, flexBasis: "100%",
+    lineHeight: 1.5, maxWidth: "70ch" },
+  attachOff: { fontSize: 10.5, color: "#8c6a1f", marginTop: 9, padding: "7px 10px",
+    background: "#fdf2e3", border: "1px solid #e8c88f", borderRadius: 5,
+    maxWidth: "70ch", lineHeight: 1.5 },
+  attachErr: { fontSize: 10.5, color: "#c1113a", flexBasis: "100%" },
+  attRow: { display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 },
+  attFig: { margin: 0, maxWidth: 320, border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+    borderRadius: 7, padding: 6, background: "#ffffff" },
+  attImg: { display: "block", maxWidth: "100%", maxHeight: 240, borderRadius: 4 },
+  attCap: { fontSize: 9.5, color: t.textMuted, marginTop: 5, display: "flex",
+    gap: 6, alignItems: "center", flexWrap: "wrap" },
+  attNote: { color: "#8c6a1f" },
+  attGone: { fontSize: 10.5, color: "#8c6a1f", background: "#fdf2e3",
+    border: "1px dashed #e8c88f", borderRadius: 4, padding: "14px 12px",
+    width: 240, lineHeight: 1.4 },
+  attDel: { marginLeft: "auto", cursor: "pointer", color: "#c1113a" },
   // Amber, worded, and never only a colour: a draft that reads as an
   // agreed answer is the one failure this whole screen exists to avoid.
   draft: { fontSize: 9, fontWeight: 800, borderRadius: 3, padding: "2px 7px",

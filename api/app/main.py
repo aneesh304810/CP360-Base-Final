@@ -79,6 +79,7 @@ for _mod in (
         "routers_sei_crosswalk",
         "routers_business_catalog",
         "routers_security",
+        "routers_hub_discussion",
         ):
     try:
         _m = __import__(f"app.{_mod}", fromlist=["router"])

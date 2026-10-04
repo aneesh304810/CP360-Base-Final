@@ -4,19 +4,26 @@
 // nothing here touches api.js. A pull must never be able to replace a
 // good api.js with a stale one plus these.
 //
-// THE STORE IS ONE DOCUMENT, not a row per call. The whole discussion
-// state round-trips as a single JSON blob, exactly as HubDesign already
-// does for component status. That keeps this working with no backend —
-// localStorage — and makes the eventual Oracle table a single CLOB or a
-// handful of rows, whichever the ingester prefers. It is the wrong shape
-// for a forum with ten thousand posts and the right shape for an
-// architecture review with a few hundred.
+// ONE OPERATION PER WRITE, NOT ONE DOCUMENT. The first cut round-tripped
+// the whole discussion as a single JSON blob. That works with no backend
+// and is the wrong shape the moment two people type at once: the second
+// save overwrites the first and nobody can tell. Each write here names
+// what it did -- answer.add, answer.accept -- and the server applies it
+// to one row and returns the state that resulted. The returned store is
+// authoritative; the local one is optimism.
+//
+// LOCALSTORAGE IS THE FALLBACK, AND IT SAYS SO. With no API the screen
+// still works on this browser's own copy, and the header says "local
+// only" out loud, because a shared discussion that is quietly private is
+// worse than one that is openly local. Attachments are the exception:
+// they need the API, and the control says why rather than failing.
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 const KEY = "cp360-hub-discussion";
 const PATH = "/hub/discussion";
+const T = 8000;
 
-export const emptyStore = () => ({ q: {}, a: {}, n: {}, ev: [] });
+export const emptyStore = () => ({ q: {}, a: {}, n: {}, ev: [], atts: {} });
 
 export function loadLocal() {
   try {
@@ -29,13 +36,11 @@ export function saveLocal(store) {
   try { localStorage.setItem(KEY, JSON.stringify(store)); } catch { /* quota */ }
 }
 
-// Returns {store, live}. `live` false means the API is not there and the
-// screen is running on this browser's own copy — which the header says
-// out loud, because a shared discussion that is quietly private is worse
-// than one that is openly local.
+// Returns {store, live}. live false means the rows are not reachable and
+// this is one browser's copy.
 export async function load() {
   try {
-    const r = await fetch(`${API_BASE}${PATH}`, { signal: AbortSignal.timeout(8000) });
+    const r = await fetch(`${API_BASE}${PATH}`, { signal: AbortSignal.timeout(T) });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const j = await r.json();
     return { store: { ...emptyStore(), ...(j.store || {}) }, live: true };
@@ -44,17 +49,59 @@ export async function load() {
   }
 }
 
-// Always writes the local copy first, so a failed POST never loses what
-// somebody just typed.
-export async function save(store) {
-  saveLocal(store);
+// Apply one named operation. Returns the server's store on success, or
+// null — the caller keeps its optimistic copy and stays local.
+export async function applyOp(op) {
   try {
-    const r = await fetch(`${API_BASE}${PATH}`, {
+    const r = await fetch(`${API_BASE}${PATH}/op`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ store }), signal: AbortSignal.timeout(8000),
+      body: JSON.stringify(op), signal: AbortSignal.timeout(T),
     });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const j = await r.json();
+    return { ...emptyStore(), ...(j.store || {}) };
+  } catch { return null; }
+}
+
+// Kept so a local-only session still survives a reload.
+export async function save(store) { saveLocal(store); return false; }
+
+export const attachmentUrl = (id) => `${API_BASE}${PATH}/attachment/${id}`;
+
+// Returns {id} or {error}. The error is shown rather than swallowed: an
+// attachment that silently did not attach is the worst outcome.
+export async function uploadAttachment(payload) {
+  try {
+    const r = await fetch(`${API_BASE}${PATH}/attachment`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload), signal: AbortSignal.timeout(30000),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { error: j.detail || `upload failed (${r.status})` };
+    return { id: j.id };
+  } catch (e) { return { error: String(e.message || e) }; }
+}
+
+export async function deleteAttachment(id) {
+  try {
+    const r = await fetch(`${API_BASE}${PATH}/attachment/${id}`,
+      { method: "DELETE", signal: AbortSignal.timeout(T) });
     return r.ok;
   } catch { return false; }
 }
 
-export default { load, save, loadLocal, saveLocal, emptyStore };
+// Which path a dropped file takes. An SVG is text and goes through the
+// sanitiser; everything else is bytes the server sniffs. This is also
+// the honest answer to "convert my image to SVG": a diagram exported as
+// SVG stays crisp and themeable, and auto-tracing a screenshot produces
+// a file that is bigger than the PNG and looks worse.
+export function attachKindFor(file) {
+  const name = (file && file.name) || "";
+  const type = (file && file.type) || "";
+  if (type === "image/svg+xml" || /\.svg$/i.test(name)) return "svg";
+  if (/^image\//.test(type)) return "image";
+  return null;
+}
+
+export default { load, save, loadLocal, saveLocal, emptyStore, applyOp,
+  uploadAttachment, deleteAttachment, attachmentUrl, attachKindFor };

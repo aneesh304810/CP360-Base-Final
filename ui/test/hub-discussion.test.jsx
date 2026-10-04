@@ -22,10 +22,10 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { renderToStaticMarkup } from "react-dom/server";
 import HubDiscussion, { statusOf, acceptAnswer, editAnswer, compLabel,
-  Expanded, sty, onAnswer } from "../src/HubDiscussion.jsx";
+  Expanded, sty, onAnswer, Attach, Attachments } from "../src/HubDiscussion.jsx";
 import { QUESTIONS, TOPICS, OWNERS, OWNER_TOTALS, compsFor }
   from "../src/hubQuestions.js";
-import { emptyStore } from "../src/hub_discussion_api.js";
+import { emptyStore, attachKindFor } from "../src/hub_discussion_api.js";
 import { SEED_ANSWERS, seedRows, materialise, seedId }
   from "../src/hubAnswers.js";
 import { FIGS } from "../src/HubAnswerFigs.jsx";
@@ -322,6 +322,80 @@ ok(/✎ edit/.test(exH) && /✓ accept/.test(exH),
    "");
 ok(!/NaN|undefined/.test(ex(tDark)), "the expanded thread is clean in dark too",
    (ex(tDark).match(/.{0,40}(NaN|undefined)/) || [])[0]);
+
+// ---- persistence: every write names an operation --------------------
+//
+// The UI and the router are different languages, so nothing but a test
+// connects them. An op the server does not implement fails with a 400
+// the browser swallows, and the only symptom is that a change quietly
+// does not persist.
+const UI = strip("ui/src/HubDiscussion.jsx");
+const uiOps = [...UI.matchAll(/op:\s*"([a-z]+\.[a-z]+)"/g)].map((m) => m[1]);
+const PY = fs.readFileSync(path.join(ROOT, "api", "app",
+  "routers_hub_discussion.py"), "utf8");
+const srvOps = [...PY.matchAll(/o\.op\s*==\s*"([a-z]+\.[a-z]+)"/g)].map((m) => m[1]);
+ok(uiOps.length >= 5, "the screen sends named operations, not whole-store saves",
+   uiOps.join(","));
+ok(srvOps.length >= 5, "and the router implements a set of them", srvOps.join(","));
+ok(uiOps.every((o) => srvOps.includes(o)),
+   "every operation the screen sends is one the router implements — a typo "
+   + "here is a 400 the browser swallows and a change that silently does not "
+   + "persist", uiOps.filter((o) => !srvOps.includes(o)).join(","));
+ok(/answer\.seed/.test(UI) && srvOps.includes("answer.seed"),
+   "including the one that materialises a drafted answer before accepting "
+   + "or editing it", "");
+ok(!/discussionApi\.save\(next\);\s*return;[\s\S]{0,40}applyOp/.test(UI)
+   && /applyOp/.test(UI),
+   "the screen reaches for applyOp, not a whole-document PUT", "");
+
+// ---- attachments ----------------------------------------------------
+ok(attachKindFor({ name: "a.svg", type: "" }) === "svg"
+   && attachKindFor({ name: "a", type: "image/svg+xml" }) === "svg",
+   "an SVG is routed to the sanitiser by extension OR by type — a file "
+   + "named .txt holding SVG must not reach the image path",
+   attachKindFor({ name: "a.svg", type: "" }));
+ok(attachKindFor({ name: "a.png", type: "image/png" }) === "image",
+   "a raster is routed to the byte path", "");
+ok(attachKindFor({ name: "a.pdf", type: "application/pdf" }) === null
+   && attachKindFor({}) === null,
+   "and anything else is refused before it is read",
+   attachKindFor({ name: "a.pdf", type: "application/pdf" }));
+
+const offH = renderToStaticMarkup(
+  <Attach t={tLight} S={sty(tLight)} live={false} target={{ qid: 1 }} />);
+ok(/Attachments need the API/.test(offH) && !/<input/.test(offH),
+   "with no API the control says why instead of offering a button that "
+   + "cannot work", offH.slice(0, 160));
+const onH = renderToStaticMarkup(
+  <Attach t={tLight} S={sty(tLight)} live target={{ qid: 1 }} />);
+ok(/<input[^>]*type="file"/.test(onH) && /accept="image\/\*,\.svg"/.test(onH),
+   "with an API it offers a file picker for images and SVG", "");
+ok(/paste SVG markup/.test(onH),
+   "and a paste box, which is the real answer to “convert my image to SVG”: "
+   + "export the SVG from the tool that drew it", "");
+ok(/stays sharp/.test(onH) && /tracing one to SVG/.test(onH),
+   "the control explains why a screenshot is NOT traced, rather than leaving "
+   + "a convert button that makes things worse", "");
+
+const att = [{ id: "t1", kind: "svg", filename: "flow.svg", note: "removed <script>" },
+             { id: "t2", kind: "image", filename: "shot.png" }];
+const attH = renderToStaticMarkup(
+  <Attachments t={tLight} S={sty(tLight)} items={att} />);
+ok(/<img /.test(attH) && /flow\.svg/.test(attH) && /shot\.png/.test(attH),
+   "attachments render", attH.slice(0, 120));
+ok(!/dangerouslySetInnerHTML/.test(UI),
+   "and NOTHING in this screen injects raw html — an uploaded SVG is drawn "
+   + "through <img>, which does not execute script even if the sanitiser "
+   + "missed some", "");
+ok(/sanitised/.test(attH),
+   "an SVG that was altered says so, so a diagram that renders oddly is "
+   + "explainable", attH);
+ok(/onError|could not load/.test(UI),
+   "an attachment that fails to load says so — the browser's broken-image "
+   + "glyph cannot distinguish a deleted row from an API that is down, and "
+   + "this screen is a record", "");
+ok(renderToStaticMarkup(<Attachments t={tLight} S={sty(tLight)} items={[]} />) === "",
+   "and no attachments renders nothing at all", "");
 
 // ---- the sourcing document stays in step with the drafts ------------
 //
