@@ -18,45 +18,71 @@ origin: SEI-BBH component tracker
 sei_coverage: covered
 gap_owner: BBH
 in_scope: true
-withdrawn: true
+generated: true
+sei_status: differs
+generated: true
+sei_status: differs
+generated: true
+sei_status: differs
 ---
 
 # Airflow DAG + Per-Domain Fan-out
 
-## Withdrawn
+## What this component is
 
-**This design document has been withdrawn. Do not build from it.**
+SEI has two DAGs, not one, and no per-domain fan-out: parallelism comes from one mapped task per FILE, created at run time.
 
-It was written before SEI's two design documents were the base for this
-architecture. Reading back through it, the content is wrong often
-enough that correcting it line by line is not worth doing, so it is
-being rewritten from the drawing rather than patched.
+It sits in **Orchestration**, in the **Ingestion DAG** lane (Airflow 3.0).
 
-What was wrong was not one fact. The layer model was the old one, it
-described a Pre-Gold Exadata tier that is in neither SEI document, it
-treated components as settled that SEI has not specified at all, and it
-read as though every statement in it had a source. None of that is
-repairable by editing.
+## What SEI specifies
 
-## Where the current answer is
+**SEI covers the need and answers it differently.** SEI has two DAGs, not one, and no per-domain fan-out: parallelism comes from one mapped task per FILE, created at run time.
 
-- **The architecture is the drawing.** The Hub's C4 goes containers,
-  then the lane a component sits in, then the component itself.
-- **For a component SEI specifies**, its record carries what SEI says,
-  the section and the page it says it on, the Oracle objects it
-  touches, and what is still open with SEI against it.
-- **For everything else**, the component registry carries a verdict —
-  specified, differs, or absent — and the reason for it.
+### S5 — Ingestion DAG (one, metadata-driven)
 
-## What replaces this page
+ONE DAG for every inbound interface, not one per interface. It is driven by configuration rows, so a new interface is onboarded by adding a row rather than by writing a DAG.
 
-Nothing yet, and that is deliberate. The drawing comes first; these
-documents are rewritten from it afterwards, against SEI's text, with a
-citation on every claim. Until then the record in the Hub is the
-design, and this page exists only so that a link does not lead
-nowhere.
+- **Technology.** Airflow 3.0
+- **Source.** ingest §5 (p.9)
 
-## Recovering the old text
+### S13 — Transformation DAG
 
-It is in git. `git log --follow` on this file reaches the last version
-before withdrawal if any of it is wanted as a starting point.
+Re-checks completeness and TRIGGER status before doing any work — trust but verify — then builds the layers in order, each as a build task followed by its own test task.
+
+- **Technology.** Airflow + dbt
+- **Source.** dbt §5.2 (p.11) · Appendix A.1 (p.25)
+
+## The Oracle objects it touches
+
+No foreign key is declared in either document. Every join below
+is one a model runs, not a constraint the database enforces.
+
+| Object | What it holds | Source |
+|---|---|---|
+| `FILE_SCHEMA_CONFIG` | How an active interface is discovered, dated, validated and routed. File-level only — there is deliberately no column mapping table, because the RAW table DDL is the schema contract. | ingest Appendix A (p.18) · §6.1 (p.12) |
+| `FILE_REGISTRY` | The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts. | ingest Appendix B (p.19) · §6.2 (p.12) |
+| `DATE_CONTROL` | The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression. | ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25) |
+
+## What happens when it goes wrong
+
+| # | Scenario | What the design does | Source |
+|---|---|---|---|
+| X21 | A transformation task fails | The date stays TRIGGER, no next date is created and the pipeline is locked. Airflow alerts and the run restarts from the failed task; each layer's write is idempotent for the date. | dbt §8.1 (p.20) |
+| X39 | A successful file has to be replaced | Approval first, then the reason, approver, operator and affected downstream scope are recorded. The registry row and the RAW rows are deleted through the controlled process, the corrected file is dropped in Landing, and a fresh lifecycle starts. The downstream rebuild for that date is coordinated separately. | ingest Appendix D.4 (p.23) |
+
+## Still open with SEI
+
+SEI's own ids, so they can be quoted straight back.
+
+- **D5.** Confirm retention units, Oracle partitioning support, volumetrics and run-window targets.
+- **O2.** Confirm batch SLA, peak timing, representative file sizes and the Oracle connection envelope.
+
+## Sources
+
+- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services
+- **BBH dbt Transformation Design Document v2** — SEI Professional Services
+- **SEI-BBH Integration Architecture v5** — SEI
+
+Generated from the cited model, not written by hand. Correct the
+model and every document that used it is corrected with it:
+`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`

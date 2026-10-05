@@ -106,8 +106,14 @@ def adapt_component_doc(front, path):
         "match": "", "zone_default": "", "default": False,
         "component_ids": [cid],
         "withdrawn": front.get('withdrawn', False) is True,
-        "chip": f"#{cid} withdrawn" if front.get('withdrawn') is True
-                else f"#{cid} design",
+        "generated": front.get('generated', False) is True,
+        "sei_status": front.get('sei_status', ''),
+        "chip": (f"#{cid} withdrawn" if front.get('withdrawn') is True
+                 else f"#{cid} \u2014 not in SEI"
+                 if front.get('sei_status') == 'absent'
+                 else f"#{cid} proposal"
+                 if front.get('sei_status') == 'proposal'
+                 else f"#{cid} design"),
         "meta": {
             "status": front.get('status',''), "owner": front.get('owner',''),
             "priority": front.get('priority',''), "custom": front.get('custom_build',''),
@@ -133,6 +139,8 @@ for path in sorted(glob.glob('designs-md/*.md')):
             "default": front.get("default", False) is True,
             "component_ids": [x.strip() for x in str(front.get("component_ids", "")).split(",") if x.strip()],
             "withdrawn": front.get("withdrawn", False) is True,
+            "generated": front.get("generated", False) is True,
+            "sei_status": front.get("sei_status", ""),
             "chip": "", "meta": {},
             "src": os.path.basename(path),
         }

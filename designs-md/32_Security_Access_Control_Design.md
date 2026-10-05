@@ -18,45 +18,61 @@ origin: SEI-BBH component tracker
 sei_coverage: partial
 gap_owner: SEI
 in_scope: true
-withdrawn: true
+generated: true
+sei_status: specified
+generated: true
+sei_status: specified
+generated: true
+sei_status: specified
 ---
 
 # Security & Access Control
 
-## Withdrawn
+## What this component is
 
-**This design document has been withdrawn. Do not build from it.**
+Credentials in OpenShift secrets, and the loader account holds only the DML it needs — no ALTER, DROP or CREATE.
 
-It was written before SEI's two design documents were the base for this
-architecture. Reading back through it, the content is wrong often
-enough that correcting it line by line is not worth doing, so it is
-being rewritten from the drawing rather than patched.
+It sits in **Foundation**, in the **Security and access** lane (OpenShift · Oracle).
 
-What was wrong was not one fact. The layer model was the old one, it
-described a Pre-Gold Exadata tier that is in neither SEI document, it
-treated components as settled that SEI has not specified at all, and it
-read as though every statement in it had a source. None of that is
-repairable by editing.
+## What SEI specifies
 
-## Where the current answer is
+### S21 — Splunk
 
-- **The architecture is the drawing.** The Hub's C4 goes containers,
-  then the lane a component sits in, then the component itself.
-- **For a component SEI specifies**, its record carries what SEI says,
-  the section and the page it says it on, the Oracle objects it
-  touches, and what is still open with SEI against it.
-- **For everything else**, the component registry carries a verdict —
-  specified, differs, or absent — and the reason for it.
+Owns all dashboards, counts, trending and alerting, for both documents. Oracle keeps the durable logs; Splunk reports from the events published to it and does the alert correlation.
 
-## What replaces this page
+- **Technology.** SEI/BBH
+- **Source.** ingest §8.1 (p.15) · dbt §4.2 (p.10)
 
-Nothing yet, and that is deliberate. The drawing comes first; these
-documents are rewritten from it afterwards, against SEI's text, with a
-citation on every claim. Until then the record in the Hub is the
-design, and this page exists only so that a link does not lead
-nowhere.
+## The Oracle objects it touches
 
-## Recovering the old text
+No foreign key is declared in either document. Every join below
+is one a model runs, not a constraint the database enforces.
 
-It is in git. `git log --follow` on this file reaches the last version
-before withdrawal if any of it is wanted as a starting point.
+| Object | What it holds | Source |
+|---|---|---|
+| `DQ_VALIDATION_FAILURE` | One store for both failure categories, carrying whether the row can replay itself and whether it is still open. | dbt §7.1 (p.17) |
+| `RECON_RESULT` | One immutable row per boundary per business date, replaced rather than updated. No status column — the verdict is derived in Splunk. | dbt §7.2.1 (p.18) |
+
+## What happens when it goes wrong
+
+| # | Scenario | What the design does | Source |
+|---|---|---|---|
+| X38 | Publishing to Splunk fails | The data is already durable in Oracle. The publish task is separate and retryable, and it is idempotent per date. | dbt §8.3 (p.21) |
+
+## Still open with SEI
+
+SEI's own ids, so they can be quoted straight back.
+
+- **D6.** Approve the Splunk event schema, masking and PII rules, dashboards and alert thresholds.
+- **O4.** Confirm Splunk integration, indexing, event format, alert ownership and routing.
+- **O7.** Confirm the Splunk correlation key, severity, alert routing and recovery handling.
+
+## Sources
+
+- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services
+- **BBH dbt Transformation Design Document v2** — SEI Professional Services
+- **SEI-BBH Integration Architecture v5** — SEI
+
+Generated from the cited model, not written by hand. Correct the
+model and every document that used it is corrected with it:
+`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`

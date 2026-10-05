@@ -14,45 +14,38 @@ origin: SEI-BBH component tracker
 sei_coverage: unassessed
 gap_owner: unassessed
 in_scope: true
-withdrawn: true
+generated: true
+sei_status: absent
+generated: true
+sei_status: absent
+generated: true
+sei_status: absent
 ---
 
 # BI / Analytics
 
-## Withdrawn
+## What this component is
 
-**This design document has been withdrawn. Do not build from it.**
+Reporting off the warehouse. Outside both documents, which end at the Gold tables.
 
-It was written before SEI's two design documents were the base for this
-architecture. Reading back through it, the content is wrong often
-enough that correcting it line by line is not worth doing, so it is
-being rewritten from the drawing rather than patched.
+It sits in **Processing**, in the **Warehouse and consumers** lane (BBH).
 
-What was wrong was not one fact. The layer model was the old one, it
-described a Pre-Gold Exadata tier that is in neither SEI document, it
-treated components as settled that SEI has not specified at all, and it
-read as though every statement in it had a source. None of that is
-repairable by editing.
+## What SEI specifies
 
-## Where the current answer is
+**Nothing.** Neither SEI design document covers this component.
 
-- **The architecture is the drawing.** The Hub's C4 goes containers,
-  then the lane a component sits in, then the component itself.
-- **For a component SEI specifies**, its record carries what SEI says,
-  the section and the page it says it on, the Oracle objects it
-  touches, and what is still open with SEI against it.
-- **For everything else**, the component registry carries a verdict —
-  specified, differs, or absent — and the reason for it.
+Reporting off the warehouse. Outside both documents, which end at the Gold tables.
 
-## What replaces this page
+That is not a judgement on whether it is needed. It means no
+design exists to build from, and writing one is BBH's to do and
+SEI's to confirm.
 
-Nothing yet, and that is deliberate. The drawing comes first; these
-documents are rewritten from it afterwards, against SEI's text, with a
-citation on every claim. Until then the record in the Hub is the
-design, and this page exists only so that a link does not lead
-nowhere.
+## Sources
 
-## Recovering the old text
+- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services
+- **BBH dbt Transformation Design Document v2** — SEI Professional Services
+- **SEI-BBH Integration Architecture v5** — SEI
 
-It is in git. `git log --follow` on this file reaches the last version
-before withdrawal if any of it is wanted as a starting point.
+Generated from the cited model, not written by hand. Correct the
+model and every document that used it is corrected with it:
+`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`

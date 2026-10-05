@@ -18,45 +18,94 @@ origin: SEI-BBH component tracker
 sei_coverage: covered
 gap_owner: BBH
 in_scope: true
-withdrawn: true
+generated: true
+sei_status: specified
+generated: true
+sei_status: specified
+generated: true
+sei_status: specified
 ---
 
 # Dim-before-Fact / dbt Threads
 
-## Withdrawn
+## What this component is
 
-**This design document has been withdrawn. Do not build from it.**
+Re-checks completeness and TRIGGER status before doing any work — trust but verify — then builds the layers in order, each as a build task followed by its own test task.
 
-It was written before SEI's two design documents were the base for this
-architecture. Reading back through it, the content is wrong often
-enough that correcting it line by line is not worth doing, so it is
-being rewritten from the drawing rather than patched.
+It sits in **Orchestration**, in the **Transformation DAG** lane (Airflow 3.0 · dbt).
 
-What was wrong was not one fact. The layer model was the old one, it
-described a Pre-Gold Exadata tier that is in neither SEI document, it
-treated components as settled that SEI has not specified at all, and it
-read as though every statement in it had a source. None of that is
-repairable by editing.
+## What SEI specifies
 
-## Where the current answer is
+### S13 — Transformation DAG
 
-- **The architecture is the drawing.** The Hub's C4 goes containers,
-  then the lane a component sits in, then the component itself.
-- **For a component SEI specifies**, its record carries what SEI says,
-  the section and the page it says it on, the Oracle objects it
-  touches, and what is still open with SEI against it.
-- **For everything else**, the component registry carries a verdict —
-  specified, differs, or absent — and the reason for it.
+Re-checks completeness and TRIGGER status before doing any work — trust but verify — then builds the layers in order, each as a build task followed by its own test task.
 
-## What replaces this page
+- **Technology.** Airflow + dbt
+- **Source.** dbt §5.2 (p.11) · Appendix A.1 (p.25)
 
-Nothing yet, and that is deliberate. The drawing comes first; these
-documents are rewritten from it afterwards, against SEI's text, with a
-citation on every claim. Until then the record in the Hub is the
-design, and this page exists only so that a link does not lead
-nowhere.
+### S16 — DIM — built first
 
-## Recovering the old text
+History by direct-compare MERGE into tables that already exist. The surrogate key comes from the Oracle sequence already in use. No DDL is issued against Gold.
 
-It is in git. `git log --follow` on this file reaches the last version
-before withdrawal if any of it is wanted as a starting point.
+- **Technology.** dbt MERGE
+- **Source.** dbt §4.1 (p.10) · §6.4 (p.15)
+
+### S17 — FACT — built second
+
+Loads only transactions whose dimension has resolved. A transaction whose account has not arrived is never written with a placeholder key — it is held and replayed once the dimension exists.
+
+- **Technology.** dbt MERGE
+- **Source.** dbt §4.1 (p.10) · §7.1 (p.17)
+
+## The Oracle objects it touches
+
+No foreign key is declared in either document. Every join below
+is one a model runs, not a constraint the database enforces.
+
+| Object | What it holds | Source |
+|---|---|---|
+| `DATE_CONTROL` | The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression. | ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25) |
+| `INT tables` | Silver persistence. Passing rows only, seven days, partitioned by business date. | dbt §4.1 (p.10) · Appendix A.3 (p.26) |
+| `Gold DIM / FACT` | Already exist and already carry history from the current system. This programme changes only how they are populated. | dbt §6.4 (p.15) · §10.1 (p.23) |
+| `DQ_VALIDATION_FAILURE` | One store for both failure categories, carrying whether the row can replay itself and whether it is still open. | dbt §7.1 (p.17) |
+
+## What happens when it goes wrong
+
+| # | Scenario | What the design does | Source |
+|---|---|---|---|
+| X21 | A transformation task fails | The date stays TRIGGER, no next date is created and the pipeline is locked. Airflow alerts and the run restarts from the failed task; each layer's write is idempotent for the date. | dbt §8.1 (p.20) |
+| X39 | A successful file has to be replaced | Approval first, then the reason, approver, operator and affected downstream scope are recorded. The registry row and the RAW rows are deleted through the controlled process, the corrected file is dropped in Landing, and a fresh lifecycle starts. The downstream rebuild for that date is coordinated separately. | ingest Appendix D.4 (p.23) |
+| X32 | A correction arrives and the row is still current | A normal MERGE, joined on the surrogate key rather than the natural key — a natural-key join matches both the closing and the opening row and fails. | dbt §6.4.1 (p.15) |
+| X33 | A correction arrives and the interval is already closed | A direct UPDATE of that closed row only. Never a MERGE — it would reopen an interval that is settled. | dbt §6.4.1 (p.15) |
+| X34 | Someone changes the shape of a Gold table | Refused. Every Gold model fails on a schema change, and the service account holds DML only — no create, alter or drop. | dbt §8.4 (p.21) |
+| X22 | FACT fails after DIM succeeded | The restart resumes at the fact build. The dimension is not rebuilt. | dbt §8.1 (p.20) |
+| X30 | A transaction's dimension has not arrived | Never written to Gold with a placeholder key. Held in the DQ store as replayable and OPEN, re-derived from INT on a later day once the dimension exists, then marked RESOLVED. | dbt §7.1 (p.17) · Figure 5a (p.18) |
+
+## Where SEI's documents disagree about this
+
+Each one is a decision to take before a model is written.
+
+### C3 — Two Gold facts, or three
+
+- **The architecture says.** FACT_TRANSACTIONS, FACT_CP_HOLDINGS and FACT_TAX_LOT, each with its own strategy — merge, merge and periodic snapshot.
+- **The design documents say.** FACT_TRANSACTIONS only.
+- **Why it matters.** Holdings and tax lot are the two the design document is silent on, and a periodic snapshot is a different pattern from a merge — it is not covered by the SCD2 and merge logic that is specified.
+
+## Still open with SEI
+
+SEI's own ids, so they can be quoted straight back.
+
+- **D1.** Confirm the existing sequence name and ownership behind the Gold surrogate key.
+- **D2.** Confirm all missing dimensions resolve inside the seven-day window, and approve the single-table DQ design, the replay policy and the retention-boundary alert.
+- **D3.** Confirm the current history coverage of the existing dimensions.
+- **D5.** Confirm retention units, Oracle partitioning support, volumetrics and run-window targets.
+
+## Sources
+
+- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services
+- **BBH dbt Transformation Design Document v2** — SEI Professional Services
+- **SEI-BBH Integration Architecture v5** — SEI
+
+Generated from the cited model, not written by hand. Correct the
+model and every document that used it is corrected with it:
+`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`

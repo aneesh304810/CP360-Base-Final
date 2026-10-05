@@ -18,45 +18,48 @@ origin: SEI-BBH component tracker
 sei_coverage: covered
 gap_owner: BBH
 in_scope: true
-withdrawn: true
+generated: true
+sei_status: absent
+generated: true
+sei_status: absent
+generated: true
+sei_status: absent
 ---
 
 # G2 RAW Profiling Gate
 
-## Withdrawn
+## What this component is
 
-**This design document has been withdrawn. Do not build from it.**
+Nothing profiles RAW. The first thing that reads a row's content in SEI's design is the STG view, already past the load.
 
-It was written before SEI's two design documents were the base for this
-architecture. Reading back through it, the content is wrong often
-enough that correcting it line by line is not worth doing, so it is
-being rewritten from the drawing rather than patched.
+It sits in **Ingestion**, in the **RAW profiling** lane (SQL).
 
-What was wrong was not one fact. The layer model was the old one, it
-described a Pre-Gold Exadata tier that is in neither SEI document, it
-treated components as settled that SEI has not specified at all, and it
-read as though every statement in it had a source. None of that is
-repairable by editing.
+## What SEI specifies
 
-## Where the current answer is
+**Nothing.** Neither SEI design document covers this component.
 
-- **The architecture is the drawing.** The Hub's C4 goes containers,
-  then the lane a component sits in, then the component itself.
-- **For a component SEI specifies**, its record carries what SEI says,
-  the section and the page it says it on, the Oracle objects it
-  touches, and what is still open with SEI against it.
-- **For everything else**, the component registry carries a verdict —
-  specified, differs, or absent — and the reason for it.
+Nothing profiles RAW. The first thing that reads a row's content in SEI's design is the STG view, already past the load.
 
-## What replaces this page
+That is not a judgement on whether it is needed. It means no
+design exists to build from, and writing one is BBH's to do and
+SEI's to confirm.
 
-Nothing yet, and that is deliberate. The drawing comes first; these
-documents are rewritten from it afterwards, against SEI's text, with a
-citation on every claim. Until then the record in the Hub is the
-design, and this page exists only so that a link does not lead
-nowhere.
+## Where SEI's documents disagree about this
 
-## Recovering the old text
+Each one is a decision to take before a model is written.
 
-It is in git. `git log --follow` on this file reaches the last version
-before withdrawal if any of it is wanted as a starting point.
+### C1 — Three RAW tables, or seven
+
+- **The architecture says.** RAW_ACCOUNT, RAW_CLIENT, RAW_TAXLOT, RAW_TRANSACTION, RAW_POSITION, RAW_CORRECTED_TRANSACTION, RAW_CORRECTED_POSITION.
+- **The design documents say.** The dbt design document names three: account, client and transaction. Position, tax lot and the two correction tables do not appear in it at all.
+- **Why it matters.** Four of the seven feeds have no transformation designed for them. If the architecture is right, the design document covers under half the inbound surface.
+
+## Sources
+
+- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services
+- **BBH dbt Transformation Design Document v2** — SEI Professional Services
+- **SEI-BBH Integration Architecture v5** — SEI
+
+Generated from the cited model, not written by hand. Correct the
+model and every document that used it is corrected with it:
+`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`

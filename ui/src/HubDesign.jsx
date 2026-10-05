@@ -21,8 +21,8 @@ import { REGISTRY, REG_STATE, REG_ORIGIN, REG_REVIEW_NOTE, BBH_LAYERS,
 import { GROUPS, PROC_STAGES, groupOfTracker, stageOfTracker, groupById,
  stageById, LANES, lanesOf, laneOfTracker, laneById } from "./hubGroups.js";
 import { SEI_ARCH_DOC, ARCH_FEEDS, ARCH_LAYERS, ARCH_ORCHESTRATION,
- ARCH_PRINCIPLES, ARCH_CONFLICTS, OUTBOUND_FLOW, INBOUND_POSTURE }
- from "./seiArchitecture.js";
+ ARCH_PRINCIPLES, ARCH_CONFLICTS, OUTBOUND_FLOW, INBOUND_POSTURE,
+ conflictsAt } from "./seiArchitecture.js";
 
 // =====================================================================
 // HubDesign — the CP Integration Hub route: C4 landing (L1 context +
@@ -749,6 +749,13 @@ export default function HubDesign({ t }) {
       fill: l.proposal ? "#cc3344" : "#0f4775" })}
     {T(x + 9, y + 27, l.tech, { fs: 7.5,
       fill: l.proposal ? "#b4707a" : "#5c7c94" })}
+    {conflictsAt(l.id).length > 0 && (
+     <g onClick={(e) => { e.stopPropagation(); setView("ARCH"); }}>
+      <rect x={x + w - 32} y={y + 5} width={26} height={13} rx="6.5"
+       fill="#cc3344" />
+      {T(x + w - 19, y + 14.5, `⚠${conflictsAt(l.id).length}`,
+        { fs: 7.5, fw: 800, anchor: "middle", fill: "#fff" })}
+     </g>)}
    </g>);
   const LaneRow = ({ id, x, y, w }) => {
    const ls = lanesOf(id);
@@ -796,6 +803,13 @@ export default function HubDesign({ t }) {
       fill: st.bbh.length ? "#b9875a" : "#bcd6f0" })}
     {T(x + 10, y + 50, [...st.sei, ...st.tbl, ...st.bbh].join(" · "),
       { fs: 7.5, fw: 800, fill: st.bbh.length ? "#c79a62" : "#9ec6ee" })}
+    {conflictsAt(st.id).length > 0 && (
+     <g onClick={(e) => { e.stopPropagation(); setView("ARCH"); }}>
+      <rect x={x + w - 34} y={y + 6} width={28} height={14} rx="7"
+       fill="#cc3344" />
+      {T(x + w - 20, y + 16, `⚠${conflictsAt(st.id).length}`,
+        { fs: 8, fw: 800, anchor: "middle", fill: "#fff" })}
+     </g>)}
    </g>);
   const Arrow = (x1, y1, x2, y2) => (
    <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#5c7c94" strokeWidth="1.6"

@@ -18,45 +18,66 @@ origin: SEI-BBH component tracker
 sei_coverage: covered
 gap_owner: BBH
 in_scope: true
-withdrawn: true
+generated: true
+sei_status: specified
+generated: true
+sei_status: specified
+generated: true
+sei_status: specified
 ---
 
 # G1 File / Structural Gate
 
-## Withdrawn
+## What this component is
 
-**This design document has been withdrawn. Do not build from it.**
+The ingestion document specifies exactly this: readable, header, trailer, zero-row and the date, all before any RAW write, and a failure goes to QUARANTINED.
 
-It was written before SEI's two design documents were the base for this
-architecture. Reading back through it, the content is wrong often
-enough that correcting it line by line is not worth doing, so it is
-being rewritten from the drawing rather than patched.
+It sits in **Ingestion**, in the **File-based ingestion** lane (SECONDARY · Airflow · Python).
 
-What was wrong was not one fact. The layer model was the old one, it
-described a Pre-Gold Exadata tier that is in neither SEI document, it
-treated components as settled that SEI has not specified at all, and it
-read as though every statement in it had a source. None of that is
-repairable by editing.
+## What SEI specifies
 
-## Where the current answer is
+### S8 — Python loader
 
-- **The architecture is the drawing.** The Hub's C4 goes containers,
-  then the lane a component sits in, then the component itself.
-- **For a component SEI specifies**, its record carries what SEI says,
-  the section and the page it says it on, the Oracle objects it
-  touches, and what is still open with SEI against it.
-- **For everything else**, the component registry carries a verdict —
-  specified, differs, or absent — and the reason for it.
+Per file: claim the (interface, business date) pair in the registry, validate readability, header, trailer, zero-row policy and row counts, load the detail rows into the configured RAW table in ONE Oracle transaction, reconcile parsed against trailer against inserted counts, and commit only when they agree. Then move the file and record the outcome.
 
-## What replaces this page
+- **Technology.** worker pod
+- **Source.** ingest §3.1 (p.6) · §4.1 (p.7) · §7.3 (p.14)
 
-Nothing yet, and that is deliberate. The drawing comes first; these
-documents are rewritten from it afterwards, against SEI's text, with a
-citation on every claim. Until then the record in the Hub is the
-design, and this page exists only so that a link does not lead
-nowhere.
+## The Oracle objects it touches
 
-## Recovering the old text
+No foreign key is declared in either document. Every join below
+is one a model runs, not a constraint the database enforces.
 
-It is in git. `git log --follow` on this file reaches the last version
-before withdrawal if any of it is wanted as a starting point.
+| Object | What it holds | Source |
+|---|---|---|
+| `FILE_REGISTRY` | The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts. | ingest Appendix B (p.19) · §6.2 (p.12) |
+| `RAW tables` | Bronze. Validated detail rows as delivered, tagged with the business date and lineage. The dbt document names three: account, client and transaction. | ingest Glossary (p.25) · dbt §4.1 (p.10) |
+
+## What happens when it goes wrong
+
+| # | Scenario | What the design does | Source |
+|---|---|---|---|
+| X5 | The business date will not parse | Rejected before any RAW write, with the parsing error recorded. The format mask must reject impossible dates even when the regex shape matches. | ingest Appendix D.6 (p.23) |
+| X6 | Header or trailer fails | RECEIVED becomes QUARANTINED, the error is recorded and the file moves to Quarantine. Nothing is written to RAW. | ingest §4 (p.7) · Appendix B.2 (p.20) |
+| X7 | A zero-row file arrives and is not allowed | QUARANTINED, same path. Whether zero rows are allowed is per interface configuration. | ingest §6.1 (p.12) |
+| X10 | The RAW load or the count check fails | Rolled back. LOADING becomes FAILED with the error and the end timestamp. The insert and the count reconciliation are one Oracle transaction, and the commit happens only when the file count, the trailer count and the inserted count all agree. | ingest §4.1 (p.7) · §7.3 (p.14) |
+| X11 | A FAILED file is rerun | The same registry id is reused and the retry count goes up. Any exceptional partial rows are removed through the approved process first, then the file reloads in one transaction. | ingest Appendix D.1 (p.22) |
+| X12 | The archive move fails after a good load | ARCHIVE_FAILED. RAW is kept and is never deleted or reloaded — the move happens after the commit and cannot be part of the transaction. Only the move is retried. | ingest §7.3 (p.14) · Appendix D.3 (p.22) |
+| X39 | A successful file has to be replaced | Approval first, then the reason, approver, operator and affected downstream scope are recorded. The registry row and the RAW rows are deleted through the controlled process, the corrected file is dropped in Landing, and a fresh lifecycle starts. The downstream rebuild for that date is coordinated separately. | ingest Appendix D.4 (p.23) |
+| X40 | A quarantined file is corrected | The same registry id is reused, the retry count goes up, the status resets to RECEIVED and every validation runs again before any RAW write. | ingest Appendix D.2 (p.22) |
+
+## Still open with SEI
+
+SEI's own ids, so they can be quoted straight back.
+
+- **O3.** Confirm the retention period and purge approach for RAW and FILE_REGISTRY.
+
+## Sources
+
+- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services
+- **BBH dbt Transformation Design Document v2** — SEI Professional Services
+- **SEI-BBH Integration Architecture v5** — SEI
+
+Generated from the cited model, not written by hand. Correct the
+model and every document that used it is corrected with it:
+`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`

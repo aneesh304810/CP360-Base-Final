@@ -43,7 +43,9 @@ import { REGISTRY, REG_STATE, BBH_LAYERS, BBH_EXTENSION }
 import { GROUPS, PROC_STAGES, groupOfTracker, stageOfTracker, LANES,
   lanesOf, laneOfTracker } from "../src/hubGroups.js";
 import { ARCH_FEEDS, ARCH_LAYERS, ARCH_CONFLICTS, OUTBOUND_FLOW,
-  INBOUND_POSTURE } from "../src/seiArchitecture.js";
+  INBOUND_POSTURE, conflictsAt } from "../src/seiArchitecture.js";
+import { SCENARIOS, SCENARIO_GAPS, scenariosFor }
+  from "../src/seiScenarios.js";
 import { TRACKER_COMPONENTS } from "../src/seiDesignTracker.js";
 
 let bad = 0;
@@ -1184,45 +1186,87 @@ ok(/view === "ARCH"/.test(HUB) && /ARCH_CONFLICTS\.length/.test(HUB),
    "the architecture has a view, and the conflict count is on the way in",
    "");
 
-// ---- the design documents are withdrawn ------------------------------
+// ---- the design documents are GENERATED ------------------------------
 //
-// All 96 were written before SEI's documents were the base. What was
-// wrong was the layer model and the sourcing, not a handful of facts,
-// so they are withdrawn whole and will be rewritten from the drawing.
+// They were withdrawn because they were wrong in ways editing could not
+// fix. They are not hand-written again: they are composed from the same
+// cited model the screens use, so a document cannot drift from it and a
+// correction to the model corrects every document that used it.
 //
-// They are NOT deleted: the front matter is what routes a component to
-// its document, so deleting them would break every link in the Hub and
-// leave the reader with nothing rather than with the truth. The body is
-// replaced by a notice that says so.
-ok(DESIGN_DOCS.length > 90, "the design documents are still routable",
+// Four kinds, and the kind must be visible before the content:
+//   specified  SEI designs this; every claim carries its section and page
+//   differs    SEI answers the need another way; somebody has to pick
+//   absent     neither design document covers it; the page records that
+//   proposal   this review's own; an argument, not a commitment
+ok(DESIGN_DOCS.length > 90, "every design document is still routable",
    DESIGN_DOCS.length);
-ok(DESIGN_DOCS.every((d) => d.withdrawn === true),
-   "and every one of them is marked withdrawn — one that is not is one "
-   + "somebody will build from",
-   DESIGN_DOCS.filter((d) => !d.withdrawn).map((d) => d.id).join(","));
-ok(DESIGN_DOCS.every((d) => d.sections.length <= 5),
-   "none still carries its old body — a long one means the rewrite "
-   + "missed it",
-   DESIGN_DOCS.filter((d) => d.sections.length > 5)
-     .map((d) => `${d.id}:${d.sections.length}`).join(","));
-ok(DESIGN_DOCS.every((d) =>
-     d.sections.some((x) => /Withdrawn/i.test(x.h))),
-   "and each says so in its first section", "");
-// Routing must still work, or the withdrawal breaks the Hub instead of
-// correcting it.
+ok(DESIGN_DOCS.every((d) => d.generated === true),
+   "and every one is generated rather than hand-written — a hand-written "
+   + "one is one that can drift from the model again",
+   DESIGN_DOCS.filter((d) => !d.generated).map((d) => d.id).join(","));
+ok(DESIGN_DOCS.every((d) => !d.withdrawn),
+   "none is still a withdrawal notice",
+   DESIGN_DOCS.filter((d) => d.withdrawn).map((d) => d.id).join(","));
+const KINDS = new Set(["specified", "differs", "absent", "proposal", "overview"]);
+ok(DESIGN_DOCS.every((d) => KINDS.has(d.sei_status)),
+   "and each declares which kind it is",
+   DESIGN_DOCS.filter((d) => !KINDS.has(d.sei_status))
+     .map((d) => `${d.id}:${d.sei_status}`).join(","));
+// A document for a component SEI specifies must actually carry sources.
+const spec = DESIGN_DOCS.filter((d) => d.sei_status === "specified");
+ok(spec.length > 15, "most tracked components SEI specifies have one",
+   spec.length);
+ok(spec.every((d) => d.sections.some((x) => /Sources/i.test(x.h))),
+   "each naming the documents it was composed from",
+   spec.filter((d) => !d.sections.some((x) => /Sources/i.test(x.h)))
+     .map((d) => d.id).join(","));
+ok(spec.every((d) => /p\.\s?\d/.test(JSON.stringify(d.sections))),
+   "and carrying a page number, because that is the whole difference "
+   + "between this and what was withdrawn",
+   spec.filter((d) => !/p\.\s?\d/.test(JSON.stringify(d.sections)))
+     .map((d) => d.id).join(","));
+// The absent ones must say why, not just stop.
+const absent = DESIGN_DOCS.filter((d) => d.sei_status === "absent");
+ok(absent.every((d) => /Nothing/.test(JSON.stringify(d.sections))),
+   "a component SEI does not specify says so in as many words",
+   absent.filter((d) => !/Nothing/.test(JSON.stringify(d.sections)))
+     .map((d) => d.id).slice(0, 5).join(","));
+// Routing still holds.
 ok(TRACKER_COMPONENTS.every((c) => DESIGN_DOCS.some((d) => d.id === docFor(c))),
-   "every component still routes to a document, so no link goes nowhere",
+   "every component still routes to a document",
    TRACKER_COMPONENTS.filter((c) => !DESIGN_DOCS.some((d) => d.id === docFor(c)))
      .map((c) => c.id).join(","));
-// The chip should not invite a click that promises a design.
-ok(DESIGN_DOCS.filter((d) => d.chip).every((d) => /withdrawn/.test(d.chip)),
-   "and the chip says withdrawn rather than design",
-   DESIGN_DOCS.filter((d) => d.chip && !/withdrawn/.test(d.chip))
-     .map((d) => d.chip).slice(0, 4).join(","));
 const DD = strip("ui/src/DocDrill.jsx");
-ok(/d\.withdrawn &&/.test(DD) && /DO NOT BUILD FROM THIS/.test(DD),
-   "opening one leads with the warning, before anything else on the page",
-   "");
+ok(/d\.generated &&/.test(DD) && /GENERATED FROM THE CITED MODEL/.test(DD),
+   "and opening one says which kind it is before the content", "");
+
+// ---- the scenario catalogue -------------------------------------------
+ok(SCENARIOS.length >= 35, "the scenarios are recorded", SCENARIOS.length);
+ok(SCENARIOS.every((x) => /p\.\s?\d/.test(x.ev)),
+   "each citing a page", SCENARIOS.filter((x) => !/p\.\s?\d/.test(x.ev))
+     .map((x) => x.id).join(","));
+ok(SCENARIOS.every((x) => x.c.every((id) => BASEC.has(id))),
+   "and attached to real baseline components, so a component page can "
+   + "carry its own failure behaviour",
+   SCENARIOS.filter((x) => x.c.some((id) => !BASEC.has(id)))
+     .map((x) => x.id).join(","));
+ok(SCENARIO_GAPS.length >= 4,
+   "and the ones neither document covers are listed rather than invented",
+   SCENARIO_GAPS.length);
+// The three corrections an earlier reading got backwards.
+const scenBlob = JSON.stringify(SCENARIOS);
+ok(/QUARANTINED/.test(scenBlob) && /FAILED/.test(scenBlob),
+   "quarantine and failure are both present and distinguished", "");
+ok(/replayable/.test(scenBlob),
+   "and replayability is stated where it applies, since the earlier "
+   + "reading had it backwards", "");
+
+// Conflicts are marked where they land on the drawing, not only on
+// their own page.
+ok(conflictsAt("stage2int").length > 0 && conflictsAt("stage1").length > 0,
+   "the boxes two SEI documents describe differently are marked", "");
+ok(/conflictsAt\(st\.id\)/.test(HUB) && /conflictsAt\(l\.id\)/.test(HUB),
+   "on the stage chain and on the lanes", "");
 
 // ---- lanes: the named parts inside a container -----------------------
 //

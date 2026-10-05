@@ -18,45 +18,63 @@ origin: SEI-BBH component tracker
 sei_coverage: covered
 gap_owner: Joint
 in_scope: true
-withdrawn: true
+generated: true
+sei_status: specified
+generated: true
+sei_status: specified
+generated: true
+sei_status: specified
 ---
 
 # Landing Zone + Transport
 
-## Withdrawn
+## What this component is
 
-**This design document has been withdrawn. Do not build from it.**
+Copies COMPLETE SWP files from SFTP into the Landing Zone. The word complete is carrying weight: the design assumes a file only appears once it is whole, and if that is not true a readiness convention such as a final rename or a marker file has to be added.
 
-It was written before SEI's two design documents were the base for this
-architecture. Reading back through it, the content is wrong often
-enough that correcting it line by line is not worth doing, so it is
-being rewritten from the drawing rather than patched.
+It sits in **Ingress and Egress**, in the **Landing and transport** lane (SFTP · Momentum · shared storage).
 
-What was wrong was not one fact. The layer model was the old one, it
-described a Pre-Gold Exadata tier that is in neither SEI document, it
-treated components as settled that SEI has not specified at all, and it
-read as though every statement in it had a source. None of that is
-repairable by editing.
+## What SEI specifies
 
-## Where the current answer is
+### S2 — Momentum
 
-- **The architecture is the drawing.** The Hub's C4 goes containers,
-  then the lane a component sits in, then the component itself.
-- **For a component SEI specifies**, its record carries what SEI says,
-  the section and the page it says it on, the Oracle objects it
-  touches, and what is still open with SEI against it.
-- **For everything else**, the component registry carries a verdict —
-  specified, differs, or absent — and the reason for it.
+Copies COMPLETE SWP files from SFTP into the Landing Zone. The word complete is carrying weight: the design assumes a file only appears once it is whole, and if that is not true a readiness convention such as a final rename or a marker file has to be added.
 
-## What replaces this page
+- **Technology.** upstream process
+- **Source.** ingest §3.1 (p.6) · §2.1 assumptions (p.5)
 
-Nothing yet, and that is deliberate. The drawing comes first; these
-documents are rewritten from it afterwards, against SEI's text, with a
-citation on every claim. Until then the record in the Hub is the
-design, and this page exists only so that a link does not lead
-nowhere.
+### S3 — Landing Zone
 
-## Recovering the old text
+Shared storage that Airflow scans for eligible files. Shared is load-bearing too — every worker pod has to see the same Landing, Archive and Quarantine folders.
 
-It is in git. `git log --follow` on this file reaches the last version
-before withdrawal if any of it is wanted as a starting point.
+- **Technology.** shared storage
+- **Source.** ingest Glossary (p.25) · §2.1 (p.5)
+
+### S4 — Archive and Quarantine
+
+Where a file goes after processing. Archive on success, Quarantine when validation fails before anything is written.
+
+- **Technology.** shared storage
+- **Source.** ingest Figure 1 (p.6) · §4.1 (p.7)
+
+## What happens when it goes wrong
+
+| # | Scenario | What the design does | Source |
+|---|---|---|---|
+| X12 | The archive move fails after a good load | ARCHIVE_FAILED. RAW is kept and is never deleted or reloaded — the move happens after the commit and cannot be part of the transaction. Only the move is retried. | ingest §7.3 (p.14) · Appendix D.3 (p.22) |
+
+## Still open with SEI
+
+SEI's own ids, so they can be quoted straight back.
+
+- **O1.** Confirm Landing Zone, Archive and Quarantine details.
+
+## Sources
+
+- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services
+- **BBH dbt Transformation Design Document v2** — SEI Professional Services
+- **SEI-BBH Integration Architecture v5** — SEI
+
+Generated from the cited model, not written by hand. Correct the
+model and every document that used it is corrected with it:
+`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`

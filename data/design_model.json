@@ -1,0 +1,3246 @@
+{
+ "SEI_DOCS": {
+  "ingest": {
+   "id": "ingest",
+   "short": "File Ingestion design doc",
+   "title": "BBH File Ingestion Framework Design Document",
+   "version": "2.0",
+   "date": "27 Aug 2026",
+   "author": "SEI Professional Services",
+   "stack": "Airflow 3.0 · OpenShift · Oracle RAW · Splunk",
+   "scope": "Landing-zone discovery through Oracle RAW load, end-of-run completeness and SLA evaluation, the DATE_CONTROL transition, the downstream trigger, recovery and monitoring.",
+   "hands_over": "Triggers the separate Transformation DAG once the expected file set is complete. STG through Gold is not its concern."
+  },
+  "dbt": {
+   "id": "dbt",
+   "short": "dbt design doc",
+   "title": "BBH dbt Transformation Design Document",
+   "version": "2",
+   "date": "",
+   "author": "SEI Professional Services",
+   "stack": "dbt · Airflow · Oracle · Splunk",
+   "scope": "Transformation from SWP_RAW through approved Gold: the STG source-DQ view, the INT PASS filter, DIM-before-FACT sequencing and MERGE against the pre-existing Gold tables, plus DQ capture, reconciliation and publishing to Splunk.",
+   "hands_over": "Advances TRIGGER to COMPLETE and seeds the next PENDING business date on success. File generation, transfer, discovery, header and trailer validation and the RAW load are outside it."
+  }
+ },
+ "SEI_BOUNDARY": {
+  "line": "the guarded PENDING → TRIGGER update on DATE_CONTROL",
+  "before": "ingest",
+  "after": "dbt",
+  "note": "The Ingestion DAG owns PENDING → TRIGGER. Only the run whose UPDATE changes exactly one row may invoke transformation — that is how two scheduled runs five minutes apart cannot both trigger it. The Transformation DAG owns TRIGGER → COMPLETE and the creation of the next PENDING row, in one database transaction, and it re-checks completeness defensively before doing any work.",
+  "ev": [
+   "File Ingestion design doc §5.1 (p.9)",
+   "File Ingestion design doc Appendix E.3 (p.24)",
+   "dbt design doc §5.3 (p.12)"
+  ]
+ },
+ "SEI_COMPONENTS": [
+  {
+   "id": "S1",
+   "s": "deliver",
+   "n": "SWP source files on SFTP",
+   "tech": "SEI",
+   "tbl": [],
+   "open": [],
+   "w": "The files SEI produces for BBH, delivered to an SFTP location.",
+   "ev": "ingest §3.1 (p.6) · Glossary (p.25)"
+  },
+  {
+   "id": "S2",
+   "s": "deliver",
+   "n": "Momentum",
+   "tech": "upstream process",
+   "tbl": [],
+   "open": [
+    "O1"
+   ],
+   "w": "Copies COMPLETE SWP files from SFTP into the Landing Zone. The word complete is carrying weight: the design assumes a file only appears once it is whole, and if that is not true a readiness convention such as a final rename or a marker file has to be added.",
+   "ev": "ingest §3.1 (p.6) · §2.1 assumptions (p.5)"
+  },
+  {
+   "id": "S3",
+   "s": "deliver",
+   "n": "Landing Zone",
+   "tech": "shared storage",
+   "tbl": [],
+   "open": [
+    "O1"
+   ],
+   "w": "Shared storage that Airflow scans for eligible files. Shared is load-bearing too — every worker pod has to see the same Landing, Archive and Quarantine folders.",
+   "ev": "ingest Glossary (p.25) · §2.1 (p.5)"
+  },
+  {
+   "id": "S4",
+   "s": "deliver",
+   "n": "Archive and Quarantine",
+   "tech": "shared storage",
+   "tbl": [],
+   "open": [
+    "O1"
+   ],
+   "w": "Where a file goes after processing. Archive on success, Quarantine when validation fails before anything is written.",
+   "ev": "ingest Figure 1 (p.6) · §4.1 (p.7)"
+  },
+  {
+   "id": "S5",
+   "s": "ingest",
+   "n": "Ingestion DAG (one, metadata-driven)",
+   "tech": "Airflow 3.0",
+   "tbl": [
+    "T1",
+    "T2",
+    "T3"
+   ],
+   "open": [
+    "O2"
+   ],
+   "w": "ONE DAG for every inbound interface, not one per interface. It is driven by configuration rows, so a new interface is onboarded by adding a row rather than by writing a DAG.",
+   "ev": "ingest §5 (p.9)"
+  },
+  {
+   "id": "S6",
+   "s": "ingest",
+   "n": "Scheduled discovery",
+   "tech": "Airflow · every 5 min",
+   "tbl": [
+    "T1",
+    "T2"
+   ],
+   "open": [
+    "O6"
+   ],
+   "w": "A scan on a schedule rather than a sensor waiting on each file. It reads the active configurations, scans the Landing Zone, matches each physical filename to exactly one logical interface and parses the business date out of the filename.",
+   "ev": "ingest §4.1 (p.7) · §9.1 (p.16) · Appendix C.1 (p.21)"
+  },
+  {
+   "id": "S7",
+   "s": "ingest",
+   "n": "Mapped file task (one per file)",
+   "tech": "Dynamic Task Mapping",
+   "tbl": [
+    "T2",
+    "T4"
+   ],
+   "open": [
+    "O2"
+   ],
+   "w": "Airflow creates one task per discovered file at run time, so files process independently and in parallel within the pool and Oracle connection limits. A file never waits for another interface.",
+   "ev": "ingest §5 (p.9) · Appendix C.1 (p.21)"
+  },
+  {
+   "id": "S8",
+   "s": "ingest",
+   "n": "Python loader",
+   "tech": "worker pod",
+   "tbl": [
+    "T2",
+    "T4"
+   ],
+   "open": [
+    "O3"
+   ],
+   "w": "Per file: claim the (interface, business date) pair in the registry, validate readability, header, trailer, zero-row policy and row counts, load the detail rows into the configured RAW table in ONE Oracle transaction, reconcile parsed against trailer against inserted counts, and commit only when they agree. Then move the file and record the outcome.",
+   "ev": "ingest §3.1 (p.6) · §4.1 (p.7) · §7.3 (p.14)"
+  },
+  {
+   "id": "S9",
+   "s": "gate",
+   "n": "Evaluate Completeness and SLA",
+   "tech": "Airflow · all_done",
+   "tbl": [
+    "T1",
+    "T2",
+    "T3"
+   ],
+   "open": [
+    "O5",
+    "O6"
+   ],
+   "w": "The last task of EVERY ingestion run, including runs that found no files at all — which is the point, because yesterday's late file can complete the set without a new one arriving today. It compares the expected active daily interfaces against the interfaces already ARCHIVED for the open business date.",
+   "ev": "ingest §5.2 (p.10) · Appendix E.2 (p.24)"
+  },
+  {
+   "id": "S10",
+   "s": "gate",
+   "n": "Guarded PENDING → TRIGGER",
+   "tech": "Oracle UPDATE",
+   "tbl": [
+    "T3"
+   ],
+   "open": [],
+   "w": "A single UPDATE with STATUS='PENDING' in the WHERE clause. If it changes one row, this run owns the trigger and invokes transformation with the deterministic run id transform__<BUSINESS_DATE>. If it changes zero rows, another run already did, and this one stops.",
+   "ev": "ingest Appendix E.3 (p.24) · Appendix C.1 (p.21)"
+  },
+  {
+   "id": "S11",
+   "s": "gate",
+   "n": "Trigger-recovery path",
+   "tech": "Airflow",
+   "tbl": [
+    "T3"
+   ],
+   "open": [],
+   "w": "For the gap between acquiring TRIGGER and the transformation run actually existing. A scheduled check retries when the row says TRIGGER, the transformation run id is null and no matching deterministic run can be found.",
+   "ev": "ingest Appendix C.1 (p.21) · Figure 3 (p.10)"
+  },
+  {
+   "id": "S12",
+   "s": "gate",
+   "n": "SLA breach and recovery events",
+   "tech": "Splunk",
+   "tbl": [
+    "T3"
+   ],
+   "open": [
+    "O4",
+    "O5",
+    "O7"
+   ],
+   "w": "Missing files at or after the cutoff: keep PENDING, do not trigger, publish a correlated breach alert. Correlation is event type plus business date, so a breach raises one alert rather than one per five-minute cycle. When the date later completes, publish recovery and then trigger.",
+   "ev": "ingest §5.2 (p.10) · §7.3 (p.14) · Appendix E.6 (p.25)"
+  },
+  {
+   "id": "S13",
+   "s": "xform",
+   "n": "Transformation DAG",
+   "tech": "Airflow + dbt",
+   "tbl": [
+    "T3"
+   ],
+   "open": [
+    "D5"
+   ],
+   "w": "Re-checks completeness and TRIGGER status before doing any work — trust but verify — then builds the layers in order, each as a build task followed by its own test task.",
+   "ev": "dbt §5.2 (p.11) · Appendix A.1 (p.25)"
+  },
+  {
+   "id": "S14",
+   "s": "xform",
+   "n": "STG — view",
+   "tech": "dbt view",
+   "tbl": [
+    "T4",
+    "T7"
+   ],
+   "open": [],
+   "w": "Standardises the source columns and computes a pass or fail verdict per row. Stores nothing: it is recomputed on read.",
+   "ev": "dbt §4.1 (p.10) · §6.3 (p.15)"
+  },
+  {
+   "id": "S15",
+   "s": "xform",
+   "n": "INT — 7 days",
+   "tech": "dbt incremental",
+   "tbl": [
+    "T5",
+    "T7"
+   ],
+   "open": [
+    "D4",
+    "D5"
+   ],
+   "w": "Reads only the rows that passed, maps the code sets, keyed on the natural business key plus business date, partitioned, purged by partition drop after seven days.",
+   "ev": "dbt §4.1 (p.10) · §6.5 (p.15)"
+  },
+  {
+   "id": "S16",
+   "s": "xform",
+   "n": "DIM — built first",
+   "tech": "dbt MERGE",
+   "tbl": [
+    "T5",
+    "T6"
+   ],
+   "open": [
+    "D1",
+    "D3"
+   ],
+   "w": "History by direct-compare MERGE into tables that already exist. The surrogate key comes from the Oracle sequence already in use. No DDL is issued against Gold.",
+   "ev": "dbt §4.1 (p.10) · §6.4 (p.15)"
+  },
+  {
+   "id": "S17",
+   "s": "xform",
+   "n": "FACT — built second",
+   "tech": "dbt MERGE",
+   "tbl": [
+    "T5",
+    "T6",
+    "T7"
+   ],
+   "open": [
+    "D2"
+   ],
+   "w": "Loads only transactions whose dimension has resolved. A transaction whose account has not arrived is never written with a placeholder key — it is held and replayed once the dimension exists.",
+   "ev": "dbt §4.1 (p.10) · §7.1 (p.17)"
+  },
+  {
+   "id": "S18",
+   "s": "xform",
+   "n": "DQ capture and replay",
+   "tech": "dbt",
+   "tbl": [
+    "T5",
+    "T7"
+   ],
+   "open": [
+    "D2"
+   ],
+   "w": "Every failing record is written to one store and held at the layer that caught it. A step after the fact build picks up the rows that can now resolve, loads them and marks them resolved.",
+   "ev": "dbt §7.1 (p.17) · Appendix A.1 (p.25)"
+  },
+  {
+   "id": "S19",
+   "s": "xform",
+   "n": "Reconciliation",
+   "tech": "dbt",
+   "tbl": [
+    "T8",
+    "T7"
+   ],
+   "open": [
+    "D6"
+   ],
+   "w": "Counts at four boundaries for the business date, written to an immutable log and published. The pass or warning verdict is derived on the Splunk side, after the data is already in Gold.",
+   "ev": "dbt §7.2 (p.18) · §7.2.1 (p.18)"
+  },
+  {
+   "id": "S20",
+   "s": "xform",
+   "n": "TRIGGER → COMPLETE and seed next",
+   "tech": "Oracle",
+   "tbl": [
+    "T3"
+   ],
+   "open": [],
+   "w": "The final task. Advances the date and inserts the next PENDING row with its resolved cutoff, in one transaction, only on full success. On failure the date stays TRIGGER and no next date is created, so the pipeline is locked rather than drifting.",
+   "ev": "dbt §5.1 (p.11) · ingest §6.3 (p.13) · Appendix E.5 (p.24)"
+  },
+  {
+   "id": "S21",
+   "s": "evid",
+   "n": "Splunk",
+   "tech": "SEI/BBH",
+   "tbl": [
+    "T7",
+    "T8"
+   ],
+   "open": [
+    "O4",
+    "O7",
+    "D6"
+   ],
+   "w": "Owns all dashboards, counts, trending and alerting, for both documents. Oracle keeps the durable logs; Splunk reports from the events published to it and does the alert correlation.",
+   "ev": "ingest §8.1 (p.15) · dbt §4.2 (p.10)"
+  }
+ ],
+ "SEI_TABLES": [
+  {
+   "id": "T1",
+   "n": "FILE_SCHEMA_CONFIG",
+   "doc": "ingest",
+   "owner": "ingestion",
+   "w": "How an active interface is discovered, dated, validated and routed. File-level only — there is deliberately no column mapping table, because the RAW table DDL is the schema contract.",
+   "cols": "FILE_NAME (PK) · FILE_NAME_PATTERN · TARGET_RAW_TABLE · DELIMITER · HAS_HEADER · HAS_TRAILER · ALLOW_ZERO_ROWS · DELIVERY_FREQUENCY · DATE_EXTRACTION_REGEX · DATE_EXTRACTION_GROUP · DATE_FORMAT_MASK · IS_ACTIVE · audit",
+   "ev": "ingest Appendix A (p.18) · §6.1 (p.12)"
+  },
+  {
+   "id": "T2",
+   "n": "FILE_REGISTRY",
+   "doc": "ingest",
+   "owner": "ingestion",
+   "w": "The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts.",
+   "cols": "FILE_REGISTRY_ID (PK) · FILE_NAME + BUSINESS_DATE (unique) · SRC_FILE_NAME · FILE_PATH · ARCHIVE_PATH · STATUS · FILE_ROW_COUNT · TRAILER_ROW_COUNT · RAW_ROW_COUNT · RECEIVED/VALIDATED/LOAD_START/LOAD_END/ARCHIVE_TS · RETRY_COUNT · ERROR_CODE · ERROR_DETAIL",
+   "ev": "ingest Appendix B (p.19) · §6.2 (p.12)"
+  },
+  {
+   "id": "T3",
+   "n": "DATE_CONTROL",
+   "doc": "both",
+   "owner": "shared",
+   "w": "The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression.",
+   "cols": "BUSINESS_DATE (PK) · STATUS · SLA_CUTOFF_TS · CREATED_TS · TRIGGER_TS · COMPLETE_TS · INGESTION_DAG_RUN_ID · TRANSFORMATION_DAG_RUN_ID",
+   "ev": "ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25)"
+  },
+  {
+   "id": "T4",
+   "n": "RAW tables",
+   "doc": "both",
+   "owner": "ingestion writes, dbt reads",
+   "w": "Bronze. Validated detail rows as delivered, tagged with the business date and lineage. The dbt document names three: account, client and transaction.",
+   "cols": "per-interface DDL · BUSINESS_DATE · SRC_RECORD_ID and lineage",
+   "ev": "ingest Glossary (p.25) · dbt §4.1 (p.10)"
+  },
+  {
+   "id": "T5",
+   "n": "INT tables",
+   "doc": "dbt",
+   "owner": "dbt",
+   "w": "Silver persistence. Passing rows only, seven days, partitioned by business date.",
+   "cols": "natural key + BUSINESS_DATE (unique) · mapped code sets",
+   "ev": "dbt §4.1 (p.10) · Appendix A.3 (p.26)"
+  },
+  {
+   "id": "T6",
+   "n": "Gold DIM / FACT",
+   "doc": "dbt",
+   "owner": "pre-existing",
+   "w": "Already exist and already carry history from the current system. This programme changes only how they are populated.",
+   "cols": "DIM_ACCOUNT: ACCOUNT_KEY (PK) · ACCOUNT_NUMBER · ACCOUNT_TYPE · SITUS_CODE · START_DATE · END_DATE · ACTIVE_IND  │  FACT_TRANSACTIONS: TRANSACTION_ID (PK) · BUSINESS_DATE · TRANSACTION_AMOUNT · ACCOUNT_KEY",
+   "ev": "dbt §6.4 (p.15) · §10.1 (p.23)"
+  },
+  {
+   "id": "T7",
+   "n": "DQ_VALIDATION_FAILURE",
+   "doc": "dbt",
+   "owner": "dbt",
+   "w": "One store for both failure categories, carrying whether the row can replay itself and whether it is still open.",
+   "cols": "DQ_FAILURE_ID (PK) · DQ_CATEGORY (SOURCE_DQ | TRANSFORMATION_DQ) · BUSINESS_DATE · LAYER_NAME (STG | INT | DIM | FACT) · MODEL_NAME · BUSINESS_KEY · SRC_RECORD_ID · COLUMN_NAME · FAILURE_REASON · REPROCESS_ELIGIBLE · RESOLUTION_STATUS · RETRY_COUNT · RESOLVED_TS · DETECTED_TS",
+   "ev": "dbt §7.1 (p.17)"
+  },
+  {
+   "id": "T8",
+   "n": "RECON_RESULT",
+   "doc": "dbt",
+   "owner": "dbt",
+   "w": "One immutable row per boundary per business date, replaced rather than updated. No status column — the verdict is derived in Splunk.",
+   "cols": "RECON_ID (PK) · BUSINESS_DATE · BOUNDARY · LEFT_COUNT · RIGHT_COUNT · SOURCE_DQ_FILTERED_COUNT · HELD_COUNT · HELD_PCT · DIFFERENCE · DETECTED_TS",
+   "ev": "dbt §7.2.1 (p.18)"
+  }
+ ],
+ "SEI_OPEN": [
+  {
+   "id": "O1",
+   "doc": "ingest",
+   "t": "Confirm Landing Zone, Archive and Quarantine details."
+  },
+  {
+   "id": "O2",
+   "doc": "ingest",
+   "t": "Confirm batch SLA, peak timing, representative file sizes and the Oracle connection envelope."
+  },
+  {
+   "id": "O3",
+   "doc": "ingest",
+   "t": "Confirm the retention period and purge approach for RAW and FILE_REGISTRY."
+  },
+  {
+   "id": "O4",
+   "doc": "ingest",
+   "t": "Confirm Splunk integration, indexing, event format, alert ownership and routing."
+  },
+  {
+   "id": "O5",
+   "doc": "ingest",
+   "t": "Confirm the common daily-file SLA time, timezone and holiday/exception override process."
+  },
+  {
+   "id": "O6",
+   "doc": "ingest",
+   "t": "Confirm expected-interface criteria and any holiday or month-end rules."
+  },
+  {
+   "id": "O7",
+   "doc": "ingest",
+   "t": "Confirm the Splunk correlation key, severity, alert routing and recovery handling."
+  },
+  {
+   "id": "D1",
+   "doc": "dbt",
+   "t": "Confirm the existing sequence name and ownership behind the Gold surrogate key."
+  },
+  {
+   "id": "D2",
+   "doc": "dbt",
+   "t": "Confirm all missing dimensions resolve inside the seven-day window, and approve the single-table DQ design, the replay policy and the retention-boundary alert."
+  },
+  {
+   "id": "D3",
+   "doc": "dbt",
+   "t": "Confirm the current history coverage of the existing dimensions."
+  },
+  {
+   "id": "D4",
+   "doc": "dbt",
+   "t": "Confirm no downstream consumer needs STG persisted."
+  },
+  {
+   "id": "D5",
+   "doc": "dbt",
+   "t": "Confirm retention units, Oracle partitioning support, volumetrics and run-window targets."
+  },
+  {
+   "id": "D6",
+   "doc": "dbt",
+   "t": "Approve the Splunk event schema, masking and PII rules, dashboards and alert thresholds."
+  }
+ ],
+ "SEI_ASSUMPTIONS": [
+  {
+   "doc": "ingest",
+   "a": "Momentum exposes only complete files in the Landing Zone.",
+   "x": "A readiness convention — final rename or a marker file — has to be enforced."
+  },
+  {
+   "doc": "ingest",
+   "a": "One active interface produces at most one file per business date.",
+   "x": "The registry uniqueness model needs an extra delivery identifier."
+  },
+  {
+   "doc": "ingest",
+   "a": "BUSINESS_DATE is reliably derivable from the filename.",
+   "x": "An alternate authoritative date source is required."
+  },
+  {
+   "doc": "ingest",
+   "a": "Landing, Archive and Quarantine are shared across worker pods.",
+   "x": "Mapped tasks may not consistently read or move files."
+  },
+  {
+   "doc": "ingest",
+   "a": "RAW carries business date and source lineage.",
+   "x": "Downstream readiness, rerun and traceability become unreliable."
+  },
+  {
+   "doc": "ingest",
+   "a": "Exactly one active non-COMPLETE DATE_CONTROL row exists at a time.",
+   "x": "Concurrency protection and one-date-at-a-time orchestration depend on it."
+  },
+  {
+   "doc": "ingest",
+   "a": "One common cutoff applies to the whole required daily set.",
+   "x": "The resolved cutoff is stored per business date on DATE_CONTROL."
+  },
+  {
+   "doc": "ingest",
+   "a": "ARCHIVED is the approved successful state for completeness.",
+   "x": "The completeness query and the documentation both change."
+  },
+  {
+   "doc": "ingest",
+   "a": "Splunk correlates repeated breach events by business date.",
+   "x": "Every five-minute run could raise a new alert for the same breach."
+  },
+  {
+   "doc": "dbt",
+   "a": "Account and Client arrive as full daily snapshots.",
+   "x": "Automatic replay would not apply; those entities need explicit reload."
+  },
+  {
+   "doc": "dbt",
+   "a": "The Gold dimension and fact tables already exist with live history.",
+   "x": "The no-DDL, direct-compare MERGE approach needs revisiting."
+  },
+  {
+   "doc": "dbt",
+   "a": "The existing Oracle sequence backs the surrogate key and is reusable.",
+   "x": "A new key strategy is needed to avoid colliding key spaces."
+  },
+  {
+   "doc": "dbt",
+   "a": "Every missing dimension resolves inside the seven-day window.",
+   "x": "Lineage-only replay fails; a durable payload or longer retention is needed."
+  },
+  {
+   "doc": "dbt",
+   "a": "The Ingestion DAG owns completeness, the transition and the trigger.",
+   "x": "The handoff moves, for example to a standalone sensor DAG."
+  },
+  {
+   "doc": "dbt",
+   "a": "Splunk owns DQ and reconciliation reporting.",
+   "x": "A stored status column and a job to maintain it come back."
+  },
+  {
+   "doc": "dbt",
+   "a": "Oracle supports interval partitioning, partition drop and a partial unique index.",
+   "x": "Retention falls back to DELETE and the single-active-row rule needs another mechanism."
+  }
+ ],
+ "SEI_NOT_BUILT": [
+  {
+   "t": "No file sensor, and no cross-interface wait inside a file task.",
+   "ev": "ingest §5.3 (p.11)"
+  },
+  {
+   "t": "No checksum-based duplicate comparison.",
+   "ev": "ingest §5.3 (p.11)"
+  },
+  {
+   "t": "No SLA status or alert-sent flag in Oracle — derived at run time, correlated in Splunk.",
+   "ev": "ingest §5.3 (p.11) · Appendix E.6 (p.25)"
+  },
+  {
+   "t": "No staging-table layer inside ingestion.",
+   "ev": "ingest §5.3 (p.11)"
+  },
+  {
+   "t": "No dynamic column-mapping configuration — the RAW DDL is the contract.",
+   "ev": "ingest §5.3 (p.11) · §6.1 (p.12)"
+  },
+  {
+   "t": "No partial-set path — the guarded transition fires only on an empty missing-set.",
+   "ev": "ingest §5.2 (p.10)"
+  },
+  {
+   "t": "No DDL against Gold, and no Gold table created by dbt.",
+   "ev": "dbt §6.4 (p.15) · §8.4 (p.21)"
+  },
+  {
+   "t": "No placeholder key in FACT for an unresolved dimension.",
+   "ev": "dbt §4.1 (p.10)"
+  },
+  {
+   "t": "No payload copy of a failed record — lineage only, re-derived from INT.",
+   "ev": "dbt §7.1 (p.17) · §8.2 assumption A4 (p.20)"
+  }
+ ],
+ "SEI_TABLE_LINKS": [
+  {
+   "a": "T1",
+   "b": "T2",
+   "on": "FILE_NAME — the logical interface",
+   "ev": "ingest §6.2 (p.12)"
+  },
+  {
+   "a": "T3",
+   "b": "T2",
+   "on": "BUSINESS_DATE — the completeness comparison",
+   "ev": "ingest Appendix E.2 (p.24)"
+  },
+  {
+   "a": "T2",
+   "b": "T4",
+   "on": "FILE_NAME + BUSINESS_DATE — load lineage",
+   "ev": "ingest §4.1 (p.7)"
+  },
+  {
+   "a": "T4",
+   "b": "T5",
+   "on": "SRC_RECORD_ID, through the STG view",
+   "ev": "dbt §4.1 (p.10) · §6.3 (p.15)"
+  },
+  {
+   "a": "T4",
+   "b": "T7",
+   "on": "Source DQ — rows the STG view marks FAIL",
+   "ev": "dbt §6.3 (p.15)"
+  },
+  {
+   "a": "T5",
+   "b": "T7",
+   "on": "Transformation DQ, and the missing-dimension hold",
+   "ev": "dbt §7.1 (p.17)"
+  },
+  {
+   "a": "T5",
+   "b": "T6",
+   "on": "SCD2 MERGE on ACCOUNT_KEY, never the natural key",
+   "ev": "dbt §6.4.1 (p.15)"
+  },
+  {
+   "a": "T3",
+   "b": "T8",
+   "on": "BUSINESS_DATE — one row per boundary per date",
+   "ev": "dbt §7.2.1 (p.18)"
+  },
+  {
+   "a": "T3",
+   "b": "T7",
+   "on": "BUSINESS_DATE",
+   "ev": "dbt §7.1 (p.17)"
+  }
+ ],
+ "REGISTRY": {
+  "1": {
+   "st": "specified",
+   "sei": [
+    "S1"
+   ]
+  },
+  "2": {
+   "st": "absent",
+   "why": "SWP's own user interface. Neither document describes it."
+  },
+  "3": {
+   "st": "absent",
+   "why": "The real-time API lane. Both documents are batch, end to end."
+  },
+  "4": {
+   "st": "absent",
+   "why": "The loader endpoints BBH submits to. Outbound, and neither document covers outbound at all."
+  },
+  "5": {
+   "st": "absent",
+   "why": "How SEI produces the files. The ingestion document puts file generation outside itself in as many words."
+  },
+  "6": {
+   "st": "absent",
+   "why": "SEI's own orchestration. Out of scope for both."
+  },
+  "7": {
+   "st": "absent",
+   "why": "SEI's monitoring surface. Out of scope for both."
+  },
+  "8": {
+   "st": "specified",
+   "sei": [
+    "S2",
+    "S3",
+    "S4"
+   ]
+  },
+  "9": {
+   "st": "differs",
+   "sei": [
+    "S6"
+   ],
+   "why": "SEI does not use arrival sensors. It runs a scheduled scan every five minutes and decides completeness at the END of the run, as a set difference. A sensor per interface is the pattern it was written to avoid."
+  },
+  "10": {
+   "st": "absent",
+   "why": "Outbound to SEI. Neither document has an outbound path."
+  },
+  "11": {
+   "st": "absent",
+   "why": "The API lane. Both SEI documents are batch from end to end — files in, Gold out — and neither mentions a proxy, a gateway or a synchronous call."
+  },
+  "12": {
+   "st": "absent",
+   "why": "The API lane, as above. Nothing in either document describes real-time access to this data."
+  },
+  "13": {
+   "st": "specified",
+   "sei": [
+    "S5",
+    "S6",
+    "S7",
+    "S8"
+   ]
+  },
+  "14": {
+   "st": "specified",
+   "sei": [
+    "T4"
+   ]
+  },
+  "15": {
+   "st": "specified",
+   "sei": [
+    "S14",
+    "S15",
+    "T5"
+   ],
+   "why": "One tracker component, two SEI objects: STG is a view that stores nothing, INT is a table kept seven days."
+  },
+  "16": {
+   "st": "specified",
+   "sei": [
+    "S16",
+    "S17",
+    "T6"
+   ],
+   "why": "One tracker component, two ordered SEI layers — and the tables already exist, so dbt populates rather than builds them."
+  },
+  "17": {
+   "st": "specified",
+   "sei": [
+    "S16"
+   ],
+   "why": "SEI gives it the rule it was missing: a closed interval is corrected by direct UPDATE, never by MERGE."
+  },
+  "18": {
+   "st": "differs",
+   "sei": [
+    "S5",
+    "S13"
+   ],
+   "why": "SEI has two DAGs, not one, and no per-domain fan-out: parallelism comes from one mapped task per FILE, created at run time."
+  },
+  "19": {
+   "st": "specified",
+   "sei": [
+    "S13",
+    "S16",
+    "S17"
+   ]
+  },
+  "20": {
+   "st": "absent",
+   "why": "Directly contradicted rather than merely absent: SEI permits one non-COMPLETE business date at a time, enforced by a unique index. An intraday cadence does not fit that state machine."
+  },
+  "21": {
+   "st": "differs",
+   "sei": [
+    "S18"
+   ],
+   "why": "SEI's replay is not an engine. It is one task at the end of the transformation run, driven by the open rows in the DQ store and bounded by INT's seven days."
+  },
+  "22": {
+   "st": "absent",
+   "why": "SEI has no partial-set path: the transition fires only on an empty missing set. Running on what arrived would be a design change."
+  },
+  "23": {
+   "st": "specified",
+   "sei": [
+    "S8"
+   ],
+   "why": "The ingestion document specifies exactly this: readable, header, trailer, zero-row and the date, all before any RAW write, and a failure goes to QUARANTINED."
+  },
+  "24": {
+   "st": "absent",
+   "why": "Nothing profiles RAW. The first thing that reads a row's content in SEI's design is the STG view, already past the load."
+  },
+  "25": {
+   "st": "specified",
+   "sei": [
+    "S13",
+    "S14"
+   ]
+  },
+  "26": {
+   "st": "differs",
+   "sei": [
+    "S19"
+   ],
+   "why": "SEI reconciles, but not as a gate. The counts are computed and published AFTER the fact build and the verdict is derived in Splunk, so a mismatch alerts rather than blocks."
+  },
+  "27": {
+   "st": "specified",
+   "sei": [
+    "S19",
+    "T8"
+   ]
+  },
+  "28": {
+   "st": "specified",
+   "sei": [
+    "S18",
+    "T7"
+   ]
+  },
+  "29": {
+   "st": "differs",
+   "sei": [
+    "S4",
+    "T7"
+   ],
+   "why": "Two different quarantines. SEI quarantines FILES before load, and for failed ROWS keeps lineage only — no payload copy — on the assumption that anything held resolves inside seven days."
+  },
+  "30": {
+   "st": "specified",
+   "sei": [
+    "S19",
+    "T8"
+   ]
+  },
+  "31": {
+   "st": "specified",
+   "sei": [
+    "T2",
+    "T3"
+   ],
+   "why": "Business date, run ids, the source record id and the failure category are correlated; the control tables are the ledger."
+  },
+  "32": {
+   "st": "specified",
+   "sei": [
+    "S21"
+   ],
+   "why": "Credentials in OpenShift secrets, and the loader account holds only the DML it needs — no ALTER, DROP or CREATE."
+  },
+  "33": {
+   "st": "specified",
+   "sei": [
+    "T1",
+    "T2",
+    "T3"
+   ]
+  },
+  "34": {
+   "st": "specified",
+   "sei": [
+    "S21"
+   ]
+  },
+  "35": {
+   "st": "absent",
+   "why": "This catalogue. SEI gives all reporting to Splunk, so 360 reading the same tables directly is BBH's addition — defensible, and nobody has written down who owns which."
+  },
+  "36": {
+   "st": "absent",
+   "why": "Sign-on for BBH's own tools. Out of scope for both."
+  },
+  "37": {
+   "st": "absent",
+   "why": "Downstream of Gold. Both documents stop at Gold."
+  },
+  "38": {
+   "st": "absent",
+   "why": "Downstream of Gold. Both documents stop once DIM and FACT are written, so how IMDS is fed is BBH's to design."
+  },
+  "39": {
+   "st": "absent",
+   "why": "Downstream of Gold, as above — and SEI's design has no notion of a consumer-specific shape at all."
+  },
+  "40": {
+   "st": "absent",
+   "why": "Not built this phase, and not in either document."
+  },
+  "41": {
+   "st": "absent",
+   "why": "Reporting off the warehouse. Outside both documents, which end at the Gold tables."
+  },
+  "42": {
+   "st": "absent",
+   "why": "The real-time lane again. Neither document has a consumer that is not fed from a completed business date."
+  },
+  "43": {
+   "st": "absent",
+   "why": "The existing BBH estate. Both documents describe what arrives and what is built, never who consumes it."
+  },
+  "44": {
+   "st": "absent",
+   "why": "Platform build. Neither document covers it."
+  },
+  "45": {
+   "st": "absent",
+   "why": "Container images. Both documents assume OpenShift and neither specifies how images are built or versioned — only that rollback is redeploying the prior one."
+  },
+  "46": {
+   "st": "absent",
+   "why": "Registry, scanning and signing. Not mentioned, and it is the supply-chain half of a design that is otherwise explicit about least privilege."
+  },
+  "47": {
+   "st": "specified",
+   "sei": [
+    "S21"
+   ],
+   "why": "Named, and narrowly: least privilege, and DML only on the Gold tables."
+  },
+  "48": {
+   "st": "specified",
+   "sei": [
+    "S21"
+   ],
+   "why": "Oracle, SFTP and storage credentials in OpenShift secrets, referenced through Airflow connections."
+  },
+  "49": {
+   "st": "absent",
+   "why": "Network policy and egress. Neither document says what the pipeline is allowed to reach, which matters given it pulls from SFTP and pushes to Splunk."
+  },
+  "50": {
+   "st": "differs",
+   "sei": [
+    "S3"
+   ],
+   "why": "SEI needs one specific thing from storage and states it as an assumption: Landing, Archive and Quarantine must be shared across worker pods, or mapped tasks cannot reliably read or move files."
+  },
+  "51": {
+   "st": "specified",
+   "sei": [
+    "S5"
+   ],
+   "why": "A starting configuration is given: schedule every five minutes, catchup off, one active run, pool 8 to 10, one or two retries."
+  },
+  "52": {
+   "st": "specified",
+   "sei": [
+    "S7"
+   ],
+   "why": "Worker pods are how file-level concurrency scales, bounded by pools and Oracle connections."
+  },
+  "53": {
+   "st": "absent",
+   "why": "Resource quotas and priority. The documents give a starting pool size and worker count and leave the cluster-level envelope open — see open decision O2."
+  },
+  "54": {
+   "st": "absent",
+   "why": "Warm start and pre-pulled images. A latency optimisation for a five-minute discovery cycle that neither document considers."
+  },
+  "55": {
+   "st": "specified",
+   "sei": [
+    "S7"
+   ],
+   "why": "Pool size is sized against Oracle connection capacity, and the document says the number is a starting position to confirm."
+  },
+  "56": {
+   "st": "absent",
+   "why": "Node placement. Not mentioned, though the shared-storage assumption for Landing, Archive and Quarantine constrains it."
+  },
+  "57": {
+   "st": "specified",
+   "sei": [
+    "S13"
+   ],
+   "why": "Git-versioned models and DAGs; the pipeline compiles and runs unit and DQ tests before promotion."
+  },
+  "58": {
+   "st": "absent",
+   "why": "GitOps and ArgoCD. The dbt document says models and DAGs are Git-versioned and promoted as tagged images; it does not name a deployment tool."
+  },
+  "59": {
+   "st": "specified",
+   "sei": [
+    "S13"
+   ],
+   "why": "Rollback is redeploying the prior image, and it is safe only because Gold writes are idempotent merges with no DDL."
+  },
+  "60": {
+   "st": "absent",
+   "why": "Nothing covers schema change management, which matters more here than usual: SEI's design forbids DDL against Gold, so whatever does change those tables sits outside it."
+  },
+  "61": {
+   "st": "absent",
+   "why": "Blue-green and canary for the API lane, which neither document has."
+  },
+  "62": {
+   "st": "absent",
+   "why": "Neither document covers availability or recovery of the platform itself."
+  },
+  "63": {
+   "st": "absent",
+   "why": "Backup and restore is not in either document."
+  },
+  "64": {
+   "st": "differs",
+   "sei": [
+    "S21"
+   ],
+   "why": "SEI gives every dashboard, trend and alert to Splunk. A separate monitoring stack is a second place for the same job."
+  },
+  "65": {
+   "st": "absent",
+   "why": "Cost and capacity are not in either document."
+  }
+ },
+ "REG_STATE": {
+  "specified": [
+   "#159943",
+   "SEI specifies this",
+   "In the baseline. This row is the cross-reference."
+  ],
+  "differs": [
+   "#a8560f",
+   "SEI designs it differently",
+   "The need is real and SEI's answer is not the one here. Pick one."
+  ],
+  "absent": [
+   "#6d3ac0",
+   "not in SEI's documents",
+   "BBH's to propose. Off the diagram until adopted."
+  ]
+ },
+ "BBH_LAYERS": {
+  "note": "Stage 2, Silver and Enriched are one layer under three names. Inside it: STG is a view, held in memory, and its job is the source DQ check. INT, DIM and FACT together are the normalised SWP data model, with reference mapping and translation applied.",
+  "beyond": "Above that sit two layers SEI's documents do not describe: a PRE-GOLD layer shaped as a mirror of IMDS and PBDW, and then a simple movement of that data into the actual warehouse. SEI's design publishes straight from DIM and FACT and stops.",
+  "why_it_matters": "It changes what Gold means. In SEI's documents DIM and FACT are the approved Gold tables and the end of the line. In BBH's model they are the normalised middle, and Gold is the consumer-shaped mirror above them. Both cannot be the published contract, and which one is decides where reconciliation has to end.",
+  "src": "BBH, stated directly — not from either SEI document"
+ },
+ "BBH_EXTENSION": [
+  {
+   "id": "B1",
+   "n": "Pre-Gold · mirror of IMDS and PBDW",
+   "st": "absent",
+   "w": "Consumer-shaped tables that mirror the warehouses they feed, built from the normalised model below them.",
+   "why": "Neither SEI document has a layer above DIM and FACT. The dbt document treats DIM and FACT as the approved Gold tables and publishes from there."
+  },
+  {
+   "id": "B2",
+   "n": "Movement into the warehouse",
+   "st": "absent",
+   "w": "A simple data movement from the mirror into the actual warehouse — extract, transport, load, verify. No transformation in flight.",
+   "why": "SEI's design ends at DIM and FACT. Nothing in either document describes moving data onward, or what proves the movement arrived intact."
+  }
+ ],
+ "GROUPS": [
+  {
+   "id": "ingress",
+   "n": "Ingress and Egress",
+   "icon": "⇆",
+   "sub": "how data arrives, and how anything goes back",
+   "sei": [
+    "S1",
+    "S2",
+    "S3",
+    "S4"
+   ],
+   "bbh": []
+  },
+  {
+   "id": "ingestion",
+   "n": "Ingestion",
+   "icon": "⬇",
+   "sub": "discover, validate, load RAW",
+   "sei": [
+    "S5",
+    "S6",
+    "S7",
+    "S8"
+   ],
+   "bbh": []
+  },
+  {
+   "id": "orchestration",
+   "n": "Orchestration",
+   "icon": "⚙",
+   "sub": "the business date, the gate, and what runs when",
+   "sei": [
+    "S9",
+    "S10",
+    "S11",
+    "S12",
+    "S13",
+    "S20"
+   ],
+   "bbh": []
+  },
+  {
+   "id": "processing",
+   "n": "Processing",
+   "icon": "⚙",
+   "sub": "Stage 1 → Stage 2 → Stage 2 INT → Stage 3",
+   "sei": [
+    "S14",
+    "S15",
+    "S16",
+    "S17",
+    "S18",
+    "S19"
+   ],
+   "bbh": [
+    "B1",
+    "B2"
+   ],
+   "stages": true
+  },
+  {
+   "id": "foundation",
+   "n": "Foundation",
+   "icon": "▤",
+   "sub": "control tables, evidence, audit, security",
+   "sei": [
+    "S21"
+   ],
+   "bbh": []
+  },
+  {
+   "id": "openshift",
+   "n": "OpenShift Platform",
+   "icon": "☸",
+   "sub": "runtime, deployment, operations",
+   "sei": [],
+   "bbh": []
+  }
+ ],
+ "PROC_STAGES": [
+  {
+   "id": "stage1",
+   "n": "Stage 1",
+   "sub": "RAW — as delivered",
+   "sei": [],
+   "tbl": [
+    "T4"
+   ],
+   "bbh": [],
+   "w": "The file exactly as it arrived, append-only, tagged with the business date and lineage. Nothing is cleaned here."
+  },
+  {
+   "id": "stage2",
+   "n": "Stage 2",
+   "sub": "STG — a view, in memory",
+   "sei": [
+    "S14"
+   ],
+   "tbl": [],
+   "bbh": [],
+   "w": "Standardises the columns and marks every row pass or fail. It is a view: it holds nothing and is recomputed on read. Its job is the source DQ check."
+  },
+  {
+   "id": "stage2int",
+   "n": "Stage 2 INT",
+   "sub": "the normalised SWP model",
+   "sei": [
+    "S15",
+    "S16",
+    "S17"
+   ],
+   "tbl": [
+    "T5",
+    "T6"
+   ],
+   "bbh": [],
+   "w": "INT, DIM and FACT together, with reference mapping and translation applied. Passing rows only; INT keeps seven days; dimensions are built before facts so a transaction can always find its account."
+  },
+  {
+   "id": "stage3",
+   "n": "Stage 3",
+   "sub": "the actual data warehouse",
+   "sei": [],
+   "tbl": [],
+   "bbh": [
+    "B1",
+    "B2"
+   ],
+   "w": "A Pre-Gold layer shaped as a mirror of IMDS and PBDW, then a simple movement of that data into the warehouse itself.",
+   "note": "BBH's. SEI's documents publish from DIM and FACT and stop, so nothing on this stage is cited."
+  }
+ ],
+ "LANES": {
+  "ingress": [
+   {
+    "id": "landing",
+    "n": "Landing and transport",
+    "tech": "SFTP · Momentum · shared storage",
+    "sei": [
+     "S1",
+     "S2",
+     "S3",
+     "S4"
+    ],
+    "reg": [
+     "8"
+    ],
+    "w": "Files arrive on SFTP, Momentum copies the complete ones into a Landing Zone every worker pod can see, and Archive and Quarantine sit beside it."
+   },
+   {
+    "id": "gateway",
+    "n": "API gateway and Apigee proxy",
+    "tech": "vendor",
+    "sei": [],
+    "reg": [
+     "11",
+     "12"
+    ],
+    "w": "The real-time lane. Neither SEI document mentions it — both are batch from end to end — so nothing here is cited."
+   },
+   {
+    "id": "loader",
+    "n": "Loader framework",
+    "tech": "Python · outbound",
+    "sei": [],
+    "reg": [
+     "10",
+     "4"
+    ],
+    "w": "Everything going back to SEI. A consumer such as CRM calls the Hub's API with the loader details and the data; the Hub validates it and transforms it into loader format; SEI PS processes the loader; the Hub calls the consumer's own API with the response. Two APIs, one each way, and neither SEI design document has an outbound path at all."
+   },
+   {
+    "id": "seisrc",
+    "n": "SEI-side source",
+    "tech": "SEI",
+    "sei": [],
+    "reg": [
+     "1",
+     "2",
+     "3",
+     "5",
+     "6",
+     "7"
+    ],
+    "w": "SWP itself and what SEI runs around it. Only the platform and the files it produces touch this design."
+   }
+  ],
+  "ingestion": [
+   {
+    "id": "eventbased",
+    "n": "Event-based ingestion",
+    "tech": "PRIMARY · SDC events",
+    "sei": [],
+    "reg": [],
+    "w": "BBH's primary inbound route. Neither SEI design document describes it — both describe the file path and only the file path — so the primary way data arrives has no design document behind it. Its components are in the event container.",
+    "primary": true
+   },
+   {
+    "id": "filebased",
+    "n": "File-based ingestion",
+    "tech": "SECONDARY · Airflow · Python",
+    "sei": [
+     "S5",
+     "S6",
+     "S7",
+     "S8"
+    ],
+    "reg": [
+     "13",
+     "9",
+     "23"
+    ],
+    "w": "The path both SEI documents describe: a scheduled scan, one mapped task per file, validate, load RAW in one transaction, reconcile three counts, archive."
+   },
+   {
+    "id": "profiling",
+    "n": "RAW profiling",
+    "tech": "SQL",
+    "sei": [],
+    "reg": [
+     "24"
+    ],
+    "w": "Looking at what landed before anything is done to it. Not in SEI's design — the first thing that reads a row's content there is the STG view."
+   }
+  ],
+  "orchestration": [
+   {
+    "id": "ingdag",
+    "n": "Ingestion DAG",
+    "tech": "Airflow 3.0",
+    "sei": [
+     "S9",
+     "S10",
+     "S11",
+     "S12"
+    ],
+    "reg": [
+     "18",
+     "22"
+    ],
+    "w": "Owns the business date up to the handoff: evaluate completeness and the SLA, take the guarded transition, invoke transformation, and recover a trigger that never started."
+   },
+   {
+    "id": "xfdag",
+    "n": "Transformation DAG",
+    "tech": "Airflow 3.0 · dbt",
+    "sei": [
+     "S13",
+     "S20"
+    ],
+    "reg": [
+     "19",
+     "21"
+    ],
+    "w": "Re-checks before it starts, builds the layers in order with a test task between each, and advances the date only on full success."
+   },
+   {
+    "id": "datectl",
+    "n": "Business-date state machine",
+    "tech": "Oracle",
+    "sei": [],
+    "reg": [
+     "20"
+    ],
+    "w": "DATE_CONTROL: one row per business date, PENDING to TRIGGER to COMPLETE, at most one date open at a time."
+   }
+  ],
+  "processing": [
+   {
+    "id": "dbt",
+    "n": "dbt models",
+    "tech": "dbt · Oracle",
+    "sei": [
+     "S14",
+     "S15",
+     "S16",
+     "S17"
+    ],
+    "reg": [
+     "15",
+     "16",
+     "14",
+     "17"
+    ],
+    "w": "The stage chain itself — the view, the persisted middle and the two Gold layers, all as version-controlled SQL."
+   },
+   {
+    "id": "dq",
+    "n": "Data quality and reconciliation",
+    "tech": "dbt · Splunk",
+    "sei": [
+     "S18",
+     "S19"
+    ],
+    "reg": [
+     "25",
+     "26",
+     "27",
+     "28"
+    ],
+    "w": "The row-level pass or fail, the store that holds what failed, the replay that clears it, and the counts across four boundaries."
+   },
+   {
+    "id": "warehouse",
+    "n": "Warehouse and consumers",
+    "tech": "BBH",
+    "sei": [],
+    "bbh": [
+     "B1",
+     "B2"
+    ],
+    "reg": [
+     "37",
+     "38",
+     "39",
+     "40",
+     "41",
+     "43"
+    ],
+    "w": "Stage 3 and what reads it. SEI's documents end at DIM and FACT, so nothing in this lane is cited."
+   }
+  ],
+  "foundation": [
+   {
+    "id": "control",
+    "n": "Control and metadata",
+    "tech": "Oracle",
+    "sei": [],
+    "reg": [
+     "33"
+    ],
+    "w": "The small tables the run depends on: what is expected, what arrived, and which date is open."
+   },
+   {
+    "id": "evidence",
+    "n": "Evidence and observability",
+    "tech": "Splunk · 360",
+    "sei": [
+     "S21"
+    ],
+    "reg": [
+     "34",
+     "35",
+     "30"
+    ],
+    "w": "Where the run proves what it did. SEI gives every dashboard and alert to Splunk; 360 reads the same tables directly."
+   },
+   {
+    "id": "errors",
+    "n": "Errors, audit and lineage",
+    "tech": "Python · dbt",
+    "sei": [],
+    "reg": [
+     "29",
+     "31"
+    ],
+    "w": "What happens to a bad record, and how a number is traced back to the file it came from."
+   },
+   {
+    "id": "sec",
+    "n": "Security and access",
+    "tech": "OpenShift · Oracle",
+    "sei": [],
+    "reg": [
+     "32",
+     "36"
+    ],
+    "w": "Credentials in secrets, and a loader account that can change rows in Gold but cannot create, alter or drop anything."
+   }
+  ],
+  "openshift": [
+   {
+    "id": "platform",
+    "n": "Platform",
+    "tech": "OpenShift",
+    "sei": [],
+    "reg": [],
+    "w": "Namespaces, images, registry, RBAC, secrets, network policy and storage."
+   },
+   {
+    "id": "runtime",
+    "n": "Runtime",
+    "tech": "OpenShift",
+    "sei": [],
+    "reg": [],
+    "w": "The Airflow deployment, worker pods, quotas, and the Oracle connection envelope the pool size is sized against."
+   },
+   {
+    "id": "deployment",
+    "n": "Deployment",
+    "tech": "CI/CD",
+    "sei": [],
+    "reg": [],
+    "w": "Git-versioned models and DAGs, compiled and tested before promotion; rollback is redeploying the prior image."
+   },
+   {
+    "id": "operations",
+    "n": "Operations",
+    "tech": "OpenShift",
+    "sei": [],
+    "reg": [],
+    "w": "Availability, recovery, monitoring and cost — none of it in either SEI document."
+   }
+  ]
+ },
+ "SEI_ARCH_DOC": {
+  "id": "arch",
+  "short": "Integration Architecture",
+  "title": "SEI-BBH Integration Architecture",
+  "version": "5",
+  "author": "SEI",
+  "scope": "End to end: the source files and their types, Python ingestion into RAW, dbt into Stage 2 and Gold, the existing Oracle warehouse tables, and the consumption layer. Plus the system-integration view of what sits either side of the Hub."
+ },
+ "ARCH_FEEDS": [
+  {
+   "k": "full",
+   "n": "Full snapshot",
+   "sub": "the entire table, every day",
+   "files": [
+    "Account Snapshot",
+    "Client Snapshot",
+    "Tax Lot Snapshot"
+   ],
+   "pattern": "SCD2 / periodic snapshot",
+   "gold": "DIM_ACCOUNT and DIM_INTERESTED_PARTY as SCD2; FACT_TAX_LOT appended by date"
+  },
+  {
+   "k": "delta",
+   "n": "Delta",
+   "sub": "new or changed records today",
+   "files": [
+    "Transaction Delta",
+    "Position Delta"
+   ],
+   "pattern": "incremental / merge",
+   "gold": "FACT_TRANSACTIONS and FACT_CP_HOLDINGS, both merged"
+  },
+  {
+   "k": "corr",
+   "n": "Correction",
+   "sub": "past records corrected today",
+   "files": [
+    "Corrected Transactions",
+    "Corrected Positions"
+   ],
+   "pattern": "merge, updating what is already there",
+   "gold": "FACT_TRANSACTIONS and FACT_CP_HOLDINGS, same two facts"
+  }
+ ],
+ "ARCH_LAYERS": [
+  {
+   "k": "ingest",
+   "n": "Python ingestion",
+   "tech": "Python + Oracle",
+   "w": "File validation, data profiling, audit and lineage, metadata capture — file name, date, row count — then load to RAW.",
+   "objects": [],
+   "note": "cx_Oracle, SQL*Loader or external tables"
+  },
+  {
+   "k": "raw",
+   "n": "RAW (SWP)",
+   "tech": "Python-managed, append only",
+   "w": "Immutable. Stored exactly as received, nothing cleaned.",
+   "objects": [
+    "RAW_ACCOUNT",
+    "RAW_CLIENT",
+    "RAW_TAXLOT",
+    "RAW_TRANSACTION",
+    "RAW_POSITION",
+    "RAW_CORRECTED_TRANSACTION",
+    "RAW_CORRECTED_POSITION"
+   ],
+   "cols": "LOAD_ID · BUSINESS_DATE · FILE_DATE · FILE_NAME · ROW_NUM · LOAD_TIMESTAMP · SOURCE_SYSTEM · INGESTION_STATUS",
+   "note": "materialisation N/A, managed by Python; load type append only"
+  },
+  {
+   "k": "stg2",
+   "n": "Stage 2",
+   "tech": "dbt · table",
+   "w": "Business integration: standardise, integrate the corrections, apply business rules and lookups, produce business-ready data.",
+   "objects": [
+    "STG2_ACCOUNT",
+    "STG2_INTERESTED_PARTY",
+    "STG2_TAX_LOT",
+    "STG2_TRANSACTIONS",
+    "STG2_CP_HOLDINGS"
+   ],
+   "steps": [
+    "Data standardisation",
+    "Data type conversion",
+    "Deduplication",
+    "Correction file integration",
+    "Reference and lookup joins",
+    "Business rule validations",
+    "Derived attributes",
+    "Latest record selection"
+   ],
+   "note": "materialised as a table; full refresh daily, or incremental"
+  },
+  {
+   "k": "gold",
+   "n": "Gold",
+   "tech": "dbt · existing Oracle DW tables",
+   "w": "The enterprise business model, ready for reporting and analytics. These tables already exist.",
+   "objects": [
+    "DIM_ACCOUNT (SCD2)",
+    "DIM_INTERESTED_PARTY (SCD2)",
+    "FACT_TRANSACTIONS (merge)",
+    "FACT_CP_HOLDINGS (merge)",
+    "FACT_TAX_LOT (periodic snapshot)"
+   ],
+   "note": "incremental; SCD2, merge or append depending on the object"
+  },
+  {
+   "k": "consume",
+   "n": "Consumption",
+   "tech": "BI",
+   "w": "Power BI, Tableau, reports, analytics, business users.",
+   "objects": []
+  }
+ ],
+ "ARCH_CONFLICTS": [
+  {
+   "id": "C1",
+   "t": "Three RAW tables, or seven",
+   "arch": "RAW_ACCOUNT, RAW_CLIENT, RAW_TAXLOT, RAW_TRANSACTION, RAW_POSITION, RAW_CORRECTED_TRANSACTION, RAW_CORRECTED_POSITION.",
+   "doc": "The dbt design document names three: account, client and transaction. Position, tax lot and the two correction tables do not appear in it at all.",
+   "why": "Four of the seven feeds have no transformation designed for them. If the architecture is right, the design document covers under half the inbound surface."
+  },
+  {
+   "id": "C2",
+   "t": "Stage 2 as five tables, or as STG plus INT",
+   "arch": "Five STG2_* tables, materialised as tables, full refresh daily or incremental.",
+   "doc": "A STG view that stores nothing, plus an INT table kept seven days and partitioned.",
+   "why": "Not a naming difference. One stores Stage 2 and one does not, and the retention, the replay window and the reconciliation boundaries all follow from which it is."
+  },
+  {
+   "id": "C3",
+   "t": "Two Gold facts, or three",
+   "arch": "FACT_TRANSACTIONS, FACT_CP_HOLDINGS and FACT_TAX_LOT, each with its own strategy — merge, merge and periodic snapshot.",
+   "doc": "FACT_TRANSACTIONS only.",
+   "why": "Holdings and tax lot are the two the design document is silent on, and a periodic snapshot is a different pattern from a merge — it is not covered by the SCD2 and merge logic that is specified."
+  },
+  {
+   "id": "C4",
+   "t": "Corrections as files, or as a rule",
+   "arch": "Two correction files arrive daily and Stage 2 has a named step, correction file integration, that merges them.",
+   "doc": "Correction is a MERGE-versus-UPDATE rule applied inside the dimension build. No correction file is described.",
+   "why": "The architecture has corrections entering as data; the design document has them as a write strategy. Both may be needed, but nobody has said how a correction file reaches the rule."
+  },
+  {
+   "id": "C5",
+   "t": "Where data quality runs",
+   "arch": "A Data Quality Checks step after dbt Gold in the Airflow chain.",
+   "doc": "A per-row pass or fail computed in the STG view, before anything is loaded, plus tests between every layer.",
+   "why": "Before or after publication is the whole question. The architecture's position puts the check after Gold is written, which is where reconciliation already sits and is already a known gap."
+  }
+ ],
+ "OUTBOUND_FLOW": {
+  "n": "Loader submission, via the Orchestration Hub",
+  "src": "BBH, stated directly — not in either SEI design document",
+  "example": "a consumer submitting through a loader file, with Pivotal CRM as the worked example",
+  "steps": [
+   {
+    "n": 1,
+    "a": "CRM → Hub",
+    "t": "The Orchestration Hub exposes an API. CRM calls it with the loader details and the data the loader needs."
+   },
+   {
+    "n": 2,
+    "a": "Hub",
+    "t": "The Hub validates what it was given and transforms it into loader format."
+   },
+   {
+    "n": 3,
+    "a": "Hub → SEI PS",
+    "t": "SEI Professional Services processes the loader."
+   },
+   {
+    "n": 4,
+    "a": "Hub → CRM",
+    "t": "CRM exposes an API of its own, and the Hub calls it with the response."
+   }
+  ],
+  "note": "Two APIs, one each way, and the Hub owns validation and the format. That makes the Hub responsible for a contract neither SEI design document mentions: what a valid submission looks like, what happens to an invalid one, and what the response carries when SEI rejects a loader rather than the Hub."
+ },
+ "INBOUND_POSTURE": {
+  "primary": "SDC events",
+  "secondary": "file-based",
+  "src": "BBH, stated directly",
+  "note": "Both SEI design documents describe the file path and only the file path — a scheduled scan every five minutes, one mapped task per file, completeness measured as a set of files that arrived. If events are the primary inbound route, the completeness gate, the business-date state machine and the SLA all rest on a path that is the secondary one.",
+  "consequence": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
+ },
+ "SCENARIOS": [
+  {
+   "id": "X1",
+   "a": "Discovery",
+   "s": "Exactly one pattern matches",
+   "r": "One work item is created, carrying the interface, the physical filename, the business date, the target RAW table and the parsing rules.",
+   "c": [
+    "S6"
+   ],
+   "ev": "ingest Appendix C.3 (p.21)"
+  },
+  {
+   "id": "X2",
+   "a": "Discovery",
+   "s": "No pattern matches",
+   "r": "Not loaded and not moved. An unmatched-file event is emitted with the filename and path, and the approved exception-location policy applies — which is still open decision O1.",
+   "c": [
+    "S6"
+   ],
+   "ev": "ingest Appendix C.3 (p.21)"
+  },
+  {
+   "id": "X3",
+   "a": "Discovery",
+   "s": "More than one pattern matches",
+   "r": "Treated as a configuration defect. No target table is chosen, nothing is processed, and it is logged and notified.",
+   "c": [
+    "S6"
+   ],
+   "ev": "ingest Appendix C.3 (p.21)"
+  },
+  {
+   "id": "X4",
+   "a": "Discovery",
+   "s": "The scan finds nothing",
+   "r": "The run succeeds with zero mapped tasks. The completeness and SLA task still runs — which is the point, because yesterday's late file can complete the set without a new one arriving.",
+   "c": [
+    "S6",
+    "S9"
+   ],
+   "ev": "ingest §5.2 (p.10)"
+  },
+  {
+   "id": "X5",
+   "a": "Validation",
+   "s": "The business date will not parse",
+   "r": "Rejected before any RAW write, with the parsing error recorded. The format mask must reject impossible dates even when the regex shape matches.",
+   "c": [
+    "S8"
+   ],
+   "ev": "ingest Appendix D.6 (p.23)"
+  },
+  {
+   "id": "X6",
+   "a": "Validation",
+   "s": "Header or trailer fails",
+   "r": "RECEIVED becomes QUARANTINED, the error is recorded and the file moves to Quarantine. Nothing is written to RAW.",
+   "c": [
+    "S8"
+   ],
+   "ev": "ingest §4 (p.7) · Appendix B.2 (p.20)"
+  },
+  {
+   "id": "X7",
+   "a": "Validation",
+   "s": "A zero-row file arrives and is not allowed",
+   "r": "QUARANTINED, same path. Whether zero rows are allowed is per interface configuration.",
+   "c": [
+    "S8"
+   ],
+   "ev": "ingest §6.1 (p.12)"
+  },
+  {
+   "id": "X8",
+   "a": "Registry",
+   "s": "The same file is discovered again",
+   "r": "If the existing record is ARCHIVED it is skipped and logged as a duplicate; no second registry row is created. A unique key on the interface and business date enforces it.",
+   "c": [
+    "S7"
+   ],
+   "ev": "ingest §5 (p.9) · Appendix B (p.19)"
+  },
+  {
+   "id": "X9",
+   "a": "Registry",
+   "s": "A record is stuck in RECEIVED, VALIDATED or LOADING",
+   "r": "Investigated, never reset automatically. The Airflow task state, the worker logs, the file location and the Oracle outcome are checked first, and the same record is reused for recovery.",
+   "c": [
+    "S7"
+   ],
+   "ev": "ingest Appendix D.5 (p.23)"
+  },
+  {
+   "id": "X10",
+   "a": "Load",
+   "s": "The RAW load or the count check fails",
+   "r": "Rolled back. LOADING becomes FAILED with the error and the end timestamp. The insert and the count reconciliation are one Oracle transaction, and the commit happens only when the file count, the trailer count and the inserted count all agree.",
+   "c": [
+    "S8"
+   ],
+   "ev": "ingest §4.1 (p.7) · §7.3 (p.14)"
+  },
+  {
+   "id": "X11",
+   "a": "Load",
+   "s": "A FAILED file is rerun",
+   "r": "The same registry id is reused and the retry count goes up. Any exceptional partial rows are removed through the approved process first, then the file reloads in one transaction.",
+   "c": [
+    "S8"
+   ],
+   "ev": "ingest Appendix D.1 (p.22)"
+  },
+  {
+   "id": "X12",
+   "a": "Archive",
+   "s": "The archive move fails after a good load",
+   "r": "ARCHIVE_FAILED. RAW is kept and is never deleted or reloaded — the move happens after the commit and cannot be part of the transaction. Only the move is retried.",
+   "c": [
+    "S8",
+    "S4"
+   ],
+   "ev": "ingest §7.3 (p.14) · Appendix D.3 (p.22)"
+  },
+  {
+   "id": "X13",
+   "a": "Archive",
+   "s": "Why ARCHIVED is the ready state",
+   "r": "A reconciled RAW commit is not released downstream until the physical archive succeeds, so completeness counts ARCHIVED and nothing earlier.",
+   "c": [
+    "S9"
+   ],
+   "ev": "ingest §6.2 (p.12)"
+  },
+  {
+   "id": "X14",
+   "a": "Gate",
+   "s": "Complete before the cutoff",
+   "r": "The guarded transition is taken and transformation is invoked.",
+   "c": [
+    "S9",
+    "S10"
+   ],
+   "ev": "ingest §5.2 (p.10)"
+  },
+  {
+   "id": "X15",
+   "a": "Gate",
+   "s": "Complete at or after the cutoff",
+   "r": "Still triggered, and a recovery or late-completion event is published if the date had already breached.",
+   "c": [
+    "S9",
+    "S12"
+   ],
+   "ev": "ingest §7.3 (p.14)"
+  },
+  {
+   "id": "X16",
+   "a": "Gate",
+   "s": "Incomplete before the cutoff",
+   "r": "The date stays PENDING, nothing is triggered, and the next scheduled run re-evaluates.",
+   "c": [
+    "S9"
+   ],
+   "ev": "ingest §5.2 (p.10)"
+  },
+  {
+   "id": "X17",
+   "a": "Gate",
+   "s": "Incomplete at or after the cutoff",
+   "r": "The date stays PENDING and a correlated breach alert is published. Correlation is event type plus business date, so a persistent breach raises one alert rather than one every five minutes.",
+   "c": [
+    "S12"
+   ],
+   "ev": "ingest §5.2 (p.10) · Appendix E.6 (p.25)"
+  },
+  {
+   "id": "X18",
+   "a": "Gate",
+   "s": "The completeness query itself fails",
+   "r": "The task fails and Airflow retries. Readiness is unknown, so nothing is triggered.",
+   "c": [
+    "S9"
+   ],
+   "ev": "ingest §5.2 (p.10)"
+  },
+  {
+   "id": "X19",
+   "a": "Orchestration",
+   "s": "Two runs try to trigger at once",
+   "r": "The second guarded update changes zero rows, so it does not trigger. The deterministic run id rejects a duplicate as well.",
+   "c": [
+    "S10"
+   ],
+   "ev": "ingest Appendix E.3 (p.24)"
+  },
+  {
+   "id": "X20",
+   "a": "Orchestration",
+   "s": "TRIGGER is set but transformation never started",
+   "r": "A scheduled check retries when the status is TRIGGER, the transformation run id is null and no matching deterministic run exists.",
+   "c": [
+    "S11"
+   ],
+   "ev": "ingest Appendix C.1 (p.21)"
+  },
+  {
+   "id": "X21",
+   "a": "Orchestration",
+   "s": "A transformation task fails",
+   "r": "The date stays TRIGGER, no next date is created and the pipeline is locked. Airflow alerts and the run restarts from the failed task; each layer's write is idempotent for the date.",
+   "c": [
+    "S13",
+    "S20"
+   ],
+   "ev": "dbt §8.1 (p.20)"
+  },
+  {
+   "id": "X22",
+   "a": "Orchestration",
+   "s": "FACT fails after DIM succeeded",
+   "r": "The restart resumes at the fact build. The dimension is not rebuilt.",
+   "c": [
+    "S17"
+   ],
+   "ev": "dbt §8.1 (p.20)"
+  },
+  {
+   "id": "X23",
+   "a": "Orchestration",
+   "s": "The restart reaches the final task",
+   "r": "The date advances to COMPLETE and the next PENDING row is inserted in the same transaction, exactly once.",
+   "c": [
+    "S20"
+   ],
+   "ev": "dbt §8.1 (p.20) · ingest Appendix E.5 (p.24)"
+  },
+  {
+   "id": "X24",
+   "a": "Source DQ",
+   "s": "A key column is missing",
+   "r": "The STG view marks the row FAIL with a reason code and INT never reads it. The row goes to the DQ store as OPEN.",
+   "c": [
+    "S14",
+    "S18"
+   ],
+   "ev": "dbt §6.3 (p.15)"
+  },
+  {
+   "id": "X25",
+   "a": "Source DQ",
+   "s": "A code is not in the mapping table",
+   "r": "Same path — FAIL at STG with its own reason code, excluded before any mapping is attempted.",
+   "c": [
+    "S14"
+   ],
+   "ev": "dbt §6.3 (p.15)"
+  },
+  {
+   "id": "X26",
+   "a": "Source DQ",
+   "s": "A full-snapshot entity fails",
+   "r": "The row stays OPEN until a corrected record arrives in a later full file, which replays it and marks it RESOLVED. This rests on account and client being full daily snapshots.",
+   "c": [
+    "S18"
+   ],
+   "ev": "dbt §7.1 (p.17) · §8.2 assumption A1 (p.20)"
+  },
+  {
+   "id": "X27",
+   "a": "Source DQ",
+   "s": "A transaction fails",
+   "r": "That date's records do not come round again, so it replays only on a corrected reload for the date, or when the missing dimension arrives.",
+   "c": [
+    "S18"
+   ],
+   "ev": "dbt §7.1 (p.17)"
+  },
+  {
+   "id": "X28",
+   "a": "Transformation DQ",
+   "s": "A code has no active mapping row",
+   "r": "Caught at INT as a transformation failure, owned by the transformation team rather than the source. Marked not auto-replayable: it stays OPEN until a code fix is deployed.",
+   "c": [
+    "S15",
+    "S18"
+   ],
+   "ev": "dbt §7 (p.17)"
+  },
+  {
+   "id": "X29",
+   "a": "Transformation DQ",
+   "s": "The same failure returns after a rerun",
+   "r": "Expected, and the signal is that a code fix is needed rather than another rerun.",
+   "c": [
+    "S18"
+   ],
+   "ev": "dbt §7 (p.17)"
+  },
+  {
+   "id": "X30",
+   "a": "Transformation DQ",
+   "s": "A transaction's dimension has not arrived",
+   "r": "Never written to Gold with a placeholder key. Held in the DQ store as replayable and OPEN, re-derived from INT on a later day once the dimension exists, then marked RESOLVED.",
+   "c": [
+    "S17",
+    "S18"
+   ],
+   "ev": "dbt §7.1 (p.17) · Figure 5a (p.18)"
+  },
+  {
+   "id": "X31",
+   "a": "Transformation DQ",
+   "s": "A row is still OPEN at the retention edge",
+   "r": "CLOSED and alerted at seven days, because the DQ store keeps lineage only and INT no longer holds the data to re-derive it.",
+   "c": [
+    "S18",
+    "S15"
+   ],
+   "ev": "dbt §7.1 (p.17) · §8.2 assumption A4 (p.20)"
+  },
+  {
+   "id": "X32",
+   "a": "Dimensions",
+   "s": "A correction arrives and the row is still current",
+   "r": "A normal MERGE, joined on the surrogate key rather than the natural key — a natural-key join matches both the closing and the opening row and fails.",
+   "c": [
+    "S16"
+   ],
+   "ev": "dbt §6.4.1 (p.15)"
+  },
+  {
+   "id": "X33",
+   "a": "Dimensions",
+   "s": "A correction arrives and the interval is already closed",
+   "r": "A direct UPDATE of that closed row only. Never a MERGE — it would reopen an interval that is settled.",
+   "c": [
+    "S16"
+   ],
+   "ev": "dbt §6.4.1 (p.15)"
+  },
+  {
+   "id": "X34",
+   "a": "Dimensions",
+   "s": "Someone changes the shape of a Gold table",
+   "r": "Refused. Every Gold model fails on a schema change, and the service account holds DML only — no create, alter or drop.",
+   "c": [
+    "S16",
+    "S17"
+   ],
+   "ev": "dbt §8.4 (p.21)"
+  },
+  {
+   "id": "X35",
+   "a": "Reconciliation",
+   "s": "Counts do not agree at a boundary",
+   "r": "The difference is written to the immutable log and published. The pass or warning verdict is derived on the Splunk side, after the data is already in Gold — so it alerts rather than blocks.",
+   "c": [
+    "S19"
+   ],
+   "ev": "dbt §7.2 (p.18) · §7.2.1 (p.18)"
+  },
+  {
+   "id": "X36",
+   "a": "Reconciliation",
+   "s": "The held backlog is growing",
+   "r": "Alerts on the ageing open rows, and the usual cause is a late dimension file.",
+   "c": [
+    "S19",
+    "S18"
+   ],
+   "ev": "dbt §7.2.1 (p.18)"
+  },
+  {
+   "id": "X37",
+   "a": "Reconciliation",
+   "s": "DQ or reconciliation is rerun for a date",
+   "r": "The DQ rows are upserted so their resolution status survives, the recon rows for that date are replaced, and both are republished.",
+   "c": [
+    "S18",
+    "S19"
+   ],
+   "ev": "dbt §8.1 (p.20)"
+  },
+  {
+   "id": "X38",
+   "a": "Evidence",
+   "s": "Publishing to Splunk fails",
+   "r": "The data is already durable in Oracle. The publish task is separate and retryable, and it is idempotent per date.",
+   "c": [
+    "S21"
+   ],
+   "ev": "dbt §8.3 (p.21)"
+  },
+  {
+   "id": "X39",
+   "a": "Restatement",
+   "s": "A successful file has to be replaced",
+   "r": "Approval first, then the reason, approver, operator and affected downstream scope are recorded. The registry row and the RAW rows are deleted through the controlled process, the corrected file is dropped in Landing, and a fresh lifecycle starts. The downstream rebuild for that date is coordinated separately.",
+   "c": [
+    "S8",
+    "S13"
+   ],
+   "ev": "ingest Appendix D.4 (p.23)"
+  },
+  {
+   "id": "X40",
+   "a": "Restatement",
+   "s": "A quarantined file is corrected",
+   "r": "The same registry id is reused, the retry count goes up, the status resets to RECEIVED and every validation runs again before any RAW write.",
+   "c": [
+    "S8"
+   ],
+   "ev": "ingest Appendix D.2 (p.22)"
+  }
+ ],
+ "SCENARIO_GAPS": [
+  "Invalid data types inside an otherwise well-formed file",
+  "Invalid measure values — a negative quantity, an impossible price",
+  "Duplicate rows arriving inside a single fact feed",
+  "Database constraint violations on the Gold write",
+  "Network or permission failures on the archive move specifically",
+  "Scheduler or worker restart part-way through a mapped task"
+ ],
+ "TRACKER_COMPONENTS": [
+  {
+   "id": "1",
+   "zone": "1. SEI",
+   "plane": "Source",
+   "component": "SWP Platform",
+   "deliverable": "Interface spec: domains, entities, extract triggers",
+   "questions": "Which domains are in scope for phase 1?",
+   "depends": "-",
+   "source": "SEI v5",
+   "priority": "P1",
+   "technology": "Contract",
+   "custom": "None",
+   "scope": "SEI-owned. Specification review only.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "2",
+   "zone": "1. SEI",
+   "plane": "Source",
+   "component": "SWP UI",
+   "deliverable": "Access model + SSO handshake spec",
+   "questions": "Which BBH roles need UI access?",
+   "depends": "36",
+   "source": "SEI v5",
+   "priority": "P3",
+   "technology": "Contract",
+   "custom": "None",
+   "scope": "SEI-owned.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "3",
+   "zone": "1. SEI",
+   "plane": "Source",
+   "component": "SWP APIs",
+   "deliverable": "API contract: endpoints, auth, rate limits, SLAs",
+   "questions": "Which consumers use real-time vs batch?",
+   "depends": "12",
+   "source": "SEI v5",
+   "priority": "P1",
+   "technology": "Contract",
+   "custom": "None",
+   "scope": "SEI-owned. Consume as published.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "4",
+   "zone": "1. SEI",
+   "plane": "Source",
+   "component": "SWP Loaders",
+   "deliverable": "Loader file format + submission/ack contract",
+   "questions": "Sync or async ack? Failure semantics?",
+   "depends": "10, 11",
+   "source": "SEI v5",
+   "priority": "P2",
+   "technology": "Contract",
+   "custom": "None",
+   "scope": "SEI-owned.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "5",
+   "zone": "1. SEI",
+   "plane": "Source",
+   "component": "Extract Generation",
+   "deliverable": "File spec: layout, naming, manifest, EOD + intraday cadence",
+   "questions": "Full snapshot daily, or change-indicator available?",
+   "depends": "8",
+   "source": "SEI v5",
+   "priority": "P1",
+   "technology": "Contract",
+   "custom": "None",
+   "scope": "SEI-owned. Ask for hash/change column - biggest volume lever.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "6",
+   "zone": "1. SEI",
+   "plane": "PS-Orchestration",
+   "component": "Orchestration API / Data Ingestion / ODM / Workflows / Config",
+   "deliverable": "Outbound orchestration design (SEI-owned, BBH-reviewed)",
+   "questions": "Is outbound in scope this phase?",
+   "depends": "10, 11",
+   "source": "SEI v5",
+   "priority": "P3",
+   "technology": "Contract",
+   "custom": "None",
+   "scope": "SEI-owned.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "7",
+   "zone": "1. SEI",
+   "plane": "PS-Orchestration",
+   "component": "Status Monitoring Dashboard",
+   "deliverable": "Status event contract to Integration360",
+   "questions": "Does this or Integration360 hold the recon record?",
+   "depends": "35",
+   "source": "SEI v5",
+   "priority": "P2",
+   "technology": "Contract",
+   "custom": "Low",
+   "scope": "Event schema agreement; no BBH build.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "8",
+   "zone": "2. Hub",
+   "plane": "Ingress/Egress",
+   "component": "Landing Zone + Transport",
+   "deliverable": "Transport design: protocol, auth, dirs, retention, completeness signal",
+   "questions": "sFTP or object store? Same for EOD and intraday?",
+   "depends": "5",
+   "source": "Both (conflict)",
+   "priority": "P1",
+   "technology": "Infra",
+   "custom": "Low",
+   "scope": "Managed service + config. Custom only for manifest/completeness check.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "9",
+   "zone": "2. Hub",
+   "plane": "Ingress/Egress",
+   "component": "File Arrival Sensors",
+   "deliverable": "Per-file sensor design; start-on-arrival not batch-complete",
+   "questions": "Manifest-driven or filename pattern?",
+   "depends": "8, 18",
+   "source": "NEW",
+   "priority": "P1",
+   "technology": "Airflow",
+   "custom": "Medium",
+   "scope": "Custom sensor/deferrable operator per domain. Base sensors do not know your manifest.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "10",
+   "zone": "2. Hub",
+   "plane": "Ingress/Egress",
+   "component": "Outbound Producers",
+   "deliverable": "Design for Data Extracts, JSON payloads, Loader File",
+   "questions": "Which BBH systems are sources?",
+   "depends": "43",
+   "source": "SEI v5",
+   "priority": "P3",
+   "technology": "Python",
+   "custom": "High",
+   "scope": "Full custom build: extract, JSON serialisation, loader-file format per SEI spec.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "11",
+   "zone": "2. Hub",
+   "plane": "Ingress/Egress",
+   "component": "Apigee Proxy",
+   "deliverable": "Proxy design: submit path + status-return path",
+   "questions": "Is Apigee a decision or a placeholder? (AD-3)",
+   "depends": "10, 35",
+   "source": "SEI v5",
+   "priority": "P3",
+   "technology": "Vendor/Infra",
+   "custom": "Low",
+   "scope": "Proxy config + policies. No application code.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "12",
+   "zone": "2. Hub",
+   "plane": "Ingress/Egress",
+   "component": "API Gateway / Data Plane",
+   "deliverable": "Real-time route design, independent of batch",
+   "questions": "Does intraday run here or on batch? (AD-4)",
+   "depends": "3, 42",
+   "source": "BBH V4.2",
+   "priority": "P2",
+   "technology": "Vendor/Infra",
+   "custom": "Low",
+   "scope": "Gateway config, routing, throttling policies.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "13",
+   "zone": "2. Hub",
+   "plane": "Processing",
+   "component": "Python Ingestion Framework",
+   "deliverable": "Module design: validation, profiling, metadata capture, RAW load",
+   "questions": "cx_Oracle vs SQL*Loader vs External Tables?",
+   "depends": "8, 14, 23",
+   "source": "SEI v5",
+   "priority": "P1",
+   "technology": "Python",
+   "custom": "High",
+   "scope": "CORE BUILD. Reusable config-driven framework, not 7 scripts. Loader abstraction + audit column injection.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "14",
+   "zone": "2. Hub",
+   "plane": "Processing",
+   "component": "Stage 1 RAW",
+   "deliverable": "Physical model: 7 RAW_* tables, 8 audit cols, partitioning, retention",
+   "questions": "Partition by BUSINESS_DATE? Purge policy?",
+   "depends": "13",
+   "source": "SEI v5",
+   "priority": "P1",
+   "technology": "Oracle DDL",
+   "custom": "None",
+   "scope": "DDL + partitioning. No application code.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "15",
+   "zone": "2. Hub",
+   "plane": "Processing",
+   "component": "Stage 2 Enriched (dbt)",
+   "deliverable": "5 STG2_* models, 8 processing steps, tests",
+   "questions": "Full refresh or incremental per model?",
+   "depends": "14, 17, 25",
+   "source": "SEI v5",
+   "priority": "P1",
+   "technology": "dbt",
+   "custom": "Medium",
+   "scope": "Standard dbt models. Custom macros for dedup and latest-record selection.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "16",
+   "zone": "2. Hub",
+   "plane": "Processing",
+   "component": "Gold (dbt)",
+   "deliverable": "2 SCD2 dims + 3 facts; SCD2 and merge logic",
+   "questions": "Writes to Hub schema or PBDW/IMDS direct? (AD-1)",
+   "depends": "15, 26, 60",
+   "source": "SEI v5 only",
+   "priority": "P1",
+   "technology": "dbt",
+   "custom": "High",
+   "scope": "dbt snapshot will NOT cover this. Custom incremental SCD2 macro + merge strategy per fact.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "17",
+   "zone": "2. Hub",
+   "plane": "Processing",
+   "component": "Correction Handling",
+   "deliverable": "Bitemporal vs merge design, applied across Stage 2 and Gold",
+   "questions": "One answer both layers. (AD-2)",
+   "depends": "15, 16, 21",
+   "source": "Both (conflict)",
+   "priority": "P1",
+   "technology": "dbt",
+   "custom": "High",
+   "scope": "No dbt idiom for bitemporal. Custom incremental strategy / macro, written once and reused.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "18",
+   "zone": "2. Hub",
+   "plane": "Orchestration",
+   "component": "Airflow DAG + Per-Domain Fan-out",
+   "deliverable": "DAG design: 7 parallel branches, join points, retries",
+   "questions": "Where do branches legitimately join?",
+   "depends": "9, 51, 52",
+   "source": "SEI v5 + NEW",
+   "priority": "P1",
+   "technology": "Airflow",
+   "custom": "High",
+   "scope": "Dynamic task mapping over domain config. Not a hand-written static DAG.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "19",
+   "zone": "2. Hub",
+   "plane": "Orchestration",
+   "component": "Dim-before-Fact / dbt Threads",
+   "deliverable": "Build-order and concurrency design",
+   "questions": "Thread count vs Oracle contention ceiling?",
+   "depends": "16, 55",
+   "source": "NEW",
+   "priority": "P2",
+   "technology": "Airflow + dbt",
+   "custom": "Low",
+   "scope": "Selector config and thread tuning.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "20",
+   "zone": "2. Hub",
+   "plane": "Orchestration",
+   "component": "Intraday Cadence Control",
+   "deliverable": "Cadence design and lane assignment",
+   "questions": "Frequency? Batch pipeline or API route? (AD-4)",
+   "depends": "12, 18",
+   "source": "SEI v5",
+   "priority": "P1",
+   "technology": "Airflow",
+   "custom": "Medium",
+   "scope": "Custom scheduling logic; overlap prevention with the EOD run.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "21",
+   "zone": "2. Hub",
+   "plane": "Orchestration",
+   "component": "Replay / Rerun Engine",
+   "deliverable": "Replay design from LOAD_ID; scope, idempotency, downstream impact",
+   "questions": "Replay rewrites Gold in place or appends? (ties to AD-2)",
+   "depends": "14, 17, 27",
+   "source": "NEW",
+   "priority": "P1",
+   "technology": "Python + Airflow",
+   "custom": "High",
+   "scope": "CORE BUILD. Airflow clear/backfill does NOT undo a Gold merge. Bespoke replay orchestration + idempotency.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "22",
+   "zone": "2. Hub",
+   "plane": "Orchestration",
+   "component": "Partial-Batch Policy",
+   "deliverable": "Policy + implementation: halt-all vs per-domain proceed",
+   "questions": "Can consumers tolerate a partial business date? (AD-5)",
+   "depends": "18, 23",
+   "source": "NEW",
+   "priority": "P1",
+   "technology": "Airflow",
+   "custom": "Medium",
+   "scope": "Custom branching + trigger rules. Publish-completeness marker per domain.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "23",
+   "zone": "2. Hub",
+   "plane": "Data Quality",
+   "component": "G1 File / Structural Gate",
+   "deliverable": "Check set + quarantine design. BLOCKS RAW insert",
+   "questions": "Which failures are fatal vs warn?",
+   "depends": "8, 13, 28",
+   "source": "SEI v5",
+   "priority": "P1",
+   "technology": "Python",
+   "custom": "High",
+   "scope": "Custom validation engine driven by the rule registry. Blocking semantics + quarantine.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "24",
+   "zone": "2. Hub",
+   "plane": "Data Quality",
+   "component": "G2 RAW Profiling Gate",
+   "deliverable": "Profiling checks. BLOCKS Stage 2",
+   "questions": "Thresholds absolute or vs trailing average?",
+   "depends": "14, 28",
+   "source": "SEI v5",
+   "priority": "P2",
+   "technology": "Airflow + SQL",
+   "custom": "Medium",
+   "scope": "Aggregate SQL pushed to Oracle; custom threshold comparison and branch.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "25",
+   "zone": "2. Hub",
+   "plane": "Data Quality",
+   "component": "G3 dbt Tests + Business Rules",
+   "deliverable": "Test suite + rule design. BLOCKS Gold",
+   "questions": "Which rules are dbt tests vs model logic?",
+   "depends": "15, 28",
+   "source": "SEI v5",
+   "priority": "P1",
+   "technology": "dbt",
+   "custom": "Medium",
+   "scope": "Generic tests cover basics; custom singular tests + generic test macros for business rules.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "26",
+   "zone": "2. Hub",
+   "plane": "Data Quality",
+   "component": "G4 Tie-out / Control Totals",
+   "deliverable": "RAW-to-Gold reconciliation. BLOCKS Gold publish. Per-target",
+   "questions": "Recount or compare to captured ingest metadata?",
+   "depends": "14, 16, 28",
+   "source": "NEW",
+   "priority": "P1",
+   "technology": "Airflow + SQL",
+   "custom": "High",
+   "scope": "CORE BUILD. dbt tests cannot do this - it crosses the graph and must gate the publish.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "27",
+   "zone": "2. Hub",
+   "plane": "Data Quality",
+   "component": "G5 Post-Publish Recon",
+   "deliverable": "Advisory recon; triggers replay",
+   "questions": "What auto-triggers a replay vs pages a human?",
+   "depends": "16, 21",
+   "source": "SEI v5",
+   "priority": "P2",
+   "technology": "Airflow + SQL",
+   "custom": "Medium",
+   "scope": "Custom recon queries + replay trigger integration.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "28",
+   "zone": "2. Hub",
+   "plane": "Data Quality",
+   "component": "DQ Framework",
+   "deliverable": "Rule registry, severity tiers, results store, audited override path",
+   "questions": "Who can override at 2am, and how is it logged?",
+   "depends": "33, 31",
+   "source": "NEW",
+   "priority": "P1",
+   "technology": "Python",
+   "custom": "High",
+   "scope": "CORE BUILD. Registry schema, severity model, results store, override API + audit trail.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "29",
+   "zone": "2. Hub",
+   "plane": "Foundation",
+   "component": "Error Handling & Quarantine",
+   "deliverable": "Error taxonomy, quarantine store, resubmission path",
+   "questions": "Quarantine retention and reprocessing route?",
+   "depends": "23, 50",
+   "source": "Both",
+   "priority": "P1",
+   "technology": "Python",
+   "custom": "High",
+   "scope": "Custom taxonomy + quarantine lifecycle + resubmission path.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "30",
+   "zone": "2. Hub",
+   "plane": "Foundation",
+   "component": "Reconciliation Framework",
+   "deliverable": "Recon model: control totals, exception lifecycle",
+   "questions": "Who owns the recon record? (AD-6)",
+   "depends": "26, 27, 35",
+   "source": "Both",
+   "priority": "P1",
+   "technology": "Python",
+   "custom": "High",
+   "scope": "Custom recon data model + exception lifecycle + Integration360 publication.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "31",
+   "zone": "2. Hub",
+   "plane": "Foundation",
+   "component": "Audit & Lineage",
+   "deliverable": "End-to-end lineage design, evidence retention",
+   "questions": "Is lineage audit-defensible under AD-2?",
+   "depends": "14, 17",
+   "source": "Both",
+   "priority": "P1",
+   "technology": "Python + dbt",
+   "custom": "Medium",
+   "scope": "dbt docs covers model lineage only. Custom row-level lineage via LOAD_ID chain.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "32",
+   "zone": "2. Hub",
+   "plane": "Foundation",
+   "component": "Security & Access Control",
+   "deliverable": "AuthN/AuthZ model, data classification, masking",
+   "questions": "Any PII in SWP extracts requiring masking?",
+   "depends": "47, 48",
+   "source": "BBH V4.2",
+   "priority": "P1",
+   "technology": "Infra",
+   "custom": "Low",
+   "scope": "Oracle roles/grants + platform controls. Custom only if masking required.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "33",
+   "zone": "2. Hub",
+   "plane": "Foundation",
+   "component": "Metadata & Configuration Store",
+   "deliverable": "Config model: rules, thresholds, mappings, schedules",
+   "questions": "One store, or does SEI keep its own? (risk R1)",
+   "depends": "6, 28",
+   "source": "Both",
+   "priority": "P1",
+   "technology": "Oracle DDL + Python",
+   "custom": "High",
+   "scope": "CORE BUILD. Everything config-driven depends on this. Build first.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "34",
+   "zone": "2. Hub",
+   "plane": "Foundation",
+   "component": "Observability",
+   "deliverable": "Logs, metrics, traces; SLIs and alerting",
+   "questions": "What are the SLOs for the EOD window?",
+   "depends": "64",
+   "source": "BBH V4.2",
+   "priority": "P2",
+   "technology": "Infra",
+   "custom": "Low",
+   "scope": "Standard stack + custom metric emission from Python/Airflow.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "35",
+   "zone": "2. Hub",
+   "plane": "Foundation",
+   "component": "Integration360",
+   "deliverable": "Monitoring, exception mgmt, process tracking, recon",
+   "questions": "Does it become the system of record? (AD-6)",
+   "depends": "7, 30",
+   "source": "Both",
+   "priority": "P1",
+   "technology": "Vendor/BBH",
+   "custom": "Medium",
+   "scope": "Existing BBH platform. Custom feed/adapter from the Hub.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "36",
+   "zone": "2. Hub",
+   "plane": "Foundation",
+   "component": "SSO",
+   "deliverable": "SSO design to SWP UI",
+   "questions": "Federation protocol and identity source?",
+   "depends": "2",
+   "source": "SEI v5",
+   "priority": "P3",
+   "technology": "Infra",
+   "custom": "None",
+   "scope": "Configuration only.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "37",
+   "zone": "3. Consumers",
+   "plane": "Consumers",
+   "component": "PBDW",
+   "deliverable": "Publication design + change control",
+   "questions": "Direct dbt writes or publish pattern? (AD-1)",
+   "depends": "16, 60",
+   "source": "Both",
+   "priority": "P1",
+   "technology": "Oracle DDL + dbt",
+   "custom": "Medium",
+   "scope": "Existing tables. Custom publish/swap pattern if AD-1 lands Hub-owned.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "38",
+   "zone": "3. Consumers",
+   "plane": "Consumers",
+   "component": "IMDS Stage -> IMDS",
+   "deliverable": "Staging DB + load design from Stage 2",
+   "questions": "Missing from BBH deck - confirm it exists",
+   "depends": "15",
+   "source": "SEI v5 only",
+   "priority": "P2",
+   "technology": "Oracle DDL + dbt",
+   "custom": "Medium",
+   "scope": "New staging schema + load models.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "39",
+   "zone": "3. Consumers",
+   "plane": "Consumers",
+   "component": "Pivotal Database",
+   "deliverable": "Feed design from Stage 2",
+   "questions": "Absent from SEI 8-component list - scope gap",
+   "depends": "15",
+   "source": "BBH V4.2 only",
+   "priority": "P2",
+   "technology": "dbt",
+   "custom": "Medium",
+   "scope": "New feed. Not costed in SEI scope.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "40",
+   "zone": "3. Consumers",
+   "plane": "Consumers",
+   "component": "CP DW Canonical Model",
+   "deliverable": "Forward-compatibility design only (future)",
+   "questions": "Keep Stage 2 neutral enough to attach later",
+   "depends": "15",
+   "source": "BBH V4.2 (future)",
+   "priority": "P3",
+   "technology": "Design only",
+   "custom": "None",
+   "scope": "No build this phase. Design constraint on Stage 2 only.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "41",
+   "zone": "3. Consumers",
+   "plane": "Consumers",
+   "component": "BI / Analytics",
+   "deliverable": "Semantic layer + access design",
+   "questions": "Which of ~1000 consumers land where?",
+   "depends": "16",
+   "source": "SEI v5",
+   "priority": "P2",
+   "technology": "BI tooling",
+   "custom": "Low",
+   "scope": "Power BI / Tableau models. Outside the Python/dbt stack.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "42",
+   "zone": "3. Consumers",
+   "plane": "Consumers",
+   "component": "Real-time Consumers",
+   "deliverable": "Consumer contract on the API lane",
+   "questions": "Which use cases justify real-time?",
+   "depends": "12",
+   "source": "BBH V4.2",
+   "priority": "P2",
+   "technology": "Contract",
+   "custom": "None",
+   "scope": "Consumer-side build, not Hub.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "43",
+   "zone": "3. Consumers",
+   "plane": "Consumers",
+   "component": "BBH Existing Systems",
+   "deliverable": "Impact assessment: front/back office, trade, custody",
+   "questions": "Which are sources for outbound?",
+   "depends": "10",
+   "source": "SEI v5",
+   "priority": "P3",
+   "technology": "Analysis",
+   "custom": "None",
+   "scope": "Assessment only this phase.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "44",
+   "zone": "4. OpenShift",
+   "plane": "Platform",
+   "component": "Projects / Namespaces",
+   "deliverable": "Environment topology: dev, test, UAT, prod",
+   "questions": "Namespace per env, or per env per component?",
+   "depends": "-",
+   "source": "NEW",
+   "priority": "P1",
+   "technology": "Infra",
+   "custom": "None",
+   "scope": "Platform config.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "45",
+   "zone": "4. OpenShift",
+   "plane": "Platform",
+   "component": "Container Images",
+   "deliverable": "Base image standard: Python, dbt, Airflow",
+   "questions": "Who owns base image patching cadence?",
+   "depends": "57",
+   "source": "NEW",
+   "priority": "P1",
+   "technology": "Infra",
+   "custom": "Medium",
+   "scope": "Custom Dockerfiles per runtime; dependency pinning for dbt + cx_Oracle.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "46",
+   "zone": "4. OpenShift",
+   "plane": "Platform",
+   "component": "Registry, Scanning, Signing",
+   "deliverable": "Image supply-chain design + promotion policy",
+   "questions": "What CVE severity blocks promotion?",
+   "depends": "45, 57",
+   "source": "NEW",
+   "priority": "P2",
+   "technology": "Infra",
+   "custom": "None",
+   "scope": "Tooling config.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "47",
+   "zone": "4. OpenShift",
+   "plane": "Platform",
+   "component": "Service Accounts, RBAC, SCCs",
+   "deliverable": "Cluster access model",
+   "questions": "Least-privilege per workload?",
+   "depends": "32",
+   "source": "NEW",
+   "priority": "P1",
+   "technology": "Infra",
+   "custom": "None",
+   "scope": "Platform config.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "48",
+   "zone": "4. OpenShift",
+   "plane": "Platform",
+   "component": "Secrets Management",
+   "deliverable": "Secrets design: Oracle creds, sFTP keys, API tokens",
+   "questions": "Vault or sealed secrets? Rotation policy?",
+   "depends": "32",
+   "source": "NEW",
+   "priority": "P1",
+   "technology": "Infra",
+   "custom": "Low",
+   "scope": "Config + custom secret injection into Airflow connections.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "49",
+   "zone": "4. OpenShift",
+   "plane": "Platform",
+   "component": "Network Policy & Egress",
+   "deliverable": "Egress to SEI/Apigee/Oracle; ingress rules",
+   "questions": "Firewall path to SEI approved?",
+   "depends": "8, 11",
+   "source": "NEW",
+   "priority": "P1",
+   "technology": "Infra",
+   "custom": "None",
+   "scope": "Network config. Long lead time - start early.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "50",
+   "zone": "4. OpenShift",
+   "plane": "Platform",
+   "component": "Persistent Storage",
+   "deliverable": "Volume design: landing, quarantine, dbt artifacts, logs",
+   "questions": "Capacity for retention window?",
+   "depends": "8, 29",
+   "source": "NEW",
+   "priority": "P2",
+   "technology": "Infra",
+   "custom": "None",
+   "scope": "Storage class + PVC config.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "51",
+   "zone": "4. OpenShift",
+   "plane": "Runtime",
+   "component": "Airflow Deployment",
+   "deliverable": "Scheduler HA, KubernetesExecutor, pod operator design",
+   "questions": "HA scheduler required for the window?",
+   "depends": "18",
+   "source": "NEW",
+   "priority": "P1",
+   "technology": "Infra + Airflow",
+   "custom": "Medium",
+   "scope": "Helm values + custom pod templates per task type.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "52",
+   "zone": "4. OpenShift",
+   "plane": "Runtime",
+   "component": "Worker Pod Autoscaling",
+   "deliverable": "Autoscaling design sized to the fan-out",
+   "questions": "Max concurrency before Oracle contention?",
+   "depends": "18, 55",
+   "source": "NEW",
+   "priority": "P1",
+   "technology": "Infra",
+   "custom": "Low",
+   "scope": "HPA/KEDA config. Requires the measurement from item 55.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "53",
+   "zone": "4. OpenShift",
+   "plane": "Runtime",
+   "component": "Resource Quotas & Priority",
+   "deliverable": "Requests/limits, quotas, priority classes for EOD",
+   "questions": "Does batch preempt other workloads?",
+   "depends": "52",
+   "source": "NEW",
+   "priority": "P2",
+   "technology": "Infra",
+   "custom": "None",
+   "scope": "Platform config.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "54",
+   "zone": "4. OpenShift",
+   "plane": "Runtime",
+   "component": "Warm-start / Pre-pulled Images",
+   "deliverable": "Cold-start mitigation design",
+   "questions": "Cold start cost vs the 5-min window?",
+   "depends": "45, 52",
+   "source": "NEW",
+   "priority": "P2",
+   "technology": "Infra",
+   "custom": "Low",
+   "scope": "Image pre-pull / slim images. Measure first.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "55",
+   "zone": "4. OpenShift",
+   "plane": "Runtime",
+   "component": "Oracle Connection Pooling",
+   "deliverable": "Pooling design; the real parallelism ceiling",
+   "questions": "Max sessions DBA will grant?",
+   "depends": "13, 52",
+   "source": "NEW",
+   "priority": "P1",
+   "technology": "Python + Infra",
+   "custom": "Medium",
+   "scope": "Custom pool management in the ingestion framework. Sets the fan-out ceiling.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "56",
+   "zone": "4. OpenShift",
+   "plane": "Runtime",
+   "component": "Node Placement",
+   "deliverable": "Taints/affinity: batch burst vs always-on API",
+   "questions": "Dedicated nodes for the real-time lane?",
+   "depends": "12, 52",
+   "source": "NEW",
+   "priority": "P2",
+   "technology": "Infra",
+   "custom": "None",
+   "scope": "Scheduling config.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "57",
+   "zone": "4. OpenShift",
+   "plane": "Deployment",
+   "component": "CI/CD Pipelines",
+   "deliverable": "Build, test, scan, promote pipeline design",
+   "questions": "Pipeline per component or monorepo?",
+   "depends": "45, 46",
+   "source": "NEW",
+   "priority": "P1",
+   "technology": "CI/CD",
+   "custom": "Medium",
+   "scope": "Custom pipelines: Python unit tests, dbt compile/test in CI against a test schema.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "58",
+   "zone": "4. OpenShift",
+   "plane": "Deployment",
+   "component": "GitOps / ArgoCD",
+   "deliverable": "Manifest promotion and drift control",
+   "questions": "Environment promotion gates?",
+   "depends": "44, 57",
+   "source": "NEW",
+   "priority": "P2",
+   "technology": "CI/CD",
+   "custom": "Low",
+   "scope": "Standard GitOps config.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "59",
+   "zone": "4. OpenShift",
+   "plane": "Deployment",
+   "component": "dbt Release & Rollback",
+   "deliverable": "dbt versioning, release cadence, rollback design",
+   "questions": "Rollback of an SCD2 dim - how?",
+   "depends": "15, 16, 21",
+   "source": "NEW",
+   "priority": "P1",
+   "technology": "dbt + CI/CD",
+   "custom": "High",
+   "scope": "No native rollback for a merged SCD2 dim. Custom restore path tied to the replay engine.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "60",
+   "zone": "4. OpenShift",
+   "plane": "Deployment",
+   "component": "Database Change Management",
+   "deliverable": "DDL control for RAW/STG2/Gold + PBDW/IMDS",
+   "questions": "Does Gold sit inside BBH prod change control? (AD-1)",
+   "depends": "16, 37",
+   "source": "NEW",
+   "priority": "P1",
+   "technology": "Process + DDL",
+   "custom": "Low",
+   "scope": "Process design + migration tooling.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "61",
+   "zone": "4. OpenShift",
+   "plane": "Deployment",
+   "component": "Blue-Green / Canary (API lane)",
+   "deliverable": "Zero-downtime release design for real-time",
+   "questions": "Needed for phase 1 or later?",
+   "depends": "12",
+   "source": "NEW",
+   "priority": "P3",
+   "technology": "Infra",
+   "custom": "None",
+   "scope": "Platform capability.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "62",
+   "zone": "4. OpenShift",
+   "plane": "Operations",
+   "component": "HA / DR",
+   "deliverable": "DR topology, RTO/RPO for the batch window",
+   "questions": "What is the agreed RTO/RPO?",
+   "depends": "44",
+   "source": "NEW",
+   "priority": "P2",
+   "technology": "Infra",
+   "custom": "Low",
+   "scope": "Topology design + runbook.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "63",
+   "zone": "4. OpenShift",
+   "plane": "Operations",
+   "component": "Backup & Restore",
+   "deliverable": "Airflow metadata DB, config store, quarantine volumes",
+   "questions": "Restore tested how often?",
+   "depends": "33, 50",
+   "source": "NEW",
+   "priority": "P2",
+   "technology": "Infra",
+   "custom": "None",
+   "scope": "Backup tooling config.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "64",
+   "zone": "4. OpenShift",
+   "plane": "Operations",
+   "component": "Monitoring Stack",
+   "deliverable": "Prometheus/Grafana/log aggregation wired into item 34",
+   "questions": "One stack, not a parallel one - confirm",
+   "depends": "34",
+   "source": "NEW",
+   "priority": "P2",
+   "technology": "Infra",
+   "custom": "Low",
+   "scope": "Dashboards + alert rules.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  },
+  {
+   "id": "65",
+   "zone": "4. OpenShift",
+   "plane": "Operations",
+   "component": "Cost & Capacity Monitoring",
+   "deliverable": "Capacity model for a sharply peaked EOD burst",
+   "questions": "Peak-to-average ratio acceptable?",
+   "depends": "52, 53",
+   "source": "NEW",
+   "priority": "P3",
+   "technology": "Infra",
+   "custom": "None",
+   "scope": "Tooling config.",
+   "owner": "",
+   "status": "Not Started",
+   "target": "",
+   "notes": ""
+  }
+ ]
+}

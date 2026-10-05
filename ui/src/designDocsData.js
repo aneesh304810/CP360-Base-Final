@@ -14,139 +14,215 @@ export const DESIGN_DOCS = [
 "zone_default": "",
 "default": true,
 "component_ids": [],
-"withdrawn": true,
+"withdrawn": false,
+"generated": true,
+"sei_status": "overview",
 "chip": "",
 "meta": {},
 "src": "architecture.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "The three documents, and that they disagree",
+"md": "\nSEI has given three documents. Two are design documents and\none is the architecture, and they do not describe the same\nbuild. Every conflict below is a decision to take before a\nmodel is written.\n\n| # | The question | The architecture says | The design documents say |\n|---|---|---|---|\n| C1 | Three RAW tables, or seven | RAW_ACCOUNT, RAW_CLIENT, RAW_TAXLOT, RAW_TRANSACTION, RAW_POSITION, RAW_CORRECTED_TRANSACTION, RAW_CORRECTED_POSITION. | The dbt design document names three: account, client and transaction. Position, tax lot and the two correction tables do not appear in it at all. |\n| C2 | Stage 2 as five tables, or as STG plus INT | Five STG2_* tables, materialised as tables, full refresh daily or incremental. | A STG view that stores nothing, plus an INT table kept seven days and partitioned. |\n| C3 | Two Gold facts, or three | FACT_TRANSACTIONS, FACT_CP_HOLDINGS and FACT_TAX_LOT, each with its own strategy — merge, merge and periodic snapshot. | FACT_TRANSACTIONS only. |\n| C4 | Corrections as files, or as a rule | Two correction files arrive daily and Stage 2 has a named step, correction file integration, that merges them. | Correction is a MERGE-versus-UPDATE rule applied inside the dimension build. No correction file is described. |\n| C5 | Where data quality runs | A Data Quality Checks step after dbt Gold in the Airflow chain. | A per-row pass or fail computed in the STG view, before anything is loaded, plus tests between every layer. |",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "SEI has given three documents. Two are design documents and"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "one is the architecture, and they do not describe the same"
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "build. Every conflict below is a decision to take before a"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
+"x": "model is written."
 },
 {
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"t": "tbl",
+"rows": [
+[
+"#",
+"The question",
+"The architecture says",
+"The design documents say"
+],
+[
+"C1",
+"Three RAW tables, or seven",
+"RAW_ACCOUNT, RAW_CLIENT, RAW_TAXLOT, RAW_TRANSACTION, RAW_POSITION, RAW_CORRECTED_TRANSACTION, RAW_CORRECTED_POSITION.",
+"The dbt design document names three: account, client and transaction. Position, tax lot and the two correction tables do not appear in it at all."
+],
+[
+"C2",
+"Stage 2 as five tables, or as STG plus INT",
+"Five STG2_* tables, materialised as tables, full refresh daily or incremental.",
+"A STG view that stores nothing, plus an INT table kept seven days and partitioned."
+],
+[
+"C3",
+"Two Gold facts, or three",
+"FACT_TRANSACTIONS, FACT_CP_HOLDINGS and FACT_TAX_LOT, each with its own strategy — merge, merge and periodic snapshot.",
+"FACT_TRANSACTIONS only."
+],
+[
+"C4",
+"Corrections as files, or as a rule",
+"Two correction files arrive daily and Stage 2 has a named step, correction file integration, that merges them.",
+"Correction is a MERGE-versus-UPDATE rule applied inside the dimension build. No correction file is described."
+],
+[
+"C5",
+"Where data quality runs",
+"A Data Quality Checks step after dbt Gold in the Airflow chain.",
+"A per-row pass or fail computed in the STG view, before anything is loaded, plus tests between every layer."
+]
+]
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "The seam between the two design documents",
+"md": "\nThe line is **the guarded PENDING → TRIGGER update on DATE_CONTROL**.\n\nThe Ingestion DAG owns PENDING → TRIGGER. Only the run whose UPDATE changes exactly one row may invoke transformation — that is how two scheduled runs five minutes apart cannot both trigger it. The Transformation DAG owns TRIGGER → COMPLETE and the creation of the next PENDING row, in one database transaction, and it re-checks completeness defensively before doing any work.\n\n*File Ingestion design doc §5.1 (p.9) · File Ingestion design doc Appendix E.3 (p.24) · dbt design doc §5.3 (p.12)*",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The line is **the guarded PENDING → TRIGGER update on DATE_CONTROL**."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "The Ingestion DAG owns PENDING → TRIGGER. Only the run whose UPDATE changes exactly one row may invoke transformation — that is how two scheduled runs five minutes apart cannot both trigger it. The Transformation DAG owns TRIGGER → COMPLETE and the creation of the next PENDING row, in one database transaction, and it re-checks completeness defensively before doing any work."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
-},
-{
-"t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "*File Ingestion design doc §5.1 (p.9) · File Ingestion design doc Appendix E.3 (p.24) · dbt design doc §5.3 (p.12)*"
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Inbound",
+"md": "\n**Primary: SDC events. Secondary: file-based.** (BBH, stated directly)\n\nBoth SEI design documents describe the file path and only the file path — a scheduled scan every five minutes, one mapped task per file, completeness measured as a set of files that arrived. If events are the primary inbound route, the completeness gate, the business-date state machine and the SLA all rest on a path that is the secondary one.\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "**Primary: SDC events. Secondary: file-based.** (BBH, stated directly)"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "Both SEI design documents describe the file path and only the file path — a scheduled scan every five minutes, one mapped task per file, completeness measured as a set of files that arrived. If events are the primary inbound route, the completeness gate, the business-date state machine and the SLA all rest on a path that is the secondary one."
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Outbound — Loader submission, via the Orchestration Hub",
+"md": "\n*BBH, stated directly — not in either SEI design document*\n\n| # | Who | What happens |\n|---|---|---|\n| 1 | CRM → Hub | The Orchestration Hub exposes an API. CRM calls it with the loader details and the data the loader needs. |\n| 2 | Hub | The Hub validates what it was given and transforms it into loader format. |\n| 3 | Hub → SEI PS | SEI Professional Services processes the loader. |\n| 4 | Hub → CRM | CRM exposes an API of its own, and the Hub calls it with the response. |\n\nTwo APIs, one each way, and the Hub owns validation and the format. That makes the Hub responsible for a contract neither SEI design document mentions: what a valid submission looks like, what happens to an invalid one, and what the response carries when SEI rejects a loader rather than the Hub.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "*BBH, stated directly — not in either SEI design document*"
+},
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Who",
+"What happens"
+],
+[
+"1",
+"CRM → Hub",
+"The Orchestration Hub exposes an API. CRM calls it with the loader details and the data the loader needs."
+],
+[
+"2",
+"Hub",
+"The Hub validates what it was given and transforms it into loader format."
+],
+[
+"3",
+"Hub → SEI PS",
+"SEI Professional Services processes the loader."
+],
+[
+"4",
+"Hub → CRM",
+"CRM exposes an API of its own, and the Hub calls it with the response."
+]
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Two APIs, one each way, and the Hub owns validation and the format. That makes the Hub responsible for a contract neither SEI design document mentions: what a valid submission looks like, what happens to an invalid one, and what the response carries when SEI rejects a loader rather than the Hub."
+}
+]
+},
+{
+"h": "The containers",
+"md": "\n| Container | What is in it |\n|---|---|\n| **Ingress and Egress** | Landing and transport · API gateway and Apigee proxy · Loader framework · SEI-side source |\n| **Ingestion** | Event-based ingestion · File-based ingestion · RAW profiling |\n| **Orchestration** | Ingestion DAG · Transformation DAG · Business-date state machine |\n| **Processing** | dbt models · Data quality and reconciliation · Warehouse and consumers |\n| **Foundation** | Control and metadata · Evidence and observability · Errors, audit and lineage · Security and access |\n| **OpenShift Platform** | Platform · Runtime · Deployment · Operations |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"Container",
+"What is in it"
+],
+[
+"**Ingress and Egress**",
+"Landing and transport · API gateway and Apigee proxy · Loader framework · SEI-side source"
+],
+[
+"**Ingestion**",
+"Event-based ingestion · File-based ingestion · RAW profiling"
+],
+[
+"**Orchestration**",
+"Ingestion DAG · Transformation DAG · Business-date state machine"
+],
+[
+"**Processing**",
+"dbt models · Data quality and reconciliation · Warehouse and consumers"
+],
+[
+"**Foundation**",
+"Control and metadata · Evidence and observability · Errors, audit and lineage · Security and access"
+],
+[
+"**OpenShift Platform**",
+"Platform · Runtime · Deployment · Operations"
+]
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "id: architecture\ntitle: Component Architecture\nlevel: L1\nicon: 🏛\ncolor: #4a5fc0\nbg: #e8ecf9\norder: 1\nsub: withdrawn - to be rewritten from the drawing\ndefault: true\nwithdrawn: true"
+"fm_raw": "id: architecture\ntitle: Component Architecture\nlevel: L1\nicon: 🏛\ncolor: #4a5fc0\nbg: #e8ecf9\norder: 1\nsub: withdrawn - to be rewritten from the drawing\ndefault: true\ngenerated: true\nsei_status: overview"
 },
 {
 "id": "l2-planes",
@@ -161,139 +237,215 @@ export const DESIGN_DOCS = [
 "zone_default": "2. Hub",
 "default": false,
 "component_ids": [],
-"withdrawn": true,
+"withdrawn": false,
+"generated": true,
+"sei_status": "overview",
 "chip": "",
 "meta": {},
 "src": "l2-plane-drilldowns.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "The three documents, and that they disagree",
+"md": "\nSEI has given three documents. Two are design documents and\none is the architecture, and they do not describe the same\nbuild. Every conflict below is a decision to take before a\nmodel is written.\n\n| # | The question | The architecture says | The design documents say |\n|---|---|---|---|\n| C1 | Three RAW tables, or seven | RAW_ACCOUNT, RAW_CLIENT, RAW_TAXLOT, RAW_TRANSACTION, RAW_POSITION, RAW_CORRECTED_TRANSACTION, RAW_CORRECTED_POSITION. | The dbt design document names three: account, client and transaction. Position, tax lot and the two correction tables do not appear in it at all. |\n| C2 | Stage 2 as five tables, or as STG plus INT | Five STG2_* tables, materialised as tables, full refresh daily or incremental. | A STG view that stores nothing, plus an INT table kept seven days and partitioned. |\n| C3 | Two Gold facts, or three | FACT_TRANSACTIONS, FACT_CP_HOLDINGS and FACT_TAX_LOT, each with its own strategy — merge, merge and periodic snapshot. | FACT_TRANSACTIONS only. |\n| C4 | Corrections as files, or as a rule | Two correction files arrive daily and Stage 2 has a named step, correction file integration, that merges them. | Correction is a MERGE-versus-UPDATE rule applied inside the dimension build. No correction file is described. |\n| C5 | Where data quality runs | A Data Quality Checks step after dbt Gold in the Airflow chain. | A per-row pass or fail computed in the STG view, before anything is loaded, plus tests between every layer. |",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "SEI has given three documents. Two are design documents and"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "one is the architecture, and they do not describe the same"
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "build. Every conflict below is a decision to take before a"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
+"x": "model is written."
 },
 {
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"t": "tbl",
+"rows": [
+[
+"#",
+"The question",
+"The architecture says",
+"The design documents say"
+],
+[
+"C1",
+"Three RAW tables, or seven",
+"RAW_ACCOUNT, RAW_CLIENT, RAW_TAXLOT, RAW_TRANSACTION, RAW_POSITION, RAW_CORRECTED_TRANSACTION, RAW_CORRECTED_POSITION.",
+"The dbt design document names three: account, client and transaction. Position, tax lot and the two correction tables do not appear in it at all."
+],
+[
+"C2",
+"Stage 2 as five tables, or as STG plus INT",
+"Five STG2_* tables, materialised as tables, full refresh daily or incremental.",
+"A STG view that stores nothing, plus an INT table kept seven days and partitioned."
+],
+[
+"C3",
+"Two Gold facts, or three",
+"FACT_TRANSACTIONS, FACT_CP_HOLDINGS and FACT_TAX_LOT, each with its own strategy — merge, merge and periodic snapshot.",
+"FACT_TRANSACTIONS only."
+],
+[
+"C4",
+"Corrections as files, or as a rule",
+"Two correction files arrive daily and Stage 2 has a named step, correction file integration, that merges them.",
+"Correction is a MERGE-versus-UPDATE rule applied inside the dimension build. No correction file is described."
+],
+[
+"C5",
+"Where data quality runs",
+"A Data Quality Checks step after dbt Gold in the Airflow chain.",
+"A per-row pass or fail computed in the STG view, before anything is loaded, plus tests between every layer."
+]
+]
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "The seam between the two design documents",
+"md": "\nThe line is **the guarded PENDING → TRIGGER update on DATE_CONTROL**.\n\nThe Ingestion DAG owns PENDING → TRIGGER. Only the run whose UPDATE changes exactly one row may invoke transformation — that is how two scheduled runs five minutes apart cannot both trigger it. The Transformation DAG owns TRIGGER → COMPLETE and the creation of the next PENDING row, in one database transaction, and it re-checks completeness defensively before doing any work.\n\n*File Ingestion design doc §5.1 (p.9) · File Ingestion design doc Appendix E.3 (p.24) · dbt design doc §5.3 (p.12)*",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The line is **the guarded PENDING → TRIGGER update on DATE_CONTROL**."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "The Ingestion DAG owns PENDING → TRIGGER. Only the run whose UPDATE changes exactly one row may invoke transformation — that is how two scheduled runs five minutes apart cannot both trigger it. The Transformation DAG owns TRIGGER → COMPLETE and the creation of the next PENDING row, in one database transaction, and it re-checks completeness defensively before doing any work."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
-},
-{
-"t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "*File Ingestion design doc §5.1 (p.9) · File Ingestion design doc Appendix E.3 (p.24) · dbt design doc §5.3 (p.12)*"
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Inbound",
+"md": "\n**Primary: SDC events. Secondary: file-based.** (BBH, stated directly)\n\nBoth SEI design documents describe the file path and only the file path — a scheduled scan every five minutes, one mapped task per file, completeness measured as a set of files that arrived. If events are the primary inbound route, the completeness gate, the business-date state machine and the SLA all rest on a path that is the secondary one.\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "**Primary: SDC events. Secondary: file-based.** (BBH, stated directly)"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "Both SEI design documents describe the file path and only the file path — a scheduled scan every five minutes, one mapped task per file, completeness measured as a set of files that arrived. If events are the primary inbound route, the completeness gate, the business-date state machine and the SLA all rest on a path that is the secondary one."
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Outbound — Loader submission, via the Orchestration Hub",
+"md": "\n*BBH, stated directly — not in either SEI design document*\n\n| # | Who | What happens |\n|---|---|---|\n| 1 | CRM → Hub | The Orchestration Hub exposes an API. CRM calls it with the loader details and the data the loader needs. |\n| 2 | Hub | The Hub validates what it was given and transforms it into loader format. |\n| 3 | Hub → SEI PS | SEI Professional Services processes the loader. |\n| 4 | Hub → CRM | CRM exposes an API of its own, and the Hub calls it with the response. |\n\nTwo APIs, one each way, and the Hub owns validation and the format. That makes the Hub responsible for a contract neither SEI design document mentions: what a valid submission looks like, what happens to an invalid one, and what the response carries when SEI rejects a loader rather than the Hub.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "*BBH, stated directly — not in either SEI design document*"
+},
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Who",
+"What happens"
+],
+[
+"1",
+"CRM → Hub",
+"The Orchestration Hub exposes an API. CRM calls it with the loader details and the data the loader needs."
+],
+[
+"2",
+"Hub",
+"The Hub validates what it was given and transforms it into loader format."
+],
+[
+"3",
+"Hub → SEI PS",
+"SEI Professional Services processes the loader."
+],
+[
+"4",
+"Hub → CRM",
+"CRM exposes an API of its own, and the Hub calls it with the response."
+]
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Two APIs, one each way, and the Hub owns validation and the format. That makes the Hub responsible for a contract neither SEI design document mentions: what a valid submission looks like, what happens to an invalid one, and what the response carries when SEI rejects a loader rather than the Hub."
+}
+]
+},
+{
+"h": "The containers",
+"md": "\n| Container | What is in it |\n|---|---|\n| **Ingress and Egress** | Landing and transport · API gateway and Apigee proxy · Loader framework · SEI-side source |\n| **Ingestion** | Event-based ingestion · File-based ingestion · RAW profiling |\n| **Orchestration** | Ingestion DAG · Transformation DAG · Business-date state machine |\n| **Processing** | dbt models · Data quality and reconciliation · Warehouse and consumers |\n| **Foundation** | Control and metadata · Evidence and observability · Errors, audit and lineage · Security and access |\n| **OpenShift Platform** | Platform · Runtime · Deployment · Operations |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"Container",
+"What is in it"
+],
+[
+"**Ingress and Egress**",
+"Landing and transport · API gateway and Apigee proxy · Loader framework · SEI-side source"
+],
+[
+"**Ingestion**",
+"Event-based ingestion · File-based ingestion · RAW profiling"
+],
+[
+"**Orchestration**",
+"Ingestion DAG · Transformation DAG · Business-date state machine"
+],
+[
+"**Processing**",
+"dbt models · Data quality and reconciliation · Warehouse and consumers"
+],
+[
+"**Foundation**",
+"Control and metadata · Evidence and observability · Errors, audit and lineage · Security and access"
+],
+[
+"**OpenShift Platform**",
+"Platform · Runtime · Deployment · Operations"
+]
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "id: l2-planes\ntitle: L2 Plane Drill-downs\nlevel: L2\nicon: 🔍\ncolor: #0b5e83\nbg: #e0f5fd\norder: 2\nsub: withdrawn - to be rewritten from the drawing\nzone_default: 2. Hub\nwithdrawn: true"
+"fm_raw": "id: l2-planes\ntitle: L2 Plane Drill-downs\nlevel: L2\nicon: 🔍\ncolor: #0b5e83\nbg: #e0f5fd\norder: 2\nsub: withdrawn - to be rewritten from the drawing\nzone_default: 2. Hub\ngenerated: true\nsei_status: overview"
 },
 {
 "id": "l3-stages",
@@ -308,139 +460,167 @@ export const DESIGN_DOCS = [
 "zone_default": "",
 "default": false,
 "component_ids": [],
-"withdrawn": true,
+"withdrawn": false,
+"generated": true,
+"sei_status": "overview",
 "chip": "",
 "meta": {},
 "src": "l3-stage1-stage2.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "As BBH states it",
+"md": "\nStage 2, Silver and Enriched are one layer under three names. Inside it: STG is a view, held in memory, and its job is the source DQ check. INT, DIM and FACT together are the normalised SWP data model, with reference mapping and translation applied.\n\nAbove that sit two layers SEI's documents do not describe: a PRE-GOLD layer shaped as a mirror of IMDS and PBDW, and then a simple movement of that data into the actual warehouse. SEI's design publishes straight from DIM and FACT and stops.\n\n**Why it matters.** It changes what Gold means. In SEI's documents DIM and FACT are the approved Gold tables and the end of the line. In BBH's model they are the normalised middle, and Gold is the consumer-shaped mirror above them. Both cannot be the published contract, and which one is decides where reconciliation has to end.\n\n*BBH, stated directly — not from either SEI document*",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "Stage 2, Silver and Enriched are one layer under three names. Inside it: STG is a view, held in memory, and its job is the source DQ check. INT, DIM and FACT together are the normalised SWP data model, with reference mapping and translation applied."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "Above that sit two layers SEI's documents do not describe: a PRE-GOLD layer shaped as a mirror of IMDS and PBDW, and then a simple movement of that data into the actual warehouse. SEI's design publishes straight from DIM and FACT and stops."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "**Why it matters.** It changes what Gold means. In SEI's documents DIM and FACT are the approved Gold tables and the end of the line. In BBH's model they are the normalised middle, and Gold is the consumer-shaped mirror above them. Both cannot be the published contract, and which one is decides where reconciliation has to end."
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "*BBH, stated directly — not from either SEI document*"
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "The stage chain",
+"md": "\n| Stage | What it is | What is in it |\n|---|---|---|\n| **Stage 1** — RAW — as delivered | The file exactly as it arrived, append-only, tagged with the business date and lineage. Nothing is cleaned here. | `T4` |\n| **Stage 2** — STG — a view, in memory | Standardises the columns and marks every row pass or fail. It is a view: it holds nothing and is recomputed on read. Its job is the source DQ check. | `S14` |\n| **Stage 2 INT** — the normalised SWP model | INT, DIM and FACT together, with reference mapping and translation applied. Passing rows only; INT keeps seven days; dimensions are built before facts so a transaction can always find its account. | `S15` `S16` `S17` `T5` `T6` |\n| **Stage 3** — the actual data warehouse | A Pre-Gold layer shaped as a mirror of IMDS and PBDW, then a simple movement of that data into the warehouse itself. | `B1` `B2` |",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
+"t": "tbl",
+"rows": [
+[
+"Stage",
+"What it is",
+"What is in it"
+],
+[
+"**Stage 1** — RAW — as delivered",
+"The file exactly as it arrived, append-only, tagged with the business date and lineage. Nothing is cleaned here.",
+"`T4`"
+],
+[
+"**Stage 2** — STG — a view, in memory",
+"Standardises the columns and marks every row pass or fail. It is a view: it holds nothing and is recomputed on read. Its job is the source DQ check.",
+"`S14`"
+],
+[
+"**Stage 2 INT** — the normalised SWP model",
+"INT, DIM and FACT together, with reference mapping and translation applied. Passing rows only; INT keeps seven days; dimensions are built before facts so a transaction can always find its account.",
+"`S15` `S16` `S17` `T5` `T6`"
+],
+[
+"**Stage 3** — the actual data warehouse",
+"A Pre-Gold layer shaped as a mirror of IMDS and PBDW, then a simple movement of that data into the warehouse itself.",
+"`B1` `B2`"
 ]
-},
-{
-"t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
 ]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
-},
-{
-"t": "p",
-"x": "specified, differs, or absent — and the reason for it."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "As the architecture states it",
+"md": "\n| Layer | Technology | Objects |\n|---|---|---|\n| **Python ingestion** | Python + Oracle | — |\n| **RAW (SWP)** | Python-managed, append only | `RAW_ACCOUNT`, `RAW_CLIENT`, `RAW_TAXLOT`, `RAW_TRANSACTION`, `RAW_POSITION`, `RAW_CORRECTED_TRANSACTION`, `RAW_CORRECTED_POSITION` |\n| **Stage 2** | dbt · table | `STG2_ACCOUNT`, `STG2_INTERESTED_PARTY`, `STG2_TAX_LOT`, `STG2_TRANSACTIONS`, `STG2_CP_HOLDINGS` |\n| **Gold** | dbt · existing Oracle DW tables | `DIM_ACCOUNT (SCD2)`, `DIM_INTERESTED_PARTY (SCD2)`, `FACT_TRANSACTIONS (merge)`, `FACT_CP_HOLDINGS (merge)`, `FACT_TAX_LOT (periodic snapshot)` |\n| **Consumption** | BI | — |",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Layer",
+"Technology",
+"Objects"
+],
+[
+"**Python ingestion**",
+"Python + Oracle",
+"—"
+],
+[
+"**RAW (SWP)**",
+"Python-managed, append only",
+"`RAW_ACCOUNT`, `RAW_CLIENT`, `RAW_TAXLOT`, `RAW_TRANSACTION`, `RAW_POSITION`, `RAW_CORRECTED_TRANSACTION`, `RAW_CORRECTED_POSITION`"
+],
+[
+"**Stage 2**",
+"dbt · table",
+"`STG2_ACCOUNT`, `STG2_INTERESTED_PARTY`, `STG2_TAX_LOT`, `STG2_TRANSACTIONS`, `STG2_CP_HOLDINGS`"
+],
+[
+"**Gold**",
+"dbt · existing Oracle DW tables",
+"`DIM_ACCOUNT (SCD2)`, `DIM_INTERESTED_PARTY (SCD2)`, `FACT_TRANSACTIONS (merge)`, `FACT_CP_HOLDINGS (merge)`, `FACT_TAX_LOT (periodic snapshot)`"
+],
+[
+"**Consumption**",
+"BI",
+"—"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "The feeds, and what each does to Gold",
+"md": "\n| Feed | Files | Pattern | Gold |\n|---|---|---|---|\n| **Full snapshot** — the entire table, every day | Account Snapshot · Client Snapshot · Tax Lot Snapshot | SCD2 / periodic snapshot | DIM_ACCOUNT and DIM_INTERESTED_PARTY as SCD2; FACT_TAX_LOT appended by date |\n| **Delta** — new or changed records today | Transaction Delta · Position Delta | incremental / merge | FACT_TRANSACTIONS and FACT_CP_HOLDINGS, both merged |\n| **Correction** — past records corrected today | Corrected Transactions · Corrected Positions | merge, updating what is already there | FACT_TRANSACTIONS and FACT_CP_HOLDINGS, same two facts |",
 "blocks": [
 {
-"t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"t": "tbl",
+"rows": [
+[
+"Feed",
+"Files",
+"Pattern",
+"Gold"
+],
+[
+"**Full snapshot** — the entire table, every day",
+"Account Snapshot · Client Snapshot · Tax Lot Snapshot",
+"SCD2 / periodic snapshot",
+"DIM_ACCOUNT and DIM_INTERESTED_PARTY as SCD2; FACT_TAX_LOT appended by date"
+],
+[
+"**Delta** — new or changed records today",
+"Transaction Delta · Position Delta",
+"incremental / merge",
+"FACT_TRANSACTIONS and FACT_CP_HOLDINGS, both merged"
+],
+[
+"**Correction** — past records corrected today",
+"Corrected Transactions · Corrected Positions",
+"merge, updating what is already there",
+"FACT_TRANSACTIONS and FACT_CP_HOLDINGS, same two facts"
+]
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "id: l3-stages\ntitle: Stage 1 RAW & Stage 2 Enriched\nlevel: L3\nicon: 🧱\ncolor: #0e8f7e\nbg: #dff2ef\norder: 3\nsub: withdrawn - to be rewritten from the drawing\nmatch: stage ?1|stage ?2|raw|enrich|dbt|landing|staging|transform\nwithdrawn: true"
+"fm_raw": "id: l3-stages\ntitle: Stage 1 RAW & Stage 2 Enriched\nlevel: L3\nicon: 🧱\ncolor: #0e8f7e\nbg: #dff2ef\norder: 3\nsub: withdrawn - to be rewritten from the drawing\nmatch: stage ?1|stage ?2|raw|enrich|dbt|landing|staging|transform\ngenerated: true\nsei_status: overview"
 },
 {
 "id": "openshift-platform",
@@ -455,139 +635,190 @@ export const DESIGN_DOCS = [
 "zone_default": "4. OpenShift",
 "default": false,
 "component_ids": [],
-"withdrawn": true,
+"withdrawn": false,
+"generated": true,
+"sei_status": "overview",
 "chip": "",
 "meta": {},
 "src": "openshift-platform.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What SEI's documents actually say about the platform",
+"md": "\nLess than people assume. Both design documents assume OpenShift\nand specify only what the pipeline needs from it.\n\n| # | Component | Verdict | What SEI says, or why not |\n|---|---|---|---|\n| 44 | Projects / Namespaces | not in SEI's documents | Platform build. Neither document covers it. |\n| 45 | Container Images | not in SEI's documents | Container images. Both documents assume OpenShift and neither specifies how images are built or versioned — only that rollback is redeploying the prior one. |\n| 46 | Registry, Scanning, Signing | not in SEI's documents | Registry, scanning and signing. Not mentioned, and it is the supply-chain half of a design that is otherwise explicit about least privilege. |\n| 47 | Service Accounts, RBAC, SCCs | SEI specifies this | Named, and narrowly: least privilege, and DML only on the Gold tables. |\n| 48 | Secrets Management | SEI specifies this | Oracle, SFTP and storage credentials in OpenShift secrets, referenced through Airflow connections. |\n| 49 | Network Policy & Egress | not in SEI's documents | Network policy and egress. Neither document says what the pipeline is allowed to reach, which matters given it pulls from SFTP and pushes to Splunk. |\n| 50 | Persistent Storage | SEI designs it differently | SEI needs one specific thing from storage and states it as an assumption: Landing, Archive and Quarantine must be shared across worker pods, or mapped tasks cannot reliably read or move files. |\n| 51 | Airflow Deployment | SEI specifies this | A starting configuration is given: schedule every five minutes, catchup off, one active run, pool 8 to 10, one or two retries. |\n| 52 | Worker Pod Autoscaling | SEI specifies this | Worker pods are how file-level concurrency scales, bounded by pools and Oracle connections. |\n| 53 | Resource Quotas & Priority | not in SEI's documents | Resource quotas and priority. The documents give a starting pool size and worker count and leave the cluster-level envelope open — see open decision O2. |\n| 54 | Warm-start / Pre-pulled Images | not in SEI's documents | Warm start and pre-pulled images. A latency optimisation for a five-minute discovery cycle that neither document considers. |\n| 55 | Oracle Connection Pooling | SEI specifies this | Pool size is sized against Oracle connection capacity, and the document says the number is a starting position to confirm. |\n| 56 | Node Placement | not in SEI's documents | Node placement. Not mentioned, though the shared-storage assumption for Landing, Archive and Quarantine constrains it. |\n| 57 | CI/CD Pipelines | SEI specifies this | Git-versioned models and DAGs; the pipeline compiles and runs unit and DQ tests before promotion. |\n| 58 | GitOps / ArgoCD | not in SEI's documents | GitOps and ArgoCD. The dbt document says models and DAGs are Git-versioned and promoted as tagged images; it does not name a deployment tool. |\n| 59 | dbt Release & Rollback | SEI specifies this | Rollback is redeploying the prior image, and it is safe only because Gold writes are idempotent merges with no DDL. |\n| 60 | Database Change Management | not in SEI's documents | Nothing covers schema change management, which matters more here than usual: SEI's design forbids DDL against Gold, so whatever does change those tables sits outside it. |\n| 61 | Blue-Green / Canary (API lane) | not in SEI's documents | Blue-green and canary for the API lane, which neither document has. |\n| 62 | HA / DR | not in SEI's documents | Neither document covers availability or recovery of the platform itself. |\n| 63 | Backup & Restore | not in SEI's documents | Backup and restore is not in either document. |\n| 64 | Monitoring Stack | SEI designs it differently | SEI gives every dashboard, trend and alert to Splunk. A separate monitoring stack is a second place for the same job. |\n| 65 | Cost & Capacity Monitoring | not in SEI's documents | Cost and capacity are not in either document. |",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "Less than people assume. Both design documents assume OpenShift"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "and specify only what the pipeline needs from it."
 },
 {
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"t": "tbl",
+"rows": [
+[
+"#",
+"Component",
+"Verdict",
+"What SEI says, or why not"
+],
+[
+"44",
+"Projects / Namespaces",
+"not in SEI's documents",
+"Platform build. Neither document covers it."
+],
+[
+"45",
+"Container Images",
+"not in SEI's documents",
+"Container images. Both documents assume OpenShift and neither specifies how images are built or versioned — only that rollback is redeploying the prior one."
+],
+[
+"46",
+"Registry, Scanning, Signing",
+"not in SEI's documents",
+"Registry, scanning and signing. Not mentioned, and it is the supply-chain half of a design that is otherwise explicit about least privilege."
+],
+[
+"47",
+"Service Accounts, RBAC, SCCs",
+"SEI specifies this",
+"Named, and narrowly: least privilege, and DML only on the Gold tables."
+],
+[
+"48",
+"Secrets Management",
+"SEI specifies this",
+"Oracle, SFTP and storage credentials in OpenShift secrets, referenced through Airflow connections."
+],
+[
+"49",
+"Network Policy & Egress",
+"not in SEI's documents",
+"Network policy and egress. Neither document says what the pipeline is allowed to reach, which matters given it pulls from SFTP and pushes to Splunk."
+],
+[
+"50",
+"Persistent Storage",
+"SEI designs it differently",
+"SEI needs one specific thing from storage and states it as an assumption: Landing, Archive and Quarantine must be shared across worker pods, or mapped tasks cannot reliably read or move files."
+],
+[
+"51",
+"Airflow Deployment",
+"SEI specifies this",
+"A starting configuration is given: schedule every five minutes, catchup off, one active run, pool 8 to 10, one or two retries."
+],
+[
+"52",
+"Worker Pod Autoscaling",
+"SEI specifies this",
+"Worker pods are how file-level concurrency scales, bounded by pools and Oracle connections."
+],
+[
+"53",
+"Resource Quotas & Priority",
+"not in SEI's documents",
+"Resource quotas and priority. The documents give a starting pool size and worker count and leave the cluster-level envelope open — see open decision O2."
+],
+[
+"54",
+"Warm-start / Pre-pulled Images",
+"not in SEI's documents",
+"Warm start and pre-pulled images. A latency optimisation for a five-minute discovery cycle that neither document considers."
+],
+[
+"55",
+"Oracle Connection Pooling",
+"SEI specifies this",
+"Pool size is sized against Oracle connection capacity, and the document says the number is a starting position to confirm."
+],
+[
+"56",
+"Node Placement",
+"not in SEI's documents",
+"Node placement. Not mentioned, though the shared-storage assumption for Landing, Archive and Quarantine constrains it."
+],
+[
+"57",
+"CI/CD Pipelines",
+"SEI specifies this",
+"Git-versioned models and DAGs; the pipeline compiles and runs unit and DQ tests before promotion."
+],
+[
+"58",
+"GitOps / ArgoCD",
+"not in SEI's documents",
+"GitOps and ArgoCD. The dbt document says models and DAGs are Git-versioned and promoted as tagged images; it does not name a deployment tool."
+],
+[
+"59",
+"dbt Release & Rollback",
+"SEI specifies this",
+"Rollback is redeploying the prior image, and it is safe only because Gold writes are idempotent merges with no DDL."
+],
+[
+"60",
+"Database Change Management",
+"not in SEI's documents",
+"Nothing covers schema change management, which matters more here than usual: SEI's design forbids DDL against Gold, so whatever does change those tables sits outside it."
+],
+[
+"61",
+"Blue-Green / Canary (API lane)",
+"not in SEI's documents",
+"Blue-green and canary for the API lane, which neither document has."
+],
+[
+"62",
+"HA / DR",
+"not in SEI's documents",
+"Neither document covers availability or recovery of the platform itself."
+],
+[
+"63",
+"Backup & Restore",
+"not in SEI's documents",
+"Backup and restore is not in either document."
+],
+[
+"64",
+"Monitoring Stack",
+"SEI designs it differently",
+"SEI gives every dashboard, trend and alert to Splunk. A separate monitoring stack is a second place for the same job."
+],
+[
+"65",
+"Cost & Capacity Monitoring",
+"not in SEI's documents",
+"Cost and capacity are not in either document."
+]
+]
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand.",
 "blocks": [
 {
 "t": "ul",
 "items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
-},
-{
-"t": "p",
-"x": "specified, differs, or absent — and the reason for it."
-}
-]
-},
-{
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
-"blocks": [
-{
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
-]
-},
-{
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
-"t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
-},
-{
-"t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "id: openshift-platform\ntitle: OpenShift Platform — Runtime, CI/CD & Operations Tier\nlevel: L2\nicon: ⚙️\ncolor: #444444\nbg: #ececec\norder: 3\nsub: withdrawn - to be rewritten from the drawing\nzone_default: 4. OpenShift\ntags: [SEI-BBH, Integration-Hub, platform, openshift]\nwithdrawn: true"
+"fm_raw": "id: openshift-platform\ntitle: OpenShift Platform — Runtime, CI/CD & Operations Tier\nlevel: L2\nicon: ⚙️\ncolor: #444444\nbg: #ececec\norder: 3\nsub: withdrawn - to be rewritten from the drawing\nzone_default: 4. OpenShift\ntags: [SEI-BBH, Integration-Hub, platform, openshift]\ngenerated: true\nsei_status: overview"
 },
 {
 "id": "l3-errors",
@@ -602,139 +833,537 @@ export const DESIGN_DOCS = [
 "zone_default": "",
 "default": false,
 "component_ids": [],
-"withdrawn": true,
+"withdrawn": false,
+"generated": true,
+"sei_status": "overview",
 "chip": "",
 "meta": {},
 "src": "l3-error-handling.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "",
+"md": "\n\nEvery scenario both SEI design documents describe, with what the\ndesign does and where it says so. Nothing here is inferred.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "Every scenario both SEI design documents describe, with what the"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "design does and where it says so. Nothing here is inferred."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Discovery",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X1 | Exactly one pattern matches | One work item is created, carrying the interface, the physical filename, the business date, the target RAW table and the parsing rules. | ingest Appendix C.3 (p.21) |\n| X2 | No pattern matches | Not loaded and not moved. An unmatched-file event is emitted with the filename and path, and the approved exception-location policy applies — which is still open decision O1. | ingest Appendix C.3 (p.21) |\n| X3 | More than one pattern matches | Treated as a configuration defect. No target table is chosen, nothing is processed, and it is logged and notified. | ingest Appendix C.3 (p.21) |\n| X4 | The scan finds nothing | The run succeeds with zero mapped tasks. The completeness and SLA task still runs — which is the point, because yesterday's late file can complete the set without a new one arriving. | ingest §5.2 (p.10) |",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X1",
+"Exactly one pattern matches",
+"One work item is created, carrying the interface, the physical filename, the business date, the target RAW table and the parsing rules.",
+"ingest Appendix C.3 (p.21)"
+],
+[
+"X2",
+"No pattern matches",
+"Not loaded and not moved. An unmatched-file event is emitted with the filename and path, and the approved exception-location policy applies — which is still open decision O1.",
+"ingest Appendix C.3 (p.21)"
+],
+[
+"X3",
+"More than one pattern matches",
+"Treated as a configuration defect. No target table is chosen, nothing is processed, and it is logged and notified.",
+"ingest Appendix C.3 (p.21)"
+],
+[
+"X4",
+"The scan finds nothing",
+"The run succeeds with zero mapped tasks. The completeness and SLA task still runs — which is the point, because yesterday's late file can complete the set without a new one arriving.",
+"ingest §5.2 (p.10)"
 ]
-},
-{
-"t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
 ]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
-},
-{
-"t": "p",
-"x": "specified, differs, or absent — and the reason for it."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Validation",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X5 | The business date will not parse | Rejected before any RAW write, with the parsing error recorded. The format mask must reject impossible dates even when the regex shape matches. | ingest Appendix D.6 (p.23) |\n| X6 | Header or trailer fails | RECEIVED becomes QUARANTINED, the error is recorded and the file moves to Quarantine. Nothing is written to RAW. | ingest §4 (p.7) · Appendix B.2 (p.20) |\n| X7 | A zero-row file arrives and is not allowed | QUARANTINED, same path. Whether zero rows are allowed is per interface configuration. | ingest §6.1 (p.12) |",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X5",
+"The business date will not parse",
+"Rejected before any RAW write, with the parsing error recorded. The format mask must reject impossible dates even when the regex shape matches.",
+"ingest Appendix D.6 (p.23)"
+],
+[
+"X6",
+"Header or trailer fails",
+"RECEIVED becomes QUARANTINED, the error is recorded and the file moves to Quarantine. Nothing is written to RAW.",
+"ingest §4 (p.7) · Appendix B.2 (p.20)"
+],
+[
+"X7",
+"A zero-row file arrives and is not allowed",
+"QUARANTINED, same path. Whether zero rows are allowed is per interface configuration.",
+"ingest §6.1 (p.12)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Registry",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X8 | The same file is discovered again | If the existing record is ARCHIVED it is skipped and logged as a duplicate; no second registry row is created. A unique key on the interface and business date enforces it. | ingest §5 (p.9) · Appendix B (p.19) |\n| X9 | A record is stuck in RECEIVED, VALIDATED or LOADING | Investigated, never reset automatically. The Airflow task state, the worker logs, the file location and the Oracle outcome are checked first, and the same record is reused for recovery. | ingest Appendix D.5 (p.23) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X8",
+"The same file is discovered again",
+"If the existing record is ARCHIVED it is skipped and logged as a duplicate; no second registry row is created. A unique key on the interface and business date enforces it.",
+"ingest §5 (p.9) · Appendix B (p.19)"
+],
+[
+"X9",
+"A record is stuck in RECEIVED, VALIDATED or LOADING",
+"Investigated, never reset automatically. The Airflow task state, the worker logs, the file location and the Oracle outcome are checked first, and the same record is reused for recovery.",
+"ingest Appendix D.5 (p.23)"
+]
+]
+}
+]
+},
+{
+"h": "Load",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X10 | The RAW load or the count check fails | Rolled back. LOADING becomes FAILED with the error and the end timestamp. The insert and the count reconciliation are one Oracle transaction, and the commit happens only when the file count, the trailer count and the inserted count all agree. | ingest §4.1 (p.7) · §7.3 (p.14) |\n| X11 | A FAILED file is rerun | The same registry id is reused and the retry count goes up. Any exceptional partial rows are removed through the approved process first, then the file reloads in one transaction. | ingest Appendix D.1 (p.22) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X10",
+"The RAW load or the count check fails",
+"Rolled back. LOADING becomes FAILED with the error and the end timestamp. The insert and the count reconciliation are one Oracle transaction, and the commit happens only when the file count, the trailer count and the inserted count all agree.",
+"ingest §4.1 (p.7) · §7.3 (p.14)"
+],
+[
+"X11",
+"A FAILED file is rerun",
+"The same registry id is reused and the retry count goes up. Any exceptional partial rows are removed through the approved process first, then the file reloads in one transaction.",
+"ingest Appendix D.1 (p.22)"
+]
+]
+}
+]
+},
+{
+"h": "Archive",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X12 | The archive move fails after a good load | ARCHIVE_FAILED. RAW is kept and is never deleted or reloaded — the move happens after the commit and cannot be part of the transaction. Only the move is retried. | ingest §7.3 (p.14) · Appendix D.3 (p.22) |\n| X13 | Why ARCHIVED is the ready state | A reconciled RAW commit is not released downstream until the physical archive succeeds, so completeness counts ARCHIVED and nothing earlier. | ingest §6.2 (p.12) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X12",
+"The archive move fails after a good load",
+"ARCHIVE_FAILED. RAW is kept and is never deleted or reloaded — the move happens after the commit and cannot be part of the transaction. Only the move is retried.",
+"ingest §7.3 (p.14) · Appendix D.3 (p.22)"
+],
+[
+"X13",
+"Why ARCHIVED is the ready state",
+"A reconciled RAW commit is not released downstream until the physical archive succeeds, so completeness counts ARCHIVED and nothing earlier.",
+"ingest §6.2 (p.12)"
+]
+]
+}
+]
+},
+{
+"h": "Gate",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X14 | Complete before the cutoff | The guarded transition is taken and transformation is invoked. | ingest §5.2 (p.10) |\n| X15 | Complete at or after the cutoff | Still triggered, and a recovery or late-completion event is published if the date had already breached. | ingest §7.3 (p.14) |\n| X16 | Incomplete before the cutoff | The date stays PENDING, nothing is triggered, and the next scheduled run re-evaluates. | ingest §5.2 (p.10) |\n| X17 | Incomplete at or after the cutoff | The date stays PENDING and a correlated breach alert is published. Correlation is event type plus business date, so a persistent breach raises one alert rather than one every five minutes. | ingest §5.2 (p.10) · Appendix E.6 (p.25) |\n| X18 | The completeness query itself fails | The task fails and Airflow retries. Readiness is unknown, so nothing is triggered. | ingest §5.2 (p.10) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X14",
+"Complete before the cutoff",
+"The guarded transition is taken and transformation is invoked.",
+"ingest §5.2 (p.10)"
+],
+[
+"X15",
+"Complete at or after the cutoff",
+"Still triggered, and a recovery or late-completion event is published if the date had already breached.",
+"ingest §7.3 (p.14)"
+],
+[
+"X16",
+"Incomplete before the cutoff",
+"The date stays PENDING, nothing is triggered, and the next scheduled run re-evaluates.",
+"ingest §5.2 (p.10)"
+],
+[
+"X17",
+"Incomplete at or after the cutoff",
+"The date stays PENDING and a correlated breach alert is published. Correlation is event type plus business date, so a persistent breach raises one alert rather than one every five minutes.",
+"ingest §5.2 (p.10) · Appendix E.6 (p.25)"
+],
+[
+"X18",
+"The completeness query itself fails",
+"The task fails and Airflow retries. Readiness is unknown, so nothing is triggered.",
+"ingest §5.2 (p.10)"
+]
+]
+}
+]
+},
+{
+"h": "Orchestration",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X19 | Two runs try to trigger at once | The second guarded update changes zero rows, so it does not trigger. The deterministic run id rejects a duplicate as well. | ingest Appendix E.3 (p.24) |\n| X20 | TRIGGER is set but transformation never started | A scheduled check retries when the status is TRIGGER, the transformation run id is null and no matching deterministic run exists. | ingest Appendix C.1 (p.21) |\n| X21 | A transformation task fails | The date stays TRIGGER, no next date is created and the pipeline is locked. Airflow alerts and the run restarts from the failed task; each layer's write is idempotent for the date. | dbt §8.1 (p.20) |\n| X22 | FACT fails after DIM succeeded | The restart resumes at the fact build. The dimension is not rebuilt. | dbt §8.1 (p.20) |\n| X23 | The restart reaches the final task | The date advances to COMPLETE and the next PENDING row is inserted in the same transaction, exactly once. | dbt §8.1 (p.20) · ingest Appendix E.5 (p.24) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X19",
+"Two runs try to trigger at once",
+"The second guarded update changes zero rows, so it does not trigger. The deterministic run id rejects a duplicate as well.",
+"ingest Appendix E.3 (p.24)"
+],
+[
+"X20",
+"TRIGGER is set but transformation never started",
+"A scheduled check retries when the status is TRIGGER, the transformation run id is null and no matching deterministic run exists.",
+"ingest Appendix C.1 (p.21)"
+],
+[
+"X21",
+"A transformation task fails",
+"The date stays TRIGGER, no next date is created and the pipeline is locked. Airflow alerts and the run restarts from the failed task; each layer's write is idempotent for the date.",
+"dbt §8.1 (p.20)"
+],
+[
+"X22",
+"FACT fails after DIM succeeded",
+"The restart resumes at the fact build. The dimension is not rebuilt.",
+"dbt §8.1 (p.20)"
+],
+[
+"X23",
+"The restart reaches the final task",
+"The date advances to COMPLETE and the next PENDING row is inserted in the same transaction, exactly once.",
+"dbt §8.1 (p.20) · ingest Appendix E.5 (p.24)"
+]
+]
+}
+]
+},
+{
+"h": "Source DQ",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X24 | A key column is missing | The STG view marks the row FAIL with a reason code and INT never reads it. The row goes to the DQ store as OPEN. | dbt §6.3 (p.15) |\n| X25 | A code is not in the mapping table | Same path — FAIL at STG with its own reason code, excluded before any mapping is attempted. | dbt §6.3 (p.15) |\n| X26 | A full-snapshot entity fails | The row stays OPEN until a corrected record arrives in a later full file, which replays it and marks it RESOLVED. This rests on account and client being full daily snapshots. | dbt §7.1 (p.17) · §8.2 assumption A1 (p.20) |\n| X27 | A transaction fails | That date's records do not come round again, so it replays only on a corrected reload for the date, or when the missing dimension arrives. | dbt §7.1 (p.17) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X24",
+"A key column is missing",
+"The STG view marks the row FAIL with a reason code and INT never reads it. The row goes to the DQ store as OPEN.",
+"dbt §6.3 (p.15)"
+],
+[
+"X25",
+"A code is not in the mapping table",
+"Same path — FAIL at STG with its own reason code, excluded before any mapping is attempted.",
+"dbt §6.3 (p.15)"
+],
+[
+"X26",
+"A full-snapshot entity fails",
+"The row stays OPEN until a corrected record arrives in a later full file, which replays it and marks it RESOLVED. This rests on account and client being full daily snapshots.",
+"dbt §7.1 (p.17) · §8.2 assumption A1 (p.20)"
+],
+[
+"X27",
+"A transaction fails",
+"That date's records do not come round again, so it replays only on a corrected reload for the date, or when the missing dimension arrives.",
+"dbt §7.1 (p.17)"
+]
+]
+}
+]
+},
+{
+"h": "Transformation DQ",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X28 | A code has no active mapping row | Caught at INT as a transformation failure, owned by the transformation team rather than the source. Marked not auto-replayable: it stays OPEN until a code fix is deployed. | dbt §7 (p.17) |\n| X29 | The same failure returns after a rerun | Expected, and the signal is that a code fix is needed rather than another rerun. | dbt §7 (p.17) |\n| X30 | A transaction's dimension has not arrived | Never written to Gold with a placeholder key. Held in the DQ store as replayable and OPEN, re-derived from INT on a later day once the dimension exists, then marked RESOLVED. | dbt §7.1 (p.17) · Figure 5a (p.18) |\n| X31 | A row is still OPEN at the retention edge | CLOSED and alerted at seven days, because the DQ store keeps lineage only and INT no longer holds the data to re-derive it. | dbt §7.1 (p.17) · §8.2 assumption A4 (p.20) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X28",
+"A code has no active mapping row",
+"Caught at INT as a transformation failure, owned by the transformation team rather than the source. Marked not auto-replayable: it stays OPEN until a code fix is deployed.",
+"dbt §7 (p.17)"
+],
+[
+"X29",
+"The same failure returns after a rerun",
+"Expected, and the signal is that a code fix is needed rather than another rerun.",
+"dbt §7 (p.17)"
+],
+[
+"X30",
+"A transaction's dimension has not arrived",
+"Never written to Gold with a placeholder key. Held in the DQ store as replayable and OPEN, re-derived from INT on a later day once the dimension exists, then marked RESOLVED.",
+"dbt §7.1 (p.17) · Figure 5a (p.18)"
+],
+[
+"X31",
+"A row is still OPEN at the retention edge",
+"CLOSED and alerted at seven days, because the DQ store keeps lineage only and INT no longer holds the data to re-derive it.",
+"dbt §7.1 (p.17) · §8.2 assumption A4 (p.20)"
+]
+]
+}
+]
+},
+{
+"h": "Dimensions",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X32 | A correction arrives and the row is still current | A normal MERGE, joined on the surrogate key rather than the natural key — a natural-key join matches both the closing and the opening row and fails. | dbt §6.4.1 (p.15) |\n| X33 | A correction arrives and the interval is already closed | A direct UPDATE of that closed row only. Never a MERGE — it would reopen an interval that is settled. | dbt §6.4.1 (p.15) |\n| X34 | Someone changes the shape of a Gold table | Refused. Every Gold model fails on a schema change, and the service account holds DML only — no create, alter or drop. | dbt §8.4 (p.21) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X32",
+"A correction arrives and the row is still current",
+"A normal MERGE, joined on the surrogate key rather than the natural key — a natural-key join matches both the closing and the opening row and fails.",
+"dbt §6.4.1 (p.15)"
+],
+[
+"X33",
+"A correction arrives and the interval is already closed",
+"A direct UPDATE of that closed row only. Never a MERGE — it would reopen an interval that is settled.",
+"dbt §6.4.1 (p.15)"
+],
+[
+"X34",
+"Someone changes the shape of a Gold table",
+"Refused. Every Gold model fails on a schema change, and the service account holds DML only — no create, alter or drop.",
+"dbt §8.4 (p.21)"
+]
+]
+}
+]
+},
+{
+"h": "Reconciliation",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X35 | Counts do not agree at a boundary | The difference is written to the immutable log and published. The pass or warning verdict is derived on the Splunk side, after the data is already in Gold — so it alerts rather than blocks. | dbt §7.2 (p.18) · §7.2.1 (p.18) |\n| X36 | The held backlog is growing | Alerts on the ageing open rows, and the usual cause is a late dimension file. | dbt §7.2.1 (p.18) |\n| X37 | DQ or reconciliation is rerun for a date | The DQ rows are upserted so their resolution status survives, the recon rows for that date are replaced, and both are republished. | dbt §8.1 (p.20) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X35",
+"Counts do not agree at a boundary",
+"The difference is written to the immutable log and published. The pass or warning verdict is derived on the Splunk side, after the data is already in Gold — so it alerts rather than blocks.",
+"dbt §7.2 (p.18) · §7.2.1 (p.18)"
+],
+[
+"X36",
+"The held backlog is growing",
+"Alerts on the ageing open rows, and the usual cause is a late dimension file.",
+"dbt §7.2.1 (p.18)"
+],
+[
+"X37",
+"DQ or reconciliation is rerun for a date",
+"The DQ rows are upserted so their resolution status survives, the recon rows for that date are replaced, and both are republished.",
+"dbt §8.1 (p.20)"
+]
+]
+}
+]
+},
+{
+"h": "Evidence",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X38 | Publishing to Splunk fails | The data is already durable in Oracle. The publish task is separate and retryable, and it is idempotent per date. | dbt §8.3 (p.21) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X38",
+"Publishing to Splunk fails",
+"The data is already durable in Oracle. The publish task is separate and retryable, and it is idempotent per date.",
+"dbt §8.3 (p.21)"
+]
+]
+}
+]
+},
+{
+"h": "Restatement",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X39 | A successful file has to be replaced | Approval first, then the reason, approver, operator and affected downstream scope are recorded. The registry row and the RAW rows are deleted through the controlled process, the corrected file is dropped in Landing, and a fresh lifecycle starts. The downstream rebuild for that date is coordinated separately. | ingest Appendix D.4 (p.23) |\n| X40 | A quarantined file is corrected | The same registry id is reused, the retry count goes up, the status resets to RECEIVED and every validation runs again before any RAW write. | ingest Appendix D.2 (p.22) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X39",
+"A successful file has to be replaced",
+"Approval first, then the reason, approver, operator and affected downstream scope are recorded. The registry row and the RAW rows are deleted through the controlled process, the corrected file is dropped in Landing, and a fresh lifecycle starts. The downstream rebuild for that date is coordinated separately.",
+"ingest Appendix D.4 (p.23)"
+],
+[
+"X40",
+"A quarantined file is corrected",
+"The same registry id is reused, the retry count goes up, the status resets to RECEIVED and every validation runs again before any RAW write.",
+"ingest Appendix D.2 (p.22)"
+]
+]
+}
+]
+},
+{
+"h": "Not covered by either document",
+"md": "\nAsked about often, and in neither document. Listed so they are\nraised rather than answered by whoever is writing the model that\nday.\n\n- Invalid data types inside an otherwise well-formed file\n- Invalid measure values — a negative quantity, an impossible price\n- Duplicate rows arriving inside a single fact feed\n- Database constraint violations on the Gold write\n- Network or permission failures on the archive move specifically\n- Scheduler or worker restart part-way through a mapped task",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Asked about often, and in neither document. Listed so they are"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "raised rather than answered by whoever is writing the model that"
+},
+{
+"t": "p",
+"x": "day."
+},
+{
+"t": "ul",
+"items": [
+"Invalid data types inside an otherwise well-formed file",
+"Invalid measure values — a negative quantity, an impossible price",
+"Duplicate rows arriving inside a single fact feed",
+"Database constraint violations on the Gold write",
+"Network or permission failures on the archive move specifically",
+"Scheduler or worker restart part-way through a mapped task"
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "id: l3-errors\ntitle: Error Handling, Quarantine & Override\nlevel: L3\nicon: 🚑\ncolor: #c0392b\nbg: #fde8e8\norder: 4\nsub: withdrawn - to be rewritten from the drawing\nmatch: error|quarantine|override|reject|dlq|dead.?letter|replay|exception|recon\nwithdrawn: true"
+"fm_raw": "id: l3-errors\ntitle: Error Handling, Quarantine & Override\nlevel: L3\nicon: 🚑\ncolor: #c0392b\nbg: #fde8e8\norder: 4\nsub: withdrawn - to be rewritten from the drawing\nmatch: error|quarantine|override|reject|dlq|dead.?letter|replay|exception|recon\ngenerated: true\nsei_status: overview"
 },
 {
 "id": "c1",
@@ -751,8 +1380,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "1"
 ],
-"withdrawn": true,
-"chip": "#1 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#1 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -766,133 +1397,68 @@ export const DESIGN_DOCS = [
 "src": "01_SWP_Platform_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nThe files SEI produces for BBH, delivered to an SFTP location.\n\nIt sits in **Ingress and Egress**, in the **SEI-side source** lane (SEI).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "The files SEI produces for BBH, delivered to an SFTP location."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Ingress and Egress**, in the **SEI-side source** lane (SEI)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### S1 — SWP source files on SFTP\n\nThe files SEI produces for BBH, delivered to an SFTP location.\n\n- **Technology.** SEI\n- **Source.** ingest §3.1 (p.6) · Glossary (p.25)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "S1 — SWP source files on SFTP"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "The files SEI produces for BBH, delivered to an SFTP location."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** SEI",
+"**Source.** ingest §3.1 (p.6) · Glossary (p.25)"
 ]
-},
-{
-"t": "p",
-"x": "specified, differs, or absent — and the reason for it."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 1\ncomponent_name: SWP Platform\nzone: 1. SEI\nplane: Source\npriority: P1\ntechnology: Contract\ncustom_build: None\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 1\ncomponent_name: SWP Platform\nzone: 1. SEI\nplane: Source\npriority: P1\ntechnology: Contract\ncustom_build: None\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c2",
@@ -909,8 +1475,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "2"
 ],
-"withdrawn": true,
-"chip": "#2 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#2 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -926,133 +1494,73 @@ export const DESIGN_DOCS = [
 "src": "02_SWP_UI_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nSWP's own user interface. Neither document describes it.\n\nIt sits in **Ingress and Egress**, in the **SEI-side source** lane (SEI).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "SWP's own user interface. Neither document describes it."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Ingress and Egress**, in the **SEI-side source** lane (SEI)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nSWP's own user interface. Neither document describes it.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "SWP's own user interface. Neither document describes it."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 2\ncomponent_name: SWP UI\nzone: 1. SEI\nplane: Source\npriority: P3\ntechnology: Contract\ncustom_build: None\ndepends_on: [36]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 2\ncomponent_name: SWP UI\nzone: 1. SEI\nplane: Source\npriority: P3\ntechnology: Contract\ncustom_build: None\ndepends_on: [36]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c3",
@@ -1069,8 +1577,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "3"
 ],
-"withdrawn": true,
-"chip": "#3 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#3 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -1086,133 +1596,73 @@ export const DESIGN_DOCS = [
 "src": "03_SWP_APIs_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nThe real-time API lane. Both documents are batch, end to end.\n\nIt sits in **Ingress and Egress**, in the **SEI-side source** lane (SEI).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "The real-time API lane. Both documents are batch, end to end."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Ingress and Egress**, in the **SEI-side source** lane (SEI)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nThe real-time API lane. Both documents are batch, end to end.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "The real-time API lane. Both documents are batch, end to end."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 3\ncomponent_name: SWP APIs\nzone: 1. SEI\nplane: Source\npriority: P1\ntechnology: Contract\ncustom_build: None\ndepends_on: [12]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 3\ncomponent_name: SWP APIs\nzone: 1. SEI\nplane: Source\npriority: P1\ntechnology: Contract\ncustom_build: None\ndepends_on: [12]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c4",
@@ -1229,8 +1679,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "4"
 ],
-"withdrawn": true,
-"chip": "#4 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#4 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -1247,133 +1699,73 @@ export const DESIGN_DOCS = [
 "src": "04_SWP_Loaders_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nThe loader endpoints BBH submits to. Outbound, and neither document covers outbound at all.\n\nIt sits in **Ingress and Egress**, in the **Loader framework** lane (Python · outbound).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "The loader endpoints BBH submits to. Outbound, and neither document covers outbound at all."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Ingress and Egress**, in the **Loader framework** lane (Python · outbound)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nThe loader endpoints BBH submits to. Outbound, and neither document covers outbound at all.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "The loader endpoints BBH submits to. Outbound, and neither document covers outbound at all."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 4\ncomponent_name: SWP Loaders\nzone: 1. SEI\nplane: Source\npriority: P2\ntechnology: Contract\ncustom_build: None\ndepends_on: [10, 11]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 4\ncomponent_name: SWP Loaders\nzone: 1. SEI\nplane: Source\npriority: P2\ntechnology: Contract\ncustom_build: None\ndepends_on: [10, 11]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c5",
@@ -1390,8 +1782,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "5"
 ],
-"withdrawn": true,
-"chip": "#5 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#5 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -1407,133 +1801,73 @@ export const DESIGN_DOCS = [
 "src": "05_Extract_Generation_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nHow SEI produces the files. The ingestion document puts file generation outside itself in as many words.\n\nIt sits in **Ingress and Egress**, in the **SEI-side source** lane (SEI).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "How SEI produces the files. The ingestion document puts file generation outside itself in as many words."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Ingress and Egress**, in the **SEI-side source** lane (SEI)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nHow SEI produces the files. The ingestion document puts file generation outside itself in as many words.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "How SEI produces the files. The ingestion document puts file generation outside itself in as many words."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 5\ncomponent_name: Extract Generation\nzone: 1. SEI\nplane: Source\npriority: P1\ntechnology: Contract\ncustom_build: None\ndepends_on: [8]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 5\ncomponent_name: Extract Generation\nzone: 1. SEI\nplane: Source\npriority: P1\ntechnology: Contract\ncustom_build: None\ndepends_on: [8]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c6",
@@ -1550,8 +1884,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "6"
 ],
-"withdrawn": true,
-"chip": "#6 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#6 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -1568,133 +1904,73 @@ export const DESIGN_DOCS = [
 "src": "06_Orchestration_API_Data_Ingestion_ODM_Workflows_Config_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nSEI's own orchestration. Out of scope for both.\n\nIt sits in **Ingress and Egress**, in the **SEI-side source** lane (SEI).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "SEI's own orchestration. Out of scope for both."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Ingress and Egress**, in the **SEI-side source** lane (SEI)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nSEI's own orchestration. Out of scope for both.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "SEI's own orchestration. Out of scope for both."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 6\ncomponent_name: Orchestration API / Data Ingestion / ODM / Workflows / Config\nzone: 1. SEI\nplane: PS-Orchestration\npriority: P3\ntechnology: Contract\ncustom_build: None\ndepends_on: [10, 11]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 6\ncomponent_name: Orchestration API / Data Ingestion / ODM / Workflows / Config\nzone: 1. SEI\nplane: PS-Orchestration\npriority: P3\ntechnology: Contract\ncustom_build: None\ndepends_on: [10, 11]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c7",
@@ -1711,8 +1987,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "7"
 ],
-"withdrawn": true,
-"chip": "#7 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#7 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -1728,133 +2006,73 @@ export const DESIGN_DOCS = [
 "src": "07_Status_Monitoring_Dashboard_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nSEI's monitoring surface. Out of scope for both.\n\nIt sits in **Ingress and Egress**, in the **SEI-side source** lane (SEI).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "SEI's monitoring surface. Out of scope for both."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Ingress and Egress**, in the **SEI-side source** lane (SEI)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nSEI's monitoring surface. Out of scope for both.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "SEI's monitoring surface. Out of scope for both."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 7\ncomponent_name: Status Monitoring Dashboard\nzone: 1. SEI\nplane: PS-Orchestration\npriority: P2\ntechnology: Contract\ncustom_build: Low\ndepends_on: [35]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 7\ncomponent_name: Status Monitoring Dashboard\nzone: 1. SEI\nplane: PS-Orchestration\npriority: P2\ntechnology: Contract\ncustom_build: Low\ndepends_on: [35]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c8",
@@ -1871,8 +2089,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "8"
 ],
-"withdrawn": true,
-"chip": "#8 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#8 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -1892,133 +2112,137 @@ export const DESIGN_DOCS = [
 "src": "08_Landing_Zone_Transport_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nCopies COMPLETE SWP files from SFTP into the Landing Zone. The word complete is carrying weight: the design assumes a file only appears once it is whole, and if that is not true a readiness convention such as a final rename or a marker file has to be added.\n\nIt sits in **Ingress and Egress**, in the **Landing and transport** lane (SFTP · Momentum · shared storage).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "Copies COMPLETE SWP files from SFTP into the Landing Zone. The word complete is carrying weight: the design assumes a file only appears once it is whole, and if that is not true a readiness convention such as a final rename or a marker file has to be added."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Ingress and Egress**, in the **Landing and transport** lane (SFTP · Momentum · shared storage)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### S2 — Momentum\n\nCopies COMPLETE SWP files from SFTP into the Landing Zone. The word complete is carrying weight: the design assumes a file only appears once it is whole, and if that is not true a readiness convention such as a final rename or a marker file has to be added.\n\n- **Technology.** upstream process\n- **Source.** ingest §3.1 (p.6) · §2.1 assumptions (p.5)\n\n### S3 — Landing Zone\n\nShared storage that Airflow scans for eligible files. Shared is load-bearing too — every worker pod has to see the same Landing, Archive and Quarantine folders.\n\n- **Technology.** shared storage\n- **Source.** ingest Glossary (p.25) · §2.1 (p.5)\n\n### S4 — Archive and Quarantine\n\nWhere a file goes after processing. Archive on success, Quarantine when validation fails before anything is written.\n\n- **Technology.** shared storage\n- **Source.** ingest Figure 1 (p.6) · §4.1 (p.7)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "S2 — Momentum"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "Copies COMPLETE SWP files from SFTP into the Landing Zone. The word complete is carrying weight: the design assumes a file only appears once it is whole, and if that is not true a readiness convention such as a final rename or a marker file has to be added."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** upstream process",
+"**Source.** ingest §3.1 (p.6) · §2.1 assumptions (p.5)"
 ]
 },
 {
+"t": "h",
+"x": "S3 — Landing Zone"
+},
+{
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "Shared storage that Airflow scans for eligible files. Shared is load-bearing too — every worker pod has to see the same Landing, Archive and Quarantine folders."
+},
+{
+"t": "ul",
+"items": [
+"**Technology.** shared storage",
+"**Source.** ingest Glossary (p.25) · §2.1 (p.5)"
+]
+},
+{
+"t": "h",
+"x": "S4 — Archive and Quarantine"
+},
+{
+"t": "p",
+"x": "Where a file goes after processing. Archive on success, Quarantine when validation fails before anything is written."
+},
+{
+"t": "ul",
+"items": [
+"**Technology.** shared storage",
+"**Source.** ingest Figure 1 (p.6) · §4.1 (p.7)"
+]
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X12 | The archive move fails after a good load | ARCHIVE_FAILED. RAW is kept and is never deleted or reloaded — the move happens after the commit and cannot be part of the transaction. Only the move is retried. | ingest §7.3 (p.14) · Appendix D.3 (p.22) |",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X12",
+"The archive move fails after a good load",
+"ARCHIVE_FAILED. RAW is kept and is never deleted or reloaded — the move happens after the commit and cannot be part of the transaction. Only the move is retried.",
+"ingest §7.3 (p.14) · Appendix D.3 (p.22)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **O1.** Confirm Landing Zone, Archive and Quarantine details.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**O1.** Confirm Landing Zone, Archive and Quarantine details."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 8\ncomponent_name: Landing Zone + Transport\nzone: 2. Hub\nplane: Ingress/Egress\npriority: P1\ntechnology: Infra\ncustom_build: Low\ndepends_on: [5]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-8]\npipeline_tiers: [Stage1-Oracle]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, ingress-egress]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: Joint\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 8\ncomponent_name: Landing Zone + Transport\nzone: 2. Hub\nplane: Ingress/Egress\npriority: P1\ntechnology: Infra\ncustom_build: Low\ndepends_on: [5]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-8]\npipeline_tiers: [Stage1-Oracle]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, ingress-egress]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: Joint\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c9",
@@ -2035,8 +2259,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "9"
 ],
-"withdrawn": true,
-"chip": "#9 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "differs",
+"chip": "#9 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -2057,133 +2283,163 @@ export const DESIGN_DOCS = [
 "src": "09_File_Arrival_Sensors_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nSEI does not use arrival sensors. It runs a scheduled scan every five minutes and decides completeness at the END of the run, as a set difference. A sensor per interface is the pattern it was written to avoid.\n\nIt sits in **Ingestion**, in the **File-based ingestion** lane (SECONDARY · Airflow · Python).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "SEI does not use arrival sensors. It runs a scheduled scan every five minutes and decides completeness at the END of the run, as a set difference. A sensor per interface is the pattern it was written to avoid."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Ingestion**, in the **File-based ingestion** lane (SECONDARY · Airflow · Python)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**SEI covers the need and answers it differently.** SEI does not use arrival sensors. It runs a scheduled scan every five minutes and decides completeness at the END of the run, as a set difference. A sensor per interface is the pattern it was written to avoid.\n\n### S6 — Scheduled discovery\n\nA scan on a schedule rather than a sensor waiting on each file. It reads the active configurations, scans the Landing Zone, matches each physical filename to exactly one logical interface and parses the business date out of the filename.\n\n- **Technology.** Airflow · every 5 min\n- **Source.** ingest §4.1 (p.7) · §9.1 (p.16) · Appendix C.1 (p.21)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**SEI covers the need and answers it differently.** SEI does not use arrival sensors. It runs a scheduled scan every five minutes and decides completeness at the END of the run, as a set difference. A sensor per interface is the pattern it was written to avoid."
+},
+{
+"t": "h",
+"x": "S6 — Scheduled discovery"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "A scan on a schedule rather than a sensor waiting on each file. It reads the active configurations, scans the Landing Zone, matches each physical filename to exactly one logical interface and parses the business date out of the filename."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** Airflow · every 5 min",
+"**Source.** ingest §4.1 (p.7) · §9.1 (p.16) · Appendix C.1 (p.21)"
 ]
-},
-{
-"t": "p",
-"x": "specified, differs, or absent — and the reason for it."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `FILE_SCHEMA_CONFIG` | How an active interface is discovered, dated, validated and routed. File-level only — there is deliberately no column mapping table, because the RAW table DDL is the schema contract. | ingest Appendix A (p.18) · §6.1 (p.12) |\n| `FILE_REGISTRY` | The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts. | ingest Appendix B (p.19) · §6.2 (p.12) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`FILE_SCHEMA_CONFIG`",
+"How an active interface is discovered, dated, validated and routed. File-level only — there is deliberately no column mapping table, because the RAW table DDL is the schema contract.",
+"ingest Appendix A (p.18) · §6.1 (p.12)"
+],
+[
+"`FILE_REGISTRY`",
+"The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts.",
+"ingest Appendix B (p.19) · §6.2 (p.12)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X1 | Exactly one pattern matches | One work item is created, carrying the interface, the physical filename, the business date, the target RAW table and the parsing rules. | ingest Appendix C.3 (p.21) |\n| X2 | No pattern matches | Not loaded and not moved. An unmatched-file event is emitted with the filename and path, and the approved exception-location policy applies — which is still open decision O1. | ingest Appendix C.3 (p.21) |\n| X3 | More than one pattern matches | Treated as a configuration defect. No target table is chosen, nothing is processed, and it is logged and notified. | ingest Appendix C.3 (p.21) |\n| X4 | The scan finds nothing | The run succeeds with zero mapped tasks. The completeness and SLA task still runs — which is the point, because yesterday's late file can complete the set without a new one arriving. | ingest §5.2 (p.10) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X1",
+"Exactly one pattern matches",
+"One work item is created, carrying the interface, the physical filename, the business date, the target RAW table and the parsing rules.",
+"ingest Appendix C.3 (p.21)"
+],
+[
+"X2",
+"No pattern matches",
+"Not loaded and not moved. An unmatched-file event is emitted with the filename and path, and the approved exception-location policy applies — which is still open decision O1.",
+"ingest Appendix C.3 (p.21)"
+],
+[
+"X3",
+"More than one pattern matches",
+"Treated as a configuration defect. No target table is chosen, nothing is processed, and it is logged and notified.",
+"ingest Appendix C.3 (p.21)"
+],
+[
+"X4",
+"The scan finds nothing",
+"The run succeeds with zero mapped tasks. The completeness and SLA task still runs — which is the point, because yesterday's late file can complete the set without a new one arriving.",
+"ingest §5.2 (p.10)"
+]
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **O6.** Confirm expected-interface criteria and any holiday or month-end rules.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**O6.** Confirm expected-interface criteria and any holiday or month-end rules."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 9\ncomponent_name: File Arrival Sensors\nzone: 2. Hub\nplane: Ingress/Egress\npriority: P1\ntechnology: Airflow\ncustom_build: Medium\ndepends_on: [8, 18]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-8]\npipeline_tiers: [Stage1-Oracle]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, ingress-egress]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: Joint\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 9\ncomponent_name: File Arrival Sensors\nzone: 2. Hub\nplane: Ingress/Egress\npriority: P1\ntechnology: Airflow\ncustom_build: Medium\ndepends_on: [8, 18]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-8]\npipeline_tiers: [Stage1-Oracle]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, ingress-egress]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: Joint\nin_scope: true\ngenerated: true\nsei_status: differs\ngenerated: true\nsei_status: differs\ngenerated: true\nsei_status: differs"
 },
 {
 "id": "c10",
@@ -2200,8 +2456,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "10"
 ],
-"withdrawn": true,
-"chip": "#10 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#10 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -2223,133 +2481,73 @@ export const DESIGN_DOCS = [
 "src": "10_Outbound_Producers_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nOutbound to SEI. Neither document has an outbound path.\n\nIt sits in **Ingress and Egress**, in the **Loader framework** lane (Python · outbound).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "Outbound to SEI. Neither document has an outbound path."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Ingress and Egress**, in the **Loader framework** lane (Python · outbound)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nOutbound to SEI. Neither document has an outbound path.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "Outbound to SEI. Neither document has an outbound path."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 10\ncomponent_name: Outbound Producers\nzone: 2. Hub\nplane: Ingress/Egress\npriority: P3\ntechnology: Python\ncustom_build: High\ndepends_on: [43]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-1, AD-2, AD-11]\npipeline_tiers: [Stage3-Exadata-Gold]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, ingress-egress, outbound]\norigin: SEI-BBH component tracker\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 10\ncomponent_name: Outbound Producers\nzone: 2. Hub\nplane: Ingress/Egress\npriority: P3\ntechnology: Python\ncustom_build: High\ndepends_on: [43]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-1, AD-2, AD-11]\npipeline_tiers: [Stage3-Exadata-Gold]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, ingress-egress, outbound]\norigin: SEI-BBH component tracker\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c11",
@@ -2366,8 +2564,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "11"
 ],
-"withdrawn": true,
-"chip": "#11 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#11 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -2386,133 +2586,73 @@ export const DESIGN_DOCS = [
 "src": "11_Apigee_Proxy_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nThe API lane. Both SEI documents are batch from end to end — files in, Gold out — and neither mentions a proxy, a gateway or a synchronous call.\n\nIt sits in **Ingress and Egress**, in the **API gateway and Apigee proxy** lane (vendor).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "The API lane. Both SEI documents are batch from end to end — files in, Gold out — and neither mentions a proxy, a gateway or a synchronous call."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Ingress and Egress**, in the **API gateway and Apigee proxy** lane (vendor)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nThe API lane. Both SEI documents are batch from end to end — files in, Gold out — and neither mentions a proxy, a gateway or a synchronous call.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "The API lane. Both SEI documents are batch from end to end — files in, Gold out — and neither mentions a proxy, a gateway or a synchronous call."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 11\ncomponent_name: Apigee Proxy\nzone: 2. Hub\nplane: Ingress/Egress\npriority: P3\ntechnology: Vendor/Infra\ncustom_build: Low\ndepends_on: [10, 35]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-11]\npipeline_tiers: []\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, ingress-egress, api]\norigin: SEI-BBH component tracker\nsei_coverage: partial\ngap_owner: Joint\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 11\ncomponent_name: Apigee Proxy\nzone: 2. Hub\nplane: Ingress/Egress\npriority: P3\ntechnology: Vendor/Infra\ncustom_build: Low\ndepends_on: [10, 35]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-11]\npipeline_tiers: []\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, ingress-egress, api]\norigin: SEI-BBH component tracker\nsei_coverage: partial\ngap_owner: Joint\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c12",
@@ -2529,8 +2669,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "12"
 ],
-"withdrawn": true,
-"chip": "#12 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#12 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -2552,133 +2694,73 @@ export const DESIGN_DOCS = [
 "src": "12_API_Gateway_DataPlane_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nThe API lane, as above. Nothing in either document describes real-time access to this data.\n\nIt sits in **Ingress and Egress**, in the **API gateway and Apigee proxy** lane (vendor).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "The API lane, as above. Nothing in either document describes real-time access to this data."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Ingress and Egress**, in the **API gateway and Apigee proxy** lane (vendor)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nThe API lane, as above. Nothing in either document describes real-time access to this data.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "The API lane, as above. Nothing in either document describes real-time access to this data."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 12\ncomponent_name: API Gateway / Data Plane\nzone: 2. Hub\nplane: Ingress/Egress\npriority: P2\ntechnology: Vendor/Infra\ncustom_build: Low\ndepends_on: [3, 42]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-1]\npipeline_tiers: [Stage3-Exadata-Gold, Consumer-Movement]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, ingress-egress, api]\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 12\ncomponent_name: API Gateway / Data Plane\nzone: 2. Hub\nplane: Ingress/Egress\npriority: P2\ntechnology: Vendor/Infra\ncustom_build: Low\ndepends_on: [3, 42]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-1]\npipeline_tiers: [Stage3-Exadata-Gold, Consumer-Movement]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, ingress-egress, api]\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c13",
@@ -2695,8 +2777,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "13"
 ],
-"withdrawn": true,
-"chip": "#13 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#13 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -2721,133 +2805,276 @@ export const DESIGN_DOCS = [
 "src": "13_Python_Ingestion_Framework_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nONE DAG for every inbound interface, not one per interface. It is driven by configuration rows, so a new interface is onboarded by adding a row rather than by writing a DAG.\n\nIt sits in **Ingestion**, in the **File-based ingestion** lane (SECONDARY · Airflow · Python).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "ONE DAG for every inbound interface, not one per interface. It is driven by configuration rows, so a new interface is onboarded by adding a row rather than by writing a DAG."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Ingestion**, in the **File-based ingestion** lane (SECONDARY · Airflow · Python)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### S5 — Ingestion DAG (one, metadata-driven)\n\nONE DAG for every inbound interface, not one per interface. It is driven by configuration rows, so a new interface is onboarded by adding a row rather than by writing a DAG.\n\n- **Technology.** Airflow 3.0\n- **Source.** ingest §5 (p.9)\n\n### S6 — Scheduled discovery\n\nA scan on a schedule rather than a sensor waiting on each file. It reads the active configurations, scans the Landing Zone, matches each physical filename to exactly one logical interface and parses the business date out of the filename.\n\n- **Technology.** Airflow · every 5 min\n- **Source.** ingest §4.1 (p.7) · §9.1 (p.16) · Appendix C.1 (p.21)\n\n### S7 — Mapped file task (one per file)\n\nAirflow creates one task per discovered file at run time, so files process independently and in parallel within the pool and Oracle connection limits. A file never waits for another interface.\n\n- **Technology.** Dynamic Task Mapping\n- **Source.** ingest §5 (p.9) · Appendix C.1 (p.21)\n\n### S8 — Python loader\n\nPer file: claim the (interface, business date) pair in the registry, validate readability, header, trailer, zero-row policy and row counts, load the detail rows into the configured RAW table in ONE Oracle transaction, reconcile parsed against trailer against inserted counts, and commit only when they agree. Then move the file and record the outcome.\n\n- **Technology.** worker pod\n- **Source.** ingest §3.1 (p.6) · §4.1 (p.7) · §7.3 (p.14)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "S5 — Ingestion DAG (one, metadata-driven)"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "ONE DAG for every inbound interface, not one per interface. It is driven by configuration rows, so a new interface is onboarded by adding a row rather than by writing a DAG."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** Airflow 3.0",
+"**Source.** ingest §5 (p.9)"
 ]
 },
 {
+"t": "h",
+"x": "S6 — Scheduled discovery"
+},
+{
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "A scan on a schedule rather than a sensor waiting on each file. It reads the active configurations, scans the Landing Zone, matches each physical filename to exactly one logical interface and parses the business date out of the filename."
+},
+{
+"t": "ul",
+"items": [
+"**Technology.** Airflow · every 5 min",
+"**Source.** ingest §4.1 (p.7) · §9.1 (p.16) · Appendix C.1 (p.21)"
+]
+},
+{
+"t": "h",
+"x": "S7 — Mapped file task (one per file)"
+},
+{
+"t": "p",
+"x": "Airflow creates one task per discovered file at run time, so files process independently and in parallel within the pool and Oracle connection limits. A file never waits for another interface."
+},
+{
+"t": "ul",
+"items": [
+"**Technology.** Dynamic Task Mapping",
+"**Source.** ingest §5 (p.9) · Appendix C.1 (p.21)"
+]
+},
+{
+"t": "h",
+"x": "S8 — Python loader"
+},
+{
+"t": "p",
+"x": "Per file: claim the (interface, business date) pair in the registry, validate readability, header, trailer, zero-row policy and row counts, load the detail rows into the configured RAW table in ONE Oracle transaction, reconcile parsed against trailer against inserted counts, and commit only when they agree. Then move the file and record the outcome."
+},
+{
+"t": "ul",
+"items": [
+"**Technology.** worker pod",
+"**Source.** ingest §3.1 (p.6) · §4.1 (p.7) · §7.3 (p.14)"
+]
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `FILE_SCHEMA_CONFIG` | How an active interface is discovered, dated, validated and routed. File-level only — there is deliberately no column mapping table, because the RAW table DDL is the schema contract. | ingest Appendix A (p.18) · §6.1 (p.12) |\n| `FILE_REGISTRY` | The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts. | ingest Appendix B (p.19) · §6.2 (p.12) |\n| `DATE_CONTROL` | The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression. | ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25) |\n| `RAW tables` | Bronze. Validated detail rows as delivered, tagged with the business date and lineage. The dbt document names three: account, client and transaction. | ingest Glossary (p.25) · dbt §4.1 (p.10) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`FILE_SCHEMA_CONFIG`",
+"How an active interface is discovered, dated, validated and routed. File-level only — there is deliberately no column mapping table, because the RAW table DDL is the schema contract.",
+"ingest Appendix A (p.18) · §6.1 (p.12)"
+],
+[
+"`FILE_REGISTRY`",
+"The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts.",
+"ingest Appendix B (p.19) · §6.2 (p.12)"
+],
+[
+"`DATE_CONTROL`",
+"The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression.",
+"ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25)"
+],
+[
+"`RAW tables`",
+"Bronze. Validated detail rows as delivered, tagged with the business date and lineage. The dbt document names three: account, client and transaction.",
+"ingest Glossary (p.25) · dbt §4.1 (p.10)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X1 | Exactly one pattern matches | One work item is created, carrying the interface, the physical filename, the business date, the target RAW table and the parsing rules. | ingest Appendix C.3 (p.21) |\n| X2 | No pattern matches | Not loaded and not moved. An unmatched-file event is emitted with the filename and path, and the approved exception-location policy applies — which is still open decision O1. | ingest Appendix C.3 (p.21) |\n| X3 | More than one pattern matches | Treated as a configuration defect. No target table is chosen, nothing is processed, and it is logged and notified. | ingest Appendix C.3 (p.21) |\n| X4 | The scan finds nothing | The run succeeds with zero mapped tasks. The completeness and SLA task still runs — which is the point, because yesterday's late file can complete the set without a new one arriving. | ingest §5.2 (p.10) |\n| X8 | The same file is discovered again | If the existing record is ARCHIVED it is skipped and logged as a duplicate; no second registry row is created. A unique key on the interface and business date enforces it. | ingest §5 (p.9) · Appendix B (p.19) |\n| X9 | A record is stuck in RECEIVED, VALIDATED or LOADING | Investigated, never reset automatically. The Airflow task state, the worker logs, the file location and the Oracle outcome are checked first, and the same record is reused for recovery. | ingest Appendix D.5 (p.23) |\n| X5 | The business date will not parse | Rejected before any RAW write, with the parsing error recorded. The format mask must reject impossible dates even when the regex shape matches. | ingest Appendix D.6 (p.23) |\n| X6 | Header or trailer fails | RECEIVED becomes QUARANTINED, the error is recorded and the file moves to Quarantine. Nothing is written to RAW. | ingest §4 (p.7) · Appendix B.2 (p.20) |\n| X7 | A zero-row file arrives and is not allowed | QUARANTINED, same path. Whether zero rows are allowed is per interface configuration. | ingest §6.1 (p.12) |\n| X10 | The RAW load or the count check fails | Rolled back. LOADING becomes FAILED with the error and the end timestamp. The insert and the count reconciliation are one Oracle transaction, and the commit happens only when the file count, the trailer count and the inserted count all agree. | ingest §4.1 (p.7) · §7.3 (p.14) |\n| X11 | A FAILED file is rerun | The same registry id is reused and the retry count goes up. Any exceptional partial rows are removed through the approved process first, then the file reloads in one transaction. | ingest Appendix D.1 (p.22) |\n| X12 | The archive move fails after a good load | ARCHIVE_FAILED. RAW is kept and is never deleted or reloaded — the move happens after the commit and cannot be part of the transaction. Only the move is retried. | ingest §7.3 (p.14) · Appendix D.3 (p.22) |\n| X39 | A successful file has to be replaced | Approval first, then the reason, approver, operator and affected downstream scope are recorded. The registry row and the RAW rows are deleted through the controlled process, the corrected file is dropped in Landing, and a fresh lifecycle starts. The downstream rebuild for that date is coordinated separately. | ingest Appendix D.4 (p.23) |\n| X40 | A quarantined file is corrected | The same registry id is reused, the retry count goes up, the status resets to RECEIVED and every validation runs again before any RAW write. | ingest Appendix D.2 (p.22) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X1",
+"Exactly one pattern matches",
+"One work item is created, carrying the interface, the physical filename, the business date, the target RAW table and the parsing rules.",
+"ingest Appendix C.3 (p.21)"
+],
+[
+"X2",
+"No pattern matches",
+"Not loaded and not moved. An unmatched-file event is emitted with the filename and path, and the approved exception-location policy applies — which is still open decision O1.",
+"ingest Appendix C.3 (p.21)"
+],
+[
+"X3",
+"More than one pattern matches",
+"Treated as a configuration defect. No target table is chosen, nothing is processed, and it is logged and notified.",
+"ingest Appendix C.3 (p.21)"
+],
+[
+"X4",
+"The scan finds nothing",
+"The run succeeds with zero mapped tasks. The completeness and SLA task still runs — which is the point, because yesterday's late file can complete the set without a new one arriving.",
+"ingest §5.2 (p.10)"
+],
+[
+"X8",
+"The same file is discovered again",
+"If the existing record is ARCHIVED it is skipped and logged as a duplicate; no second registry row is created. A unique key on the interface and business date enforces it.",
+"ingest §5 (p.9) · Appendix B (p.19)"
+],
+[
+"X9",
+"A record is stuck in RECEIVED, VALIDATED or LOADING",
+"Investigated, never reset automatically. The Airflow task state, the worker logs, the file location and the Oracle outcome are checked first, and the same record is reused for recovery.",
+"ingest Appendix D.5 (p.23)"
+],
+[
+"X5",
+"The business date will not parse",
+"Rejected before any RAW write, with the parsing error recorded. The format mask must reject impossible dates even when the regex shape matches.",
+"ingest Appendix D.6 (p.23)"
+],
+[
+"X6",
+"Header or trailer fails",
+"RECEIVED becomes QUARANTINED, the error is recorded and the file moves to Quarantine. Nothing is written to RAW.",
+"ingest §4 (p.7) · Appendix B.2 (p.20)"
+],
+[
+"X7",
+"A zero-row file arrives and is not allowed",
+"QUARANTINED, same path. Whether zero rows are allowed is per interface configuration.",
+"ingest §6.1 (p.12)"
+],
+[
+"X10",
+"The RAW load or the count check fails",
+"Rolled back. LOADING becomes FAILED with the error and the end timestamp. The insert and the count reconciliation are one Oracle transaction, and the commit happens only when the file count, the trailer count and the inserted count all agree.",
+"ingest §4.1 (p.7) · §7.3 (p.14)"
+],
+[
+"X11",
+"A FAILED file is rerun",
+"The same registry id is reused and the retry count goes up. Any exceptional partial rows are removed through the approved process first, then the file reloads in one transaction.",
+"ingest Appendix D.1 (p.22)"
+],
+[
+"X12",
+"The archive move fails after a good load",
+"ARCHIVE_FAILED. RAW is kept and is never deleted or reloaded — the move happens after the commit and cannot be part of the transaction. Only the move is retried.",
+"ingest §7.3 (p.14) · Appendix D.3 (p.22)"
+],
+[
+"X39",
+"A successful file has to be replaced",
+"Approval first, then the reason, approver, operator and affected downstream scope are recorded. The registry row and the RAW rows are deleted through the controlled process, the corrected file is dropped in Landing, and a fresh lifecycle starts. The downstream rebuild for that date is coordinated separately.",
+"ingest Appendix D.4 (p.23)"
+],
+[
+"X40",
+"A quarantined file is corrected",
+"The same registry id is reused, the retry count goes up, the status resets to RECEIVED and every validation runs again before any RAW write.",
+"ingest Appendix D.2 (p.22)"
+]
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **O2.** Confirm batch SLA, peak timing, representative file sizes and the Oracle connection envelope.\n- **O3.** Confirm the retention period and purge approach for RAW and FILE_REGISTRY.\n- **O6.** Confirm expected-interface criteria and any holiday or month-end rules.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**O2.** Confirm batch SLA, peak timing, representative file sizes and the Oracle connection envelope.",
+"**O3.** Confirm the retention period and purge approach for RAW and FILE_REGISTRY.",
+"**O6.** Confirm expected-interface criteria and any holiday or month-end rules."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 13\ncomponent_name: Python Ingestion Framework\nzone: 2. Hub\nplane: Processing\npriority: P1\ntechnology: Python\ncustom_build: High\ndepends_on: [8, 14, 23]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-7, AD-8, AD-9, AD-10]\npipeline_tiers: [Stage1-Oracle]\nlast_updated: 2026-08-10\ntags: [SEI-BBH, Integration-Hub, hub, processing, ingestion]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 13\ncomponent_name: Python Ingestion Framework\nzone: 2. Hub\nplane: Processing\npriority: P1\ntechnology: Python\ncustom_build: High\ndepends_on: [8, 14, 23]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-7, AD-8, AD-9, AD-10]\npipeline_tiers: [Stage1-Oracle]\nlast_updated: 2026-08-10\ntags: [SEI-BBH, Integration-Hub, hub, processing, ingestion]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c14",
@@ -2864,8 +3091,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "14"
 ],
-"withdrawn": true,
-"chip": "#14 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#14 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -2887,133 +3116,119 @@ export const DESIGN_DOCS = [
 "src": "14_Stage1_RAW_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nBronze. Validated detail rows as delivered, tagged with the business date and lineage. The dbt document names three: account, client and transaction.\n\nIt sits in **Processing**, in the **dbt models** lane (dbt · Oracle).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "Bronze. Validated detail rows as delivered, tagged with the business date and lineage. The dbt document names three: account, client and transaction."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Processing**, in the **dbt models** lane (dbt · Oracle)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### T4 — RAW tables\n\nBronze. Validated detail rows as delivered, tagged with the business date and lineage. The dbt document names three: account, client and transaction.\n\n- **Columns.** per-interface DDL · BUSINESS_DATE · SRC_RECORD_ID and lineage\n- **Source.** ingest Glossary (p.25) · dbt §4.1 (p.10)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "T4 — RAW tables"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "Bronze. Validated detail rows as delivered, tagged with the business date and lineage. The dbt document names three: account, client and transaction."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Columns.** per-interface DDL · BUSINESS_DATE · SRC_RECORD_ID and lineage",
+"**Source.** ingest Glossary (p.25) · dbt §4.1 (p.10)"
 ]
-},
-{
-"t": "p",
-"x": "specified, differs, or absent — and the reason for it."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `RAW tables` | Bronze. Validated detail rows as delivered, tagged with the business date and lineage. The dbt document names three: account, client and transaction. | ingest Glossary (p.25) · dbt §4.1 (p.10) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`RAW tables`",
+"Bronze. Validated detail rows as delivered, tagged with the business date and lineage. The dbt document names three: account, client and transaction.",
+"ingest Glossary (p.25) · dbt §4.1 (p.10)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Where SEI's documents disagree about this",
+"md": "\nEach one is a decision to take before a model is written.\n\n### C1 — Three RAW tables, or seven\n\n- **The architecture says.** RAW_ACCOUNT, RAW_CLIENT, RAW_TAXLOT, RAW_TRANSACTION, RAW_POSITION, RAW_CORRECTED_TRANSACTION, RAW_CORRECTED_POSITION.\n- **The design documents say.** The dbt design document names three: account, client and transaction. Position, tax lot and the two correction tables do not appear in it at all.\n- **Why it matters.** Four of the seven feeds have no transformation designed for them. If the architecture is right, the design document covers under half the inbound surface.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Each one is a decision to take before a model is written."
+},
+{
+"t": "h",
+"x": "C1 — Three RAW tables, or seven"
+},
+{
+"t": "ul",
+"items": [
+"**The architecture says.** RAW_ACCOUNT, RAW_CLIENT, RAW_TAXLOT, RAW_TRANSACTION, RAW_POSITION, RAW_CORRECTED_TRANSACTION, RAW_CORRECTED_POSITION.",
+"**The design documents say.** The dbt design document names three: account, client and transaction. Position, tax lot and the two correction tables do not appear in it at all.",
+"**Why it matters.** Four of the seven feeds have no transformation designed for them. If the architecture is right, the design document covers under half the inbound surface."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 14\ncomponent_name: Stage 1 RAW\nzone: 2. Hub\nplane: Processing\npriority: P1\ntechnology: Oracle DDL\ncustom_build: None\ndepends_on: [13]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-8, AD-7, AD-10]\npipeline_tiers: [Stage1-Oracle]\nlast_updated: 2026-08-10\ntags: [SEI-BBH, Integration-Hub, hub, processing, raw]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 14\ncomponent_name: Stage 1 RAW\nzone: 2. Hub\nplane: Processing\npriority: P1\ntechnology: Oracle DDL\ncustom_build: None\ndepends_on: [13]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-8, AD-7, AD-10]\npipeline_tiers: [Stage1-Oracle]\nlast_updated: 2026-08-10\ntags: [SEI-BBH, Integration-Hub, hub, processing, raw]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c15",
@@ -3030,8 +3245,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "15"
 ],
-"withdrawn": true,
-"chip": "#15 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#15 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -3055,133 +3272,217 @@ export const DESIGN_DOCS = [
 "src": "15_Stage2_Enriched_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nOne tracker component, two SEI objects: STG is a view that stores nothing, INT is a table kept seven days.\n\nIt sits in **Processing**, in the **dbt models** lane (dbt · Oracle).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "One tracker component, two SEI objects: STG is a view that stores nothing, INT is a table kept seven days."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Processing**, in the **dbt models** lane (dbt · Oracle)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### S14 — STG — view\n\nStandardises the source columns and computes a pass or fail verdict per row. Stores nothing: it is recomputed on read.\n\n- **Technology.** dbt view\n- **Source.** dbt §4.1 (p.10) · §6.3 (p.15)\n\n### S15 — INT — 7 days\n\nReads only the rows that passed, maps the code sets, keyed on the natural business key plus business date, partitioned, purged by partition drop after seven days.\n\n- **Technology.** dbt incremental\n- **Source.** dbt §4.1 (p.10) · §6.5 (p.15)\n\n### T5 — INT tables\n\nSilver persistence. Passing rows only, seven days, partitioned by business date.\n\n- **Columns.** natural key + BUSINESS_DATE (unique) · mapped code sets\n- **Source.** dbt §4.1 (p.10) · Appendix A.3 (p.26)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "S14 — STG — view"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "Standardises the source columns and computes a pass or fail verdict per row. Stores nothing: it is recomputed on read."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** dbt view",
+"**Source.** dbt §4.1 (p.10) · §6.3 (p.15)"
 ]
 },
 {
+"t": "h",
+"x": "S15 — INT — 7 days"
+},
+{
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "Reads only the rows that passed, maps the code sets, keyed on the natural business key plus business date, partitioned, purged by partition drop after seven days."
+},
+{
+"t": "ul",
+"items": [
+"**Technology.** dbt incremental",
+"**Source.** dbt §4.1 (p.10) · §6.5 (p.15)"
+]
+},
+{
+"t": "h",
+"x": "T5 — INT tables"
+},
+{
+"t": "p",
+"x": "Silver persistence. Passing rows only, seven days, partitioned by business date."
+},
+{
+"t": "ul",
+"items": [
+"**Columns.** natural key + BUSINESS_DATE (unique) · mapped code sets",
+"**Source.** dbt §4.1 (p.10) · Appendix A.3 (p.26)"
+]
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `RAW tables` | Bronze. Validated detail rows as delivered, tagged with the business date and lineage. The dbt document names three: account, client and transaction. | ingest Glossary (p.25) · dbt §4.1 (p.10) |\n| `DQ_VALIDATION_FAILURE` | One store for both failure categories, carrying whether the row can replay itself and whether it is still open. | dbt §7.1 (p.17) |\n| `INT tables` | Silver persistence. Passing rows only, seven days, partitioned by business date. | dbt §4.1 (p.10) · Appendix A.3 (p.26) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`RAW tables`",
+"Bronze. Validated detail rows as delivered, tagged with the business date and lineage. The dbt document names three: account, client and transaction.",
+"ingest Glossary (p.25) · dbt §4.1 (p.10)"
+],
+[
+"`DQ_VALIDATION_FAILURE`",
+"One store for both failure categories, carrying whether the row can replay itself and whether it is still open.",
+"dbt §7.1 (p.17)"
+],
+[
+"`INT tables`",
+"Silver persistence. Passing rows only, seven days, partitioned by business date.",
+"dbt §4.1 (p.10) · Appendix A.3 (p.26)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X24 | A key column is missing | The STG view marks the row FAIL with a reason code and INT never reads it. The row goes to the DQ store as OPEN. | dbt §6.3 (p.15) |\n| X25 | A code is not in the mapping table | Same path — FAIL at STG with its own reason code, excluded before any mapping is attempted. | dbt §6.3 (p.15) |\n| X28 | A code has no active mapping row | Caught at INT as a transformation failure, owned by the transformation team rather than the source. Marked not auto-replayable: it stays OPEN until a code fix is deployed. | dbt §7 (p.17) |\n| X31 | A row is still OPEN at the retention edge | CLOSED and alerted at seven days, because the DQ store keeps lineage only and INT no longer holds the data to re-derive it. | dbt §7.1 (p.17) · §8.2 assumption A4 (p.20) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X24",
+"A key column is missing",
+"The STG view marks the row FAIL with a reason code and INT never reads it. The row goes to the DQ store as OPEN.",
+"dbt §6.3 (p.15)"
+],
+[
+"X25",
+"A code is not in the mapping table",
+"Same path — FAIL at STG with its own reason code, excluded before any mapping is attempted.",
+"dbt §6.3 (p.15)"
+],
+[
+"X28",
+"A code has no active mapping row",
+"Caught at INT as a transformation failure, owned by the transformation team rather than the source. Marked not auto-replayable: it stays OPEN until a code fix is deployed.",
+"dbt §7 (p.17)"
+],
+[
+"X31",
+"A row is still OPEN at the retention edge",
+"CLOSED and alerted at seven days, because the DQ store keeps lineage only and INT no longer holds the data to re-derive it.",
+"dbt §7.1 (p.17) · §8.2 assumption A4 (p.20)"
+]
+]
+}
+]
+},
+{
+"h": "Where SEI's documents disagree about this",
+"md": "\nEach one is a decision to take before a model is written.\n\n### C2 — Stage 2 as five tables, or as STG plus INT\n\n- **The architecture says.** Five STG2_* tables, materialised as tables, full refresh daily or incremental.\n- **The design documents say.** A STG view that stores nothing, plus an INT table kept seven days and partitioned.\n- **Why it matters.** Not a naming difference. One stores Stage 2 and one does not, and the retention, the replay window and the reconciliation boundaries all follow from which it is.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Each one is a decision to take before a model is written."
+},
+{
+"t": "h",
+"x": "C2 — Stage 2 as five tables, or as STG plus INT"
+},
+{
+"t": "ul",
+"items": [
+"**The architecture says.** Five STG2_* tables, materialised as tables, full refresh daily or incremental.",
+"**The design documents say.** A STG view that stores nothing, plus an INT table kept seven days and partitioned.",
+"**Why it matters.** Not a naming difference. One stores Stage 2 and one does not, and the retention, the replay window and the reconciliation boundaries all follow from which it is."
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **D4.** Confirm no downstream consumer needs STG persisted.\n- **D5.** Confirm retention units, Oracle partitioning support, volumetrics and run-window targets.",
+"blocks": [
+{
+"t": "p",
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**D4.** Confirm no downstream consumer needs STG persisted.",
+"**D5.** Confirm retention units, Oracle partitioning support, volumetrics and run-window targets."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 15\ncomponent_name: Stage 2 Enriched (dbt)\nzone: 2. Hub\nplane: Processing\npriority: P1\ntechnology: dbt\ncustom_build: Medium\ndepends_on: [14, 17, 25]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-2, AD-9, AD-1]\npipeline_tiers: [Stage2-Oracle]\nlast_updated: 2026-08-10\ntags: [SEI-BBH, Integration-Hub, hub, processing, dbt]\norigin: SEI-BBH component tracker\nsei_coverage: partial\ngap_owner: Joint\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 15\ncomponent_name: Stage 2 Enriched (dbt)\nzone: 2. Hub\nplane: Processing\npriority: P1\ntechnology: dbt\ncustom_build: Medium\ndepends_on: [14, 17, 25]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-2, AD-9, AD-1]\npipeline_tiers: [Stage2-Oracle]\nlast_updated: 2026-08-10\ntags: [SEI-BBH, Integration-Hub, hub, processing, dbt]\norigin: SEI-BBH component tracker\nsei_coverage: partial\ngap_owner: Joint\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c16",
@@ -3198,8 +3499,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "16"
 ],
-"withdrawn": true,
-"chip": "#16 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#16 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -3224,133 +3527,224 @@ export const DESIGN_DOCS = [
 "src": "16_Gold_dbt_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nOne tracker component, two ordered SEI layers — and the tables already exist, so dbt populates rather than builds them.\n\nIt sits in **Processing**, in the **dbt models** lane (dbt · Oracle).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "One tracker component, two ordered SEI layers — and the tables already exist, so dbt populates rather than builds them."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Processing**, in the **dbt models** lane (dbt · Oracle)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### S16 — DIM — built first\n\nHistory by direct-compare MERGE into tables that already exist. The surrogate key comes from the Oracle sequence already in use. No DDL is issued against Gold.\n\n- **Technology.** dbt MERGE\n- **Source.** dbt §4.1 (p.10) · §6.4 (p.15)\n\n### S17 — FACT — built second\n\nLoads only transactions whose dimension has resolved. A transaction whose account has not arrived is never written with a placeholder key — it is held and replayed once the dimension exists.\n\n- **Technology.** dbt MERGE\n- **Source.** dbt §4.1 (p.10) · §7.1 (p.17)\n\n### T6 — Gold DIM / FACT\n\nAlready exist and already carry history from the current system. This programme changes only how they are populated.\n\n- **Columns.** DIM_ACCOUNT: ACCOUNT_KEY (PK) · ACCOUNT_NUMBER · ACCOUNT_TYPE · SITUS_CODE · START_DATE · END_DATE · ACTIVE_IND  │  FACT_TRANSACTIONS: TRANSACTION_ID (PK) · BUSINESS_DATE · TRANSACTION_AMOUNT · ACCOUNT_KEY\n- **Source.** dbt §6.4 (p.15) · §10.1 (p.23)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "S16 — DIM — built first"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "History by direct-compare MERGE into tables that already exist. The surrogate key comes from the Oracle sequence already in use. No DDL is issued against Gold."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** dbt MERGE",
+"**Source.** dbt §4.1 (p.10) · §6.4 (p.15)"
 ]
 },
 {
+"t": "h",
+"x": "S17 — FACT — built second"
+},
+{
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "Loads only transactions whose dimension has resolved. A transaction whose account has not arrived is never written with a placeholder key — it is held and replayed once the dimension exists."
+},
+{
+"t": "ul",
+"items": [
+"**Technology.** dbt MERGE",
+"**Source.** dbt §4.1 (p.10) · §7.1 (p.17)"
+]
+},
+{
+"t": "h",
+"x": "T6 — Gold DIM / FACT"
+},
+{
+"t": "p",
+"x": "Already exist and already carry history from the current system. This programme changes only how they are populated."
+},
+{
+"t": "ul",
+"items": [
+"**Columns.** DIM_ACCOUNT: ACCOUNT_KEY (PK) · ACCOUNT_NUMBER · ACCOUNT_TYPE · SITUS_CODE · START_DATE · END_DATE · ACTIVE_IND  │  FACT_TRANSACTIONS: TRANSACTION_ID (PK) · BUSINESS_DATE · TRANSACTION_AMOUNT · ACCOUNT_KEY",
+"**Source.** dbt §6.4 (p.15) · §10.1 (p.23)"
+]
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `INT tables` | Silver persistence. Passing rows only, seven days, partitioned by business date. | dbt §4.1 (p.10) · Appendix A.3 (p.26) |\n| `Gold DIM / FACT` | Already exist and already carry history from the current system. This programme changes only how they are populated. | dbt §6.4 (p.15) · §10.1 (p.23) |\n| `DQ_VALIDATION_FAILURE` | One store for both failure categories, carrying whether the row can replay itself and whether it is still open. | dbt §7.1 (p.17) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`INT tables`",
+"Silver persistence. Passing rows only, seven days, partitioned by business date.",
+"dbt §4.1 (p.10) · Appendix A.3 (p.26)"
+],
+[
+"`Gold DIM / FACT`",
+"Already exist and already carry history from the current system. This programme changes only how they are populated.",
+"dbt §6.4 (p.15) · §10.1 (p.23)"
+],
+[
+"`DQ_VALIDATION_FAILURE`",
+"One store for both failure categories, carrying whether the row can replay itself and whether it is still open.",
+"dbt §7.1 (p.17)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X32 | A correction arrives and the row is still current | A normal MERGE, joined on the surrogate key rather than the natural key — a natural-key join matches both the closing and the opening row and fails. | dbt §6.4.1 (p.15) |\n| X33 | A correction arrives and the interval is already closed | A direct UPDATE of that closed row only. Never a MERGE — it would reopen an interval that is settled. | dbt §6.4.1 (p.15) |\n| X34 | Someone changes the shape of a Gold table | Refused. Every Gold model fails on a schema change, and the service account holds DML only — no create, alter or drop. | dbt §8.4 (p.21) |\n| X22 | FACT fails after DIM succeeded | The restart resumes at the fact build. The dimension is not rebuilt. | dbt §8.1 (p.20) |\n| X30 | A transaction's dimension has not arrived | Never written to Gold with a placeholder key. Held in the DQ store as replayable and OPEN, re-derived from INT on a later day once the dimension exists, then marked RESOLVED. | dbt §7.1 (p.17) · Figure 5a (p.18) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X32",
+"A correction arrives and the row is still current",
+"A normal MERGE, joined on the surrogate key rather than the natural key — a natural-key join matches both the closing and the opening row and fails.",
+"dbt §6.4.1 (p.15)"
+],
+[
+"X33",
+"A correction arrives and the interval is already closed",
+"A direct UPDATE of that closed row only. Never a MERGE — it would reopen an interval that is settled.",
+"dbt §6.4.1 (p.15)"
+],
+[
+"X34",
+"Someone changes the shape of a Gold table",
+"Refused. Every Gold model fails on a schema change, and the service account holds DML only — no create, alter or drop.",
+"dbt §8.4 (p.21)"
+],
+[
+"X22",
+"FACT fails after DIM succeeded",
+"The restart resumes at the fact build. The dimension is not rebuilt.",
+"dbt §8.1 (p.20)"
+],
+[
+"X30",
+"A transaction's dimension has not arrived",
+"Never written to Gold with a placeholder key. Held in the DQ store as replayable and OPEN, re-derived from INT on a later day once the dimension exists, then marked RESOLVED.",
+"dbt §7.1 (p.17) · Figure 5a (p.18)"
+]
+]
+}
+]
+},
+{
+"h": "Where SEI's documents disagree about this",
+"md": "\nEach one is a decision to take before a model is written.\n\n### C3 — Two Gold facts, or three\n\n- **The architecture says.** FACT_TRANSACTIONS, FACT_CP_HOLDINGS and FACT_TAX_LOT, each with its own strategy — merge, merge and periodic snapshot.\n- **The design documents say.** FACT_TRANSACTIONS only.\n- **Why it matters.** Holdings and tax lot are the two the design document is silent on, and a periodic snapshot is a different pattern from a merge — it is not covered by the SCD2 and merge logic that is specified.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Each one is a decision to take before a model is written."
+},
+{
+"t": "h",
+"x": "C3 — Two Gold facts, or three"
+},
+{
+"t": "ul",
+"items": [
+"**The architecture says.** FACT_TRANSACTIONS, FACT_CP_HOLDINGS and FACT_TAX_LOT, each with its own strategy — merge, merge and periodic snapshot.",
+"**The design documents say.** FACT_TRANSACTIONS only.",
+"**Why it matters.** Holdings and tax lot are the two the design document is silent on, and a periodic snapshot is a different pattern from a merge — it is not covered by the SCD2 and merge logic that is specified."
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **D1.** Confirm the existing sequence name and ownership behind the Gold surrogate key.\n- **D2.** Confirm all missing dimensions resolve inside the seven-day window, and approve the single-table DQ design, the replay policy and the retention-boundary alert.\n- **D3.** Confirm the current history coverage of the existing dimensions.",
+"blocks": [
+{
+"t": "p",
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**D1.** Confirm the existing sequence name and ownership behind the Gold surrogate key.",
+"**D2.** Confirm all missing dimensions resolve inside the seven-day window, and approve the single-table DQ design, the replay policy and the retention-boundary alert.",
+"**D3.** Confirm the current history coverage of the existing dimensions."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 16\ncomponent_name: Gold (dbt)\nzone: 2. Hub\nplane: Processing\npriority: P1\ntechnology: dbt\ncustom_build: High\ndepends_on: [15, 26, 60]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-1, AD-2, AD-9]\npipeline_tiers: [Stage3-Exadata-Gold, Consumer-Movement]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, processing]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: SEI\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 16\ncomponent_name: Gold (dbt)\nzone: 2. Hub\nplane: Processing\npriority: P1\ntechnology: dbt\ncustom_build: High\ndepends_on: [15, 26, 60]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-1, AD-2, AD-9]\npipeline_tiers: [Stage3-Exadata-Gold, Consumer-Movement]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, processing]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: SEI\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c17",
@@ -3367,8 +3761,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "17"
 ],
-"withdrawn": true,
-"chip": "#17 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#17 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -3393,133 +3789,188 @@ export const DESIGN_DOCS = [
 "src": "17_Correction_Handling_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nSEI gives it the rule it was missing: a closed interval is corrected by direct UPDATE, never by MERGE.\n\nIt sits in **Processing**, in the **dbt models** lane (dbt · Oracle).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "SEI gives it the rule it was missing: a closed interval is corrected by direct UPDATE, never by MERGE."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Processing**, in the **dbt models** lane (dbt · Oracle)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### S16 — DIM — built first\n\nHistory by direct-compare MERGE into tables that already exist. The surrogate key comes from the Oracle sequence already in use. No DDL is issued against Gold.\n\n- **Technology.** dbt MERGE\n- **Source.** dbt §4.1 (p.10) · §6.4 (p.15)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "S16 — DIM — built first"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "History by direct-compare MERGE into tables that already exist. The surrogate key comes from the Oracle sequence already in use. No DDL is issued against Gold."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** dbt MERGE",
+"**Source.** dbt §4.1 (p.10) · §6.4 (p.15)"
 ]
-},
-{
-"t": "p",
-"x": "specified, differs, or absent — and the reason for it."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `INT tables` | Silver persistence. Passing rows only, seven days, partitioned by business date. | dbt §4.1 (p.10) · Appendix A.3 (p.26) |\n| `Gold DIM / FACT` | Already exist and already carry history from the current system. This programme changes only how they are populated. | dbt §6.4 (p.15) · §10.1 (p.23) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`INT tables`",
+"Silver persistence. Passing rows only, seven days, partitioned by business date.",
+"dbt §4.1 (p.10) · Appendix A.3 (p.26)"
+],
+[
+"`Gold DIM / FACT`",
+"Already exist and already carry history from the current system. This programme changes only how they are populated.",
+"dbt §6.4 (p.15) · §10.1 (p.23)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X32 | A correction arrives and the row is still current | A normal MERGE, joined on the surrogate key rather than the natural key — a natural-key join matches both the closing and the opening row and fails. | dbt §6.4.1 (p.15) |\n| X33 | A correction arrives and the interval is already closed | A direct UPDATE of that closed row only. Never a MERGE — it would reopen an interval that is settled. | dbt §6.4.1 (p.15) |\n| X34 | Someone changes the shape of a Gold table | Refused. Every Gold model fails on a schema change, and the service account holds DML only — no create, alter or drop. | dbt §8.4 (p.21) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X32",
+"A correction arrives and the row is still current",
+"A normal MERGE, joined on the surrogate key rather than the natural key — a natural-key join matches both the closing and the opening row and fails.",
+"dbt §6.4.1 (p.15)"
+],
+[
+"X33",
+"A correction arrives and the interval is already closed",
+"A direct UPDATE of that closed row only. Never a MERGE — it would reopen an interval that is settled.",
+"dbt §6.4.1 (p.15)"
+],
+[
+"X34",
+"Someone changes the shape of a Gold table",
+"Refused. Every Gold model fails on a schema change, and the service account holds DML only — no create, alter or drop.",
+"dbt §8.4 (p.21)"
+]
+]
+}
+]
+},
+{
+"h": "Where SEI's documents disagree about this",
+"md": "\nEach one is a decision to take before a model is written.\n\n### C3 — Two Gold facts, or three\n\n- **The architecture says.** FACT_TRANSACTIONS, FACT_CP_HOLDINGS and FACT_TAX_LOT, each with its own strategy — merge, merge and periodic snapshot.\n- **The design documents say.** FACT_TRANSACTIONS only.\n- **Why it matters.** Holdings and tax lot are the two the design document is silent on, and a periodic snapshot is a different pattern from a merge — it is not covered by the SCD2 and merge logic that is specified.\n\n### C4 — Corrections as files, or as a rule\n\n- **The architecture says.** Two correction files arrive daily and Stage 2 has a named step, correction file integration, that merges them.\n- **The design documents say.** Correction is a MERGE-versus-UPDATE rule applied inside the dimension build. No correction file is described.\n- **Why it matters.** The architecture has corrections entering as data; the design document has them as a write strategy. Both may be needed, but nobody has said how a correction file reaches the rule.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Each one is a decision to take before a model is written."
+},
+{
+"t": "h",
+"x": "C3 — Two Gold facts, or three"
+},
+{
+"t": "ul",
+"items": [
+"**The architecture says.** FACT_TRANSACTIONS, FACT_CP_HOLDINGS and FACT_TAX_LOT, each with its own strategy — merge, merge and periodic snapshot.",
+"**The design documents say.** FACT_TRANSACTIONS only.",
+"**Why it matters.** Holdings and tax lot are the two the design document is silent on, and a periodic snapshot is a different pattern from a merge — it is not covered by the SCD2 and merge logic that is specified."
+]
+},
+{
+"t": "h",
+"x": "C4 — Corrections as files, or as a rule"
+},
+{
+"t": "ul",
+"items": [
+"**The architecture says.** Two correction files arrive daily and Stage 2 has a named step, correction file integration, that merges them.",
+"**The design documents say.** Correction is a MERGE-versus-UPDATE rule applied inside the dimension build. No correction file is described.",
+"**Why it matters.** The architecture has corrections entering as data; the design document has them as a write strategy. Both may be needed, but nobody has said how a correction file reaches the rule."
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **D1.** Confirm the existing sequence name and ownership behind the Gold surrogate key.\n- **D3.** Confirm the current history coverage of the existing dimensions.",
+"blocks": [
+{
+"t": "p",
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**D1.** Confirm the existing sequence name and ownership behind the Gold surrogate key.",
+"**D3.** Confirm the current history coverage of the existing dimensions."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 17\ncomponent_name: Correction Handling\nzone: 2. Hub\nplane: Processing\npriority: P1\ntechnology: dbt\ncustom_build: High\ndepends_on: [15, 16, 21]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-2, AD-8, AD-9]\npipeline_tiers: [Stage2-Oracle, Stage3-Exadata-Gold]\nlast_updated: 2026-08-10\ntags: [SEI-BBH, Integration-Hub, hub, processing, bitemporal]\norigin: SEI-BBH component tracker\nsei_coverage: partial\ngap_owner: SEI\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 17\ncomponent_name: Correction Handling\nzone: 2. Hub\nplane: Processing\npriority: P1\ntechnology: dbt\ncustom_build: High\ndepends_on: [15, 16, 21]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-2, AD-8, AD-9]\npipeline_tiers: [Stage2-Oracle, Stage3-Exadata-Gold]\nlast_updated: 2026-08-10\ntags: [SEI-BBH, Integration-Hub, hub, processing, bitemporal]\norigin: SEI-BBH component tracker\nsei_coverage: partial\ngap_owner: SEI\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c18",
@@ -3536,8 +3987,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "18"
 ],
-"withdrawn": true,
-"chip": "#18 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "differs",
+"chip": "#18 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -3565,133 +4018,172 @@ export const DESIGN_DOCS = [
 "src": "18_Airflow_DAG_Fanout_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nSEI has two DAGs, not one, and no per-domain fan-out: parallelism comes from one mapped task per FILE, created at run time.\n\nIt sits in **Orchestration**, in the **Ingestion DAG** lane (Airflow 3.0).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "SEI has two DAGs, not one, and no per-domain fan-out: parallelism comes from one mapped task per FILE, created at run time."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Orchestration**, in the **Ingestion DAG** lane (Airflow 3.0)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**SEI covers the need and answers it differently.** SEI has two DAGs, not one, and no per-domain fan-out: parallelism comes from one mapped task per FILE, created at run time.\n\n### S5 — Ingestion DAG (one, metadata-driven)\n\nONE DAG for every inbound interface, not one per interface. It is driven by configuration rows, so a new interface is onboarded by adding a row rather than by writing a DAG.\n\n- **Technology.** Airflow 3.0\n- **Source.** ingest §5 (p.9)\n\n### S13 — Transformation DAG\n\nRe-checks completeness and TRIGGER status before doing any work — trust but verify — then builds the layers in order, each as a build task followed by its own test task.\n\n- **Technology.** Airflow + dbt\n- **Source.** dbt §5.2 (p.11) · Appendix A.1 (p.25)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**SEI covers the need and answers it differently.** SEI has two DAGs, not one, and no per-domain fan-out: parallelism comes from one mapped task per FILE, created at run time."
+},
+{
+"t": "h",
+"x": "S5 — Ingestion DAG (one, metadata-driven)"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "ONE DAG for every inbound interface, not one per interface. It is driven by configuration rows, so a new interface is onboarded by adding a row rather than by writing a DAG."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** Airflow 3.0",
+"**Source.** ingest §5 (p.9)"
 ]
 },
 {
+"t": "h",
+"x": "S13 — Transformation DAG"
+},
+{
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "Re-checks completeness and TRIGGER status before doing any work — trust but verify — then builds the layers in order, each as a build task followed by its own test task."
+},
+{
+"t": "ul",
+"items": [
+"**Technology.** Airflow + dbt",
+"**Source.** dbt §5.2 (p.11) · Appendix A.1 (p.25)"
+]
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `FILE_SCHEMA_CONFIG` | How an active interface is discovered, dated, validated and routed. File-level only — there is deliberately no column mapping table, because the RAW table DDL is the schema contract. | ingest Appendix A (p.18) · §6.1 (p.12) |\n| `FILE_REGISTRY` | The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts. | ingest Appendix B (p.19) · §6.2 (p.12) |\n| `DATE_CONTROL` | The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression. | ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`FILE_SCHEMA_CONFIG`",
+"How an active interface is discovered, dated, validated and routed. File-level only — there is deliberately no column mapping table, because the RAW table DDL is the schema contract.",
+"ingest Appendix A (p.18) · §6.1 (p.12)"
+],
+[
+"`FILE_REGISTRY`",
+"The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts.",
+"ingest Appendix B (p.19) · §6.2 (p.12)"
+],
+[
+"`DATE_CONTROL`",
+"The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression.",
+"ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X21 | A transformation task fails | The date stays TRIGGER, no next date is created and the pipeline is locked. Airflow alerts and the run restarts from the failed task; each layer's write is idempotent for the date. | dbt §8.1 (p.20) |\n| X39 | A successful file has to be replaced | Approval first, then the reason, approver, operator and affected downstream scope are recorded. The registry row and the RAW rows are deleted through the controlled process, the corrected file is dropped in Landing, and a fresh lifecycle starts. The downstream rebuild for that date is coordinated separately. | ingest Appendix D.4 (p.23) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X21",
+"A transformation task fails",
+"The date stays TRIGGER, no next date is created and the pipeline is locked. Airflow alerts and the run restarts from the failed task; each layer's write is idempotent for the date.",
+"dbt §8.1 (p.20)"
+],
+[
+"X39",
+"A successful file has to be replaced",
+"Approval first, then the reason, approver, operator and affected downstream scope are recorded. The registry row and the RAW rows are deleted through the controlled process, the corrected file is dropped in Landing, and a fresh lifecycle starts. The downstream rebuild for that date is coordinated separately.",
+"ingest Appendix D.4 (p.23)"
+]
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **D5.** Confirm retention units, Oracle partitioning support, volumetrics and run-window targets.\n- **O2.** Confirm batch SLA, peak timing, representative file sizes and the Oracle connection envelope.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**D5.** Confirm retention units, Oracle partitioning support, volumetrics and run-window targets.",
+"**O2.** Confirm batch SLA, peak timing, representative file sizes and the Oracle connection envelope."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 18\ncomponent_name: Airflow DAG + Per-Domain Fan-out\nzone: 2. Hub\nplane: Orchestration\npriority: P1\ntechnology: Airflow\ncustom_build: High\ndepends_on: [9, 51, 52]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-4, AD-5, AD-9, AD-1]\npipeline_tiers: [Stage1-Oracle, Stage2-Oracle, Stage3-Exadata-Gold, Consumer-Movement]\nlast_updated: 2026-08-10\ntags: [SEI-BBH, Integration-Hub, hub, orchestration, airflow]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 18\ncomponent_name: Airflow DAG + Per-Domain Fan-out\nzone: 2. Hub\nplane: Orchestration\npriority: P1\ntechnology: Airflow\ncustom_build: High\ndepends_on: [9, 51, 52]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-4, AD-5, AD-9, AD-1]\npipeline_tiers: [Stage1-Oracle, Stage2-Oracle, Stage3-Exadata-Gold, Consumer-Movement]\nlast_updated: 2026-08-10\ntags: [SEI-BBH, Integration-Hub, hub, orchestration, airflow]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\ngenerated: true\nsei_status: differs\ngenerated: true\nsei_status: differs\ngenerated: true\nsei_status: differs"
 },
 {
 "id": "c19",
@@ -3708,8 +4200,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "19"
 ],
-"withdrawn": true,
-"chip": "#19 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#19 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -3731,133 +4225,242 @@ export const DESIGN_DOCS = [
 "src": "19_Dim_Before_Fact_Threads_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nRe-checks completeness and TRIGGER status before doing any work — trust but verify — then builds the layers in order, each as a build task followed by its own test task.\n\nIt sits in **Orchestration**, in the **Transformation DAG** lane (Airflow 3.0 · dbt).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "Re-checks completeness and TRIGGER status before doing any work — trust but verify — then builds the layers in order, each as a build task followed by its own test task."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Orchestration**, in the **Transformation DAG** lane (Airflow 3.0 · dbt)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### S13 — Transformation DAG\n\nRe-checks completeness and TRIGGER status before doing any work — trust but verify — then builds the layers in order, each as a build task followed by its own test task.\n\n- **Technology.** Airflow + dbt\n- **Source.** dbt §5.2 (p.11) · Appendix A.1 (p.25)\n\n### S16 — DIM — built first\n\nHistory by direct-compare MERGE into tables that already exist. The surrogate key comes from the Oracle sequence already in use. No DDL is issued against Gold.\n\n- **Technology.** dbt MERGE\n- **Source.** dbt §4.1 (p.10) · §6.4 (p.15)\n\n### S17 — FACT — built second\n\nLoads only transactions whose dimension has resolved. A transaction whose account has not arrived is never written with a placeholder key — it is held and replayed once the dimension exists.\n\n- **Technology.** dbt MERGE\n- **Source.** dbt §4.1 (p.10) · §7.1 (p.17)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "S13 — Transformation DAG"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "Re-checks completeness and TRIGGER status before doing any work — trust but verify — then builds the layers in order, each as a build task followed by its own test task."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** Airflow + dbt",
+"**Source.** dbt §5.2 (p.11) · Appendix A.1 (p.25)"
 ]
 },
 {
+"t": "h",
+"x": "S16 — DIM — built first"
+},
+{
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "History by direct-compare MERGE into tables that already exist. The surrogate key comes from the Oracle sequence already in use. No DDL is issued against Gold."
+},
+{
+"t": "ul",
+"items": [
+"**Technology.** dbt MERGE",
+"**Source.** dbt §4.1 (p.10) · §6.4 (p.15)"
+]
+},
+{
+"t": "h",
+"x": "S17 — FACT — built second"
+},
+{
+"t": "p",
+"x": "Loads only transactions whose dimension has resolved. A transaction whose account has not arrived is never written with a placeholder key — it is held and replayed once the dimension exists."
+},
+{
+"t": "ul",
+"items": [
+"**Technology.** dbt MERGE",
+"**Source.** dbt §4.1 (p.10) · §7.1 (p.17)"
+]
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `DATE_CONTROL` | The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression. | ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25) |\n| `INT tables` | Silver persistence. Passing rows only, seven days, partitioned by business date. | dbt §4.1 (p.10) · Appendix A.3 (p.26) |\n| `Gold DIM / FACT` | Already exist and already carry history from the current system. This programme changes only how they are populated. | dbt §6.4 (p.15) · §10.1 (p.23) |\n| `DQ_VALIDATION_FAILURE` | One store for both failure categories, carrying whether the row can replay itself and whether it is still open. | dbt §7.1 (p.17) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`DATE_CONTROL`",
+"The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression.",
+"ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25)"
+],
+[
+"`INT tables`",
+"Silver persistence. Passing rows only, seven days, partitioned by business date.",
+"dbt §4.1 (p.10) · Appendix A.3 (p.26)"
+],
+[
+"`Gold DIM / FACT`",
+"Already exist and already carry history from the current system. This programme changes only how they are populated.",
+"dbt §6.4 (p.15) · §10.1 (p.23)"
+],
+[
+"`DQ_VALIDATION_FAILURE`",
+"One store for both failure categories, carrying whether the row can replay itself and whether it is still open.",
+"dbt §7.1 (p.17)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X21 | A transformation task fails | The date stays TRIGGER, no next date is created and the pipeline is locked. Airflow alerts and the run restarts from the failed task; each layer's write is idempotent for the date. | dbt §8.1 (p.20) |\n| X39 | A successful file has to be replaced | Approval first, then the reason, approver, operator and affected downstream scope are recorded. The registry row and the RAW rows are deleted through the controlled process, the corrected file is dropped in Landing, and a fresh lifecycle starts. The downstream rebuild for that date is coordinated separately. | ingest Appendix D.4 (p.23) |\n| X32 | A correction arrives and the row is still current | A normal MERGE, joined on the surrogate key rather than the natural key — a natural-key join matches both the closing and the opening row and fails. | dbt §6.4.1 (p.15) |\n| X33 | A correction arrives and the interval is already closed | A direct UPDATE of that closed row only. Never a MERGE — it would reopen an interval that is settled. | dbt §6.4.1 (p.15) |\n| X34 | Someone changes the shape of a Gold table | Refused. Every Gold model fails on a schema change, and the service account holds DML only — no create, alter or drop. | dbt §8.4 (p.21) |\n| X22 | FACT fails after DIM succeeded | The restart resumes at the fact build. The dimension is not rebuilt. | dbt §8.1 (p.20) |\n| X30 | A transaction's dimension has not arrived | Never written to Gold with a placeholder key. Held in the DQ store as replayable and OPEN, re-derived from INT on a later day once the dimension exists, then marked RESOLVED. | dbt §7.1 (p.17) · Figure 5a (p.18) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X21",
+"A transformation task fails",
+"The date stays TRIGGER, no next date is created and the pipeline is locked. Airflow alerts and the run restarts from the failed task; each layer's write is idempotent for the date.",
+"dbt §8.1 (p.20)"
+],
+[
+"X39",
+"A successful file has to be replaced",
+"Approval first, then the reason, approver, operator and affected downstream scope are recorded. The registry row and the RAW rows are deleted through the controlled process, the corrected file is dropped in Landing, and a fresh lifecycle starts. The downstream rebuild for that date is coordinated separately.",
+"ingest Appendix D.4 (p.23)"
+],
+[
+"X32",
+"A correction arrives and the row is still current",
+"A normal MERGE, joined on the surrogate key rather than the natural key — a natural-key join matches both the closing and the opening row and fails.",
+"dbt §6.4.1 (p.15)"
+],
+[
+"X33",
+"A correction arrives and the interval is already closed",
+"A direct UPDATE of that closed row only. Never a MERGE — it would reopen an interval that is settled.",
+"dbt §6.4.1 (p.15)"
+],
+[
+"X34",
+"Someone changes the shape of a Gold table",
+"Refused. Every Gold model fails on a schema change, and the service account holds DML only — no create, alter or drop.",
+"dbt §8.4 (p.21)"
+],
+[
+"X22",
+"FACT fails after DIM succeeded",
+"The restart resumes at the fact build. The dimension is not rebuilt.",
+"dbt §8.1 (p.20)"
+],
+[
+"X30",
+"A transaction's dimension has not arrived",
+"Never written to Gold with a placeholder key. Held in the DQ store as replayable and OPEN, re-derived from INT on a later day once the dimension exists, then marked RESOLVED.",
+"dbt §7.1 (p.17) · Figure 5a (p.18)"
+]
+]
+}
+]
+},
+{
+"h": "Where SEI's documents disagree about this",
+"md": "\nEach one is a decision to take before a model is written.\n\n### C3 — Two Gold facts, or three\n\n- **The architecture says.** FACT_TRANSACTIONS, FACT_CP_HOLDINGS and FACT_TAX_LOT, each with its own strategy — merge, merge and periodic snapshot.\n- **The design documents say.** FACT_TRANSACTIONS only.\n- **Why it matters.** Holdings and tax lot are the two the design document is silent on, and a periodic snapshot is a different pattern from a merge — it is not covered by the SCD2 and merge logic that is specified.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Each one is a decision to take before a model is written."
+},
+{
+"t": "h",
+"x": "C3 — Two Gold facts, or three"
+},
+{
+"t": "ul",
+"items": [
+"**The architecture says.** FACT_TRANSACTIONS, FACT_CP_HOLDINGS and FACT_TAX_LOT, each with its own strategy — merge, merge and periodic snapshot.",
+"**The design documents say.** FACT_TRANSACTIONS only.",
+"**Why it matters.** Holdings and tax lot are the two the design document is silent on, and a periodic snapshot is a different pattern from a merge — it is not covered by the SCD2 and merge logic that is specified."
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **D1.** Confirm the existing sequence name and ownership behind the Gold surrogate key.\n- **D2.** Confirm all missing dimensions resolve inside the seven-day window, and approve the single-table DQ design, the replay policy and the retention-boundary alert.\n- **D3.** Confirm the current history coverage of the existing dimensions.\n- **D5.** Confirm retention units, Oracle partitioning support, volumetrics and run-window targets.",
+"blocks": [
+{
+"t": "p",
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**D1.** Confirm the existing sequence name and ownership behind the Gold surrogate key.",
+"**D2.** Confirm all missing dimensions resolve inside the seven-day window, and approve the single-table DQ design, the replay policy and the retention-boundary alert.",
+"**D3.** Confirm the current history coverage of the existing dimensions.",
+"**D5.** Confirm retention units, Oracle partitioning support, volumetrics and run-window targets."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 19\ncomponent_name: Dim-before-Fact / dbt Threads\nzone: 2. Hub\nplane: Orchestration\npriority: P2\ntechnology: Airflow + dbt\ncustom_build: Low\ndepends_on: [16, 55]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-2]\npipeline_tiers: [Stage2-Oracle, Stage3-Exadata-Gold]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, orchestration]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 19\ncomponent_name: Dim-before-Fact / dbt Threads\nzone: 2. Hub\nplane: Orchestration\npriority: P2\ntechnology: Airflow + dbt\ncustom_build: Low\ndepends_on: [16, 55]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-2]\npipeline_tiers: [Stage2-Oracle, Stage3-Exadata-Gold]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, orchestration]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c20",
@@ -3874,8 +4477,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "20"
 ],
-"withdrawn": true,
-"chip": "#20 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#20 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -3897,133 +4502,95 @@ export const DESIGN_DOCS = [
 "src": "20_Intraday_Cadence_Control_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nDirectly contradicted rather than merely absent: SEI permits one non-COMPLETE business date at a time, enforced by a unique index. An intraday cadence does not fit that state machine.\n\nIt sits in **Orchestration**, in the **Business-date state machine** lane (Oracle).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "Directly contradicted rather than merely absent: SEI permits one non-COMPLETE business date at a time, enforced by a unique index. An intraday cadence does not fit that state machine."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Orchestration**, in the **Business-date state machine** lane (Oracle)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nDirectly contradicted rather than merely absent: SEI permits one non-COMPLETE business date at a time, enforced by a unique index. An intraday cadence does not fit that state machine.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "Directly contradicted rather than merely absent: SEI permits one non-COMPLETE business date at a time, enforced by a unique index. An intraday cadence does not fit that state machine."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Where SEI's documents disagree about this",
+"md": "\nEach one is a decision to take before a model is written.\n\n### C2 — Stage 2 as five tables, or as STG plus INT\n\n- **The architecture says.** Five STG2_* tables, materialised as tables, full refresh daily or incremental.\n- **The design documents say.** A STG view that stores nothing, plus an INT table kept seven days and partitioned.\n- **Why it matters.** Not a naming difference. One stores Stage 2 and one does not, and the retention, the replay window and the reconciliation boundaries all follow from which it is.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Each one is a decision to take before a model is written."
 },
 {
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"t": "h",
+"x": "C2 — Stage 2 as five tables, or as STG plus INT"
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "ul",
+"items": [
+"**The architecture says.** Five STG2_* tables, materialised as tables, full refresh daily or incremental.",
+"**The design documents say.** A STG view that stores nothing, plus an INT table kept seven days and partitioned.",
+"**Why it matters.** Not a naming difference. One stores Stage 2 and one does not, and the retention, the replay window and the reconciliation boundaries all follow from which it is."
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 20\ncomponent_name: Intraday Cadence Control\nzone: 2. Hub\nplane: Orchestration\npriority: P1\ntechnology: Airflow\ncustom_build: Medium\ndepends_on: [12, 18]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-2]\npipeline_tiers: [Stage1-Oracle, Stage2-Oracle]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, orchestration]\norigin: SEI-BBH component tracker\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 20\ncomponent_name: Intraday Cadence Control\nzone: 2. Hub\nplane: Orchestration\npriority: P1\ntechnology: Airflow\ncustom_build: Medium\ndepends_on: [12, 18]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-2]\npipeline_tiers: [Stage1-Oracle, Stage2-Oracle]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, orchestration]\norigin: SEI-BBH component tracker\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c21",
@@ -4040,8 +4607,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "21"
 ],
-"withdrawn": true,
-"chip": "#21 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "differs",
+"chip": "#21 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -4068,133 +4637,215 @@ export const DESIGN_DOCS = [
 "src": "21_Replay_Rerun_Engine_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nSEI's replay is not an engine. It is one task at the end of the transformation run, driven by the open rows in the DQ store and bounded by INT's seven days.\n\nIt sits in **Orchestration**, in the **Transformation DAG** lane (Airflow 3.0 · dbt).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "SEI's replay is not an engine. It is one task at the end of the transformation run, driven by the open rows in the DQ store and bounded by INT's seven days."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Orchestration**, in the **Transformation DAG** lane (Airflow 3.0 · dbt)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**SEI covers the need and answers it differently.** SEI's replay is not an engine. It is one task at the end of the transformation run, driven by the open rows in the DQ store and bounded by INT's seven days.\n\n### S18 — DQ capture and replay\n\nEvery failing record is written to one store and held at the layer that caught it. A step after the fact build picks up the rows that can now resolve, loads them and marks them resolved.\n\n- **Technology.** dbt\n- **Source.** dbt §7.1 (p.17) · Appendix A.1 (p.25)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**SEI covers the need and answers it differently.** SEI's replay is not an engine. It is one task at the end of the transformation run, driven by the open rows in the DQ store and bounded by INT's seven days."
+},
+{
+"t": "h",
+"x": "S18 — DQ capture and replay"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "Every failing record is written to one store and held at the layer that caught it. A step after the fact build picks up the rows that can now resolve, loads them and marks them resolved."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** dbt",
+"**Source.** dbt §7.1 (p.17) · Appendix A.1 (p.25)"
 ]
-},
-{
-"t": "p",
-"x": "specified, differs, or absent — and the reason for it."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `INT tables` | Silver persistence. Passing rows only, seven days, partitioned by business date. | dbt §4.1 (p.10) · Appendix A.3 (p.26) |\n| `DQ_VALIDATION_FAILURE` | One store for both failure categories, carrying whether the row can replay itself and whether it is still open. | dbt §7.1 (p.17) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`INT tables`",
+"Silver persistence. Passing rows only, seven days, partitioned by business date.",
+"dbt §4.1 (p.10) · Appendix A.3 (p.26)"
+],
+[
+"`DQ_VALIDATION_FAILURE`",
+"One store for both failure categories, carrying whether the row can replay itself and whether it is still open.",
+"dbt §7.1 (p.17)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X24 | A key column is missing | The STG view marks the row FAIL with a reason code and INT never reads it. The row goes to the DQ store as OPEN. | dbt §6.3 (p.15) |\n| X26 | A full-snapshot entity fails | The row stays OPEN until a corrected record arrives in a later full file, which replays it and marks it RESOLVED. This rests on account and client being full daily snapshots. | dbt §7.1 (p.17) · §8.2 assumption A1 (p.20) |\n| X27 | A transaction fails | That date's records do not come round again, so it replays only on a corrected reload for the date, or when the missing dimension arrives. | dbt §7.1 (p.17) |\n| X28 | A code has no active mapping row | Caught at INT as a transformation failure, owned by the transformation team rather than the source. Marked not auto-replayable: it stays OPEN until a code fix is deployed. | dbt §7 (p.17) |\n| X29 | The same failure returns after a rerun | Expected, and the signal is that a code fix is needed rather than another rerun. | dbt §7 (p.17) |\n| X30 | A transaction's dimension has not arrived | Never written to Gold with a placeholder key. Held in the DQ store as replayable and OPEN, re-derived from INT on a later day once the dimension exists, then marked RESOLVED. | dbt §7.1 (p.17) · Figure 5a (p.18) |\n| X31 | A row is still OPEN at the retention edge | CLOSED and alerted at seven days, because the DQ store keeps lineage only and INT no longer holds the data to re-derive it. | dbt §7.1 (p.17) · §8.2 assumption A4 (p.20) |\n| X36 | The held backlog is growing | Alerts on the ageing open rows, and the usual cause is a late dimension file. | dbt §7.2.1 (p.18) |\n| X37 | DQ or reconciliation is rerun for a date | The DQ rows are upserted so their resolution status survives, the recon rows for that date are replaced, and both are republished. | dbt §8.1 (p.20) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X24",
+"A key column is missing",
+"The STG view marks the row FAIL with a reason code and INT never reads it. The row goes to the DQ store as OPEN.",
+"dbt §6.3 (p.15)"
+],
+[
+"X26",
+"A full-snapshot entity fails",
+"The row stays OPEN until a corrected record arrives in a later full file, which replays it and marks it RESOLVED. This rests on account and client being full daily snapshots.",
+"dbt §7.1 (p.17) · §8.2 assumption A1 (p.20)"
+],
+[
+"X27",
+"A transaction fails",
+"That date's records do not come round again, so it replays only on a corrected reload for the date, or when the missing dimension arrives.",
+"dbt §7.1 (p.17)"
+],
+[
+"X28",
+"A code has no active mapping row",
+"Caught at INT as a transformation failure, owned by the transformation team rather than the source. Marked not auto-replayable: it stays OPEN until a code fix is deployed.",
+"dbt §7 (p.17)"
+],
+[
+"X29",
+"The same failure returns after a rerun",
+"Expected, and the signal is that a code fix is needed rather than another rerun.",
+"dbt §7 (p.17)"
+],
+[
+"X30",
+"A transaction's dimension has not arrived",
+"Never written to Gold with a placeholder key. Held in the DQ store as replayable and OPEN, re-derived from INT on a later day once the dimension exists, then marked RESOLVED.",
+"dbt §7.1 (p.17) · Figure 5a (p.18)"
+],
+[
+"X31",
+"A row is still OPEN at the retention edge",
+"CLOSED and alerted at seven days, because the DQ store keeps lineage only and INT no longer holds the data to re-derive it.",
+"dbt §7.1 (p.17) · §8.2 assumption A4 (p.20)"
+],
+[
+"X36",
+"The held backlog is growing",
+"Alerts on the ageing open rows, and the usual cause is a late dimension file.",
+"dbt §7.2.1 (p.18)"
+],
+[
+"X37",
+"DQ or reconciliation is rerun for a date",
+"The DQ rows are upserted so their resolution status survives, the recon rows for that date are replaced, and both are republished.",
+"dbt §8.1 (p.20)"
+]
+]
+}
+]
+},
+{
+"h": "Where SEI's documents disagree about this",
+"md": "\nEach one is a decision to take before a model is written.\n\n### C5 — Where data quality runs\n\n- **The architecture says.** A Data Quality Checks step after dbt Gold in the Airflow chain.\n- **The design documents say.** A per-row pass or fail computed in the STG view, before anything is loaded, plus tests between every layer.\n- **Why it matters.** Before or after publication is the whole question. The architecture's position puts the check after Gold is written, which is where reconciliation already sits and is already a known gap.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Each one is a decision to take before a model is written."
+},
+{
+"t": "h",
+"x": "C5 — Where data quality runs"
+},
+{
+"t": "ul",
+"items": [
+"**The architecture says.** A Data Quality Checks step after dbt Gold in the Airflow chain.",
+"**The design documents say.** A per-row pass or fail computed in the STG view, before anything is loaded, plus tests between every layer.",
+"**Why it matters.** Before or after publication is the whole question. The architecture's position puts the check after Gold is written, which is where reconciliation already sits and is already a known gap."
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **D2.** Confirm all missing dimensions resolve inside the seven-day window, and approve the single-table DQ design, the replay policy and the retention-boundary alert.",
+"blocks": [
+{
+"t": "p",
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**D2.** Confirm all missing dimensions resolve inside the seven-day window, and approve the single-table DQ design, the replay policy and the retention-boundary alert."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 21\ncomponent_name: Replay / Rerun Engine\nzone: 2. Hub\nplane: Orchestration\npriority: P1\ntechnology: Python + Airflow\ncustom_build: High\ndepends_on: [14, 17, 27]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-2, AD-8, AD-9]\npipeline_tiers: [Stage1-Oracle, Stage2-Oracle, Stage3-Exadata-Gold, Consumer-Movement]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, orchestration]\norigin: SEI-BBH component tracker\nsei_coverage: partial\ngap_owner: SEI\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 21\ncomponent_name: Replay / Rerun Engine\nzone: 2. Hub\nplane: Orchestration\npriority: P1\ntechnology: Python + Airflow\ncustom_build: High\ndepends_on: [14, 17, 27]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-2, AD-8, AD-9]\npipeline_tiers: [Stage1-Oracle, Stage2-Oracle, Stage3-Exadata-Gold, Consumer-Movement]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, orchestration]\norigin: SEI-BBH component tracker\nsei_coverage: partial\ngap_owner: SEI\nin_scope: true\ngenerated: true\nsei_status: differs\ngenerated: true\nsei_status: differs\ngenerated: true\nsei_status: differs"
 },
 {
 "id": "c22",
@@ -4211,8 +4862,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "22"
 ],
-"withdrawn": true,
-"chip": "#22 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#22 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -4233,133 +4886,73 @@ export const DESIGN_DOCS = [
 "src": "22_Partial_Batch_Policy_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nSEI has no partial-set path: the transition fires only on an empty missing set. Running on what arrived would be a design change.\n\nIt sits in **Orchestration**, in the **Ingestion DAG** lane (Airflow 3.0).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "SEI has no partial-set path: the transition fires only on an empty missing set. Running on what arrived would be a design change."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Orchestration**, in the **Ingestion DAG** lane (Airflow 3.0)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nSEI has no partial-set path: the transition fires only on an empty missing set. Running on what arrived would be a design change.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "SEI has no partial-set path: the transition fires only on an empty missing set. Running on what arrived would be a design change."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 22\ncomponent_name: Partial-Batch Policy\nzone: 2. Hub\nplane: Orchestration\npriority: P1\ntechnology: Airflow\ncustom_build: Medium\ndepends_on: [18, 23]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-9]\npipeline_tiers: [Consumer-Movement]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, orchestration]\norigin: SEI-BBH component tracker\nsei_coverage: partial\ngap_owner: Joint\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 22\ncomponent_name: Partial-Batch Policy\nzone: 2. Hub\nplane: Orchestration\npriority: P1\ntechnology: Airflow\ncustom_build: Medium\ndepends_on: [18, 23]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-9]\npipeline_tiers: [Consumer-Movement]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, orchestration]\norigin: SEI-BBH component tracker\nsei_coverage: partial\ngap_owner: Joint\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c23",
@@ -4376,8 +4969,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "23"
 ],
-"withdrawn": true,
-"chip": "#23 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#23 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -4402,133 +4997,183 @@ export const DESIGN_DOCS = [
 "src": "23_G1_File_Structural_Gate_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nThe ingestion document specifies exactly this: readable, header, trailer, zero-row and the date, all before any RAW write, and a failure goes to QUARANTINED.\n\nIt sits in **Ingestion**, in the **File-based ingestion** lane (SECONDARY · Airflow · Python).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "The ingestion document specifies exactly this: readable, header, trailer, zero-row and the date, all before any RAW write, and a failure goes to QUARANTINED."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Ingestion**, in the **File-based ingestion** lane (SECONDARY · Airflow · Python)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### S8 — Python loader\n\nPer file: claim the (interface, business date) pair in the registry, validate readability, header, trailer, zero-row policy and row counts, load the detail rows into the configured RAW table in ONE Oracle transaction, reconcile parsed against trailer against inserted counts, and commit only when they agree. Then move the file and record the outcome.\n\n- **Technology.** worker pod\n- **Source.** ingest §3.1 (p.6) · §4.1 (p.7) · §7.3 (p.14)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "S8 — Python loader"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "Per file: claim the (interface, business date) pair in the registry, validate readability, header, trailer, zero-row policy and row counts, load the detail rows into the configured RAW table in ONE Oracle transaction, reconcile parsed against trailer against inserted counts, and commit only when they agree. Then move the file and record the outcome."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** worker pod",
+"**Source.** ingest §3.1 (p.6) · §4.1 (p.7) · §7.3 (p.14)"
 ]
-},
-{
-"t": "p",
-"x": "specified, differs, or absent — and the reason for it."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `FILE_REGISTRY` | The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts. | ingest Appendix B (p.19) · §6.2 (p.12) |\n| `RAW tables` | Bronze. Validated detail rows as delivered, tagged with the business date and lineage. The dbt document names three: account, client and transaction. | ingest Glossary (p.25) · dbt §4.1 (p.10) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`FILE_REGISTRY`",
+"The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts.",
+"ingest Appendix B (p.19) · §6.2 (p.12)"
+],
+[
+"`RAW tables`",
+"Bronze. Validated detail rows as delivered, tagged with the business date and lineage. The dbt document names three: account, client and transaction.",
+"ingest Glossary (p.25) · dbt §4.1 (p.10)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X5 | The business date will not parse | Rejected before any RAW write, with the parsing error recorded. The format mask must reject impossible dates even when the regex shape matches. | ingest Appendix D.6 (p.23) |\n| X6 | Header or trailer fails | RECEIVED becomes QUARANTINED, the error is recorded and the file moves to Quarantine. Nothing is written to RAW. | ingest §4 (p.7) · Appendix B.2 (p.20) |\n| X7 | A zero-row file arrives and is not allowed | QUARANTINED, same path. Whether zero rows are allowed is per interface configuration. | ingest §6.1 (p.12) |\n| X10 | The RAW load or the count check fails | Rolled back. LOADING becomes FAILED with the error and the end timestamp. The insert and the count reconciliation are one Oracle transaction, and the commit happens only when the file count, the trailer count and the inserted count all agree. | ingest §4.1 (p.7) · §7.3 (p.14) |\n| X11 | A FAILED file is rerun | The same registry id is reused and the retry count goes up. Any exceptional partial rows are removed through the approved process first, then the file reloads in one transaction. | ingest Appendix D.1 (p.22) |\n| X12 | The archive move fails after a good load | ARCHIVE_FAILED. RAW is kept and is never deleted or reloaded — the move happens after the commit and cannot be part of the transaction. Only the move is retried. | ingest §7.3 (p.14) · Appendix D.3 (p.22) |\n| X39 | A successful file has to be replaced | Approval first, then the reason, approver, operator and affected downstream scope are recorded. The registry row and the RAW rows are deleted through the controlled process, the corrected file is dropped in Landing, and a fresh lifecycle starts. The downstream rebuild for that date is coordinated separately. | ingest Appendix D.4 (p.23) |\n| X40 | A quarantined file is corrected | The same registry id is reused, the retry count goes up, the status resets to RECEIVED and every validation runs again before any RAW write. | ingest Appendix D.2 (p.22) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X5",
+"The business date will not parse",
+"Rejected before any RAW write, with the parsing error recorded. The format mask must reject impossible dates even when the regex shape matches.",
+"ingest Appendix D.6 (p.23)"
+],
+[
+"X6",
+"Header or trailer fails",
+"RECEIVED becomes QUARANTINED, the error is recorded and the file moves to Quarantine. Nothing is written to RAW.",
+"ingest §4 (p.7) · Appendix B.2 (p.20)"
+],
+[
+"X7",
+"A zero-row file arrives and is not allowed",
+"QUARANTINED, same path. Whether zero rows are allowed is per interface configuration.",
+"ingest §6.1 (p.12)"
+],
+[
+"X10",
+"The RAW load or the count check fails",
+"Rolled back. LOADING becomes FAILED with the error and the end timestamp. The insert and the count reconciliation are one Oracle transaction, and the commit happens only when the file count, the trailer count and the inserted count all agree.",
+"ingest §4.1 (p.7) · §7.3 (p.14)"
+],
+[
+"X11",
+"A FAILED file is rerun",
+"The same registry id is reused and the retry count goes up. Any exceptional partial rows are removed through the approved process first, then the file reloads in one transaction.",
+"ingest Appendix D.1 (p.22)"
+],
+[
+"X12",
+"The archive move fails after a good load",
+"ARCHIVE_FAILED. RAW is kept and is never deleted or reloaded — the move happens after the commit and cannot be part of the transaction. Only the move is retried.",
+"ingest §7.3 (p.14) · Appendix D.3 (p.22)"
+],
+[
+"X39",
+"A successful file has to be replaced",
+"Approval first, then the reason, approver, operator and affected downstream scope are recorded. The registry row and the RAW rows are deleted through the controlled process, the corrected file is dropped in Landing, and a fresh lifecycle starts. The downstream rebuild for that date is coordinated separately.",
+"ingest Appendix D.4 (p.23)"
+],
+[
+"X40",
+"A quarantined file is corrected",
+"The same registry id is reused, the retry count goes up, the status resets to RECEIVED and every validation runs again before any RAW write.",
+"ingest Appendix D.2 (p.22)"
+]
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **O3.** Confirm the retention period and purge approach for RAW and FILE_REGISTRY.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**O3.** Confirm the retention period and purge approach for RAW and FILE_REGISTRY."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 23\ncomponent_name: G1 File / Structural Gate\nzone: 2. Hub\nplane: Data Quality\npriority: P1\ntechnology: Python\ncustom_build: High\ndepends_on: [8, 13, 28]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-9, AD-8, AD-10, AD-5]\npipeline_tiers: [Stage1-Oracle]\nlast_updated: 2026-08-10\ntags: [SEI-BBH, Integration-Hub, hub, data-quality, gate]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 23\ncomponent_name: G1 File / Structural Gate\nzone: 2. Hub\nplane: Data Quality\npriority: P1\ntechnology: Python\ncustom_build: High\ndepends_on: [8, 13, 28]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-9, AD-8, AD-10, AD-5]\npipeline_tiers: [Stage1-Oracle]\nlast_updated: 2026-08-10\ntags: [SEI-BBH, Integration-Hub, hub, data-quality, gate]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c24",
@@ -4545,8 +5190,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "24"
 ],
-"withdrawn": true,
-"chip": "#24 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#24 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -4568,133 +5215,95 @@ export const DESIGN_DOCS = [
 "src": "24_G2_RAW_Profiling_Gate_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nNothing profiles RAW. The first thing that reads a row's content in SEI's design is the STG view, already past the load.\n\nIt sits in **Ingestion**, in the **RAW profiling** lane (SQL).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "Nothing profiles RAW. The first thing that reads a row's content in SEI's design is the STG view, already past the load."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Ingestion**, in the **RAW profiling** lane (SQL)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nNothing profiles RAW. The first thing that reads a row's content in SEI's design is the STG view, already past the load.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "Nothing profiles RAW. The first thing that reads a row's content in SEI's design is the STG view, already past the load."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Where SEI's documents disagree about this",
+"md": "\nEach one is a decision to take before a model is written.\n\n### C1 — Three RAW tables, or seven\n\n- **The architecture says.** RAW_ACCOUNT, RAW_CLIENT, RAW_TAXLOT, RAW_TRANSACTION, RAW_POSITION, RAW_CORRECTED_TRANSACTION, RAW_CORRECTED_POSITION.\n- **The design documents say.** The dbt design document names three: account, client and transaction. Position, tax lot and the two correction tables do not appear in it at all.\n- **Why it matters.** Four of the seven feeds have no transformation designed for them. If the architecture is right, the design document covers under half the inbound surface.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Each one is a decision to take before a model is written."
 },
 {
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"t": "h",
+"x": "C1 — Three RAW tables, or seven"
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "ul",
+"items": [
+"**The architecture says.** RAW_ACCOUNT, RAW_CLIENT, RAW_TAXLOT, RAW_TRANSACTION, RAW_POSITION, RAW_CORRECTED_TRANSACTION, RAW_CORRECTED_POSITION.",
+"**The design documents say.** The dbt design document names three: account, client and transaction. Position, tax lot and the two correction tables do not appear in it at all.",
+"**Why it matters.** Four of the seven feeds have no transformation designed for them. If the architecture is right, the design document covers under half the inbound surface."
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 24\ncomponent_name: G2 RAW Profiling Gate\nzone: 2. Hub\nplane: Data Quality\npriority: P2\ntechnology: Airflow + SQL\ncustom_build: Medium\ndepends_on: [14, 28]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-8, AD-9]\npipeline_tiers: [Stage1-Oracle]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, data-quality]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 24\ncomponent_name: G2 RAW Profiling Gate\nzone: 2. Hub\nplane: Data Quality\npriority: P2\ntechnology: Airflow + SQL\ncustom_build: Medium\ndepends_on: [14, 28]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-8, AD-9]\npipeline_tiers: [Stage1-Oracle]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, data-quality]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c25",
@@ -4711,8 +5320,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "25"
 ],
-"withdrawn": true,
-"chip": "#25 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#25 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -4735,133 +5346,201 @@ export const DESIGN_DOCS = [
 "src": "25_G3_dbt_Tests_Business_Rules_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nRe-checks completeness and TRIGGER status before doing any work — trust but verify — then builds the layers in order, each as a build task followed by its own test task.\n\nIt sits in **Processing**, in the **Data quality and reconciliation** lane (dbt · Splunk).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "Re-checks completeness and TRIGGER status before doing any work — trust but verify — then builds the layers in order, each as a build task followed by its own test task."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Processing**, in the **Data quality and reconciliation** lane (dbt · Splunk)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### S13 — Transformation DAG\n\nRe-checks completeness and TRIGGER status before doing any work — trust but verify — then builds the layers in order, each as a build task followed by its own test task.\n\n- **Technology.** Airflow + dbt\n- **Source.** dbt §5.2 (p.11) · Appendix A.1 (p.25)\n\n### S14 — STG — view\n\nStandardises the source columns and computes a pass or fail verdict per row. Stores nothing: it is recomputed on read.\n\n- **Technology.** dbt view\n- **Source.** dbt §4.1 (p.10) · §6.3 (p.15)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "S13 — Transformation DAG"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "Re-checks completeness and TRIGGER status before doing any work — trust but verify — then builds the layers in order, each as a build task followed by its own test task."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** Airflow + dbt",
+"**Source.** dbt §5.2 (p.11) · Appendix A.1 (p.25)"
 ]
 },
 {
+"t": "h",
+"x": "S14 — STG — view"
+},
+{
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "Standardises the source columns and computes a pass or fail verdict per row. Stores nothing: it is recomputed on read."
+},
+{
+"t": "ul",
+"items": [
+"**Technology.** dbt view",
+"**Source.** dbt §4.1 (p.10) · §6.3 (p.15)"
+]
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `DATE_CONTROL` | The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression. | ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25) |\n| `RAW tables` | Bronze. Validated detail rows as delivered, tagged with the business date and lineage. The dbt document names three: account, client and transaction. | ingest Glossary (p.25) · dbt §4.1 (p.10) |\n| `DQ_VALIDATION_FAILURE` | One store for both failure categories, carrying whether the row can replay itself and whether it is still open. | dbt §7.1 (p.17) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`DATE_CONTROL`",
+"The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression.",
+"ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25)"
+],
+[
+"`RAW tables`",
+"Bronze. Validated detail rows as delivered, tagged with the business date and lineage. The dbt document names three: account, client and transaction.",
+"ingest Glossary (p.25) · dbt §4.1 (p.10)"
+],
+[
+"`DQ_VALIDATION_FAILURE`",
+"One store for both failure categories, carrying whether the row can replay itself and whether it is still open.",
+"dbt §7.1 (p.17)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X21 | A transformation task fails | The date stays TRIGGER, no next date is created and the pipeline is locked. Airflow alerts and the run restarts from the failed task; each layer's write is idempotent for the date. | dbt §8.1 (p.20) |\n| X39 | A successful file has to be replaced | Approval first, then the reason, approver, operator and affected downstream scope are recorded. The registry row and the RAW rows are deleted through the controlled process, the corrected file is dropped in Landing, and a fresh lifecycle starts. The downstream rebuild for that date is coordinated separately. | ingest Appendix D.4 (p.23) |\n| X24 | A key column is missing | The STG view marks the row FAIL with a reason code and INT never reads it. The row goes to the DQ store as OPEN. | dbt §6.3 (p.15) |\n| X25 | A code is not in the mapping table | Same path — FAIL at STG with its own reason code, excluded before any mapping is attempted. | dbt §6.3 (p.15) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X21",
+"A transformation task fails",
+"The date stays TRIGGER, no next date is created and the pipeline is locked. Airflow alerts and the run restarts from the failed task; each layer's write is idempotent for the date.",
+"dbt §8.1 (p.20)"
+],
+[
+"X39",
+"A successful file has to be replaced",
+"Approval first, then the reason, approver, operator and affected downstream scope are recorded. The registry row and the RAW rows are deleted through the controlled process, the corrected file is dropped in Landing, and a fresh lifecycle starts. The downstream rebuild for that date is coordinated separately.",
+"ingest Appendix D.4 (p.23)"
+],
+[
+"X24",
+"A key column is missing",
+"The STG view marks the row FAIL with a reason code and INT never reads it. The row goes to the DQ store as OPEN.",
+"dbt §6.3 (p.15)"
+],
+[
+"X25",
+"A code is not in the mapping table",
+"Same path — FAIL at STG with its own reason code, excluded before any mapping is attempted.",
+"dbt §6.3 (p.15)"
+]
+]
+}
+]
+},
+{
+"h": "Where SEI's documents disagree about this",
+"md": "\nEach one is a decision to take before a model is written.\n\n### C2 — Stage 2 as five tables, or as STG plus INT\n\n- **The architecture says.** Five STG2_* tables, materialised as tables, full refresh daily or incremental.\n- **The design documents say.** A STG view that stores nothing, plus an INT table kept seven days and partitioned.\n- **Why it matters.** Not a naming difference. One stores Stage 2 and one does not, and the retention, the replay window and the reconciliation boundaries all follow from which it is.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Each one is a decision to take before a model is written."
+},
+{
+"t": "h",
+"x": "C2 — Stage 2 as five tables, or as STG plus INT"
+},
+{
+"t": "ul",
+"items": [
+"**The architecture says.** Five STG2_* tables, materialised as tables, full refresh daily or incremental.",
+"**The design documents say.** A STG view that stores nothing, plus an INT table kept seven days and partitioned.",
+"**Why it matters.** Not a naming difference. One stores Stage 2 and one does not, and the retention, the replay window and the reconciliation boundaries all follow from which it is."
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **D5.** Confirm retention units, Oracle partitioning support, volumetrics and run-window targets.",
+"blocks": [
+{
+"t": "p",
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**D5.** Confirm retention units, Oracle partitioning support, volumetrics and run-window targets."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 25\ncomponent_name: G3 dbt Tests + Business Rules\nzone: 2. Hub\nplane: Data Quality\npriority: P1\ntechnology: dbt\ncustom_build: Medium\ndepends_on: [15, 28]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-2, AD-9]\npipeline_tiers: [Stage2-Oracle, Stage3-Exadata-Gold]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, data-quality]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 25\ncomponent_name: G3 dbt Tests + Business Rules\nzone: 2. Hub\nplane: Data Quality\npriority: P1\ntechnology: dbt\ncustom_build: Medium\ndepends_on: [15, 28]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-2, AD-9]\npipeline_tiers: [Stage2-Oracle, Stage3-Exadata-Gold]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, data-quality]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c26",
@@ -4878,8 +5557,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "26"
 ],
-"withdrawn": true,
-"chip": "#26 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "differs",
+"chip": "#26 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -4905,133 +5586,157 @@ export const DESIGN_DOCS = [
 "src": "26_G4_Tieout_Gate_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nSEI reconciles, but not as a gate. The counts are computed and published AFTER the fact build and the verdict is derived in Splunk, so a mismatch alerts rather than blocks.\n\nIt sits in **Processing**, in the **Data quality and reconciliation** lane (dbt · Splunk).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "SEI reconciles, but not as a gate. The counts are computed and published AFTER the fact build and the verdict is derived in Splunk, so a mismatch alerts rather than blocks."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Processing**, in the **Data quality and reconciliation** lane (dbt · Splunk)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**SEI covers the need and answers it differently.** SEI reconciles, but not as a gate. The counts are computed and published AFTER the fact build and the verdict is derived in Splunk, so a mismatch alerts rather than blocks.\n\n### S19 — Reconciliation\n\nCounts at four boundaries for the business date, written to an immutable log and published. The pass or warning verdict is derived on the Splunk side, after the data is already in Gold.\n\n- **Technology.** dbt\n- **Source.** dbt §7.2 (p.18) · §7.2.1 (p.18)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**SEI covers the need and answers it differently.** SEI reconciles, but not as a gate. The counts are computed and published AFTER the fact build and the verdict is derived in Splunk, so a mismatch alerts rather than blocks."
+},
+{
+"t": "h",
+"x": "S19 — Reconciliation"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "Counts at four boundaries for the business date, written to an immutable log and published. The pass or warning verdict is derived on the Splunk side, after the data is already in Gold."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** dbt",
+"**Source.** dbt §7.2 (p.18) · §7.2.1 (p.18)"
 ]
-},
-{
-"t": "p",
-"x": "specified, differs, or absent — and the reason for it."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `RECON_RESULT` | One immutable row per boundary per business date, replaced rather than updated. No status column — the verdict is derived in Splunk. | dbt §7.2.1 (p.18) |\n| `DQ_VALIDATION_FAILURE` | One store for both failure categories, carrying whether the row can replay itself and whether it is still open. | dbt §7.1 (p.17) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`RECON_RESULT`",
+"One immutable row per boundary per business date, replaced rather than updated. No status column — the verdict is derived in Splunk.",
+"dbt §7.2.1 (p.18)"
+],
+[
+"`DQ_VALIDATION_FAILURE`",
+"One store for both failure categories, carrying whether the row can replay itself and whether it is still open.",
+"dbt §7.1 (p.17)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X35 | Counts do not agree at a boundary | The difference is written to the immutable log and published. The pass or warning verdict is derived on the Splunk side, after the data is already in Gold — so it alerts rather than blocks. | dbt §7.2 (p.18) · §7.2.1 (p.18) |\n| X36 | The held backlog is growing | Alerts on the ageing open rows, and the usual cause is a late dimension file. | dbt §7.2.1 (p.18) |\n| X37 | DQ or reconciliation is rerun for a date | The DQ rows are upserted so their resolution status survives, the recon rows for that date are replaced, and both are republished. | dbt §8.1 (p.20) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X35",
+"Counts do not agree at a boundary",
+"The difference is written to the immutable log and published. The pass or warning verdict is derived on the Splunk side, after the data is already in Gold — so it alerts rather than blocks.",
+"dbt §7.2 (p.18) · §7.2.1 (p.18)"
+],
+[
+"X36",
+"The held backlog is growing",
+"Alerts on the ageing open rows, and the usual cause is a late dimension file.",
+"dbt §7.2.1 (p.18)"
+],
+[
+"X37",
+"DQ or reconciliation is rerun for a date",
+"The DQ rows are upserted so their resolution status survives, the recon rows for that date are replaced, and both are republished.",
+"dbt §8.1 (p.20)"
+]
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **D6.** Approve the Splunk event schema, masking and PII rules, dashboards and alert thresholds.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**D6.** Approve the Splunk event schema, masking and PII rules, dashboards and alert thresholds."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 26\ncomponent_name: G4 Tie-out / Control Totals\nzone: 2. Hub\nplane: Data Quality\npriority: P1\ntechnology: Airflow + SQL\ncustom_build: High\ndepends_on: [14, 16, 28]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-9, AD-1, AD-2, AD-8]\npipeline_tiers: [Stage3-Exadata-Gold, Consumer-Movement]\nlast_updated: 2026-08-10\ntags: [SEI-BBH, Integration-Hub, hub, data-quality, tie-out]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 26\ncomponent_name: G4 Tie-out / Control Totals\nzone: 2. Hub\nplane: Data Quality\npriority: P1\ntechnology: Airflow + SQL\ncustom_build: High\ndepends_on: [14, 16, 28]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-9, AD-1, AD-2, AD-8]\npipeline_tiers: [Stage3-Exadata-Gold, Consumer-Movement]\nlast_updated: 2026-08-10\ntags: [SEI-BBH, Integration-Hub, hub, data-quality, tie-out]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\ngenerated: true\nsei_status: differs\ngenerated: true\nsei_status: differs\ngenerated: true\nsei_status: differs"
 },
 {
 "id": "c27",
@@ -5048,8 +5753,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "27"
 ],
-"withdrawn": true,
-"chip": "#27 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#27 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -5071,133 +5778,168 @@ export const DESIGN_DOCS = [
 "src": "27_G5_Post_Publish_Recon_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nCounts at four boundaries for the business date, written to an immutable log and published. The pass or warning verdict is derived on the Splunk side, after the data is already in Gold.\n\nIt sits in **Processing**, in the **Data quality and reconciliation** lane (dbt · Splunk).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "Counts at four boundaries for the business date, written to an immutable log and published. The pass or warning verdict is derived on the Splunk side, after the data is already in Gold."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Processing**, in the **Data quality and reconciliation** lane (dbt · Splunk)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### S19 — Reconciliation\n\nCounts at four boundaries for the business date, written to an immutable log and published. The pass or warning verdict is derived on the Splunk side, after the data is already in Gold.\n\n- **Technology.** dbt\n- **Source.** dbt §7.2 (p.18) · §7.2.1 (p.18)\n\n### T8 — RECON_RESULT\n\nOne immutable row per boundary per business date, replaced rather than updated. No status column — the verdict is derived in Splunk.\n\n- **Columns.** RECON_ID (PK) · BUSINESS_DATE · BOUNDARY · LEFT_COUNT · RIGHT_COUNT · SOURCE_DQ_FILTERED_COUNT · HELD_COUNT · HELD_PCT · DIFFERENCE · DETECTED_TS\n- **Source.** dbt §7.2.1 (p.18)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "S19 — Reconciliation"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "Counts at four boundaries for the business date, written to an immutable log and published. The pass or warning verdict is derived on the Splunk side, after the data is already in Gold."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** dbt",
+"**Source.** dbt §7.2 (p.18) · §7.2.1 (p.18)"
 ]
 },
 {
+"t": "h",
+"x": "T8 — RECON_RESULT"
+},
+{
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "One immutable row per boundary per business date, replaced rather than updated. No status column — the verdict is derived in Splunk."
+},
+{
+"t": "ul",
+"items": [
+"**Columns.** RECON_ID (PK) · BUSINESS_DATE · BOUNDARY · LEFT_COUNT · RIGHT_COUNT · SOURCE_DQ_FILTERED_COUNT · HELD_COUNT · HELD_PCT · DIFFERENCE · DETECTED_TS",
+"**Source.** dbt §7.2.1 (p.18)"
+]
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `RECON_RESULT` | One immutable row per boundary per business date, replaced rather than updated. No status column — the verdict is derived in Splunk. | dbt §7.2.1 (p.18) |\n| `DQ_VALIDATION_FAILURE` | One store for both failure categories, carrying whether the row can replay itself and whether it is still open. | dbt §7.1 (p.17) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`RECON_RESULT`",
+"One immutable row per boundary per business date, replaced rather than updated. No status column — the verdict is derived in Splunk.",
+"dbt §7.2.1 (p.18)"
+],
+[
+"`DQ_VALIDATION_FAILURE`",
+"One store for both failure categories, carrying whether the row can replay itself and whether it is still open.",
+"dbt §7.1 (p.17)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X35 | Counts do not agree at a boundary | The difference is written to the immutable log and published. The pass or warning verdict is derived on the Splunk side, after the data is already in Gold — so it alerts rather than blocks. | dbt §7.2 (p.18) · §7.2.1 (p.18) |\n| X36 | The held backlog is growing | Alerts on the ageing open rows, and the usual cause is a late dimension file. | dbt §7.2.1 (p.18) |\n| X37 | DQ or reconciliation is rerun for a date | The DQ rows are upserted so their resolution status survives, the recon rows for that date are replaced, and both are republished. | dbt §8.1 (p.20) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X35",
+"Counts do not agree at a boundary",
+"The difference is written to the immutable log and published. The pass or warning verdict is derived on the Splunk side, after the data is already in Gold — so it alerts rather than blocks.",
+"dbt §7.2 (p.18) · §7.2.1 (p.18)"
+],
+[
+"X36",
+"The held backlog is growing",
+"Alerts on the ageing open rows, and the usual cause is a late dimension file.",
+"dbt §7.2.1 (p.18)"
+],
+[
+"X37",
+"DQ or reconciliation is rerun for a date",
+"The DQ rows are upserted so their resolution status survives, the recon rows for that date are replaced, and both are republished.",
+"dbt §8.1 (p.20)"
+]
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **D6.** Approve the Splunk event schema, masking and PII rules, dashboards and alert thresholds.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**D6.** Approve the Splunk event schema, masking and PII rules, dashboards and alert thresholds."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 27\ncomponent_name: G5 Post-Publish Recon\nzone: 2. Hub\nplane: Data Quality\npriority: P2\ntechnology: Airflow + SQL\ncustom_build: Medium\ndepends_on: [16, 21]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-1, AD-9]\npipeline_tiers: [Consumer-Movement]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, data-quality]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 27\ncomponent_name: G5 Post-Publish Recon\nzone: 2. Hub\nplane: Data Quality\npriority: P2\ntechnology: Airflow + SQL\ncustom_build: Medium\ndepends_on: [16, 21]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-1, AD-9]\npipeline_tiers: [Consumer-Movement]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, data-quality]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c28",
@@ -5214,8 +5956,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "28"
 ],
-"withdrawn": true,
-"chip": "#28 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#28 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -5242,133 +5986,226 @@ export const DESIGN_DOCS = [
 "src": "28_DQ_Framework_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nEvery failing record is written to one store and held at the layer that caught it. A step after the fact build picks up the rows that can now resolve, loads them and marks them resolved.\n\nIt sits in **Processing**, in the **Data quality and reconciliation** lane (dbt · Splunk).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "Every failing record is written to one store and held at the layer that caught it. A step after the fact build picks up the rows that can now resolve, loads them and marks them resolved."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Processing**, in the **Data quality and reconciliation** lane (dbt · Splunk)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### S18 — DQ capture and replay\n\nEvery failing record is written to one store and held at the layer that caught it. A step after the fact build picks up the rows that can now resolve, loads them and marks them resolved.\n\n- **Technology.** dbt\n- **Source.** dbt §7.1 (p.17) · Appendix A.1 (p.25)\n\n### T7 — DQ_VALIDATION_FAILURE\n\nOne store for both failure categories, carrying whether the row can replay itself and whether it is still open.\n\n- **Columns.** DQ_FAILURE_ID (PK) · DQ_CATEGORY (SOURCE_DQ | TRANSFORMATION_DQ) · BUSINESS_DATE · LAYER_NAME (STG | INT | DIM | FACT) · MODEL_NAME · BUSINESS_KEY · SRC_RECORD_ID · COLUMN_NAME · FAILURE_REASON · REPROCESS_ELIGIBLE · RESOLUTION_STATUS · RETRY_COUNT · RESOLVED_TS · DETECTED_TS\n- **Source.** dbt §7.1 (p.17)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "S18 — DQ capture and replay"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "Every failing record is written to one store and held at the layer that caught it. A step after the fact build picks up the rows that can now resolve, loads them and marks them resolved."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** dbt",
+"**Source.** dbt §7.1 (p.17) · Appendix A.1 (p.25)"
 ]
 },
 {
+"t": "h",
+"x": "T7 — DQ_VALIDATION_FAILURE"
+},
+{
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "One store for both failure categories, carrying whether the row can replay itself and whether it is still open."
+},
+{
+"t": "ul",
+"items": [
+"**Columns.** DQ_FAILURE_ID (PK) · DQ_CATEGORY (SOURCE_DQ | TRANSFORMATION_DQ) · BUSINESS_DATE · LAYER_NAME (STG | INT | DIM | FACT) · MODEL_NAME · BUSINESS_KEY · SRC_RECORD_ID · COLUMN_NAME · FAILURE_REASON · REPROCESS_ELIGIBLE · RESOLUTION_STATUS · RETRY_COUNT · RESOLVED_TS · DETECTED_TS",
+"**Source.** dbt §7.1 (p.17)"
+]
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `INT tables` | Silver persistence. Passing rows only, seven days, partitioned by business date. | dbt §4.1 (p.10) · Appendix A.3 (p.26) |\n| `DQ_VALIDATION_FAILURE` | One store for both failure categories, carrying whether the row can replay itself and whether it is still open. | dbt §7.1 (p.17) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`INT tables`",
+"Silver persistence. Passing rows only, seven days, partitioned by business date.",
+"dbt §4.1 (p.10) · Appendix A.3 (p.26)"
+],
+[
+"`DQ_VALIDATION_FAILURE`",
+"One store for both failure categories, carrying whether the row can replay itself and whether it is still open.",
+"dbt §7.1 (p.17)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X24 | A key column is missing | The STG view marks the row FAIL with a reason code and INT never reads it. The row goes to the DQ store as OPEN. | dbt §6.3 (p.15) |\n| X26 | A full-snapshot entity fails | The row stays OPEN until a corrected record arrives in a later full file, which replays it and marks it RESOLVED. This rests on account and client being full daily snapshots. | dbt §7.1 (p.17) · §8.2 assumption A1 (p.20) |\n| X27 | A transaction fails | That date's records do not come round again, so it replays only on a corrected reload for the date, or when the missing dimension arrives. | dbt §7.1 (p.17) |\n| X28 | A code has no active mapping row | Caught at INT as a transformation failure, owned by the transformation team rather than the source. Marked not auto-replayable: it stays OPEN until a code fix is deployed. | dbt §7 (p.17) |\n| X29 | The same failure returns after a rerun | Expected, and the signal is that a code fix is needed rather than another rerun. | dbt §7 (p.17) |\n| X30 | A transaction's dimension has not arrived | Never written to Gold with a placeholder key. Held in the DQ store as replayable and OPEN, re-derived from INT on a later day once the dimension exists, then marked RESOLVED. | dbt §7.1 (p.17) · Figure 5a (p.18) |\n| X31 | A row is still OPEN at the retention edge | CLOSED and alerted at seven days, because the DQ store keeps lineage only and INT no longer holds the data to re-derive it. | dbt §7.1 (p.17) · §8.2 assumption A4 (p.20) |\n| X36 | The held backlog is growing | Alerts on the ageing open rows, and the usual cause is a late dimension file. | dbt §7.2.1 (p.18) |\n| X37 | DQ or reconciliation is rerun for a date | The DQ rows are upserted so their resolution status survives, the recon rows for that date are replaced, and both are republished. | dbt §8.1 (p.20) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X24",
+"A key column is missing",
+"The STG view marks the row FAIL with a reason code and INT never reads it. The row goes to the DQ store as OPEN.",
+"dbt §6.3 (p.15)"
+],
+[
+"X26",
+"A full-snapshot entity fails",
+"The row stays OPEN until a corrected record arrives in a later full file, which replays it and marks it RESOLVED. This rests on account and client being full daily snapshots.",
+"dbt §7.1 (p.17) · §8.2 assumption A1 (p.20)"
+],
+[
+"X27",
+"A transaction fails",
+"That date's records do not come round again, so it replays only on a corrected reload for the date, or when the missing dimension arrives.",
+"dbt §7.1 (p.17)"
+],
+[
+"X28",
+"A code has no active mapping row",
+"Caught at INT as a transformation failure, owned by the transformation team rather than the source. Marked not auto-replayable: it stays OPEN until a code fix is deployed.",
+"dbt §7 (p.17)"
+],
+[
+"X29",
+"The same failure returns after a rerun",
+"Expected, and the signal is that a code fix is needed rather than another rerun.",
+"dbt §7 (p.17)"
+],
+[
+"X30",
+"A transaction's dimension has not arrived",
+"Never written to Gold with a placeholder key. Held in the DQ store as replayable and OPEN, re-derived from INT on a later day once the dimension exists, then marked RESOLVED.",
+"dbt §7.1 (p.17) · Figure 5a (p.18)"
+],
+[
+"X31",
+"A row is still OPEN at the retention edge",
+"CLOSED and alerted at seven days, because the DQ store keeps lineage only and INT no longer holds the data to re-derive it.",
+"dbt §7.1 (p.17) · §8.2 assumption A4 (p.20)"
+],
+[
+"X36",
+"The held backlog is growing",
+"Alerts on the ageing open rows, and the usual cause is a late dimension file.",
+"dbt §7.2.1 (p.18)"
+],
+[
+"X37",
+"DQ or reconciliation is rerun for a date",
+"The DQ rows are upserted so their resolution status survives, the recon rows for that date are replaced, and both are republished.",
+"dbt §8.1 (p.20)"
+]
+]
+}
+]
+},
+{
+"h": "Where SEI's documents disagree about this",
+"md": "\nEach one is a decision to take before a model is written.\n\n### C5 — Where data quality runs\n\n- **The architecture says.** A Data Quality Checks step after dbt Gold in the Airflow chain.\n- **The design documents say.** A per-row pass or fail computed in the STG view, before anything is loaded, plus tests between every layer.\n- **Why it matters.** Before or after publication is the whole question. The architecture's position puts the check after Gold is written, which is where reconciliation already sits and is already a known gap.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Each one is a decision to take before a model is written."
+},
+{
+"t": "h",
+"x": "C5 — Where data quality runs"
+},
+{
+"t": "ul",
+"items": [
+"**The architecture says.** A Data Quality Checks step after dbt Gold in the Airflow chain.",
+"**The design documents say.** A per-row pass or fail computed in the STG view, before anything is loaded, plus tests between every layer.",
+"**Why it matters.** Before or after publication is the whole question. The architecture's position puts the check after Gold is written, which is where reconciliation already sits and is already a known gap."
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **D2.** Confirm all missing dimensions resolve inside the seven-day window, and approve the single-table DQ design, the replay policy and the retention-boundary alert.",
+"blocks": [
+{
+"t": "p",
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**D2.** Confirm all missing dimensions resolve inside the seven-day window, and approve the single-table DQ design, the replay policy and the retention-boundary alert."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 28\ncomponent_name: DQ Framework\nzone: 2. Hub\nplane: Data Quality\npriority: P1\ntechnology: Python\ncustom_build: High\ndepends_on: [33, 31]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-9, AD-2, AD-5, AD-6]\npipeline_tiers: [Stage1-Oracle, Stage2-Oracle, Stage3-Exadata-Gold, Consumer-Movement]\nlast_updated: 2026-08-10\ntags: [SEI-BBH, Integration-Hub, hub, data-quality, framework]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 28\ncomponent_name: DQ Framework\nzone: 2. Hub\nplane: Data Quality\npriority: P1\ntechnology: Python\ncustom_build: High\ndepends_on: [33, 31]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-9, AD-2, AD-5, AD-6]\npipeline_tiers: [Stage1-Oracle, Stage2-Oracle, Stage3-Exadata-Gold, Consumer-Movement]\nlast_updated: 2026-08-10\ntags: [SEI-BBH, Integration-Hub, hub, data-quality, framework]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c29",
@@ -5385,8 +6222,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "29"
 ],
-"withdrawn": true,
-"chip": "#29 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "differs",
+"chip": "#29 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -5409,133 +6248,155 @@ export const DESIGN_DOCS = [
 "src": "29_Error_Handling_Quarantine_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nTwo different quarantines. SEI quarantines FILES before load, and for failed ROWS keeps lineage only — no payload copy — on the assumption that anything held resolves inside seven days.\n\nIt sits in **Foundation**, in the **Errors, audit and lineage** lane (Python · dbt).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "Two different quarantines. SEI quarantines FILES before load, and for failed ROWS keeps lineage only — no payload copy — on the assumption that anything held resolves inside seven days."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Foundation**, in the **Errors, audit and lineage** lane (Python · dbt)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**SEI covers the need and answers it differently.** Two different quarantines. SEI quarantines FILES before load, and for failed ROWS keeps lineage only — no payload copy — on the assumption that anything held resolves inside seven days.\n\n### S4 — Archive and Quarantine\n\nWhere a file goes after processing. Archive on success, Quarantine when validation fails before anything is written.\n\n- **Technology.** shared storage\n- **Source.** ingest Figure 1 (p.6) · §4.1 (p.7)\n\n### T7 — DQ_VALIDATION_FAILURE\n\nOne store for both failure categories, carrying whether the row can replay itself and whether it is still open.\n\n- **Columns.** DQ_FAILURE_ID (PK) · DQ_CATEGORY (SOURCE_DQ | TRANSFORMATION_DQ) · BUSINESS_DATE · LAYER_NAME (STG | INT | DIM | FACT) · MODEL_NAME · BUSINESS_KEY · SRC_RECORD_ID · COLUMN_NAME · FAILURE_REASON · REPROCESS_ELIGIBLE · RESOLUTION_STATUS · RETRY_COUNT · RESOLVED_TS · DETECTED_TS\n- **Source.** dbt §7.1 (p.17)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**SEI covers the need and answers it differently.** Two different quarantines. SEI quarantines FILES before load, and for failed ROWS keeps lineage only — no payload copy — on the assumption that anything held resolves inside seven days."
+},
+{
+"t": "h",
+"x": "S4 — Archive and Quarantine"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "Where a file goes after processing. Archive on success, Quarantine when validation fails before anything is written."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** shared storage",
+"**Source.** ingest Figure 1 (p.6) · §4.1 (p.7)"
 ]
 },
 {
+"t": "h",
+"x": "T7 — DQ_VALIDATION_FAILURE"
+},
+{
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "One store for both failure categories, carrying whether the row can replay itself and whether it is still open."
+},
+{
+"t": "ul",
+"items": [
+"**Columns.** DQ_FAILURE_ID (PK) · DQ_CATEGORY (SOURCE_DQ | TRANSFORMATION_DQ) · BUSINESS_DATE · LAYER_NAME (STG | INT | DIM | FACT) · MODEL_NAME · BUSINESS_KEY · SRC_RECORD_ID · COLUMN_NAME · FAILURE_REASON · REPROCESS_ELIGIBLE · RESOLUTION_STATUS · RETRY_COUNT · RESOLVED_TS · DETECTED_TS",
+"**Source.** dbt §7.1 (p.17)"
+]
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `DQ_VALIDATION_FAILURE` | One store for both failure categories, carrying whether the row can replay itself and whether it is still open. | dbt §7.1 (p.17) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`DQ_VALIDATION_FAILURE`",
+"One store for both failure categories, carrying whether the row can replay itself and whether it is still open.",
+"dbt §7.1 (p.17)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X12 | The archive move fails after a good load | ARCHIVE_FAILED. RAW is kept and is never deleted or reloaded — the move happens after the commit and cannot be part of the transaction. Only the move is retried. | ingest §7.3 (p.14) · Appendix D.3 (p.22) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X12",
+"The archive move fails after a good load",
+"ARCHIVE_FAILED. RAW is kept and is never deleted or reloaded — the move happens after the commit and cannot be part of the transaction. Only the move is retried.",
+"ingest §7.3 (p.14) · Appendix D.3 (p.22)"
+]
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **O1.** Confirm Landing Zone, Archive and Quarantine details.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**O1.** Confirm Landing Zone, Archive and Quarantine details."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 29\ncomponent_name: Error Handling & Quarantine\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Python\ncustom_build: High\ndepends_on: [23, 50]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-2, AD-8]\npipeline_tiers: [Stage1-Oracle, Stage2-Oracle]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, foundation]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 29\ncomponent_name: Error Handling & Quarantine\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Python\ncustom_build: High\ndepends_on: [23, 50]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-2, AD-8]\npipeline_tiers: [Stage1-Oracle, Stage2-Oracle]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, foundation]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\ngenerated: true\nsei_status: differs\ngenerated: true\nsei_status: differs\ngenerated: true\nsei_status: differs"
 },
 {
 "id": "c30",
@@ -5552,8 +6413,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "30"
 ],
-"withdrawn": true,
-"chip": "#30 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#30 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -5579,133 +6442,168 @@ export const DESIGN_DOCS = [
 "src": "30_Reconciliation_Framework_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nCounts at four boundaries for the business date, written to an immutable log and published. The pass or warning verdict is derived on the Splunk side, after the data is already in Gold.\n\nIt sits in **Foundation**, in the **Evidence and observability** lane (Splunk · 360).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "Counts at four boundaries for the business date, written to an immutable log and published. The pass or warning verdict is derived on the Splunk side, after the data is already in Gold."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Foundation**, in the **Evidence and observability** lane (Splunk · 360)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### S19 — Reconciliation\n\nCounts at four boundaries for the business date, written to an immutable log and published. The pass or warning verdict is derived on the Splunk side, after the data is already in Gold.\n\n- **Technology.** dbt\n- **Source.** dbt §7.2 (p.18) · §7.2.1 (p.18)\n\n### T8 — RECON_RESULT\n\nOne immutable row per boundary per business date, replaced rather than updated. No status column — the verdict is derived in Splunk.\n\n- **Columns.** RECON_ID (PK) · BUSINESS_DATE · BOUNDARY · LEFT_COUNT · RIGHT_COUNT · SOURCE_DQ_FILTERED_COUNT · HELD_COUNT · HELD_PCT · DIFFERENCE · DETECTED_TS\n- **Source.** dbt §7.2.1 (p.18)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "S19 — Reconciliation"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "Counts at four boundaries for the business date, written to an immutable log and published. The pass or warning verdict is derived on the Splunk side, after the data is already in Gold."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** dbt",
+"**Source.** dbt §7.2 (p.18) · §7.2.1 (p.18)"
 ]
 },
 {
+"t": "h",
+"x": "T8 — RECON_RESULT"
+},
+{
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "One immutable row per boundary per business date, replaced rather than updated. No status column — the verdict is derived in Splunk."
+},
+{
+"t": "ul",
+"items": [
+"**Columns.** RECON_ID (PK) · BUSINESS_DATE · BOUNDARY · LEFT_COUNT · RIGHT_COUNT · SOURCE_DQ_FILTERED_COUNT · HELD_COUNT · HELD_PCT · DIFFERENCE · DETECTED_TS",
+"**Source.** dbt §7.2.1 (p.18)"
+]
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `RECON_RESULT` | One immutable row per boundary per business date, replaced rather than updated. No status column — the verdict is derived in Splunk. | dbt §7.2.1 (p.18) |\n| `DQ_VALIDATION_FAILURE` | One store for both failure categories, carrying whether the row can replay itself and whether it is still open. | dbt §7.1 (p.17) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`RECON_RESULT`",
+"One immutable row per boundary per business date, replaced rather than updated. No status column — the verdict is derived in Splunk.",
+"dbt §7.2.1 (p.18)"
+],
+[
+"`DQ_VALIDATION_FAILURE`",
+"One store for both failure categories, carrying whether the row can replay itself and whether it is still open.",
+"dbt §7.1 (p.17)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X35 | Counts do not agree at a boundary | The difference is written to the immutable log and published. The pass or warning verdict is derived on the Splunk side, after the data is already in Gold — so it alerts rather than blocks. | dbt §7.2 (p.18) · §7.2.1 (p.18) |\n| X36 | The held backlog is growing | Alerts on the ageing open rows, and the usual cause is a late dimension file. | dbt §7.2.1 (p.18) |\n| X37 | DQ or reconciliation is rerun for a date | The DQ rows are upserted so their resolution status survives, the recon rows for that date are replaced, and both are republished. | dbt §8.1 (p.20) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X35",
+"Counts do not agree at a boundary",
+"The difference is written to the immutable log and published. The pass or warning verdict is derived on the Splunk side, after the data is already in Gold — so it alerts rather than blocks.",
+"dbt §7.2 (p.18) · §7.2.1 (p.18)"
+],
+[
+"X36",
+"The held backlog is growing",
+"Alerts on the ageing open rows, and the usual cause is a late dimension file.",
+"dbt §7.2.1 (p.18)"
+],
+[
+"X37",
+"DQ or reconciliation is rerun for a date",
+"The DQ rows are upserted so their resolution status survives, the recon rows for that date are replaced, and both are republished.",
+"dbt §8.1 (p.20)"
+]
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **D6.** Approve the Splunk event schema, masking and PII rules, dashboards and alert thresholds.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**D6.** Approve the Splunk event schema, masking and PII rules, dashboards and alert thresholds."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 30\ncomponent_name: Reconciliation Framework\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Python\ncustom_build: High\ndepends_on: [26, 27, 35]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-2, AD-6]\npipeline_tiers: [Stage1-Oracle, Stage2-Oracle, Stage3-Exadata-Gold, Consumer-Movement]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, foundation]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 30\ncomponent_name: Reconciliation Framework\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Python\ncustom_build: High\ndepends_on: [26, 27, 35]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-2, AD-6]\npipeline_tiers: [Stage1-Oracle, Stage2-Oracle, Stage3-Exadata-Gold, Consumer-Movement]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, foundation]\norigin: SEI-BBH component tracker\nsei_coverage: covered\ngap_owner: BBH\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c31",
@@ -5722,8 +6620,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "31"
 ],
-"withdrawn": true,
-"chip": "#31 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#31 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -5748,133 +6648,117 @@ export const DESIGN_DOCS = [
 "src": "31_Audit_Lineage_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nBusiness date, run ids, the source record id and the failure category are correlated; the control tables are the ledger.\n\nIt sits in **Foundation**, in the **Errors, audit and lineage** lane (Python · dbt).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "Business date, run ids, the source record id and the failure category are correlated; the control tables are the ledger."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Foundation**, in the **Errors, audit and lineage** lane (Python · dbt)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### T2 — FILE_REGISTRY\n\nThe lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts.\n\n- **Columns.** FILE_REGISTRY_ID (PK) · FILE_NAME + BUSINESS_DATE (unique) · SRC_FILE_NAME · FILE_PATH · ARCHIVE_PATH · STATUS · FILE_ROW_COUNT · TRAILER_ROW_COUNT · RAW_ROW_COUNT · RECEIVED/VALIDATED/LOAD_START/LOAD_END/ARCHIVE_TS · RETRY_COUNT · ERROR_CODE · ERROR_DETAIL\n- **Source.** ingest Appendix B (p.19) · §6.2 (p.12)\n\n### T3 — DATE_CONTROL\n\nThe orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression.\n\n- **Columns.** BUSINESS_DATE (PK) · STATUS · SLA_CUTOFF_TS · CREATED_TS · TRIGGER_TS · COMPLETE_TS · INGESTION_DAG_RUN_ID · TRANSFORMATION_DAG_RUN_ID\n- **Source.** ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "T2 — FILE_REGISTRY"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Columns.** FILE_REGISTRY_ID (PK) · FILE_NAME + BUSINESS_DATE (unique) · SRC_FILE_NAME · FILE_PATH · ARCHIVE_PATH · STATUS · FILE_ROW_COUNT · TRAILER_ROW_COUNT · RAW_ROW_COUNT · RECEIVED/VALIDATED/LOAD_START/LOAD_END/ARCHIVE_TS · RETRY_COUNT · ERROR_CODE · ERROR_DETAIL",
+"**Source.** ingest Appendix B (p.19) · §6.2 (p.12)"
 ]
 },
 {
+"t": "h",
+"x": "T3 — DATE_CONTROL"
+},
+{
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression."
+},
+{
+"t": "ul",
+"items": [
+"**Columns.** BUSINESS_DATE (PK) · STATUS · SLA_CUTOFF_TS · CREATED_TS · TRIGGER_TS · COMPLETE_TS · INGESTION_DAG_RUN_ID · TRANSFORMATION_DAG_RUN_ID",
+"**Source.** ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25)"
+]
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `FILE_REGISTRY` | The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts. | ingest Appendix B (p.19) · §6.2 (p.12) |\n| `DATE_CONTROL` | The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression. | ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`FILE_REGISTRY`",
+"The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts.",
+"ingest Appendix B (p.19) · §6.2 (p.12)"
+],
+[
+"`DATE_CONTROL`",
+"The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression.",
+"ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 31\ncomponent_name: Audit & Lineage\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Python + dbt\ncustom_build: Medium\ndepends_on: [14, 17]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-2, AD-8]\npipeline_tiers: [Stage1-Oracle, Stage2-Oracle, Stage3-Exadata-Gold, Consumer-Movement]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, foundation]\norigin: SEI-BBH component tracker\nsei_coverage: partial\ngap_owner: SEI\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 31\ncomponent_name: Audit & Lineage\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Python + dbt\ncustom_build: Medium\ndepends_on: [14, 17]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-2, AD-8]\npipeline_tiers: [Stage1-Oracle, Stage2-Oracle, Stage3-Exadata-Gold, Consumer-Movement]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, foundation]\norigin: SEI-BBH component tracker\nsei_coverage: partial\ngap_owner: SEI\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c32",
@@ -5891,8 +6775,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "32"
 ],
-"withdrawn": true,
-"chip": "#32 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#32 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -5914,133 +6800,143 @@ export const DESIGN_DOCS = [
 "src": "32_Security_Access_Control_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nCredentials in OpenShift secrets, and the loader account holds only the DML it needs — no ALTER, DROP or CREATE.\n\nIt sits in **Foundation**, in the **Security and access** lane (OpenShift · Oracle).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "Credentials in OpenShift secrets, and the loader account holds only the DML it needs — no ALTER, DROP or CREATE."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Foundation**, in the **Security and access** lane (OpenShift · Oracle)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### S21 — Splunk\n\nOwns all dashboards, counts, trending and alerting, for both documents. Oracle keeps the durable logs; Splunk reports from the events published to it and does the alert correlation.\n\n- **Technology.** SEI/BBH\n- **Source.** ingest §8.1 (p.15) · dbt §4.2 (p.10)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "S21 — Splunk"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "Owns all dashboards, counts, trending and alerting, for both documents. Oracle keeps the durable logs; Splunk reports from the events published to it and does the alert correlation."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** SEI/BBH",
+"**Source.** ingest §8.1 (p.15) · dbt §4.2 (p.10)"
 ]
-},
-{
-"t": "p",
-"x": "specified, differs, or absent — and the reason for it."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `DQ_VALIDATION_FAILURE` | One store for both failure categories, carrying whether the row can replay itself and whether it is still open. | dbt §7.1 (p.17) |\n| `RECON_RESULT` | One immutable row per boundary per business date, replaced rather than updated. No status column — the verdict is derived in Splunk. | dbt §7.2.1 (p.18) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`DQ_VALIDATION_FAILURE`",
+"One store for both failure categories, carrying whether the row can replay itself and whether it is still open.",
+"dbt §7.1 (p.17)"
+],
+[
+"`RECON_RESULT`",
+"One immutable row per boundary per business date, replaced rather than updated. No status column — the verdict is derived in Splunk.",
+"dbt §7.2.1 (p.18)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X38 | Publishing to Splunk fails | The data is already durable in Oracle. The publish task is separate and retryable, and it is idempotent per date. | dbt §8.3 (p.21) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X38",
+"Publishing to Splunk fails",
+"The data is already durable in Oracle. The publish task is separate and retryable, and it is idempotent per date.",
+"dbt §8.3 (p.21)"
+]
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **D6.** Approve the Splunk event schema, masking and PII rules, dashboards and alert thresholds.\n- **O4.** Confirm Splunk integration, indexing, event format, alert ownership and routing.\n- **O7.** Confirm the Splunk correlation key, severity, alert routing and recovery handling.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**D6.** Approve the Splunk event schema, masking and PII rules, dashboards and alert thresholds.",
+"**O4.** Confirm Splunk integration, indexing, event format, alert ownership and routing.",
+"**O7.** Confirm the Splunk correlation key, severity, alert routing and recovery handling."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 32\ncomponent_name: Security & Access Control\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Infra\ncustom_build: Low\ndepends_on: [47, 48]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: []\npipeline_tiers: [Stage1-Oracle, Stage2-Oracle, Stage3-Exadata-Gold, Consumer-Movement]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, foundation, nydfs]\norigin: SEI-BBH component tracker\nsei_coverage: partial\ngap_owner: SEI\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 32\ncomponent_name: Security & Access Control\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Infra\ncustom_build: Low\ndepends_on: [47, 48]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: []\npipeline_tiers: [Stage1-Oracle, Stage2-Oracle, Stage3-Exadata-Gold, Consumer-Movement]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, foundation, nydfs]\norigin: SEI-BBH component tracker\nsei_coverage: partial\ngap_owner: SEI\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c33",
@@ -6057,8 +6953,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "33"
 ],
-"withdrawn": true,
-"chip": "#33 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#33 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -6084,133 +6982,137 @@ export const DESIGN_DOCS = [
 "src": "33_Metadata_Config_Store_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nHow an active interface is discovered, dated, validated and routed. File-level only — there is deliberately no column mapping table, because the RAW table DDL is the schema contract.\n\nIt sits in **Foundation**, in the **Control and metadata** lane (Oracle).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "How an active interface is discovered, dated, validated and routed. File-level only — there is deliberately no column mapping table, because the RAW table DDL is the schema contract."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Foundation**, in the **Control and metadata** lane (Oracle)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### T1 — FILE_SCHEMA_CONFIG\n\nHow an active interface is discovered, dated, validated and routed. File-level only — there is deliberately no column mapping table, because the RAW table DDL is the schema contract.\n\n- **Columns.** FILE_NAME (PK) · FILE_NAME_PATTERN · TARGET_RAW_TABLE · DELIMITER · HAS_HEADER · HAS_TRAILER · ALLOW_ZERO_ROWS · DELIVERY_FREQUENCY · DATE_EXTRACTION_REGEX · DATE_EXTRACTION_GROUP · DATE_FORMAT_MASK · IS_ACTIVE · audit\n- **Source.** ingest Appendix A (p.18) · §6.1 (p.12)\n\n### T2 — FILE_REGISTRY\n\nThe lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts.\n\n- **Columns.** FILE_REGISTRY_ID (PK) · FILE_NAME + BUSINESS_DATE (unique) · SRC_FILE_NAME · FILE_PATH · ARCHIVE_PATH · STATUS · FILE_ROW_COUNT · TRAILER_ROW_COUNT · RAW_ROW_COUNT · RECEIVED/VALIDATED/LOAD_START/LOAD_END/ARCHIVE_TS · RETRY_COUNT · ERROR_CODE · ERROR_DETAIL\n- **Source.** ingest Appendix B (p.19) · §6.2 (p.12)\n\n### T3 — DATE_CONTROL\n\nThe orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression.\n\n- **Columns.** BUSINESS_DATE (PK) · STATUS · SLA_CUTOFF_TS · CREATED_TS · TRIGGER_TS · COMPLETE_TS · INGESTION_DAG_RUN_ID · TRANSFORMATION_DAG_RUN_ID\n- **Source.** ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "T1 — FILE_SCHEMA_CONFIG"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "How an active interface is discovered, dated, validated and routed. File-level only — there is deliberately no column mapping table, because the RAW table DDL is the schema contract."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Columns.** FILE_NAME (PK) · FILE_NAME_PATTERN · TARGET_RAW_TABLE · DELIMITER · HAS_HEADER · HAS_TRAILER · ALLOW_ZERO_ROWS · DELIVERY_FREQUENCY · DATE_EXTRACTION_REGEX · DATE_EXTRACTION_GROUP · DATE_FORMAT_MASK · IS_ACTIVE · audit",
+"**Source.** ingest Appendix A (p.18) · §6.1 (p.12)"
 ]
 },
 {
+"t": "h",
+"x": "T2 — FILE_REGISTRY"
+},
+{
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts."
+},
+{
+"t": "ul",
+"items": [
+"**Columns.** FILE_REGISTRY_ID (PK) · FILE_NAME + BUSINESS_DATE (unique) · SRC_FILE_NAME · FILE_PATH · ARCHIVE_PATH · STATUS · FILE_ROW_COUNT · TRAILER_ROW_COUNT · RAW_ROW_COUNT · RECEIVED/VALIDATED/LOAD_START/LOAD_END/ARCHIVE_TS · RETRY_COUNT · ERROR_CODE · ERROR_DETAIL",
+"**Source.** ingest Appendix B (p.19) · §6.2 (p.12)"
+]
+},
+{
+"t": "h",
+"x": "T3 — DATE_CONTROL"
+},
+{
+"t": "p",
+"x": "The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression."
+},
+{
+"t": "ul",
+"items": [
+"**Columns.** BUSINESS_DATE (PK) · STATUS · SLA_CUTOFF_TS · CREATED_TS · TRIGGER_TS · COMPLETE_TS · INGESTION_DAG_RUN_ID · TRANSFORMATION_DAG_RUN_ID",
+"**Source.** ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25)"
+]
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `FILE_SCHEMA_CONFIG` | How an active interface is discovered, dated, validated and routed. File-level only — there is deliberately no column mapping table, because the RAW table DDL is the schema contract. | ingest Appendix A (p.18) · §6.1 (p.12) |\n| `FILE_REGISTRY` | The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts. | ingest Appendix B (p.19) · §6.2 (p.12) |\n| `DATE_CONTROL` | The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression. | ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`FILE_SCHEMA_CONFIG`",
+"How an active interface is discovered, dated, validated and routed. File-level only — there is deliberately no column mapping table, because the RAW table DDL is the schema contract.",
+"ingest Appendix A (p.18) · §6.1 (p.12)"
+],
+[
+"`FILE_REGISTRY`",
+"The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts.",
+"ingest Appendix B (p.19) · §6.2 (p.12)"
+],
+[
+"`DATE_CONTROL`",
+"The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression.",
+"ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 33\ncomponent_name: Metadata & Configuration Store\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Oracle DDL + Python\ncustom_build: High\ndepends_on: [6, 28]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-6, AD-9, AD-2]\npipeline_tiers: [Stage1-Oracle, Stage2-Oracle, Stage3-Exadata-Gold, Consumer-Movement]\nlast_updated: 2026-08-10\ntags: [SEI-BBH, Integration-Hub, hub, foundation, config]\norigin: SEI-BBH component tracker\nsei_coverage: partial\ngap_owner: Joint\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 33\ncomponent_name: Metadata & Configuration Store\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Oracle DDL + Python\ncustom_build: High\ndepends_on: [6, 28]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: [AD-6, AD-9, AD-2]\npipeline_tiers: [Stage1-Oracle, Stage2-Oracle, Stage3-Exadata-Gold, Consumer-Movement]\nlast_updated: 2026-08-10\ntags: [SEI-BBH, Integration-Hub, hub, foundation, config]\norigin: SEI-BBH component tracker\nsei_coverage: partial\ngap_owner: Joint\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c34",
@@ -6227,8 +7129,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "34"
 ],
-"withdrawn": true,
-"chip": "#34 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#34 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -6249,133 +7153,143 @@ export const DESIGN_DOCS = [
 "src": "34_Observability_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nOwns all dashboards, counts, trending and alerting, for both documents. Oracle keeps the durable logs; Splunk reports from the events published to it and does the alert correlation.\n\nIt sits in **Foundation**, in the **Evidence and observability** lane (Splunk · 360).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "Owns all dashboards, counts, trending and alerting, for both documents. Oracle keeps the durable logs; Splunk reports from the events published to it and does the alert correlation."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Foundation**, in the **Evidence and observability** lane (Splunk · 360)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### S21 — Splunk\n\nOwns all dashboards, counts, trending and alerting, for both documents. Oracle keeps the durable logs; Splunk reports from the events published to it and does the alert correlation.\n\n- **Technology.** SEI/BBH\n- **Source.** ingest §8.1 (p.15) · dbt §4.2 (p.10)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "S21 — Splunk"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "Owns all dashboards, counts, trending and alerting, for both documents. Oracle keeps the durable logs; Splunk reports from the events published to it and does the alert correlation."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** SEI/BBH",
+"**Source.** ingest §8.1 (p.15) · dbt §4.2 (p.10)"
 ]
-},
-{
-"t": "p",
-"x": "specified, differs, or absent — and the reason for it."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `DQ_VALIDATION_FAILURE` | One store for both failure categories, carrying whether the row can replay itself and whether it is still open. | dbt §7.1 (p.17) |\n| `RECON_RESULT` | One immutable row per boundary per business date, replaced rather than updated. No status column — the verdict is derived in Splunk. | dbt §7.2.1 (p.18) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`DQ_VALIDATION_FAILURE`",
+"One store for both failure categories, carrying whether the row can replay itself and whether it is still open.",
+"dbt §7.1 (p.17)"
+],
+[
+"`RECON_RESULT`",
+"One immutable row per boundary per business date, replaced rather than updated. No status column — the verdict is derived in Splunk.",
+"dbt §7.2.1 (p.18)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X38 | Publishing to Splunk fails | The data is already durable in Oracle. The publish task is separate and retryable, and it is idempotent per date. | dbt §8.3 (p.21) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X38",
+"Publishing to Splunk fails",
+"The data is already durable in Oracle. The publish task is separate and retryable, and it is idempotent per date.",
+"dbt §8.3 (p.21)"
+]
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **D6.** Approve the Splunk event schema, masking and PII rules, dashboards and alert thresholds.\n- **O4.** Confirm Splunk integration, indexing, event format, alert ownership and routing.\n- **O7.** Confirm the Splunk correlation key, severity, alert routing and recovery handling.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**D6.** Approve the Splunk event schema, masking and PII rules, dashboards and alert thresholds.",
+"**O4.** Confirm Splunk integration, indexing, event format, alert ownership and routing.",
+"**O7.** Confirm the Splunk correlation key, severity, alert routing and recovery handling."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 34\ncomponent_name: Observability\nzone: 2. Hub\nplane: Foundation\npriority: P2\ntechnology: Infra\ncustom_build: Low\ndepends_on: [64]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: []\npipeline_tiers: [Stage1-Oracle, Stage2-Oracle, Stage3-Exadata-Gold, Consumer-Movement]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, foundation, splunk, cp360]\norigin: SEI-BBH component tracker\nsei_coverage: partial\ngap_owner: Joint\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 34\ncomponent_name: Observability\nzone: 2. Hub\nplane: Foundation\npriority: P2\ntechnology: Infra\ncustom_build: Low\ndepends_on: [64]\nstatus: Not Started\nowner: TBD\narchitecture_decisions: []\npipeline_tiers: [Stage1-Oracle, Stage2-Oracle, Stage3-Exadata-Gold, Consumer-Movement]\nlast_updated: 2026-08-13\ntags: [SEI-BBH, Integration-Hub, foundation, splunk, cp360]\norigin: SEI-BBH component tracker\nsei_coverage: partial\ngap_owner: Joint\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c35",
@@ -6392,8 +7306,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "35"
 ],
-"withdrawn": true,
-"chip": "#35 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#35 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -6410,133 +7326,95 @@ export const DESIGN_DOCS = [
 "src": "35_Integration360_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nThis catalogue. SEI gives all reporting to Splunk, so 360 reading the same tables directly is BBH's addition — defensible, and nobody has written down who owns which.\n\nIt sits in **Foundation**, in the **Evidence and observability** lane (Splunk · 360).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "This catalogue. SEI gives all reporting to Splunk, so 360 reading the same tables directly is BBH's addition — defensible, and nobody has written down who owns which."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Foundation**, in the **Evidence and observability** lane (Splunk · 360)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nThis catalogue. SEI gives all reporting to Splunk, so 360 reading the same tables directly is BBH's addition — defensible, and nobody has written down who owns which.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "This catalogue. SEI gives all reporting to Splunk, so 360 reading the same tables directly is BBH's addition — defensible, and nobody has written down who owns which."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Where SEI's documents disagree about this",
+"md": "\nEach one is a decision to take before a model is written.\n\n### C2 — Stage 2 as five tables, or as STG plus INT\n\n- **The architecture says.** Five STG2_* tables, materialised as tables, full refresh daily or incremental.\n- **The design documents say.** A STG view that stores nothing, plus an INT table kept seven days and partitioned.\n- **Why it matters.** Not a naming difference. One stores Stage 2 and one does not, and the retention, the replay window and the reconciliation boundaries all follow from which it is.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Each one is a decision to take before a model is written."
 },
 {
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"t": "h",
+"x": "C2 — Stage 2 as five tables, or as STG plus INT"
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "ul",
+"items": [
+"**The architecture says.** Five STG2_* tables, materialised as tables, full refresh daily or incremental.",
+"**The design documents say.** A STG view that stores nothing, plus an INT table kept seven days and partitioned.",
+"**Why it matters.** Not a naming difference. One stores Stage 2 and one does not, and the retention, the replay window and the reconciliation boundaries all follow from which it is."
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 35\ncomponent_name: Integration360\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Vendor/BBH\ncustom_build: Medium\ndepends_on: [7, 30]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 35\ncomponent_name: Integration360\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Vendor/BBH\ncustom_build: Medium\ndepends_on: [7, 30]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c36",
@@ -6553,8 +7431,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "36"
 ],
-"withdrawn": true,
-"chip": "#36 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#36 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -6570,133 +7450,73 @@ export const DESIGN_DOCS = [
 "src": "36_SSO_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nSign-on for BBH's own tools. Out of scope for both.\n\nIt sits in **Foundation**, in the **Security and access** lane (OpenShift · Oracle).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "Sign-on for BBH's own tools. Out of scope for both."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Foundation**, in the **Security and access** lane (OpenShift · Oracle)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nSign-on for BBH's own tools. Out of scope for both.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "Sign-on for BBH's own tools. Out of scope for both."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 36\ncomponent_name: SSO\nzone: 2. Hub\nplane: Foundation\npriority: P3\ntechnology: Infra\ncustom_build: None\ndepends_on: [2]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 36\ncomponent_name: SSO\nzone: 2. Hub\nplane: Foundation\npriority: P3\ntechnology: Infra\ncustom_build: None\ndepends_on: [2]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c37",
@@ -6713,8 +7533,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "37"
 ],
-"withdrawn": true,
-"chip": "#37 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#37 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -6731,133 +7553,73 @@ export const DESIGN_DOCS = [
 "src": "37_PBDW_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nDownstream of Gold. Both documents stop at Gold.\n\nIt sits in **Processing**, in the **Warehouse and consumers** lane (BBH).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "Downstream of Gold. Both documents stop at Gold."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Processing**, in the **Warehouse and consumers** lane (BBH)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nDownstream of Gold. Both documents stop at Gold.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "Downstream of Gold. Both documents stop at Gold."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 37\ncomponent_name: PBDW\nzone: 3. Consumers\nplane: Consumers\npriority: P1\ntechnology: Oracle DDL + dbt\ncustom_build: Medium\ndepends_on: [16, 60]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 37\ncomponent_name: PBDW\nzone: 3. Consumers\nplane: Consumers\npriority: P1\ntechnology: Oracle DDL + dbt\ncustom_build: Medium\ndepends_on: [16, 60]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c38",
@@ -6874,8 +7636,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "38"
 ],
-"withdrawn": true,
-"chip": "#38 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#38 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -6891,133 +7655,73 @@ export const DESIGN_DOCS = [
 "src": "38_IMDS_Stage_IMDS_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nDownstream of Gold. Both documents stop once DIM and FACT are written, so how IMDS is fed is BBH's to design.\n\nIt sits in **Processing**, in the **Warehouse and consumers** lane (BBH).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "Downstream of Gold. Both documents stop once DIM and FACT are written, so how IMDS is fed is BBH's to design."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Processing**, in the **Warehouse and consumers** lane (BBH)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nDownstream of Gold. Both documents stop once DIM and FACT are written, so how IMDS is fed is BBH's to design.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "Downstream of Gold. Both documents stop once DIM and FACT are written, so how IMDS is fed is BBH's to design."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 38\ncomponent_name: IMDS Stage -> IMDS\nzone: 3. Consumers\nplane: Consumers\npriority: P2\ntechnology: Oracle DDL + dbt\ncustom_build: Medium\ndepends_on: [15]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 38\ncomponent_name: IMDS Stage -> IMDS\nzone: 3. Consumers\nplane: Consumers\npriority: P2\ntechnology: Oracle DDL + dbt\ncustom_build: Medium\ndepends_on: [15]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c39",
@@ -7034,8 +7738,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "39"
 ],
-"withdrawn": true,
-"chip": "#39 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#39 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -7051,133 +7757,73 @@ export const DESIGN_DOCS = [
 "src": "39_Pivotal_Database_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nDownstream of Gold, as above — and SEI's design has no notion of a consumer-specific shape at all.\n\nIt sits in **Processing**, in the **Warehouse and consumers** lane (BBH).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "Downstream of Gold, as above — and SEI's design has no notion of a consumer-specific shape at all."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Processing**, in the **Warehouse and consumers** lane (BBH)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nDownstream of Gold, as above — and SEI's design has no notion of a consumer-specific shape at all.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "Downstream of Gold, as above — and SEI's design has no notion of a consumer-specific shape at all."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 39\ncomponent_name: Pivotal Database\nzone: 3. Consumers\nplane: Consumers\npriority: P2\ntechnology: dbt\ncustom_build: Medium\ndepends_on: [15]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 39\ncomponent_name: Pivotal Database\nzone: 3. Consumers\nplane: Consumers\npriority: P2\ntechnology: dbt\ncustom_build: Medium\ndepends_on: [15]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c40",
@@ -7194,8 +7840,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "40"
 ],
-"withdrawn": true,
-"chip": "#40 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#40 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -7211,133 +7859,73 @@ export const DESIGN_DOCS = [
 "src": "40_CP_DW_Canonical_Model_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nNot built this phase, and not in either document.\n\nIt sits in **Processing**, in the **Warehouse and consumers** lane (BBH).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "Not built this phase, and not in either document."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Processing**, in the **Warehouse and consumers** lane (BBH)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nNot built this phase, and not in either document.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "Not built this phase, and not in either document."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 40\ncomponent_name: CP DW Canonical Model\nzone: 3. Consumers\nplane: Consumers\npriority: P3\ntechnology: Design only\ncustom_build: None\ndepends_on: [15]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 40\ncomponent_name: CP DW Canonical Model\nzone: 3. Consumers\nplane: Consumers\npriority: P3\ntechnology: Design only\ncustom_build: None\ndepends_on: [15]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c41",
@@ -7354,8 +7942,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "41"
 ],
-"withdrawn": true,
-"chip": "#41 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#41 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -7371,133 +7961,73 @@ export const DESIGN_DOCS = [
 "src": "41_BI_Analytics_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nReporting off the warehouse. Outside both documents, which end at the Gold tables.\n\nIt sits in **Processing**, in the **Warehouse and consumers** lane (BBH).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "Reporting off the warehouse. Outside both documents, which end at the Gold tables."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Processing**, in the **Warehouse and consumers** lane (BBH)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nReporting off the warehouse. Outside both documents, which end at the Gold tables.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "Reporting off the warehouse. Outside both documents, which end at the Gold tables."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 41\ncomponent_name: BI / Analytics\nzone: 3. Consumers\nplane: Consumers\npriority: P2\ntechnology: BI tooling\ncustom_build: Low\ndepends_on: [16]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 41\ncomponent_name: BI / Analytics\nzone: 3. Consumers\nplane: Consumers\npriority: P2\ntechnology: BI tooling\ncustom_build: Low\ndepends_on: [16]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c42",
@@ -7514,8 +8044,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "42"
 ],
-"withdrawn": true,
-"chip": "#42 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#42 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -7531,133 +8063,69 @@ export const DESIGN_DOCS = [
 "src": "42_Real_time_Consumers_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nThe real-time lane again. Neither document has a consumer that is not fed from a completed business date.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
-},
-{
-"t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "The real-time lane again. Neither document has a consumer that is not fed from a completed business date."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nThe real-time lane again. Neither document has a consumer that is not fed from a completed business date.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "The real-time lane again. Neither document has a consumer that is not fed from a completed business date."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 42\ncomponent_name: Real-time Consumers\nzone: 3. Consumers\nplane: Consumers\npriority: P2\ntechnology: Contract\ncustom_build: None\ndepends_on: [12]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 42\ncomponent_name: Real-time Consumers\nzone: 3. Consumers\nplane: Consumers\npriority: P2\ntechnology: Contract\ncustom_build: None\ndepends_on: [12]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c43",
@@ -7674,8 +8142,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "43"
 ],
-"withdrawn": true,
-"chip": "#43 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#43 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -7691,133 +8161,73 @@ export const DESIGN_DOCS = [
 "src": "43_BBH_Existing_Systems_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nThe existing BBH estate. Both documents describe what arrives and what is built, never who consumes it.\n\nIt sits in **Processing**, in the **Warehouse and consumers** lane (BBH).",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "The existing BBH estate. Both documents describe what arrives and what is built, never who consumes it."
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "It sits in **Processing**, in the **Warehouse and consumers** lane (BBH)."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nThe existing BBH estate. Both documents describe what arrives and what is built, never who consumes it.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "The existing BBH estate. Both documents describe what arrives and what is built, never who consumes it."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 43\ncomponent_name: BBH Existing Systems\nzone: 3. Consumers\nplane: Consumers\npriority: P3\ntechnology: Analysis\ncustom_build: None\ndepends_on: [10]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 43\ncomponent_name: BBH Existing Systems\nzone: 3. Consumers\nplane: Consumers\npriority: P3\ntechnology: Analysis\ncustom_build: None\ndepends_on: [10]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c44",
@@ -7834,8 +8244,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "44"
 ],
-"withdrawn": true,
-"chip": "#44 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#44 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -7849,133 +8261,69 @@ export const DESIGN_DOCS = [
 "src": "44_Projects_Namespaces_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nPlatform build. Neither document covers it.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
-},
-{
-"t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "Platform build. Neither document covers it."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nPlatform build. Neither document covers it.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "Platform build. Neither document covers it."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 44\ncomponent_name: Projects / Namespaces\nzone: 4. OpenShift\nplane: Platform\npriority: P1\ntechnology: Infra\ncustom_build: None\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 44\ncomponent_name: Projects / Namespaces\nzone: 4. OpenShift\nplane: Platform\npriority: P1\ntechnology: Infra\ncustom_build: None\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c45",
@@ -7992,8 +8340,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "45"
 ],
-"withdrawn": true,
-"chip": "#45 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#45 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -8009,133 +8359,69 @@ export const DESIGN_DOCS = [
 "src": "45_Container_Images_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nContainer images. Both documents assume OpenShift and neither specifies how images are built or versioned — only that rollback is redeploying the prior one.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
-},
-{
-"t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "Container images. Both documents assume OpenShift and neither specifies how images are built or versioned — only that rollback is redeploying the prior one."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nContainer images. Both documents assume OpenShift and neither specifies how images are built or versioned — only that rollback is redeploying the prior one.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "Container images. Both documents assume OpenShift and neither specifies how images are built or versioned — only that rollback is redeploying the prior one."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 45\ncomponent_name: Container Images\nzone: 4. OpenShift\nplane: Platform\npriority: P1\ntechnology: Infra\ncustom_build: Medium\ndepends_on: [57]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 45\ncomponent_name: Container Images\nzone: 4. OpenShift\nplane: Platform\npriority: P1\ntechnology: Infra\ncustom_build: Medium\ndepends_on: [57]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c46",
@@ -8152,8 +8438,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "46"
 ],
-"withdrawn": true,
-"chip": "#46 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#46 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -8170,133 +8458,69 @@ export const DESIGN_DOCS = [
 "src": "46_Registry_Scanning_Signing_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nRegistry, scanning and signing. Not mentioned, and it is the supply-chain half of a design that is otherwise explicit about least privilege.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
-},
-{
-"t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "Registry, scanning and signing. Not mentioned, and it is the supply-chain half of a design that is otherwise explicit about least privilege."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nRegistry, scanning and signing. Not mentioned, and it is the supply-chain half of a design that is otherwise explicit about least privilege.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "Registry, scanning and signing. Not mentioned, and it is the supply-chain half of a design that is otherwise explicit about least privilege."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 46\ncomponent_name: Registry, Scanning, Signing\nzone: 4. OpenShift\nplane: Platform\npriority: P2\ntechnology: Infra\ncustom_build: None\ndepends_on: [45, 57]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 46\ncomponent_name: Registry, Scanning, Signing\nzone: 4. OpenShift\nplane: Platform\npriority: P2\ntechnology: Infra\ncustom_build: None\ndepends_on: [45, 57]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c47",
@@ -8313,8 +8537,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "47"
 ],
-"withdrawn": true,
-"chip": "#47 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#47 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -8330,133 +8556,139 @@ export const DESIGN_DOCS = [
 "src": "47_Service_Accounts_RBAC_SCCs_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nNamed, and narrowly: least privilege, and DML only on the Gold tables.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
-},
-{
-"t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "Named, and narrowly: least privilege, and DML only on the Gold tables."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### S21 — Splunk\n\nOwns all dashboards, counts, trending and alerting, for both documents. Oracle keeps the durable logs; Splunk reports from the events published to it and does the alert correlation.\n\n- **Technology.** SEI/BBH\n- **Source.** ingest §8.1 (p.15) · dbt §4.2 (p.10)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "S21 — Splunk"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "Owns all dashboards, counts, trending and alerting, for both documents. Oracle keeps the durable logs; Splunk reports from the events published to it and does the alert correlation."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** SEI/BBH",
+"**Source.** ingest §8.1 (p.15) · dbt §4.2 (p.10)"
 ]
-},
-{
-"t": "p",
-"x": "specified, differs, or absent — and the reason for it."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `DQ_VALIDATION_FAILURE` | One store for both failure categories, carrying whether the row can replay itself and whether it is still open. | dbt §7.1 (p.17) |\n| `RECON_RESULT` | One immutable row per boundary per business date, replaced rather than updated. No status column — the verdict is derived in Splunk. | dbt §7.2.1 (p.18) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`DQ_VALIDATION_FAILURE`",
+"One store for both failure categories, carrying whether the row can replay itself and whether it is still open.",
+"dbt §7.1 (p.17)"
+],
+[
+"`RECON_RESULT`",
+"One immutable row per boundary per business date, replaced rather than updated. No status column — the verdict is derived in Splunk.",
+"dbt §7.2.1 (p.18)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X38 | Publishing to Splunk fails | The data is already durable in Oracle. The publish task is separate and retryable, and it is idempotent per date. | dbt §8.3 (p.21) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X38",
+"Publishing to Splunk fails",
+"The data is already durable in Oracle. The publish task is separate and retryable, and it is idempotent per date.",
+"dbt §8.3 (p.21)"
+]
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **D6.** Approve the Splunk event schema, masking and PII rules, dashboards and alert thresholds.\n- **O4.** Confirm Splunk integration, indexing, event format, alert ownership and routing.\n- **O7.** Confirm the Splunk correlation key, severity, alert routing and recovery handling.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**D6.** Approve the Splunk event schema, masking and PII rules, dashboards and alert thresholds.",
+"**O4.** Confirm Splunk integration, indexing, event format, alert ownership and routing.",
+"**O7.** Confirm the Splunk correlation key, severity, alert routing and recovery handling."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 47\ncomponent_name: Service Accounts, RBAC, SCCs\nzone: 4. OpenShift\nplane: Platform\npriority: P1\ntechnology: Infra\ncustom_build: None\ndepends_on: [32]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 47\ncomponent_name: Service Accounts, RBAC, SCCs\nzone: 4. OpenShift\nplane: Platform\npriority: P1\ntechnology: Infra\ncustom_build: None\ndepends_on: [32]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c48",
@@ -8473,8 +8705,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "48"
 ],
-"withdrawn": true,
-"chip": "#48 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#48 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -8490,133 +8724,139 @@ export const DESIGN_DOCS = [
 "src": "48_Secrets_Management_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nOracle, SFTP and storage credentials in OpenShift secrets, referenced through Airflow connections.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
-},
-{
-"t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "Oracle, SFTP and storage credentials in OpenShift secrets, referenced through Airflow connections."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### S21 — Splunk\n\nOwns all dashboards, counts, trending and alerting, for both documents. Oracle keeps the durable logs; Splunk reports from the events published to it and does the alert correlation.\n\n- **Technology.** SEI/BBH\n- **Source.** ingest §8.1 (p.15) · dbt §4.2 (p.10)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "S21 — Splunk"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "Owns all dashboards, counts, trending and alerting, for both documents. Oracle keeps the durable logs; Splunk reports from the events published to it and does the alert correlation."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** SEI/BBH",
+"**Source.** ingest §8.1 (p.15) · dbt §4.2 (p.10)"
 ]
-},
-{
-"t": "p",
-"x": "specified, differs, or absent — and the reason for it."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `DQ_VALIDATION_FAILURE` | One store for both failure categories, carrying whether the row can replay itself and whether it is still open. | dbt §7.1 (p.17) |\n| `RECON_RESULT` | One immutable row per boundary per business date, replaced rather than updated. No status column — the verdict is derived in Splunk. | dbt §7.2.1 (p.18) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`DQ_VALIDATION_FAILURE`",
+"One store for both failure categories, carrying whether the row can replay itself and whether it is still open.",
+"dbt §7.1 (p.17)"
+],
+[
+"`RECON_RESULT`",
+"One immutable row per boundary per business date, replaced rather than updated. No status column — the verdict is derived in Splunk.",
+"dbt §7.2.1 (p.18)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X38 | Publishing to Splunk fails | The data is already durable in Oracle. The publish task is separate and retryable, and it is idempotent per date. | dbt §8.3 (p.21) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X38",
+"Publishing to Splunk fails",
+"The data is already durable in Oracle. The publish task is separate and retryable, and it is idempotent per date.",
+"dbt §8.3 (p.21)"
+]
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **D6.** Approve the Splunk event schema, masking and PII rules, dashboards and alert thresholds.\n- **O4.** Confirm Splunk integration, indexing, event format, alert ownership and routing.\n- **O7.** Confirm the Splunk correlation key, severity, alert routing and recovery handling.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**D6.** Approve the Splunk event schema, masking and PII rules, dashboards and alert thresholds.",
+"**O4.** Confirm Splunk integration, indexing, event format, alert ownership and routing.",
+"**O7.** Confirm the Splunk correlation key, severity, alert routing and recovery handling."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 48\ncomponent_name: Secrets Management\nzone: 4. OpenShift\nplane: Platform\npriority: P1\ntechnology: Infra\ncustom_build: Low\ndepends_on: [32]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 48\ncomponent_name: Secrets Management\nzone: 4. OpenShift\nplane: Platform\npriority: P1\ntechnology: Infra\ncustom_build: Low\ndepends_on: [32]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c49",
@@ -8633,8 +8873,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "49"
 ],
-"withdrawn": true,
-"chip": "#49 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#49 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -8651,133 +8893,69 @@ export const DESIGN_DOCS = [
 "src": "49_Network_Policy_and_Egress_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nNetwork policy and egress. Neither document says what the pipeline is allowed to reach, which matters given it pulls from SFTP and pushes to Splunk.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
-},
-{
-"t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "Network policy and egress. Neither document says what the pipeline is allowed to reach, which matters given it pulls from SFTP and pushes to Splunk."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nNetwork policy and egress. Neither document says what the pipeline is allowed to reach, which matters given it pulls from SFTP and pushes to Splunk.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "Network policy and egress. Neither document says what the pipeline is allowed to reach, which matters given it pulls from SFTP and pushes to Splunk."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 49\ncomponent_name: Network Policy & Egress\nzone: 4. OpenShift\nplane: Platform\npriority: P1\ntechnology: Infra\ncustom_build: None\ndepends_on: [8, 11]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 49\ncomponent_name: Network Policy & Egress\nzone: 4. OpenShift\nplane: Platform\npriority: P1\ntechnology: Infra\ncustom_build: None\ndepends_on: [8, 11]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c50",
@@ -8794,8 +8972,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "50"
 ],
-"withdrawn": true,
-"chip": "#50 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "differs",
+"chip": "#50 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -8812,133 +8992,84 @@ export const DESIGN_DOCS = [
 "src": "50_Persistent_Storage_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nSEI needs one specific thing from storage and states it as an assumption: Landing, Archive and Quarantine must be shared across worker pods, or mapped tasks cannot reliably read or move files.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
-},
-{
-"t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "SEI needs one specific thing from storage and states it as an assumption: Landing, Archive and Quarantine must be shared across worker pods, or mapped tasks cannot reliably read or move files."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**SEI covers the need and answers it differently.** SEI needs one specific thing from storage and states it as an assumption: Landing, Archive and Quarantine must be shared across worker pods, or mapped tasks cannot reliably read or move files.\n\n### S3 — Landing Zone\n\nShared storage that Airflow scans for eligible files. Shared is load-bearing too — every worker pod has to see the same Landing, Archive and Quarantine folders.\n\n- **Technology.** shared storage\n- **Source.** ingest Glossary (p.25) · §2.1 (p.5)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**SEI covers the need and answers it differently.** SEI needs one specific thing from storage and states it as an assumption: Landing, Archive and Quarantine must be shared across worker pods, or mapped tasks cannot reliably read or move files."
+},
+{
+"t": "h",
+"x": "S3 — Landing Zone"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "Shared storage that Airflow scans for eligible files. Shared is load-bearing too — every worker pod has to see the same Landing, Archive and Quarantine folders."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** shared storage",
+"**Source.** ingest Glossary (p.25) · §2.1 (p.5)"
 ]
-},
-{
-"t": "p",
-"x": "specified, differs, or absent — and the reason for it."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **O1.** Confirm Landing Zone, Archive and Quarantine details.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "SEI's own ids, so they can be quoted straight back."
 },
 {
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "ul",
+"items": [
+"**O1.** Confirm Landing Zone, Archive and Quarantine details."
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 50\ncomponent_name: Persistent Storage\nzone: 4. OpenShift\nplane: Platform\npriority: P2\ntechnology: Infra\ncustom_build: None\ndepends_on: [8, 29]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 50\ncomponent_name: Persistent Storage\nzone: 4. OpenShift\nplane: Platform\npriority: P2\ntechnology: Infra\ncustom_build: None\ndepends_on: [8, 29]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: differs\ngenerated: true\nsei_status: differs\ngenerated: true\nsei_status: differs"
 },
 {
 "id": "c51",
@@ -8955,8 +9086,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "51"
 ],
-"withdrawn": true,
-"chip": "#51 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#51 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -8972,133 +9105,119 @@ export const DESIGN_DOCS = [
 "src": "51_Airflow_Deployment_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nA starting configuration is given: schedule every five minutes, catchup off, one active run, pool 8 to 10, one or two retries.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
-},
-{
-"t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "A starting configuration is given: schedule every five minutes, catchup off, one active run, pool 8 to 10, one or two retries."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### S5 — Ingestion DAG (one, metadata-driven)\n\nONE DAG for every inbound interface, not one per interface. It is driven by configuration rows, so a new interface is onboarded by adding a row rather than by writing a DAG.\n\n- **Technology.** Airflow 3.0\n- **Source.** ingest §5 (p.9)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "S5 — Ingestion DAG (one, metadata-driven)"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "ONE DAG for every inbound interface, not one per interface. It is driven by configuration rows, so a new interface is onboarded by adding a row rather than by writing a DAG."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** Airflow 3.0",
+"**Source.** ingest §5 (p.9)"
 ]
-},
-{
-"t": "p",
-"x": "specified, differs, or absent — and the reason for it."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `FILE_SCHEMA_CONFIG` | How an active interface is discovered, dated, validated and routed. File-level only — there is deliberately no column mapping table, because the RAW table DDL is the schema contract. | ingest Appendix A (p.18) · §6.1 (p.12) |\n| `FILE_REGISTRY` | The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts. | ingest Appendix B (p.19) · §6.2 (p.12) |\n| `DATE_CONTROL` | The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression. | ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`FILE_SCHEMA_CONFIG`",
+"How an active interface is discovered, dated, validated and routed. File-level only — there is deliberately no column mapping table, because the RAW table DDL is the schema contract.",
+"ingest Appendix A (p.18) · §6.1 (p.12)"
+],
+[
+"`FILE_REGISTRY`",
+"The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts.",
+"ingest Appendix B (p.19) · §6.2 (p.12)"
+],
+[
+"`DATE_CONTROL`",
+"The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression.",
+"ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **O2.** Confirm batch SLA, peak timing, representative file sizes and the Oracle connection envelope.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**O2.** Confirm batch SLA, peak timing, representative file sizes and the Oracle connection envelope."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 51\ncomponent_name: Airflow Deployment\nzone: 4. OpenShift\nplane: Runtime\npriority: P1\ntechnology: Infra + Airflow\ncustom_build: Medium\ndepends_on: [18]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 51\ncomponent_name: Airflow Deployment\nzone: 4. OpenShift\nplane: Runtime\npriority: P1\ntechnology: Infra + Airflow\ncustom_build: Medium\ndepends_on: [18]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c52",
@@ -9115,8 +9234,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "52"
 ],
-"withdrawn": true,
-"chip": "#52 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#52 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -9133,133 +9254,143 @@ export const DESIGN_DOCS = [
 "src": "52_Worker_Pod_Autoscaling_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nWorker pods are how file-level concurrency scales, bounded by pools and Oracle connections.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
-},
-{
-"t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "Worker pods are how file-level concurrency scales, bounded by pools and Oracle connections."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### S7 — Mapped file task (one per file)\n\nAirflow creates one task per discovered file at run time, so files process independently and in parallel within the pool and Oracle connection limits. A file never waits for another interface.\n\n- **Technology.** Dynamic Task Mapping\n- **Source.** ingest §5 (p.9) · Appendix C.1 (p.21)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "S7 — Mapped file task (one per file)"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "Airflow creates one task per discovered file at run time, so files process independently and in parallel within the pool and Oracle connection limits. A file never waits for another interface."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** Dynamic Task Mapping",
+"**Source.** ingest §5 (p.9) · Appendix C.1 (p.21)"
 ]
-},
-{
-"t": "p",
-"x": "specified, differs, or absent — and the reason for it."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `FILE_REGISTRY` | The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts. | ingest Appendix B (p.19) · §6.2 (p.12) |\n| `RAW tables` | Bronze. Validated detail rows as delivered, tagged with the business date and lineage. The dbt document names three: account, client and transaction. | ingest Glossary (p.25) · dbt §4.1 (p.10) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`FILE_REGISTRY`",
+"The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts.",
+"ingest Appendix B (p.19) · §6.2 (p.12)"
+],
+[
+"`RAW tables`",
+"Bronze. Validated detail rows as delivered, tagged with the business date and lineage. The dbt document names three: account, client and transaction.",
+"ingest Glossary (p.25) · dbt §4.1 (p.10)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X8 | The same file is discovered again | If the existing record is ARCHIVED it is skipped and logged as a duplicate; no second registry row is created. A unique key on the interface and business date enforces it. | ingest §5 (p.9) · Appendix B (p.19) |\n| X9 | A record is stuck in RECEIVED, VALIDATED or LOADING | Investigated, never reset automatically. The Airflow task state, the worker logs, the file location and the Oracle outcome are checked first, and the same record is reused for recovery. | ingest Appendix D.5 (p.23) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X8",
+"The same file is discovered again",
+"If the existing record is ARCHIVED it is skipped and logged as a duplicate; no second registry row is created. A unique key on the interface and business date enforces it.",
+"ingest §5 (p.9) · Appendix B (p.19)"
+],
+[
+"X9",
+"A record is stuck in RECEIVED, VALIDATED or LOADING",
+"Investigated, never reset automatically. The Airflow task state, the worker logs, the file location and the Oracle outcome are checked first, and the same record is reused for recovery.",
+"ingest Appendix D.5 (p.23)"
+]
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **O2.** Confirm batch SLA, peak timing, representative file sizes and the Oracle connection envelope.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**O2.** Confirm batch SLA, peak timing, representative file sizes and the Oracle connection envelope."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 52\ncomponent_name: Worker Pod Autoscaling\nzone: 4. OpenShift\nplane: Runtime\npriority: P1\ntechnology: Infra\ncustom_build: Low\ndepends_on: [18, 55]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 52\ncomponent_name: Worker Pod Autoscaling\nzone: 4. OpenShift\nplane: Runtime\npriority: P1\ntechnology: Infra\ncustom_build: Low\ndepends_on: [18, 55]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c53",
@@ -9276,8 +9407,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "53"
 ],
-"withdrawn": true,
-"chip": "#53 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#53 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -9293,133 +9426,69 @@ export const DESIGN_DOCS = [
 "src": "53_Resource_Quotas_and_Priority_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nResource quotas and priority. The documents give a starting pool size and worker count and leave the cluster-level envelope open — see open decision O2.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
-},
-{
-"t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "Resource quotas and priority. The documents give a starting pool size and worker count and leave the cluster-level envelope open — see open decision O2."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nResource quotas and priority. The documents give a starting pool size and worker count and leave the cluster-level envelope open — see open decision O2.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "Resource quotas and priority. The documents give a starting pool size and worker count and leave the cluster-level envelope open — see open decision O2."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 53\ncomponent_name: Resource Quotas & Priority\nzone: 4. OpenShift\nplane: Runtime\npriority: P2\ntechnology: Infra\ncustom_build: None\ndepends_on: [52]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 53\ncomponent_name: Resource Quotas & Priority\nzone: 4. OpenShift\nplane: Runtime\npriority: P2\ntechnology: Infra\ncustom_build: None\ndepends_on: [52]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c54",
@@ -9436,8 +9505,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "54"
 ],
-"withdrawn": true,
-"chip": "#54 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#54 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -9454,133 +9525,69 @@ export const DESIGN_DOCS = [
 "src": "54_Warm_start_Pre_pulled_Images_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nWarm start and pre-pulled images. A latency optimisation for a five-minute discovery cycle that neither document considers.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
-},
-{
-"t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "Warm start and pre-pulled images. A latency optimisation for a five-minute discovery cycle that neither document considers."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nWarm start and pre-pulled images. A latency optimisation for a five-minute discovery cycle that neither document considers.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "Warm start and pre-pulled images. A latency optimisation for a five-minute discovery cycle that neither document considers."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 54\ncomponent_name: Warm-start / Pre-pulled Images\nzone: 4. OpenShift\nplane: Runtime\npriority: P2\ntechnology: Infra\ncustom_build: Low\ndepends_on: [45, 52]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 54\ncomponent_name: Warm-start / Pre-pulled Images\nzone: 4. OpenShift\nplane: Runtime\npriority: P2\ntechnology: Infra\ncustom_build: Low\ndepends_on: [45, 52]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c55",
@@ -9597,8 +9604,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "55"
 ],
-"withdrawn": true,
-"chip": "#55 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#55 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -9615,133 +9624,143 @@ export const DESIGN_DOCS = [
 "src": "55_Oracle_Connection_Pooling_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nPool size is sized against Oracle connection capacity, and the document says the number is a starting position to confirm.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
-},
-{
-"t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "Pool size is sized against Oracle connection capacity, and the document says the number is a starting position to confirm."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### S7 — Mapped file task (one per file)\n\nAirflow creates one task per discovered file at run time, so files process independently and in parallel within the pool and Oracle connection limits. A file never waits for another interface.\n\n- **Technology.** Dynamic Task Mapping\n- **Source.** ingest §5 (p.9) · Appendix C.1 (p.21)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "S7 — Mapped file task (one per file)"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "Airflow creates one task per discovered file at run time, so files process independently and in parallel within the pool and Oracle connection limits. A file never waits for another interface."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** Dynamic Task Mapping",
+"**Source.** ingest §5 (p.9) · Appendix C.1 (p.21)"
 ]
-},
-{
-"t": "p",
-"x": "specified, differs, or absent — and the reason for it."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `FILE_REGISTRY` | The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts. | ingest Appendix B (p.19) · §6.2 (p.12) |\n| `RAW tables` | Bronze. Validated detail rows as delivered, tagged with the business date and lineage. The dbt document names three: account, client and transaction. | ingest Glossary (p.25) · dbt §4.1 (p.10) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`FILE_REGISTRY`",
+"The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts.",
+"ingest Appendix B (p.19) · §6.2 (p.12)"
+],
+[
+"`RAW tables`",
+"Bronze. Validated detail rows as delivered, tagged with the business date and lineage. The dbt document names three: account, client and transaction.",
+"ingest Glossary (p.25) · dbt §4.1 (p.10)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X8 | The same file is discovered again | If the existing record is ARCHIVED it is skipped and logged as a duplicate; no second registry row is created. A unique key on the interface and business date enforces it. | ingest §5 (p.9) · Appendix B (p.19) |\n| X9 | A record is stuck in RECEIVED, VALIDATED or LOADING | Investigated, never reset automatically. The Airflow task state, the worker logs, the file location and the Oracle outcome are checked first, and the same record is reused for recovery. | ingest Appendix D.5 (p.23) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X8",
+"The same file is discovered again",
+"If the existing record is ARCHIVED it is skipped and logged as a duplicate; no second registry row is created. A unique key on the interface and business date enforces it.",
+"ingest §5 (p.9) · Appendix B (p.19)"
+],
+[
+"X9",
+"A record is stuck in RECEIVED, VALIDATED or LOADING",
+"Investigated, never reset automatically. The Airflow task state, the worker logs, the file location and the Oracle outcome are checked first, and the same record is reused for recovery.",
+"ingest Appendix D.5 (p.23)"
+]
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **O2.** Confirm batch SLA, peak timing, representative file sizes and the Oracle connection envelope.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**O2.** Confirm batch SLA, peak timing, representative file sizes and the Oracle connection envelope."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 55\ncomponent_name: Oracle Connection Pooling\nzone: 4. OpenShift\nplane: Runtime\npriority: P1\ntechnology: Python + Infra\ncustom_build: Medium\ndepends_on: [13, 52]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 55\ncomponent_name: Oracle Connection Pooling\nzone: 4. OpenShift\nplane: Runtime\npriority: P1\ntechnology: Python + Infra\ncustom_build: Medium\ndepends_on: [13, 52]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c56",
@@ -9758,8 +9777,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "56"
 ],
-"withdrawn": true,
-"chip": "#56 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#56 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -9776,133 +9797,69 @@ export const DESIGN_DOCS = [
 "src": "56_Node_Placement_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nNode placement. Not mentioned, though the shared-storage assumption for Landing, Archive and Quarantine constrains it.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
-},
-{
-"t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "Node placement. Not mentioned, though the shared-storage assumption for Landing, Archive and Quarantine constrains it."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nNode placement. Not mentioned, though the shared-storage assumption for Landing, Archive and Quarantine constrains it.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "Node placement. Not mentioned, though the shared-storage assumption for Landing, Archive and Quarantine constrains it."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 56\ncomponent_name: Node Placement\nzone: 4. OpenShift\nplane: Runtime\npriority: P2\ntechnology: Infra\ncustom_build: None\ndepends_on: [12, 52]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 56\ncomponent_name: Node Placement\nzone: 4. OpenShift\nplane: Runtime\npriority: P2\ntechnology: Infra\ncustom_build: None\ndepends_on: [12, 52]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c57",
@@ -9919,8 +9876,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "57"
 ],
-"withdrawn": true,
-"chip": "#57 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#57 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -9937,133 +9896,138 @@ export const DESIGN_DOCS = [
 "src": "57_CI_CD_Pipelines_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nGit-versioned models and DAGs; the pipeline compiles and runs unit and DQ tests before promotion.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
-},
-{
-"t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "Git-versioned models and DAGs; the pipeline compiles and runs unit and DQ tests before promotion."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### S13 — Transformation DAG\n\nRe-checks completeness and TRIGGER status before doing any work — trust but verify — then builds the layers in order, each as a build task followed by its own test task.\n\n- **Technology.** Airflow + dbt\n- **Source.** dbt §5.2 (p.11) · Appendix A.1 (p.25)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "S13 — Transformation DAG"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "Re-checks completeness and TRIGGER status before doing any work — trust but verify — then builds the layers in order, each as a build task followed by its own test task."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** Airflow + dbt",
+"**Source.** dbt §5.2 (p.11) · Appendix A.1 (p.25)"
 ]
-},
-{
-"t": "p",
-"x": "specified, differs, or absent — and the reason for it."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `DATE_CONTROL` | The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression. | ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`DATE_CONTROL`",
+"The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression.",
+"ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X21 | A transformation task fails | The date stays TRIGGER, no next date is created and the pipeline is locked. Airflow alerts and the run restarts from the failed task; each layer's write is idempotent for the date. | dbt §8.1 (p.20) |\n| X39 | A successful file has to be replaced | Approval first, then the reason, approver, operator and affected downstream scope are recorded. The registry row and the RAW rows are deleted through the controlled process, the corrected file is dropped in Landing, and a fresh lifecycle starts. The downstream rebuild for that date is coordinated separately. | ingest Appendix D.4 (p.23) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X21",
+"A transformation task fails",
+"The date stays TRIGGER, no next date is created and the pipeline is locked. Airflow alerts and the run restarts from the failed task; each layer's write is idempotent for the date.",
+"dbt §8.1 (p.20)"
+],
+[
+"X39",
+"A successful file has to be replaced",
+"Approval first, then the reason, approver, operator and affected downstream scope are recorded. The registry row and the RAW rows are deleted through the controlled process, the corrected file is dropped in Landing, and a fresh lifecycle starts. The downstream rebuild for that date is coordinated separately.",
+"ingest Appendix D.4 (p.23)"
+]
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **D5.** Confirm retention units, Oracle partitioning support, volumetrics and run-window targets.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**D5.** Confirm retention units, Oracle partitioning support, volumetrics and run-window targets."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 57\ncomponent_name: CI/CD Pipelines\nzone: 4. OpenShift\nplane: Deployment\npriority: P1\ntechnology: CI/CD\ncustom_build: Medium\ndepends_on: [45, 46]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 57\ncomponent_name: CI/CD Pipelines\nzone: 4. OpenShift\nplane: Deployment\npriority: P1\ntechnology: CI/CD\ncustom_build: Medium\ndepends_on: [45, 46]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c58",
@@ -10080,8 +10044,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "58"
 ],
-"withdrawn": true,
-"chip": "#58 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#58 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -10098,133 +10064,69 @@ export const DESIGN_DOCS = [
 "src": "58_GitOps_ArgoCD_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nGitOps and ArgoCD. The dbt document says models and DAGs are Git-versioned and promoted as tagged images; it does not name a deployment tool.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
-},
-{
-"t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "GitOps and ArgoCD. The dbt document says models and DAGs are Git-versioned and promoted as tagged images; it does not name a deployment tool."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nGitOps and ArgoCD. The dbt document says models and DAGs are Git-versioned and promoted as tagged images; it does not name a deployment tool.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "GitOps and ArgoCD. The dbt document says models and DAGs are Git-versioned and promoted as tagged images; it does not name a deployment tool."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 58\ncomponent_name: GitOps / ArgoCD\nzone: 4. OpenShift\nplane: Deployment\npriority: P2\ntechnology: CI/CD\ncustom_build: Low\ndepends_on: [44, 57]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 58\ncomponent_name: GitOps / ArgoCD\nzone: 4. OpenShift\nplane: Deployment\npriority: P2\ntechnology: CI/CD\ncustom_build: Low\ndepends_on: [44, 57]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c59",
@@ -10241,8 +10143,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "59"
 ],
-"withdrawn": true,
-"chip": "#59 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "specified",
+"chip": "#59 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -10260,133 +10164,138 @@ export const DESIGN_DOCS = [
 "src": "59_dbt_Release_and_Rollback_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nRollback is redeploying the prior image, and it is safe only because Gold writes are idempotent merges with no DDL.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
-},
-{
-"t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "Rollback is redeploying the prior image, and it is safe only because Gold writes are idempotent merges with no DDL."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n### S13 — Transformation DAG\n\nRe-checks completeness and TRIGGER status before doing any work — trust but verify — then builds the layers in order, each as a build task followed by its own test task.\n\n- **Technology.** Airflow + dbt\n- **Source.** dbt §5.2 (p.11) · Appendix A.1 (p.25)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "h",
+"x": "S13 — Transformation DAG"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "Re-checks completeness and TRIGGER status before doing any work — trust but verify — then builds the layers in order, each as a build task followed by its own test task."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** Airflow + dbt",
+"**Source.** dbt §5.2 (p.11) · Appendix A.1 (p.25)"
 ]
-},
-{
-"t": "p",
-"x": "specified, differs, or absent — and the reason for it."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `DATE_CONTROL` | The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression. | ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`DATE_CONTROL`",
+"The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression.",
+"ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X21 | A transformation task fails | The date stays TRIGGER, no next date is created and the pipeline is locked. Airflow alerts and the run restarts from the failed task; each layer's write is idempotent for the date. | dbt §8.1 (p.20) |\n| X39 | A successful file has to be replaced | Approval first, then the reason, approver, operator and affected downstream scope are recorded. The registry row and the RAW rows are deleted through the controlled process, the corrected file is dropped in Landing, and a fresh lifecycle starts. The downstream rebuild for that date is coordinated separately. | ingest Appendix D.4 (p.23) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X21",
+"A transformation task fails",
+"The date stays TRIGGER, no next date is created and the pipeline is locked. Airflow alerts and the run restarts from the failed task; each layer's write is idempotent for the date.",
+"dbt §8.1 (p.20)"
+],
+[
+"X39",
+"A successful file has to be replaced",
+"Approval first, then the reason, approver, operator and affected downstream scope are recorded. The registry row and the RAW rows are deleted through the controlled process, the corrected file is dropped in Landing, and a fresh lifecycle starts. The downstream rebuild for that date is coordinated separately.",
+"ingest Appendix D.4 (p.23)"
+]
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **D5.** Confirm retention units, Oracle partitioning support, volumetrics and run-window targets.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**D5.** Confirm retention units, Oracle partitioning support, volumetrics and run-window targets."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 59\ncomponent_name: dbt Release & Rollback\nzone: 4. OpenShift\nplane: Deployment\npriority: P1\ntechnology: dbt + CI/CD\ncustom_build: High\ndepends_on: [15, 16, 21]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 59\ncomponent_name: dbt Release & Rollback\nzone: 4. OpenShift\nplane: Deployment\npriority: P1\ntechnology: dbt + CI/CD\ncustom_build: High\ndepends_on: [15, 16, 21]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified\ngenerated: true\nsei_status: specified"
 },
 {
 "id": "c60",
@@ -10403,8 +10312,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "60"
 ],
-"withdrawn": true,
-"chip": "#60 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#60 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -10421,133 +10332,69 @@ export const DESIGN_DOCS = [
 "src": "60_Database_Change_Management_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nNothing covers schema change management, which matters more here than usual: SEI's design forbids DDL against Gold, so whatever does change those tables sits outside it.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
-},
-{
-"t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "Nothing covers schema change management, which matters more here than usual: SEI's design forbids DDL against Gold, so whatever does change those tables sits outside it."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nNothing covers schema change management, which matters more here than usual: SEI's design forbids DDL against Gold, so whatever does change those tables sits outside it.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "Nothing covers schema change management, which matters more here than usual: SEI's design forbids DDL against Gold, so whatever does change those tables sits outside it."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 60\ncomponent_name: Database Change Management\nzone: 4. OpenShift\nplane: Deployment\npriority: P1\ntechnology: Process + DDL\ncustom_build: Low\ndepends_on: [16, 37]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 60\ncomponent_name: Database Change Management\nzone: 4. OpenShift\nplane: Deployment\npriority: P1\ntechnology: Process + DDL\ncustom_build: Low\ndepends_on: [16, 37]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c61",
@@ -10564,8 +10411,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "61"
 ],
-"withdrawn": true,
-"chip": "#61 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#61 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -10581,133 +10430,69 @@ export const DESIGN_DOCS = [
 "src": "61_Blue_Green_Canary_API_lane_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nBlue-green and canary for the API lane, which neither document has.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
-},
-{
-"t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "Blue-green and canary for the API lane, which neither document has."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nBlue-green and canary for the API lane, which neither document has.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "Blue-green and canary for the API lane, which neither document has."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 61\ncomponent_name: Blue-Green / Canary (API lane)\nzone: 4. OpenShift\nplane: Deployment\npriority: P3\ntechnology: Infra\ncustom_build: None\ndepends_on: [12]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 61\ncomponent_name: Blue-Green / Canary (API lane)\nzone: 4. OpenShift\nplane: Deployment\npriority: P3\ntechnology: Infra\ncustom_build: None\ndepends_on: [12]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c62",
@@ -10724,8 +10509,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "62"
 ],
-"withdrawn": true,
-"chip": "#62 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#62 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -10741,133 +10528,69 @@ export const DESIGN_DOCS = [
 "src": "62_HA_DR_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nNeither document covers availability or recovery of the platform itself.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
-},
-{
-"t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "Neither document covers availability or recovery of the platform itself."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nNeither document covers availability or recovery of the platform itself.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "Neither document covers availability or recovery of the platform itself."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 62\ncomponent_name: HA / DR\nzone: 4. OpenShift\nplane: Operations\npriority: P2\ntechnology: Infra\ncustom_build: Low\ndepends_on: [44]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 62\ncomponent_name: HA / DR\nzone: 4. OpenShift\nplane: Operations\npriority: P2\ntechnology: Infra\ncustom_build: Low\ndepends_on: [44]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c63",
@@ -10884,8 +10607,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "63"
 ],
-"withdrawn": true,
-"chip": "#63 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#63 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -10902,133 +10627,69 @@ export const DESIGN_DOCS = [
 "src": "63_Backup_and_Restore_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nBackup and restore is not in either document.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
-},
-{
-"t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "Backup and restore is not in either document."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nBackup and restore is not in either document.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "Backup and restore is not in either document."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 63\ncomponent_name: Backup & Restore\nzone: 4. OpenShift\nplane: Operations\npriority: P2\ntechnology: Infra\ncustom_build: None\ndepends_on: [33, 50]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 63\ncomponent_name: Backup & Restore\nzone: 4. OpenShift\nplane: Operations\npriority: P2\ntechnology: Infra\ncustom_build: None\ndepends_on: [33, 50]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c64",
@@ -11045,8 +10706,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "64"
 ],
-"withdrawn": true,
-"chip": "#64 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "differs",
+"chip": "#64 design",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -11062,133 +10725,143 @@ export const DESIGN_DOCS = [
 "src": "64_Monitoring_Stack_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nSEI gives every dashboard, trend and alert to Splunk. A separate monitoring stack is a second place for the same job.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
-},
-{
-"t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "SEI gives every dashboard, trend and alert to Splunk. A separate monitoring stack is a second place for the same job."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**SEI covers the need and answers it differently.** SEI gives every dashboard, trend and alert to Splunk. A separate monitoring stack is a second place for the same job.\n\n### S21 — Splunk\n\nOwns all dashboards, counts, trending and alerting, for both documents. Oracle keeps the durable logs; Splunk reports from the events published to it and does the alert correlation.\n\n- **Technology.** SEI/BBH\n- **Source.** ingest §8.1 (p.15) · dbt §4.2 (p.10)",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**SEI covers the need and answers it differently.** SEI gives every dashboard, trend and alert to Splunk. A separate monitoring stack is a second place for the same job."
+},
+{
+"t": "h",
+"x": "S21 — Splunk"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
-},
-{
-"t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
-},
-{
-"t": "p",
-"x": "touches, and what is still open with SEI against it."
+"x": "Owns all dashboards, counts, trending and alerting, for both documents. Oracle keeps the durable logs; Splunk reports from the events published to it and does the alert correlation."
 },
 {
 "t": "ul",
 "items": [
-"**For everything else**, the component registry carries a verdict —"
+"**Technology.** SEI/BBH",
+"**Source.** ingest §8.1 (p.15) · dbt §4.2 (p.10)"
 ]
-},
-{
-"t": "p",
-"x": "specified, differs, or absent — and the reason for it."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "The Oracle objects it touches",
+"md": "\nNo foreign key is declared in either document. Every join below\nis one a model runs, not a constraint the database enforces.\n\n| Object | What it holds | Source |\n|---|---|---|\n| `DQ_VALIDATION_FAILURE` | One store for both failure categories, carrying whether the row can replay itself and whether it is still open. | dbt §7.1 (p.17) |\n| `RECON_RESULT` | One immutable row per boundary per business date, replaced rather than updated. No status column — the verdict is derived in Splunk. | dbt §7.2.1 (p.18) |",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "No foreign key is declared in either document. Every join below"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "is one a model runs, not a constraint the database enforces."
 },
 {
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
+"t": "tbl",
+"rows": [
+[
+"Object",
+"What it holds",
+"Source"
+],
+[
+"`DQ_VALIDATION_FAILURE`",
+"One store for both failure categories, carrying whether the row can replay itself and whether it is still open.",
+"dbt §7.1 (p.17)"
+],
+[
+"`RECON_RESULT`",
+"One immutable row per boundary per business date, replaced rather than updated. No status column — the verdict is derived in Splunk.",
+"dbt §7.2.1 (p.18)"
+]
+]
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "What happens when it goes wrong",
+"md": "\n| # | Scenario | What the design does | Source |\n|---|---|---|---|\n| X38 | Publishing to Splunk fails | The data is already durable in Oracle. The publish task is separate and retryable, and it is idempotent per date. | dbt §8.3 (p.21) |",
+"blocks": [
+{
+"t": "tbl",
+"rows": [
+[
+"#",
+"Scenario",
+"What the design does",
+"Source"
+],
+[
+"X38",
+"Publishing to Splunk fails",
+"The data is already durable in Oracle. The publish task is separate and retryable, and it is idempotent per date.",
+"dbt §8.3 (p.21)"
+]
+]
+}
+]
+},
+{
+"h": "Still open with SEI",
+"md": "\nSEI's own ids, so they can be quoted straight back.\n\n- **D6.** Approve the Splunk event schema, masking and PII rules, dashboards and alert thresholds.\n- **O4.** Confirm Splunk integration, indexing, event format, alert ownership and routing.\n- **O7.** Confirm the Splunk correlation key, severity, alert routing and recovery handling.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "SEI's own ids, so they can be quoted straight back."
+},
+{
+"t": "ul",
+"items": [
+"**D6.** Approve the Splunk event schema, masking and PII rules, dashboards and alert thresholds.",
+"**O4.** Confirm Splunk integration, indexing, event format, alert ownership and routing.",
+"**O7.** Confirm the Splunk correlation key, severity, alert routing and recovery handling."
+]
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
+]
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "Generated from the cited model, not written by hand. Correct the"
+},
+{
+"t": "p",
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 64\ncomponent_name: Monitoring Stack\nzone: 4. OpenShift\nplane: Operations\npriority: P2\ntechnology: Infra\ncustom_build: Low\ndepends_on: [34]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 64\ncomponent_name: Monitoring Stack\nzone: 4. OpenShift\nplane: Operations\npriority: P2\ntechnology: Infra\ncustom_build: Low\ndepends_on: [34]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: differs\ngenerated: true\nsei_status: differs\ngenerated: true\nsei_status: differs"
 },
 {
 "id": "c65",
@@ -11205,8 +10878,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "65"
 ],
-"withdrawn": true,
-"chip": "#65 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "absent",
+"chip": "#65 — not in SEI",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -11223,133 +10898,69 @@ export const DESIGN_DOCS = [
 "src": "65_Cost_and_Capacity_Monitoring_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this component is",
+"md": "\nCost and capacity are not in either document.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
-},
-{
-"t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
-},
-{
-"t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
-},
-{
-"t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "Cost and capacity are not in either document."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "What SEI specifies",
+"md": "\n**Nothing.** Neither SEI design document covers this component.\n\nCost and capacity are not in either document.\n\nThat is not a judgement on whether it is needed. It means no\ndesign exists to build from, and writing one is BBH's to do and\nSEI's to confirm.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "**Nothing.** Neither SEI design document covers this component."
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "Cost and capacity are not in either document."
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "That is not a judgement on whether it is needed. It means no"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "design exists to build from, and writing one is BBH's to do and"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "SEI's to confirm."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "Sources",
+"md": "\n- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services\n- **BBH dbt Transformation Design Document v2** — SEI Professional Services\n- **SEI-BBH Integration Architecture v5** — SEI\n\nGenerated from the cited model, not written by hand. Correct the\nmodel and every document that used it is corrected with it:\n`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`",
 "blocks": [
 {
-"t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
-},
-{
-"t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
-},
-{
-"t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
-},
-{
-"t": "p",
-"x": "design, and this page exists only so that a link does not lead"
-},
-{
-"t": "p",
-"x": "nowhere."
-}
+"t": "ul",
+"items": [
+"**BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services",
+"**BBH dbt Transformation Design Document v2** — SEI Professional Services",
+"**SEI-BBH Integration Architecture v5** — SEI"
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
-"blocks": [
-{
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Generated from the cited model, not written by hand. Correct the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "model and every document that used it is corrected with it:"
+},
+{
+"t": "p",
+"x": "`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`"
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 65\ncomponent_name: Cost & Capacity Monitoring\nzone: 4. OpenShift\nplane: Operations\npriority: P3\ntechnology: Infra\ncustom_build: None\ndepends_on: [52, 53]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 65\ncomponent_name: Cost & Capacity Monitoring\nzone: 4. OpenShift\nplane: Operations\npriority: P3\ntechnology: Infra\ncustom_build: None\ndepends_on: [52, 53]\nstatus: Not Started\nowner: TBD\norigin: SEI-BBH component tracker\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent\ngenerated: true\nsei_status: absent"
 },
 {
 "id": "c66",
@@ -11366,8 +10977,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "66"
 ],
-"withdrawn": true,
-"chip": "#66 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#66 proposal",
 "meta": {
 "status": "In Design",
 "owner": "TBD",
@@ -11398,133 +11011,116 @@ export const DESIGN_DOCS = [
 "src": "66_Pre-Gold_Exadata_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncatalog_module: Datapoint 360\ncomponent_id: 66\ncomponent_name: Pre-Gold (Exadata) — dimensional assembly & tie-out\nzone: 2. Hub\nplane: Processing\npriority: P1\ntechnology: dbt + Oracle Exadata\ncustom_build: High\ndepends_on: [15, 17, 26, 28, 31, 33, 67]\narchitecture_decisions: [AD-1, AD-2, AD-8, AD-9, AD-4]\npipeline_tiers: [Stage2-Oracle, Stage3-Exadata-Gold]\nstatus: In Design\nowner: TBD\nlast_updated: 2026-08-10\ntags: [SEI-BBH, Integration-Hub, hub, exadata, pre-gold]\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncatalog_module: Datapoint 360\ncomponent_id: 66\ncomponent_name: Pre-Gold (Exadata) — dimensional assembly & tie-out\nzone: 2. Hub\nplane: Processing\npriority: P1\ntechnology: dbt + Oracle Exadata\ncustom_build: High\ndepends_on: [15, 17, 26, 28, 31, 33, 67]\narchitecture_decisions: [AD-1, AD-2, AD-8, AD-9, AD-4]\npipeline_tiers: [Stage2-Oracle, Stage3-Exadata-Gold]\nstatus: In Design\nowner: TBD\nlast_updated: 2026-08-10\ntags: [SEI-BBH, Integration-Hub, hub, exadata, pre-gold]\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c101",
@@ -11541,8 +11137,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "101"
 ],
-"withdrawn": true,
-"chip": "#101 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#101 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -11556,133 +11154,116 @@ export const DESIGN_DOCS = [
 "src": "101_SDC_Event_Listener_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 101\ncomponent_name: SDC Event Listener\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · Event Hub consumer\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 101\ncomponent_name: SDC Event Listener\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · Event Hub consumer\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c102",
@@ -11699,8 +11280,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "102"
 ],
-"withdrawn": true,
-"chip": "#102 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#102 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -11714,133 +11297,116 @@ export const DESIGN_DOCS = [
 "src": "102_Callback_Receiver_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 102\ncomponent_name: Callback Receiver\nzone: 2. Hub\nplane: Ingress/Egress\npriority: P1\ntechnology: Python · Apigee-fronted endpoint\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 102\ncomponent_name: Callback Receiver\nzone: 2. Hub\nplane: Ingress/Egress\npriority: P1\ntechnology: Python · Apigee-fronted endpoint\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c103",
@@ -11857,8 +11423,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "103"
 ],
-"withdrawn": true,
-"chip": "#103 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#103 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -11872,133 +11440,116 @@ export const DESIGN_DOCS = [
 "src": "103_Loader_Submission_Registry_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 103\ncomponent_name: Loader Submission Registry\nzone: 2. Hub\nplane: Ingress/Egress\npriority: P1\ntechnology: Oracle DDL + Python\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 103\ncomponent_name: Loader Submission Registry\nzone: 2. Hub\nplane: Ingress/Egress\npriority: P1\ntechnology: Oracle DDL + Python\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c104",
@@ -12015,8 +11566,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "104"
 ],
-"withdrawn": true,
-"chip": "#104 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#104 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -12030,133 +11583,116 @@ export const DESIGN_DOCS = [
 "src": "104_Key_Set_Collapser_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 104\ncomponent_name: Key-Set Collapser\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 104\ncomponent_name: Key-Set Collapser\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c105",
@@ -12173,8 +11709,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "105"
 ],
-"withdrawn": true,
-"chip": "#105 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#105 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -12188,133 +11726,116 @@ export const DESIGN_DOCS = [
 "src": "105_Set_Based_Puller_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 105\ncomponent_name: Set-Based Puller\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · SEI view API\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 105\ncomponent_name: Set-Based Puller\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · SEI view API\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c106",
@@ -12331,8 +11852,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "106"
 ],
-"withdrawn": true,
-"chip": "#106 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#106 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -12346,133 +11869,116 @@ export const DESIGN_DOCS = [
 "src": "106_Intraday_Stage_1_Loader_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 106\ncomponent_name: Intraday Stage-1 Loader\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · Oracle array insert\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 106\ncomponent_name: Intraday Stage-1 Loader\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · Oracle array insert\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c107",
@@ -12489,8 +11995,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "107"
 ],
-"withdrawn": true,
-"chip": "#107 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#107 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -12504,133 +12012,116 @@ export const DESIGN_DOCS = [
 "src": "107_Domain_Sequencer_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 107\ncomponent_name: Domain Sequencer\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · Airflow\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 107\ncomponent_name: Domain Sequencer\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · Airflow\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c108",
@@ -12647,8 +12138,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "108"
 ],
-"withdrawn": true,
-"chip": "#108 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#108 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -12662,133 +12155,116 @@ export const DESIGN_DOCS = [
 "src": "108_Event_Gate_Evaluator_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 108\ncomponent_name: Event Gate Evaluator\nzone: 2. Hub\nplane: Orchestration\npriority: P1\ntechnology: Python · Oracle\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 108\ncomponent_name: Event Gate Evaluator\nzone: 2. Hub\nplane: Orchestration\npriority: P1\ntechnology: Python · Oracle\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c109",
@@ -12805,8 +12281,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "109"
 ],
-"withdrawn": true,
-"chip": "#109 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#109 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -12820,133 +12298,116 @@ export const DESIGN_DOCS = [
 "src": "109_SEI_Status_Poller_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 109\ncomponent_name: SEI Status Poller\nzone: 2. Hub\nplane: Orchestration\npriority: P2\ntechnology: Python · Airflow · Apigee\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 109\ncomponent_name: SEI Status Poller\nzone: 2. Hub\nplane: Orchestration\npriority: P2\ntechnology: Python · Airflow · Apigee\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c110",
@@ -12963,8 +12424,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "110"
 ],
-"withdrawn": true,
-"chip": "#110 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#110 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -12978,133 +12441,116 @@ export const DESIGN_DOCS = [
 "src": "110_Sequence_Gap_Detector_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 110\ncomponent_name: Sequence Gap Detector\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · SQL\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 110\ncomponent_name: Sequence Gap Detector\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · SQL\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c111",
@@ -13121,8 +12567,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "111"
 ],
-"withdrawn": true,
-"chip": "#111 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#111 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -13136,133 +12584,116 @@ export const DESIGN_DOCS = [
 "src": "111_G0_Envelope_Gate_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 111\ncomponent_name: G0 Envelope Gate\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 111\ncomponent_name: G0 Envelope Gate\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c112",
@@ -13279,8 +12710,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "112"
 ],
-"withdrawn": true,
-"chip": "#112 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#112 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -13294,133 +12727,116 @@ export const DESIGN_DOCS = [
 "src": "112_Event_Staging_Store_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 112\ncomponent_name: Event Staging Store\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Oracle DDL\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 112\ncomponent_name: Event Staging Store\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Oracle DDL\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c113",
@@ -13437,8 +12853,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "113"
 ],
-"withdrawn": true,
-"chip": "#113 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#113 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -13452,133 +12870,116 @@ export const DESIGN_DOCS = [
 "src": "113_Micro_Batch_Registry_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 113\ncomponent_name: Micro-Batch Registry\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Oracle DDL + Python\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 113\ncomponent_name: Micro-Batch Registry\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Oracle DDL + Python\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c114",
@@ -13595,8 +12996,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "114"
 ],
-"withdrawn": true,
-"chip": "#114 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#114 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -13610,133 +13013,116 @@ export const DESIGN_DOCS = [
 "src": "114_Idempotency_Service_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 114\ncomponent_name: Idempotency Service\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · Oracle\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 114\ncomponent_name: Idempotency Service\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · Oracle\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c115",
@@ -13753,8 +13139,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "115"
 ],
-"withdrawn": true,
-"chip": "#115 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#115 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -13768,133 +13156,116 @@ export const DESIGN_DOCS = [
 "src": "115_Event_Quarantine_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 115\ncomponent_name: Event Quarantine\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Oracle DDL + Python\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 115\ncomponent_name: Event Quarantine\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Oracle DDL + Python\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c116",
@@ -13911,8 +13282,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "116"
 ],
-"withdrawn": true,
-"chip": "#116 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#116 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -13926,133 +13299,116 @@ export const DESIGN_DOCS = [
 "src": "116_Consumer_Lag_Monitor_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 116\ncomponent_name: Consumer Lag Monitor\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · Splunk\ncustom_build: Low\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 116\ncomponent_name: Consumer Lag Monitor\nzone: 2. Hub\nplane: Event Ingestion\npriority: P1\ntechnology: Python · Splunk\ncustom_build: Low\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c117",
@@ -14069,8 +13425,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "117"
 ],
-"withdrawn": true,
-"chip": "#117 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#117 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -14084,133 +13442,116 @@ export const DESIGN_DOCS = [
 "src": "117_Loader_Template_Registry_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 117\ncomponent_name: Loader Template Registry\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Oracle DDL + Python\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 117\ncomponent_name: Loader Template Registry\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Oracle DDL + Python\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c118",
@@ -14227,8 +13568,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "118"
 ],
-"withdrawn": true,
-"chip": "#118 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#118 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -14242,133 +13585,116 @@ export const DESIGN_DOCS = [
 "src": "118_G6_Outbound_Validation_Gate_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 118\ncomponent_name: G6 Outbound Validation Gate\nzone: 2. Hub\nplane: Data Quality\npriority: P1\ntechnology: Python · SQL\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 118\ncomponent_name: G6 Outbound Validation Gate\nzone: 2. Hub\nplane: Data Quality\npriority: P1\ntechnology: Python · SQL\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c119",
@@ -14385,8 +13711,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "119"
 ],
-"withdrawn": true,
-"chip": "#119 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#119 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -14400,133 +13728,116 @@ export const DESIGN_DOCS = [
 "src": "119_Loader_Payload_Store_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 119\ncomponent_name: Loader Payload Store\nzone: 2. Hub\nplane: Ingress/Egress\npriority: P1\ntechnology: Oracle DDL + object store\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 119\ncomponent_name: Loader Payload Store\nzone: 2. Hub\nplane: Ingress/Egress\npriority: P1\ntechnology: Oracle DDL + object store\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: BBH\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c120",
@@ -14543,8 +13854,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "120"
 ],
-"withdrawn": true,
-"chip": "#120 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#120 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -14558,133 +13871,116 @@ export const DESIGN_DOCS = [
 "src": "120_Outbound_Quarantine_and_Correction_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 120\ncomponent_name: Outbound Quarantine & Correction\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Python · Oracle\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 120\ncomponent_name: Outbound Quarantine & Correction\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Python · Oracle\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c121",
@@ -14701,8 +13997,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "121"
 ],
-"withdrawn": true,
-"chip": "#121 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#121 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -14716,133 +14014,116 @@ export const DESIGN_DOCS = [
 "src": "121_Outbound_Reconciliation_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 121\ncomponent_name: Outbound Reconciliation\nzone: 2. Hub\nplane: Data Quality\npriority: P1\ntechnology: Python · SQL\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 121\ncomponent_name: Outbound Reconciliation\nzone: 2. Hub\nplane: Data Quality\npriority: P1\ntechnology: Python · SQL\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c122",
@@ -14859,8 +14140,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "122"
 ],
-"withdrawn": true,
-"chip": "#122 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#122 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -14874,133 +14157,116 @@ export const DESIGN_DOCS = [
 "src": "122_Transformation_Rule_Registry_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 122\ncomponent_name: Transformation Rule Registry\nzone: 2. Hub\nplane: Processing\npriority: P1\ntechnology: Oracle DDL + BA authoring surface\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 122\ncomponent_name: Transformation Rule Registry\nzone: 2. Hub\nplane: Processing\npriority: P1\ntechnology: Oracle DDL + BA authoring surface\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c123",
@@ -15017,8 +14283,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "123"
 ],
-"withdrawn": true,
-"chip": "#123 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#123 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -15032,133 +14300,116 @@ export const DESIGN_DOCS = [
 "src": "123_Rule_to_dbt_Compiler_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 123\ncomponent_name: Rule-to-dbt Compiler\nzone: 2. Hub\nplane: Processing\npriority: P1\ntechnology: Python · dbt · CI\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 123\ncomponent_name: Rule-to-dbt Compiler\nzone: 2. Hub\nplane: Processing\npriority: P1\ntechnology: Python · dbt · CI\ncustom_build: High\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: unassessed\ngap_owner: unassessed\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c124",
@@ -15175,8 +14426,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "124"
 ],
-"withdrawn": true,
-"chip": "#124 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#124 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -15190,133 +14443,116 @@ export const DESIGN_DOCS = [
 "src": "124_Schema_Contract_Registry_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 124\ncomponent_name: Schema Contract Registry\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Oracle DDL + CI\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 124\ncomponent_name: Schema Contract Registry\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Oracle DDL + CI\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: SEI\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 },
 {
 "id": "c125",
@@ -15333,8 +14569,10 @@ export const DESIGN_DOCS = [
 "component_ids": [
 "125"
 ],
-"withdrawn": true,
-"chip": "#125 withdrawn",
+"withdrawn": false,
+"generated": true,
+"sei_status": "proposal",
+"chip": "#125 proposal",
 "meta": {
 "status": "Not Started",
 "owner": "TBD",
@@ -15348,132 +14586,115 @@ export const DESIGN_DOCS = [
 "src": "125_Expectation_Store_Design.md",
 "sections": [
 {
-"h": "Withdrawn",
-"md": "\n**This design document has been withdrawn. Do not build from it.**\n\nIt was written before SEI's two design documents were the base for this\narchitecture. Reading back through it, the content is wrong often\nenough that correcting it line by line is not worth doing, so it is\nbeing rewritten from the drawing rather than patched.\n\nWhat was wrong was not one fact. The layer model was the old one, it\ndescribed a Pre-Gold Exadata tier that is in neither SEI document, it\ntreated components as settled that SEI has not specified at all, and it\nread as though every statement in it had a source. None of that is\nrepairable by editing.",
+"h": "What this is",
+"md": "\nA component proposed by this programme's own review. It is not in\neither SEI design document and it is not in the delivery workbook.\nIts id is above 100 so it can never be mistaken for a tracker\ncomponent.",
 "blocks": [
 {
 "t": "p",
-"x": "**This design document has been withdrawn. Do not build from it.**"
+"x": "A component proposed by this programme's own review. It is not in"
 },
 {
 "t": "p",
-"x": "It was written before SEI's two design documents were the base for this"
+"x": "either SEI design document and it is not in the delivery workbook."
 },
 {
 "t": "p",
-"x": "architecture. Reading back through it, the content is wrong often"
+"x": "Its id is above 100 so it can never be mistaken for a tracker"
 },
 {
 "t": "p",
-"x": "enough that correcting it line by line is not worth doing, so it is"
-},
-{
-"t": "p",
-"x": "being rewritten from the drawing rather than patched."
-},
-{
-"t": "p",
-"x": "What was wrong was not one fact. The layer model was the old one, it"
-},
-{
-"t": "p",
-"x": "described a Pre-Gold Exadata tier that is in neither SEI document, it"
-},
-{
-"t": "p",
-"x": "treated components as settled that SEI has not specified at all, and it"
-},
-{
-"t": "p",
-"x": "read as though every statement in it had a source. None of that is"
-},
-{
-"t": "p",
-"x": "repairable by editing."
+"x": "component."
 }
 ]
 },
 {
-"h": "Where the current answer is",
-"md": "\n- **The architecture is the drawing.** The Hub's C4 goes containers,\n  then the lane a component sits in, then the component itself.\n- **For a component SEI specifies**, its record carries what SEI says,\n  the section and the page it says it on, the Oracle objects it\n  touches, and what is still open with SEI against it.\n- **For everything else**, the component registry carries a verdict —\n  specified, differs, or absent — and the reason for it.",
+"h": "Why it was proposed",
+"md": "\nThe review asked what would have to exist if events, rather than\nfiles, were the primary way data arrives. BBH has since confirmed\nthat they are: **SDC events is the primary inbound route and file-based is the\nsecondary one.**\n\nThis does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.",
 "blocks": [
 {
-"t": "ul",
-"items": [
-"**The architecture is the drawing.** The Hub's C4 goes containers,"
-]
+"t": "p",
+"x": "The review asked what would have to exist if events, rather than"
 },
 {
 "t": "p",
-"x": "then the lane a component sits in, then the component itself."
-},
-{
-"t": "ul",
-"items": [
-"**For a component SEI specifies**, its record carries what SEI says,"
-]
+"x": "files, were the primary way data arrives. BBH has since confirmed"
 },
 {
 "t": "p",
-"x": "the section and the page it says it on, the Oracle objects it"
+"x": "that they are: **SDC events is the primary inbound route and file-based is the"
 },
 {
 "t": "p",
-"x": "touches, and what is still open with SEI against it."
-},
-{
-"t": "ul",
-"items": [
-"**For everything else**, the component registry carries a verdict —"
-]
+"x": "secondary one.**"
 },
 {
 "t": "p",
-"x": "specified, differs, or absent — and the reason for it."
+"x": "This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one."
 }
 ]
 },
 {
-"h": "What replaces this page",
-"md": "\nNothing yet, and that is deliberate. The drawing comes first; these\ndocuments are rewritten from it afterwards, against SEI's text, with a\ncitation on every claim. Until then the record in the Hub is the\ndesign, and this page exists only so that a link does not lead\nnowhere.",
+"h": "What would have to be true",
+"md": "\nBoth SEI design documents describe the file path and only the file\npath. The completeness gate counts files that arrived, the\nbusiness-date state machine opens one date at a time, and the SLA\nmeasures a cutoff for a set of files. None of those hold for a\ncontinuous event stream without being redesigned.",
 "blocks": [
 {
 "t": "p",
-"x": "Nothing yet, and that is deliberate. The drawing comes first; these"
+"x": "Both SEI design documents describe the file path and only the file"
 },
 {
 "t": "p",
-"x": "documents are rewritten from it afterwards, against SEI's text, with a"
+"x": "path. The completeness gate counts files that arrived, the"
 },
 {
 "t": "p",
-"x": "citation on every claim. Until then the record in the Hub is the"
+"x": "business-date state machine opens one date at a time, and the SLA"
 },
 {
 "t": "p",
-"x": "design, and this page exists only so that a link does not lead"
+"x": "measures a cutoff for a set of files. None of those hold for a"
 },
 {
 "t": "p",
-"x": "nowhere."
+"x": "continuous event stream without being redesigned."
 }
 ]
 },
 {
-"h": "Recovering the old text",
-"md": "\nIt is in git. `git log --follow` on this file reaches the last version\nbefore withdrawal if any of it is wanted as a starting point.",
+"h": "Status",
+"md": "\nProposed, not approved and not specified. It goes on the\narchitecture drawing when SEI's documents cover it or BBH formally\nadopts it. Until then it is in the event container, drawn apart.",
 "blocks": [
 {
 "t": "p",
-"x": "It is in git. `git log --follow` on this file reaches the last version"
+"x": "Proposed, not approved and not specified. It goes on the"
 },
 {
 "t": "p",
-"x": "before withdrawal if any of it is wanted as a starting point."
+"x": "architecture drawing when SEI's documents cover it or BBH formally"
+},
+{
+"t": "p",
+"x": "adopts it. Until then it is in the event container, drawn apart."
+}
+]
+},
+{
+"h": "Sources",
+"md": "\n- This programme's events-primary review\n- Inbound posture: BBH, stated directly\n\nGenerated from the cited model, not written by hand.",
+"blocks": [
+{
+"t": "ul",
+"items": [
+"This programme's events-primary review",
+"Inbound posture: BBH, stated directly"
+]
+},
+{
+"t": "p",
+"x": "Generated from the cited model, not written by hand."
 }
 ]
 }
 ],
-"fm_raw": "cp360_type: design_document\ncomponent_id: 125\ncomponent_name: Expectation Store\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Oracle DDL\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true\nwithdrawn: true"
+"fm_raw": "cp360_type: design_document\ncomponent_id: 125\ncomponent_name: Expectation Store\nzone: 2. Hub\nplane: Foundation\npriority: P1\ntechnology: Oracle DDL\ncustom_build: Medium\ndepends_on: []\nstatus: Not Started\nowner: TBD\norigin: events-primary architect review\nsei_coverage: absent\ngap_owner: Joint\nin_scope: true\ngenerated: true\nsei_status: proposal\ngenerated: true\nsei_status: proposal"
 }
 ];

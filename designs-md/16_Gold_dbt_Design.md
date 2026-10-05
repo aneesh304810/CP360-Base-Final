@@ -18,45 +18,90 @@ origin: SEI-BBH component tracker
 sei_coverage: covered
 gap_owner: SEI
 in_scope: true
-withdrawn: true
+generated: true
+sei_status: specified
+generated: true
+sei_status: specified
+generated: true
+sei_status: specified
 ---
 
 # Gold (dbt)
 
-## Withdrawn
+## What this component is
 
-**This design document has been withdrawn. Do not build from it.**
+One tracker component, two ordered SEI layers — and the tables already exist, so dbt populates rather than builds them.
 
-It was written before SEI's two design documents were the base for this
-architecture. Reading back through it, the content is wrong often
-enough that correcting it line by line is not worth doing, so it is
-being rewritten from the drawing rather than patched.
+It sits in **Processing**, in the **dbt models** lane (dbt · Oracle).
 
-What was wrong was not one fact. The layer model was the old one, it
-described a Pre-Gold Exadata tier that is in neither SEI document, it
-treated components as settled that SEI has not specified at all, and it
-read as though every statement in it had a source. None of that is
-repairable by editing.
+## What SEI specifies
 
-## Where the current answer is
+### S16 — DIM — built first
 
-- **The architecture is the drawing.** The Hub's C4 goes containers,
-  then the lane a component sits in, then the component itself.
-- **For a component SEI specifies**, its record carries what SEI says,
-  the section and the page it says it on, the Oracle objects it
-  touches, and what is still open with SEI against it.
-- **For everything else**, the component registry carries a verdict —
-  specified, differs, or absent — and the reason for it.
+History by direct-compare MERGE into tables that already exist. The surrogate key comes from the Oracle sequence already in use. No DDL is issued against Gold.
 
-## What replaces this page
+- **Technology.** dbt MERGE
+- **Source.** dbt §4.1 (p.10) · §6.4 (p.15)
 
-Nothing yet, and that is deliberate. The drawing comes first; these
-documents are rewritten from it afterwards, against SEI's text, with a
-citation on every claim. Until then the record in the Hub is the
-design, and this page exists only so that a link does not lead
-nowhere.
+### S17 — FACT — built second
 
-## Recovering the old text
+Loads only transactions whose dimension has resolved. A transaction whose account has not arrived is never written with a placeholder key — it is held and replayed once the dimension exists.
 
-It is in git. `git log --follow` on this file reaches the last version
-before withdrawal if any of it is wanted as a starting point.
+- **Technology.** dbt MERGE
+- **Source.** dbt §4.1 (p.10) · §7.1 (p.17)
+
+### T6 — Gold DIM / FACT
+
+Already exist and already carry history from the current system. This programme changes only how they are populated.
+
+- **Columns.** DIM_ACCOUNT: ACCOUNT_KEY (PK) · ACCOUNT_NUMBER · ACCOUNT_TYPE · SITUS_CODE · START_DATE · END_DATE · ACTIVE_IND  │  FACT_TRANSACTIONS: TRANSACTION_ID (PK) · BUSINESS_DATE · TRANSACTION_AMOUNT · ACCOUNT_KEY
+- **Source.** dbt §6.4 (p.15) · §10.1 (p.23)
+
+## The Oracle objects it touches
+
+No foreign key is declared in either document. Every join below
+is one a model runs, not a constraint the database enforces.
+
+| Object | What it holds | Source |
+|---|---|---|
+| `INT tables` | Silver persistence. Passing rows only, seven days, partitioned by business date. | dbt §4.1 (p.10) · Appendix A.3 (p.26) |
+| `Gold DIM / FACT` | Already exist and already carry history from the current system. This programme changes only how they are populated. | dbt §6.4 (p.15) · §10.1 (p.23) |
+| `DQ_VALIDATION_FAILURE` | One store for both failure categories, carrying whether the row can replay itself and whether it is still open. | dbt §7.1 (p.17) |
+
+## What happens when it goes wrong
+
+| # | Scenario | What the design does | Source |
+|---|---|---|---|
+| X32 | A correction arrives and the row is still current | A normal MERGE, joined on the surrogate key rather than the natural key — a natural-key join matches both the closing and the opening row and fails. | dbt §6.4.1 (p.15) |
+| X33 | A correction arrives and the interval is already closed | A direct UPDATE of that closed row only. Never a MERGE — it would reopen an interval that is settled. | dbt §6.4.1 (p.15) |
+| X34 | Someone changes the shape of a Gold table | Refused. Every Gold model fails on a schema change, and the service account holds DML only — no create, alter or drop. | dbt §8.4 (p.21) |
+| X22 | FACT fails after DIM succeeded | The restart resumes at the fact build. The dimension is not rebuilt. | dbt §8.1 (p.20) |
+| X30 | A transaction's dimension has not arrived | Never written to Gold with a placeholder key. Held in the DQ store as replayable and OPEN, re-derived from INT on a later day once the dimension exists, then marked RESOLVED. | dbt §7.1 (p.17) · Figure 5a (p.18) |
+
+## Where SEI's documents disagree about this
+
+Each one is a decision to take before a model is written.
+
+### C3 — Two Gold facts, or three
+
+- **The architecture says.** FACT_TRANSACTIONS, FACT_CP_HOLDINGS and FACT_TAX_LOT, each with its own strategy — merge, merge and periodic snapshot.
+- **The design documents say.** FACT_TRANSACTIONS only.
+- **Why it matters.** Holdings and tax lot are the two the design document is silent on, and a periodic snapshot is a different pattern from a merge — it is not covered by the SCD2 and merge logic that is specified.
+
+## Still open with SEI
+
+SEI's own ids, so they can be quoted straight back.
+
+- **D1.** Confirm the existing sequence name and ownership behind the Gold surrogate key.
+- **D2.** Confirm all missing dimensions resolve inside the seven-day window, and approve the single-table DQ design, the replay policy and the retention-boundary alert.
+- **D3.** Confirm the current history coverage of the existing dimensions.
+
+## Sources
+
+- **BBH File Ingestion Framework Design Document v2.0** — SEI Professional Services
+- **BBH dbt Transformation Design Document v2** — SEI Professional Services
+- **SEI-BBH Integration Architecture v5** — SEI
+
+Generated from the cited model, not written by hand. Correct the
+model and every document that used it is corrected with it:
+`node tools/export_design_model.mjs && python3 tools/gen_design_docs.py`

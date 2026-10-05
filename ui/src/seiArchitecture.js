@@ -191,4 +191,17 @@ export const INBOUND_POSTURE = {
 + "a sharper problem and a different one.",
 };
 
+// Where each conflict shows up on the drawing, so a box that two SEI
+// documents describe differently says so rather than looking settled.
+export const CONFLICT_AT = {
+ stage1:   ["C1"],
+ stage2:   ["C2", "C5"],
+ stage2int: ["C2", "C3", "C4"],
+ ingestion: ["C1"],
+ processing: ["C1", "C2", "C3", "C4", "C5"],
+};
+export const conflictsAt = (k) =>
+ (CONFLICT_AT[k] || []).map((id) =>
+   ARCH_CONFLICTS.find((c) => c.id === id)).filter(Boolean);
+
 export const archConflictCount = () => ARCH_CONFLICTS.length;

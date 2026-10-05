@@ -84,6 +84,38 @@ export default function DocDrill({ t, docKey, from, onBack }) {
        source: designs-md/{d.src}</span>
      </span>
     </div>
+    {d.generated && (() => {
+      const [col, bg, label, line] = d.sei_status === "absent"
+        ? ["#6d3ac0", "#f6f1fc", "NOT IN EITHER SEI DESIGN DOCUMENT",
+           "No design exists to build from. This page records the absence "
+           + "and the reason for it, which is BBH's to resolve and SEI's "
+           + "to confirm."]
+        : d.sei_status === "proposal"
+        ? ["#cc3344", "#fdf1f2", "PROPOSED BY THIS REVIEW",
+           "Not in SEI's documents and not in the delivery workbook. A "
+           + "proposal with an argument behind it, not a commitment."]
+        : d.sei_status === "differs"
+        ? ["#a8560f", "#fdf7ea", "SEI ANSWERS THIS DIFFERENTLY",
+           "SEI covers the need and designs it another way. Somebody has "
+           + "to pick before a model is written."]
+        : d.sei_status === "overview"
+        ? ["#0f4775", "#eef3f8", "OVERVIEW \u00b7 GENERATED FROM THE CITED MODEL",
+           "Composed from the same model the component pages use, so the "
+           + "overview and the detail cannot disagree."]
+        : ["#1f6b45", "#eef7f1", "SPECIFIED BY SEI \u00b7 GENERATED FROM THE CITED MODEL",
+           "Every claim below carries the document, section and page it "
+           + "came from. Correct the model and this page is corrected "
+           + "with it."];
+      return (
+       <div style={{ background: bg, border: `1px solid ${col}44`,
+        borderLeft: `4px solid ${col}`, borderRadius: 8, padding: "13px 18px",
+        marginBottom: 12 }}>
+        <div style={{ fontSize: 8.5, fontWeight: 800, color: col,
+         letterSpacing: .4 }}>{label}</div>
+        <div style={{ fontSize: 12, color: "#33414d", lineHeight: 1.65,
+         marginTop: 5, maxWidth: 940 }}>{line}</div>
+       </div>);
+    })()}
     {d.withdrawn && (
      <div style={{ background: "#fdf1f2", border: "1px solid #e0a9b0",
       borderLeft: "4px solid #cc3344", borderRadius: 8, padding: "14px 18px",

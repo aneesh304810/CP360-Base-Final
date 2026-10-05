@@ -14,45 +14,47 @@ origin: events-primary architect review
 sei_coverage: absent
 gap_owner: Joint
 in_scope: true
-withdrawn: true
+generated: true
+sei_status: proposal
+generated: true
+sei_status: proposal
 ---
 
 # Expectation Store
 
-## Withdrawn
+## What this is
 
-**This design document has been withdrawn. Do not build from it.**
+A component proposed by this programme's own review. It is not in
+either SEI design document and it is not in the delivery workbook.
+Its id is above 100 so it can never be mistaken for a tracker
+component.
 
-It was written before SEI's two design documents were the base for this
-architecture. Reading back through it, the content is wrong often
-enough that correcting it line by line is not worth doing, so it is
-being rewritten from the drawing rather than patched.
+## Why it was proposed
 
-What was wrong was not one fact. The layer model was the old one, it
-described a Pre-Gold Exadata tier that is in neither SEI document, it
-treated components as settled that SEI has not specified at all, and it
-read as though every statement in it had a source. None of that is
-repairable by editing.
+The review asked what would have to exist if events, rather than
+files, were the primary way data arrives. BBH has since confirmed
+that they are: **SDC events is the primary inbound route and file-based is the
+secondary one.**
 
-## Where the current answer is
+This does not make the event components a proposal any more. It makes them the primary path with no design document behind them, which is a sharper problem and a different one.
 
-- **The architecture is the drawing.** The Hub's C4 goes containers,
-  then the lane a component sits in, then the component itself.
-- **For a component SEI specifies**, its record carries what SEI says,
-  the section and the page it says it on, the Oracle objects it
-  touches, and what is still open with SEI against it.
-- **For everything else**, the component registry carries a verdict —
-  specified, differs, or absent — and the reason for it.
+## What would have to be true
 
-## What replaces this page
+Both SEI design documents describe the file path and only the file
+path. The completeness gate counts files that arrived, the
+business-date state machine opens one date at a time, and the SLA
+measures a cutoff for a set of files. None of those hold for a
+continuous event stream without being redesigned.
 
-Nothing yet, and that is deliberate. The drawing comes first; these
-documents are rewritten from it afterwards, against SEI's text, with a
-citation on every claim. Until then the record in the Hub is the
-design, and this page exists only so that a link does not lead
-nowhere.
+## Status
 
-## Recovering the old text
+Proposed, not approved and not specified. It goes on the
+architecture drawing when SEI's documents cover it or BBH formally
+adopts it. Until then it is in the event container, drawn apart.
 
-It is in git. `git log --follow` on this file reaches the last version
-before withdrawal if any of it is wanted as a starting point.
+## Sources
+
+- This programme's events-primary review
+- Inbound posture: BBH, stated directly
+
+Generated from the cited model, not written by hand.
