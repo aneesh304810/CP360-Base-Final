@@ -20,6 +20,9 @@ import { REGISTRY, REG_STATE, REG_ORIGIN, REG_REVIEW_NOTE, BBH_LAYERS,
  BBH_EXTENSION } from "./hubComponentRegistry.js";
 import { GROUPS, PROC_STAGES, groupOfTracker, stageOfTracker, groupById,
  stageById, LANES, lanesOf, laneOfTracker, laneById } from "./hubGroups.js";
+import { SEI_ARCH_DOC, ARCH_FEEDS, ARCH_LAYERS, ARCH_ORCHESTRATION,
+ ARCH_PRINCIPLES, ARCH_CONFLICTS, OUTBOUND_FLOW, INBOUND_POSTURE }
+ from "./seiArchitecture.js";
 
 // =====================================================================
 // HubDesign — the CP Integration Hub route: C4 landing (L1 context +
@@ -817,6 +820,11 @@ export default function HubDesign({ t }) {
        borderRadius: 999, cursor: "pointer", background: "#f3eefb",
        color: "#6d3ac0", border: "1px solid #d9c9f0" }}>
       ▦ component registry</span>
+     <span onClick={() => setView("ARCH")} style={{ fontSize: 10.5,
+      fontWeight: 800, padding: "6px 14px", borderRadius: 999,
+      cursor: "pointer", background: "#fdf1f2", color: "#cc3344",
+      border: "1px solid #f0c9ce" }}>
+      ⚠ architecture v5 · {ARCH_CONFLICTS.length} conflicts with the design documents</span>
     </div>
     <div style={{ background: "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
      borderRadius: 10, padding: 16, overflowX: "auto" }}>
@@ -1087,6 +1095,188 @@ export default function HubDesign({ t }) {
         o.doc === "ingest" ? "INGEST" : "DBT")}</span>
        <span style={{ color: "#33414d", lineHeight: 1.55 }}>{o.t}</span>
       </div>))}
+    </div>
+   </div>);
+ }
+
+ /* ---------- SEI-BBH Integration Architecture v5 ------------------
+    The third SEI document, and the one that disagrees with the other
+    two. Kept apart rather than merged, because merging them is exactly
+    the silent reconciliation this whole exercise exists to avoid. */
+ if (view === "ARCH") {
+  const Bar = ({ icon, title, note, n, label, bg }) => (
+   <div style={{ display: "flex", alignItems: "center", gap: 12,
+    background: bg || (t.navy || "#10193b"), color: "#fff", borderRadius: 10,
+    padding: "13px 18px", margin: "16px 0 10px" }}>
+    <span style={{ fontSize: 22 }}>{icon}</span>
+    <div><b>{title}</b>
+     <div style={{ fontSize: 10, color: "#dfe7f2", marginTop: 2 }}>{note}</div></div>
+    {n !== undefined && (
+     <div style={{ marginLeft: "auto", textAlign: "center", fontSize: 10,
+      color: "#dfe7f2" }}><b style={{ display: "block", fontSize: 19,
+      color: "#fff" }}>{n}</b>{label}</div>)}
+   </div>);
+  return (
+   <div>
+    <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <Crumb trail={[["containers", () => setView("L2")],
+                   ["Integration Architecture v5", null]]} />
+
+    <div style={{ background: "#5c3030", color: "#fff", borderRadius: 10,
+     padding: "16px 20px", marginBottom: 4 }}>
+     <b style={{ fontSize: 15 }}>{SEI_ARCH_DOC.title} v{SEI_ARCH_DOC.version}</b>
+     <div style={{ fontSize: 11.5, color: "#efdada", lineHeight: 1.65,
+      marginTop: 6, maxWidth: 940 }}>
+      {SEI_ARCH_DOC.scope}
+      <br /><br />
+      <b>It does not agree with SEI's two design documents</b>, and that is
+      the most useful thing on this page. Three RAW tables or seven. A
+      Silver made of STG and INT, or a Stage 2 made of five tables. One
+      Gold fact or three. These are not different words for one design.
+     </div>
+    </div>
+
+    <Bar icon="⚠" title="Where SEI's own documents disagree" bg="#8c2f3a"
+     note="each one is a decision somebody has to take before a model is written"
+     n={ARCH_CONFLICTS.length} label="conflicts" />
+    <div style={{ display: "grid", gap: 8 }}>
+     {ARCH_CONFLICTS.map((c) => (
+      <div key={c.id} style={{ background: "#fff",
+       border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+       borderLeft: "3px solid #cc3344", borderRadius: 8, padding: "13px 16px" }}>
+       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontFamily: "Roboto Mono, monospace", fontSize: 10,
+         fontWeight: 800, color: "#cc3344" }}>{c.id}</span>
+        <b style={{ fontSize: 12.5, color: t.navy || "#10193b" }}>{c.t}</b>
+       </div>
+       <div style={{ display: "grid", gap: 10, marginTop: 9,
+        gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))" }}>
+        <div><div style={{ fontSize: 8.5, fontWeight: 800, color: "#a8560f",
+         letterSpacing: .4 }}>THE ARCHITECTURE SAYS</div>
+         <div style={{ fontSize: 11, color: "#33414d", lineHeight: 1.6,
+          marginTop: 3 }}>{c.arch}</div></div>
+        <div><div style={{ fontSize: 8.5, fontWeight: 800, color: "#0f4775",
+         letterSpacing: .4 }}>THE DESIGN DOCUMENTS SAY</div>
+         <div style={{ fontSize: 11, color: "#33414d", lineHeight: 1.6,
+          marginTop: 3 }}>{c.doc}</div></div>
+       </div>
+       <div style={{ background: "#fdf1f2", borderRadius: 6,
+        padding: "9px 12px", marginTop: 9, fontSize: 11, color: "#33414d",
+        lineHeight: 1.6 }}><b>Why it matters. </b>{c.why}</div>
+      </div>))}
+    </div>
+
+    <Bar icon="⇄" title="Inbound" bg="#6b5420"
+     note={INBOUND_POSTURE.src} />
+    <div style={{ background: "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+     borderLeft: "3px solid #a8560f", borderRadius: 8, padding: "13px 16px" }}>
+     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      {chip("#fdf2e3", "#a8560f", `PRIMARY · ${INBOUND_POSTURE.primary}`)}
+      {chip("#eef3f8", "#5c7c94", `SECONDARY · ${INBOUND_POSTURE.secondary}`)}
+     </div>
+     <div style={{ fontSize: 11.5, color: "#33414d", lineHeight: 1.65,
+      marginTop: 8, maxWidth: 940 }}>{INBOUND_POSTURE.note}</div>
+     <div style={{ fontSize: 11.5, color: "#a8560f", lineHeight: 1.65,
+      marginTop: 7, maxWidth: 940 }}>{INBOUND_POSTURE.consequence}</div>
+    </div>
+
+    <Bar icon="⬆" title="Outbound — the loader contract" bg="#1f4f7a"
+     note={OUTBOUND_FLOW.src} n={OUTBOUND_FLOW.steps.length} label="steps" />
+    <div style={{ fontSize: 11, color: t.sub || "#666", marginBottom: 8 }}>
+     {OUTBOUND_FLOW.example}</div>
+    <div style={{ display: "grid", gap: 8,
+     gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))" }}>
+     {OUTBOUND_FLOW.steps.map((st) => (
+      <div key={st.n} style={{ background: "#fff", borderRadius: 8,
+       border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+       borderLeft: "3px solid #1168bd", padding: "12px 15px" }}>
+       <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+        <span style={{ width: 18, height: 18, borderRadius: 9,
+         background: "#1168bd", color: "#fff", fontSize: 9, fontWeight: 800,
+         display: "inline-flex", alignItems: "center",
+         justifyContent: "center" }}>{st.n}</span>
+        <b style={{ fontSize: 11, color: "#0f4775" }}>{st.a}</b>
+       </div>
+       <div style={{ fontSize: 11.5, color: "#33414d", lineHeight: 1.6,
+        marginTop: 7 }}>{st.t}</div>
+      </div>))}
+    </div>
+    <div style={{ background: "#fdf7ea", borderRadius: 8,
+     borderLeft: "3px solid #a8560f", padding: "12px 16px", marginTop: 8,
+     fontSize: 11.5, color: "#33414d", lineHeight: 1.65 }}>
+     {OUTBOUND_FLOW.note}</div>
+
+    <Bar icon="▦" title="The feeds, and what each one does to Gold"
+     bg="#1f6b45" n={ARCH_FEEDS.length} label="feed types" />
+    <div style={{ background: "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+     borderRadius: 8, overflow: "hidden" }}>
+     {ARCH_FEEDS.map((f) => (
+      <div key={f.k} style={{ display: "grid",
+       gridTemplateColumns: "150px minmax(0,1.2fr) 170px minmax(0,1.3fr)",
+       gap: 12, padding: "11px 14px", fontSize: 11,
+       borderTop: "1px solid #eef1f4", alignItems: "start" }}>
+       <div><b style={{ color: t.navy || "#10193b" }}>{f.n}</b>
+        <div style={{ fontSize: 9.5, color: t.sub || "#666", marginTop: 2 }}>
+         {f.sub}</div></div>
+       <span style={{ color: "#33414d", lineHeight: 1.55 }}>
+        {f.files.join(" · ")}</span>
+       <span>{chip("#eef3f8", "#5c7c94", f.pattern)}</span>
+       <span style={{ color: "#33414d", lineHeight: 1.55 }}>{f.gold}</span>
+      </div>))}
+    </div>
+
+    <Bar icon="◆" title="The layers, and the objects in them" bg="#0f4775"
+     n={ARCH_LAYERS.reduce((n, l) => n + l.objects.length, 0)} label="objects" />
+    <div style={{ display: "grid", gap: 8 }}>
+     {ARCH_LAYERS.map((l) => (
+      <div key={l.k} style={{ background: "#fff", borderRadius: 8,
+       border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+       borderLeft: "3px solid #1168bd", padding: "12px 16px" }}>
+       <div style={{ display: "flex", alignItems: "center", gap: 8,
+        flexWrap: "wrap" }}>
+        <b style={{ fontSize: 12.5, color: t.navy || "#10193b" }}>{l.n}</b>
+        {chip("#eef3f8", "#5c7c94", l.tech)}
+       </div>
+       <div style={{ fontSize: 11.5, color: "#33414d", lineHeight: 1.6,
+        marginTop: 6 }}>{l.w}</div>
+       {l.objects.length > 0 && (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap",
+         marginTop: 8 }}>
+         {l.objects.map((o) => (
+          <span key={o} style={{ fontFamily: "Roboto Mono, monospace",
+           fontSize: 9.5, fontWeight: 700, padding: "3px 9px",
+           borderRadius: 5, background: "#e4f0fb", color: "#0f4775" }}>
+           {o}</span>))}
+        </div>)}
+       {l.cols && (
+        <div style={{ fontSize: 10, fontFamily: "Roboto Mono, monospace",
+         color: "#5c7c94", lineHeight: 1.6, marginTop: 7, background: "#f6f9fb",
+         borderRadius: 5, padding: "7px 10px" }}>{l.cols}</div>)}
+       {l.steps && (
+        <div style={{ fontSize: 10.5, color: t.sub || "#666", marginTop: 7,
+         lineHeight: 1.6 }}>{l.steps.join(" · ")}</div>)}
+       {l.note && (
+        <div style={{ fontSize: 9.5, color: t.muted || "#999", marginTop: 5 }}>
+         {l.note}</div>)}
+      </div>))}
+    </div>
+
+    <Bar icon="⚙" title="Orchestration, and the principles" bg="#4a2f6b" />
+    <div style={{ background: "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+     borderRadius: 8, padding: "13px 16px", marginBottom: 24 }}>
+     <div style={{ display: "flex", gap: 8, flexWrap: "wrap",
+      alignItems: "center" }}>
+      {ARCH_ORCHESTRATION.map((o, i) => (
+       <span key={o} style={{ display: "inline-flex", alignItems: "center",
+        gap: 8 }}>
+        {i > 0 && <span style={{ color: "#9aa7b2" }}>→</span>}
+        {chip("#e4f0fb", "#0f4775", o)}</span>))}
+     </div>
+     <div style={{ display: "grid", gap: 5, marginTop: 11 }}>
+      {ARCH_PRINCIPLES.map((p) => (
+       <div key={p} style={{ fontSize: 11.5, color: "#33414d",
+        lineHeight: 1.6 }}>· {p}</div>))}
+     </div>
     </div>
    </div>);
  }

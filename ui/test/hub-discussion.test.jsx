@@ -42,6 +42,8 @@ import { REGISTRY, REG_STATE, BBH_LAYERS, BBH_EXTENSION }
   from "../src/hubComponentRegistry.js";
 import { GROUPS, PROC_STAGES, groupOfTracker, stageOfTracker, LANES,
   lanesOf, laneOfTracker } from "../src/hubGroups.js";
+import { ARCH_FEEDS, ARCH_LAYERS, ARCH_CONFLICTS, OUTBOUND_FLOW,
+  INBOUND_POSTURE } from "../src/seiArchitecture.js";
 import { TRACKER_COMPONENTS } from "../src/seiDesignTracker.js";
 
 let bad = 0;
@@ -1116,6 +1118,72 @@ ok(/\["containers", \(\) => setView\("L2"\)\]/.test(HUB),
 ok(/view === "SEIFLOW"/.test(HUB) && /setView\("SEIFLOW"\)/.test(HUB),
    "the box-by-box SEI pipeline is still reachable from here", "");
 
+// ---- the architecture, and where SEI disagrees with SEI ---------------
+//
+// A third SEI document, and the one that does not agree with the other
+// two. Kept in its own file: merging it into the baseline would be the
+// silent reconciliation this exercise exists to avoid.
+ok(ARCH_CONFLICTS.length >= 4,
+   "the conflicts between SEI's architecture and SEI's design documents "
+   + "are recorded", ARCH_CONFLICTS.length);
+ok(ARCH_CONFLICTS.every((c) => c.arch && c.doc && c.why),
+   "and each gives both sides AND why it matters — a conflict with only "
+   + "one side stated is an accusation",
+   ARCH_CONFLICTS.filter((c) => !(c.arch && c.doc && c.why))
+     .map((c) => c.id).join(","));
+ok(ARCH_CONFLICTS.every((c) => (c.why || "").length > 60),
+   "with the consequence spelled out, because that is what decides it",
+   ARCH_CONFLICTS.filter((c) => (c.why || "").length <= 60)
+     .map((c) => c.id).join(","));
+// The three that are countable, so a renumber cannot hide them.
+const rawL = ARCH_LAYERS.find((l) => l.k === "raw");
+const stgL = ARCH_LAYERS.find((l) => l.k === "stg2");
+const goldL = ARCH_LAYERS.find((l) => l.k === "gold");
+ok(rawL.objects.length === 7,
+   "the architecture's seven RAW tables are all here, against the design "
+   + "document's three", rawL.objects.length);
+ok(stgL.objects.length === 5, "and its five Stage 2 tables",
+   stgL.objects.length);
+ok(goldL.objects.filter((o) => /^FACT/.test(o)).length === 3,
+   "and its three Gold facts, against the design document's one",
+   goldL.objects.filter((o) => /^FACT/.test(o)).join(", "));
+ok(ARCH_FEEDS.length === 3
+   && ARCH_FEEDS.every((f) => f.files.length && f.pattern && f.gold),
+   "every feed type names its files, its pattern and what it does to Gold",
+   ARCH_FEEDS.map((f) => f.k).join(","));
+
+// Inbound: events primary, files secondary. This reverses what both
+// design documents assume, so it is stated rather than implied.
+ok(/SDC events/.test(INBOUND_POSTURE.primary)
+   && /file/.test(INBOUND_POSTURE.secondary),
+   "the inbound posture is recorded: events primary, files secondary",
+   `${INBOUND_POSTURE.primary} / ${INBOUND_POSTURE.secondary}`);
+ok(/BBH/.test(INBOUND_POSTURE.src) && INBOUND_POSTURE.consequence,
+   "with who said it and what follows from it", INBOUND_POSTURE.src);
+const evLane = lanesOf("ingestion").find((l) => l.id === "eventbased");
+ok(evLane && evLane.primary === true && !evLane.proposal,
+   "and the diagram follows: event ingestion is the PRIMARY lane now, "
+   + "not a proposal — which is a sharper problem, because the primary "
+   + "path has no design document behind it", evLane && evLane.tech);
+ok(lanesOf("ingestion")[0].id === "eventbased",
+   "and it is drawn first, because it is first", "");
+
+// Outbound: the first concrete contract in any of this.
+ok(OUTBOUND_FLOW.steps.length === 4,
+   "the loader contract has its four steps", OUTBOUND_FLOW.steps.length);
+ok(OUTBOUND_FLOW.steps.every((x) => x.a && x.t),
+   "each naming who calls whom", "");
+ok(/CRM/.test(JSON.stringify(OUTBOUND_FLOW.steps))
+   && /loader format/.test(JSON.stringify(OUTBOUND_FLOW.steps)),
+   "including the Hub validating and transforming into loader format",
+   "");
+ok(/neither SEI design document/.test(OUTBOUND_FLOW.note),
+   "and says plainly that no SEI design document has an outbound path",
+   "");
+ok(/view === "ARCH"/.test(HUB) && /ARCH_CONFLICTS\.length/.test(HUB),
+   "the architecture has a view, and the conflict count is on the way in",
+   "");
+
 // ---- the design documents are withdrawn ------------------------------
 //
 // All 96 were written before SEI's documents were the base. What was
@@ -1205,8 +1273,17 @@ ok(/Landing and transport/.test(ingress) && /API gateway/.test(ingress)
 const ing = lanesOf("ingestion").map((l) => l.n).join(" | ");
 ok(/File-based/.test(ing) && /Event-based/.test(ing),
    "and Ingestion splits file-based from event-based", ing);
-ok(lanesOf("ingestion").find((l) => /Event-based/.test(l.n)).proposal === true,
-   "with the event half marked a proposal, because it is one", "");
+// SUPERSEDED. This used to require the event half to be marked a
+// proposal. BBH has since stated that events are the PRIMARY inbound
+// route and files the secondary one, so the marking is wrong and the
+// guard with it. What replaces it is stronger: the primary lane must
+// be the event one, and it must say it has no design document.
+ok(lanesOf("ingestion").find((l) => /Event-based/.test(l.n)).primary === true,
+   "with the event half marked PRIMARY, because BBH says it is", "");
+ok(/no design document behind it/.test(
+     lanesOf("ingestion").find((l) => /Event-based/.test(l.n)).w),
+   "and saying out loud that the primary route has no design document",
+   "");
 // Drawn, not just declared.
 ok(/const Lane = /.test(HUB) && /lanesOf\(id\)/.test(HUB),
    "the lanes are drawn on the container layer", "");

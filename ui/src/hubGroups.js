@@ -149,25 +149,30 @@ export const LANES = {
      + "batch from end to end \u2014 so nothing here is cited." },
   { id: "loader", n: "Loader framework", tech: "Python \u00b7 outbound",
     sei: [], reg: ["10", "4"],
-    w: "Everything going back to SEI: producing a submission, sending it, "
-     + "and tracking what came back. Outbound is in neither document." },
+    w: "Everything going back to SEI. A consumer such as CRM calls the "
+     + "Hub's API with the loader details and the data; the Hub validates "
+     + "it and transforms it into loader format; SEI PS processes the "
+     + "loader; the Hub calls the consumer's own API with the response. "
+     + "Two APIs, one each way, and neither SEI design document has an "
+     + "outbound path at all." },
   { id: "seisrc", n: "SEI-side source", tech: "SEI",
     sei: [], reg: ["1", "2", "3", "5", "6", "7"],
     w: "SWP itself and what SEI runs around it. Only the platform and the "
      + "files it produces touch this design." },
  ],
  ingestion: [
-  { id: "filebased", n: "File-based ingestion", tech: "Airflow \u00b7 Python \u00b7 Oracle",
+  { id: "eventbased", n: "Event-based ingestion", tech: "PRIMARY \u00b7 SDC events",
+    sei: [], reg: [],
+    w: "BBH's primary inbound route. Neither SEI design document describes "
+     + "it \u2014 both describe the file path and only the file path \u2014 so "
+     + "the primary way data arrives has no design document behind it. "
+     + "Its components are in the event container.",
+    primary: true },
+  { id: "filebased", n: "File-based ingestion", tech: "SECONDARY \u00b7 Airflow \u00b7 Python",
     sei: ["S5", "S6", "S7", "S8"], reg: ["13", "9", "23"],
     w: "The path both SEI documents describe: a scheduled scan, one mapped "
      + "task per file, validate, load RAW in one transaction, reconcile "
      + "three counts, archive." },
-  { id: "eventbased", n: "Event-based ingestion", tech: "proposal",
-    sei: [], reg: [],
-    w: "Continuous intake rather than a five-minute scan. Proposed by this "
-     + "programme's review; not in either document and not in the "
-     + "workbook. Its components are in the event container.",
-    proposal: true },
   { id: "profiling", n: "RAW profiling", tech: "SQL",
     sei: [], reg: ["24"],
     w: "Looking at what landed before anything is done to it. Not in "
