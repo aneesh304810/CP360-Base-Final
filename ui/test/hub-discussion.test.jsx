@@ -810,20 +810,18 @@ ok(base !== "",
    "the guard is anchored to the commit that introduced the Discussion tab, "
    + "so it keeps meaning something after the work is committed",
    base || "no such commit — falling back to HEAD");
-ok(removed === 0,
-   "HubDesign.jsx has NO removed lines since before the tab existed — the "
-   + "brief was to add a tab, not to change the Hub", `+${added} -${removed}`);
-// The cap used to be 25 and read "an import, a branch and a pill",
-// which was right while the only brief was to add a tab. It is not any
-// more: the C4 was asked to be reconciled against the dbt TDD, and that
-// is a change to the Hub by request. So the cap moved once, deliberately,
-// and the thing actually holding the line is `removed === 0` plus the
-// marker assertions below — a number that gets bumped every time is a
-// guard that has stopped saying anything.
-ok(added > 0 && added < 130,
-   "and the additions are still bounded: the Discussion tab's three edits "
-   + "plus the TDD alignment, and nothing else has crept into this file",
-   `+${added}`);
+// What replaces `removed === 0`: the Discussion tab was additive and must
+// stay that way, so nothing it introduced may be edited out by later work
+// on the Hub. Checked by marker rather than by arithmetic.
+// This guard has now outlived its brief twice. "No removed lines" was
+// right while the only ask was to add a tab; then the C4 was asked to be
+// reconciled against the dbt TDD, and the last ask was to REDRAW the
+// processing band so it matches — which cannot be done by adding lines.
+// Bumping a number each time would leave a guard that says nothing, so
+// the line-count assertions are gone and the structural ones below take
+// over: the tab's edits must survive, and the band must read in the
+// TDD's layer order.
+ok(added > 0, "HubDesign.jsx has changed", `+${added} -${removed}`);
 const HUB = strip("ui/src/HubDesign.jsx");
 ok(/import HubDiscussion from "\.\/HubDiscussion\.jsx"/.test(HUB)
    && /view === "DISC"/.test(HUB) && /setView\("DISC"\)/.test(HUB),
@@ -902,12 +900,86 @@ ok(!/SWP_RAW|DATE_CONTROL|DQ_VALIDATION_FAILURE|\bINT_|STG_/.test(TRKSRC),
    (TRKSRC.match(/SWP_RAW|DATE_CONTROL|DQ_VALIDATION_FAILURE|\bINT_|STG_/g)
      || []).join(","));
 
+// The L3 row's last cell is 196px and already holds the SEI citation
+// chip and the design-doc chip. The first version of the TDD indicator
+// put the full verdict in there — "TDD \u00b7 ANOTHER DOCUMENT OWNS IT" —
+// and it overlapped the status column on screen while looking perfectly
+// fine in the source. Nothing about a grid cell errors when its content
+// is too wide; it just draws over the neighbour.
+const TDDBADGE = /<span title=\{`dbt TDD: \$\{[^`]*`\}[\s\S]{0,400}?>([^<]{1,40})<\/span>/
+  .exec(HUB);
+ok(TDDBADGE, "the L3 row carries a TDD badge", "");
+ok(TDDBADGE && TDDBADGE[1].trim().length <= 4,
+   "and its visible text is at most four characters — the cell has about "
+   + "50px spare and the long version drew over the status chip",
+   TDDBADGE && `${TDDBADGE[1].trim().length}: ${TDDBADGE[1].trim()}`);
+ok(TDDBADGE && /title=\{`dbt TDD: \$\{TDD_VERDICTS\[td\.v\]\[1\]\}/.test(HUB),
+   "so the verdict it stands for is on hover, not lost — a four-letter "
+   + "badge with no tooltip is decoration", "");
+// Scoped to the ROW, not the panel: the expanded panel is full width and
+// is exactly where the spelled-out verdict belongs.
+const ROWSRC = HUB.slice(
+  HUB.indexOf('gridTemplateColumns: "34px minmax(0,1.05fr)'),
+  HUB.indexOf("{isX && (", HUB.indexOf('gridTemplateColumns: "34px minmax(0,1.05fr)')));
+ok(ROWSRC.length > 400 && ROWSRC.length < 4000,
+   "the L3 row markup is found to measure", ROWSRC.length);
+ok(!/TDD_VERDICTS\[td\.v\]\[1\]\.toUpperCase\(\)/.test(ROWSRC),
+   "the full verdict is never put back into the ROW — it belongs in the "
+   + "panel below, which has the width for it", "");
+
 // The two divergences that are visible on the L2 drawing itself, which
 // is the half of this a reviewer actually looks at.
-ok(/Stage 2 is TWO objects/.test(HUB) && /No Exadata tier in the TDD/.test(HUB),
-   "the L2 processing band says on the drawing that Stage 2 is two objects "
-   + "and that there is no Exadata tier — a divergence only visible after "
-   + "clicking into a panel is a divergence nobody reads", "");
+// The L2 processing band IS the layer model, so it is asserted as one:
+// the boxes in order, top to bottom, by their y coordinate. A band that
+// still reads "Stage 2 Enriched" or "Pre-Gold Exadata" is the old build.
+const BAND = [...HUB.matchAll(
+  /<Mini x=\{454\} y=\{(\d+)\}[^>]*label="([^"]+)"/g)]
+  .map((m) => ({ y: +m[1], label: m[2] }))
+  .sort((a, b) => a.y - b.y);
+ok(BAND.length === 7, "the processing band has seven boxes", BAND.length);
+const LAYERS = BAND.map((b) => b.label.split(" \u00b7 ")[0].trim());
+ok(JSON.stringify(LAYERS) === JSON.stringify(
+     ["Python Ingestion Fwk", "SWP_RAW", "STG", "INT", "DIM", "FACT",
+      "Correction Handling"]),
+   "and reads in the dbt TDD's layer order: SWP_RAW, STG, INT, then DIM "
+   + "before FACT — this is the reconciliation, not a label change",
+   LAYERS.join(" -> "));
+// strip() drops // comments but not JSX {/* ... */} blocks, and the band
+// carries one recording what it used to say. That is documentation, not
+// a label, so it is removed before looking for the old names.
+const HUBCODE = HUB.replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+ok(!/Stage 2 Enriched|Pre-Gold|Exadata/.test(HUBCODE),
+   "the old layer model is gone from the drawing — Stage 2 Enriched merged "
+   + "two objects into one and Pre-Gold Exadata is a tier the TDD does not "
+   + "have", (HUBCODE.match(/Stage 2 Enriched|Pre-Gold|Exadata/g) || []).join(","));
+// STG stores nothing, and the shape says so: every other data box is a
+// cylinder and STG is not. Losing that makes the drawing wrong again in
+// the one way the split was meant to fix.
+const stg = [...HUB.matchAll(/<Mini x=\{454\} y=\{(\d+)\} w=\{200\}([^>]*)>/g)]
+  .map((m) => ({ y: +m[1], rest: m[2] }));
+const stgBox = stg.find((b) => /label="STG/.test(b.rest));
+const intBox = stg.find((b) => /label="INT/.test(b.rest));
+ok(stgBox && !/\bcyl\b/.test(stgBox.rest),
+   "STG is drawn square, not as a cylinder — it is a view and holds no "
+   + "data, and the shape is the only place that is visible at a glance",
+   stgBox && stgBox.rest);
+ok(intBox && /\bcyl\b/.test(intBox.rest),
+   "and INT is a cylinder, because it does hold data", intBox && intBox.rest);
+// Every arrow in the chain must land on a box, or the drawing shows a
+// flow that stops in mid-air. Correction Handling is deliberately off
+// the chain: in the TDD it is a rule inside DIM, not a layer.
+const RELS = [...HUB.matchAll(
+  /<Rel x1=\{554\} y1=\{(\d+)\} x2=\{554\} y2=\{(\d+)\}/g)]
+  .map((m) => ({ from: +m[1], to: +m[2] }));
+const tops = new Set(BAND.map((b) => b.y));
+const bottoms = new Set(BAND.map((b) => b.y + 24));
+ok(RELS.length === 5,
+   "six boxes in the chain means five arrows", RELS.length);
+ok(RELS.every((r) => bottoms.has(r.from) && tops.has(r.to)),
+   "and every arrow runs from one box's bottom edge to the next box's top "
+   + "— an arrow at a stale y draws into empty space and still renders",
+   RELS.filter((r) => !(bottoms.has(r.from) && tops.has(r.to)))
+     .map((r) => `${r.from}->${r.to}`).join(","));
 // SVG text that leaves its box still renders; it is just drawn over the
 // neighbouring group. The figure suite caught that once by overlap maths
 // and this is the same check by hand, because these six captions were
@@ -915,15 +987,21 @@ ok(/Stage 2 is TWO objects/.test(HUB) && /No Exadata tier in the TDD/.test(HUB),
 //   PROC group: <Grp x={444} y={180} w={226} h={470} />  ->  444..670, 180..650
 //   last Mini in it: y={478}, height 24               ->  bottom 502
 const CAPS = [...HUB.matchAll(
-  /<text x="(\d+)" y="(\d+)" fontSize="8" fontStyle="italic" fill="#(?:cc3344|a8560f)">\s*\n?\s*([^<]*(?:TDD|Exadata|Oracle Gold|DML-only|DIM then FACT|STG \()[^<]*)</g)]
+  /<text x="(\d+)" y="(\d+)" fontSize="8" fontStyle="italic" fill="#(?:cc3344|a8560f|159943)">\s*\n?\s*([^<]+)</g)]
   .map((m) => ({ x: +m[1], y: +m[2], txt: m[3].trim() }))
   .filter((c) => c.x === 454);
-ok(CAPS.length === 6, "six TDD captions on the processing band", CAPS.length);
-ok(CAPS.every((c) => c.y > 502 && c.y < 650),
-   "every one sits below the last component box and inside the processing "
-   + "group — a caption at the wrong y is drawn over data quality and still "
-   + "looks fine in the source",
-   CAPS.filter((c) => !(c.y > 502 && c.y < 650)).map((c) => c.y).join(","));
+ok(CAPS.length === 4, "four captions under the processing band", CAPS.length);
+// The band's last box is Correction Handling at y 562, bottom 586; the
+// group is <Grp y={180} h={470}>, so it ends at 650.
+const lastBox = Math.max(...BAND.map((b) => b.y)) + 24;
+ok(CAPS.every((c) => c.y > lastBox && c.y < 650),
+   "every one sits below the last box and inside the processing group — a "
+   + "caption at a stale y is drawn over data quality and still looks fine "
+   + "in the source",
+   CAPS.filter((c) => !(c.y > lastBox && c.y < 650)).map((c) => c.y).join(","));
+ok(/Aligned to the dbt TDD/.test(HUB) && /Tracker still names/.test(HUB),
+   "and the drawing says both halves out loud: it follows the TDD now, and "
+   + "the tracker's component names have not moved with it", "");
 // 226px of group, 10px of inset: ~48 characters at fontSize 8.
 //
 // This guard earned its place twice over. It first failed on a caption

@@ -85,10 +85,15 @@ export const TDD_ALIGN = {
 + "partitioned table that reads PASS rows only, maps the code sets, is keyed "
 + "on the natural key plus BUSINESS_DATE, and is purged by partition drop "
 + "after seven days.\n\n"
-+ "Worth splitting on the screen, because a single box invites two wrong "
-+ "assumptions: that the enriched layer can be queried for history (it is a "
-+ "view over today), and that it has one retention policy (one half has "
-+ "none, the other has seven days).",
++ "THE L2 DRAWING NOW SPLITS IT. It shows STG and INT as separate boxes, "
++ "and STG is drawn square rather than as a cylinder because it stores "
++ "nothing. A single box invited two wrong assumptions — that the "
++ "enriched layer can be queried for history (it is a view over today), and "
++ "that it has one retention policy (one half has none, the other has seven "
++ "days).\n\n"
++ "The tracker still calls this component Stage 2 Enriched, because it is "
++ "generated from the workbook. The drawing follows the TDD; the delivery "
++ "name has not moved. Worth closing that gap in the workbook itself.",
   ev: "§2 (p.7) · §4.1 (p.10) · Appendix A.3 (p.26)" },
 
  "16": { v: "conflict", name: "DIM then FACT · pre-existing Gold",
@@ -105,9 +110,14 @@ export const TDD_ALIGN = {
 + "objects are declared as dbt SOURCES rather than models so dbt cannot "
 + "create them. The C4 and its design document have dbt building Kimball "
 + "dimensions and facts, which is a different job.\n\n"
-+ "And there is no Exadata. The L2 diagram labels this box Pre-Gold Exadata; "
-+ "neither Exadata nor a pre-Gold tier appears anywhere in the TDD, which "
-+ "writes into the Oracle Gold tables directly.",
++ "AND THERE IS NO EXADATA. The L2 drawing used to label this box Pre-Gold "
++ "Exadata. Neither Exadata nor a pre-Gold tier appears anywhere in the TDD, "
++ "which MERGEs into the Oracle Gold tables directly, so the drawing now "
++ "shows DIM and FACT as two ordered boxes and the tier is gone.\n\n"
++ "What has NOT moved is the ownership question. The tracker still has this "
++ "as one component, Gold (dbt), built by dbt; the TDD has dbt populating "
++ "tables it may not create or alter. Redrawing the layers does not settle "
++ "that, and it is the more expensive half.",
   ev: "§4.1 (p.10) · §6.4 (p.15) · §8.4 (p.21) · Appendix A.3 (p.26)" },
 
  "17": { v: "same", name: "MERGE-vs-UPDATE reprocessing rule",
@@ -315,13 +325,16 @@ export const TDD_MISSING = {
     ev: "§10.3 (p.24) · Appendix A.2 (p.25)" },
  ],
  PROC: [
-  { name: "the STG / INT split",
+  { name: "a component for STG and a component for INT",
     why:
-"Covered above under component 15, and repeated here because it is a "
-+ "drawing problem as much as a naming one: the processing band shows one "
-+ "box where the build has two, with different storage, different retention "
-+ "and different owners of what goes wrong in them.",
-    ev: "§4.1 (p.10)" },
+"The DRAWING has been realigned: the processing band now reads SWP_RAW "
++ "→ STG → INT → DIM → FACT, with STG square rather than "
++ "a cylinder because it stores nothing. The TRACKER has not moved — "
++ "components 15 and 16 are still one box each, so two objects with "
++ "different storage, different retention and different failure modes share "
++ "one delivery status and one design document between them.\n\n"
++ "That is a workbook change now, not a drawing one.",
+    ev: "§4.1 (p.10) · §2 (p.7)" },
  ],
 };
 

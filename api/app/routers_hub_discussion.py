@@ -116,21 +116,21 @@ def _corpus():
     """
     owners, totals = {}, {}
     for r in _safe("SELECT owner_code, name, focus, declared_total FROM hub_owner"):
-        owners[r["OWNER_CODE"]] = {"name": r.get("NAME"), "focus": r.get("FOCUS")}
-        if r.get("DECLARED_TOTAL") is not None:
-            totals[r["OWNER_CODE"]] = int(r["DECLARED_TOTAL"])
+        owners[r["owner_code"]] = {"name": r.get("name"), "focus": r.get("focus")}
+        if r.get("declared_total") is not None:
+            totals[r["owner_code"]] = int(r["declared_total"])
 
-    topics = [{"no": int(r["TOPIC_NO"]), "title": r.get("TITLE"),
-               "comps": [c for c in (r.get("COMPS") or "").split(",") if c]}
+    topics = [{"no": int(r["topic_no"]), "title": r.get("title"),
+               "comps": [c for c in (r.get("comps") or "").split(",") if c]}
               for r in _safe("SELECT topic_no, title, comps, sort_order "
                              "FROM hub_topic ORDER BY sort_order, topic_no")]
 
-    questions = [{"n": int(r["QID"]), "topic": int(r["TOPIC"] or 0),
-                  "owner": r.get("OWNER_CODE") or "KB",
-                  "body": _clob(r.get("BODY")) or "",
-                  "comps": [c for c in (r.get("COMPS") or "").split(",") if c],
-                  "note": r.get("NOTE"),
-                  "source": r.get("SOURCE") or "review"}
+    questions = [{"n": int(r["qid"]), "topic": int(r["topic"] or 0),
+                  "owner": r.get("owner_code") or "KB",
+                  "body": _clob(r.get("body")) or "",
+                  "comps": [c for c in (r.get("comps") or "").split(",") if c],
+                  "note": r.get("note"),
+                  "source": r.get("source") or "review"}
                  for r in _safe("SELECT qid, topic, owner_code, body, comps, "
                                 "note, source FROM hub_question ORDER BY qid")]
     return {"owners": owners, "ownerTotals": totals,
@@ -143,74 +143,74 @@ def _store():
     for r in _safe("SELECT qid, source, topic, owner_code, body, comps, status, "
                    "status_by, status_at, created_by, created_at, edited_by, "
                    "edited_at FROM hub_question"):
-        qid = int(r["QID"])
-        body = _clob(r.get("BODY"))
-        comps = [c for c in (r.get("COMPS") or "").split(",") if c]
+        qid = int(r["qid"])
+        body = _clob(r.get("body"))
+        comps = [c for c in (r.get("comps") or "").split(",") if c]
         rec = {}
         if comps:
             rec["comps"] = comps
-        if r.get("STATUS"):
-            rec.update(status=r["STATUS"], statusBy=r.get("STATUS_BY"),
-                       statusAt=_ts(r.get("STATUS_AT")))
-        if r.get("EDITED_AT"):
-            rec.update(editedBy=r.get("EDITED_BY"), editedAt=_ts(r.get("EDITED_AT")),
+        if r.get("status"):
+            rec.update(status=r["status"], statusBy=r.get("status_by"),
+                       statusAt=_ts(r.get("status_at")))
+        if r.get("edited_at"):
+            rec.update(editedBy=r.get("edited_by"), editedAt=_ts(r.get("edited_at")),
                        body=body)
         out["q"][str(qid)] = rec
-        if (r.get("SOURCE") or "review") == "user":
+        if (r.get("source") or "review") == "user":
             out["n"][str(qid)] = {
-                "n": qid, "topic": int(r["TOPIC"] or 0),
-                "owner": r.get("OWNER_CODE") or "KB", "body": body or "",
-                "comps": comps, "raisedBy": r.get("CREATED_BY"),
-                "raisedAt": _ts(r.get("CREATED_AT")),
+                "n": qid, "topic": int(r["topic"] or 0),
+                "owner": r.get("owner_code") or "KB", "body": body or "",
+                "comps": comps, "raisedBy": r.get("created_by"),
+                "raisedAt": _ts(r.get("created_at")),
             }
 
     for r in _safe("SELECT answer_id, qid, body, author, created_at, updated_by, "
                    "updated_at, accepted, accepted_by, accepted_at, seed_key, "
                    "conf, gap, quote, fig, ev, is_draft, sei_ask, signoff, lan_id, "
                    "host_name, id_source FROM hub_answer"):
-        a = {"qid": int(r["QID"]), "body": _clob(r.get("BODY")) or "",
-             "author": r.get("AUTHOR"), "createdAt": _ts(r.get("CREATED_AT")),
-             "accepted": (r.get("ACCEPTED") or "N") == "Y"}
-        if r.get("UPDATED_AT"):
-            a.update(updatedBy=r.get("UPDATED_BY"), updatedAt=_ts(r.get("UPDATED_AT")))
+        a = {"qid": int(r["qid"]), "body": _clob(r.get("body")) or "",
+             "author": r.get("author"), "createdAt": _ts(r.get("created_at")),
+             "accepted": (r.get("accepted") or "N") == "Y"}
+        if r.get("updated_at"):
+            a.update(updatedBy=r.get("updated_by"), updatedAt=_ts(r.get("updated_at")))
         if a["accepted"]:
-            a.update(acceptedBy=r.get("ACCEPTED_BY"),
-                     acceptedAt=_ts(r.get("ACCEPTED_AT")),
-                     signoff=r.get("SIGNOFF"), lanId=r.get("LAN_ID"),
-                     host=r.get("HOST_NAME"), idSource=r.get("ID_SOURCE"))
-        if r.get("SEED_KEY"):
-            a["seedKey"] = r["SEED_KEY"]
+            a.update(acceptedBy=r.get("accepted_by"),
+                     acceptedAt=_ts(r.get("accepted_at")),
+                     signoff=r.get("signoff"), lanId=r.get("lan_id"),
+                     host=r.get("host_name"), idSource=r.get("id_source"))
+        if r.get("seed_key"):
+            a["seedKey"] = r["seed_key"]
         # A drafted answer keeps its draft chrome only while it IS one.
         # Editing clears the flag, because at that point it is the
         # editor's answer and labelling it a draft misattributes it.
-        if (r.get("IS_DRAFT") or "N") == "Y" and not r.get("UPDATED_AT"):
+        if (r.get("is_draft") or "N") == "Y" and not r.get("updated_at"):
             a["draft"] = True
-            a.update(conf=r.get("CONF"), gap=_clob(r.get("GAP")),
-                     quote=_clob(r.get("QUOTE")), fig=r.get("FIG"),
-                     seiAsk=r.get("SEI_ASK"),
-                     ev=[e.strip() for e in (r.get("EV") or "").split("|") if e.strip()])
-        out["a"][r["ANSWER_ID"]] = a
+            a.update(conf=r.get("conf"), gap=_clob(r.get("gap")),
+                     quote=_clob(r.get("quote")), fig=r.get("fig"),
+                     seiAsk=r.get("sei_ask"),
+                     ev=[e.strip() for e in (r.get("ev") or "").split("|") if e.strip()])
+        out["a"][r["answer_id"]] = a
 
     # Metadata only; the bytes are fetched one at a time by the browser.
     for r in _safe("SELECT att_id, answer_id, qid, kind, mime, filename, caption, "
                    "width_px, height_px, byte_size, sanitised, sanitise_note, "
                    "uploaded_by, uploaded_at FROM hub_attachment ORDER BY uploaded_at"):
-        key = r.get("ANSWER_ID") or f"q{int(r['QID'] or 0)}"
+        key = r.get("answer_id") or f"q{int(r['QID'] or 0)}"
         out["atts"].setdefault(key, []).append({
-            "id": r["ATT_ID"], "kind": r.get("KIND"), "mime": r.get("MIME"),
-            "filename": r.get("FILENAME"), "caption": r.get("CAPTION"),
-            "w": r.get("WIDTH_PX"), "h": r.get("HEIGHT_PX"),
-            "bytes": r.get("BYTE_SIZE"),
-            "sanitised": (r.get("SANITISED") or "N") == "Y",
-            "note": r.get("SANITISE_NOTE"),
-            "by": r.get("UPLOADED_BY"), "at": _ts(r.get("UPLOADED_AT")),
+            "id": r["att_id"], "kind": r.get("kind"), "mime": r.get("mime"),
+            "filename": r.get("filename"), "caption": r.get("caption"),
+            "w": r.get("width_px"), "h": r.get("height_px"),
+            "bytes": r.get("byte_size"),
+            "sanitised": (r.get("sanitised") or "N") == "Y",
+            "note": r.get("sanitise_note"),
+            "by": r.get("uploaded_by"), "at": _ts(r.get("uploaded_at")),
         })
 
     for r in _safe("SELECT qid, answer_id, to_status, actor, at_ts, note "
                    "FROM hub_event ORDER BY at_ts"):
-        out["ev"].append({"qid": int(r["QID"] or 0), "to": r.get("TO_STATUS"),
-                          "actor": r.get("ACTOR"), "at": _ts(r.get("AT_TS")),
-                          "note": r.get("NOTE") or ""})
+        out["ev"].append({"qid": int(r["qid"] or 0), "to": r.get("to_status"),
+                          "actor": r.get("actor"), "at": _ts(r.get("at_ts")),
+                          "note": r.get("note") or ""})
     return out
 
 
@@ -288,8 +288,8 @@ def apply_op(o: Op, request: Request):
                     {"i": o.answerId})
         if not cur:
             raise HTTPException(404, "no such answer")
-        qid = int(cur[0]["QID"])
-        was = (cur[0].get("ACCEPTED") or "N") == "Y"
+        qid = int(cur[0]["qid"])
+        was = (cur[0].get("accepted") or "N") == "Y"
         # Editing an accepted answer withdraws the acceptance, here as well
         # as in the browser -- the rule has to hold for any client.
         st.append(("UPDATE hub_answer SET body = :b, updated_by = :u, "
@@ -345,7 +345,7 @@ def apply_op(o: Op, request: Request):
     elif o.op == "question.add":
         nxt = _safe("SELECT NVL(MAX(qid), :f - 1) + 1 AS n FROM hub_question "
                     "WHERE qid >= :f", {"f": FIRST_USER_QID})
-        qid = int(nxt[0]["N"]) if nxt else FIRST_USER_QID
+        qid = int(nxt[0]["n"]) if nxt else FIRST_USER_QID
         st.append(("INSERT INTO hub_question (qid, source, topic, owner_code, body, "
                    "comps, created_by) VALUES (:q, 'user', :t, :o, :b, :c, :u)",
                    {"q": qid, "t": o.topic or 0, "o": (o.owner or "KB")[:10],
@@ -452,7 +452,7 @@ def get_attachment(att_id: str):
     r = rows[0]
     # A row that did not go through the sanitiser is not served. One
     # inserted around the API is exactly the row not to trust.
-    if (r.get("SANITISED") or "N") != "Y":
+    if (r.get("sanitised") or "N") != "Y":
         raise HTTPException(409, "attachment was not sanitised and will not be served")
 
     # nosniff everywhere, and a CSP on the SVG so that even a defect in
@@ -462,13 +462,13 @@ def get_attachment(att_id: str):
                "Content-Security-Policy":
                    "default-src 'none'; style-src 'unsafe-inline'; img-src data:",
                "Content-Disposition":
-                   f'inline; filename="{(r.get("FILENAME") or att_id)[:80]}"'}
-    if r["KIND"] == "svg":
-        return Response(_clob(r.get("SVG_TEXT")) or "", media_type="image/svg+xml",
+                   f'inline; filename="{(r.get("filename") or att_id)[:80]}"'}
+    if r["kind"] == "svg":
+        return Response(_clob(r.get("svg_text")) or "", media_type="image/svg+xml",
                         headers=headers)
-    blob = r.get("CONTENT")
+    blob = r.get("content")
     data = blob.read() if hasattr(blob, "read") else (blob or b"")
-    return Response(bytes(data), media_type=r.get("MIME") or "application/octet-stream",
+    return Response(bytes(data), media_type=r.get("mime") or "application/octet-stream",
                     headers=headers)
 
 

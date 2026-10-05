@@ -30,9 +30,29 @@ def fake_execute(statements):
 
 
 def fake_query(sql, params=None):
+    """Hand back rows the way db.query does, or this proves nothing.
+
+    THIS IS THE BUG THIS FAKE ONCE HID. db.query lowercases every column
+    name off the cursor description. This fake used to return whatever
+    the fixture wrote, the fixtures were written in Oracle's uppercase,
+    and so the whole router was built reading r["OWNER_CODE"] against a
+    dict that only ever has "owner_code". Every suite passed and
+    GET /hub/discussion was a 500 on the first real call.
+
+    So the fake lowercases, exactly as db.query does, and an uppercase
+    fixture key is now an error rather than a convenience — a fixture
+    that can lie about the shape of a row is not a fixture.
+    """
     for frag, rows in ROWS.items():
         if frag in " ".join(sql.split()):
-            return rows
+            for row in rows:
+                bad = [k for k in row if k != k.lower()]
+                if bad:
+                    raise AssertionError(
+                        f"fixture key(s) {bad} are not lowercase; db.query "
+                        f"lowercases every column name, so a row never "
+                        f"looks like this")
+            return [dict(r) for r in rows]
     return []
 
 
@@ -90,7 +110,7 @@ ok(any("hub_question SET status = NULL" in s for s in sql),
 # ---- editing an accepted answer withdraws the acceptance ------------
 ROWS.clear()
 ROWS["SELECT qid, accepted FROM hub_answer WHERE answer_id = :i"] = [
-    {"QID": 62, "ACCEPTED": "Y"}]
+    {"qid": 62, "accepted": "Y"}]
 sql, par = run(op="answer.edit", answerId="a1", body="revised", actor="K Barnhardt")
 upd = next(s for s in sql if s.startswith("UPDATE hub_answer SET body"))
 ok("accepted = 'N'" in upd and "accepted_by = NULL" in upd,
@@ -101,7 +121,7 @@ ok(any("hub_event" in s and "withdrawn" in (p.get("n") or "")
    "and the withdrawal is recorded", par)
 
 ROWS["SELECT qid, accepted FROM hub_answer WHERE answer_id = :i"] = [
-    {"QID": 62, "ACCEPTED": "N"}]
+    {"qid": 62, "accepted": "N"}]
 sql, par = run(op="answer.edit", answerId="a2", body="revised", actor="K Barnhardt")
 ok(not any("hub_event" in s for s in sql),
    "editing an answer that was never accepted writes no withdrawal event", sql)
@@ -112,7 +132,7 @@ sql, par = run(op="answer.seed", qid=107, answerId="seed107", body="draft text")
 ok(any("INSERT INTO hub_answer" in s and ":k" in s for s in sql),
    "materialising a draft records seed_key, so an edited draft stays "
    "distinguishable from an answer somebody wrote", sql)
-ROWS["SELECT answer_id FROM hub_answer WHERE answer_id = :i"] = [{"ANSWER_ID": "seed107"}]
+ROWS["SELECT answer_id FROM hub_answer WHERE answer_id = :i"] = [{"answer_id": "seed107"}]
 SENT.clear()
 R.apply_op(R.Op(op="answer.seed", qid=107, answerId="seed107",
                 body="draft text"), Req())
@@ -185,14 +205,14 @@ ok(refuses(lambda: R.add_attachment(R.Att(answerId="a1", kind="svg",
 
 # ---- the reader refuses what the writer did not sanitise ------------
 ROWS["SELECT kind, mime, content, svg_text, sanitised, filename"] = [
-    {"KIND": "svg", "MIME": "image/svg+xml", "SVG_TEXT": "<svg onload='alert(1)'/>",
-     "SANITISED": "N", "FILENAME": "x.svg", "CONTENT": None}]
+    {"kind": "svg", "mime": "image/svg+xml", "svg_text": "<svg onload='alert(1)'/>",
+     "sanitised": "N", "filename": "x.svg", "content": None}]
 ok(refuses(lambda: R.get_attachment("t1")) == 409,
    "a row that did not go through the sanitiser is NOT served — a row "
    "inserted around the API is exactly the one not to trust", "")
 ROWS["SELECT kind, mime, content, svg_text, sanitised, filename"] = [
-    {"KIND": "svg", "MIME": "image/svg+xml", "SVG_TEXT": "<svg/>",
-     "SANITISED": "Y", "FILENAME": "x.svg", "CONTENT": None}]
+    {"kind": "svg", "mime": "image/svg+xml", "svg_text": "<svg/>",
+     "sanitised": "Y", "filename": "x.svg", "content": None}]
 resp = R.get_attachment("t1")
 ok(resp.headers.get("x-content-type-options") == "nosniff",
    "a served attachment carries nosniff", dict(resp.headers))
@@ -281,6 +301,87 @@ for col in ("lan_id = NULL", "host_name = NULL", "client_ip = NULL",
     ok(col in " ".join(clr.split()),
        f"withdrawing an acceptance also clears {col.split()[0]} — a cleared "
        f"signature that keeps its machine name still reads as signed", clr)
+
+# --------------------------------------------------------------------
+# THE READ PATH, which nothing here used to touch.
+#
+# Every test above drives apply_op and asserts on the SQL it emits. Not
+# one of them ever called _corpus() or _store(), so the whole GET side
+# of the router was unexercised — and that is exactly where it broke:
+# GET /hub/discussion raised KeyError 'OWNER_CODE' on the first real
+# call, because db.query hands back lowercase keys and the router was
+# written against uppercase ones.
+#
+# Two guards and one exercise, in that order: pin the contract, prove
+# the router honours it, then run the thing end to end.
+import re, pathlib                                     # noqa: E402
+
+APPDIR = pathlib.Path(__file__).resolve().parents[1] / "app"
+DBSRC = (APPDIR.parent / "app" / "db.py").read_text(encoding="utf-8")
+ok("c[0].lower()" in DBSRC,
+   "db.query still lowercases every column name off the cursor — the fake "
+   "above copies this, and if db.py ever stops doing it the fake becomes "
+   "a lie again", DBSRC[:0])
+
+RSRC = (APPDIR / "routers_hub_discussion.py").read_text(encoding="utf-8")
+upper = re.findall(r'\[\s*"([A-Z][A-Z_0-9]*)"\s*\]|\.get\(\s*"([A-Z][A-Z_0-9]*)"',
+                   RSRC)
+upper = [a or b for a, b in upper]
+ok(not upper,
+   "and the router reads no UPPERCASE row key anywhere — the ones that "
+   "subscript raise a 500, and the ones that .get() come back None and "
+   "render a blank field, which is the worse half",
+   ", ".join(sorted(set(upper))[:12]))
+
+# The exercise. Rows shaped the way Oracle returns them, through the
+# fake that now enforces that shape.
+ROWS.clear()
+SENT.clear()
+ROWS["FROM hub_owner"] = [
+    {"owner_code": "KB", "name": "K B", "focus": "architecture",
+     "declared_total": 42},
+    {"owner_code": "GL", "name": "G L", "focus": "ingestion",
+     "declared_total": 29},
+]
+ROWS["FROM hub_topic"] = [
+    {"topic_no": 1, "title": "SEI Data Structure", "comps": "15,40,37",
+     "sort_order": 1},
+]
+ROWS["note, source FROM hub_question"] = [
+    {"qid": 1, "topic": 1, "owner_code": "KB", "body": "What is enriched?",
+     "comps": "15,40", "note": None, "source": "review"},
+]
+c = R._corpus()
+ok(c["owners"].get("KB", {}).get("name") == "K B",
+   "the corpus reads owners out of the row — the name used to come back "
+   "None while the code key raised, so half the failure was silent",
+   c["owners"])
+ok(c["ownerTotals"].get("KB") == 42, "and their declared totals",
+   c["ownerTotals"])
+ok(c["topics"] and c["topics"][0]["title"] == "SEI Data Structure"
+   and c["topics"][0]["comps"] == ["15", "40", "37"],
+   "topics, with their component lists split", c["topics"])
+ok(c["questions"] and c["questions"][0]["body"] == "What is enriched?"
+   and c["questions"][0]["owner"] == "KB"
+   and c["questions"][0]["topic"] == 1,
+   "and the questions themselves, owner and topic resolved", c["questions"])
+ok(all(v is not None for v in
+       [c["questions"][0]["body"], c["topics"][0]["title"],
+        c["owners"]["KB"]["focus"]]),
+   "with nothing silently None — a .get() against the wrong case returns "
+   "None rather than raising, so a blank screen is the shape this bug "
+   "takes when it does not 500", "")
+
+# And the endpoint itself, which is what actually returned the 500.
+d = R.get_discussion()
+ok(set(d) >= {"store", "corpus", "persisted", "seeded"},
+   "GET /hub/discussion returns its four parts", sorted(d))
+for k in ("owners", "topics", "questions"):
+    ok(d["corpus"].get(k), f"and the corpus carries {k} — this call was the "
+       f"500", sorted(d["corpus"]))
+
+ROWS.clear()
+SENT.clear()
 
 print()
 print(f"{BAD} assertion(s) failed" if BAD else "hub discussion router assertions pass")

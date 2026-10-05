@@ -41,7 +41,7 @@ const findIn = (k) => COMPS.filter((c) => c.container === k && FIND[c.id]).lengt
 const CONTAINERS = {
  EVT: ["Event Ingestion", "⚡", "listener · staging · collapse · pull · micro-batch registry · quarantine"],
  IE: ["Ingress / Egress", "📥", "Landing+Transport · Sensors · Outbound Producers · Apigee · Gateway"],
- PROC: ["Processing", "🧪", "Python Ingestion · RAW · Stage 2 dbt · Gold dbt · Corrections"],
+ PROC: ["Processing", "🧪", "Python Ingestion · SWP_RAW · STG (view) · INT · DIM · FACT · Corrections"],
  ORCH: ["Orchestration", "🛠", "DAG fan-out · dim-before-fact · intraday · replay · partial-batch"],
  DQ: ["Data Quality", "🛡", "G1 structural · G2 profiling · G3 dbt tests · G4 tie-out · G5 recon · DQ framework"],
  FND: ["Foundation", "⚙", "errors/quarantine · recon · audit/lineage · security · metadata · observability · SSO"],
@@ -388,8 +388,12 @@ export default function HubDesign({ t }) {
          <span>{chip((STCOL[sx.status] || "#eef1f4") + "22",
           STCOL[sx.status] || "#8a97a3", `${sx.status.toUpperCase()} · ${sx.pct}%`)}</span>
          <span style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-          {td && chip(TDD_VERDICTS[td.v][0] + "1f", TDD_VERDICTS[td.v][0],
-           `TDD \u00b7 ${TDD_VERDICTS[td.v][1].toUpperCase()}`)}
+          {td && (
+           <span title={`dbt TDD: ${TDD_VERDICTS[td.v][1]} \u2014 ${td.name}`}
+            style={{ fontSize: 9, fontWeight: 800, padding: "3px 7px",
+             borderRadius: 999, background: TDD_VERDICTS[td.v][0] + "1f",
+             color: TDD_VERDICTS[td.v][0], border: `1px solid ${TDD_VERDICTS[td.v][0]}55`,
+             whiteSpace: "nowrap", flex: "0 0 auto" }}>TDD</span>)}
           {nCite > 0 && (
            <span onClick={(e) => { e.stopPropagation(); setSrcOf(c.id); }}
             title={`${nCite} SEI citation${nCite === 1 ? "" : "s"} — read side by side`}
@@ -549,27 +553,35 @@ export default function HubDesign({ t }) {
 
       {/* processing */}
       <Grp x={444} y={180} w={226} h={470} k="PROC" />
+      {/* Layer model per the dbt TDD: SWP_RAW -> STG (view) -> INT ->
+          DIM -> FACT. This band used to read Stage 1 RAW -> Correction ->
+          Stage 2 Enriched -> Pre-Gold Exadata, which is a different
+          build: it merged STG and INT into one box and invented a tier
+          the TDD does not have. STG is drawn square, not as a cylinder,
+          because it is a view and stores nothing — the shape is the
+          point. Corrections come out of the chain: in the TDD they are
+          the MERGE-vs-UPDATE rule applied inside DIM (§6.4.1), not a
+          layer between RAW and Silver. */}
       <Mini x={454} y={214} w={200} label="Python Ingestion Fwk" k="python ingestion" />
-      <Mini x={454} y={280} w={200} label="Stage 1 RAW" cyl k="stage 1" />
-      <Mini x={454} y={346} w={200} label="Correction Handling" k="correction" />
-      <Mini x={454} y={412} w={200} label="Stage 2 Enriched · dbt" cyl k="stage 2" />
-      <Mini x={454} y={478} w={200} label="Pre-Gold Exadata · dbt" cyl k="gold" />
-      <Rel x1={554} y1={238} x2={554} y2={280} label="" />
-      <Rel x1={554} y1={304} x2={554} y2={346} label="" />
-      <Rel x1={554} y1={370} x2={554} y2={412} label="" />
-      <Rel x1={554} y1={436} x2={554} y2={478} label="" />
-      <text x="454" y="528" fontSize="8" fontStyle="italic" fill="#cc3344">
-       Against the dbt TDD: Stage 2 is TWO objects —</text>
-      <text x="454" y="540" fontSize="8" fontStyle="italic" fill="#cc3344">
-       STG (a view, stores nothing) + INT (7 days)</text>
-      <text x="454" y="558" fontSize="8" fontStyle="italic" fill="#cc3344">
-       No Exadata tier in the TDD: dbt MERGEs into</text>
-      <text x="454" y="570" fontSize="8" fontStyle="italic" fill="#cc3344">
-       the Oracle Gold tables that already exist,</text>
-      <text x="454" y="582" fontSize="8" fontStyle="italic" fill="#cc3344">
-       DML-only, no DDL, ODI history preserved</text>
-      <text x="454" y="600" fontSize="8" fontStyle="italic" fill="#a8560f">
-       DIM then FACT — two ordered layers, not one</text>
+      <Mini x={454} y={272} w={200} label="SWP_RAW · Bronze" cyl k="stage 1" />
+      <Mini x={454} y={330} w={200} label="STG · view, stores nothing" k="stage 2" />
+      <Mini x={454} y={388} w={200} label="INT · 7 days, PASS only" cyl k="stage 2" />
+      <Mini x={454} y={446} w={200} label="DIM · built first" cyl k="gold" />
+      <Mini x={454} y={504} w={200} label="FACT · built second" cyl k="gold" />
+      <Mini x={454} y={562} w={200} label="Correction Handling" k="correction" />
+      <Rel x1={554} y1={238} x2={554} y2={272} label="" />
+      <Rel x1={554} y1={296} x2={554} y2={330} label="" />
+      <Rel x1={554} y1={354} x2={554} y2={388} label="" />
+      <Rel x1={554} y1={412} x2={554} y2={446} label="" />
+      <Rel x1={554} y1={470} x2={554} y2={504} label="" />
+      <text x="454" y="598" fontSize="8" fontStyle="italic" fill="#159943">
+       Aligned to the dbt TDD: Silver is STG + INT</text>
+      <text x="454" y="610" fontSize="8" fontStyle="italic" fill="#a8560f">
+       STG is the one box here that stores nothing</text>
+      <text x="454" y="622" fontSize="8" fontStyle="italic" fill="#a8560f">
+       Gold pre-exists — dbt MERGEs, DML-only, no DDL</text>
+      <text x="454" y="634" fontSize="8" fontStyle="italic" fill="#a8560f">
+       Tracker still names 15 Stage 2 and 16 Gold</text>
 
       {/* data quality */}
       <Grp x={688} y={180} w={232} h={470} k="DQ" />
@@ -622,7 +634,7 @@ export default function HubDesign({ t }) {
       <Ortho pts={[[212,470],[192,470],[192,466],[176,466]]} label="set-based pull" lx={196} ly={500} />
       <Ortho pts={[[176,775],[212,775]]} label="files [standby]" lx={194} ly={762} />
       <Ortho pts={[[212,905],[190,905],[190,800],[176,800]]} label="submit · push + poll" kind="out" lx={186} ly={932} />
-      <Ortho pts={[[426,514],[436,514],[436,292],[452,292]]} label="" />
+      <Ortho pts={[[426,514],[436,514],[436,284],[452,284]]} label="" />
       <text x="222" y="644" fontSize="8" fontStyle="italic" fill="#159943">
        one commit per micro-batch → Stage 1</text>
       <Ortho pts={[[426,712],[557,712],[557,654]]} label="standby load" lx={600} ly={706} />
