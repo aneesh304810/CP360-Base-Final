@@ -23,6 +23,10 @@ import { GROUPS, PROC_STAGES, groupOfTracker, stageOfTracker, groupById,
 import { SEI_ARCH_DOC, ARCH_FEEDS, ARCH_LAYERS, ARCH_ORCHESTRATION,
  ARCH_PRINCIPLES, ARCH_CONFLICTS, OUTBOUND_FLOW, INBOUND_POSTURE,
  conflictsAt } from "./seiArchitecture.js";
+import { ContextView, GateView, LoaderLoopView, Stage2Model }
+ from "./HubContext.jsx";
+import { s2DomainName, s2DomainOf, S2_TABLES, S2_RELS, S2_INFERRED_COUNT }
+ from "./hubStage2Model.js";
 
 // =====================================================================
 // HubDesign — the CP Integration Hub route: C4 landing (L1 context +
@@ -87,6 +91,9 @@ export default function HubDesign({ t }) {
  const [seiStage, setSeiStage] = useState(null);   // C4 L3: which band
  const [seiComp, setSeiComp] = useState(null);     // C4 L4: which component
  const [grp, setGrp] = useState(null);             // C4 L3: which container       // "all components" flat tracker
+ const [chan, setChan] = useState(null);           // C4 L1: which boundary channel
+ const [s2dom, setS2dom] = useState(null);         // Stage 2 model: which domain
+ const [s2tbl, setS2tbl] = useState(null);         // Stage 2 model: which table
  const [expand, setExpand] = useState(null);    // L3 component detail panel
  const [srcOf, setSrcOf] = useState(null);      // component shown beside its SEI source
  const [seiDoc, setSeiDoc] = useState(null);    // {doc, section} open in the popup
@@ -699,6 +706,55 @@ export default function HubDesign({ t }) {
     there was nowhere to see was the SHAPE, once, in the words the
     programme uses rather than the words SEI's documents use.
     Click any container and it opens with its components. */
+ /* ---------- CTX: the boundary, above the containers ---------- */
+ if (view === "CTX") return (
+  <div>
+   <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+   <Popup />
+   <Crumb trail={[["containers", () => setView("L2")],
+                  ["the boundary", null]]} />
+   <ContextView t={t} chan={chan} setChan={setChan} />
+  </div>);
+
+ /* ---------- GATE: three kinds of event, and what opens the day ------ */
+ if (view === "GATE") return (
+  <div>
+   <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+   <Popup />
+   <Crumb trail={[["containers", () => setView("L2")],
+                  ["Orchestration", () => { setGrp("orchestration"); setView("GRP"); }],
+                  ["events and the gate", null]]} />
+   <GateView t={t} />
+  </div>);
+
+ /* ---------- LOOP: the outbound round trip ---------- */
+ if (view === "LOOP") return (
+  <div>
+   <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+   <Popup />
+   <Crumb trail={[["containers", () => setView("L2")],
+                  ["Ingress and Egress", () => { setGrp("ingress"); setView("GRP"); }],
+                  ["the loader loop", null]]} />
+   <LoaderLoopView t={t} />
+  </div>);
+
+ /* ---------- S2M: Stage 2 INT, the canonical model ---------- */
+ if (view === "S2M") return (
+  <div>
+   <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+   <Popup />
+   <Crumb trail={[["containers", () => setView("L2")],
+    ["Processing", () => { setGrp("processing"); setView("GRP"); }],
+    ["Stage 2 INT", s2dom || s2tbl
+      ? () => { setS2dom(null); setS2tbl(null); } : null],
+    ...(s2dom && !s2tbl ? [[s2DomainName(s2dom), null]] : []),
+    ...(s2tbl ? [[s2DomainName(s2dom || ""), () => setS2tbl(null)],
+                 [s2tbl, null]] : [])]} />
+   <Stage2Model t={t} dom={s2dom} tbl={s2tbl}
+    setDom={(d) => { setS2dom(d); setS2tbl(null); }}
+    setTbl={(x) => { setS2tbl(x); if (x && !s2dom) setS2dom(s2DomainOf(x)); }} />
+  </div>);
+
  if (view === "L2") {
   const cnt = (g) => {
    const trk = COMPS.filter((c) => groupOfTracker(c) === g.id);
@@ -821,9 +877,14 @@ export default function HubDesign({ t }) {
      <span onClick={() => setView("L1")} style={{ fontSize: 11.5, fontWeight: 700,
       padding: "7px 16px", borderRadius: 5, background: t.navy || "#10193b",
       color: "#fff", cursor: "pointer" }}>← context + dashboard</span>
+     <span onClick={() => { setView("CTX"); setChan(null); }}
+      style={{ fontSize: 10.5, fontWeight: 800, padding: "6px 14px",
+       borderRadius: 999, cursor: "pointer", background: "#0f4775",
+       color: "#fff" }}>
+      ⇆ the boundary · 3 transports, 4 channels</span>
      <span onClick={() => setView("SEIFLOW")} style={{ fontSize: 10.5,
       fontWeight: 800, padding: "6px 14px", borderRadius: 999, cursor: "pointer",
-      background: "#0f4775", color: "#fff" }}>
+      background: "#eef3f8", color: "#0f4775" }}>
       ◆ the SEI pipeline, box by box</span>
      <span onClick={() => { setView("SEIBASE"); setExpand(null); }}
       style={{ fontSize: 10.5, fontWeight: 800, padding: "6px 14px",
@@ -1335,6 +1396,26 @@ export default function HubDesign({ t }) {
             : g.sub}</div>
     </div>
 
+    {/* A container that owns a detailed screen offers it here rather than
+        leaving the reader to find it from the top. */}
+    {(grp === "orchestration" || grp === "ingress" || grp === "events") && (
+     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "10px 0 2px" }}>
+      {(grp === "orchestration" || grp === "events") && (
+       <span onClick={() => setView("GATE")} style={{ fontSize: 10.5,
+        fontWeight: 800, padding: "6px 14px", borderRadius: 999,
+        cursor: "pointer", background: "#e4f0fb", color: "#0f4775" }}>
+        ◆ three kinds of event, and what opens the day</span>)}
+      {grp === "ingress" && (
+       <span onClick={() => setView("LOOP")} style={{ fontSize: 10.5,
+        fontWeight: 800, padding: "6px 14px", borderRadius: 999,
+        cursor: "pointer", background: "#fdf2e3", color: "#a8560f" }}>
+        ⇄ the loader loop · four legs, two transports</span>)}
+      <span onClick={() => { setView("CTX"); setChan(null); }}
+       style={{ fontSize: 10.5, fontWeight: 800, padding: "6px 14px",
+        borderRadius: 999, cursor: "pointer", background: "#eef3f8",
+        color: "#0f4775" }}>⇆ the boundary</span>
+     </div>)}
+
     {grp === "processing" && (
      <>
       <Head title="The stage chain" bg="#1f4f7a"
@@ -1356,6 +1437,11 @@ export default function HubDesign({ t }) {
           marginTop: 7 }}>{st.w}</div>
          {st.note && <div style={{ fontSize: 10.5, color: "#a8560f",
           lineHeight: 1.55, marginTop: 6 }}>{st.note}</div>}
+         {st.id === "stage2int" && (
+          <div onClick={() => { setS2dom(null); setS2tbl(null); setView("S2M"); }}
+           style={{ fontSize: 11, fontWeight: 700, color: "#0f4775",
+            cursor: "pointer", marginTop: 8 }}>
+           {S2_TABLES.length} canonical tables, 10 domains →</div>)}
          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
           {[...st.sei, ...st.bbh].map((id) => (
            <span key={id} onClick={() => { if (id[0] === "S") {
