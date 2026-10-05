@@ -40,9 +40,21 @@ R.execute = fake_execute
 R.query = fake_query
 
 
+class Req:
+    """A request with only what hub_identity reads off it."""
+
+    def __init__(self, headers=None, host="10.20.30.40"):
+        self.headers = headers or {}
+
+        class C:
+            pass
+        self.client = C()
+        self.client.host = host
+
+
 def run(**kw):
     SENT.clear()
-    R.apply_op(R.Op(**kw))
+    R.apply_op(R.Op(**kw), Req())
     return [" ".join(s.split()) for s, _ in SENT], [p for _, p in SENT]
 
 
@@ -59,7 +71,7 @@ ok(R.sniff(b"<svg xmlns='http://www.w3.org/2000/svg'/>") is None,
    "skip the sanitiser", "")
 
 # ---- accepting clears the siblings, in that order -------------------
-sql, par = run(op="answer.accept", qid=62, answerId="a1", actor="GL")
+sql, par = run(op="answer.accept", qid=62, answerId="a1", actor="Glenn Lasrado")
 clear = next((i for i, s in enumerate(sql)
               if s.startswith("UPDATE hub_answer SET accepted = 'N'")), -1)
 setq = next((i for i, s in enumerate(sql)
@@ -79,7 +91,7 @@ ok(any("hub_question SET status = NULL" in s for s in sql),
 ROWS.clear()
 ROWS["SELECT qid, accepted FROM hub_answer WHERE answer_id = :i"] = [
     {"QID": 62, "ACCEPTED": "Y"}]
-sql, par = run(op="answer.edit", answerId="a1", body="revised", actor="KB")
+sql, par = run(op="answer.edit", answerId="a1", body="revised", actor="K Barnhardt")
 upd = next(s for s in sql if s.startswith("UPDATE hub_answer SET body"))
 ok("accepted = 'N'" in upd and "accepted_by = NULL" in upd,
    "editing clears the acceptance in the DATABASE too — the rule cannot "
@@ -90,7 +102,7 @@ ok(any("hub_event" in s and "withdrawn" in (p.get("n") or "")
 
 ROWS["SELECT qid, accepted FROM hub_answer WHERE answer_id = :i"] = [
     {"QID": 62, "ACCEPTED": "N"}]
-sql, par = run(op="answer.edit", answerId="a2", body="revised", actor="KB")
+sql, par = run(op="answer.edit", answerId="a2", body="revised", actor="K Barnhardt")
 ok(not any("hub_event" in s for s in sql),
    "editing an answer that was never accepted writes no withdrawal event", sql)
 
@@ -102,14 +114,15 @@ ok(any("INSERT INTO hub_answer" in s and ":k" in s for s in sql),
    "distinguishable from an answer somebody wrote", sql)
 ROWS["SELECT answer_id FROM hub_answer WHERE answer_id = :i"] = [{"ANSWER_ID": "seed107"}]
 SENT.clear()
-R.apply_op(R.Op(op="answer.seed", qid=107, answerId="seed107", body="draft text"))
+R.apply_op(R.Op(op="answer.seed", qid=107, answerId="seed107",
+                body="draft text"), Req())
 ok(len(SENT) == 0,
    "and materialising the same draft twice writes nothing — two clients "
    "opening the same question must not create two rows", len(SENT))
 ROWS.clear()
 
 # ---- a question row may not exist: the 108 live in code -------------
-sql, _ = run(op="answer.add", qid=62, body="an answer", actor="GM")
+sql, _ = run(op="answer.add", qid=62, body="an answer", actor="G Middha")
 ok(any("MERGE INTO hub_question" in s for s in sql),
    "answering a seeded question creates its row first — the 108 are not in "
    "the database, so a foreign-key-shaped assumption would fail on question "
@@ -130,11 +143,12 @@ def refuses(fn, what=""):
     return None
 
 
-ok(refuses(lambda: R.apply_op(R.Op(op="nonsense")), "") == 400,
+ok(refuses(lambda: R.apply_op(R.Op(op="nonsense"), Req()), "") == 400,
    "an unknown op is refused rather than silently doing nothing", "")
-ok(refuses(lambda: R.apply_op(R.Op(op="answer.add", qid=1, body="   "))) == 400,
+ok(refuses(lambda: R.apply_op(R.Op(op="answer.add", qid=1, body="   "), Req())) == 400,
    "an empty answer is refused", "")
-ok(refuses(lambda: R.apply_op(R.Op(op="question.status", qid=1, status="resolved"))) == 400,
+ok(refuses(lambda: R.apply_op(R.Op(op="question.status", qid=1,
+                                status="resolved"), Req())) == 400,
    "status cannot be set to resolved by hand — resolved is DERIVED from an "
    "accepted answer, and a settable one would let a question read resolved "
    "with nothing answering it", "")
@@ -187,6 +201,86 @@ ok("default-src 'none'" in (resp.headers.get("content-security-policy") or ""),
    resp.headers.get("content-security-policy"))
 ok(refuses(lambda: R.get_attachment("../../etc/passwd")) == 400,
    "and an id that is not an id is refused before it reaches a query", "")
+
+# ---- who signed, and how much that is worth -------------------------
+#
+# A browser cannot read a machine name or a Windows account. So none of
+# this comes from the client, and the tests drive the server side.
+import app.hub_identity as ID                                 # noqa: E402
+
+
+ok(ID.client_ip(Req({"x-forwarded-for": "10.1.2.3, 10.0.0.1"})) == "10.1.2.3",
+   "the caller's address comes from the FIRST hop in x-forwarded-for, not "
+   "the proxy that relayed it", ID.client_ip(Req({"x-forwarded-for": "10.1.2.3, 10.0.0.1"})))
+ok(ID.client_ip(Req({}, host="10.9.9.9")) == "10.9.9.9",
+   "and falls back to the socket when there is no proxy header", "")
+ok(ID.client_ip(Req({"x-forwarded-for": "not-an-ip"})) is None,
+   "a header that is not an address is dropped rather than stored — it is "
+   "attacker-controlled text", "")
+
+os.environ.pop("HUB_USER_HEADER", None)
+ok(ID.lan_id(Req({"X-Remote-User": "BBHCORP\\knair"}))[1] == "none",
+   "a proxy header is IGNORED unless HUB_USER_HEADER names it — if the API "
+   "can be reached directly, anyone can send one, so trusting it by default "
+   "would be worse than having no identity at all", ID.lan_id(Req({}))[1])
+
+os.environ["HUB_USER_HEADER"] = "X-Remote-User"
+uid, src = ID.lan_id(Req({"X-Remote-User": "BBHCORP\\knair"}))
+ok(uid == "knair" and src == "proxy",
+   "once named, DOMAIN\\user is reduced to the account", f"{uid}/{src}")
+uid2, _ = ID.lan_id(Req({"X-Remote-User": "knair@bbh.com"}))
+ok(uid2 == "knair", "and so is user@domain", uid2)
+w = ID.whoami(Req({"X-Remote-User": "BBHCORP\\knair",
+                   "x-forwarded-for": "10.1.2.3"}))
+ok(w["verified"] is True and w["lanId"] == "knair" and w["ip"] == "10.1.2.3",
+   "whoami reports the account and the address", w)
+os.environ.pop("HUB_USER_HEADER", None)
+
+os.environ.pop("HUB_REVERSE_DNS", None)
+ok(ID.machine_name("10.1.2.3") is None,
+   "reverse DNS is off unless HUB_REVERSE_DNS is set — a blocking lookup on "
+   "the request path is a bad trade for a nice-to-have", "")
+
+# The accept statement records all four, and prefers the server's answer.
+ROWS.clear()
+SENT.clear()
+R.apply_op(R.Op(op="answer.accept", qid=62, answerId="a1",
+                actor="Somebody Else", signoff="I accept."),
+           Req({"x-forwarded-for": "10.1.2.3"}))
+setq = next(p for s_, p in SENT if "accepted = 'Y'" in " ".join(s_.split()))
+ok(setq["src"] == "none" and setq["p"] == "10.1.2.3",
+   "with no sign-in the row records id_source 'none' and the address — so a "
+   "self-declared signature is identifiable as one forever after", setq)
+ok(setq["u"] == "Somebody Else",
+   "and the self-declared name is used, because nothing better exists",
+   setq.get("u"))
+
+os.environ["HUB_USER_HEADER"] = "X-Remote-User"
+SENT.clear()
+R.apply_op(R.Op(op="answer.accept", qid=62, answerId="a1",
+                actor="Somebody Else", signoff="I accept."),
+           Req({"X-Remote-User": "knair", "x-forwarded-for": "10.1.2.3"}))
+setq = next(p for s_, p in SENT if "accepted = 'Y'" in " ".join(s_.split()))
+ok(setq["u"] == "knair" and setq["src"] == "proxy",
+   "but when the server knows the account, THAT is who signed — whatever "
+   "name the browser sent. A client-supplied identity never wins", setq)
+os.environ.pop("HUB_USER_HEADER", None)
+
+SENT.clear()
+ok(refuses(lambda: R.apply_op(R.Op(op="answer.accept", qid=1, answerId="a",
+                                   actor="  "), Req())) == 400,
+   "accepting with no name at all is refused", "")
+
+clear = next(p for s_, p in SENT if "accepted = 'N'" in " ".join(s_.split())) \
+    if SENT else None
+SENT.clear()
+R.apply_op(R.Op(op="answer.accept", qid=62, answerId="a1", actor="A Person"), Req())
+clr = next(s_ for s_, _ in SENT if "accepted = 'N'" in " ".join(s_.split()))
+for col in ("lan_id = NULL", "host_name = NULL", "client_ip = NULL",
+            "id_source = NULL"):
+    ok(col in " ".join(clr.split()),
+       f"withdrawing an acceptance also clears {col.split()[0]} — a cleared "
+       f"signature that keeps its machine name still reads as signed", clr)
 
 print()
 print(f"{BAD} assertion(s) failed" if BAD else "hub discussion router assertions pass")

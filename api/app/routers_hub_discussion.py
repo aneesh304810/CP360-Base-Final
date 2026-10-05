@@ -24,10 +24,11 @@ import re
 import time
 import uuid
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from .db import query, execute
+from .hub_identity import whoami
 from .svg_sanitize import sanitize_svg
 
 log = logging.getLogger("cp.api.hub_discussion")
@@ -165,14 +166,18 @@ def _store():
 
     for r in _safe("SELECT answer_id, qid, body, author, created_at, updated_by, "
                    "updated_at, accepted, accepted_by, accepted_at, seed_key, "
-                   "conf, gap, quote, fig, ev, is_draft, sei_ask FROM hub_answer"):
+                   "conf, gap, quote, fig, ev, is_draft, sei_ask, signoff, lan_id, "
+                   "host_name, id_source FROM hub_answer"):
         a = {"qid": int(r["QID"]), "body": _clob(r.get("BODY")) or "",
              "author": r.get("AUTHOR"), "createdAt": _ts(r.get("CREATED_AT")),
              "accepted": (r.get("ACCEPTED") or "N") == "Y"}
         if r.get("UPDATED_AT"):
             a.update(updatedBy=r.get("UPDATED_BY"), updatedAt=_ts(r.get("UPDATED_AT")))
         if a["accepted"]:
-            a.update(acceptedBy=r.get("ACCEPTED_BY"), acceptedAt=_ts(r.get("ACCEPTED_AT")))
+            a.update(acceptedBy=r.get("ACCEPTED_BY"),
+                     acceptedAt=_ts(r.get("ACCEPTED_AT")),
+                     signoff=r.get("SIGNOFF"), lanId=r.get("LAN_ID"),
+                     host=r.get("HOST_NAME"), idSource=r.get("ID_SOURCE"))
         if r.get("SEED_KEY"):
             a["seedKey"] = r["SEED_KEY"]
         # A drafted answer keeps its draft chrome only while it IS one.
@@ -209,6 +214,16 @@ def _store():
     return out
 
 
+@router.get("/whoami")
+def who(request: Request):
+    """What the server can tell about the caller.
+
+    verified false means the screen must ask who this is and say the
+    answer is self-declared. None of it comes from the browser.
+    """
+    return whoami(request)
+
+
 @router.get("")
 def get_discussion():
     c = _corpus()
@@ -228,6 +243,7 @@ class Op(BaseModel):
     actor: str | None = None
     status: str | None = None
     note: str | None = None
+    signoff: str | None = None
     topic: int | None = None
     owner: str | None = None
     comps: list[str] | None = None
@@ -250,8 +266,9 @@ def _touch_question(qid, source="review", topic=None, owner=None):
 
 
 @router.post("/op")
-def apply_op(o: Op):
+def apply_op(o: Op, request: Request):
     actor = _actor(o.actor)
+    who_ = whoami(request)
     st = []
 
     if o.op == "answer.add":
@@ -286,11 +303,25 @@ def apply_op(o: Op):
     elif o.op == "answer.accept":
         if not o.answerId or o.qid is None:
             raise HTTPException(400, "qid and answerId required")
+        # A sign-off needs a person, and a session default is not one.
+        if not o.actor or len(o.actor.strip()) < 3:
+            raise HTTPException(400, "accepting requires the name of the "
+                                     "person signing off")
         st.append(("UPDATE hub_answer SET accepted = 'N', accepted_by = NULL, "
-                   "accepted_at = NULL WHERE qid = :q", {"q": o.qid}))
+                   "accepted_at = NULL, signoff = NULL, lan_id = NULL, "
+                   "host_name = NULL, client_ip = NULL, id_source = NULL "
+                   "WHERE qid = :q", {"q": o.qid}))
+        # When the server knows the account, that is who signed —
+        # whatever the browser sent. A self-declared name is only used
+        # when nothing else is available, and ID_SOURCE records which.
+        signer = who_["lanId"] if who_["verified"] else actor
         st.append(("UPDATE hub_answer SET accepted = 'Y', accepted_by = :u, "
-                   "accepted_at = SYSTIMESTAMP WHERE answer_id = :i",
-                   {"u": actor, "i": o.answerId}))
+                   "accepted_at = SYSTIMESTAMP, signoff = :s, lan_id = :l, "
+                   "host_name = :h, client_ip = :p, id_source = :src "
+                   "WHERE answer_id = :i",
+                   {"u": signer, "s": (o.signoff or "")[:600],
+                    "l": who_["lanId"], "h": who_["host"], "p": who_["ip"],
+                    "src": who_["source"], "i": o.answerId}))
         st.append(("UPDATE hub_question SET status = NULL, status_by = NULL, "
                    "status_at = NULL WHERE qid = :q", {"q": o.qid}))
         st.append(_ev(o.qid, o.answerId, "resolved", actor,

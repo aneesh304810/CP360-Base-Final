@@ -22,7 +22,8 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { renderToStaticMarkup } from "react-dom/server";
 import HubDiscussion, { statusOf, acceptAnswer, editAnswer, compLabel,
-  Expanded, sty, onAnswer, Attach, Attachments } from "../src/HubDiscussion.jsx";
+  Expanded, sty, onAnswer, Attach, Attachments, canSignOff, SIGNOFF_TEXT }
+  from "../src/HubDiscussion.jsx";
 import { QUESTIONS, TOPICS, OWNERS, OWNER_TOTALS, compsFor }
   from "../src/hubQuestions.js";
 import { emptyStore, attachKindFor } from "../src/hub_discussion_api.js";
@@ -118,6 +119,48 @@ ok(s.a.a3.accepted && s.a.a3.acceptedBy === "K. Barnhardt",
 ok(s.ev.length === 1 && s.ev[0].to === "resolved" && s.ev[0].actor === "Glenn Lasrado",
    "the transition is written to the audit trail", JSON.stringify(s.ev));
 
+// ---- accepting is a SIGN-OFF, not a click ---------------------------
+//
+// There is no login on this screen, so the only thing standing between
+// an audit trail and "resolved by local.user" is this.
+for (const [name, want] of [["Kelley Barnhardt", true], ["Glenn Lasrado", true],
+                            ["local.user", false], ["", false], ["   ", false],
+                            ["me", false], ["GL", false], ["tester", false],
+                            ["unknown", false], ["12345", false]]) {
+  ok(canSignOff(name) === want,
+     `canSignOff(${JSON.stringify(name)}) is ${want}`, canSignOff(name));
+}
+let threw = null;
+try { acceptAnswer({ a: { z: { qid: 1 } }, q: {}, ev: [] }, 1, "z", "local.user"); }
+catch (err) { threw = err; }
+ok(threw && /real name/.test(threw.message),
+   "acceptAnswer REFUSES the session default — a sign-off by local.user "
+   + "looks signed and is not, which is worse than an unsigned one",
+   threw && threw.message);
+
+const sg = acceptAnswer({ a: { z: { qid: 1 } }, q: {}, ev: [] }, 1, "z",
+                        "  Kelley Barnhardt  ", SIGNOFF_TEXT);
+ok(sg.a.z.acceptedBy === "Kelley Barnhardt",
+   "the name is trimmed before it is recorded", JSON.stringify(sg.a.z.acceptedBy));
+ok(sg.a.z.signoff === SIGNOFF_TEXT,
+   "and the WORDING they agreed to is stored on the row, not just the fact "
+   + "of a click — if the wording changes later, old rows keep theirs",
+   sg.a.z.signoff);
+ok(/I accept it as BBH's position/.test(SIGNOFF_TEXT),
+   "and that wording actually says they accept it", SIGNOFF_TEXT);
+ok(sg.ev[0].actor === "Kelley Barnhardt" && sg.ev[0].note.includes(SIGNOFF_TEXT),
+   "the audit event carries the signer and the statement", JSON.stringify(sg.ev[0]));
+
+// Signing off a second answer clears the first one's signature too.
+let two = { ...emptyStore(), a: {
+  p: { qid: 9, accepted: true, acceptedBy: "Glenn Lasrado", signoff: SIGNOFF_TEXT },
+  r: { qid: 9 } } };
+two = acceptAnswer(two, 9, "r", "Kelley Barnhardt");
+ok(!two.a.p.accepted && !two.a.p.signoff,
+   "accepting a different answer withdraws the earlier signature as well as "
+   + "the acceptance — a withdrawn acceptance that keeps its sign-off still "
+   + "reads as signed", JSON.stringify(two.a.p));
+
 // ---- editing an accepted answer withdraws the acceptance ------------
 const after = editAnswer(s, "a1", "one, revised", "G. Middha");
 ok(!after.a.a1.accepted && !after.a.a1.acceptedBy,
@@ -125,6 +168,9 @@ ok(!after.a.a1.accepted && !after.a.a1.acceptedBy,
    + "look again at what they agreed to", JSON.stringify(after.a.a1));
 ok(statusOf(Q, Object.values(after.a), {}) === "answered",
    "so the question drops back to answered", "");
+ok(!after.a.a1.signoff,
+   "editing also clears the sign-off wording — otherwise the row still "
+   + "carries a statement nobody has agreed to about the new text", "");
 ok(after.ev.length === 2 && /withdrawn/.test(after.ev[1].note),
    "and the withdrawal is recorded, not silent", JSON.stringify(after.ev[1]));
 const plain = editAnswer(s, "a2", "two, revised", "SA");
@@ -357,12 +403,12 @@ ok(seedRows(mats).every((r) => r.qid !== 107),
 // screen actually performs — starting from a store where the draft has
 // NOT been materialised, which is the state a real first click is in.
 const r107 = seeded.find((r) => r.qid === 107);
-const viaAccept = onAnswer(fresh, r107, (st) => acceptAnswer(st, 107, seedId(107), "GL"));
+const viaAccept = onAnswer(fresh, r107, (st) => acceptAnswer(st, 107, seedId(107), "Glenn Lasrado"));
 ok(viaAccept.a[seedId(107)].accepted && viaAccept.a[seedId(107)].qid === 107,
    "accepting a draft straight from an empty store works and keeps the "
    + "question id — this is the first click anyone makes",
    JSON.stringify(viaAccept.a[seedId(107)]));
-const viaEdit = onAnswer(fresh, r107, (st) => editAnswer(st, seedId(107), "redone", "KB"));
+const viaEdit = onAnswer(fresh, r107, (st) => editAnswer(st, seedId(107), "redone", "K. Barnhardt"));
 ok(viaEdit.a[seedId(107)].body === "redone" && viaEdit.a[seedId(107)].qid === 107,
    "and so does editing one", JSON.stringify(viaEdit.a[seedId(107)]));
 ok(statusOf({ n: 107 }, [...Object.entries(viaAccept.a).map(([id, a]) => ({ ...a, id })),
@@ -500,6 +546,17 @@ ok(/guardrail_changeset/.test(exH),
    "and the evidence it cites is on screen, so the claim is checkable", "");
 ok(!/✓ accepted answer/.test(exH),
    "a draft is NOT rendered as an accepted answer", "");
+// The sign-off panel, on the rendered screen.
+const signH = renderToStaticMarkup(
+  <Expanded t={tLight} x={q107} S={sty(tLight)} answers={seedRows(emptyStore())}
+    actor="local.user" store={emptyStore()} commit={() => {}} onClose={() => {}}
+    own={OWNERS} onOpenComponent={() => {}} setStatus={() => {}}
+    addAnswer={() => {}} saveQuestionEdit={() => {}} />);
+ok(!/select your name/i.test(signH),
+   "the sign-off panel is not shown until accept is clicked", "");
+ok(/no login on this screen/i.test(signH) === false,
+   "and neither is the note that goes with it", "");
+
 ok(/✎ edit/.test(exH) && /✓ accept/.test(exH),
    "and it is editable and acceptable like any other answer — which is the "
    + "whole point of drafting it rather than writing it into the document",

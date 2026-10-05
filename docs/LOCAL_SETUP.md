@@ -316,6 +316,8 @@ Order matters once, on first setup:
 sqlplus ... @sql/70_hub_discussion.sql          # questions, answers, attachments, events
 sqlplus ... @sql/71_hub_discussion_corpus.sql   # topics, owners, the corpus columns
 sqlplus ... @sql/72_hub_sei_ask.sql             # the question to put to SEI, per answer
+sqlplus ... @sql/73_hub_signoff.sql            # the wording somebody accepted
+sqlplus ... @sql/74_hub_signoff_identity.sql   # lan id, host, ip and how it was obtained
 python -m ingestion.run                         # the corpus loads as the hub_corpus step
 ```
 

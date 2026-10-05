@@ -78,6 +78,21 @@ export async function applyOp(op) {
 // Kept so a local-only session still survives a reload.
 export async function save(store) { saveLocal(store); return false; }
 
+// Who the SERVER thinks is calling. Never asked of the browser: a page
+// cannot read a machine name or a Windows account, and one that could
+// would be a problem rather than a feature.
+export async function whoami() {
+  try {
+    const r = await fetch(`${API_BASE}${PATH}/whoami`,
+      { signal: AbortSignal.timeout(T) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  } catch {
+    return { lanId: null, source: "none", host: null, ip: null,
+             verified: false };
+  }
+}
+
 export const attachmentUrl = (id) => `${API_BASE}${PATH}/attachment/${id}`;
 
 // Returns {id} or {error}. The error is shown rather than swallowed: an
@@ -115,5 +130,5 @@ export function attachKindFor(file) {
   return null;
 }
 
-export default { load, save, loadLocal, saveLocal, emptyStore, applyOp,
+export default { load, save, loadLocal, saveLocal, emptyStore, applyOp, whoami,
   uploadAttachment, deleteAttachment, attachmentUrl, attachKindFor };

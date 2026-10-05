@@ -55,17 +55,43 @@ export function statusOf(q, answers, over) {
   return mine.length ? "answered" : "open";
 }
 
-// Acceptance is a decision, so it records a person and a time. An
-// accepted answer with no acceptor is a comment.
-export function acceptAnswer(store, qid, aid, actor) {
+// The words somebody is agreeing to when they sign off. Stored on the
+// row, not just implied by the click, so the record says WHAT was
+// accepted rather than only that a button was pressed.
+export const SIGNOFF_TEXT =
+  "I have read this answer and I accept it as BBH's position on this "
+  + "question.";
+
+// A session default is not a signature. "local.user" is what the screen
+// falls back to when it does not know who you are, and accepting under
+// it would put an unattributable sign-off into an audit trail.
+const PLACEHOLDER = /^(local\.user|unknown|anonymous|user|me|tester)$/i;
+export const canSignOff = (name) => {
+  const n = (name || "").trim();
+  return n.length >= 3 && !PLACEHOLDER.test(n) && /[a-z]/i.test(n);
+};
+
+// Acceptance is a decision, so it records a person, a time, and the
+// statement they agreed to. An accepted answer with no acceptor is a
+// comment; one with a placeholder acceptor is worse, because it looks
+// signed.
+export function acceptAnswer(store, qid, aid, actor, signoff) {
+  if (!canSignOff(actor)) {
+    throw new Error(`acceptAnswer needs a real name, got ${JSON.stringify(actor)}`);
+  }
+  const who = actor.trim();
+  const text = signoff || SIGNOFF_TEXT;
   const a = { ...store.a };
   Object.keys(a).forEach((k) => {
-    if (a[k].qid === qid) a[k] = { ...a[k], accepted: false, acceptedBy: null, acceptedAt: null };
+    if (a[k].qid === qid) a[k] = { ...a[k], accepted: false, acceptedBy: null,
+      acceptedAt: null, signoff: null };
   });
-  a[aid] = { ...a[aid], accepted: true, acceptedBy: actor, acceptedAt: now() };
+  a[aid] = { ...a[aid], accepted: true, acceptedBy: who, acceptedAt: now(),
+    signoff: text };
   const q = { ...store.q, [qid]: { ...(store.q[qid] || {}), status: null } };
   return { ...store, a, q,
-    ev: [...store.ev, { qid, to: "resolved", at: now(), actor, note: `accepted answer ${aid}` }] };
+    ev: [...store.ev, { qid, to: "resolved", at: now(), actor: who,
+      note: `accepted answer ${aid} — ${text}` }] };
 }
 
 // ONE place that materialises a draft, not two. Accept and edit both
@@ -80,7 +106,7 @@ export function editAnswer(store, aid, body, actor) {
   const prev = store.a[aid] || {};
   const withdrawn = !!prev.accepted;
   const a = { ...store.a, [aid]: { ...prev, body, updatedAt: now(), updatedBy: actor,
-    accepted: false, acceptedBy: null, acceptedAt: null } };
+    accepted: false, acceptedBy: null, acceptedAt: null, signoff: null } };
   const ev = withdrawn
     ? [...store.ev, { qid: prev.qid, to: "answered", at: now(), actor,
         note: "acceptance withdrawn — the accepted answer was edited" }]
@@ -211,6 +237,8 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
   // null until the API answers. Non-null means the questions on screen
   // came from the database; null means the copy in this bundle.
   const [corpus, setCorpus] = useState(null);
+  // What the server can tell about the caller. Null until it answers.
+  const [who, setWho] = useState(null);
   const [open, setOpen] = useState(null);
   const [ftopic, setFtopic] = useState("");
   const [fowner, setFowner] = useState("");
@@ -226,6 +254,7 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
     discussionApi.load().then(({ store: s, live: l, corpus: c }) => {
       if (!on) return; setStore(s); setLive(l); setCorpus(c || null);
     });
+    discussionApi.whoami().then((w) => { if (on) setWho(w); });
     return () => { on = false; };
   }, []);
   // Optimistic locally, authoritative from the server. Every write names
@@ -427,7 +456,7 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
               {qs.filter((x) => x.status === "resolved").length} resolved</span></div>
           {qs.map((x) => open === x.n
             ? <Expanded key={x.n} t={t} x={x} S={S} answers={answers}
-                live={live} refresh={refresh} own={OWN}
+                live={live} refresh={refresh} own={OWN} who={who}
                 actor={actor} store={store} commit={commit}
                 onClose={() => setOpen(null)} onOpenComponent={onOpenComponent}
                 setStatus={setStatus} addAnswer={addAnswer}
@@ -445,7 +474,10 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
 }
 
 function Row({ t, x, S, answers, onOpen, own }) {
-  const n = answers.filter((a) => a.qid === x.n).length;
+  const mineR = answers.filter((a) => a.qid === x.n);
+  const n = mineR.length;
+  // "Resolved" on its own says a button was pressed. The list says who.
+  const signed = mineR.find((a) => a.accepted && a.acceptedBy);
   return (
     <div onClick={onOpen} style={S.row}>
       <span style={S.qn}>{x.n}</span>
@@ -457,6 +489,9 @@ function Row({ t, x, S, answers, onOpen, own }) {
           color: "#b4620f" }}>unlinked</i>}</span>
       <span style={S.own}>{((own || OWNERS)[x.owner] || {}).name || x.owner}</span>
       <Badge S={S} s={x.status} />
+      <span style={S.sigN} title={signed
+        ? `signed off by ${signed.acceptedBy} on ${signed.acceptedAt}` : ""}>
+        {signed ? `✓ ${signed.acceptedBy}` : ""}</span>
       <span style={S.ansN}>{n || ""}</span>
     </div>);
 }
@@ -465,10 +500,28 @@ const Badge = ({ S, s }) => (
   <span style={{ ...S.badge, background: ST[s].bg, color: ST[s].c }}>
     {ST[s].label}</span>);
 
-export function Expanded({ t, x, S, answers, actor, store, commit, onClose, live, refresh, own,
+export function Expanded({ t, x, S, answers, actor, store, commit, onClose, live, refresh, own, who,
                     onOpenComponent, setStatus, addAnswer, saveQuestionEdit,
                     editing, setEditing, text, setText }) {
   const [reply, setReply] = useState("");
+  // Accepting is a sign-off, so it is two steps: say who you are, and
+  // say you accept. One click that records whoever the session thinks
+  // you are is not a signature.
+  const [signing, setSigning] = useState(null);
+  // A free text box is not attribution when there is no login behind
+  // it: anyone can type anyone. A list of the people on the review at
+  // least constrains it to somebody real, and the name that lands in
+  // the audit trail matches the owners table rather than a typo.
+  const people = Object.values(own || OWNERS).map((o) => o.name)
+    .filter(Boolean).sort();
+  // When the server knows the account there is nothing to choose: that
+  // is who is signing. The list is only for the case where it does not.
+  const known = who && who.verified ? who.lanId : null;
+  const [signer, setSigner] = useState(
+    canSignOff(actor) && people.includes(actor) ? actor : "");
+  const signAs = known || signer;
+  const [agreed, setAgreed] = useState(false);
+  const startSign = (id) => { setSigning(id); setAgreed(false); };
   const mine = answers.filter((a) => a.qid === x.n);
   const editQ = editing === `q${x.n}`;
   return (
@@ -528,11 +581,8 @@ export function Expanded({ t, x, S, answers, actor, store, commit, onClose, live
                 {a.accepted ? ` · accepted by ${a.acceptedBy}, ${a.acceptedAt}` : ""}</span>
               {!ed && <span onClick={() => { setEditing(a.id); setText(a.body); }}
                 style={S.ghostSm}>✎ edit</span>}
-              {!a.accepted && <span
-                onClick={() => commit(onAnswer(store, a,
-                  (st) => acceptAnswer(st, x.n, a.id, actor)),
-                  { op: "answer.accept", qid: x.n, answerId: a.id,
-                    seed: a.draft ? { body: a.body } : null })}
+              {!a.accepted && signing !== a.id && <span
+                onClick={() => startSign(a.id)}
                 style={S.okSm}>✓ accept &amp; resolve</span>}
             </div>
             {ed ? (<>
@@ -568,6 +618,66 @@ export function Expanded({ t, x, S, answers, actor, store, commit, onClose, live
                 the attach control inside it, so a diagram could only be
                 added by someone who had first clicked "edit" — which is
                 also the one action that withdraws an acceptance. */}
+            {signing === a.id && (
+              <div style={S.sign}>
+                <div style={S.signHd}>Sign off this answer</div>
+                {known ? (<>
+                  <div style={S.signWho}>
+                    Signing as <b>{known}</b>
+                    {who.host ? <> from <b>{who.host}</b></> : null}
+                    {who.ip ? <span style={S.signIp}> · {who.ip}</span> : null}
+                  </div>
+                  <div style={S.signNote}>
+                    Taken from {who.source === "session"
+                      ? "your signed-in session" : "your network sign-on"},
+                    not from anything this page could ask your browser for.
+                  </div>
+                </>) : (<>
+                  <div style={S.signNote}>Sign-in is not switched on, so the
+                    server cannot tell who you are. Pick your own name — the
+                    record will show it was self-declared.</div>
+                  <label style={S.signRow}>
+                    <span style={S.signLbl}>Your name</span>
+                    <select style={S.signIn} value={signer} autoFocus
+                      onChange={(ev) => setSigner(ev.target.value)}>
+                      <option value="">— select your name —</option>
+                      {people.map((nm) =>
+                        <option key={nm} value={nm}>{nm}</option>)}
+                    </select>
+                  </label>
+                </>)}
+                <label style={S.signChk}>
+                  <input type="checkbox" checked={agreed}
+                    onChange={(ev) => setAgreed(ev.target.checked)} />
+                  <span>{SIGNOFF_TEXT}</span>
+                </label>
+                <div style={S.signAct}>
+                  <span style={{ ...S.primarySm,
+                    opacity: canSignOff(signAs) && agreed ? 1 : .4,
+                    cursor: canSignOff(signAs) && agreed ? "pointer" : "default" }}
+                    onClick={() => {
+                      if (!canSignOff(signAs) || !agreed) return;
+                      commit(onAnswer(store, a,
+                        (st) => acceptAnswer(st, x.n, a.id, signAs, SIGNOFF_TEXT)),
+                        { op: "answer.accept", qid: x.n, answerId: a.id,
+                          actor: signAs.trim(), signoff: SIGNOFF_TEXT,
+                          seed: a.draft ? { body: a.body } : null });
+                      setSigning(null);
+                    }}>Confirm sign-off</span>{" "}
+                  <span onClick={() => setSigning(null)} style={S.ghostSm}>
+                    Cancel</span>
+                  {!signAs && <span style={S.signWarn}>
+                    Select your name and tick the box to sign off.</span>}
+                </div>
+              </div>)}
+            {a.accepted && a.signoff && (
+              <div style={S.signed}>
+                ✓ Signed off by <b>{a.acceptedBy}</b> on {a.acceptedAt}
+                {a.host ? <> from <b>{a.host}</b></> : null}
+                {a.idSource === "none" && <span style={S.selfDecl}>
+                  {" "}· self-declared, no sign-in</span>}
+                <div style={S.signedQ}>“{a.signoff}”</div>
+              </div>)}
             <Attachments t={t} S={S} items={(store.atts || {})[a.id]}
               onRemove={(id) => discussionApi.deleteAttachment(id).then(refresh)} />
             <Attach t={t} S={S} live={live} onDone={refresh}
@@ -676,6 +786,32 @@ export const sty = (t) => ({
     background: "#e8f6ed", color: "#15803d" },
   aMet: { fontSize: 10.5, color: t.textMuted },
   conf: { fontSize: 9, fontWeight: 800, borderRadius: 3, padding: "2px 7px" },
+  sign: { marginTop: 12, padding: "13px 15px", borderRadius: 8,
+    background: t.hoverBg || "#f1f5f9",
+    border: `1px solid ${t.panel2 || "#dfe6e9"}`, maxWidth: "62ch" },
+  signHd: { fontSize: 12, fontWeight: 800, letterSpacing: ".03em",
+    textTransform: "uppercase", color: t.text, marginBottom: 10 },
+  signRow: { display: "flex", gap: 10, alignItems: "center", marginBottom: 10 },
+  signLbl: { fontSize: 12, color: t.textMuted, flex: "none", width: 72 },
+  signIn: { flex: 1, fontSize: 13, padding: "6px 9px", borderRadius: 5,
+    border: `1px solid ${t.panel2 || "#dfe6e9"}`, background: t.panel || "#fff",
+    color: t.text, font: "inherit" },
+  signChk: { display: "flex", gap: 8, alignItems: "flex-start", fontSize: 12.5,
+    lineHeight: 1.5, color: t.text, cursor: "pointer", marginBottom: 11 },
+  signAct: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" },
+  signWarn: { fontSize: 11.5, color: "#b4620f" },
+  signWho: { fontSize: 13.5, color: t.text, marginBottom: 6 },
+  signIp: { color: t.textMuted, fontSize: 11.5 },
+  selfDecl: { color: "#8c6a1f", fontWeight: 700 },
+  signNote: { fontSize: 11.5, lineHeight: 1.5, color: t.textMuted,
+    marginBottom: 11 },
+  signed: { marginTop: 11, padding: "10px 13px", borderRadius: 7,
+    background: "#e8f6ed", border: "1px solid #a9d8bb", maxWidth: "62ch",
+    fontSize: 12.5, color: "#15803d" },
+  signedQ: { marginTop: 4, fontSize: 11.5, fontStyle: "italic",
+    color: "#3b6b4c" },
+  sigN: { fontSize: 10.5, color: "#15803d", flex: "none", width: 112,
+    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
   // Grey and quiet: provenance, not a finding.
   prov: { fontSize: 11, lineHeight: 1.5, marginTop: 10, maxWidth: "76ch",
     color: t.textMuted, background: t.hoverBg || "#f1f5f9",
