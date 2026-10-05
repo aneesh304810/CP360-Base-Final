@@ -1,0 +1,1256 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Integration Hub — Flow</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500;700&display=swap">
+<style>
+/* MOCKUP — not wired to anything. Every number and name on this page comes
+   from the SEI pack, the Event 360 workbook, the Stage 2 canonical model or
+   the architect review. Nothing here is live.
+
+   The organising rule: the FLOW views carry no provenance, no verdicts and
+   no counts of what is missing. One box style. A reader who has never seen
+   the programme should follow it cold. The review material lives behind the
+   "Open questions" tab, reached deliberately. */
+:root{
+  --bg:#f5f8f8; --panel:#fff; --panel2:#dfe6e9; --line:#c9d4dc; --sunk:#eef3f5;
+  --ink:#10193b; --sub:#4a5a68; --muted:#7b8894;
+  --accent:#0f4775; --ok:#159943; --warn:#e67e22; --bad:#c1113a; --info:#0091bf;
+  --sei:#0091bf; --bbh:#0f4775;
+  /* event kinds — the Event 360 categorical ramp, never reused elsewhere */
+  --ev-data:#2a78d6; --ev-marker:#1baf7a; --ev-system:#eb6834;
+  /* edge state in the ERD — ordered by how much you can rely on it */
+  --e-declared:#1a8f4c; --e-tested:#3a6f9e; --e-inferred:#b0772a;
+  --f-ui:"Roboto","Helvetica Neue",Arial,sans-serif;
+  --f-mono:"Roboto Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1419; --panel:#161e26; --panel2:#24303a; --line:#2e3b47; --sunk:#111922;
+  --ink:#e8eef4; --sub:#a9b8c6; --muted:#7d8d9c;
+  --accent:#5aa8e0; --ok:#3ec27a; --warn:#f0993f; --bad:#ef6b7f; --info:#4fb8e8;
+  --sei:#4fb8e8; --bbh:#5aa8e0;
+  --ev-data:#5fa0e8; --ev-marker:#3ecf96; --ev-system:#f5885a;
+  --e-declared:#2ba05f; --e-tested:#6fa6d4; --e-inferred:#d39a46;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1419; --panel:#161e26; --panel2:#24303a; --line:#2e3b47; --sunk:#111922;
+  --ink:#e8eef4; --sub:#a9b8c6; --muted:#7d8d9c;
+  --accent:#5aa8e0; --ok:#3ec27a; --warn:#f0993f; --bad:#ef6b7f; --info:#4fb8e8;
+  --sei:#4fb8e8; --bbh:#5aa8e0;
+  --ev-data:#5fa0e8; --ev-marker:#3ecf96; --ev-system:#f5885a;
+  --e-declared:#2ba05f; --e-tested:#6fa6d4; --e-inferred:#d39a46;
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-ui);
+  font-size:13.5px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{padding:18px 16px 60px;max-width:1260px;margin:0 auto}
+h1{font-size:20px;font-weight:500;margin:0;letter-spacing:-.01em}
+h2{font-size:16px;font-weight:500;margin:0 0 8px}
+h3{font-size:13.5px;font-weight:500;margin:0 0 6px}
+p{margin:6px 0}
+.eyebrow{font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted)}
+.mono{font-family:var(--f-mono)}
+.sub{color:var(--sub)} .mut{color:var(--muted)}
+.sm{font-size:12px} .xs{font-size:11px}
+.max{max-width:78ch}
+
+header.top{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;
+  border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:14px}
+.tag{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  border:1px solid var(--warn);color:var(--warn);border-radius:3px;padding:2px 7px}
+.spacer{flex:1}
+.ghost{font:inherit;font-size:11px;padding:4px 11px;border-radius:3px;cursor:pointer;
+  border:1px solid var(--panel2);background:var(--panel);color:var(--accent)}
+.ghost:hover{border-color:var(--accent)}
+
+nav.views{display:flex;flex-wrap:wrap;gap:3px;background:var(--sunk);border-radius:999px;
+  padding:3px;margin-bottom:6px;width:fit-content;max-width:100%}
+nav.views button{font:inherit;font-size:12px;padding:5px 15px;border-radius:999px;
+  border:0;background:none;color:var(--sub);cursor:pointer;white-space:nowrap}
+nav.views button[aria-pressed="true"]{background:var(--bbh);color:#fff;font-weight:500}
+
+.crumb{display:flex;gap:7px;align-items:center;flex-wrap:wrap;font-size:12px;
+  color:var(--muted);margin:12px 0 14px;min-height:19px}
+.crumb button{font:inherit;font-size:12px;background:none;border:0;padding:0;
+  color:var(--accent);cursor:pointer}
+.crumb button:hover{text-decoration:underline}
+.crumb .here{color:var(--ink)}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  padding:15px 17px;margin-bottom:13px}
+.card.flush{padding:0;overflow:hidden}
+.grid{display:grid;gap:13px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(205px,1fr));align-items:start}
+
+figure{margin:0}
+svg{display:block;width:100%;height:auto}
+svg text{font-family:var(--f-ui)}
+svg .mono{font-family:var(--f-mono)}
+.hit{cursor:pointer}
+.hit:hover rect.bx,.hit:hover path.bx{stroke-width:2.2}
+.hit:focus{outline:none}
+.hit:focus-visible rect.bx,.hit:focus-visible path.bx{stroke:var(--accent);stroke-width:2.6}
+figcaption{font-size:11.5px;color:var(--sub);line-height:1.6;margin-top:9px;max-width:92ch}
+
+.chip{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.05em;
+  text-transform:uppercase;border-radius:3px;padding:2px 7px;white-space:nowrap}
+.chip.pri{background:var(--bbh);color:#fff}
+.chip.std{border:1px solid var(--line);color:var(--muted)}
+.chip.ok{background:var(--ok);color:#fff}
+.chip.warn{background:var(--warn);color:#fff}
+.chip.bad{background:var(--bad);color:#fff}
+.chip.data{background:var(--ev-data);color:#fff}
+.chip.marker{background:var(--ev-marker);color:#fff}
+.chip.system{background:var(--ev-system);color:#fff}
+
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th{text-align:left;font-weight:500;color:var(--muted);font-size:10px;
+  letter-spacing:.07em;text-transform:uppercase;padding:7px 10px;
+  border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid var(--sunk);vertical-align:top}
+tr:last-child td{border-bottom:0}
+tbody tr.pick{cursor:pointer}
+tbody tr.pick:hover{background:var(--sunk)}
+
+.kv{display:grid;grid-template-columns:150px 1fr;gap:5px 14px;font-size:12.5px}
+.kv dt{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em;
+  padding-top:2px}
+.kv dd{margin:0}
+
+.pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);
+  border-radius:999px;padding:3px 11px;font-size:11.5px;background:var(--panel)}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+
+.leglist{list-style:none;margin:0;padding:0;counter-reset:leg}
+.leglist li{display:flex;gap:12px;padding:11px 0;border-top:1px solid var(--sunk)}
+.leglist li:first-child{border-top:0}
+.legno{flex:0 0 24px;height:24px;border-radius:50%;background:var(--bbh);color:#fff;
+  font-size:11.5px;font-weight:700;display:grid;place-items:center}
+.legno.sei{background:var(--sei)}
+
+.ent{border:1px solid var(--line);border-radius:6px;background:var(--panel);
+  padding:9px 11px;cursor:pointer}
+.ent:hover{border-color:var(--accent)}
+.ent.anchor{border-left:3px solid var(--bbh)}
+.ent h4{margin:0;font-size:12px;font-weight:500;font-family:var(--f-mono);
+  overflow-wrap:anywhere}
+.ent .pk{font-size:10.5px;color:var(--muted);font-family:var(--f-mono);
+  margin-top:3px;word-break:break-word}
+.gapdot{display:inline-block;width:7px;height:7px;border-radius:50%;
+  background:var(--warn);margin-left:5px;vertical-align:middle}
+.gapdot.block{background:var(--bad)}
+
+.note{border-left:3px solid var(--accent);background:var(--sunk);padding:9px 13px;
+  border-radius:0 5px 5px 0;font-size:12.5px;margin:10px 0}
+.note.warn{border-left-color:var(--warn)}
+.note.bad{border-left-color:var(--bad)}
+.note b{font-weight:500}
+
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--sub);
+  margin-top:10px;align-items:center}
+.scroll{overflow-x:auto}
+@media (max-width:720px){.kv{grid-template-columns:1fr}}
+</style>
+<body>
+<div class="wrap">
+<header class="top">
+  <h1>CP360 — Integration Hub</h1>
+  <span class="tag">Mockup</span>
+  <span class="spacer"></span>
+  <button class="ghost" id="theme">Theme</button>
+</header>
+
+<nav class="views" id="views"></nav>
+<div class="crumb" id="crumb"></div>
+<main id="main"></main>
+</div>
+<script>
+/* =========================================================================
+   DATA — every row traceable to one of four inputs:
+     PACK   SEI File Ingestion Framework TDD v2.0 / dbt Transformation Design
+            Document v2 / SEI-BBH Integration Architecture v5
+     E360   SEI event specification workbook (105 events, 575 fields,
+            2 micro-batch markers)
+     MODEL  SWP_BBH Normalized Canonical Data Model v1 + ERD draft
+     REVIEW the architect review of the event substitution
+   ========================================================================= */
+
+/* ---- 1. The four channels across the boundary ------------------------- */
+const CHANNELS = [
+  { id:"C1", no:1, name:"Change events", dir:"in", transport:"SDC topics",
+    role:"primary", y:130, port:"A",
+    one:"SEI tells BBH that a row changed. The event carries no data.",
+    detail:"Four envelope fields — eventid (a type code, not a message id), key, op (I/U/D) and view. The event names what changed and where to read it; it never carries the change itself. Published on domain topics, at-least-once, ordered within topic and partition only.",
+    legs:[
+      ["SEI","SWP writes to the Snowflake intake; SDC publishes on the domain topic"],
+      ["BBH","Event listener consumes; markers 1000/1001 bracket each commit"],
+      ["BBH","Key-set collapser folds repeat keys over the micro-batch window"]],
+    src:"E360 · Payload_Structure, Consumption_Guidance" },
+  { id:"C2", no:2, name:"Data fetch API", dir:"out", transport:"Apigee + API Gateway",
+    role:"primary", y:215, port:"B",
+    one:"BBH reads the current state of the keys the events named.",
+    detail:"One bound, set-based retrieval per view per micro-batch — not per event. The same gateway and the same contract also serve an on-demand real-time read for consumers that cannot wait for the pipeline: one API, two callers.",
+    legs:[
+      ["BBH","Set-based puller builds the key set for the view"],
+      ["BBH","Call leaves through Apigee and the API Gateway"],
+      ["SEI","SEI view API returns current state for the set"]],
+    src:"REVIEW · M5 Set-Based Puller" },
+  { id:"C3", no:3, name:"File delivery", dir:"in", transport:"SFTP / Momentum",
+    role:"standby", y:360, port:"C",
+    one:"The daily file set. Generated and held as a recovery route.",
+    detail:"SWP writes to SFTP, Momentum copies complete files to the Landing Zone, discovery runs every five minutes and maps one task per file. Validate, load RAW in one transaction, three counts must agree, archive. Under the event-primary posture this is produced each day but not loaded in the ordinary course.",
+    legs:[
+      ["SEI","SWP extract to SFTP"],
+      ["SEI","Momentum copies complete files to the Landing Zone"],
+      ["BBH","Scheduled discovery, one mapped task per file, validate, load, archive"]],
+    src:"PACK · File Ingestion Framework" },
+  { id:"C4", no:4, name:"Loader round trip", dir:"loop", transport:"Gateway + file",
+    role:"primary", y:285, port:"B",
+    one:"BBH data to SEI, and the outcome back — status by API, detail by file.",
+    detail:"Four legs and two transports. The status API carries the verdict and the counts; the error file carries the per-record detail. The response to the originating consumer cannot be sent until both are in and agree.",
+    legs:[
+      ["BBH","Consumer calls the Hub API with loader details and data"],
+      ["BBH","Validate, map to SWP loader format, call the loader API out through the gateway"],
+      ["SEI","SEI PS processes; calls Integration 360 with status and counts"],
+      ["SEI","Status and error detail arrive as a file on the file transport"]],
+    src:"PACK v5 + BBH decision" },
+];
+
+/* ---- 2. Inside the Hub — the two clocks ------------------------------- */
+const INTRADAY = [
+  { id:"H1", n:"Event listener",        t:"Consumes the domain topics; tracks offsets per partition." },
+  { id:"H2", n:"Marker tracker",        t:"Watches 1000/1001 on every partition. A commit is whole only when the last topic closes." },
+  { id:"H3", n:"Key-set collapser",     t:"Many events on one key inside a window become one key to fetch." },
+  { id:"H4", n:"Set-based puller",      t:"One bound retrieval per view per micro-batch, out through the gateway." },
+  { id:"H5", n:"Idempotency service",   t:"Same key at the same version lands once. The stream is at-least-once." },
+  { id:"H6", n:"Stage-1 loader",        t:"Array insert, one commit per micro-batch. A failed micro-batch rolls back whole." },
+  { id:"H7", n:"Micro-batch registry",  t:"One row per micro-batch with a state. The event path's FILE_REGISTRY." },
+];
+const STANDBY = [
+  { id:"F1", n:"Discovery",  t:"Scheduled scan of the Landing Zone, one mapped task per file." },
+  { id:"F2", n:"Validation", t:"Readable, header, trailer, zero-row, business date." },
+  { id:"F3", n:"RAW load",   t:"One Oracle transaction per file." },
+  { id:"F4", n:"Count check",t:"FILE_ROW_COUNT = TRAILER_ROW_COUNT = RAW_ROW_COUNT." },
+  { id:"F5", n:"Archive",    t:"Move on success. Commit succeeded but move failed is ARCHIVE_FAILED, never a reload." },
+];
+const XFORM = [
+  { id:"T1", n:"defensive_recheck", t:"Re-asserts the gate inside the run." },
+  { id:"T2", n:"STG",  t:"A view, not a table. Computes DQ_STATUS_CD and DQ_FAIL_REASON_CDS." },
+  { id:"T3", n:"INT",  t:"PASS rows only. Natural key plus BUSINESS_DATE, partitioned, 7 days." },
+  { id:"T4", n:"DIM",  t:"Built first. SCD2 direct-compare MERGE on ACCOUNT_KEY, never the natural key." },
+  { id:"T5", n:"FACT", t:"Built second. Dimension-resolved only, never a placeholder key." },
+  { id:"T6", n:"DQ + recon", t:"Marks replayed rows resolved, persists DQ and RECON_RESULT." },
+  { id:"T7", n:"advance_date_control", t:"The business date moves. Last task in the chain." },
+];
+
+/* ---- 3. The gate ------------------------------------------------------ */
+const GATE = {
+  what:"One guarded UPDATE on DATE_CONTROL takes the business date from PENDING to TRIGGER. Only the run whose UPDATE changes exactly one row may invoke the transformation.",
+  arms:[
+    { id:"A", live:true, name:"Event arm", sub:"both conditions, not either",
+      cond:["Every micro-batch up to the boundary is LOADED",
+            "The EOD system event has been received"],
+      why:"The system event says SEI finished producing. It says nothing about whether BBH finished consuming. Gating on the event alone lets the transformation run on short Stage 1 — and STG to INT still reconciles, because it ties against a Stage 1 that is itself short.",
+      src:"REVIEW · M8 Event Gate Evaluator" },
+    { id:"B", live:false, name:"File arm", sub:"recovery route",
+      cond:["Expected active DAILY interfaces in FILE_SCHEMA_CONFIG",
+            "MINUS distinct ARCHIVED interfaces in FILE_REGISTRY = empty"],
+      why:"Runs after every ingestion run including zero-file runs, with trigger_rule all_done. Under the event-primary posture this arm is the recovery path rather than the daily one.",
+      src:"PACK · File Ingestion Framework E.2" },
+  ],
+  sla:"If the cutoff passes and neither arm is satisfied: the date stays PENDING, nothing is triggered, a correlated breach alert is published. On later completion a recovery alert is published and the trigger fires. One SLA model, two triggers.",
+  nonGating:"The loader error-detail file must not join the expected set. A clean outbound day produces no file; if that file is an expected daily interface, the set never empties and the inbound day never transforms. Outbound status and inbound completeness are two different clocks.",
+};
+
+/* ---- 4. Event 360 — three kinds --------------------------------------- */
+const EVKINDS = [
+  { k:"Data", cls:"data", var:"--ev-data", cadence:"continuous",
+    tells:"A row changed on a named SDC view.",
+    carries:"eventid, key, op (I/U/D), view. No payload.",
+    note:"The event is a notification. Nothing moves until the puller re-reads current state from the view the event names." },
+  { k:"Marker", cls:"marker", var:"--ev-marker", cadence:"~288 / day",
+    tells:"A commit boundary on a topic — you have the whole commit, not part of one.",
+    carries:"eventId, batchDt, onlineDt. Three fields, no counts.",
+    note:"1000 opens and 1001 closes, on every partition of every subscribed topic. The batch is consistent only when the LAST topic closes. A consumer that declares itself done at its own end marker has read part of a transaction. Ids 1000/1001 sit clear of the catalogue's 1–105 and are not catalogue events." },
+  { k:"System", cls:"system", var:"--ev-system", cadence:"~once / day",
+    tells:"A business process in SWP has finished.",
+    carries:"eventId, batchDt, onlineDt.",
+    note:"Event 2 — batch date flip, EDB: end-of-day position and accrual processing has completed, and this is the gate for retrieving EOD data. Event 5 — pricing complete, price date flip. A missing system event raises the System Event SLA alert." },
+];
+const EVRULES = [
+  "Marker events carry no record counts, so they cannot be used for record-count completeness.",
+  "There is no required processing order between event types. If ordering matters downstream, the listener imposes it.",
+  "The stream is at-least-once. Consumers must handle duplicates; the key field is the deduplication identifier.",
+  "Events stay on the topic 7 days by default, 90 days maximum by configuration. Recovery is by moving the consumer group offset back.",
+  "Published events are immutable. An event at an offset cannot be updated, replaced, corrected or removed.",
+  "An MB Start on one domain topic guarantees the same MB Start on every other domain topic.",
+];
+
+/* ---- 5. Outbound submission ------------------------------------------- */
+const SUBSTATES = [
+  ["SUBMITTED","Loader API accepted the push. Nothing known about the outcome."],
+  ["ACCEPTED","SEI acknowledged the batch for processing."],
+  ["PROCESSED","All records landed. No error file expected."],
+  ["PARTIALLY_PROCESSED","Some rejected. The response to the consumer waits on the detail file."],
+  ["REJECTED","Batch refused whole."],
+  ["STATUS_UNRESOLVED","Past max age with no terminal status. Not left sitting at SUBMITTED for ever."],
+  ["RESPONDED","The originating consumer has been called back. Terminal."],
+];
+const OUTRULES = [
+  ["Correlation","One submission id threads all four legs, so a batch has one timeline rather than four logs."],
+  ["Reconciliation","The reject count SEI reported by API must equal the row count in the detail file. Disagreement means the picture is incomplete and the consumer is not told it is done."],
+  ["Idempotency","SEI will resend status. The same status twice lands once."],
+  ["Push and poll","A poller covers non-terminal submissions on a tiered cadence. When push and poll disagree, the poll wins and terminal never regresses."],
+  ["Asynchronous by necessity","The API status can say 60 rejected; only the file says which 60. So the consumer contract is acknowledge on submission, respond on completion — never request/response."],
+  ["Error file handling","Registry row, header and trailer counts, quarantine on malformed, archive on success — the existing file framework, with the gating flag off."],
+];
+
+/* ---- 6. The layers ----------------------------------------------------- */
+const LAYERS = [
+  { id:"L_RAW", stage:"Stage 1", name:"RAW", shape:"Landing tables, one per feed",
+    desc:"What arrived, as it arrived. No keys, no types asserted beyond the landing shape, no rejection.",
+    model:null },
+  { id:"L_STG", stage:"Stage 2", name:"STG", shape:"A view per source, not a table",
+    desc:"Held in memory. Its whole job is the source DQ check: it computes DQ_STATUS_CD and DQ_FAIL_REASON_CDS and persists nothing.",
+    model:null },
+  { id:"L_INT", stage:"Stage 2", name:"INT — normalised", shape:"52 canonical tables, 10 domains, 3NF",
+    desc:"The normalised SWP data model with reference mapping and translation. Fed only by STG PASS rows. Partitioned by BUSINESS_DATE, 7-day retention.",
+    model:"stage2" },
+  { id:"L_GOLD", stage:"Stage 2", name:"DIM and FACT", shape:"SCD2 dimensions, dimension-resolved facts",
+    desc:"DIM is built first and merged by surrogate key. FACT is built second and never carries a placeholder key.",
+    model:null },
+  { id:"L_PRE", stage:"Pre-Gold", name:"IMDS / PBDW mirror", shape:"Mirror of the warehouse models",
+    desc:"Shaped to match what the warehouse already expects, so the final step is movement rather than transformation.",
+    model:null },
+  { id:"L_WH", stage:"Stage 3", name:"Warehouse", shape:"The actual warehouse",
+    desc:"Simple movement from Pre-Gold. No reshaping at this boundary.",
+    model:null },
+];
+
+/* ---- 7. Stage 2 canonical model --------------------------------------- */
+const DOMAINS = [
+  { k:"PM", n:"Party Management",            c:11 },
+  { k:"AP", n:"Account & Portfolio",         c:10 },
+  { k:"AS", n:"Asset & Security Master",     c:3  },
+  { k:"PH", n:"Positions & Holdings",        c:6  },
+  { k:"TX", n:"Transactions & Cash Activity",c:7  },
+  { k:"FB", n:"Fees & Billing",              c:4  },
+  { k:"SC", n:"Statements & Communications", c:3  },
+  { k:"IP", n:"Investment Product",          c:2  },
+  { k:"OS", n:"Organization & Security",     c:3  },
+  { k:"RC", n:"Reference & Configuration",   c:3  },
+];
+const ANCHORS = ["ACCOUNT","PORTFOLIO","ASSET","CLIENT"];
+
+/* [domain, table, pk, [[col,parent],...], source sheet] — model §15 */
+const T = [
+["PM","CLIENT","CLIENT_ID",[],"Client"],
+["PM","CLIENT_ACCOUNT_LINKAGE","CLIENT_ID, ACCOUNT_ID, RELATIONSHIP",[["CLIENT_ID","CLIENT"],["ACCOUNT_ID","ACCOUNT"]],"Client Account Linkage"],
+["PM","CLIENT_INVESTMENT_MANAGER",null,[["CLIENT_ID","CLIENT"]],"Client"],
+["PM","CLIENT_RELATED_THIRD_PARTY",null,[["CLIENT_ID","CLIENT"]],"Client"],
+["PM","CLIENT_SOLUTION",null,[["CLIENT_ID","CLIENT"]],"Client"],
+["PM","CLIENT_TAX_PROFILE",null,[["CLIENT_ID","CLIENT"]],"Client"],
+["PM","CLIENT_W8_PROFILE",null,[["CLIENT_ID","CLIENT"]],"Client"],
+["PM","PARTY_CONTACT","CONTACT_IDENTIFIER, CONTACT_TYPE, ENTITY_IDENTIFIER",[["ENTITY_IDENTIFIER","CLIENT"]],"Contact Details"],
+["PM","PARTY_OPTIONAL_FIELDS","PARTY_ID",[["PARTY_ID","CLIENT"]],"Party Optional Fields"],
+["PM","PARTY_RELATIONSHIPS","RELATIONSHIP_IDENTIFIER, RELATIONSHIP_ROLE",[],"Relationships"],
+["PM","PAY_TO_RECIPIENTS","ACCOUNT_NUMBER, ENTITY_ID, PAY_TO_METHOD, PROFILE_ID",[["ACCOUNT_NUMBER","ACCOUNT"]],"Pay To Recipients"],
+["AP","ACCOUNT","ACCOUNT_ID",[],"Account"],
+["AP","ACCOUNT_FEE_PACKAGE_ASSOCIATION","ACCOUNT_ID, FEE_PACKAGE_ID",[["ACCOUNT_ID","ACCOUNT"],["FEE_PACKAGE_ID","FEE_PACKAGE"]],"Account"],
+["AP","ACCOUNT_INVESTMENT_GUIDELINES","ACCOUNT_ID, INVESTMENT_GUIDELINE_ID",[["ACCOUNT_ID","ACCOUNT"]],"Account"],
+["AP","ACCOUNT_INVESTMENT_MANAGER","ACCOUNT_ID, INVESTMENT_MANAGER",[["ACCOUNT_ID","ACCOUNT"]],"Account"],
+["AP","ACCOUNT_INVESTMENT_RESTRICTIONS","ACCOUNT_ID, INVESTMENT_RESTRICTIONS",[["ACCOUNT_ID","ACCOUNT"]],"Account"],
+["AP","ACCOUNT_OPTIONAL_FIELDS","ACCOUNT_ID, ACCOUNT_NUMBER, ACCOUNT_OPTIONAL_FIELD_ID, ACCOUNT_OPTIONAL_FIELD_VALUE",[["ACCOUNT_ID","ACCOUNT"]],"Account Optional Fields"],
+["AP","ACCOUNT_SOLUTION","ACCOUNT_ID, SOLUTION",[["ACCOUNT_ID","ACCOUNT"]],"Account"],
+["AP","ACCOUNT_SPECIFIC_FEE","ACCOUNT_ID, ACCOUNT_SPECIFIC_FEE_TYPE",[["ACCOUNT_ID","ACCOUNT"]],"Account"],
+["AP","PORTFOLIO","PORTFOLIO_ID",[["ACCOUNT_ID","ACCOUNT"]],"Portfolio"],
+["AP","PORTFOLIO_GROUPS","GROUP_ID, GROUP_TYPE_ID",[["ACCOUNT_ID","ACCOUNT"]],"Portfolio Groups"],
+["AS","ASSET","FIRM_ID, INSTRUMENT_ID",[],"Asset"],
+["AS","ASSET_INVESTMENT_CLASS","SCHEMA_ID, TRD_INSTRUMENT_ID",[["TRD_INSTRUMENT_ID","ASSET"]],"Asset Investment Class"],
+["AS","ASSET_OPTIONAL_FIELDS","ASSET_OPTIONAL_FIELD_DATA_ID",[["INSTRUMENT_ID","ASSET"]],"Asset Optional Fields"],
+["PH","ACTIVE_COMMITS_AND_BLOCKS","ACCOUNT_NUMBER, FIRM_ID, PORTFOLIO_ID, TRD_INSTRUMENT_ID",[["ACCOUNT_NUMBER","ACCOUNT"],["PORTFOLIO_ID","PORTFOLIO"],["TRD_INSTRUMENT_ID","ASSET"]],"Active Commits and Blocks"],
+["PH","CUSTODY_AND_NOSTRO_POS","ACCOUNT_NUMBER, INSTRUMENT_ID, ISO_3_CHARACTER_CCY, PORTFOLIO_ID, POSITION_TYPE, POSK_ID, TRADING_PARTNER_ACCOUNT_NAME, TRADING_PARTNER_ACCOUNT_NUMBER",[["ACCOUNT_NUMBER","ACCOUNT"],["INSTRUMENT_ID","ASSET"],["PORTFOLIO_ID","PORTFOLIO"]],"Custody And Nostro Pos"],
+["PH","END_OF_DAY_POSITIONS","AS_OF_DATE, TAXLOT_PORTFOLIO_ID, TRD_INSTRUMENT_ID",[["TAXLOT_PORTFOLIO_ID","PORTFOLIO"],["TRD_INSTRUMENT_ID","ASSET"]],"End of Day Positions"],
+["PH","END_OF_PERIOD_VALUE_AGG","ACCOUNT_NUMBER, FIRM_ID",[["ACCOUNT_NUMBER","ACCOUNT"]],"End of Period Value Agg"],
+["PH","FX_FORWARD_POSITION","COUNTER_CURR, PORTFOLIO_ID, PROCESSING_DATE, REFERENCE_CURR",[["ACCOUNT_ID","ACCOUNT"],["PORTFOLIO_ID","PORTFOLIO"]],"FX Forward Position"],
+["PH","TAXLOT","TAXLOT_ID",[["INSTRUMENT_ID","ASSET"],["PORTFOLIO_ID","PORTFOLIO"]],"Taxlot"],
+["TX","RECURRING_CASH_ACTIVITY","ACCOUNT_NUMBER, NEXT_ACTIVITY_ID, PORTFOLIO_ID, PROCESSING_SCHEDULE_ID",[["ACCOUNT_NUMBER","ACCOUNT"],["PORTFOLIO_ID","PORTFOLIO"]],"Recurring Cash Activities"],
+["TX","TRANSACTION_DETAIL","TRANSACTION_DETAIL_ID",[["TRANSACTION_ID","TRANSACTION_HEADER"]],"Transaction Detail"],
+["TX","TRANSACTION_DETAIL_ADJUSTMENT_TYPE","ADJUSTMENT_TYPE, TRANSACTION_DETAIL_ID",[["TRANSACTION_DETAIL_ID","TRANSACTION_DETAIL"]],"Transaction Detail"],
+["TX","TRANSACTION_HEADER","TRANSACTION_ID",[],"Transaction Header"],
+["TX","TRANSACTION_HEADER_ADJUSTMENT_TYPE","ADJUSTMENT_TYPE, TRANSACTION_ID",[["TRANSACTION_ID","TRANSACTION_HEADER"]],"Transaction Header"],
+["TX","TRANSACTION_HEADER_RELATED_TRANSACTION","TRANSACTION_ID, RELATED_TRANSACTION_ID",[["RELATED_TRANSACTION_ID","TRANSACTION_HEADER"]],"Transaction Header"],
+["TX","UPCOMING_CASH_ACTIVITIES","ACCOUNT_NUMBER, ACTIVITY_REF, ACTIVITY_TYPE, PORTFOLIO_ID",[["ACCOUNT_NUMBER","ACCOUNT"],["PORTFOLIO_ID","PORTFOLIO"]],"Curr Upcoming Activities"],
+["FB","FEE_COMPUTATION","COMPUTATION_ACTIVITY_ID, FEE_BASIS, RULE_DESCRIPTION",[],"Fee Computation"],
+["FB","FEE_GROUP","FEE_GROUP_MEMBER_ACCOUNT, FEE_GROUP_MEMBER_ACCOUNT_PORTFOLIO",[["FEE_GROUP_MEMBER_ACCOUNT","ACCOUNT"],["FEE_GROUP_MEMBER_ACCOUNT_PORTFOLIO","PORTFOLIO"]],"Fee Group"],
+["FB","FEE_PACKAGE","FEE_PACKAGE_PROFILE_ID, FEE_RULE_ID",[],"Fee Package"],
+["FB","FEE_PACKAGE_USAGE","FEE_PACKAGE_USAGE_ID",[],"Fee Package Usage"],
+["SC","STATEMENT_EVENT","STATEMENT_EVENT_ID",[],"Statement Event"],
+["SC","STATEMENT_EVENT_INSTANCE","STATEMENT_EVENT_INSTANCE_ID",[["STATEMENT_EVENT_ID","STATEMENT_EVENT"]],"Statement Event Instance"],
+["SC","STATEMENT_PACKAGE","STATEMENT_PACKAGE_ID",[],"Statement Package"],
+["IP","MODEL","MODEL_ID",[],"Model"],
+["IP","MODEL_ALLOCATION","ALLOCATION_ID",[["MODEL_ID","MODEL"]],"Model Allocation"],
+["OS","ROLE_DETAILS","ACCESS_TYPE, FUNCTION, ROLE_ID, TARGET_TYPE",[],"Role Details"],
+["OS","USER_DETAIL","ENTITY_ID",[],"User Detail"],
+["OS","USER_TEAM_AND_ROLE","EMPLOYEE_ROLE_ID, EMPLOYEE_TEAM_ID, ENTITY_ID",[],"User Team and Role"],
+["RC","FUND_CUTOFF_TIMES",null,[],"Fund Cutoff Times"],
+["RC","INTEREST_RATES",null,[],"Interest Rates"],
+["RC","REFERENCE",null,[],"Reference"],
+];
+
+/* Relationships drawn in the ERD that are NOT declared FKs — model §17 gap 9.
+   [child, parent, label] */
+const INFERRED = [
+ ["TRANSACTION_HEADER","ACCOUNT","transacts"],
+ ["TRANSACTION_HEADER","ASSET","traded"],
+ ["TRANSACTION_HEADER","PAY_TO_RECIPIENTS","paid to"],
+ ["TRANSACTION_HEADER","TAXLOT","creates lot"],
+ ["TRANSACTION_DETAIL","PORTFOLIO","impacts"],
+ ["STATEMENT_EVENT","ACCOUNT","receives"],
+ ["STATEMENT_EVENT","STATEMENT_PACKAGE","defines"],
+ ["STATEMENT_EVENT","PORTFOLIO_GROUPS","group receives"],
+ ["STATEMENT_EVENT_INSTANCE","CLIENT","tax reporting"],
+ ["FEE_PACKAGE_USAGE","FEE_PACKAGE","used by"],
+ ["FEE_PACKAGE_USAGE","ACCOUNT","uses package"],
+ ["FEE_PACKAGE_USAGE","FEE_GROUP","uses package"],
+ ["FEE_COMPUTATION","FEE_PACKAGE_USAGE","computed from"],
+ ["USER_TEAM_AND_ROLE","USER_DETAIL","assigned"],
+ ["USER_TEAM_AND_ROLE","ROLE_DETAILS","EMPLOYEE_ROLE_ID = ROLE_ID"],
+ ["ACCOUNT","MODEL","assigned to"],
+ ["PORTFOLIO","MODEL","assigned to"],
+ ["PORTFOLIO_GROUPS","PORTFOLIO","grouped in"],
+ ["MODEL_ALLOCATION","ASSET","allocated to"],
+ ["MODEL_ALLOCATION","MODEL_ALLOCATION","parent of"],
+ ["ASSET","ASSET","RELATED_INSTRUMENT_ID (underlying)"],
+ ["CLIENT_RELATED_THIRD_PARTY","CLIENT","related to"],
+ ["PARTY_RELATIONSHIPS","CLIENT","primary entity"],
+ ["TAXLOT","END_OF_DAY_POSITIONS","detailed by"],
+ ["INTEREST_RATES","ASSET","rated"],
+ ["FUND_CUTOFF_TIMES","ASSET","cutoff for"],
+];
+
+/* Relationships the INT contract says should run as dbt relationships tests —
+   model §16. Keyed CHILD|COL. */
+const TESTED = new Set([
+ "CLIENT_ACCOUNT_LINKAGE|CLIENT_ID","CLIENT_ACCOUNT_LINKAGE|ACCOUNT_ID",
+ "PORTFOLIO|ACCOUNT_ID",
+ "END_OF_DAY_POSITIONS|TAXLOT_PORTFOLIO_ID","END_OF_DAY_POSITIONS|TRD_INSTRUMENT_ID",
+ "TAXLOT|PORTFOLIO_ID","TAXLOT|INSTRUMENT_ID",
+ "TRANSACTION_DETAIL|TRANSACTION_ID",
+ "STATEMENT_EVENT_INSTANCE|STATEMENT_EVENT_ID",
+ "MODEL_ALLOCATION|MODEL_ID",
+ "ACCOUNT_FEE_PACKAGE_ASSOCIATION|FEE_PACKAGE_ID",
+]);
+
+/* Model gaps — §17. block:true stops a downstream build. */
+const GAPS = [
+ {n:1, block:true,  on:["ACCOUNT"], g:"ACCOUNT primary key differs between the dictionary sheet (ACCOUNT_NUMBER) and the domain sheet (ACCOUNT_ID). Children join on either.", r:"Keep ACCOUNT_ID as PK, declare ACCOUNT_NUMBER a unique alternate key."},
+ {n:2, block:true,  on:["ASSET"], g:"ASSET PK is FIRM_ID + INSTRUMENT_ID, but positions and classifications reference TRD_INSTRUMENT_ID, and FIRM_ID is nullable.", r:"Decide the asset grain — global or trading-level. Declare TRD_INSTRUMENT_ID a UK and make PK columns NOT NULL."},
+ {n:3, block:false, on:["PARTY_CONTACT"], g:"Called PARTY_ADDRESS in the dictionary sheet and PARTY_CONTACT in the domain sheet and ERD.", r:"Standardise on PARTY_CONTACT."},
+ {n:4, block:false, on:["ACCOUNT_INVESTMENT_GUIDELINES","ACCOUNT_INVESTMENT_MANAGER"], g:"In the Account domain sheet these rows are labelled ACCOUNT_FEE_PACKAGE_ASSOCIATION.", r:"Correct the table labels."},
+ {n:5, block:true,  on:["CLIENT_INVESTMENT_MANAGER","CLIENT_RELATED_THIRD_PARTY","CLIENT_SOLUTION","CLIENT_TAX_PROFILE","CLIENT_W8_PROFILE","FUND_CUTOFF_TIMES","INTEREST_RATES","REFERENCE"], g:"No primary key defined for 8 tables — 5 Party children and all 3 Reference tables.", r:"Define composite keys. Without one there is no INT merge key and no partition identity."},
+ {n:6, block:true,  on:["PARTY_CONTACT","CLIENT_ACCOUNT_LINKAGE","TAXLOT","MODEL_ALLOCATION","USER_DETAIL","FEE_PACKAGE_USAGE","ROLE_DETAILS"], g:"PK columns marked nullable.", r:"Make NOT NULL or replace with a stable key."},
+ {n:7, block:false, on:["ACCOUNT_FEE_PACKAGE_ASSOCIATION","FEE_PACKAGE"], g:"The FK points at FEE_PACKAGE, whose PK is FEE_PACKAGE_PROFILE_ID + FEE_RULE_ID — so the FK is to half a key.", r:"Align to FEE_PACKAGE_PROFILE_ID, or split a package header from its rules."},
+ {n:8, block:false, on:["FEE_GROUP","FEE_COMPUTATION","FEE_PACKAGE_USAGE"], g:"Fee Group is referenced by FEE_GROUP_NAME, which is not a key.", r:"Introduce FEE_GROUP_ID."},
+ {n:9, block:false, on:[], g:"Many logical relationships are not declared foreign keys.", r:"Declare them, or confirm they are intentionally loose. Shown as inferred edges throughout."},
+ {n:10,block:false, on:["FEE_COMPUTATION","FEE_GROUP"], g:"The ERD coverage page lists FEE_COMPUTATION twice and omits FEE_GROUP.", r:"Correct the coverage slide and recheck per-domain attribute counts."},
+ {n:11,block:false, on:["ACCOUNT_OPTIONAL_FIELDS","FEE_COMPUTATION","CUSTODY_AND_NOSTRO_POS"], g:"Composite primary keys with free-text members.", r:"Replace text members with identifiers where available."},
+ {n:12,block:true,  on:[], g:"BUSINESS_DATE and the lineage columns are not in the canonical dictionary but are required by the INT contract — so every dictionary key is short by one column.", r:"Add the standard INT columns to all 52 tables. This mockup already renders the effective INT key, not the dictionary key."},
+];
+
+const INTSTD = [
+ ["BUSINESS_DATE","date","partition and key part"],
+ ["SRC_RECORD_ID","number","RAW lineage"],
+ ["FILE_REGISTRY_ID","number","file lineage"],
+ ["MICRO_BATCH_ID","number","event lineage — the event path's equivalent"],
+ ["LOAD_TS","timestamp","load time"],
+ ["DBT_INVOCATION_ID","varchar","run audit"],
+];
+
+const INTCONTRACT = [
+ ["Input","STG view rows where DQ_STATUS_CD = PASS, plus approved mapping tables"],
+ ["Materialization","dbt incremental table, partitioned by BUSINESS_DATE"],
+ ["Primary key","Natural key from the dictionary PLUS BUSINESS_DATE"],
+ ["Surrogate keys","Not generated here. Gold sequences such as ACCOUNT_KEY are never used in INT"],
+ ["Retention","7 days, by partition drop"],
+ ["Transformation DQ","Unmapped codes, ambiguous mappings and unresolved relationships raise DQ_VALIDATION_FAILURE"],
+ ["Replay","OPEN, reprocess-eligible rows are re-selected by key plus BUSINESS_DATE"],
+ ["Reconciliation","STG PASS count = INT count, per table per BUSINESS_DATE, boundary STG_TO_INT"],
+];
+
+/* ---- 8. What is still open -------------------------------------------- */
+const OPEN = [
+ { id:"Q1", sev:"block", t:"Is the file path live or cold?",
+   b:"The event-primary posture describes files as generated and held, not loaded. That makes the file arm of the gate a recovery route rather than a daily one — and the two look very different on a page. Only one of them is true.",
+   who:"BBH" },
+ { id:"Q2", sev:"block", t:"transform__<date> versus restatement",
+   b:"A deterministic run id and a restatement path cannot both hold: Airflow refuses a run that already succeeded, and the reconciliation path only fires when no such run exists.",
+   who:"Joint" },
+ { id:"Q3", sev:"block", t:"Asset grain",
+   b:"ASSET is keyed FIRM_ID + INSTRUMENT_ID but referenced by TRD_INSTRUMENT_ID nearly everywhere. Gold cannot define its dimension key until this is settled.",
+   who:"SEI" },
+ { id:"Q4", sev:"open", t:"Partial view failure inside a micro-batch",
+   b:"Three of five views pull cleanly and the fourth times out. Roll back whole is the safe default; it is not the useful one. Somebody has to choose.",
+   who:"Joint" },
+ { id:"Q5", sev:"open", t:"Status API contract",
+   b:"Endpoint, auth through Apigee, pagination, rate limits, whether a mid-processing poll returns partial errors — and how long reject detail stays retrievable.",
+   who:"SEI" },
+ { id:"Q6", sev:"open", t:"Who owns outbound exceptions after SEI purges detail",
+   b:"If reject detail is purged on SEI's side, BBH's stored copy silently becomes the system of record for outbound exceptions. That is a retention and audit obligation nobody has accepted.",
+   who:"Joint" },
+ { id:"Q7", sev:"open", t:"Quota split at the gateway",
+   b:"Puller, loader and interactive consumers share one door and one SEI quota. A consumer read-storm can starve ingestion and the day never lands. Separate API products with a reserved floor for the puller.",
+   who:"BBH" },
+ { id:"Q8", sev:"open", t:"Stage 2 naming",
+   b:"The canonical model calls INT Stage 2. The layer chain calls STG Stage 2 and INT Stage 2 INT. Both are defensible; both cannot be on the diagram.",
+   who:"BBH" },
+];
+
+/* =========================================================================
+   RENDER
+   ========================================================================= */
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) =>
+  ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+const byName = {}; T.forEach((r) => { byName[r[1]] = r; });
+const dName = {}; DOMAINS.forEach((d) => { dName[d.k] = d.n; });
+
+const VIEWS = [
+  ["flow",     "The whole picture"],
+  ["hub",      "Inside the Hub"],
+  ["gate",     "Events and the gate"],
+  ["layers",   "Layers and data"],
+  ["outbound", "The loader loop"],
+  ["open",     "Open questions"],
+];
+
+let S = { view:"flow", chan:null, comp:null, layer:null, dom:null, tbl:null };
+
+/* ---------- small svg helpers ---------- */
+function box(x, y, w, h, label, sub, opt) {
+  const o = opt || {};
+  const fill = o.fill || "var(--panel)";
+  const stroke = o.stroke || "var(--line)";
+  const dash = o.dash ? ' stroke-dasharray="5 4"' : "";
+  const op = o.dim ? ' opacity="0.62"' : "";
+  const pick = o.pick ? ` class="hit" tabindex="0" role="button" data-pick="${o.pick}"` : "";
+  const ty = sub ? y + h / 2 - 4 : y + h / 2 + 4;
+  return `<g${pick}${op}>
+    <rect class="bx" x="${x}" y="${y}" width="${w}" height="${h}" rx="6"
+      fill="${fill}" stroke="${stroke}" stroke-width="1.4"${dash}/>
+    <text x="${x + w / 2}" y="${ty}" text-anchor="middle" font-size="${o.fs || 12.5}"
+      font-weight="${o.fw || 500}" fill="${o.ink || "var(--ink)"}">${esc(label)}</text>
+    ${sub ? `<text x="${x + w / 2}" y="${y + h / 2 + 12}" text-anchor="middle"
+      font-size="10.5" fill="var(--muted)">${esc(sub)}</text>` : ""}
+  </g>`;
+}
+function arrow(x1, y1, x2, y2, opt) {
+  const o = opt || {};
+  const c = o.color || "var(--sub)";
+  const dash = o.dash ? ' stroke-dasharray="6 4"' : "";
+  return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}"
+    stroke-width="${o.w || 1.6}"${dash} marker-end="url(#ar)"/>`;
+}
+function poly(pts, opt) {
+  const o = opt || {};
+  return `<polyline points="${pts}" fill="none" stroke="${o.color || "var(--sub)"}"
+    stroke-width="${o.w || 1.6}"${o.dash ? ' stroke-dasharray="6 4"' : ""}
+    marker-end="url(#ar)"/>`;
+}
+function tx(x, y, s, opt) {
+  const o = opt || {};
+  return `<text x="${x}" y="${y}" text-anchor="${o.a || "start"}" font-size="${o.fs || 11}"
+    font-weight="${o.fw || 400}" fill="${o.c || "var(--sub)"}"
+    ${o.mono ? 'class="mono"' : ""}>${esc(s)}</text>`;
+}
+const DEFS = `<defs>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6"
+    markerHeight="6" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--sub)"/>
+  </marker></defs>`;
+
+/* ---------- VIEW 1 — the whole picture ---------- */
+function svgL1() {
+  const P = { A:[470,98,140,50], B:[470,190,140,130], C:[470,345,140,75] };
+  let s = `<svg viewBox="0 0 1200 500" role="img"
+    aria-label="SEI and BBH, three transports and four channels">${DEFS}`;
+
+  /* party panels */
+  s += `<rect x="20" y="60" width="250" height="400" rx="9" fill="var(--sunk)"
+    stroke="var(--sei)" stroke-width="1.5"/>`;
+  s += tx(145, 50, "SEI", { a:"middle", fs:13, fw:700, c:"var(--sei)" });
+  s += `<rect x="690" y="60" width="490" height="400" rx="9" fill="var(--sunk)"
+    stroke="var(--bbh)" stroke-width="1.5"/>`;
+  s += tx(935, 50, "BBH", { a:"middle", fs:13, fw:700, c:"var(--bbh)" });
+
+  s += box(38, 100, 214, 42, "SWP", "the book of record");
+  s += box(38, 156, 214, 56, "SDC", "Snowflake intake, domain topics");
+  s += box(38, 226, 214, 42, "SEI PS loader", "processes BBH pushes");
+  s += box(38, 282, 214, 42, "SFTP extract", "the daily file set");
+  s += tx(145, 352, "Produces the whole day", { a:"middle", fs:10.5, c:"var(--muted)" });
+  s += tx(145, 368, "on all three transports", { a:"middle", fs:10.5, c:"var(--muted)" });
+
+  /* the boundary and its three crossings */
+  s += `<line x1="640" y1="40" x2="640" y2="478" stroke="var(--line)"
+    stroke-width="1.2" stroke-dasharray="3 5"/>`;
+  s += tx(640, 32, "BBH boundary", { a:"middle", fs:10, c:"var(--muted)" });
+
+  s += box(P.A[0], P.A[1], P.A[2], P.A[3], "SDC consumer", "topic subscription",
+    { fill:"var(--panel)", stroke:"var(--ev-data)" });
+  s += box(P.B[0], P.B[1], P.B[2], P.B[3], "", "", { fill:"var(--panel)", stroke:"var(--bbh)" });
+  s += tx(540, 243, "Apigee", { a:"middle", fs:12.5, fw:500, c:"var(--ink)" });
+  s += tx(540, 260, "+ API Gateway", { a:"middle", fs:12.5, fw:500, c:"var(--ink)" });
+  s += tx(540, 279, "every API, both ways", { a:"middle", fs:10, c:"var(--muted)" });
+  s += box(P.C[0], P.C[1], P.C[2], P.C[3], "File transport", "SFTP / Momentum",
+    { fill:"var(--panel)", stroke:"var(--line)", dim:true });
+
+  /* the channels */
+  const lane = (y, dir, label, role, id, dim) => {
+    const col = dim ? "var(--muted)" : "var(--accent)";
+    const a = y + 8;
+    let g = `<g class="hit" tabindex="0" role="button" data-pick="${id}">`;
+    g += `<rect class="bx" x="270" y="${y - 22}" width="420" height="38" rx="4"
+      fill="transparent" stroke="transparent"/>`;
+    if (dir === "in") {
+      g += arrow(272, a, 466, a, { color:col, dash:dim });
+      g += arrow(614, a, 686, a, { color:col, dash:dim });
+    } else {
+      g += arrow(466, a, 272, a, { color:col, dash:dim });
+      g += arrow(686, a, 614, a, { color:col, dash:dim });
+    }
+    g += tx(276, y - 14, label, { fs:11.5, fw:500, c:"var(--ink)" });
+    g += tx(276, y - 2, role, { fs:10, c:dim ? "var(--muted)" : "var(--accent)" });
+    g += `</g>`;
+    return g;
+  };
+  s += lane(120, "in",  "1 · Change events",     "PRIMARY · notification only",   "C1", false);
+  s += lane(205, "out", "2 · Data fetch",        "fetches what the events name",    "C2", false);
+  s += lane(247, "out", "3 · Loader push",       "BBH data to SEI",               "C4", false);
+  s += lane(289, "in",  "4 · Status back",       "verdict and counts",            "C4", false);
+  s += lane(360, "in",  "5 · File delivery",     "STANDBY · recovery route",      "C3", true);
+  s += lane(400, "in",  "6 · Error detail",      "which records, and why",        "C4", true);
+
+  /* BBH internals */
+  s += box(706, 96, 458, 196, "", "", { fill:"var(--panel)", stroke:"var(--panel2)" });
+  s += tx(718, 114, "INTEGRATION HUB", { fs:9.5, fw:700, c:"var(--muted)" });
+  s += box(718, 124, 216, 40, "Event listener", "+ collapser, idempotency", { pick:"HUB" });
+  s += box(946, 124, 206, 40, "Set-based puller", "one pull per view", { pick:"HUB" });
+  s += box(718, 172, 216, 40, "Loader framework", "template, map, push", { pick:"OUT" });
+  s += box(946, 172, 206, 40, "Integration 360", "status intake, registry", { pick:"OUT" });
+  s += box(718, 228, 434, 48, "Completeness gate", "DATE_CONTROL · PENDING to TRIGGER",
+    { pick:"GATE", stroke:"var(--accent)" });
+
+  s += box(706, 308, 458, 142, "", "", { fill:"var(--panel)", stroke:"var(--panel2)" });
+  s += tx(718, 326, "DATA HUB", { fs:9.5, fw:700, c:"var(--muted)" });
+  const LB = ["RAW", "STG", "INT", "DIM/FACT", "Pre-Gold", "Stage 3"];
+  LB.forEach((n, i) => {
+    const w = 62, x = 720 + i * 73;
+    s += box(x, 338, w, 36, n, "", { fs:10.5, pick:"LAY" + i });
+    if (i < LB.length - 1) s += arrow(x + w + 1, 356, x + w + 9, 356);
+  });
+  s += tx(718, 398, "Stage 1 lands it · Stage 2 checks and normalises it ·",
+    { fs:10.5, c:"var(--muted)" });
+  s += tx(718, 414, "Gold models it · Pre-Gold mirrors the warehouse · Stage 3 is movement",
+    { fs:10.5, c:"var(--muted)" });
+  s += tx(718, 436, "Consumers read the Hub's APIs through the same gateway.",
+    { fs:10.5, c:"var(--muted)" });
+
+  s += `</svg>`;
+  return s;
+}
+
+/* ---------- VIEW 2 — inside the Hub, two clocks ---------- */
+function svgL2() {
+  let s = `<svg viewBox="0 0 1200 640" role="img"
+    aria-label="Two clocks meeting at the completeness gate">${DEFS}`;
+
+  s += tx(35, 44, "INTRADAY — continuous, about 288 micro-batches a day",
+    { fs:10, fw:700, c:"var(--ev-data)" });
+  s += `<rect x="24" y="56" width="1152" height="96" rx="8" fill="var(--sunk)"
+    stroke="var(--panel2)"/>`;
+  INTRADAY.forEach((c, i) => {
+    const x = 35 + i * 164;
+    s += box(x, 78, 150, 52, c.n, "", { pick:"H:" + c.id, fs:11.5 });
+    if (i < INTRADAY.length - 1) s += arrow(x + 151, 104, x + 162, 104);
+  });
+
+  s += tx(35, 190, "STANDBY — the file set, generated and held",
+    { fs:10, fw:700, c:"var(--muted)" });
+  s += `<rect x="24" y="202" width="842" height="96" rx="8" fill="var(--sunk)"
+    stroke="var(--panel2)" stroke-dasharray="6 4"/>`;
+  STANDBY.forEach((c, i) => {
+    const x = 35 + i * 164;
+    s += box(x, 224, 150, 52, c.n, "", { pick:"F:" + c.id, fs:11.5, dim:true, dash:true });
+    if (i < STANDBY.length - 1) s += arrow(x + 151, 250, x + 162, 250, { dash:true, color:"var(--muted)" });
+  });
+
+  /* The two arms. The event arm descends clear of the standby lane rather
+     than through it — a line that crosses a box reads as touching it. */
+  s += poly("1094,131 1094,373 826,373", { color:"var(--ev-data)" });
+  s += tx(1084, 365, "every micro-batch LOADED  +  EOD system event",
+    { a:"end", fs:10.5, c:"var(--ev-data)" });
+  s += poly("766,277 766,312 600,312 600,326", { color:"var(--muted)", dash:true });
+  s += tx(758, 303, "all expected interfaces ARCHIVED",
+    { a:"end", fs:10.5, c:"var(--muted)" });
+
+  /* the gate */
+  s += box(380, 330, 440, 86, "", "", { stroke:"var(--accent)", fill:"var(--panel)" });
+  s += tx(600, 356, "Completeness gate", { a:"middle", fs:14, fw:500, c:"var(--ink)" });
+  s += tx(600, 376, "one guarded UPDATE on DATE_CONTROL", { a:"middle", fs:11, c:"var(--sub)" });
+  s += tx(600, 398, "only the run that changes exactly one row may trigger",
+    { a:"middle", fs:10.5, c:"var(--muted)" });
+  s += `<g class="hit" tabindex="0" role="button" data-pick="GATE">
+    <rect class="bx" x="380" y="330" width="440" height="86" rx="6"
+      fill="transparent" stroke="transparent"/></g>`;
+
+  s += arrow(600, 418, 600, 462, { color:"var(--accent)", w:2 });
+  s += tx(612, 446, "PENDING to TRIGGER", { fs:11, fw:500, c:"var(--accent)", mono:true });
+
+  s += tx(35, 492, "END OF DAY — once, when the gate opens",
+    { fs:10, fw:700, c:"var(--accent)" });
+  s += `<rect x="24" y="504" width="1152" height="96" rx="8" fill="var(--sunk)"
+    stroke="var(--panel2)"/>`;
+  XFORM.forEach((c, i) => {
+    const x = 35 + i * 164;
+    s += box(x, 526, 150, 52, c.n, "", { pick:"T:" + c.id, fs:11.5 });
+    if (i < XFORM.length - 1) s += arrow(x + 151, 552, x + 162, 552);
+  });
+  s += `</svg>`;
+  return s;
+}
+
+/* ---------- VIEW 5 — the loader loop ---------- */
+function svgOut() {
+  let s = `<svg viewBox="0 0 1200 430" role="img"
+    aria-label="The loader round trip, four legs">${DEFS}`;
+  s += box(30, 160, 160, 80, "Consumer", "CRM and others");
+  s += box(270, 110, 290, 190, "", "", { fill:"var(--sunk)", stroke:"var(--bbh)" });
+  s += tx(284, 132, "INTEGRATION HUB", { fs:9.5, fw:700, c:"var(--muted)" });
+  s += box(284, 142, 262, 44, "Loader framework", "template check, map to SWP");
+  s += box(284, 196, 262, 44, "Integration 360", "status intake");
+  s += box(284, 250, 262, 40, "Submission registry", "one id, four legs",
+    { stroke:"var(--accent)" });
+
+  s += box(620, 90, 70, 170, "", "", { fill:"var(--panel)", stroke:"var(--bbh)" });
+  s += tx(655, 166, "Apigee", { a:"middle", fs:10.5, fw:500 });
+  s += tx(655, 181, "Gateway", { a:"middle", fs:10.5, fw:500 });
+
+  s += box(760, 110, 240, 130, "SEI PS loader", "processes the batch",
+    { stroke:"var(--sei)" });
+  s += box(760, 300, 240, 62, "File transport", "the error detail file",
+    { dim:true, dash:true });
+
+  s += arrow(192, 198, 268, 198, { color:"var(--accent)" });
+  s += tx(230, 190, "1", { a:"middle", fs:12, fw:700, c:"var(--accent)" });
+  s += poly("562,152 618,152", { color:"var(--accent)" });
+  s += poly("692,152 758,152", { color:"var(--accent)" });
+  s += tx(655, 128, "2", { a:"middle", fs:12, fw:700, c:"var(--accent)" });
+  s += poly("758,218 694,218", { color:"var(--sei)" });
+  s += poly("618,218 564,218", { color:"var(--sei)" });
+  s += tx(655, 240, "3", { a:"middle", fs:12, fw:700, c:"var(--sei)" });
+  s += poly("758,330 564,330", { color:"var(--muted)", dash:true });
+  s += tx(660, 322, "4", { a:"middle", fs:12, fw:700, c:"var(--muted)" });
+  s += poly("300,302 300,380 110,380 110,244", { color:"var(--ok)" });
+  s += tx(210, 374, "5", { a:"middle", fs:12, fw:700, c:"var(--ok)" });
+
+  s += tx(230, 174, "submit", { a:"middle", fs:10.5, c:"var(--muted)" });
+  s += tx(660, 346, "per-record detail", { a:"middle", fs:10.5, c:"var(--muted)" });
+  s += tx(210, 394, "callback — only once 3 and 4 agree", { a:"middle", fs:10.5, c:"var(--ok)" });
+  s += `</svg>`;
+  return s;
+}
+
+/* ---------- panels ---------- */
+function chanPanel(id) {
+  const c = CHANNELS.find((x) => x.id === id);
+  if (!c) return "";
+  const roleChip = c.role === "primary"
+    ? '<span class="chip pri">Primary</span>'
+    : '<span class="chip std">Standby</span>';
+  return `<div class="card">
+    <div class="eyebrow">Channel ${c.no}</div>
+    <h2>${esc(c.name)} ${roleChip}</h2>
+    <p class="max">${esc(c.one)}</p>
+    <p class="max sub sm">${esc(c.detail)}</p>
+    <div class="eyebrow" style="margin:14px 0 4px">How it runs</div>
+    <ul class="leglist">${c.legs.map((l, i) => `<li>
+      <span class="legno ${l[0] === "SEI" ? "sei" : ""}">${i + 1}</span>
+      <span><b class="xs mut">${l[0]}</b><br>${esc(l[1])}</span></li>`).join("")}</ul>
+    <p class="xs mut" style="margin-top:12px">Transport · ${esc(c.transport)}
+      &nbsp;·&nbsp; ${esc(c.src)}</p>
+  </div>`;
+}
+
+function compPanel(key) {
+  const [kind, id] = key.split(":");
+  const list = kind === "H" ? INTRADAY : kind === "F" ? STANDBY : XFORM;
+  const c = list.find((x) => x.id === id);
+  if (!c) return "";
+  const clock = kind === "H" ? "Runs continuously — once per micro-batch"
+    : kind === "F" ? "Runs only when the file route is used"
+    : "Runs once, after the gate opens";
+  return `<div class="card"><div class="eyebrow">${esc(clock)}</div>
+    <h2>${esc(c.n)}</h2><p class="max">${esc(c.t)}</p></div>`;
+}
+
+function viewFlow() {
+  return `<figure class="card">${svgL1()}
+    <figcaption><b>Three transports, four channels.</b> Events and files cross
+    on their own transports. Everything API-shaped — the data fetch, the loader
+    push, the status coming back, and every consumer call — crosses through
+    Apigee and the API Gateway. That band is a wall, not a step in a chain.
+    Click any channel, or anything inside BBH.</figcaption></figure>
+    ${S.chan ? chanPanel(S.chan) : `<div class="card">
+      <div class="eyebrow">The pattern underneath</div>
+      <p class="max">One idea, applied four times: <b>a thin signal on one
+      transport, the payload on another.</b> Inbound, the event says a row
+      changed and the API fetches it. Outbound, the status API gives the
+      verdict and a file carries the per-record detail. Learn it once and all
+      four channels read the same way.</p></div>`}`;
+}
+
+function viewHub() {
+  return `<figure class="card">${svgL2()}
+    <figcaption><b>Two clocks, meeting at one gate.</b> The intraday consumer
+    runs about 288 times a day and owns the event path. The end-of-day DAG runs
+    once and owns the transformation. The daily DAG is not extended to 288 runs;
+    the two meet at the gate and nowhere else. The standby lane is drawn dashed
+    because it is produced each day and loaded only when it is
+    needed.</figcaption></figure>
+    ${S.comp ? compPanel(S.comp) : `<div class="card">
+      <div class="eyebrow">Why the gate sits between them</div>
+      <p class="max">A micro-batch that fails at 11am and goes unnoticed means
+      the transformation runs on a short Stage 1 — and STG to INT still
+      reconciles cleanly, because it ties against a Stage 1 that is itself
+      short. Every existing reconciliation boundary is downstream of the loss
+      and cannot see it. The gate is the only place that can.</p></div>`}`;
+}
+
+function viewGate() {
+  const kinds = EVKINDS.map((k) => `<div class="card">
+    <span class="chip ${k.cls}">${esc(k.k)}</span>
+    <span class="xs mut" style="margin-left:8px">${esc(k.cadence)}</span>
+    <h3 style="margin-top:9px">${esc(k.tells)}</h3>
+    <p class="sm mono mut">${esc(k.carries)}</p>
+    <p class="sm sub">${esc(k.note)}</p></div>`).join("");
+
+  const arms = GATE.arms.map((a) => `<div class="card"
+    style="border-left:3px solid ${a.live ? "var(--ev-data)" : "var(--muted)"}">
+    <div class="eyebrow">${esc(a.name)} · ${esc(a.sub)}</div>
+    <ul class="sm" style="margin:8px 0;padding-left:18px">
+      ${a.cond.map((c) => `<li class="mono" style="font-size:11.5px">${esc(c)}</li>`).join("")}</ul>
+    <p class="sm sub">${esc(a.why)}</p>
+    <p class="xs mut">${esc(a.src)}</p></div>`).join("");
+
+  return `<div class="card"><h2>Three kinds of event, three different jobs</h2>
+    <p class="max sub sm">Conflating any two of them is the mistake this page
+    exists to prevent. The boundary tells you a commit is whole; the system
+    event tells you a process has finished; neither tells you how many records
+    to expect.</p></div>
+    <div class="grid g3">${kinds}</div>
+    <div class="card" style="margin-top:13px"><h2>The gate</h2>
+      <p class="max sm">${esc(GATE.what)}</p></div>
+    <div class="grid g2">${arms}</div>
+    <div class="note warn"><b>When neither arm is satisfied by the cutoff.</b>
+      ${esc(GATE.sla)}</div>
+    <div class="note bad"><b>The non-gating rule.</b> ${esc(GATE.nonGating)}</div>
+    <div class="card"><div class="eyebrow">Consumer rules the listener must honour</div>
+      <ul class="sm sub" style="margin:9px 0 0;padding-left:18px">
+      ${EVRULES.map((r) => `<li style="margin-bottom:4px">${esc(r)}</li>`).join("")}</ul></div>`;
+}
+
+const OUTLEGS = [
+  ["1","Consumer submits","loader details and the data, to the Hub API"],
+  ["2","Loader push","validated, mapped to SWP format, out through the gateway"],
+  ["3","Status back","verdict and counts, into Integration 360"],
+  ["4","Error detail","per-record outcomes, as a file on the file transport"],
+  ["5","Callback","the consumer is answered, once 3 and 4 agree"],
+];
+function viewOut() {
+  const legend = `<div class="legend" style="margin:14px 0 0">${
+    OUTLEGS.map((l) => `<span class="pill"><b>${l[0]}</b> ${esc(l[1])}
+      <span class="mut xs">${esc(l[2])}</span></span>`).join("")}</div>`;
+  return `<figure class="card">${svgOut()}${legend}
+    <figcaption><b>A loop, not an arrow.</b> Legs 2 and 3 cross the gateway;
+    leg 4 arrives on the file transport. The consumer cannot be answered until
+    the status and the detail file agree, which is why this contract is
+    asynchronous by necessity rather than by preference.</figcaption></figure>
+    <div class="grid g2">
+      <div class="card"><div class="eyebrow">Submission lifecycle</div>
+        <table><tbody>${SUBSTATES.map((s) => `<tr>
+          <td class="mono" style="white-space:nowrap">${esc(s[0])}</td>
+          <td class="sub">${esc(s[1])}</td></tr>`).join("")}</tbody></table></div>
+      <div class="card"><div class="eyebrow">What holds the loop together</div>
+        <table><tbody>${OUTRULES.map((r) => `<tr>
+          <td style="white-space:nowrap">${esc(r[0])}</td>
+          <td class="sub">${esc(r[1])}</td></tr>`).join("")}</tbody></table></div>
+    </div>
+    <div class="note"><b>There is no outbound equivalent of FILE_REGISTRY yet.</b>
+      Inbound, every file has a row and a state. Outbound, a submission has
+      nowhere to live — so the reject count SEI reports has nothing to be
+      reconciled against, and a batch that never comes back has nothing to
+      age out.</div>`;
+}
+
+function viewOpen() {
+  const row = (q) => `<div class="card"
+    style="border-left:3px solid ${q.sev === "block" ? "var(--bad)" : "var(--warn)"}">
+    <div class="eyebrow">${q.sev === "block" ? "Blocks a build" : "Open"}
+      · ${esc(q.who)}</div>
+    <h3 style="margin-top:6px">${esc(q.t)}</h3>
+    <p class="sm sub max">${esc(q.b)}</p></div>`;
+  return `<div class="card"><h2>What is not settled</h2>
+    <p class="max sub sm">Deliberately behind its own tab. None of this belongs
+    on the flow views — a reader learning how the Hub works should not have to
+    step over it.</p></div>
+    ${OPEN.filter((q) => q.sev === "block").map(row).join("")}
+    ${OPEN.filter((q) => q.sev !== "block").map(row).join("")}`;
+}
+
+/* ---------- the Stage 2 model ---------- */
+function declaredRels() {
+  const out = [];
+  T.forEach((r) => r[3].forEach((f) => out.push({
+    child:r[1], col:f[0], parent:f[1], label:"declared FK",
+    kind:"fk", tested:TESTED.has(r[1] + "|" + f[0]) })));
+  return out;
+}
+const DECL = declaredRels();
+const INF = INFERRED.map((i) => ({ child:i[0], parent:i[1], col:null,
+  label:i[2], kind:"inf", tested:false }));
+const ALLREL = DECL.concat(INF);
+
+function domainOf(t) { const r = byName[t]; return r ? r[0] : null; }
+/* A relationship belongs to the domain that OWNS the child — the side that
+   carries the column. Counting both sides made every domain look busy and
+   double-counted every cross-domain join. */
+function relsOwned(k) { return ALLREL.filter((r) => domainOf(r.child) === k); }
+function relsInto(k) {
+  return ALLREL.filter((r) => domainOf(r.parent) === k && domainOf(r.child) !== k);
+}
+function gapsOn(t) { return GAPS.filter((g) => g.on.indexOf(t) >= 0); }
+function intKey(r) {
+  return r[2] ? r[2] + ", BUSINESS_DATE"
+              : "BUSINESS_DATE only — no dictionary key defined";
+}
+/* An eight-column key makes one card four times the height of its
+   neighbours and the row stops being scannable. Full key on the record. */
+function shortKey(r) {
+  const parts = intKey(r).split(", ");
+  return parts.length <= 4 ? parts.join(", ")
+    : parts.slice(0, 3).join(", ") + " +" + (parts.length - 3) + " more";
+}
+const EDGE = {
+  fk:   { c:"var(--e-declared)", t:"Declared FK" },
+  inf:  { c:"var(--e-inferred)", t:"Inferred — enforced nowhere" },
+};
+function edgeRow(r) {
+  const e = EDGE[r.kind];
+  const test = r.tested
+    ? ' <span class="chip std" style="border-color:var(--e-tested);color:var(--e-tested)">dbt test</span>'
+    : "";
+  return `<tr class="pick" data-tbl="${esc(r.child)}">
+    <td><span class="dot" style="background:${e.c}"></span></td>
+    <td class="mono" style="font-size:11.5px">${esc(r.child)}${
+      r.col ? `<span class="mut"> . ${esc(r.col)}</span>` : ""}</td>
+    <td class="mut">to</td>
+    <td class="mono" style="font-size:11.5px">${esc(r.parent)}</td>
+    <td class="sub xs">${esc(e.t)}${
+      r.kind === "inf" ? ` <span class="mut">&mdash; ${esc(r.label)}</span>` : ""}${test}</td></tr>`;
+}
+
+function viewLayers() {
+  if (S.tbl) return tablePanel(S.tbl);
+  if (S.dom) return domainPanel(S.dom);
+  if (S.layer === "L_INT") return stage2Panel();
+  if (S.layer) {
+    const l = LAYERS.find((x) => x.id === S.layer);
+    return `<div class="card"><div class="eyebrow">${esc(l.stage)}</div>
+      <h2>${esc(l.name)}</h2>
+      <p class="sm"><b>${esc(l.shape)}</b></p>
+      <p class="max sub">${esc(l.desc)}</p>
+      <p class="xs mut" style="margin-top:12px">No table-level model has been
+      supplied for this layer yet — which is not the same as there being
+      none.</p></div>`;
+  }
+  const cards = LAYERS.map((l) => `<div class="card" style="cursor:pointer"
+    data-layer="${l.id}">
+    <div class="eyebrow">${esc(l.stage)}</div>
+    <h3 style="margin:4px 0 2px">${esc(l.name)}</h3>
+    <p class="sm" style="margin:0"><b>${esc(l.shape)}</b></p>
+    <p class="sm sub" style="margin:6px 0 0">${esc(l.desc)}</p>
+    ${l.model ? '<p class="xs" style="color:var(--accent);margin:8px 0 0">Open the data model &rarr;</p>' : ""}
+    </div>`).join("");
+  return `<div class="card"><h2>What the data looks like at each layer</h2>
+    <p class="max sub sm">The same slot on every layer, so it is learned once.
+    Stage 2 INT is the one with a full table-level model behind it.</p></div>
+    <div class="grid g2">${cards}</div>`;
+}
+
+function stage2Panel() {
+  const cards = DOMAINS.map((d) => {
+    const rels = relsOwned(d.k);
+    const inf = rels.filter((r) => r.kind === "inf").length;
+    const into = relsInto(d.k).length;
+    const nokey = T.filter((t) => t[0] === d.k)
+      .filter((t) => gapsOn(t[1]).some((g) => g.block)).length;
+    return `<div class="card" style="cursor:pointer" data-dom="${d.k}">
+      <h3 style="margin:0">${esc(d.n)}</h3>
+      <p class="sm mut" style="margin:3px 0 8px">${d.c} tables ·
+        ${rels.length} out${into ? ` · ${into} in` : ""}</p>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        <span class="chip std">${rels.length - inf} declared</span>
+        <span class="chip std" style="border-color:var(--e-inferred);color:var(--e-inferred)">${inf} inferred</span>
+        ${nokey ? `<span class="chip bad">${nokey} key${nokey > 1 ? "s" : ""} undecided</span>` : ""}
+      </div></div>`;
+  }).join("");
+  const infTotal = ALLREL.filter((r) => r.kind === "inf").length;
+  return `<div class="card">
+    <div class="eyebrow">Stage 2 · INT · normalised SWP model</div>
+    <h2>52 canonical tables, 10 domains</h2>
+    <p class="max sub sm">38 SWP feeds, 1,452 business attributes, 3NF. Fed only
+    by STG PASS rows, partitioned by BUSINESS_DATE, 7-day retention. Pick a
+    domain.</p>
+    <div class="legend">
+      <span class="pill"><span class="dot" style="background:var(--e-declared)"></span>
+        declared foreign key</span>
+      <span class="pill"><span class="dot" style="background:var(--e-inferred)"></span>
+        inferred — enforced nowhere</span>
+      <span class="pill" style="border-color:var(--e-tested)">dbt relationships test</span>
+    </div></div>
+    <div class="grid g3">${cards}</div>
+    <div class="note warn"><b>${infTotal} of ${ALLREL.length} relationships are not
+      declared foreign keys</b>, and ${TESTED.size} relationships are proposed as dbt
+      tests. Every edge is either declared, tested, or enforced nowhere — and
+      the third group is where the build risk sits.</div>
+    <div class="card"><div class="eyebrow">The INT contract</div>
+      <table><tbody>${INTCONTRACT.map((c) => `<tr>
+        <td style="white-space:nowrap">${esc(c[0])}</td>
+        <td class="sub">${esc(c[1])}</td></tr>`).join("")}</tbody></table></div>
+    <div class="card"><div class="eyebrow">Standard INT columns — on all 52</div>
+      <p class="sm sub">Not in the canonical dictionary. Required by the
+      contract, so every dictionary key is short by at least one column.</p>
+      <table><tbody>${INTSTD.map((c) => `<tr>
+        <td class="mono" style="white-space:nowrap">${esc(c[0])}</td>
+        <td class="mut xs">${esc(c[1])}</td>
+        <td class="sub">${esc(c[2])}</td></tr>`).join("")}</tbody></table></div>`;
+}
+
+function domainPanel(k) {
+  const tabs = T.filter((t) => t[0] === k);
+  const rels = relsOwned(k);
+  const into = relsInto(k);
+  const ents = tabs.map((t) => {
+    const g = gapsOn(t[1]);
+    const dot = g.length
+      ? `<span class="gapdot ${g.some((x) => x.block) ? "block" : ""}"
+         title="${esc(g.map((x) => "Gap " + x.n).join(", "))}"></span>` : "";
+    return `<div class="ent ${ANCHORS.indexOf(t[1]) >= 0 ? "anchor" : ""}"
+      data-tbl="${esc(t[1])}">
+      <h4>${esc(t[1])}${dot}</h4>
+      <div class="pk" title="${esc(intKey(t))}">${esc(shortKey(t))}</div></div>`;
+  }).join("");
+  const outside = [...new Set(rels.concat(into).map((r) => [r.child, r.parent])
+    .flat().filter((n) => byName[n] && byName[n][0] !== k))];
+  return `<div class="card">
+    <h2>${esc(dName[k])}</h2>
+    <p class="sm mut">${tabs.length} tables · ${rels.length} relationships out ·
+      ${into.length} in · anchors shown with a left rule · a dot marks an
+      unresolved model gap</p></div>
+    <div class="grid g4">${ents}</div>
+    ${outside.length ? `<div class="card"><div class="eyebrow">Also referenced,
+      from other domains</div><div class="grid g4" style="margin-top:9px">
+      ${outside.map((n) => `<div class="ent ${ANCHORS.indexOf(n) >= 0 ? "anchor" : ""}"
+        data-tbl="${esc(n)}"><h4>${esc(n)}</h4>
+        <div class="pk">${esc(dName[byName[n][0]])}</div></div>`).join("")}
+      </div></div>` : ""}
+    <div class="card flush"><div style="padding:14px 17px 0"><div class="eyebrow">
+      Relationships from this domain — ${rels.length}</div></div>
+      <div class="scroll"><table><tbody>${rels.map(edgeRow).join("")}</tbody></table></div></div>
+    ${into.length ? `<div class="card flush"><div style="padding:14px 17px 0">
+      <div class="eyebrow">Referenced from other domains — ${into.length}</div></div>
+      <div class="scroll"><table><tbody>${into.map(edgeRow).join("")}</tbody></table></div></div>` : ""}`;
+}
+
+function tablePanel(n) {
+  const r = byName[n];
+  if (!r) return `<div class="card">Not in the model.</div>`;
+  const kids = ALLREL.filter((x) => x.parent === n);
+  const pars = ALLREL.filter((x) => x.child === n);
+  const g = gapsOn(n);
+  const anchor = ANCHORS.indexOf(n) >= 0;
+  const inDomains = anchor
+    ? [...new Set(ALLREL.filter((x) => x.parent === n || x.child === n)
+        .map((x) => domainOf(x.child === n ? x.parent : x.child)).filter(Boolean))]
+    : [];
+  return `<div class="card">
+    <div class="eyebrow">${esc(dName[r[0]])}${anchor ? " · anchor entity" : ""}</div>
+    <h2 class="mono">${esc(n)}</h2>
+    ${anchor && inDomains.length ? `<p class="sm sub">Referenced from
+      ${inDomains.length} domains — ${esc(inDomains.map((d) => dName[d]).join(", "))}.</p>` : ""}
+    <dl class="kv" style="margin-top:12px">
+      <dt>INT key</dt><dd class="mono">${esc(intKey(r))}</dd>
+      <dt>Dictionary key</dt><dd class="mono ${r[2] ? "" : "mut"}">${
+        esc(r[2] || "not defined")}</dd>
+      <dt>Source sheet</dt><dd>${esc(r[4])}</dd>
+      <dt>Feeds from</dt><dd class="sub">SWP feed &rarr; FILE_SCHEMA_CONFIG interface
+        &rarr; Stage 1 RAW &rarr; STG view &rarr; this table</dd>
+      <dt>Reconciliation</dt><dd class="sub">STG PASS count = INT count,
+        per BUSINESS_DATE &mdash; boundary <span class="mono">STG_TO_INT</span></dd>
+      <dt>Retention</dt><dd class="sub">7 days, partition drop on BUSINESS_DATE</dd>
+    </dl></div>
+    ${g.length ? `<div class="card" style="border-left:3px solid ${
+      g.some((x) => x.block) ? "var(--bad)" : "var(--warn)"}">
+      <div class="eyebrow">Unresolved on this table</div>
+      ${g.map((x) => `<p class="sm" style="margin:8px 0 0">
+        <span class="chip ${x.block ? "bad" : "warn"}">Gap ${x.n}${
+          x.block ? " · blocks a build" : ""}</span><br>
+        ${esc(x.g)}<br><span class="sub">${esc(x.r)}</span></p>`).join("")}</div>` : ""}
+    <div class="grid g2">
+      <div class="card flush"><div style="padding:14px 17px 0">
+        <div class="eyebrow">Points at — ${pars.length}</div></div>
+        <div class="scroll"><table><tbody>${
+          pars.length ? pars.map(edgeRow).join("")
+            : '<tr><td class="mut sm">Nothing.</td></tr>'}</tbody></table></div></div>
+      <div class="card flush"><div style="padding:14px 17px 0">
+        <div class="eyebrow">Pointed at by — ${kids.length}</div></div>
+        <div class="scroll"><table><tbody>${
+          kids.length ? kids.map(edgeRow).join("")
+            : '<tr><td class="mut sm">Nothing.</td></tr>'}</tbody></table></div></div>
+    </div>`;
+}
+
+/* ---------- breadcrumb, router, wiring ---------- */
+function crumb() {
+  const parts = [];
+  const label = (VIEWS.find((v) => v[0] === S.view) || ["", ""])[1];
+  const root = () => { S.chan = S.comp = S.layer = S.dom = S.tbl = null; draw(); };
+  parts.push({ t:label, go:root });
+  if (S.view === "flow" && S.chan) {
+    const c = CHANNELS.find((x) => x.id === S.chan);
+    if (c) parts.push({ t:c.name });
+  }
+  if (S.view === "hub" && S.comp) {
+    const [k, id] = S.comp.split(":");
+    const l = (k === "H" ? INTRADAY : k === "F" ? STANDBY : XFORM).find((x) => x.id === id);
+    if (l) parts.push({ t:l.n });
+  }
+  if (S.view === "layers" && S.layer) {
+    const l = LAYERS.find((x) => x.id === S.layer);
+    parts.push({ t:l.stage + " " + l.name,
+      go:() => { S.dom = S.tbl = null; draw(); } });
+    if (S.dom) parts.push({ t:dName[S.dom], go:() => { S.tbl = null; draw(); } });
+    if (S.tbl) parts.push({ t:S.tbl });
+  }
+  const host = document.getElementById("crumb");
+  host.innerHTML = parts.map((p, i) => {
+    const sep = i ? '<span class="mut">&rsaquo;</span>' : "";
+    return sep + (p.go && i < parts.length - 1
+      ? `<button data-crumb="${i}">${esc(p.t)}</button>`
+      : `<span class="here">${esc(p.t)}</span>`);
+  }).join("");
+  host.querySelectorAll("[data-crumb]").forEach((b) => {
+    b.onclick = () => parts[+b.dataset.crumb].go();
+  });
+}
+
+function draw() {
+  document.getElementById("views").innerHTML = VIEWS.map((v) =>
+    `<button data-view="${v[0]}" aria-pressed="${S.view === v[0]}">${esc(v[1])}</button>`
+  ).join("");
+  const m = document.getElementById("main");
+  m.innerHTML = S.view === "flow" ? viewFlow()
+    : S.view === "hub" ? viewHub()
+    : S.view === "gate" ? viewGate()
+    : S.view === "layers" ? viewLayers()
+    : S.view === "outbound" ? viewOut()
+    : viewOpen();
+  crumb();
+  wire();
+  toHash();
+}
+
+function go(view) {
+  S.view = view; S.chan = S.comp = null;
+  if (view !== "layers") { S.layer = S.dom = S.tbl = null; }
+  draw();
+}
+
+/* Deep links, so a view can be sent to someone rather than described to them.
+   #hub, #layers/L_INT, #layers/L_INT/PH/TAXLOT, #gate ... */
+function fromHash() {
+  const raw = location.hash.replace(/^#/, "");
+  if (!raw) return false;
+  const [v, layer, dom, tbl] = raw.split("/").map(decodeURIComponent);
+  if (!VIEWS.some((x) => x[0] === v)) return false;
+  S.view = v; S.chan = S.comp = null;
+  S.layer = layer || null; S.dom = dom || null; S.tbl = tbl || null;
+  return true;
+}
+function toHash() {
+  const p = [S.view];
+  if (S.view === "layers" && S.layer) {
+    p.push(S.layer);
+    if (S.dom) p.push(S.dom);
+    if (S.tbl) p.push(S.tbl);
+  }
+  const h = "#" + p.map(encodeURIComponent).join("/");
+  if (location.hash !== h) history.replaceState(null, "", h);
+}
+
+function wire() {
+  document.querySelectorAll("[data-view]").forEach((b) => {
+    b.onclick = () => go(b.dataset.view);
+  });
+  document.querySelectorAll("[data-pick]").forEach((g) => {
+    const act = () => {
+      const p = g.dataset.pick;
+      if (p === "HUB") return go("hub");
+      if (p === "OUT") return go("outbound");
+      if (p === "GATE") return go("gate");
+      if (p.slice(0, 3) === "LAY") {
+        S.view = "layers"; S.layer = null; S.dom = S.tbl = null; return draw();
+      }
+      if (p.indexOf(":") > 0) { S.comp = p; return draw(); }
+      S.chan = p; draw();
+    };
+    g.onclick = act;
+    g.onkeydown = (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); act(); }
+    };
+  });
+  document.querySelectorAll("[data-layer]").forEach((d) => {
+    d.onclick = () => { S.layer = d.dataset.layer; S.dom = S.tbl = null; draw(); };
+  });
+  document.querySelectorAll("[data-dom]").forEach((d) => {
+    d.onclick = () => { S.dom = d.dataset.dom; S.tbl = null; draw(); };
+  });
+  document.querySelectorAll("[data-tbl]").forEach((d) => {
+    d.onclick = () => {
+      S.view = "layers"; S.layer = "L_INT";
+      S.tbl = d.dataset.tbl;
+      if (!S.dom) S.dom = domainOf(S.tbl);
+      draw();
+    };
+  });
+}
+
+document.getElementById("theme").onclick = () => {
+  const r = document.documentElement;
+  const now = r.getAttribute("data-theme");
+  const dark = now ? now === "dark"
+    : matchMedia("(prefers-color-scheme: dark)").matches;
+  r.setAttribute("data-theme", dark ? "light" : "dark");
+};
+
+fromHash();
+addEventListener("hashchange", () => { if (fromHash()) draw(); });
+draw();
+</script>
+</body>
+</html>
