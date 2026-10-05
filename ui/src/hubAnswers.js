@@ -611,50 +611,47 @@ export const SEED_ANSWERS = [
 
 { n: 45, conf: "practice",
   seiAsk:
-"Which population and which freeze point will SEI agree for a parity run, and will SEI produce the ODI-era baseline or will BBH?",
+"Can SEI agree which accounts we compare against, and the date we freeze the current system for that comparison? And will SEI produce the baseline figures from the existing system, or should we?",
   body:
-"The usual shape is a three-tier comparison, cheapest first, because a "
-+ "row-by-row diff of a full history does not finish:\n\n"
-+ "1. COUNTS per table per business date. Catches whole-file and "
-+ "whole-partition losses and costs almost nothing.\n"
-+ "2. AGGREGATES per table per date — SUM of every monetary column, "
-+ "MIN/MAX of dates, COUNT DISTINCT of each key. Catches sign flips, "
-+ "scale errors and duplicate explosions that counts miss.\n"
-+ "3. ROW HASHES for a sampled or targeted population — a hash of the "
-+ "concatenated business columns per key, compared both sides. Catches "
-+ "field-level drift. Run full-population once at cutover, sampled "
-+ "thereafter.\n\n"
-+ "Variance 360 already computes exactly these metrics per column per "
-+ "stage (CNT, SUM, HASHSUM, NDV, MIN_D, MAX_D), so tier 1 and 2 are "
-+ "available now against an ODI-era snapshot.",
+"The risk is that we switch over, the numbers look fine, and six months "
++ "later somebody finds a client whose figures never matched the old "
++ "system. "
++ "\n\n"
++ "To avoid that we should compare in three steps, cheapest first. Count "
++ "the rows per table per day, which catches a whole file going missing. "
++ "Then total the money columns and the date ranges, which catches the "
++ "errors counts cannot see, a sign flipped or an amount out by a factor of "
++ "a hundred. Then compare the records themselves, field by field, once "
++ "over everything at cutover and on a sample after that. "
++ "\n\n"
++ "Variance 360 already produces the first two today, so this is mostly "
++ "agreeing the scope rather than building something new. ",
   gap:
-"The decisions BBH owns: the tolerance (is a 1-cent rounding difference a "
-+ "break?), the population (all accounts, or a stratified sample "
-+ "including the awkward ones — closed accounts, multi-currency, "
-+ "corrections), and WHEN the ODI side is frozen to compare against. "
-+ "Parity against a moving target proves nothing.",
+"Three things need deciding, and none of them are technical. How close is "
++ "close enough, is a one penny difference a failure. Which accounts go in "
++ "the sample, and we should make sure the difficult ones are in there, "
++ "closed accounts, multi currency, anything already corrected. And the "
++ "date we freeze the old system for comparison. Comparing against "
++ "something still changing underneath us proves nothing. ",
   ev: ["standard migration-parity practice", "Variance 360 (metrics already exist)"] },
 
 { n: 46, conf: "practice",
   body:
-"Three controls, all cheap, and the TDD already has the first:\n\n"
-+ "• BUILD ORDER AS A BARRIER. Dimensions complete and pass their tests "
-+ "before facts start, so a fact never resolves against a stale "
-+ "dimension. The TDD does this (build_dim → test_dim → build_fact).\n"
-+ "• A DECLARED GRAIN PER FACT, written down and tested. One row per "
-+ "what? The test is a uniqueness assertion on the declared key — if the "
-+ "grain is ever violated the build fails rather than the numbers "
-+ "doubling quietly.\n"
-+ "• CONFORMED DIMENSION OWNERSHIP. One model owns each dimension; "
-+ "everything else references it. Two models writing DIM_ACCOUNT is how "
-+ "upstream changes reach downstream facts invisibly.\n\n"
-+ "For fact-to-fact dependencies the convention is to forbid them: derive "
-+ "from the shared dimension, not from another fact, so one fact's "
-+ "rebuild cannot silently change another's numbers.",
+"The concern is that a change to client or account reference data "
++ "quietly changes transaction numbers that were already reported. "
++ "\n\n"
++ "Three things prevent it, and the design has the first already. Account "
++ "and client records are built and checked before any transactions are "
++ "loaded, so a transaction can never attach itself to out of date account "
++ "details. Each transaction table has one agreed level of detail written "
++ "down and tested, so if that is ever broken the run stops rather than the "
++ "figures silently doubling. And one process owns each reference table. "
++ "Two processes writing the same account record is how a change in one "
++ "place turns up somewhere nobody expected. ",
   gap:
-"Whether any fact here depends on another is not stated anywhere — with "
-+ "one fact table today it may be moot, but it is the thing to rule on "
-+ "before a second one is added.",
+"We should also agree that a transaction table never derives from another "
++ "transaction table, only from shared reference data. With one such table "
++ "today it may not matter, but it will the moment a second one is added. ",
   ev: ["Kimball conformed-dimension practice", "dbt uniqueness/relationship tests"] },
 
 { n: 47, conf: "document", fig: "scd2",
@@ -769,25 +766,25 @@ export const SEED_ANSWERS = [
 
 { n: 58, conf: "practice",
   seiAsk:
-"Does SWP deliver on Saturdays, Sundays and market holidays — per interface, not globally — and against which calendar?",
+"Does SEI send us anything on Saturdays, Sundays and market holidays? We need this per feed rather than one answer for everything, and we need to know which market calendar applies to each.",
   body:
-"The standard answer is a BUSINESS CALENDAR TABLE, not logic in a DAG. "
-+ "One row per date per calendar, saying whether it is a processing day, "
-+ "and which calendar applies to which interface — because a "
-+ "multi-currency estate has more than one. Currency and market holidays "
-+ "do not coincide, and a single “is it a weekday” test is the usual "
-+ "source of month-end surprises.\n\n"
-+ "The orchestration then asks the calendar rather than computing the "
-+ "answer: a non-processing date is seeded COMPLETE with zero expected "
-+ "interfaces, or not seeded at all, and both are defensible as long as "
-+ "the choice is explicit. The first keeps the date series continuous, "
-+ "which makes gap detection trivial, so it is usually preferred.",
+"We need a calendar held as data, not working days worked out in code. "
++ "\n\n"
++ "A single is it a weekday check is where month end problems usually come "
++ "from. Different markets and currencies close on different days, so one "
++ "rule for everything will be wrong for somebody. A table listing which "
++ "days are processing days, and which calendar applies to which feed, "
++ "keeps that visible and changeable without a release. "
++ "\n\n"
++ "For a non processing day we can either record it as closed with nothing "
++ "expected, or not record it at all. Recording it is better because it "
++ "keeps the run of dates unbroken, which makes a missing day obvious. ",
   gap:
-"BBH owns two decisions nobody has made: whether SWP delivers on "
-+ "Saturday and Sunday at all, and if it does, whether BBH processes "
-+ "those dates or holds them for the next business day. Those are "
-+ "different answers for transactions than for positions, so it is "
-+ "probably per-interface rather than global.",
+"Two decisions nobody has taken. Does SEI send us anything on Saturdays "
++ "and Sundays at all. And if they do, do we process those days or hold "
++ "them until Monday. The answer is probably different for transactions "
++ "than for positions, so this is likely a decision per feed rather than one "
++ "for everything. ",
   ev: ["standard business-calendar practice"] },
 
 { n: 59, conf: "document", fig: "datectl",
@@ -836,23 +833,22 @@ export const SEED_ANSWERS = [
 
 { n: 61, conf: "practice",
   body:
-"The pattern is to make the trigger an OBSERVED FACT rather than a "
-+ "fire-and-forget call.\n\n"
-+ "The caller writes its intent durably first (status = TRIGGER with a "
-+ "run id it generated), then invokes. If the invoke fails, the row "
-+ "already records that a run was intended and a reconciler can act on "
-+ "it. The downstream run is given a DETERMINISTIC id derived from the "
-+ "business date — the TDD does this (transform_{business_date}) — so "
-+ "re-invoking is naturally idempotent: either it creates the run or it "
-+ "collides with the existing one, and both outcomes are correct.\n\n"
-+ "A sweeper then runs on a schedule, finds dates in TRIGGER with no live "
-+ "downstream run, and re-invokes. That is the piece questions 62 and 63 "
-+ "are both asking for.",
+"The failure here is quiet, which is what makes it expensive. We tell "
++ "the next stage to start, the instruction does not land, and nothing "
++ "reports an error. The day simply never finishes, and we usually find out "
++ "when somebody downstream asks where their data is. "
++ "\n\n"
++ "The fix is to write down that we intended to start before we start, and "
++ "give that run a name worked out from the business date. Then if the "
++ "instruction is lost we can safely issue it again, because the name "
++ "already exists and we cannot accidentally run the same day twice. "
++ "\n\n"
++ "A scheduled check then looks for days that were told to start and never "
++ "did, and starts them. ",
   gap:
-"BBH owns the sweep interval and what it does on repeated failure — "
-+ "re-invoke forever, or stop after N and page somebody. Forever is the "
-+ "wrong default: a date that has failed to start five times is not a "
-+ "transient fault.",
+"We need to agree how often that check runs and what it does when the "
++ "same day keeps failing. Retrying forever is the wrong answer. A day that "
++ "has failed to start five times needs a person, not another attempt. ",
   ev: ["idempotent-trigger practice", "dbt TDD §5.3 (deterministic run_id already specified)"] },
 
 { n: 62, conf: "codebase", fig: "runstate",
@@ -917,188 +913,203 @@ export const SEED_ANSWERS = [
 
 { n: 65, conf: "practice",
   body:
-"The standard fix is to make LOADING a CLAIM WITH AN EXPIRY rather than "
-+ "a status somebody sets.\n\n"
-+ "The worker writes LOADING together with a lease: who holds it "
-+ "(worker/pod id), when it was taken, and a heartbeat it refreshes while "
-+ "working. A crashed worker stops refreshing. A sweeper then finds rows "
-+ "in LOADING whose heartbeat is stale, and that is an unambiguous "
-+ "signal — not a guess about whether somebody is still going.\n\n"
-+ "What the sweeper does next depends on the load being IDEMPOTENT, which "
-+ "is the more important half: if the RAW insert is keyed so that "
-+ "re-running it cannot duplicate (a natural key plus file identity, or "
-+ "a delete-by-file-then-insert inside one transaction), recovery is "
-+ "simply “run it again” and the crash needs no special case.",
+"A file marked as loading, with nothing actually loading it, is "
++ "indistinguishable from a file being worked on. Today nobody can tell the "
++ "difference, so either we wait on something that is never coming, or we "
++ "restart something that was running fine and risk loading it twice. "
++ "\n\n"
++ "The fix is to make loading a claim that expires. Whoever picks the file "
++ "up records who they are and keeps a timestamp ticking while they work. "
++ "If they die the timestamp stops, and that is an unambiguous signal "
++ "rather than a guess. "
++ "\n\n"
++ "The more important half is making the load safe to repeat. If running it "
++ "twice cannot duplicate anything, recovery is simply run it again and the "
++ "crash needs no special handling. ",
   gap:
-"BBH owns the heartbeat interval and the stale threshold, and they have "
-+ "to exceed the longest legitimate pause — a large file, a slow volume. "
-+ "Set too short, the sweeper fights a working pod.",
+"We need to set how long is too long before we treat a load as dead, and "
++ "it has to be longer than a genuinely slow file. Set it too short and we "
++ "will be interrupting work that was going to finish. ",
   ev: ["lease/heartbeat practice", "idempotent-load practice"] },
 
 { n: 66, conf: "practice",
   seiAsk:
-"Will each delivery carry a checksum or manifest (row count and content hash)? Without one, a resend cannot be distinguished from the original.",
+"Will each delivery come with a row count or a checksum we can check against? Without one we cannot tell a corrected file from the original.",
   body:
-"By making the file's identity and its loaded footprint both recorded, "
-+ "so the question is answered by comparison rather than by judgement.\n\n"
-+ "On arrival, record the file's CONTENT HASH and byte size. On load, "
-+ "record the ROW COUNT inserted and the hash of the key set. Then "
-+ "“should RAW be reloaded?” is three checks: does a registry row exist "
-+ "for this file, does its content hash match the file on disk, and does "
-+ "the RAW row count for that file identity match what the registry "
-+ "says. All three agreeing means loaded; any disagreeing names what "
-+ "went wrong.\n\n"
-+ "Without the hash, a resend with the same name is indistinguishable "
-+ "from the original, which is also question 51.",
+"At the moment, if a file is half loaded, nobody can prove whether it "
++ "needs loading again. That matters because guessing wrong in either "
++ "direction is bad. Reload something already loaded and we double the "
++ "figures. Fail to reload and we are short. "
++ "\n\n"
++ "Recording two things makes the question answerable rather than a "
++ "judgement call. A fingerprint of the file when it arrives, and the "
++ "number of rows we loaded from it. Then we can check that the file on "
++ "disk is the one we think it is, and that what is in the system matches "
++ "what we said we loaded. "
++ "\n\n"
++ "Without the fingerprint, a corrected file sent under the same name looks "
++ "exactly like the original. ",
   gap:
-"The content hash is the piece that does not exist. It is cheap to add "
-+ "at arrival and impossible to reconstruct later, so it is worth doing "
-+ "before go-live rather than after the first incident.",
+"The fingerprint does not exist today. It costs almost nothing to capture "
++ "when the file arrives and cannot be worked out afterwards, so it needs "
++ "to go in before go live rather than after the first problem. ",
   ev: ["content-addressable ingestion practice"] },
 
 { n: 67, conf: "practice",
   seiAsk:
-"Does the delivery contract permit a file for a business date BBH has already closed, and with what notice?",
+"Does our agreement with SEI allow a file to arrive for a day we have already closed off, and how much notice would we get?",
   body:
-"Three policies are defensible and the choice is a business one, not a "
-+ "technical one:\n\n"
-+ "• REJECT. The date is closed; a late file is an exception requiring a "
-+ "restatement. Simplest, and the only one where a published figure never "
-+ "changes under a consumer.\n"
-+ "• ACCEPT INTO A NEW CYCLE. The file is loaded against the same "
-+ "business date as a new delivery, the date reopens to PENDING, and "
-+ "everything downstream reruns. Safe only if every downstream consumer "
-+ "can tolerate a restated date.\n"
-+ "• ACCEPT AS NEXT-DAY. The rows are loaded with the next business date "
-+ "and flagged as late. Keeps published history immutable, moves the "
-+ "distortion forward.\n\n"
-+ "Most custody and fund platforms land on REJECT plus an explicit "
-+ "restatement path, because silent reopening of a closed date is what "
-+ "breaks downstream reconciliations.",
+"This is a business decision about whether a published number is allowed "
++ "to change, not a technical one. "
++ "\n\n"
++ "We can refuse the file, and treat it as an exception needing a formal "
++ "correction. That is the only option where a figure we have already given "
++ "out never changes underneath the person who received it. "
++ "\n\n"
++ "We can accept it and rerun the day. That is only safe if everybody "
++ "downstream can cope with yesterday's numbers being restated. "
++ "\n\n"
++ "Or we can load it against the next day and mark it late. Published "
++ "history stays fixed and the difference moves forward instead. "
++ "\n\n"
++ "Most firms in this space land on refusing it plus a proper correction "
++ "process, because quietly reopening a closed day is what breaks everyone "
++ "else's reconciliations. ",
   gap:
-"Whichever is chosen, the design must ENFORCE it — today nothing in "
-+ "DATE_CONTROL stops a load against a COMPLETE date, so the answer is "
-+ "currently “whatever the ingestion code happens to do”.",
+"Whichever we pick, the system has to enforce it. Today nothing stops a "
++ "file being loaded against a day we have already closed, so the real "
++ "answer at the moment is whatever the code happens to do. ",
   ev: ["late-arriving-data practice"] },
 
 { n: 68, conf: "practice",
   seiAsk:
-"When SEI restates a delivery, how is BBH told — and how far back may a restatement reach?",
+"When SEI corrects something they have already sent us, how do we get told, and how far back is a correction allowed to go?",
   body:
-"By making restatement a FIRST-CLASS, VERSIONED operation rather than a "
-+ "reload.\n\n"
-+ "The pattern: RAW is append-only and never edited — a corrected file is "
-+ "a new delivery with its own identity, not an overwrite. The business "
-+ "date is reopened explicitly, with a recorded reason and actor. "
-+ "Downstream is rebuilt from RAW deterministically, so Gold is always a "
-+ "pure function of RAW plus the code version. And the restatement is "
-+ "announced: consumers are told that date changed, rather than "
-+ "discovering it.\n\n"
-+ "The property that keeps RAW and Gold in step is determinism — if "
-+ "rebuilding from RAW cannot reproduce Gold, they are already out of "
-+ "sync and nobody can tell.",
+"The risk is that we correct something and the corrected figures no "
++ "longer match the records we are supposed to be able to reproduce them "
++ "from. For an audit that is the worst position to be in. "
++ "\n\n"
++ "It stays in step if we never edit what we originally received. A "
++ "corrected file is a new delivery recorded alongside the old one, not an "
++ "overwrite. We reopen the day deliberately, with a reason and a name "
++ "against it, then rebuild everything downstream from the original "
++ "records. "
++ "\n\n"
++ "That rebuild is the control. If we cannot reproduce today's published "
++ "figures from what we received, then they have already drifted apart and "
++ "nobody can tell. ",
   gap:
-"The announcement is the part teams skip and then regret. A restatement "
-+ "nobody downstream was told about is indistinguishable from a bug in "
-+ "their own reconciliation.",
+"Telling people is the part that gets skipped and then causes the "
++ "support call. A correction nobody downstream was warned about looks "
++ "exactly like a fault in their own reconciliation, and they will raise it "
++ "as one. ",
   ev: ["append-only RAW / deterministic rebuild practice"] },
 
 { n: 69, conf: "practice",
   body:
-"Treat the archive move as a cleanup that may be repeated, never as the "
-+ "thing that records success.\n\n"
-+ "Order matters: commit the data AND the registry row in one "
-+ "transaction, then move the file. If the worker dies between the two, "
-+ "the database already says the file is loaded and the file is still in "
-+ "landing — which is a recoverable, self-describing state. A sweeper "
-+ "finds files in landing that the registry says are loaded, and moves "
-+ "them.\n\n"
-+ "The failure to avoid is the reverse order: move first, commit second. "
-+ "Then a crash leaves a file that is archived and not loaded, and "
-+ "nothing in landing to notice.",
+"The file is moved to an archive folder once it has been processed. The "
++ "question is what happens if we stop halfway. "
++ "\n\n"
++ "It depends entirely on the order. If we record the data and mark the "
++ "file as done together, and only then move it, a failure in between "
++ "leaves the system saying loaded and the file still sitting in the "
++ "incoming folder. That is untidy but safe, and something can tidy it up "
++ "later. "
++ "\n\n"
++ "The other order is the dangerous one. Move the file first and record it "
++ "second, and a failure leaves the file filed away as processed when it "
++ "never was. Nothing is left in the incoming folder to tell us. ",
   gap:
-"Which order the implementation uses is not recorded anywhere, and it is "
-+ "the single most consequential detail in this question. Worth "
-+ "confirming in one line of the DAG code.",
+"Which order the code actually uses is not written down anywhere, and it "
++ "is the entire answer to this question. Somebody should check it and "
++ "record it. ",
   ev: ["commit-then-move practice"] },
 
 { n: 70, conf: "practice",
   body:
-"Same answer as question 69 and it generalises, which is the point: on "
-+ "OpenShift a pod can vanish at any instruction — OOM kill, eviction, "
-+ "node drain, a rolling deploy — so recovery cannot depend on anything "
-+ "running after the crash.\n\n"
-+ "So: the database transaction is the commit point, the file move is "
-+ "idempotent cleanup, and every step is safe to repeat. The pod gets a "
-+ "termination grace period and handles SIGTERM to finish or abandon "
-+ "cleanly, but that is an optimisation — correctness must not rely on "
-+ "it, because an OOM kill gives no signal at all.\n\n"
-+ "Detection is the lease from question 65: a claim with a stale "
-+ "heartbeat is a crashed worker, whatever killed it.",
+"Same answer as the previous question, and it is worth saying why it "
++ "generalises. On the platform we are using, a process can be stopped at "
++ "any moment without warning, because it ran short of memory or the "
++ "platform needed the capacity. So recovery cannot depend on anything "
++ "happening after the failure. "
++ "\n\n"
++ "That means the point at which we record the work is the point it counts, "
++ "and everything after that has to be repeatable. We can ask for a few "
++ "seconds of warning before a process is stopped, and we should, but we "
++ "cannot rely on it, because the memory case gives no warning at all. "
++ "\n\n"
++ "Detecting it is the expiring claim described in question 65. ",
   gap:
-"Eviction and OOM are the realistic causes here given the 4 GB "
-+ "non-production namespaces (question 84), so this is not a "
-+ "once-a-year scenario — it is a weekly one until the sizing is settled.",
+"Given the memory allocated to the non production environments, see "
++ "question 84, this is not a rare event. It will happen regularly until "
++ "the sizing is settled. ",
   ev: ["Kubernetes pod-lifecycle practice", "crash-only design"] },
 
 { n: 71, conf: "practice",
   body:
-"Two shapes are normal, and they behave very differently under load:\n\n"
-+ "• TASK-PARALLEL within the DAG — Airflow fans out one task per "
-+ "interface, bounded by a pool. Visible in the UI, retried per task, "
-+ "and the concurrency ceiling is the pool size. This is what the "
-+ "proposed pool of 8–10 implies (question 84).\n"
-+ "• QUEUE-AND-WORKER — the DAG enqueues work and long-lived workers "
-+ "consume it. Better for uneven arrival, worse for observability, and "
-+ "it needs its own retry and dead-letter handling.\n\n"
-+ "For a daily batch with a known interface list, task-parallel is almost "
-+ "always right: the work is bounded, the fan-out is knowable in advance, "
-+ "and Airflow already gives per-task retry and visibility for free.",
+"Two normal approaches, and the difference matters for how much we can "
++ "see. "
++ "\n\n"
++ "The scheduler can run the feeds side by side itself, up to a set limit. "
++ "Everything is visible in one place, each feed can be retried on its own, "
++ "and the limit is one number we control. "
++ "\n\n"
++ "Or the work goes on a queue and separate processes pick it up. Better if "
++ "files arrive unevenly through the day, but harder to see what is "
++ "happening and it needs its own handling for work that keeps failing. "
++ "\n\n"
++ "For a daily run with a known list of feeds, the first is almost always "
++ "right. We know in advance how much work there is, and we get the "
++ "visibility and the retries without building anything. ",
   gap:
-"Whichever it is, the concurrency limit has to be set from the Oracle "
-+ "connection ceiling and the namespace CPU, not chosen independently — "
-+ "see questions 83 and 84.",
+"Whichever we use, the limit on how much runs at once has to come from "
++ "what the database can take and the capacity we have been given. It "
++ "cannot be chosen on its own. See questions 83 and 84. ",
   ev: ["Airflow fan-out practice"] },
 
 { n: 72, conf: "practice",
   body:
-"It should not, and this is the clearest smell in the questions.\n\n"
-+ "A registry is an audit record of what arrived and what was done with "
-+ "it. Deleting the row to allow a reload destroys the only evidence that "
-+ "the first delivery happened, which is exactly the evidence an auditor "
-+ "asks for after a restatement. It also makes the reload "
-+ "indistinguishable from a first load.\n\n"
-+ "The standard shape is append-only with a version or sequence per "
-+ "(interface, business date): the original row stays, is marked "
-+ "SUPERSEDED, and the corrected delivery is a new row pointing at it. "
-+ "The question “what did we receive and when” then still answers "
-+ "correctly a year later.",
+"This one we think is wrong, rather than just undocumented. "
++ "\n\n"
++ "The register is our record of what arrived and what we did with it. "
++ "Deleting the entry so a file can be reloaded destroys the only evidence "
++ "the first delivery ever happened. That is exactly the evidence an "
++ "auditor asks for after a correction, and it also means a reload looks "
++ "identical to a first load. "
++ "\n\n"
++ "The normal approach is to keep the original entry and mark it as "
++ "superseded, with the corrected delivery recorded as a new entry pointing "
++ "back at it. Then what did we receive and when still answers correctly a "
++ "year later. ",
   gap:
-"If the delete exists to satisfy a unique constraint on (FILE_NAME, "
-+ "BUSINESS_DATE), the fix is the constraint, not the delete — add the "
-+ "delivery sequence from question 51 and the conflict disappears.",
+"If the deletion only exists to get around a technical restriction on "
++ "duplicate file names, then the restriction is the thing to change, not "
++ "the record. Adding a delivery number, as in question 51, removes the "
++ "conflict. ",
   ev: ["append-only audit practice"] },
 
 { n: 73, conf: "practice",
   seiAsk:
-"Does SEI resend a corrected file under the SAME filename and business date? If so, (FILE_NAME, BUSINESS_DATE) is not a key and a delivery sequence has to come from SEI, not be invented by BBH.",
+"When SEI resends a corrected file, does it come under the same file name and the same business date? If it does, we need a delivery number from SEI rather than inventing one ourselves.",
   body:
-"Yes — and this is the same change as question 72, which is worth "
-+ "treating as one piece of work rather than two.\n\n"
-+ "Keep the original lifecycle intact and add two things: a version or "
-+ "delivery sequence that makes a resend a new row, and a status that "
-+ "can express SUPERSEDED alongside the existing terminal states. "
-+ "Current state is then “the highest-sequence row that is not "
-+ "superseded”, which is one predicate rather than a story somebody "
-+ "reconstructs.\n\n"
-+ "The cost is one column and one index. The benefit is that “how many "
-+ "times did this interface get restated last quarter” becomes a query "
-+ "instead of a Splunk archaeology exercise.",
+"Yes, and it is the same change as the previous question, so worth doing "
++ "once rather than twice. "
++ "\n\n"
++ "Keep the existing record as it is and add two things. A delivery number "
++ "so a resent file becomes a new entry rather than replacing the old one. "
++ "And a status that can say superseded alongside the ones we already have. "
++ "Current position is then simply the latest entry that has not been "
++ "superseded. "
++ "\n\n"
++ "The cost is small. What we get back is that a question like how many "
++ "times was this feed corrected last quarter becomes something we can "
++ "answer from the system rather than by searching through logs. ",
   gap:
-"Decide whether restatement is per-file or per-business-date. Per-file "
-+ "is finer and matches how corrections actually arrive; per-date is "
-+ "simpler and matches how DATE_CONTROL already thinks. They disagree "
-+ "when one of five interfaces is restated.",
+"We need to decide whether a correction applies to one file or to the "
++ "whole day. Per file matches how corrections actually arrive. Per day "
++ "matches how the rest of the design already thinks. They only differ when "
++ "one feed out of five is corrected, which is precisely the case that will "
++ "come up. ",
   ev: ["append-only audit practice", "SCD-style versioning"] },
 
 { n: 74, conf: "document",
@@ -1140,49 +1151,57 @@ export const SEED_ANSWERS = [
 
 { n: 75, conf: "practice",
   body:
-"The usual governance is a short matrix saying, for each failure class, "
-+ "who retries and how many times before a human is involved:\n\n"
-+ "• TRANSIENT infrastructure (connection reset, pod evicted, lock "
-+ "timeout) — automatic retry with bounded exponential backoff, no "
-+ "notification unless the bound is hit.\n"
-+ "• DATA THAT MAY RESOLVE ITSELF (a missing dimension) — no task retry; "
-+ "the row goes to the DQ store as reprocess-eligible and is replayed on "
-+ "a later cycle. The TDD specifies exactly this.\n"
-+ "• DATA THAT CANNOT RESOLVE ITSELF (a malformed source record) — no "
-+ "retry at all; it waits for a corrected delivery.\n"
-+ "• CODE DEFECT — no retry; the run fails and somebody fixes it.\n\n"
-+ "The discipline that matters: retrying something that cannot succeed "
-+ "turns a clear failure into a slow one, and it is the most common "
-+ "mistake in batch orchestration.",
+"What is missing is a simple agreement on who retries what, and how many "
++ "times, before a person is involved. "
++ "\n\n"
++ "Infrastructure problems, a dropped connection or a process restarted by "
++ "the platform, should retry automatically a few times and only tell "
++ "somebody if they keep failing. "
++ "\n\n"
++ "Data that might sort itself out, such as a transaction arriving before "
++ "its account, should not be retried at the job level at all. It is held "
++ "and picked up on a later run, which the design already does. "
++ "\n\n"
++ "Data that cannot sort itself out, such as a malformed record, should not "
++ "be retried either. It waits for a corrected file. "
++ "\n\n"
++ "A fault in our own code should stop and be fixed. "
++ "\n\n"
++ "The thing to avoid is retrying something that cannot succeed. That turns "
++ "a clear failure into a slow one, and it is the most common mistake in "
++ "this kind of processing. ",
   gap:
-"Only the second class is specified. The other three are Airflow "
-+ "defaults until somebody writes them down — which means they are "
-+ "whatever the first developer typed.",
+"Only the second case is specified today. The other three will be "
++ "whatever defaults the tooling came with until we write them down. ",
   ev: ["retry-taxonomy practice", "dbt TDD §7.1 (the replay class is specified)"] },
 
 { n: 76, conf: "practice",
   seiAsk:
-"What is SEI's role in a restatement — who declares it, who re-delivers, and within what window?",
+"What is SEI's part in a correction? Who declares it, who resends the data, and within what timeframe?",
   body:
-"As a named, auditable operation with four parts — and the TDD already "
-+ "has the hardest one.\n\n"
-+ "1. TRIGGER AND AUTHORITY — who may declare a restatement, on what "
-+ "evidence, recorded rather than verbal.\n"
-+ "2. SCOPE — which dates and which interfaces. Narrow by default: "
-+ "restating a week because one file was wrong is how a correction "
-+ "becomes an incident.\n"
-+ "3. MECHANISM — reopen the date, reload the corrected delivery, rebuild "
-+ "deterministically. For dimensions the MERGE-vs-UPDATE rule in §6.4.1 "
-+ "decides whether the correction may MERGE at all, which is the part "
-+ "most designs get wrong and this one does not.\n"
-+ "4. NOTIFICATION — consumers are told which dates changed and why, "
-+ "before they reconcile and find it themselves.\n\n"
-+ "Business corrections differ from technical restatements in one "
-+ "respect: the original value was not wrong when published, so history "
-+ "usually has to show both.",
+"A correction needs to be a named process we can evidence afterwards, "
++ "with four parts. The design already has the hardest one. "
++ "\n\n"
++ "Who is allowed to declare a correction and on what basis, recorded "
++ "rather than agreed verbally. "
++ "\n\n"
++ "What it covers. Which days and which feeds, kept as narrow as possible. "
++ "Correcting a whole week because one file was wrong is how a correction "
++ "becomes an incident. "
++ "\n\n"
++ "How it is done. Reopen the day, load the corrected file, rebuild. Where "
++ "account history is involved there is a rule in the design about when a "
++ "correction may be applied normally and when it must not, and that is the "
++ "part most designs get wrong. "
++ "\n\n"
++ "Who gets told, and before they find it themselves. "
++ "\n\n"
++ "Business corrections differ slightly from technical ones. The original "
++ "figure was not wrong when it was published, so the history usually has "
++ "to show both. ",
   gap:
-"Parts 1, 2 and 4 are not recorded anywhere. Part 4 is the one that "
-+ "turns a controlled correction into a support call.",
+"The first, second and fourth parts are not written down anywhere. The "
++ "fourth is the one that turns a controlled correction into a complaint. ",
   ev: ["restatement-runbook practice", "dbt TDD §6.4.1 (the MERGE-vs-UPDATE rule already exists)"] },
 
 { n: 77, conf: "codebase",
@@ -1217,23 +1236,24 @@ export const SEED_ANSWERS = [
 
 { n: 79, conf: "practice",
   body:
-"With a genuine RWX volume this is not a failure mode — that is what "
-+ "ReadWriteMany means: every pod on every node mounts the same "
-+ "filesystem. The landing share here is CIFS-backed, and network "
-+ "filesystems are node-independent by construction, so a worker landing "
-+ "on a different node is the normal case rather than an edge case.\n\n"
-+ "The documented failure is the OPPOSITE arrangement: a ReadWriteOnce "
-+ "volume binds to one node, so a pod scheduled elsewhere stays Pending "
-+ "— and the symptom is a DAG that hangs rather than errors. The usual "
-+ "guards are asserting the access mode in the manifest and alerting on "
-+ "pods Pending beyond a threshold.\n\n"
-+ "What a network filesystem does change is semantics, not reachability: "
-+ "locking and atomic rename behave differently over CIFS than on local "
-+ "disk, which is question 57's problem rather than this one.",
+"Short answer, with the storage arrangement described it is not a "
++ "problem. The incoming folder sits on shared network storage, so every "
++ "processing task can see it wherever it happens to be running. That is "
++ "the normal case here rather than an exception. "
++ "\n\n"
++ "The arrangement that does fail is the other one, where storage is tied "
++ "to a single machine. Then a task started anywhere else simply waits, and "
++ "the symptom is a run that hangs rather than one that reports an error, "
++ "which is worse because nobody is alerted. "
++ "\n\n"
++ "What shared network storage does change is the fine detail of two tasks "
++ "picking up the same file at the same moment, which is question 57 rather "
++ "than this one. ",
   gap:
-"Nobody has named the storage class (question 78), so “RWX” is an "
-+ "assertion on a diagram. One `kubectl get sc` and one `kubectl get pvc "
-+ "-o wide` settle this and question 82 in a minute.",
+"Nobody has confirmed which storage we have actually been given, see "
++ "question 78, so at the moment this is an assumption on a diagram. Two "
++ "commands would confirm it and would settle question 82 at the same "
++ "time. ",
   ev: ["Kubernetes access-mode semantics"] },
 
 { n: 80, conf: "absence",
@@ -1271,20 +1291,21 @@ export const SEED_ANSWERS = [
 
 { n: 82, conf: "practice",
   body:
-"It is guaranteed by the access mode and by nothing else. ReadWriteMany "
-+ "means every pod sees the same volume; ReadWriteOnce means one node "
-+ "does, and a second pod elsewhere never starts.\n\n"
-+ "The topology models the landing share as RWX over CIFS, which is "
-+ "consistent with multiple Airflow workers. So the guarantee is exactly "
-+ "as good as the provisioner actually delivering RWX — which is "
-+ "unverified (question 78).\n\n"
-+ "Worth adopting: assert it rather than assume it. A start-up check in "
-+ "the worker image that writes and reads back a sentinel file turns a "
-+ "silent mis-provision into a clear failure at deploy time rather than a "
-+ "mysterious one at month-end.",
+"It is guaranteed by how the storage is provisioned and by nothing else. "
++ "Shared storage means every processing task sees the same folder. Storage "
++ "tied to one machine means only tasks on that machine do, and the rest "
++ "never start. "
++ "\n\n"
++ "The design assumes shared storage, which fits having several tasks "
++ "running at once. So the guarantee is only as good as what we were "
++ "actually given, and that has not been checked. "
++ "\n\n"
++ "Worth building in a simple check when the process starts, writing a test "
++ "file and reading it back. That turns a wrong configuration into a clear "
++ "failure on the day we deploy, rather than a strange one at month end. ",
   gap:
-"Quarantine and archive are the same share as landing (question 77), so "
-+ "they inherit this answer and the same single point of failure.",
+"The quarantine and archive folders are on the same storage, see question "
++ "77, so they get the same answer and the same single point of failure. ",
   ev: ["Kubernetes access-mode semantics"] },
 
 { n: 83, conf: "absence",
@@ -1320,23 +1341,25 @@ export const SEED_ANSWERS = [
 
 { n: 85, conf: "practice",
   body:
-"By measuring, not by reasoning — and the measurement is small.\n\n"
-+ "The ceiling is SESSIONS on the database, and it is shared: Airflow "
-+ "workers, dbt runs, the API and anything else on that service all draw "
-+ "from the same pool. So the validation is a load test at the intended "
-+ "concurrency, watching sessions against the limit, plus a check of what "
-+ "else already consumes it.\n\n"
-+ "The arithmetic that catches most problems before any test: pods × "
-+ "threads per pod × connections per thread. dbt opens one connection per "
-+ "thread, so a `threads: 8` profile in four concurrent pods is 32 "
-+ "sessions from dbt alone — before Airflow's own metadata connections, "
-+ "which are separate.\n\n"
-+ "The two settings to pin are dbt's thread count and the Airflow pool "
-+ "size, and they multiply rather than add.",
+"This needs measuring rather than reasoning about, and the measurement "
++ "is small. "
++ "\n\n"
++ "The limit is the number of simultaneous connections the database will "
++ "accept, and it is shared with everything else using that database. So "
++ "validating it means running at the concurrency we actually intend, while "
++ "watching the connection count, and checking what else is already using "
++ "it. "
++ "\n\n"
++ "Most of the problem shows up before any test, from the arithmetic. "
++ "Number of processes, times the number of parallel operations each one "
++ "runs, times the connections each of those opens. Eight parallel "
++ "operations in four processes is thirty two connections before anything "
++ "else is counted. Those numbers multiply, they do not add. ",
   gap:
-"The Oracle session limit is not recorded (question 83) and neither is "
-+ "the dbt thread count. Those two numbers plus the pool size are the "
-+ "whole calculation, and none of the three is written down.",
+"We do not have the database limit, see question 83, and we have not "
++ "agreed the parallel setting either. Those two figures plus the "
++ "concurrency limit are the whole calculation and we are missing all "
++ "three. ",
   ev: ["connection-pool sizing practice", "dbt threads semantics"] },
 
 { n: 86, conf: "codebase", fig: "sizing",
@@ -1375,47 +1398,52 @@ export const SEED_ANSWERS = [
 
 { n: 88, conf: "practice",
   body:
-"The convention that matters more than the tool: STRUCTURED, "
-+ "machine-readable log lines — JSON, one event per line — with a fixed "
-+ "set of fields on every line.\n\n"
-+ "The fields that earn their place here: timestamp, level, service, "
-+ "environment, business_date, correlation_id, interface, dag_id, "
-+ "task_id, run_id, and a stable event name. Free text goes in a message "
-+ "field and nothing is ever parsed back out of it, because a log a "
-+ "human wrote is a log a dashboard cannot aggregate.\n\n"
-+ "Whether Dynatrace or Splunk consumes it is a routing decision and can "
-+ "change. The FIELD CONTRACT cannot, because every dashboard and alert "
-+ "depends on it — so that is the thing to agree, and to agree before "
-+ "the first DAG is written rather than retrofitted after.",
+"The point that matters more than which tool we use is that every log "
++ "entry should carry the same set of details, in a consistent format a "
++ "machine can read. "
++ "\n\n"
++ "The details worth insisting on here are when it happened, which process, "
++ "which environment, which business date, which feed, and an identifier "
++ "that follows one file all the way through. Anything written for a human "
++ "to read goes in a separate description field that nothing depends on. "
++ "\n\n"
++ "Whether the logs end up in one tool or another can change later. The list "
++ "of details cannot, because every dashboard and alert we build will "
++ "depend on it. So the list is the thing to agree, and we should agree it "
++ "before the first job is written rather than retrofit it afterwards. ",
   gap:
-"business_date and correlation_id are the two fields missing everywhere "
-+ "else as well (questions 42 and 87). Agreeing the field list here "
-+ "would settle all three at once.",
+"Two of those details, the business date and the identifier that follows "
++ "a file through, are missing everywhere else as well, see questions 42 and "
++ "87. Agreeing the list here would settle all three together. ",
   ev: ["structured-logging practice"] },
 
 { n: 89, conf: "practice",
   seiAsk:
-"Which alerts should escalate to SEI rather than to BBH support, and through what channel?",
+"Which problems should be escalated to SEI rather than handled by our own support team, and how should we raise them?",
   body:
-"Three mechanisms, and the first is the one most estates skip:\n\n"
-+ "• A DEDUPLICATION KEY per alert condition — here naturally (rule, "
-+ "dataset, business_date). A repeat occurrence updates the existing "
-+ "alert rather than raising a new one, which is what stops one bad file "
-+ "generating a thousand pages.\n"
-+ "• SEVERITY TIED TO ACTION, not to how bad it sounds. Critical means "
-+ "somebody is woken; warning means next working day; info means it is "
-+ "only read during an investigation. An alert with no action at its "
-+ "severity should not exist.\n"
-+ "• EXPLICIT RECOVERY. The alert closes when the condition clears and "
-+ "the closure is recorded — without it nobody can tell a resolved "
-+ "incident from an ignored one.\n\n"
-+ "Routing then follows severity and time of day, with one owning rota "
-+ "per severity rather than per system.",
+"Three things, and the first is the one most places skip. "
++ "\n\n"
++ "The same problem should raise one alert, not one per occurrence. Without "
++ "that, a single bad file can generate hundreds of notifications overnight "
++ "and the real one gets lost in them. "
++ "\n\n"
++ "Severity should describe what somebody does about it. Critical means we "
++ "wake a person. Warning means it is looked at the next working day. "
++ "Anything else is only read during an investigation. If there is no "
++ "action attached to a severity then the alert should not exist at that "
++ "level. "
++ "\n\n"
++ "And an alert should close itself when the problem clears, with that "
++ "recorded. Otherwise we cannot tell afterwards which incidents were "
++ "resolved and which were simply ignored. "
++ "\n\n"
++ "Routing then follows severity and time of day, with one rota per "
++ "severity rather than one per system. ",
   gap:
-"None of this is persisted on the Oracle side (question 90), so "
-+ "suppression and closure would live entirely in the alerting tool. "
-+ "Workable, but it means alert history cannot be reconciled against "
-+ "what actually failed.",
+"None of this is recorded on our side, see question 90, so suppression "
++ "and closure would live entirely inside the alerting tool. That works, but "
++ "it means we cannot reconcile what was alerted against what actually went "
++ "wrong. ",
   ev: ["alert-taxonomy practice", "deduplication-key practice"] },
 
 { n: 90, conf: "absence",

@@ -236,6 +236,17 @@ ok(prac.every((a) => !(a.ev || []).some(bare)),
    + "points at is parenthesised as a cross-reference",
    prac.filter((a) => (a.ev || []).some(bare))
      .map((a) => `${a.n}: ${(a.ev || []).filter(bare).join("; ")}`).join(" | "));
+// These twenty go in front of a business audience and, through the SEI
+// asks, in front of the vendor. Unexplained platform jargon loses that
+// reader on the sentence it appears in.
+const JARGON = /\b(RWX|ReadWriteMany|ReadWriteOnce|SIGTERM|OOM|kubectl|idempotenc?[ty]|DAG|upsert|dead[- ]letter|exponential backoff)\b/i;
+ok(prac.every((a) => !JARGON.test(
+     `${a.body} ${a.gap || ""} ${a.seiAsk || ""}`)),
+   "no BBH recommendation uses unexplained platform jargon — these are "
+   + "read by a business audience, and the SEI asks are read by the "
+   + "vendor",
+   prac.filter((a) => JARGON.test(`${a.body} ${a.gap || ""} ${a.seiAsk || ""}`))
+     .map((a) => `${a.n}: ${(JARGON.exec(a.body + a.gap) || [])[0]}`).join(", "));
 ok(prac.every((a) => a.gap && a.gap.length > 30),
    "and every one names what BBH still has to decide — a recommendation "
    + "that hides the choice is worse than no recommendation",
