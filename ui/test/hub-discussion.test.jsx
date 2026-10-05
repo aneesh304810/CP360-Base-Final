@@ -1055,6 +1055,59 @@ ok(/const \[evtOpen, setEvtOpen\] = useState\(false\)/.test(HUB),
 ok(/setEvtOpen\(!evtOpen\)/.test(HUB) && /evtOpen && \(/.test(HUB),
    "and expands on click", "");
 
+// ---- the C4 drill-down ----------------------------------------------
+//
+// Context -> containers -> components -> the design record. The value
+// is in it being WHOLE: a level that cannot be reached, or one with no
+// way back up, is worse than not having the level.
+ok(/view === "SEIL3"/.test(HUB) && /view === "SEIL4"/.test(HUB),
+   "the drill-down has a container level and a component level", "");
+// Every band on the diagram must open something.
+const STAGED = [...HUB.matchAll(/stage="([a-z]+)"/g)].map((m) => m[1]);
+const STAGEK = new Set(SEI_STAGES.map((x) => x.k));
+ok(STAGED.length > 0 && STAGED.every((k) => STAGEK.has(k)),
+   "every clickable band names a real stage",
+   STAGED.filter((k) => !STAGEK.has(k)).join(","));
+ok([...STAGEK].every((k) => STAGED.includes(k)),
+   "and every stage is reachable from the diagram — a container with no "
+   + "way in is a container nobody opens",
+   [...STAGEK].filter((k) => !STAGED.includes(k)).join(","));
+ok(/setSeiComp\(id\); setView\("SEIL4"\)/.test(HUB),
+   "and every component box opens its own record", "");
+// Back up, at every level.
+ok(/const Crumb = /.test(HUB)
+   && (HUB.match(/<Crumb trail=\{\[/g) || []).length >= 2,
+   "both levels carry a breadcrumb — a reader who has to use the "
+   + "browser's back button has lost the hierarchy the diagram is for",
+   (HUB.match(/<Crumb trail=\{\[/g) || []).length);
+// L4 is only worth opening if it assembles something.
+for (const [re, what] of [
+  [/THE ORACLE OBJECTS IT TOUCHES/, "the Oracle objects"],
+  [/STILL OPEN WITH SEI/, "what is still open with SEI"],
+  [/WHAT BBH HAS AGAINST IT/, "what BBH has against it"],
+  [/design document \u2192|design document →/, "the design document link"],
+]) {
+  ok(re.test(HUB), `the component record carries ${what}`, "");
+}
+// The links those sections read must resolve, or the record renders
+// empty sections and looks broken rather than incomplete.
+const TBLIDS = new Set(SEI_TABLES.map((x) => x.id));
+const OPENIDS = new Set(SEI_OPEN.map((x) => x.id));
+ok(SEI_COMPONENTS.every((c) => (c.tbl || []).every((x) => TBLIDS.has(x))),
+   "every component's table links resolve",
+   SEI_COMPONENTS.filter((c) => (c.tbl || []).some((x) => !TBLIDS.has(x)))
+     .map((c) => c.id).join(","));
+ok(SEI_COMPONENTS.every((c) => (c.open || []).every((x) => OPENIDS.has(x))),
+   "and its open-decision links resolve",
+   SEI_COMPONENTS.filter((c) => (c.open || []).some((x) => !OPENIDS.has(x)))
+     .map((c) => c.id).join(","));
+// Most components should touch something; an all-empty record means the
+// links were never filled in.
+ok(SEI_COMPONENTS.filter((c) => (c.tbl || []).length).length
+     >= SEI_COMPONENTS.length * 0.6,
+   "most components name the Oracle objects they touch",
+   `${SEI_COMPONENTS.filter((c) => (c.tbl || []).length).length} of ${SEI_COMPONENTS.length}`);
+
 // ---- the component registry ------------------------------------------
 const REGIDS = Object.keys(REGISTRY);
 const BASEALL = new Set([...SEI_COMPONENTS.map((c) => c.id),

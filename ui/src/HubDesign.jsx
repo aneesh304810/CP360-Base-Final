@@ -78,7 +78,9 @@ export default function HubDesign({ t }) {
  const [dc, setDc] = useState("");
  const [dq, setDq] = useState("");
  const [flat, setFlat] = useState(false);
- const [evtOpen, setEvtOpen] = useState(false);  // L2 event group       // "all components" flat tracker
+ const [evtOpen, setEvtOpen] = useState(false);  // L2 event group
+ const [seiStage, setSeiStage] = useState(null);   // C4 L3: which band
+ const [seiComp, setSeiComp] = useState(null);     // C4 L4: which component       // "all components" flat tracker
  const [expand, setExpand] = useState(null);    // L3 component detail panel
  const [srcOf, setSrcOf] = useState(null);      // component shown beside its SEI source
  const [seiDoc, setSeiDoc] = useState(null);    // {doc, section} open in the popup
@@ -186,6 +188,23 @@ export default function HubDesign({ t }) {
     color: tone || t.sub || "#666" }}>{k.toUpperCase()}</div>
    <div style={{ fontSize: 11, color: "#33414d", lineHeight: 1.6, marginTop: 2,
     maxWidth: 940 }}>{v}</div>
+  </div>);
+ // C4 breadcrumb. The drill-down is only useful if the way back up is
+ // obvious at every level — a reader who has to use the browser's back
+ // button has lost the hierarchy the diagram is for.
+ const Crumb = ({ trail }) => (
+  <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap",
+   marginBottom: 12, fontSize: 11 }}>
+   {trail.map(([label, go], i) => (
+    <span key={label + i} style={{ display: "inline-flex", alignItems: "center",
+     gap: 7 }}>
+     {i > 0 && <span style={{ color: "#9aa7b2" }}>›</span>}
+     <span onClick={go || undefined}
+      style={{ fontWeight: go ? 700 : 800, cursor: go ? "pointer" : "default",
+       padding: "5px 12px", borderRadius: 999,
+       background: go ? "#eef3f8" : (t.navy || "#10193b"),
+       color: go ? (t.accent || "#0f4775") : "#fff" }}>{label}</span>
+    </span>))}
   </div>);
  const Defs = () => (
   <defs><marker id="hubarr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8"
@@ -496,14 +515,17 @@ export default function HubDesign({ t }) {
     {sub && T(x + (id ? 34 : 10), y + 28, sub,
       { fs: 7.5, fill: bbh ? "#b9875a" : "#bcd6f0" })}
    </g>);
-  const Band = ({ x, y, w, h, label, note, bbh }) => (
-   <g>
+  const Band = ({ x, y, w, h, label, note, bbh, stage }) => (
+   <g onClick={stage ? () => { setSeiStage(stage); setView("SEIL3"); } : undefined}
+    style={stage ? { cursor: "pointer" } : undefined}>
     <rect x={x} y={y} width={w} height={h} rx="8" fill={bbh ? "#fdf7ea" : "#f4f8fb"}
      stroke={bbh ? "#dfa96a" : "#7fa8c9"} strokeDasharray="5 4" strokeWidth="1.2" />
     {T(x + 12, y + 17, label, { fs: 9.5, fw: 800,
       fill: bbh ? "#a8560f" : "#0f4775" })}
     {note && T(x + w - 12, y + 17, note, { fs: 8, anchor: "end", italic: true,
       fill: bbh ? "#b9875a" : "#5c7c94" })}
+    {stage && T(x + w - 12, y + h - 8, "▸ open container", { fs: 7.5,
+      anchor: "end", fw: 800, fill: "#0f4775" })}
    </g>);
   const Down = (x, y1, y2) => (
    <line x1={x} y1={y1} x2={x} y2={y2} stroke="#5c7c94" strokeWidth="1.3"
@@ -512,7 +534,9 @@ export default function HubDesign({ t }) {
   const SB = ({ id, x, y, w, h, sub }) => {
    const c = comp(id);
    return <Box x={x} y={y} w={w} h={h} id={id} label={c.n}
-    sub={sub === undefined ? c.tech : sub} />;
+    sub={sub === undefined ? c.tech : sub}
+    onClick={(e) => { if (e) e.stopPropagation();
+      setSeiComp(id); setView("SEIL4"); }} />;
   };
   return (
    <div>
@@ -547,14 +571,14 @@ export default function HubDesign({ t }) {
         { fs: 8.5, italic: true })}
 
       {/* delivery, left column */}
-      <Band x={24} y={58} w={200} h={246} label="DELIVERY" />
+      <Band x={24} y={58} w={200} h={246} label="DELIVERY" stage="deliver" />
       <SB id="S1" x={34} y={80} w={180} />
       <SB id="S2" x={34} y={132} w={180} />
       <SB id="S3" x={34} y={184} w={180} />
       <SB id="S4" x={34} y={236} w={180} />
 
       {/* ingestion */}
-      <Band x={248} y={58} w={660} h={130} label="INGESTION"
+      <Band x={248} y={58} w={660} h={130} label="INGESTION" stage="ingest"
        note="Airflow 3.0 on OpenShift · scan every five minutes" />
       <SB id="S5" x={258} y={80} w={320} />
       <SB id="S6" x={588} y={80} w={310} />
@@ -562,7 +586,7 @@ export default function HubDesign({ t }) {
       <SB id="S8" x={588} y={132} w={310} />
 
       {/* the gate */}
-      <Band x={248} y={200} w={660} h={130} label="COMPLETENESS AND SLA"
+      <Band x={248} y={200} w={660} h={130} label="COMPLETENESS AND SLA" stage="gate"
        note="the handoff between the two documents" />
       <SB id="S9" x={258} y={222} w={320} />
       <SB id="S10" x={588} y={222} w={310} />
@@ -575,7 +599,7 @@ export default function HubDesign({ t }) {
 
       {/* silver — one layer, three names */}
       <Band x={248} y={360} w={660} h={196}
-       label="SILVER · STAGE 2 · ENRICHED — one layer, three names"
+       label="SILVER · STAGE 2 · ENRICHED — one layer, three names" stage="xform"
        note="dbt" />
       <SB id="S14" x={258} y={382} w={640}
        sub="a view, held in memory — its job is the source DQ check" />
@@ -590,7 +614,7 @@ export default function HubDesign({ t }) {
         { fs: 8, italic: true, fill: "#a8560f" })}
 
       {/* the run */}
-      <Band x={248} y={568} w={660} h={130} label="THE TRANSFORMATION RUN" />
+      <Band x={248} y={568} w={660} h={130} label="THE TRANSFORMATION RUN" stage="xform" />
       <SB id="S13" x={258} y={590} w={320} />
       <SB id="S18" x={588} y={590} w={310} />
       <SB id="S19" x={258} y={642} w={320} />
@@ -620,7 +644,7 @@ export default function HubDesign({ t }) {
       {T(942, 508, "not a constraint the database enforces.", { fs: 8, italic: true })}
 
       {/* evidence + consumers */}
-      <Band x={932} y={530} w={284} h={82} label="EVIDENCE" />
+      <Band x={932} y={530} w={284} h={82} label="EVIDENCE" stage="evid" />
       <SB id="S21" x={942} y={552} w={264} />
       <Box x={942} y={640} w={264} h={44} bbh
        label="PBDW · IMDS · Pivotal"
@@ -851,6 +875,183 @@ export default function HubDesign({ t }) {
        <span style={{ color: "#33414d", lineHeight: 1.55 }}>{o.t}</span>
       </div>))}
     </div>
+   </div>);
+ }
+
+ /* ---------- C4 L3 — the components inside one container -------
+    Reached by clicking a band on L2. Lists what SEI puts in that part
+    of the design, and nothing else; each one opens its record. */
+ if (view === "SEIL3" && seiStage) {
+  const st = SEI_STAGES.find((x) => x.k === seiStage) || {};
+  const cs = seiCompsIn(seiStage);
+  return (
+   <div>
+    <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <Crumb trail={[
+      ["architecture", () => setView("L2")],
+      [st.n, null]]} />
+    <div style={{ display: "flex", alignItems: "center", gap: 12,
+     background: "#0f4775", color: "#fff", borderRadius: 10,
+     padding: "14px 20px", marginBottom: 12 }}>
+     <span style={{ fontSize: 24 }}>◆</span>
+     <div><b>{st.n}</b>
+      <div style={{ fontSize: 10, color: "#cfe0f2", marginTop: 2 }}>{st.d}</div></div>
+     <div style={{ marginLeft: "auto", textAlign: "center", fontSize: 10,
+      color: "#cfe0f2" }}><b style={{ display: "block", fontSize: 20,
+      color: "#fff" }}>{cs.length}</b>components</div>
+    </div>
+    <div style={{ display: "grid", gap: 8 }}>
+     {cs.map((c) => (
+      <div key={c.id} onClick={() => { setSeiComp(c.id); setView("SEIL4"); }}
+       style={{ background: "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+        borderLeft: "3px solid #1168bd", borderRadius: 8, padding: "12px 16px",
+        cursor: "pointer" }}>
+       <div style={{ display: "flex", alignItems: "center", gap: 8,
+        flexWrap: "wrap" }}>
+        <span style={{ fontFamily: "Roboto Mono, monospace", fontSize: 10,
+         fontWeight: 700, color: "#8a97a3" }}>{c.id}</span>
+        <b style={{ fontSize: 12.5, color: t.navy || "#10193b" }}>{c.n}</b>
+        {chip("#eef3f8", "#5c7c94", c.tech)}
+        {(c.tbl || []).map((x) => (
+          <span key={x}>{chip("#e4f0fb", "#0f4775",
+           (SEI_TABLES.find((z) => z.id === x) || {}).n || x)}</span>))}
+        {(c.open || []).length > 0 && chip("#f3eefb", "#6d3ac0",
+          `${(c.open || []).length} open with SEI`)}
+        <span style={{ marginLeft: "auto", fontSize: 9.5, fontWeight: 800,
+         color: "#0f4775" }}>open record →</span>
+       </div>
+       <div style={{ fontSize: 11.5, color: "#33414d", lineHeight: 1.6,
+        marginTop: 6, maxWidth: 940 }}>{c.w}</div>
+       <div style={{ fontSize: 9.5, color: t.muted || "#999", marginTop: 5 }}>
+        {c.ev}</div>
+      </div>))}
+    </div>
+   </div>);
+ }
+
+ /* ---------- C4 L4 — one component's record -------------------
+    The bottom of the drill-down, and the nearest thing to a design
+    document for a SEI component: what it is, what SEI says and where,
+    the Oracle objects it touches, what is still open about it, and
+    which BBH components map onto it. Where a tracker component maps,
+    its generated design document is one more click. */
+ if (view === "SEIL4" && seiComp) {
+  const c = SEI_COMPONENTS.find((x) => x.id === seiComp);
+  if (!c) return null;
+  const st = SEI_STAGES.find((x) => x.k === c.s) || {};
+  const tbls = (c.tbl || []).map((x) => SEI_TABLES.find((z) => z.id === x))
+    .filter(Boolean);
+  const opens = (c.open || []).map((x) => SEI_OPEN.find((z) => z.id === x))
+    .filter(Boolean);
+  const mapped = Object.entries(REGISTRY)
+    .filter(([, r]) => (r.sei || []).includes(c.id))
+    .map(([id, r]) => ({ id, r, c: COMPS.find((z) => z.id === id) }))
+    .filter((x) => x.c);
+  const Sec = ({ title, note, children }) => (
+   <div style={{ marginTop: 14 }}>
+    <div style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: .4,
+     color: "#5c7c94" }}>{title}</div>
+    {note && <div style={{ fontSize: 10, color: t.muted || "#999",
+      marginTop: 2 }}>{note}</div>}
+    <div style={{ marginTop: 6 }}>{children}</div>
+   </div>);
+  return (
+   <div>
+    <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <Crumb trail={[
+      ["architecture", () => setView("L2")],
+      [st.n, () => { setSeiStage(c.s); setView("SEIL3"); }],
+      [c.id, null]]} />
+    <div style={{ background: "#0f4775", color: "#fff", borderRadius: 10,
+     padding: "16px 20px", marginBottom: 12 }}>
+     <div style={{ display: "flex", alignItems: "center", gap: 10,
+      flexWrap: "wrap" }}>
+      <span style={{ fontFamily: "Roboto Mono, monospace", fontSize: 11,
+       fontWeight: 800, color: "#9ec6ee" }}>{c.id}</span>
+      <b style={{ fontSize: 16 }}>{c.n}</b>
+      {chip("#ffffff22", "#cfe0f2", c.tech)}
+     </div>
+     <div style={{ fontSize: 12, color: "#e6eef7", lineHeight: 1.65,
+      marginTop: 8, maxWidth: 940 }}>{c.w}</div>
+     <div style={{ fontSize: 10, color: "#9ec6ee", marginTop: 9 }}>
+      {c.ev}</div>
+    </div>
+
+    {tbls.length > 0 && (
+     <Sec title="THE ORACLE OBJECTS IT TOUCHES"
+      note="columns as the design documents give them; no foreign key is declared">
+      <div style={{ display: "grid", gap: 8 }}>
+       {tbls.map((tb) => (
+        <div key={tb.id} style={{ background: "#fff", borderRadius: 8,
+         border: `1px solid ${t.panel2 || "#dfe6e9"}`, padding: "11px 14px" }}>
+         <b style={{ fontFamily: "Roboto Mono, monospace", fontSize: 11.5,
+          color: t.navy || "#10193b" }}>{tb.n}</b>
+         <div style={{ fontSize: 11, color: "#33414d", lineHeight: 1.6,
+          marginTop: 4 }}>{tb.w}</div>
+         <div style={{ fontSize: 10, fontFamily: "Roboto Mono, monospace",
+          color: "#5c7c94", lineHeight: 1.6, marginTop: 6, background: "#f6f9fb",
+          borderRadius: 5, padding: "7px 10px" }}>{tb.cols}</div>
+         <div style={{ fontSize: 9.5, color: t.muted || "#999", marginTop: 5 }}>
+          {tb.ev}</div>
+        </div>))}
+      </div>
+     </Sec>)}
+
+    {opens.length > 0 && (
+     <Sec title="STILL OPEN WITH SEI"
+      note="SEI's own ids, so they can be quoted straight back">
+      <div style={{ background: "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+       borderRadius: 8, overflow: "hidden" }}>
+       {opens.map((o) => (
+        <div key={o.id} style={{ display: "grid",
+         gridTemplateColumns: "48px minmax(0,1fr)", gap: 12, padding: "10px 14px",
+         fontSize: 11, borderTop: "1px solid #eef1f4" }}>
+         <b style={{ fontFamily: "Roboto Mono, monospace", fontSize: 10.5,
+          color: "#6d3ac0" }}>{o.id}</b>
+         <span style={{ color: "#33414d", lineHeight: 1.55 }}>{o.t}</span>
+        </div>))}
+      </div>
+     </Sec>)}
+
+    <Sec title="WHAT BBH HAS AGAINST IT"
+     note={mapped.length ? "tracker components that map onto this, and their design documents"
+       : "nothing in the tracker maps onto this"}>
+     {mapped.length === 0 ? (
+      <div style={{ background: "#fdf1f2", borderRadius: 8,
+       borderLeft: "3px solid #cc3344", padding: "11px 14px", fontSize: 11.5,
+       color: "#33414d", lineHeight: 1.6 }}>
+       SEI specifies this and no component in the delivery workbook
+       corresponds to it. That is worth a look: it is either genuinely
+       covered by one of the components above, or it is work nobody is
+       tracking.
+      </div>) : (
+      <div style={{ display: "grid", gap: 8 }}>
+       {mapped.map(({ id, r, c: tc }) => {
+        const dk = docFor(tc), d = DOCS[dk];
+        const [sc, sl] = REG_STATE[r.st];
+        return (
+         <div key={id} style={{ background: "#fff", borderRadius: 8,
+          border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderLeft: `3px solid ${sc}`,
+          padding: "11px 14px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8,
+           flexWrap: "wrap" }}>
+           <span style={{ fontFamily: "Roboto Mono, monospace", fontSize: 10,
+            fontWeight: 700, color: "#8a97a3" }}>#{id}</span>
+           <b style={{ fontSize: 12, color: t.navy || "#10193b" }}>
+            {tc.component}</b>
+           {chip(sc + "1f", sc, sl.toUpperCase())}
+           <span onClick={() => setDoc({ key: dk, from: tc })}
+            style={{ marginLeft: "auto", fontSize: 9.5, fontWeight: 800,
+             padding: "4px 11px", borderRadius: 999, cursor: "pointer",
+             background: d.bg, color: d.color, border: `1px solid ${d.color}` }}>
+            {d.icon} design document →</span>
+          </div>
+          {r.why && <div style={{ fontSize: 11, color: "#33414d",
+           lineHeight: 1.6, marginTop: 5 }}>{r.why}</div>}
+         </div>);
+       })}
+      </div>)}
+    </Sec>
    </div>);
  }
 
