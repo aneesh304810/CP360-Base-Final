@@ -37,11 +37,22 @@
 //              looking like a verified one.
 //   inference  reasoned from the above rather than read. The premises
 //              belong in the body, and it is never a settled position.
+//   practice   what a comparable platform normally does, offered because
+//              the question was asked and no BBH document answers it.
+//              NOT evidence of anything: it describes the industry, not
+//              this estate. Every one names the decision BBH still owns,
+//              because a recommendation that hides the choice is worse
+//              than no recommendation. These never carry a quote.
 export const CONF = {
   codebase:  { label: "from the codebase", c: "#0f4775", bg: "#e4f0fb" },
   absence:   { label: "nothing recorded",  c: "#8c6a1f", bg: "#fdf2e3" },
   document:  { label: "from a document",   c: "#15803d", bg: "#e8f6ed" },
   inference: { label: "reasoned, not read", c: "#7c3aed", bg: "#f1e9fd" },
+  // Deliberately the plainest badge of the five. This class is a
+  // SUGGESTION — what comparable platforms do — and it must never read
+  // as something BBH has decided or a document has stated. It carries no
+  // quote, because there is no source text to quote.
+  practice:  { label: "industry practice · not BBH's", c: "#475569", bg: "#f1f5f9" },
 };
 
 export const SEED_PREFIX = "seed";
@@ -574,6 +585,52 @@ export const SEED_ANSWERS = [
        + "exist and carry live history from ODI.",
   ev: ["dbt TDD §4.1 — Medallion Mapping", "dbt TDD §10 — Figure 6, logical data model"] },
 
+{ n: 45, conf: "practice",
+  body:
+"The usual shape is a three-tier comparison, cheapest first, because a "
++ "row-by-row diff of a full history does not finish:\n\n"
++ "1. COUNTS per table per business date. Catches whole-file and "
++ "whole-partition losses and costs almost nothing.\n"
++ "2. AGGREGATES per table per date — SUM of every monetary column, "
++ "MIN/MAX of dates, COUNT DISTINCT of each key. Catches sign flips, "
++ "scale errors and duplicate explosions that counts miss.\n"
++ "3. ROW HASHES for a sampled or targeted population — a hash of the "
++ "concatenated business columns per key, compared both sides. Catches "
++ "field-level drift. Run full-population once at cutover, sampled "
++ "thereafter.\n\n"
++ "Variance 360 already computes exactly these metrics per column per "
++ "stage (CNT, SUM, HASHSUM, NDV, MIN_D, MAX_D), so tier 1 and 2 are "
++ "available now against an ODI-era snapshot.",
+  gap:
+"The decisions BBH owns: the tolerance (is a 1-cent rounding difference a "
++ "break?), the population (all accounts, or a stratified sample "
++ "including the awkward ones — closed accounts, multi-currency, "
++ "corrections), and WHEN the ODI side is frozen to compare against. "
++ "Parity against a moving target proves nothing.",
+  ev: ["standard migration-parity practice", "Variance 360 (metrics already exist)"] },
+
+{ n: 46, conf: "practice",
+  body:
+"Three controls, all cheap, and the TDD already has the first:\n\n"
++ "• BUILD ORDER AS A BARRIER. Dimensions complete and pass their tests "
++ "before facts start, so a fact never resolves against a stale "
++ "dimension. The TDD does this (build_dim → test_dim → build_fact).\n"
++ "• A DECLARED GRAIN PER FACT, written down and tested. One row per "
++ "what? The test is a uniqueness assertion on the declared key — if the "
++ "grain is ever violated the build fails rather than the numbers "
++ "doubling quietly.\n"
++ "• CONFORMED DIMENSION OWNERSHIP. One model owns each dimension; "
++ "everything else references it. Two models writing DIM_ACCOUNT is how "
++ "upstream changes reach downstream facts invisibly.\n\n"
++ "For fact-to-fact dependencies the convention is to forbid them: derive "
++ "from the shared dimension, not from another fact, so one fact's "
++ "rebuild cannot silently change another's numbers.",
+  gap:
+"Whether any fact here depends on another is not stated anywhere — with "
++ "one fact table today it may be moot, but it is the thing to rule on "
++ "before a second one is added.",
+  ev: ["Kimball conformed-dimension practice", "dbt uniqueness/relationship tests"] },
+
 { n: 47, conf: "document", fig: "scd2",
   body:
 "The document addresses this directly, and the answer is a rule about "
@@ -684,6 +741,27 @@ export const SEED_ANSWERS = [
 + "throughout these questions but its DDL is not in this repository.",
   ev: ["Environment 360 → Topology (CIFS 445 → RWX PVC)"] },
 
+{ n: 58, conf: "practice",
+  body:
+"The standard answer is a BUSINESS CALENDAR TABLE, not logic in a DAG. "
++ "One row per date per calendar, saying whether it is a processing day, "
++ "and which calendar applies to which interface — because a "
++ "multi-currency estate has more than one. Currency and market holidays "
++ "do not coincide, and a single “is it a weekday” test is the usual "
++ "source of month-end surprises.\n\n"
++ "The orchestration then asks the calendar rather than computing the "
++ "answer: a non-processing date is seeded COMPLETE with zero expected "
++ "interfaces, or not seeded at all, and both are defensible as long as "
++ "the choice is explicit. The first keeps the date series continuous, "
++ "which makes gap detection trivial, so it is usually preferred.",
+  gap:
+"BBH owns two decisions nobody has made: whether SWP delivers on "
++ "Saturday and Sunday at all, and if it does, whether BBH processes "
++ "those dates or holds them for the next business day. Those are "
++ "different answers for transactions than for positions, so it is "
++ "probably per-interface rather than global.",
+  ev: ["standard business-calendar practice"] },
+
 { n: 59, conf: "document", fig: "datectl",
   body:
 "Confirmed, and that is precisely the design. DATE_CONTROL holds one row "
@@ -727,6 +805,27 @@ export const SEED_ANSWERS = [
   quote: "On failure the run stops with DATE_CONTROL = TRIGGER and restarts "
        + "from the failed task.",
   ev: ["dbt TDD §5.2 — Figure 3, layer-barrier execution (p.11)"] },
+
+{ n: 61, conf: "practice",
+  body:
+"The pattern is to make the trigger an OBSERVED FACT rather than a "
++ "fire-and-forget call.\n\n"
++ "The caller writes its intent durably first (status = TRIGGER with a "
++ "run id it generated), then invokes. If the invoke fails, the row "
++ "already records that a run was intended and a reconciler can act on "
++ "it. The downstream run is given a DETERMINISTIC id derived from the "
++ "business date — the TDD does this (transform_{business_date}) — so "
++ "re-invoking is naturally idempotent: either it creates the run or it "
++ "collides with the existing one, and both outcomes are correct.\n\n"
++ "A sweeper then runs on a schedule, finds dates in TRIGGER with no live "
++ "downstream run, and re-invokes. That is the piece questions 62 and 63 "
++ "are both asking for.",
+  gap:
+"BBH owns the sweep interval and what it does on repeated failure — "
++ "re-invoke forever, or stop after N and page somebody. Forever is the "
++ "wrong default: a date that has failed to start five times is not a "
++ "transient fault.",
+  ev: ["idempotent-trigger practice", "dbt TDD §5.3 (deterministic run_id already specified)"] },
 
 { n: 62, conf: "codebase", fig: "runstate",
   body:
@@ -788,6 +887,184 @@ export const SEED_ANSWERS = [
   gap: "Ownership needs to be a column before it can be a process.",
   ev: ["guardrail_events (sql/24)", "guardrail_gate_run (sql/67)"] },
 
+{ n: 65, conf: "practice",
+  body:
+"The standard fix is to make LOADING a CLAIM WITH AN EXPIRY rather than "
++ "a status somebody sets.\n\n"
++ "The worker writes LOADING together with a lease: who holds it "
++ "(worker/pod id), when it was taken, and a heartbeat it refreshes while "
++ "working. A crashed worker stops refreshing. A sweeper then finds rows "
++ "in LOADING whose heartbeat is stale, and that is an unambiguous "
++ "signal — not a guess about whether somebody is still going.\n\n"
++ "What the sweeper does next depends on the load being IDEMPOTENT, which "
++ "is the more important half: if the RAW insert is keyed so that "
++ "re-running it cannot duplicate (a natural key plus file identity, or "
++ "a delete-by-file-then-insert inside one transaction), recovery is "
++ "simply “run it again” and the crash needs no special case.",
+  gap:
+"BBH owns the heartbeat interval and the stale threshold, and they have "
++ "to exceed the longest legitimate pause — a large file, a slow volume. "
++ "Set too short, the sweeper fights a working pod.",
+  ev: ["lease/heartbeat practice", "idempotent-load practice"] },
+
+{ n: 66, conf: "practice",
+  body:
+"By making the file's identity and its loaded footprint both recorded, "
++ "so the question is answered by comparison rather than by judgement.\n\n"
++ "On arrival, record the file's CONTENT HASH and byte size. On load, "
++ "record the ROW COUNT inserted and the hash of the key set. Then "
++ "“should RAW be reloaded?” is three checks: does a registry row exist "
++ "for this file, does its content hash match the file on disk, and does "
++ "the RAW row count for that file identity match what the registry "
++ "says. All three agreeing means loaded; any disagreeing names what "
++ "went wrong.\n\n"
++ "Without the hash, a resend with the same name is indistinguishable "
++ "from the original, which is also question 51.",
+  gap:
+"The content hash is the piece that does not exist. It is cheap to add "
++ "at arrival and impossible to reconstruct later, so it is worth doing "
++ "before go-live rather than after the first incident.",
+  ev: ["content-addressable ingestion practice"] },
+
+{ n: 67, conf: "practice",
+  body:
+"Three policies are defensible and the choice is a business one, not a "
++ "technical one:\n\n"
++ "• REJECT. The date is closed; a late file is an exception requiring a "
++ "restatement. Simplest, and the only one where a published figure never "
++ "changes under a consumer.\n"
++ "• ACCEPT INTO A NEW CYCLE. The file is loaded against the same "
++ "business date as a new delivery, the date reopens to PENDING, and "
++ "everything downstream reruns. Safe only if every downstream consumer "
++ "can tolerate a restated date.\n"
++ "• ACCEPT AS NEXT-DAY. The rows are loaded with the next business date "
++ "and flagged as late. Keeps published history immutable, moves the "
++ "distortion forward.\n\n"
++ "Most custody and fund platforms land on REJECT plus an explicit "
++ "restatement path, because silent reopening of a closed date is what "
++ "breaks downstream reconciliations.",
+  gap:
+"Whichever is chosen, the design must ENFORCE it — today nothing in "
++ "DATE_CONTROL stops a load against a COMPLETE date, so the answer is "
++ "currently “whatever the ingestion code happens to do”.",
+  ev: ["late-arriving-data practice"] },
+
+{ n: 68, conf: "practice",
+  body:
+"By making restatement a FIRST-CLASS, VERSIONED operation rather than a "
++ "reload.\n\n"
++ "The pattern: RAW is append-only and never edited — a corrected file is "
++ "a new delivery with its own identity, not an overwrite. The business "
++ "date is reopened explicitly, with a recorded reason and actor. "
++ "Downstream is rebuilt from RAW deterministically, so Gold is always a "
++ "pure function of RAW plus the code version. And the restatement is "
++ "announced: consumers are told that date changed, rather than "
++ "discovering it.\n\n"
++ "The property that keeps RAW and Gold in step is determinism — if "
++ "rebuilding from RAW cannot reproduce Gold, they are already out of "
++ "sync and nobody can tell.",
+  gap:
+"The announcement is the part teams skip and then regret. A restatement "
++ "nobody downstream was told about is indistinguishable from a bug in "
++ "their own reconciliation.",
+  ev: ["append-only RAW / deterministic rebuild practice"] },
+
+{ n: 69, conf: "practice",
+  body:
+"Treat the archive move as a cleanup that may be repeated, never as the "
++ "thing that records success.\n\n"
++ "Order matters: commit the data AND the registry row in one "
++ "transaction, then move the file. If the worker dies between the two, "
++ "the database already says the file is loaded and the file is still in "
++ "landing — which is a recoverable, self-describing state. A sweeper "
++ "finds files in landing that the registry says are loaded, and moves "
++ "them.\n\n"
++ "The failure to avoid is the reverse order: move first, commit second. "
++ "Then a crash leaves a file that is archived and not loaded, and "
++ "nothing in landing to notice.",
+  gap:
+"Which order the implementation uses is not recorded anywhere, and it is "
++ "the single most consequential detail in this question. Worth "
++ "confirming in one line of the DAG code.",
+  ev: ["commit-then-move practice"] },
+
+{ n: 70, conf: "practice",
+  body:
+"Same answer as question 69 and it generalises, which is the point: on "
++ "OpenShift a pod can vanish at any instruction — OOM kill, eviction, "
++ "node drain, a rolling deploy — so recovery cannot depend on anything "
++ "running after the crash.\n\n"
++ "So: the database transaction is the commit point, the file move is "
++ "idempotent cleanup, and every step is safe to repeat. The pod gets a "
++ "termination grace period and handles SIGTERM to finish or abandon "
++ "cleanly, but that is an optimisation — correctness must not rely on "
++ "it, because an OOM kill gives no signal at all.\n\n"
++ "Detection is the lease from question 65: a claim with a stale "
++ "heartbeat is a crashed worker, whatever killed it.",
+  gap:
+"Eviction and OOM are the realistic causes here given the 4 GB "
++ "non-production namespaces (question 84), so this is not a "
++ "once-a-year scenario — it is a weekly one until the sizing is settled.",
+  ev: ["Kubernetes pod-lifecycle practice", "crash-only design"] },
+
+{ n: 71, conf: "practice",
+  body:
+"Two shapes are normal, and they behave very differently under load:\n\n"
++ "• TASK-PARALLEL within the DAG — Airflow fans out one task per "
++ "interface, bounded by a pool. Visible in the UI, retried per task, "
++ "and the concurrency ceiling is the pool size. This is what the "
++ "proposed pool of 8–10 implies (question 84).\n"
++ "• QUEUE-AND-WORKER — the DAG enqueues work and long-lived workers "
++ "consume it. Better for uneven arrival, worse for observability, and "
++ "it needs its own retry and dead-letter handling.\n\n"
++ "For a daily batch with a known interface list, task-parallel is almost "
++ "always right: the work is bounded, the fan-out is knowable in advance, "
++ "and Airflow already gives per-task retry and visibility for free.",
+  gap:
+"Whichever it is, the concurrency limit has to be set from the Oracle "
++ "connection ceiling and the namespace CPU, not chosen independently — "
++ "see questions 83 and 84.",
+  ev: ["Airflow fan-out practice"] },
+
+{ n: 72, conf: "practice",
+  body:
+"It should not, and this is the clearest smell in the questions.\n\n"
++ "A registry is an audit record of what arrived and what was done with "
++ "it. Deleting the row to allow a reload destroys the only evidence that "
++ "the first delivery happened, which is exactly the evidence an auditor "
++ "asks for after a restatement. It also makes the reload "
++ "indistinguishable from a first load.\n\n"
++ "The standard shape is append-only with a version or sequence per "
++ "(interface, business date): the original row stays, is marked "
++ "SUPERSEDED, and the corrected delivery is a new row pointing at it. "
++ "The question “what did we receive and when” then still answers "
++ "correctly a year later.",
+  gap:
+"If the delete exists to satisfy a unique constraint on (FILE_NAME, "
++ "BUSINESS_DATE), the fix is the constraint, not the delete — add the "
++ "delivery sequence from question 51 and the conflict disappears.",
+  ev: ["append-only audit practice"] },
+
+{ n: 73, conf: "practice",
+  body:
+"Yes — and this is the same change as question 72, which is worth "
++ "treating as one piece of work rather than two.\n\n"
++ "Keep the original lifecycle intact and add two things: a version or "
++ "delivery sequence that makes a resend a new row, and a status that "
++ "can express SUPERSEDED alongside the existing terminal states. "
++ "Current state is then “the highest-sequence row that is not "
++ "superseded”, which is one predicate rather than a story somebody "
++ "reconstructs.\n\n"
++ "The cost is one column and one index. The benefit is that “how many "
++ "times did this interface get restated last quarter” becomes a query "
++ "instead of a Splunk archaeology exercise.",
+  gap:
+"Decide whether restatement is per-file or per-business-date. Per-file "
++ "is finer and matches how corrections actually arrive; per-date is "
++ "simpler and matches how DATE_CONTROL already thinks. They disagree "
++ "when one of five interfaces is restated.",
+  ev: ["append-only audit practice", "SCD-style versioning"] },
+
 { n: 74, conf: "document",
   body:
 "The structural answer is the one the question already contains: the replay "
@@ -825,6 +1102,51 @@ export const SEED_ANSWERS = [
   ev: ["dbt TDD §6.5 — INT Retention via Partition Drop (p.15)",
        "dbt TDD §7.1 — Capture and Publishing (p.17)"] },
 
+{ n: 75, conf: "practice",
+  body:
+"The usual governance is a short matrix saying, for each failure class, "
++ "who retries and how many times before a human is involved:\n\n"
++ "• TRANSIENT infrastructure (connection reset, pod evicted, lock "
++ "timeout) — automatic retry with bounded exponential backoff, no "
++ "notification unless the bound is hit.\n"
++ "• DATA THAT MAY RESOLVE ITSELF (a missing dimension) — no task retry; "
++ "the row goes to the DQ store as reprocess-eligible and is replayed on "
++ "a later cycle. The TDD specifies exactly this.\n"
++ "• DATA THAT CANNOT RESOLVE ITSELF (a malformed source record) — no "
++ "retry at all; it waits for a corrected delivery.\n"
++ "• CODE DEFECT — no retry; the run fails and somebody fixes it.\n\n"
++ "The discipline that matters: retrying something that cannot succeed "
++ "turns a clear failure into a slow one, and it is the most common "
++ "mistake in batch orchestration.",
+  gap:
+"Only the second class is specified. The other three are Airflow "
++ "defaults until somebody writes them down — which means they are "
++ "whatever the first developer typed.",
+  ev: ["retry-taxonomy practice", "dbt TDD §7.1 (the replay class is specified)"] },
+
+{ n: 76, conf: "practice",
+  body:
+"As a named, auditable operation with four parts — and the TDD already "
++ "has the hardest one.\n\n"
++ "1. TRIGGER AND AUTHORITY — who may declare a restatement, on what "
++ "evidence, recorded rather than verbal.\n"
++ "2. SCOPE — which dates and which interfaces. Narrow by default: "
++ "restating a week because one file was wrong is how a correction "
++ "becomes an incident.\n"
++ "3. MECHANISM — reopen the date, reload the corrected delivery, rebuild "
++ "deterministically. For dimensions the MERGE-vs-UPDATE rule in §6.4.1 "
++ "decides whether the correction may MERGE at all, which is the part "
++ "most designs get wrong and this one does not.\n"
++ "4. NOTIFICATION — consumers are told which dates changed and why, "
++ "before they reconcile and find it themselves.\n\n"
++ "Business corrections differ from technical restatements in one "
++ "respect: the original value was not wrong when published, so history "
++ "usually has to show both.",
+  gap:
+"Parts 1, 2 and 4 are not recorded anywhere. Part 4 is the one that "
++ "turns a controlled correction into a support call.",
+  ev: ["restatement-runbook practice", "dbt TDD §6.4.1 (the MERGE-vs-UPDATE rule already exists)"] },
+
 { n: 77, conf: "codebase",
   body:
 "The topology models the landing share as a CIFS share reached on port 445 "
@@ -854,6 +1176,27 @@ export const SEED_ANSWERS = [
 + "including whether rename is atomic across pods, which question 57 depends "
 + "on.",
   ev: ["Environment 360 → Topology"] },
+
+{ n: 79, conf: "practice",
+  body:
+"With a genuine RWX volume this is not a failure mode — that is what "
++ "ReadWriteMany means: every pod on every node mounts the same "
++ "filesystem. The landing share here is CIFS-backed, and network "
++ "filesystems are node-independent by construction, so a worker landing "
++ "on a different node is the normal case rather than an edge case.\n\n"
++ "The documented failure is the OPPOSITE arrangement: a ReadWriteOnce "
++ "volume binds to one node, so a pod scheduled elsewhere stays Pending "
++ "— and the symptom is a DAG that hangs rather than errors. The usual "
++ "guards are asserting the access mode in the manifest and alerting on "
++ "pods Pending beyond a threshold.\n\n"
++ "What a network filesystem does change is semantics, not reachability: "
++ "locking and atomic rename behave differently over CIFS than on local "
++ "disk, which is question 57's problem rather than this one.",
+  gap:
+"Nobody has named the storage class (question 78), so “RWX” is an "
++ "assertion on a diagram. One `kubectl get sc` and one `kubectl get pvc "
++ "-o wide` settle this and question 82 in a minute.",
+  ev: ["Kubernetes access-mode semantics"] },
 
 { n: 80, conf: "absence",
   body:
@@ -888,6 +1231,24 @@ export const SEED_ANSWERS = [
 + "a landing share fills on a month-end.",
   ev: ["Environment 360 → Topology (Growth = TBD on all rows)"] },
 
+{ n: 82, conf: "practice",
+  body:
+"It is guaranteed by the access mode and by nothing else. ReadWriteMany "
++ "means every pod sees the same volume; ReadWriteOnce means one node "
++ "does, and a second pod elsewhere never starts.\n\n"
++ "The topology models the landing share as RWX over CIFS, which is "
++ "consistent with multiple Airflow workers. So the guarantee is exactly "
++ "as good as the provisioner actually delivering RWX — which is "
++ "unverified (question 78).\n\n"
++ "Worth adopting: assert it rather than assume it. A start-up check in "
++ "the worker image that writes and reads back a sentinel file turns a "
++ "silent mis-provision into a clear failure at deploy time rather than a "
++ "mysterious one at month-end.",
+  gap:
+"Quarantine and archive are the same share as landing (question 77), so "
++ "they inherit this answer and the same single point of failure.",
+  ev: ["Kubernetes access-mode semantics"] },
+
 { n: 83, conf: "absence",
   body:
 "None of the four is recorded.\n\n"
@@ -918,6 +1279,27 @@ export const SEED_ANSWERS = [
 + "arrival profile), and then a namespace request sized to it — or an "
 + "explicit decision that non-production runs at reduced concurrency.",
   ev: ["Environment 360 → Topology (4 GB / 2 CPU non-prod)"] },
+
+{ n: 85, conf: "practice",
+  body:
+"By measuring, not by reasoning — and the measurement is small.\n\n"
++ "The ceiling is SESSIONS on the database, and it is shared: Airflow "
++ "workers, dbt runs, the API and anything else on that service all draw "
++ "from the same pool. So the validation is a load test at the intended "
++ "concurrency, watching sessions against the limit, plus a check of what "
++ "else already consumes it.\n\n"
++ "The arithmetic that catches most problems before any test: pods × "
++ "threads per pod × connections per thread. dbt opens one connection per "
++ "thread, so a `threads: 8` profile in four concurrent pods is 32 "
++ "sessions from dbt alone — before Airflow's own metadata connections, "
++ "which are separate.\n\n"
++ "The two settings to pin are dbt's thread count and the Airflow pool "
++ "size, and they multiply rather than add.",
+  gap:
+"The Oracle session limit is not recorded (question 83) and neither is "
++ "the dbt thread count. Those two numbers plus the pool size are the "
++ "whole calculation, and none of the three is written down.",
+  ev: ["connection-pool sizing practice", "dbt threads semantics"] },
 
 { n: 86, conf: "codebase", fig: "sizing",
   body:
@@ -952,6 +1334,49 @@ export const SEED_ANSWERS = [
 + "business_date as well — a correlation id without a business date still "
 + "cannot distinguish a run from its replay.",
   ev: ["guardrail_events (sql/24)", "recon_profile (sql/31)", "guardrail_gate_run (sql/67)"] },
+
+{ n: 88, conf: "practice",
+  body:
+"The convention that matters more than the tool: STRUCTURED, "
++ "machine-readable log lines — JSON, one event per line — with a fixed "
++ "set of fields on every line.\n\n"
++ "The fields that earn their place here: timestamp, level, service, "
++ "environment, business_date, correlation_id, interface, dag_id, "
++ "task_id, run_id, and a stable event name. Free text goes in a message "
++ "field and nothing is ever parsed back out of it, because a log a "
++ "human wrote is a log a dashboard cannot aggregate.\n\n"
++ "Whether Dynatrace or Splunk consumes it is a routing decision and can "
++ "change. The FIELD CONTRACT cannot, because every dashboard and alert "
++ "depends on it — so that is the thing to agree, and to agree before "
++ "the first DAG is written rather than retrofitted after.",
+  gap:
+"business_date and correlation_id are the two fields missing everywhere "
++ "else as well (questions 42 and 87). Agreeing the field list here "
++ "would settle all three at once.",
+  ev: ["structured-logging practice"] },
+
+{ n: 89, conf: "practice",
+  body:
+"Three mechanisms, and the first is the one most estates skip:\n\n"
++ "• A DEDUPLICATION KEY per alert condition — here naturally (rule, "
++ "dataset, business_date). A repeat occurrence updates the existing "
++ "alert rather than raising a new one, which is what stops one bad file "
++ "generating a thousand pages.\n"
++ "• SEVERITY TIED TO ACTION, not to how bad it sounds. Critical means "
++ "somebody is woken; warning means next working day; info means it is "
++ "only read during an investigation. An alert with no action at its "
++ "severity should not exist.\n"
++ "• EXPLICIT RECOVERY. The alert closes when the condition clears and "
++ "the closure is recorded — without it nobody can tell a resolved "
++ "incident from an ignored one.\n\n"
++ "Routing then follows severity and time of day, with one owning rota "
++ "per severity rather than per system.",
+  gap:
+"None of this is persisted on the Oracle side (question 90), so "
++ "suppression and closure would live entirely in the alerting tool. "
++ "Workable, but it means alert history cannot be reconciled against "
++ "what actually failed.",
+  ev: ["alert-taxonomy practice", "deduplication-key practice"] },
 
 { n: 90, conf: "absence",
   body:

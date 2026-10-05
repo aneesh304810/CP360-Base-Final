@@ -220,6 +220,30 @@ ok(fromDoc.every((a) => a.quote.length >= 40 && /[a-z]{4}/.test(a.quote)),
    "and the quote is a sentence rather than a fragment", 
    fromDoc.filter((a) => a.quote.length < 40).map((a) => a.n));
 
+// "practice" is a SUGGESTION, and the whole risk of adding it is that it
+// stops reading as one. Three rules keep it honest.
+const prac = SEED_ANSWERS.filter((a) => a.conf === "practice");
+ok(prac.length > 0 && prac.every((a) => !a.quote),
+   "no industry-practice answer carries a quote — there is no source text, "
+   + "and a quote would make a recommendation look like a citation",
+   prac.filter((a) => a.quote).map((a) => a.n));
+// A bare "dbt TDD §6.4.1" on a suggestion reads as though the document
+// recommended it. Where a practice answer points at a document it is a
+// cross-reference, and the parenthetical says so. Q76 had a bare one.
+const bare = (e) => /^(dbt TDD|SEI |sql\/)/.test(e) && !e.includes("(");
+ok(prac.every((a) => !(a.ev || []).some(bare)),
+   "its evidence never passes itself off as the source — a document it "
+   + "points at is parenthesised as a cross-reference",
+   prac.filter((a) => (a.ev || []).some(bare))
+     .map((a) => `${a.n}: ${(a.ev || []).filter(bare).join("; ")}`).join(" | "));
+ok(prac.every((a) => a.gap && a.gap.length > 30),
+   "and every one names what BBH still has to decide — a recommendation "
+   + "that hides the choice is worse than no recommendation",
+   prac.filter((a) => !a.gap).map((a) => a.n));
+ok(CONF.practice && /not BBH/.test(CONF.practice.label),
+   "the badge says out loud that it is not BBH's position",
+   CONF.practice && CONF.practice.label);
+
 // A draft is an answer, never a resolution.
 const fresh = emptyStore();
 const seeded = seedRows(fresh);
@@ -566,20 +590,27 @@ if (fs.existsSync(DOC)) {
   // with a draft has to leave them. Bucket C says "no document answers
   // this; a person decides" — an absence draft there records that the
   // search was done and changes nothing about who decides, so it stays.
-  const sourceable = new Set([...buckets[0], ...buckets[1]]);
-  ok(![...sourceable].some((n) => answered.has(n)),
-     "no question in bucket A or B already has a draft — otherwise the "
-     + "document sends someone to extract an answer that is on the screen",
-     [...sourceable].filter((n) => answered.has(n)).join(","));
+  ok(![...buckets[0]].some((n) => answered.has(n)),
+     "no question in bucket A already has a draft — the SEI pack is still "
+     + "expected to answer those, and a draft there would send someone to "
+     + "extract an answer that is already on the screen",
+     [...buckets[0]].filter((n) => answered.has(n)).join(","));
+  const classOf = (n) => (SEED_ANSWERS.find((x) => x.n === n) || {}).conf;
   const cDrafts = [...buckets[2]].filter((n) => answered.has(n));
-  ok(cDrafts.every((n) => {
-       const a = SEED_ANSWERS.find((x) => x.n === n);
-       return a && a.conf === "absence";
-     }),
-     "and a bucket C question may only carry an ABSENCE draft — anything "
-     + "else would be answering a decision nobody has made",
-     cDrafts.filter((n) => (SEED_ANSWERS.find((x) => x.n === n) || {}).conf
-       !== "absence").join(","));
+  ok(cDrafts.every((n) => classOf(n) === "absence"),
+     "a bucket C question may only carry an ABSENCE draft — anything else "
+     + "would be answering a decision nobody has made",
+     cDrafts.filter((n) => classOf(n) !== "absence").join(","));
+  // Bucket B says "a BBH document should answer this". A suggestion does
+  // not, so it does not evict the question from the bucket — but nothing
+  // stronger may sit there either, or the extraction would be skipped.
+  const bDrafts = [...buckets[1]].filter((n) => answered.has(n));
+  ok(bDrafts.every((n) => classOf(n) === "practice"),
+     "and a bucket B question may only carry an INDUSTRY-PRACTICE draft — "
+     + "the BBH design document still has to answer it, and a suggestion "
+     + "sitting there must not look like it already did",
+     bDrafts.filter((n) => classOf(n) !== "practice")
+       .map((n) => `${n}:${classOf(n)}`).join(","));
   const dup = [];
   for (let i = 0; i < buckets.length; i++)
     for (let j = i + 1; j < buckets.length; j++)

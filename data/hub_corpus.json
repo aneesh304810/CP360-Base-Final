@@ -1580,6 +1580,30 @@
    "ev": "dbt TDD §4.1 — Medallion Mapping | dbt TDD §10 — Figure 6, logical data model"
   },
   {
+   "answer_id": "seed45",
+   "qid": 45,
+   "body": "The usual shape is a three-tier comparison, cheapest first, because a row-by-row diff of a full history does not finish:\n\n1. COUNTS per table per business date. Catches whole-file and whole-partition losses and costs almost nothing.\n2. AGGREGATES per table per date — SUM of every monetary column, MIN/MAX of dates, COUNT DISTINCT of each key. Catches sign flips, scale errors and duplicate explosions that counts miss.\n3. ROW HASHES for a sampled or targeted population — a hash of the concatenated business columns per key, compared both sides. Catches field-level drift. Run full-population once at cutover, sampled thereafter.\n\nVariance 360 already computes exactly these metrics per column per stage (CNT, SUM, HASHSUM, NDV, MIN_D, MAX_D), so tier 1 and 2 are available now against an ODI-era snapshot.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "practice",
+   "gap": "The decisions BBH owns: the tolerance (is a 1-cent rounding difference a break?), the population (all accounts, or a stratified sample including the awkward ones — closed accounts, multi-currency, corrections), and WHEN the ODI side is frozen to compare against. Parity against a moving target proves nothing.",
+   "quote": null,
+   "fig": null,
+   "ev": "standard migration-parity practice | Variance 360 (metrics already exist)"
+  },
+  {
+   "answer_id": "seed46",
+   "qid": 46,
+   "body": "Three controls, all cheap, and the TDD already has the first:\n\n• BUILD ORDER AS A BARRIER. Dimensions complete and pass their tests before facts start, so a fact never resolves against a stale dimension. The TDD does this (build_dim → test_dim → build_fact).\n• A DECLARED GRAIN PER FACT, written down and tested. One row per what? The test is a uniqueness assertion on the declared key — if the grain is ever violated the build fails rather than the numbers doubling quietly.\n• CONFORMED DIMENSION OWNERSHIP. One model owns each dimension; everything else references it. Two models writing DIM_ACCOUNT is how upstream changes reach downstream facts invisibly.\n\nFor fact-to-fact dependencies the convention is to forbid them: derive from the shared dimension, not from another fact, so one fact's rebuild cannot silently change another's numbers.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "practice",
+   "gap": "Whether any fact here depends on another is not stated anywhere — with one fact table today it may be moot, but it is the thing to rule on before a second one is added.",
+   "quote": null,
+   "fig": null,
+   "ev": "Kimball conformed-dimension practice | dbt uniqueness/relationship tests"
+  },
+  {
    "answer_id": "seed47",
    "qid": 47,
    "body": "The document addresses this directly, and the answer is a rule about which WRITE to use — not about lookups.\n\nWhen a corrected record is reprocessed, the mechanism depends on the state of the dimension row it belongs to. If the account's ACTIVE_IND=1 row is still the one open on the failed business date, a normal MERGE is correct. If a later change has already closed that interval (ACTIVE_IND=0), the fix must be a direct UPDATE of that specific closed historical row and must NOT be a MERGE — a MERGE would reopen a closed interval.\n\nThat is exactly the Monday-replayed-after-Wednesday case you describe, and the design names it rather than leaving it to the implementer.",
@@ -1652,6 +1676,18 @@
    "ev": "Environment 360 → Topology (CIFS 445 → RWX PVC)"
   },
   {
+   "answer_id": "seed58",
+   "qid": 58,
+   "body": "The standard answer is a BUSINESS CALENDAR TABLE, not logic in a DAG. One row per date per calendar, saying whether it is a processing day, and which calendar applies to which interface — because a multi-currency estate has more than one. Currency and market holidays do not coincide, and a single “is it a weekday” test is the usual source of month-end surprises.\n\nThe orchestration then asks the calendar rather than computing the answer: a non-processing date is seeded COMPLETE with zero expected interfaces, or not seeded at all, and both are defensible as long as the choice is explicit. The first keeps the date series continuous, which makes gap detection trivial, so it is usually preferred.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "practice",
+   "gap": "BBH owns two decisions nobody has made: whether SWP delivers on Saturday and Sunday at all, and if it does, whether BBH processes those dates or holds them for the next business day. Those are different answers for transactions than for positions, so it is probably per-interface rather than global.",
+   "quote": null,
+   "fig": null,
+   "ev": "standard business-calendar practice"
+  },
+  {
    "answer_id": "seed59",
    "qid": 59,
    "body": "Confirmed, and that is precisely the design. DATE_CONTROL holds one row per business date with a STATUS moving PENDING → TRIGGER → COMPLETE.\n\nThe Ingestion DAG loads files, then compares the expected interface set (FILE_SCHEMA_CONFIG) against the completed set (FILE_REGISTRY). If complete it moves PENDING → TRIGGER under a guarded UPDATE (SQL%ROWCOUNT = 1, so only one DAG run can trigger) and invokes the Transformation DAG. If incomplete it ends normally, the date stays PENDING, and the next cycle re-checks.\n\nThe next date is seeded only by the Transformation DAG, only on success, together with its SLA cutoff.",
@@ -1674,6 +1710,18 @@
    "quote": "On failure the run stops with DATE_CONTROL = TRIGGER and restarts from the failed task.",
    "fig": "datectl",
    "ev": "dbt TDD §5.2 — Figure 3, layer-barrier execution (p.11)"
+  },
+  {
+   "answer_id": "seed61",
+   "qid": 61,
+   "body": "The pattern is to make the trigger an OBSERVED FACT rather than a fire-and-forget call.\n\nThe caller writes its intent durably first (status = TRIGGER with a run id it generated), then invokes. If the invoke fails, the row already records that a run was intended and a reconciler can act on it. The downstream run is given a DETERMINISTIC id derived from the business date — the TDD does this (transform_{business_date}) — so re-invoking is naturally idempotent: either it creates the run or it collides with the existing one, and both outcomes are correct.\n\nA sweeper then runs on a schedule, finds dates in TRIGGER with no live downstream run, and re-invokes. That is the piece questions 62 and 63 are both asking for.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "practice",
+   "gap": "BBH owns the sweep interval and what it does on repeated failure — re-invoke forever, or stop after N and page somebody. Forever is the wrong default: a date that has failed to start five times is not a transient fault.",
+   "quote": null,
+   "fig": null,
+   "ev": "idempotent-trigger practice | dbt TDD §5.3 (deterministic run_id already specified)"
   },
   {
    "answer_id": "seed62",
@@ -1712,6 +1760,114 @@
    "ev": "guardrail_events (sql/24) | guardrail_gate_run (sql/67)"
   },
   {
+   "answer_id": "seed65",
+   "qid": 65,
+   "body": "The standard fix is to make LOADING a CLAIM WITH AN EXPIRY rather than a status somebody sets.\n\nThe worker writes LOADING together with a lease: who holds it (worker/pod id), when it was taken, and a heartbeat it refreshes while working. A crashed worker stops refreshing. A sweeper then finds rows in LOADING whose heartbeat is stale, and that is an unambiguous signal — not a guess about whether somebody is still going.\n\nWhat the sweeper does next depends on the load being IDEMPOTENT, which is the more important half: if the RAW insert is keyed so that re-running it cannot duplicate (a natural key plus file identity, or a delete-by-file-then-insert inside one transaction), recovery is simply “run it again” and the crash needs no special case.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "practice",
+   "gap": "BBH owns the heartbeat interval and the stale threshold, and they have to exceed the longest legitimate pause — a large file, a slow volume. Set too short, the sweeper fights a working pod.",
+   "quote": null,
+   "fig": null,
+   "ev": "lease/heartbeat practice | idempotent-load practice"
+  },
+  {
+   "answer_id": "seed66",
+   "qid": 66,
+   "body": "By making the file's identity and its loaded footprint both recorded, so the question is answered by comparison rather than by judgement.\n\nOn arrival, record the file's CONTENT HASH and byte size. On load, record the ROW COUNT inserted and the hash of the key set. Then “should RAW be reloaded?” is three checks: does a registry row exist for this file, does its content hash match the file on disk, and does the RAW row count for that file identity match what the registry says. All three agreeing means loaded; any disagreeing names what went wrong.\n\nWithout the hash, a resend with the same name is indistinguishable from the original, which is also question 51.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "practice",
+   "gap": "The content hash is the piece that does not exist. It is cheap to add at arrival and impossible to reconstruct later, so it is worth doing before go-live rather than after the first incident.",
+   "quote": null,
+   "fig": null,
+   "ev": "content-addressable ingestion practice"
+  },
+  {
+   "answer_id": "seed67",
+   "qid": 67,
+   "body": "Three policies are defensible and the choice is a business one, not a technical one:\n\n• REJECT. The date is closed; a late file is an exception requiring a restatement. Simplest, and the only one where a published figure never changes under a consumer.\n• ACCEPT INTO A NEW CYCLE. The file is loaded against the same business date as a new delivery, the date reopens to PENDING, and everything downstream reruns. Safe only if every downstream consumer can tolerate a restated date.\n• ACCEPT AS NEXT-DAY. The rows are loaded with the next business date and flagged as late. Keeps published history immutable, moves the distortion forward.\n\nMost custody and fund platforms land on REJECT plus an explicit restatement path, because silent reopening of a closed date is what breaks downstream reconciliations.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "practice",
+   "gap": "Whichever is chosen, the design must ENFORCE it — today nothing in DATE_CONTROL stops a load against a COMPLETE date, so the answer is currently “whatever the ingestion code happens to do”.",
+   "quote": null,
+   "fig": null,
+   "ev": "late-arriving-data practice"
+  },
+  {
+   "answer_id": "seed68",
+   "qid": 68,
+   "body": "By making restatement a FIRST-CLASS, VERSIONED operation rather than a reload.\n\nThe pattern: RAW is append-only and never edited — a corrected file is a new delivery with its own identity, not an overwrite. The business date is reopened explicitly, with a recorded reason and actor. Downstream is rebuilt from RAW deterministically, so Gold is always a pure function of RAW plus the code version. And the restatement is announced: consumers are told that date changed, rather than discovering it.\n\nThe property that keeps RAW and Gold in step is determinism — if rebuilding from RAW cannot reproduce Gold, they are already out of sync and nobody can tell.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "practice",
+   "gap": "The announcement is the part teams skip and then regret. A restatement nobody downstream was told about is indistinguishable from a bug in their own reconciliation.",
+   "quote": null,
+   "fig": null,
+   "ev": "append-only RAW / deterministic rebuild practice"
+  },
+  {
+   "answer_id": "seed69",
+   "qid": 69,
+   "body": "Treat the archive move as a cleanup that may be repeated, never as the thing that records success.\n\nOrder matters: commit the data AND the registry row in one transaction, then move the file. If the worker dies between the two, the database already says the file is loaded and the file is still in landing — which is a recoverable, self-describing state. A sweeper finds files in landing that the registry says are loaded, and moves them.\n\nThe failure to avoid is the reverse order: move first, commit second. Then a crash leaves a file that is archived and not loaded, and nothing in landing to notice.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "practice",
+   "gap": "Which order the implementation uses is not recorded anywhere, and it is the single most consequential detail in this question. Worth confirming in one line of the DAG code.",
+   "quote": null,
+   "fig": null,
+   "ev": "commit-then-move practice"
+  },
+  {
+   "answer_id": "seed70",
+   "qid": 70,
+   "body": "Same answer as question 69 and it generalises, which is the point: on OpenShift a pod can vanish at any instruction — OOM kill, eviction, node drain, a rolling deploy — so recovery cannot depend on anything running after the crash.\n\nSo: the database transaction is the commit point, the file move is idempotent cleanup, and every step is safe to repeat. The pod gets a termination grace period and handles SIGTERM to finish or abandon cleanly, but that is an optimisation — correctness must not rely on it, because an OOM kill gives no signal at all.\n\nDetection is the lease from question 65: a claim with a stale heartbeat is a crashed worker, whatever killed it.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "practice",
+   "gap": "Eviction and OOM are the realistic causes here given the 4 GB non-production namespaces (question 84), so this is not a once-a-year scenario — it is a weekly one until the sizing is settled.",
+   "quote": null,
+   "fig": null,
+   "ev": "Kubernetes pod-lifecycle practice | crash-only design"
+  },
+  {
+   "answer_id": "seed71",
+   "qid": 71,
+   "body": "Two shapes are normal, and they behave very differently under load:\n\n• TASK-PARALLEL within the DAG — Airflow fans out one task per interface, bounded by a pool. Visible in the UI, retried per task, and the concurrency ceiling is the pool size. This is what the proposed pool of 8–10 implies (question 84).\n• QUEUE-AND-WORKER — the DAG enqueues work and long-lived workers consume it. Better for uneven arrival, worse for observability, and it needs its own retry and dead-letter handling.\n\nFor a daily batch with a known interface list, task-parallel is almost always right: the work is bounded, the fan-out is knowable in advance, and Airflow already gives per-task retry and visibility for free.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "practice",
+   "gap": "Whichever it is, the concurrency limit has to be set from the Oracle connection ceiling and the namespace CPU, not chosen independently — see questions 83 and 84.",
+   "quote": null,
+   "fig": null,
+   "ev": "Airflow fan-out practice"
+  },
+  {
+   "answer_id": "seed72",
+   "qid": 72,
+   "body": "It should not, and this is the clearest smell in the questions.\n\nA registry is an audit record of what arrived and what was done with it. Deleting the row to allow a reload destroys the only evidence that the first delivery happened, which is exactly the evidence an auditor asks for after a restatement. It also makes the reload indistinguishable from a first load.\n\nThe standard shape is append-only with a version or sequence per (interface, business date): the original row stays, is marked SUPERSEDED, and the corrected delivery is a new row pointing at it. The question “what did we receive and when” then still answers correctly a year later.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "practice",
+   "gap": "If the delete exists to satisfy a unique constraint on (FILE_NAME, BUSINESS_DATE), the fix is the constraint, not the delete — add the delivery sequence from question 51 and the conflict disappears.",
+   "quote": null,
+   "fig": null,
+   "ev": "append-only audit practice"
+  },
+  {
+   "answer_id": "seed73",
+   "qid": 73,
+   "body": "Yes — and this is the same change as question 72, which is worth treating as one piece of work rather than two.\n\nKeep the original lifecycle intact and add two things: a version or delivery sequence that makes a resend a new row, and a status that can express SUPERSEDED alongside the existing terminal states. Current state is then “the highest-sequence row that is not superseded”, which is one predicate rather than a story somebody reconstructs.\n\nThe cost is one column and one index. The benefit is that “how many times did this interface get restated last quarter” becomes a query instead of a Splunk archaeology exercise.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "practice",
+   "gap": "Decide whether restatement is per-file or per-business-date. Per-file is finer and matches how corrections actually arrive; per-date is simpler and matches how DATE_CONTROL already thinks. They disagree when one of five interfaces is restated.",
+   "quote": null,
+   "fig": null,
+   "ev": "append-only audit practice | SCD-style versioning"
+  },
+  {
    "answer_id": "seed74",
    "qid": 74,
    "body": "The structural answer is the one the question already contains: the replay payload must not live in a layer that has a retention clock. An immutable RAW pointer or a copy of the payload in a replay store, with its own retention set from the maximum dependency wait rather than from INT's needs.\n\nTHE dbt TDD CONFIRMS THE RISK RATHER THAN RESOLVING IT, and it does so in two separate sections that are never read together. §6.5: INT is partitioned by BUSINESS_DATE and purged by DROP PARTITION after seven days. §7 / Figure 5a: the replay step RE-DERIVES THE OPEN ROW FROM INT. So the replay source and the thing on a seven-day clock are the same object.\n\nA held transaction whose dimension arrives on day eight has nothing left to re-derive it from.\n\n§7.1 does handle this, and it is worth being precise about HOW: anything still OPEN at the seven-day edge is CLOSED and alerted. So the loss is DETECTED and raised — it is not silent. But closed-and-alerted is not replayed: the transaction is still not in FACT, and the data it was derived from is gone. The control turns a silent loss into a visible one, which is a real improvement and is not the same as durability.",
@@ -1722,6 +1878,30 @@
    "quote": "INT is partitioned by BUSINESS_DATE and purged with ALTER TABLE … DROP PARTITION (near-instant metadata work) rather than a row-level DELETE.",
    "fig": null,
    "ev": "dbt TDD §6.5 — INT Retention via Partition Drop (p.15) | dbt TDD §7.1 — Capture and Publishing (p.17)"
+  },
+  {
+   "answer_id": "seed75",
+   "qid": 75,
+   "body": "The usual governance is a short matrix saying, for each failure class, who retries and how many times before a human is involved:\n\n• TRANSIENT infrastructure (connection reset, pod evicted, lock timeout) — automatic retry with bounded exponential backoff, no notification unless the bound is hit.\n• DATA THAT MAY RESOLVE ITSELF (a missing dimension) — no task retry; the row goes to the DQ store as reprocess-eligible and is replayed on a later cycle. The TDD specifies exactly this.\n• DATA THAT CANNOT RESOLVE ITSELF (a malformed source record) — no retry at all; it waits for a corrected delivery.\n• CODE DEFECT — no retry; the run fails and somebody fixes it.\n\nThe discipline that matters: retrying something that cannot succeed turns a clear failure into a slow one, and it is the most common mistake in batch orchestration.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "practice",
+   "gap": "Only the second class is specified. The other three are Airflow defaults until somebody writes them down — which means they are whatever the first developer typed.",
+   "quote": null,
+   "fig": null,
+   "ev": "retry-taxonomy practice | dbt TDD §7.1 (the replay class is specified)"
+  },
+  {
+   "answer_id": "seed76",
+   "qid": 76,
+   "body": "As a named, auditable operation with four parts — and the TDD already has the hardest one.\n\n1. TRIGGER AND AUTHORITY — who may declare a restatement, on what evidence, recorded rather than verbal.\n2. SCOPE — which dates and which interfaces. Narrow by default: restating a week because one file was wrong is how a correction becomes an incident.\n3. MECHANISM — reopen the date, reload the corrected delivery, rebuild deterministically. For dimensions the MERGE-vs-UPDATE rule in §6.4.1 decides whether the correction may MERGE at all, which is the part most designs get wrong and this one does not.\n4. NOTIFICATION — consumers are told which dates changed and why, before they reconcile and find it themselves.\n\nBusiness corrections differ from technical restatements in one respect: the original value was not wrong when published, so history usually has to show both.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "practice",
+   "gap": "Parts 1, 2 and 4 are not recorded anywhere. Part 4 is the one that turns a controlled correction into a support call.",
+   "quote": null,
+   "fig": null,
+   "ev": "restatement-runbook practice | dbt TDD §6.4.1 (the MERGE-vs-UPDATE rule already exists)"
   },
   {
    "answer_id": "seed77",
@@ -1748,6 +1928,18 @@
    "ev": "Environment 360 → Topology"
   },
   {
+   "answer_id": "seed79",
+   "qid": 79,
+   "body": "With a genuine RWX volume this is not a failure mode — that is what ReadWriteMany means: every pod on every node mounts the same filesystem. The landing share here is CIFS-backed, and network filesystems are node-independent by construction, so a worker landing on a different node is the normal case rather than an edge case.\n\nThe documented failure is the OPPOSITE arrangement: a ReadWriteOnce volume binds to one node, so a pod scheduled elsewhere stays Pending — and the symptom is a DAG that hangs rather than errors. The usual guards are asserting the access mode in the manifest and alerting on pods Pending beyond a threshold.\n\nWhat a network filesystem does change is semantics, not reachability: locking and atomic rename behave differently over CIFS than on local disk, which is question 57's problem rather than this one.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "practice",
+   "gap": "Nobody has named the storage class (question 78), so “RWX” is an assertion on a diagram. One `kubectl get sc` and one `kubectl get pvc -o wide` settle this and question 82 in a minute.",
+   "quote": null,
+   "fig": null,
+   "ev": "Kubernetes access-mode semantics"
+  },
+  {
    "answer_id": "seed80",
    "qid": 80,
    "body": "None today. A probe framework exists — env_probe and env_probe_result — and env_workload records what runs where, so there is somewhere for this to live. But no probe in this repository measures volume utilisation and no threshold is configured.\n\nThe thing that would fill is the 20 GB landing share, which holds landing, quarantine and archive together (question 77). Archive grows monotonically unless something purges it, and no purge rule is recorded (question 100).",
@@ -1770,6 +1962,18 @@
    "quote": null,
    "fig": "sizing",
    "ev": "Environment 360 → Topology (Growth = TBD on all rows)"
+  },
+  {
+   "answer_id": "seed82",
+   "qid": 82,
+   "body": "It is guaranteed by the access mode and by nothing else. ReadWriteMany means every pod sees the same volume; ReadWriteOnce means one node does, and a second pod elsewhere never starts.\n\nThe topology models the landing share as RWX over CIFS, which is consistent with multiple Airflow workers. So the guarantee is exactly as good as the provisioner actually delivering RWX — which is unverified (question 78).\n\nWorth adopting: assert it rather than assume it. A start-up check in the worker image that writes and reads back a sentinel file turns a silent mis-provision into a clear failure at deploy time rather than a mysterious one at month-end.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "practice",
+   "gap": "Quarantine and archive are the same share as landing (question 77), so they inherit this answer and the same single point of failure.",
+   "quote": null,
+   "fig": null,
+   "ev": "Kubernetes access-mode semantics"
   },
   {
    "answer_id": "seed83",
@@ -1796,6 +2000,18 @@
    "ev": "Environment 360 → Topology (4 GB / 2 CPU non-prod)"
   },
   {
+   "answer_id": "seed85",
+   "qid": 85,
+   "body": "By measuring, not by reasoning — and the measurement is small.\n\nThe ceiling is SESSIONS on the database, and it is shared: Airflow workers, dbt runs, the API and anything else on that service all draw from the same pool. So the validation is a load test at the intended concurrency, watching sessions against the limit, plus a check of what else already consumes it.\n\nThe arithmetic that catches most problems before any test: pods × threads per pod × connections per thread. dbt opens one connection per thread, so a `threads: 8` profile in four concurrent pods is 32 sessions from dbt alone — before Airflow's own metadata connections, which are separate.\n\nThe two settings to pin are dbt's thread count and the Airflow pool size, and they multiply rather than add.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "practice",
+   "gap": "The Oracle session limit is not recorded (question 83) and neither is the dbt thread count. Those two numbers plus the pool size are the whole calculation, and none of the three is written down.",
+   "quote": null,
+   "fig": null,
+   "ev": "connection-pool sizing practice | dbt threads semantics"
+  },
+  {
    "answer_id": "seed86",
    "qid": 86,
    "body": "What is recorded is a step, not a strategy. Non-production namespaces are 4 GB / 2 CPU; production is 16 GB / 16 CPU — 4× the memory and 8× the CPU — and the Growth column is TBD on every row (question 81).\n\nThe consequence is worth stating because it affects go-live evidence (question 108): performance testing in UAT runs at one-eighth of production CPU. A UAT pass is therefore not evidence of production throughput, and a UAT failure may be an artefact of the namespace rather than of the code.",
@@ -1818,6 +2034,30 @@
    "quote": null,
    "fig": null,
    "ev": "guardrail_events (sql/24) | recon_profile (sql/31) | guardrail_gate_run (sql/67)"
+  },
+  {
+   "answer_id": "seed88",
+   "qid": 88,
+   "body": "The convention that matters more than the tool: STRUCTURED, machine-readable log lines — JSON, one event per line — with a fixed set of fields on every line.\n\nThe fields that earn their place here: timestamp, level, service, environment, business_date, correlation_id, interface, dag_id, task_id, run_id, and a stable event name. Free text goes in a message field and nothing is ever parsed back out of it, because a log a human wrote is a log a dashboard cannot aggregate.\n\nWhether Dynatrace or Splunk consumes it is a routing decision and can change. The FIELD CONTRACT cannot, because every dashboard and alert depends on it — so that is the thing to agree, and to agree before the first DAG is written rather than retrofitted after.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "practice",
+   "gap": "business_date and correlation_id are the two fields missing everywhere else as well (questions 42 and 87). Agreeing the field list here would settle all three at once.",
+   "quote": null,
+   "fig": null,
+   "ev": "structured-logging practice"
+  },
+  {
+   "answer_id": "seed89",
+   "qid": 89,
+   "body": "Three mechanisms, and the first is the one most estates skip:\n\n• A DEDUPLICATION KEY per alert condition — here naturally (rule, dataset, business_date). A repeat occurrence updates the existing alert rather than raising a new one, which is what stops one bad file generating a thousand pages.\n• SEVERITY TIED TO ACTION, not to how bad it sounds. Critical means somebody is woken; warning means next working day; info means it is only read during an investigation. An alert with no action at its severity should not exist.\n• EXPLICIT RECOVERY. The alert closes when the condition clears and the closure is recorded — without it nobody can tell a resolved incident from an ignored one.\n\nRouting then follows severity and time of day, with one owning rota per severity rather than per system.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "practice",
+   "gap": "None of this is persisted on the Oracle side (question 90), so suppression and closure would live entirely in the alerting tool. Workable, but it means alert history cannot be reconciled against what actually failed.",
+   "quote": null,
+   "fig": null,
+   "ev": "alert-taxonomy practice | deduplication-key practice"
   },
   {
    "answer_id": "seed90",

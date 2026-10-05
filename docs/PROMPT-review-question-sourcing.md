@@ -122,6 +122,17 @@ describe.** Asking the SEI PDF will produce plausible fiction.
 > spot". It exists: the **BBH dbt Transformation Framework TDD**. It has
 > already answered 47, 48, 59, 60 and 63, and it settles several more below.
 > Point extractions at *that* document, not at the SEI pack.
+>
+> **All twenty now carry an industry-practice draft.** Those are
+> *suggestions* — what a comparable platform normally does — and they are
+> badged `industry practice · not BBH's` on screen, carry no quote, and each
+> names the decision BBH still owns. **They do not answer these questions**,
+> which is why the questions stay in this bucket: the BBH design document
+> still has to say what BBH actually did. The suggestions are there so the
+> conversation starts from a proposal rather than a blank thread.
+>
+> The suite enforces the distinction: a bucket B question may carry an
+> industry-practice draft and nothing stronger.
 
 | Area | Questions | Ask |
 |---|---|---|
