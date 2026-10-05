@@ -356,6 +356,51 @@ export const SEED_ANSWERS = [
   gap: "No cutover date or dual-run period is recorded for SFTP → SDC.",
   ev: ["Environment 360 → Topology", "Event 360 → Micro-batch"] },
 
+{ n: 28, conf: "document", fig: "layers",
+  body:
+"Layer for layer, and the TDD uses the same phrase this question does: "
++ "SWP_RAW \u2192 STG (view) \u2192 INT \u2192 approved DIM/FACT, with dbt "
++ "replacing ODI. What runs at each step:\n\n"
++ "\u2022 SWP_RAW \u2014 the file as delivered. Append-only, with file and "
++ "record lineage carried on SRC_RECORD_ID.\n"
++ "\u2022 STG \u2014 a VIEW, not a table. It standardises the source columns "
++ "and computes the source-DQ flag, DQ_STATUS_CD and DQ_FAIL_REASON_CDS. It "
++ "stores nothing.\n"
++ "\u2022 INT \u2014 reads PASS rows only, maps the code sets, keyed on the "
++ "natural business key plus BUSINESS_DATE, partitioned, kept seven days.\n"
++ "\u2022 DIM \u2014 built FIRST. Direct-compare MERGE into the Gold tables "
++ "that already exist; ACCOUNT_KEY comes from the Oracle sequence that is "
++ "already there; no DDL.\n"
++ "\u2022 FACT \u2014 built SECOND, and only from transactions whose "
++ "dimension has resolved. A missing dimension is held in "
++ "DQ_VALIDATION_FAILURE and replayed later, never written to Gold with a "
++ "placeholder key.\n\n"
++ "\u201cApproved\u201d is not an approval step, which is worth saying "
++ "because the word invites that reading. The glossary defines Gold as the "
++ "approved DIM/FACT \u2014 meaning the Gold tables that already exist and "
++ "that this design is not permitted to alter.\n\n"
++ "Holding it together is DATE_CONTROL. The Ingestion DAG loads the files "
++ "and moves the date PENDING \u2192 TRIGGER; the Transformation DAG builds "
++ "the four layers in order and moves the date to COMPLETE only on full "
++ "success.",
+  gap:
+"The SEI half of this question is in a document BBH does not have. The "
++ "TDD\u2019s own scope boundary puts SWP file generation, external file "
++ "transfer, physical file discovery, header and trailer validation, and the "
++ "RAW load itself OUTSIDE it \u2014 the RAW load is owned by a separate "
++ "Ingestion Framework TDD. So everything above starts at the point the data "
++ "is already sitting in SWP_RAW. How it got that far is that other "
++ "document\u2019s to answer, and getting hold of it would close most of "
++ "topic 10 as well.\n\n"
++ "Three interfaces are named \u2014 Account, Client, Transaction. Nothing "
++ "says what happens to the rest.",
+  quote: "Like-for-like layer mapping: SWP_RAW \u2192 STG (view) \u2192 INT "
+       + "\u2192 approved DIM/FACT, replacing ODI with version-controlled, "
+       + "testable dbt SQL.",
+  ev: ["dbt TDD \u00a71.1 \u2014 Key Outcomes (p.5)",
+       "dbt TDD \u00a74.1 \u2014 Medallion Mapping (p.10)",
+       "dbt TDD \u00a71.2 \u2014 Scope Boundary (p.6)"] },
+
 { n: 32, conf: "document", fig: "dqstore",
   body:
 "They are held, not dropped. Every failing record is written to ONE Oracle "
@@ -499,6 +544,49 @@ export const SEED_ANSWERS = [
 + "which boundary warned when.",
   ev: ["dbt TDD §7.2 — Reconciliation Boundaries (p.18)", "recon_summary (sql/31)",
        "Variance 360"] },
+
+{ n: 38, conf: "document", fig: "dqstore",
+  body:
+"Three controls block, and one does not \u2014 and the one that does not is "
++ "the one most people assume is the gate.\n\n"
++ "BLOCKING, in the order they run:\n"
++ "\u2022 The STG source-DQ flag. A failing record is written to "
++ "DQ_VALIDATION_FAILURE and held at the layer that caught it; it never "
++ "proceeds to the next one. INT reads PASS rows only.\n"
++ "\u2022 The per-layer test task. Each layer is a build task followed by "
++ "its own test task, and the next layer waits on it \u2014 build_fact "
++ "starts only after build_dim AND test_dim have passed.\n"
++ "\u2022 Dimension resolution at INT \u2192 FACT. A transaction whose "
++ "dimension has not arrived is not loaded. Nothing reaches Gold on a "
++ "placeholder key; it is held and replayed once the dimension exists.\n\n"
++ "NOT BLOCKING: reconciliation. The four boundary counts are computed and "
++ "shipped to Splunk in a task that runs AFTER the fact build, and the "
++ "PASS/WARNING verdict is derived on the Splunk side from the published "
++ "counts \u2014 it is not stored and nothing in the pipeline reads it. So a "
++ "reconciliation WARNING tells you something went wrong after the data is "
++ "already in Gold. It is a detective control, not a preventive one.\n\n"
++ "One more, about the date rather than the rows: the Ingestion DAG sets "
++ "TRIGGER only when every expected interface has arrived, and the "
++ "Transformation DAG re-checks that on its first task before doing any "
++ "work.",
+  gap:
+"The question asks WHICH controls, and what the document gives is the "
++ "machinery rather than the list. There is no inventory of the actual rules "
++ "per interface. DQ_STATUS_CD and DQ_FAIL_REASON_CDS are named as columns, "
++ "two example failures appear in a figure, and the set of reason codes is "
++ "nowhere. Until somebody writes that list down, \u201cpassed DQ\u201d "
++ "means something different for Account than it does for Transaction and "
++ "nobody can say what.\n\n"
++ "The reconciliation point above is a decision, not an oversight. If a count "
++ "mismatch ought to stop publication rather than raise an alert after it, "
++ "that has to be designed in, because the current task order makes it "
++ "impossible.",
+  quote: "Every failing record is written to one store, DQ_VALIDATION_FAILURE, "
+       + "and is held at its failing layer \u2014 it never proceeds to the "
+       + "next layer.",
+  ev: ["dbt TDD \u00a77.1 \u2014 Capture and Publishing (p.17)",
+       "dbt TDD \u00a77.2 \u2014 Reconciliation Boundaries (p.18)",
+       "dbt TDD Appendix A.1 \u2014 Two-DAG Task Sequence (p.25)"] },
 
 { n: 39, conf: "codebase",
   body:
@@ -746,6 +834,35 @@ export const SEED_ANSWERS = [
 + "key — making it (FILE_NAME, BUSINESS_DATE, DELIVERY_SEQ). This is the "
 + "same underlying issue as questions 55, 56 and 72.",
   ev: ["ref_micro_batch_marker (sql/63)"] },
+
+{ n: 52, conf: "document", fig: "datectl",
+  body:
+"FILE_SCHEMA_CONFIG holds the expected set; FILE_REGISTRY holds what "
++ "actually turned up.\n\n"
++ "The Ingestion DAG compares the two for the open business date, and only "
++ "when expected minus completed is empty does it move DATE_CONTROL from "
++ "PENDING to TRIGGER. The Transformation DAG then re-checks the same thing "
++ "on its first task before it does any work \u2014 the document calls that "
++ "trust-but-verify. The check runs as a short-circuit step, so an incomplete "
++ "date stops the run quietly rather than failing it.\n\n"
++ "Both tables are listed among the Oracle objects the design depends on, "
++ "next to DATE_CONTROL and the existing sequence.",
+  gap:
+"We have the name and not the shape. FILE_SCHEMA_CONFIG has no DDL anywhere "
++ "in the TDD \u2014 unlike DATE_CONTROL, DQ_VALIDATION_FAILURE and "
++ "RECON_RESULT, which all have one. It belongs to the Ingestion Framework, "
++ "which the scope boundary puts outside this document, so the columns, who "
++ "maintains the rows, and whether a row is effective-dated are all "
++ "unanswered here. That last one is question 54 and it cannot be settled "
++ "from this document.\n\n"
++ "Also worth being clear about what the check is NOT. It is a set "
++ "difference on interfaces. It confirms that something arrived for each "
++ "interface expected; it does not confirm that it was the right file.",
+  quote: "After all load tasks, it compares the expected interface set "
+       + "(FILE_SCHEMA_CONFIG) against the completed set (FILE_REGISTRY).",
+  ev: ["dbt TDD \u00a75.3 \u2014 Ingestion-to-Transformation Trigger (p.12)",
+       "dbt TDD \u00a710.2 \u2014 Operational Controls Contract (p.23)",
+       "dbt TDD Appendix A.1 (p.25)"] },
 
 { n: 57, conf: "absence",
   body:
@@ -1463,6 +1580,98 @@ export const SEED_ANSWERS = [
 + "business_date (question 42).",
   ev: ["guardrail_events (sql/24)"] },
 
+{ n: 91, conf: "document", fig: "datectl",
+  body:
+"There is a place for it and there is no number in it.\n\n"
++ "DATE_CONTROL carries SLA_CUTOFF_TS \u2014 a time-zone-aware timestamp, "
++ "one per business date \u2014 and the design says it gates the ingestion "
++ "SLA. Modelling the cutoff per date rather than as one standing time is the "
++ "right shape: it leaves room for a month-end or a short day without a code "
++ "change.\n\n"
++ "The value is not set, and the document does not pretend otherwise. The "
++ "section is headed \u201cPerformance, Volumetrics, and SLAs (to "
++ "confirm)\u201d and every target in it is a placeholder: the daily run "
++ "window is \u201cTBC \u2014 within N hours\u201d, the stuck alert "
++ "\u201cTBC \u2014 > N minutes\u201d, the DQ failure rate \u201cTBC "
++ "\u2014 > X% of a feed\u201d. Confirming the volumetrics and the "
++ "run-window target is also on the list of decisions required before build.",
+  gap:
+"So there is no approved cutoff yet, and the question is really two "
++ "questions. The number is a business decision nobody has taken. The "
++ "exception process does not exist in any form \u2014 there is an action "
++ "for a run that gets stuck, which is a technical failure, and nothing at "
++ "all for a file that is simply late. That second half is question 97.\n\n"
++ "One thing to check when the number is agreed: no task in the published DAG "
++ "sequence consults SLA_CUTOFF_TS. The column is declared and the "
++ "completeness check does not read it, so setting a value would not by "
++ "itself make anything happen.",
+  quote: "SLA_CUTOFF_TS (tz-aware) gates the Ingestion SLA; the *_DAG_RUN_ID "
+       + "columns trace which runs acted.",
+  ev: ["dbt TDD Appendix A.2 \u2014 date_control.sql (p.25)",
+       "dbt TDD \u00a710.3 \u2014 Performance, Volumetrics, and SLAs (p.24)",
+       "dbt TDD \u00a79 \u2014 Decision D5 (p.22)"] },
+
+{ n: 92, conf: "document",
+  body:
+"One thing in the design is time-zone aware, and it is the right one. "
++ "SLA_CUTOFF_TS on DATE_CONTROL is declared TIMESTAMP WITH TIME ZONE, as "
++ "are the created, trigger and complete timestamps beside it. A cutoff can "
++ "therefore be expressed in a named zone per business date rather than in "
++ "whatever zone the database happens to be running in.\n\n"
++ "That is the whole of it. BUSINESS_DATE itself is a plain DATE with no "
++ "zone, and it is the partition key, the retention key and half of every "
++ "natural key in INT. So the time-zone question only ever bites on WHEN a "
++ "file is late \u2014 never on which business date a record belongs "
++ "to.\n\n"
++ "The multi-currency half has no answer here at all. Currency does not "
++ "appear in the document. Neither does a market, a region, or a per-"
++ "interface cutoff.",
+  gap:
+"Two decisions. Which zone the cutoff is written in \u2014 one zone for "
++ "everything, or one per interface \u2014 because the column supports "
++ "either and nothing says which. And whether a single cutoff is the right "
++ "model at all: a multi-currency day with Asian and US sources has two "
++ "natural arrival windows, and one cutoff across both either waits for the "
++ "latest market or breaches on the earliest one.\n\n"
++ "Searched the document for: time zone, timezone, UTC, holiday, calendar, "
++ "currency, market, region. The four timestamp columns are the only hits.",
+  quote: "sla_cutoff_ts TIMESTAMP WITH TIME ZONE NOT NULL, created_ts "
+       + "TIMESTAMP WITH TIME ZONE DEFAULT SYSTIMESTAMP NOT NULL, trigger_ts "
+       + "TIMESTAMP WITH TIME ZONE, complete_ts TIMESTAMP WITH TIME ZONE",
+  ev: ["dbt TDD Appendix A.2 \u2014 date_control.sql (p.25)",
+       "dbt TDD \u00a710.3 (p.24)"] },
+
+{ n: 93, conf: "document",
+  body:
+"The measures exist. The targets do not.\n\n"
++ "Four are listed, each with what to do when it breaches:\n"
++ "\u2022 Daily run window, measured from the last file in to everything "
++ "COMPLETE. Target TBC \u2014 within N hours. On breach: find the longest "
++ "layer, scale threads or pods.\n"
++ "\u2022 Stuck in TRIGGER. Target TBC \u2014 more than N minutes. On "
++ "breach: page on-call, restart from the failed task.\n"
++ "\u2022 DQ failure rate. Target TBC \u2014 more than X per cent of a "
++ "feed. On breach: alert, then triage source against transformation.\n"
++ "\u2022 A reconciliation WARNING, or an OPEN DQ backlog ageing past N "
++ "days. On breach: investigate the boundary and the date, look for a late "
++ "dimension or aged OPEN rows.\n\n"
++ "Four measures with four named responses is further along than most "
++ "designs get at this stage. What is missing is every number in it.",
+  gap:
+"Production support cannot be held to any of this until the N, the X and "
++ "the hours are filled in, and the document says so itself \u2014 the "
++ "section is marked \u201cto confirm\u201d, and confirming volumetrics and "
++ "the run-window target is on the list of decisions required before "
++ "build.\n\n"
++ "The bigger gap is what is not measured at all. There is no measure for a "
++ "late file, which is the single most common operational event on any feed. "
++ "The stuck alert watches TRIGGER, and a late file leaves the date sitting "
++ "in PENDING, which nothing watches. See question 97.",
+  quote: "Daily run window (last file \u2192 all COMPLETE) | TBC \u2014 "
+       + "within N hours | Investigate longest layer; scale threads/pods.",
+  ev: ["dbt TDD \u00a710.3 \u2014 Performance, Volumetrics, and SLAs (p.24)",
+       "dbt TDD \u00a79 \u2014 Decision D5 (p.22)"] },
+
 { n: 94, conf: "absence",
   body:
 "Nothing is recorded. API 360 catalogues the APIs in detail, but the "
@@ -1473,6 +1682,71 @@ export const SEED_ANSWERS = [
 + "apply to, rather than living only in a document.",
   gap: "The targets themselves are a business decision, not a platform fact.",
   ev: ["API 360 (no SLA columns in sql/07, sql/36)"] },
+
+{ n: 96, conf: "absence",
+  body:
+"Nobody. The design has an owner column and what it names is software: the "
++ "business date and its state are owned by \u201cboth DAGs\u201d, the "
++ "expected-versus-completed check by the Ingestion DAG, the DIM-before-FACT "
++ "ordering by the Transformation DAG. Those are the components that enforce "
++ "a rule, not the people who set it.\n\n"
++ "Searched for: owner, responsible, RACI, approver, holiday, calendar, "
++ "override, exception process. \u201cAccountable\u201d appears only on the "
++ "document-control page, and it refers to the author of the TDD. The only "
++ "human-side ownership stated anywhere is that BBH owns the Splunk "
++ "dashboards and alerting, and that source DQ belongs to the SWP source "
++ "system while transformation DQ belongs to the transformation team.",
+  gap:
+"Three of the four things this question asks about do not exist in the "
++ "design yet, which makes the ownership question premature for them and "
++ "urgent for exactly that reason. The cutoff is a column with no value "
++ "(question 91). Holiday overrides are absent entirely \u2014 the next "
++ "business date is handed to the insert as a parameter, so whatever decides "
++ "that Monday follows Friday sits outside the design. There is no exception "
++ "process at all. Time zone is the only one that is modelled.\n\n"
++ "Name the owner first and all four answers come from one person. Leave it "
++ "unowned and the cutoff gets set by whoever happens to be on the call the "
++ "first time a file is late.",
+  ev: ["dbt TDD \u00a710.2 \u2014 Operational Controls Contract (p.23)",
+       "dbt TDD \u00a77 \u2014 the two DQ categories and their owners (p.17)",
+       "dbt TDD Appendix A.2 \u2014 date_control.sql (p.25)"] },
+
+{ n: 97, conf: "document", fig: "datectl",
+  body:
+"Nothing happens. That is worth stating flatly, because the design looks "
++ "like it covers this and it does not.\n\n"
++ "The ingestion flow has five steps and the fourth one is the answer: if the "
++ "expected files are incomplete the run ends normally, the date stays "
++ "PENDING, and the next cycle re-checks. No timer, no escalation, no alert. "
++ "The date will sit there across as many cycles as it takes.\n\n"
++ "The alert that does exist is watching the other state. The risk register "
++ "lists \u201crun stuck in TRIGGER, stalling the pipeline\u201d and "
++ "mitigates it with an alert on any row in TRIGGER beyond the SLA, and the "
++ "SLA table carries a stuck-in-TRIGGER alert that pages on-call. But TRIGGER "
++ "means every file arrived and the transformation is running or has failed. "
++ "A late file never gets that far, so none of it fires.\n\n"
++ "And the queue is blocked while this is true. At most one non-COMPLETE row "
++ "may exist in DATE_CONTROL at any moment, enforced by a unique index, so a "
++ "date stuck in PENDING also stops the next business date from opening.",
+  gap:
+"This is the cheapest thing on the list to fix. SLA_CUTOFF_TS is already on "
++ "the row, already time-zone aware, already described as gating the "
++ "ingestion SLA, and nothing reads it. A stuck-in-PENDING alert is the same "
++ "shape as the stuck-in-TRIGGER one that is already specified \u2014 "
++ "compare now against SLA_CUTOFF_TS for the open PENDING date \u2014 and it "
++ "is the difference between knowing at 07:00 and finding out when somebody "
++ "asks why yesterday\u2019s report is missing.\n\n"
++ "What should happen AFTER the alert is a business decision, not a technical "
++ "one: wait, run on what arrived, or roll the date forward. Note that "
++ "running on a partial set is not currently possible \u2014 TRIGGER is set "
++ "only when the expected set is complete \u2014 so if that is the answer it "
++ "is a design change and not a runbook entry.",
+  quote: "If incomplete \u2014 it ends normally; the date stays PENDING and "
+       + "the next cycle re-checks.",
+  ev: ["dbt TDD \u00a75.3 \u2014 Ingestion-to-Transformation Trigger (p.12)",
+       "dbt TDD \u00a78.3 \u2014 Risks and Mitigations (p.21)",
+       "dbt TDD \u00a710.3 (p.24)",
+       "dbt TDD Appendix A.2 \u2014 date_control.sql (p.25)"] },
 
 { n: 99, conf: "document",
   body:

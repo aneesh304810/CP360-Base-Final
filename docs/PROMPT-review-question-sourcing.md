@@ -17,7 +17,7 @@ So the buckets below are the point of this document, not the prompts.
 
 ---
 
-## Bucket A — the SEI document should answer these (9)
+## Bucket A — the SEI document should answer these (5)
 
 > **Topics 1 and 2 are done**, and six more questions were answered from a
 > second document. Questions 1–10 went to the SEI pack; 18, 19, 32, 33, 34
@@ -30,12 +30,24 @@ So the buckets below are the point of this document, not the prompts.
 > enterprise-wide canonical model — which is the sentence that makes
 > questions 3 and 10 matter.
 
+> **Second update, October 2026.** The full dbt TDD, appendices included,
+> answered four more of these: 28 (the layer mapping end to end), 52
+> (`FILE_SCHEMA_CONFIG` is the expected set, `FILE_REGISTRY` the completed
+> one), and 91 and 92 (`DATE_CONTROL.SLA_CUTOFF_TS` is a tz-aware column per
+> business date, and every SLA target in the document is still `TBC`). They
+> have left this bucket.
+>
+> It also named **a document nobody has asked for yet.** The TDD's scope
+> boundary puts file generation, external transfer, physical file discovery,
+> header/trailer validation and the RAW load itself outside itself, and
+> assigns them to a separate **Ingestion Framework TDD**. That is the document
+> that owns most of what is left in this bucket. Getting hold of it is
+> probably worth more than any prompt on this page.
+
 | Topic | Questions |
 |---|---|
 | 6 · SDC vs SFTP | 26 |
-| 7 · How SEI data feeds the framework | 28 |
-| 10 · Delivery contract | 52, 53, 54, 55, 56 |
-| 15 · Delivery SLA and time zones | 91, 92 |
+| 10 · Delivery contract | 53, 54, 55, 56 |
 
 ### How to run these
 
@@ -61,11 +73,15 @@ because they will be read as SEI's position.
 
 ---
 
-### A3 · Transfer mechanism and delivery contract (questions 26, 52–56, 91, 92)
+### A3 · Transfer mechanism and delivery contract (questions 26, 53–56)
 
-This is the highest-value prompt in the set. Seven questions, and the answers
+Still the highest-value prompt in the set, and now a shorter one. The answers
 are contractual rather than architectural — they are what BBH is entitled to
-rely on.
+rely on, and no BBH design document can supply them.
+
+Items 2 and 8 below are kept but marked: the dbt TDD has answered the BBH side
+of both, so what is wanted from SEI is only the half the TDD cannot give — the
+commitment, not the mechanism.
 
 ```
 Attached is SEI's design document. Answer only from it.
@@ -73,8 +89,10 @@ Attached is SEI's design document. Answer only from it.
 1. Which transfer mechanism does the document specify for SEI → BBH: SDC,
    SFTP, both, or a migration between them? If both, which is target state and
    is a cutover described?
-2. Is there an authoritative list of which interfaces are delivered on each
-   business date? Where does it live and who maintains it?
+2. (BBH side answered — question 52.) Does SEI commit to a list of which
+   interfaces are delivered on each business date, and does SEI notify BBH
+   when that list changes? BBH loads its own copy into FILE_SCHEMA_CONFIG;
+   what is wanted here is the source of truth SEI stands behind.
 3. How are holidays, month-end, weekly files and one-off exceptions handled?
 4. Is the expected-file set effective-dated or snapshotted, or can it change
    for a business date that is already open?
@@ -84,8 +102,11 @@ Attached is SEI's design document. Answer only from it.
    distinguishes them? Is there a batch key, sequence number or manifest?
 7. What file-readiness signal indicates a file has finished arriving — a
    trailer record, a sentinel file, a manifest, a marker event, or none?
-8. What delivery cutoff times are committed, in which time zone, and how is
-   multi-currency / multi-region timing handled?
+8. (BBH side answered — questions 91 and 92.) What delivery cutoff times
+   does SEI COMMIT to, in which named time zone, and is the commitment one
+   cutoff for everything or one per interface? How is multi-currency /
+   multi-region timing handled? BBH has a per-date, time-zone-aware cutoff
+   column and no agreed value to put in it.
 
 <the two rules above>
 ```
@@ -149,13 +170,22 @@ the remaining business-date questions.
 
 ---
 
-## Bucket C — no document answers these (23)
+## Bucket C — no document answers these (20)
 
 > Questions 11, 12, 14 and 15 now carry an **absence** draft: the SEI pack
 > was searched and is silent. That records the search so nobody repeats it;
 > it does **not** answer who owns the work, which is still a decision. They
 > stay in this bucket for that reason. Question 13 came back `no_data` and
 > has no draft at all.
+
+> **Three have left, October 2026.** The dbt TDD turned out to answer 38 (the
+> blocking controls are the STG DQ filter, the per-layer test task and
+> dimension resolution — reconciliation runs *after* the fact build and only
+> alerts), 93 (four measures with four named responses, every target `TBC`)
+> and 97 (a date stuck in PENDING triggers nothing; the alert that exists
+> watches TRIGGER, which a late file never reaches). Question 96 keeps an
+> **absence** draft and stays: the design names DAGs as owners, not people,
+> and who owns the cutoff is still a decision.
 
 They are decisions nobody has recorded, or numbers nobody has measured. A
 document search will not find them and should not be attempted.
@@ -166,8 +196,7 @@ document search will not find them and should not be attempted.
 | PB DWH internal logic ownership | 16, 17 | BBH data engineering |
 | BBH vs SEI RACI | 20, 22, 23, 24, 25 | Programme — a RACI, not an architecture |
 | Dual-run period and surviving outputs | 29, 30, 31 | Programme |
-| Mandatory DQ gates before publication | 38 | BBH Data Management |
-| Operational SLAs and ownership | 93, 95, 96, 97 | BBH production support |
+| Operational SLAs and ownership | 95, 96 | BBH production support |
 | Retention and compliance | 98 | BBH compliance |
 | Upgrade path and training | 104, 105 | BBH platform / Kartheek |
 
