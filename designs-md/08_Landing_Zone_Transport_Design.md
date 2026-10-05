@@ -44,9 +44,9 @@ Scope as recorded in the component tracker: Managed service + config. Custom onl
 
 ## 3. Design Decisions
 
-**Review verdict: demoted.** Becomes the standby path. It also conflicts with the SEI pack: this design uses a manifest written last plus deferrable sensors verifying size and mtime, while the File Ingestion TDD discovers by filename pattern every five minutes with no manifest at all. Two different transport contracts with the same upstream party.
+**Review verdict: demoted.** Becomes the standby path. It also conflicts with the SEI pack: this design uses a manifest written last plus deferrable sensors verifying size and mtime, while the File Ingestion Framework Design Document discovers by filename pattern every five minutes with no manifest at all. Two different transport contracts with the same upstream party.
 
-**Direction.** Settle on one before build. The manifest is the stronger guarantee; the TDD is what is being built. Whichever wins, the other document has to change.
+**Direction.** Settle on one before build. The manifest is the stronger guarantee; the design document is what is being built. Whichever wins, the other document has to change.
 
 ## 4. Detailed Design
 
@@ -95,8 +95,8 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §6 | specifies this component | Transport and the landing zone: Momentum SFTP into the landing zone, retention, directory layout. |
-| BBH File Ingestion Framework TDD v2.0 | §C.3 | the pack and this design disagree | Discovery every five minutes by filename pattern, with rules for one match, none, many, zero files and an existing key. |
+| BBH File Ingestion Framework Design Document v2.0 | §6 | specifies this component | Transport and the landing zone: Momentum SFTP into the landing zone, retention, directory layout. |
+| BBH File Ingestion Framework Design Document v2.0 | §C.3 | the pack and this design disagree | Discovery every five minutes by filename pattern, with rules for one match, none, many, zero files and an existing key. |
 
 **Disagreement with §C.3.** This codebase designs a manifest written last plus deferrable sensors verifying size and mtime. The pack has no manifest at all. Two different transport contracts with the same upstream party.
 
@@ -104,7 +104,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 ### What is missing
 
-Becomes the standby path. It also conflicts with the SEI pack: this design uses a manifest written last plus deferrable sensors verifying size and mtime, while the File Ingestion TDD discovers by filename pattern every five minutes with no manifest at all. Two different transport contracts with the same upstream party.
+Becomes the standby path. It also conflicts with the SEI pack: this design uses a manifest written last plus deferrable sensors verifying size and mtime, while the File Ingestion Framework Design Document discovers by filename pattern every five minutes with no manifest at all. Two different transport contracts with the same upstream party.
 
 ### Risk
 
@@ -126,9 +126,9 @@ The pack specifies this component. The gap is not in the documentation.
 
 ## 11. Recommendation
 
-Settle on one before build. The manifest is the stronger guarantee; the TDD is what is being built. Whichever wins, the other document has to change.
+Settle on one before build. The manifest is the stronger guarantee; the design document is what is being built. Whichever wins, the other document has to change.
 
-**Action.** Pick one contract. The manifest protocol is stronger; the TDD is what is being built.
+**Action.** Pick one contract. The manifest protocol is stronger; the design document is what is being built.
 
 **Hub · ingress and egress.** Split this component set in two on the plan. Inbound standby is small and nearly done; outbound is eight components and has no design at all. Tracking them as one plane hides how unequal they are.
 

@@ -3,8 +3,8 @@
 // Standpoint: data architect for a high-throughput, high-error-tolerance
 // integration platform. One assumption changes: SDC events are the primary
 // ingestion path. Everything from Stage 1 onward is taken exactly as the SEI
-// design pack specifies it (File Ingestion Framework TDD v2.0, dbt
-// Transformation TDD v2, Architecture v5).
+// design pack specifies it (File Ingestion Framework Design Document v2.0, dbt
+// Transformation Design Document v2, Architecture v5).
 //
 // The pack was written for a file-driven pipeline. This file records what
 // that one substitution breaks, what it makes expensive, and what it leaves
@@ -42,13 +42,13 @@ export const AR_ASSUMPTIONS = [
     src: "SEI producer/consumer contract" },
   { id: "A6", holds: "unchanged", what: "Medallion shape and the control plane",
     detail: "SWP_RAW (Bronze) → STG (a view, recomputed on read) → INT (Silver, PK = natural key + BUSINESS_DATE, 7-day retention) → DIM then FACT (Gold, DML-only MERGE, on_schema_change='fail'). DATE_CONTROL, FILE_REGISTRY, RECON_RESULT, DQ_VALIDATION_FAILURE as specified.",
-    src: "dbt Transformation TDD v2 / File Ingestion TDD v2.0" },
+    src: "dbt Transformation Design Document v2 / File Ingestion Framework Design Document v2.0" },
   { id: "A7", holds: "unchanged", what: "Splunk is a write-only sink; verdicts are not stored in Oracle",
     detail: "E.6 forbids SLA_STATUS, SLA_BREACH_IND and ALERT_SENT_IND on DATE_CONTROL. PASS/WARNING is derived, never persisted.",
-    src: "File Ingestion TDD v2.0 E.6, dbt TDD B.5" },
+    src: "File Ingestion Framework Design Document v2.0 E.6, dbt design document B.5" },
   { id: "A8", holds: "unchanged", what: "Airflow 3.0 on OpenShift, Oracle as the control store",
     detail: "Dynamic task mapping, deterministic run ids, guarded state transitions, worker pods per work item.",
-    src: "File Ingestion TDD v2.0 C.1" },
+    src: "File Ingestion Framework Design Document v2.0 C.1" },
 ];
 
 /* ------------------------------------------------------------------ *
@@ -227,7 +227,7 @@ export const AR_BOTTLENECKS = [
 
   { id: "B2", sev: "critical", title: "STG is a view, and events make it run 288 times a day",
     comp: ["15", "M6"],
-    body: "The dbt TDD defines STG as a view, recomputed on read. Under a daily file cycle it is recomputed once. Under intraday events, INT is built incrementally all day, so the STG view is recomputed on every incremental run — and each recomputation scans Stage 1. This is the single largest cost the event substitution introduces, and it comes from a design decision that was entirely reasonable when it was made.",
+    body: "The dbt design document defines STG as a view, recomputed on read. Under a daily file cycle it is recomputed once. Under intraday events, INT is built incrementally all day, so the STG view is recomputed on every incremental run — and each recomputation scans Stage 1. This is the single largest cost the event substitution introduces, and it comes from a design decision that was entirely reasonable when it was made.",
     fix: "Either materialise STG per micro-batch, or ensure the INT incremental predicate pushes down to Stage 1's partition so the view scans one micro-batch rather than the whole accumulated day. Verify the push-down on the actual plan; do not assume it." },
 
   { id: "B3", sev: "high", title: "Airflow task volume multiplies by roughly 300×",
@@ -347,8 +347,8 @@ export const AR_ERRORS = [
  * ------------------------------------------------------------------ */
 export const AR_FINDINGS = [
   { id: "8", verdict: "demoted", name: "Landing Zone + Transport",
-    finding: "Becomes the standby path. It also conflicts with the SEI pack: this design uses a manifest written last plus deferrable sensors verifying size and mtime, while the File Ingestion TDD discovers by filename pattern every five minutes with no manifest at all. Two different transport contracts with the same upstream party.",
-    action: "Pick one contract. The manifest protocol is stronger; the TDD is what is being built." },
+    finding: "Becomes the standby path. It also conflicts with the SEI pack: this design uses a manifest written last plus deferrable sensors verifying size and mtime, while the File Ingestion Framework Design Document discovers by filename pattern every five minutes with no manifest at all. Two different transport contracts with the same upstream party.",
+    action: "Pick one contract. The manifest protocol is stronger; the design document is what is being built." },
   { id: "9", verdict: "demoted", name: "File Arrival Sensors",
     finding: "Deferrable sensors idling all day for a path that now only needs to prove a file was generated and held. The registry gains no state meaning 'available and deliberately unused', so a standby file looks either permanently missing or falsely satisfies a gate that should not be running.",
     action: "Add the state. Reduce the sensor to a readiness check." },
@@ -463,7 +463,7 @@ export const AR_COVERAGE = [
   /* ---- Ingress / Egress ---- */
   { id: "8", sei: "covered", owner: "Joint",
     ask: "The pack discovers by filename pattern every five minutes with no manifest. This design uses a manifest written last plus size and mtime verification. Which transport contract is the real one?",
-    rec: "Settle on one before build. The manifest is the stronger guarantee; the TDD is what is being built. Whichever wins, the other document has to change." },
+    rec: "Settle on one before build. The manifest is the stronger guarantee; the design document is what is being built. Whichever wins, the other document has to change." },
   { id: "9", sei: "covered", owner: "Joint",
     ask: "Under events the files are standby. Is there a registry state meaning 'available and deliberately unused'?",
     rec: "Add the state. Without it a standby file looks either permanently missing or falsely satisfies a gate that should not be running." },

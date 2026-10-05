@@ -99,8 +99,8 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH dbt Transformation TDD v2 | §B.4 | specifies this component | dq_validation_failure with resolution_status and reprocess_eligible='Y', driving the OPEN replay worklist. |
-| BBH File Ingestion Framework TDD v2.0 | whole document | nothing in the pack covers it | No rule registry anywhere. The gates exist as code, so which rules ran against which model on which date is unanswerable, and blocking-versus-advisory is a global argument rather than a per-rule attribute. |
+| BBH dbt Transformation Design Document v2 | §B.4 | specifies this component | dq_validation_failure with resolution_status and reprocess_eligible='Y', driving the OPEN replay worklist. |
+| BBH File Ingestion Framework Design Document v2.0 | whole document | nothing in the pack covers it | No rule registry anywhere. The gates exist as code, so which rules ran against which model on which date is unanswerable, and blocking-versus-advisory is a global argument rather than a per-rule attribute. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -124,7 +124,7 @@ No event DQ taxonomy. The failure modes of an envelope and a pull — unknown vi
 
 ### Gap against the SEI pack
 
-- No rule registry anywhere. The gates exist as code, so which rules ran against which model on which date is unanswerable, and blocking-versus-advisory is a global argument rather than a per-rule attribute. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*
+- No rule registry anywhere. The gates exist as code, so which rules ran against which model on which date is unanswerable, and blocking-versus-advisory is a global argument rather than a per-rule attribute. *(nearest counterpart: BBH File Ingestion Framework Design Document, no section — the whole document)*
 
 ## 11. Recommendation
 

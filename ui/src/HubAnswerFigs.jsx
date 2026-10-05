@@ -280,7 +280,7 @@ function Envs() {
 }
 
 
-// ---- drawn from the BBH dbt Transformation Framework TDD -----------
+// ---- drawn from the BBH dbt Transformation Design Document -----------
 
 // The five layers, what each one IS, and how long it keeps anything.
 // The two facts people keep getting wrong: STG stores nothing, and INT
@@ -330,7 +330,7 @@ function Layers() {
 function Terms() {
   const rows = [
     ["BBH today", ["Source", "STG1", "STG2", "DIM / FACT"], "#55636f"],
-    ["dbt TDD", ["SWP_RAW", "STG (view)", "INT", "DIM → FACT"], "#0f4775"],
+    ["dbt design document", ["SWP_RAW", "STG (view)", "INT", "DIM → FACT"], "#0f4775"],
     ["SEI pack", ["—", "Stage 1", "Stage 2", "IMDS / PBDW"], "#7c3aed"],
   ];
   return (
@@ -353,7 +353,7 @@ function Terms() {
       ))}
       <Box x={224} y={150} w={376} h={30} fill="#fdf2e3" stroke="#e8c88f" r={5} />
       <T x={412} y={163} s={9.5} w={700} fill={WA}>
-        ▲ “Silver (Enriched)” in the TDD = STG + INT, not one layer
+        ▲ “Silver (Enriched)” in the design document = STG + INT, not one layer
       </T>
       <T x={412} y={175} s={8.5} fill="#7a6433">
         so “the enriched layer” names two objects, one of which stores nothing

@@ -99,7 +99,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | whole document | nothing in the pack covers it | Event Hub sequence numbers are monotonic per partition, so a gap is a provably lost event — the strongest completeness proof available, and no document mentions it. |
+| BBH File Ingestion Framework Design Document v2.0 | whole document | nothing in the pack covers it | Event Hub sequence numbers are monotonic per partition, so a gap is a provably lost event — the strongest completeness proof available, and no document mentions it. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -125,7 +125,7 @@ No ranked bottleneck or unowned error path touches this component.
 
 ### Gap against the SEI pack
 
-- Event Hub sequence numbers are monotonic per partition, so a gap is a provably lost event — the strongest completeness proof available, and no document mentions it. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*
+- Event Hub sequence numbers are monotonic per partition, so a gap is a provably lost event — the strongest completeness proof available, and no document mentions it. *(nearest counterpart: BBH File Ingestion Framework Design Document, no section — the whole document)*
 
 ## 11. Recommendation
 

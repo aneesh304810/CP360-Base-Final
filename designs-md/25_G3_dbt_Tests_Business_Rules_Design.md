@@ -95,7 +95,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH dbt Transformation TDD v2 | §B.4 | specifies this component | dq_reason stamped on the same join the fact model filters, so tests and the fact table cannot diverge. |
+| BBH dbt Transformation Design Document v2 | §B.4 | specifies this component | dq_reason stamped on the same join the fact model filters, so tests and the fact table cannot diverge. |
 
 ## 10. Gaps, Risks & What Is Missing
 

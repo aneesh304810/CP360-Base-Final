@@ -99,7 +99,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH dbt Transformation TDD v2 | §B.5 | specifies this component | No status column: PASS and WARNING are derived in Splunk and deliberately not stored. |
+| BBH dbt Transformation Design Document v2 | §B.5 | specifies this component | No status column: PASS and WARNING are derived in Splunk and deliberately not stored. |
 
 ## 10. Gaps, Risks & What Is Missing
 

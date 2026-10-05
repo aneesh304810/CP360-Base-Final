@@ -98,7 +98,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §C.4 | nothing in the pack covers it | C.4 validates a file's structure before load. Nothing validates an envelope, so an unknown view or an invalid op reaches the collapser. |
+| BBH File Ingestion Framework Design Document v2.0 | §C.4 | nothing in the pack covers it | C.4 validates a file's structure before load. Nothing validates an envelope, so an unknown view or an invalid op reaches the collapser. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -124,7 +124,7 @@ This component does not exist. G1 validates a file's structure. Nothing validate
 
 ### Gap against the SEI pack
 
-- C.4 validates a file's structure before load. Nothing validates an envelope, so an unknown view or an invalid op reaches the collapser. *(nearest counterpart: BBH File Ingestion Framework TDD, §C.4)*
+- C.4 validates a file's structure before load. Nothing validates an envelope, so an unknown view or an invalid op reaches the collapser. *(nearest counterpart: BBH File Ingestion Framework Design Document, §C.4)*
 
 ## 11. Recommendation
 

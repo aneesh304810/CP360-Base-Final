@@ -97,7 +97,7 @@ No ranked bottleneck or unowned error path touches this component.
 
 ### Not specified — and what to do until it is
 
-**The interface list itself.** The architecture says roughly 43 interfaces per business date. The TDDs model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table.
+**The interface list itself.** The architecture says roughly 43 interfaces per business date. The two design documents model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table.
 
   *Recommended default:* Ask for the list before sizing anything. Until it exists, design for the three that are modelled and mark every count that depends on interface cardinality as provisional.
 

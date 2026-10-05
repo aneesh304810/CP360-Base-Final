@@ -113,8 +113,8 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §6.2 | touches it, does not specify it | FILE_REGISTRY unique on FILE_NAME plus BUSINESS_DATE, with RETRY_COUNT. |
-| BBH File Ingestion Framework TDD v2.0 | §Appendix F | the pack and this design disagree | The glossary says FILE_REGISTRY is versioned per interface and date with one current version. |
+| BBH File Ingestion Framework Design Document v2.0 | §6.2 | touches it, does not specify it | FILE_REGISTRY unique on FILE_NAME plus BUSINESS_DATE, with RETRY_COUNT. |
+| BBH File Ingestion Framework Design Document v2.0 | §Appendix F | the pack and this design disagree | The glossary says FILE_REGISTRY is versioned per interface and date with one current version. |
 
 **Disagreement with §Appendix F.** §6.2's unique key gives exactly one row; D.1 and D.5 reuse it and D.4 deletes it. History survives only as RETRY_COUNT. Either the schema gains version history or the glossary line goes.
 

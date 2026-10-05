@@ -97,7 +97,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | whole document | nothing in the pack covers it | Nothing records what was sent. A rejection names records in a payload nobody kept. |
+| BBH File Ingestion Framework Design Document v2.0 | whole document | nothing in the pack covers it | Nothing records what was sent. A rejection names records in a payload nobody kept. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -123,7 +123,7 @@ This component does not exist. Without it a rejected record cannot be tied to th
 
 ### Gap against the SEI pack
 
-- Nothing records what was sent. A rejection names records in a payload nobody kept. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*
+- Nothing records what was sent. A rejection names records in a payload nobody kept. *(nearest counterpart: BBH File Ingestion Framework Design Document, no section — the whole document)*
 
 ## 11. Recommendation
 

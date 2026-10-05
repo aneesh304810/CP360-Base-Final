@@ -103,7 +103,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH dbt Transformation TDD v2 | §B.4 | nothing in the pack covers it | B.4 handles a fact whose dimension is missing, via hold-and-replay. It does not order domains, and SEI assigns cross-domain dependency to the consumer in writing. |
+| BBH dbt Transformation Design Document v2 | §B.4 | nothing in the pack covers it | B.4 handles a fact whose dimension is missing, via hold-and-replay. It does not order domains, and SEI assigns cross-domain dependency to the consumer in writing. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -130,7 +130,7 @@ This component does not exist. SEI assigns cross-domain dependency to the consum
 
 ### Gap against the SEI pack
 
-- B.4 handles a fact whose dimension is missing, via hold-and-replay. It does not order domains, and SEI assigns cross-domain dependency to the consumer in writing. *(nearest counterpart: BBH dbt Transformation TDD, §B.4)*
+- B.4 handles a fact whose dimension is missing, via hold-and-replay. It does not order domains, and SEI assigns cross-domain dependency to the consumer in writing. *(nearest counterpart: BBH dbt Transformation Design Document, §B.4)*
 
 ## 11. Recommendation
 

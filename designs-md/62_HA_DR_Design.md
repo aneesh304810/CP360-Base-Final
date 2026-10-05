@@ -90,7 +90,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §D.1 | nothing in the pack covers it | D.1 to D.6 are data-correction procedures. There is no disaster recovery section in any document — no RPO, no RTO, no failover for Oracle, OpenShift or the landing zone. |
+| BBH File Ingestion Framework Design Document v2.0 | §D.1 | nothing in the pack covers it | D.1 to D.6 are data-correction procedures. There is no disaster recovery section in any document — no RPO, no RTO, no failover for Oracle, OpenShift or the landing zone. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -114,7 +114,7 @@ No ranked bottleneck or unowned error path touches this component.
 
 ### Gap against the SEI pack
 
-- D.1 to D.6 are data-correction procedures. There is no disaster recovery section in any document — no RPO, no RTO, no failover for Oracle, OpenShift or the landing zone. *(nearest counterpart: BBH File Ingestion Framework TDD, §D.1)*
+- D.1 to D.6 are data-correction procedures. There is no disaster recovery section in any document — no RPO, no RTO, no failover for Oracle, OpenShift or the landing zone. *(nearest counterpart: BBH File Ingestion Framework Design Document, §D.1)*
 
 ## 11. Recommendation
 

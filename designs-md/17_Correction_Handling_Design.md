@@ -173,9 +173,9 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH dbt Transformation TDD v2 | §Appendix C | touches it, does not specify it | The twelve-scenario runbook, including reprocessing an already-closed row by direct UPDATE and never MERGE. |
-| BBH File Ingestion Framework TDD v2.0 | §D.3 | touches it, does not specify it | Approved restatement — the procedure exists and names no approver. |
-| BBH dbt Transformation TDD v2 | whole document | nothing in the pack covers it | Nothing defines the downstream semantics of an event op=D, and nothing defines an outbound correction. Both are written for a file world. |
+| BBH dbt Transformation Design Document v2 | §Appendix C | touches it, does not specify it | The twelve-scenario runbook, including reprocessing an already-closed row by direct UPDATE and never MERGE. |
+| BBH File Ingestion Framework Design Document v2.0 | §D.3 | touches it, does not specify it | Approved restatement — the procedure exists and names no approver. |
+| BBH dbt Transformation Design Document v2 | whole document | nothing in the pack covers it | Nothing defines the downstream semantics of an event op=D, and nothing defines an outbound correction. Both are written for a file world. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -200,7 +200,7 @@ Written for restatement and in-place merge. A delete arriving as an event has no
 
 ### Gap against the SEI pack
 
-- Nothing defines the downstream semantics of an event op=D, and nothing defines an outbound correction. Both are written for a file world. *(nearest counterpart: BBH dbt Transformation TDD, no section — the whole document)*
+- Nothing defines the downstream semantics of an event op=D, and nothing defines an outbound correction. Both are written for a file world. *(nearest counterpart: BBH dbt Transformation Design Document, no section — the whole document)*
 
 ## 11. Recommendation
 

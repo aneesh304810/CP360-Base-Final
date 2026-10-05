@@ -102,7 +102,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §6.2 | nothing in the pack covers it | FILE_REGISTRY is the inbound record of a file. The outbound path has no submission registry, so a submission that never reached SEI is indistinguishable from one that succeeded. |
+| BBH File Ingestion Framework Design Document v2.0 | §6.2 | nothing in the pack covers it | FILE_REGISTRY is the inbound record of a file. The outbound path has no submission registry, so a submission that never reached SEI is indistinguishable from one that succeeded. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -129,7 +129,7 @@ This component does not exist. The outbound path has no FILE_REGISTRY equivalent
 
 ### Gap against the SEI pack
 
-- FILE_REGISTRY is the inbound record of a file. The outbound path has no submission registry, so a submission that never reached SEI is indistinguishable from one that succeeded. *(nearest counterpart: BBH File Ingestion Framework TDD, §6.2)*
+- FILE_REGISTRY is the inbound record of a file. The outbound path has no submission registry, so a submission that never reached SEI is indistinguishable from one that succeeded. *(nearest counterpart: BBH File Ingestion Framework Design Document, §6.2)*
 
 ## 11. Recommendation
 

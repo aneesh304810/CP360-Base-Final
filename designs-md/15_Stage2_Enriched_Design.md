@@ -139,7 +139,7 @@ No DQ or reconciliation obligation specific to this component. Two estate rules 
 
 ### B2 · STG is a view, and events make it run 288 times a day (critical)
 
-The dbt TDD defines STG as a view, recomputed on read. Under a daily file cycle it is recomputed once. Under intraday events, INT is built incrementally all day, so the STG view is recomputed on every incremental run — and each recomputation scans Stage 1. This is the single largest cost the event substitution introduces, and it comes from a design decision that was entirely reasonable when it was made.
+The dbt design document defines STG as a view, recomputed on read. Under a daily file cycle it is recomputed once. Under intraday events, INT is built incrementally all day, so the STG view is recomputed on every incremental run — and each recomputation scans Stage 1. This is the single largest cost the event substitution introduces, and it comes from a design decision that was entirely reasonable when it was made.
 
 **What to do.** Either materialise STG per micro-batch, or ensure the INT incremental predicate pushes down to Stage 1's partition so the view scans one micro-batch rather than the whole accumulated day. Verify the push-down on the actual plan; do not assume it.
 ### B6 · INT's incremental MERGE into a growing current-day partition (high)
@@ -173,7 +173,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH dbt Transformation TDD v2 | §Appendix E | the pack and this design disagree | STG is a view, recomputed on read. INT is Silver, primary key natural key plus BUSINESS_DATE, seven-day retention. |
+| BBH dbt Transformation Design Document v2 | §Appendix E | the pack and this design disagree | STG is a view, recomputed on read. INT is Silver, primary key natural key plus BUSINESS_DATE, seven-day retention. |
 
 **Disagreement with §Appendix E.** This codebase names a Stage 2 Enriched layer and a Pre-Gold Exadata tier that the pack does not have. The layer models have to be reconciled before either document is a build spec.
 

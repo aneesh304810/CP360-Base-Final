@@ -112,7 +112,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §C.1 | specifies this component | Deterministic transformation run id transform__<BUSINESS_DATE>, plus a scheduled reconciliation path that retries when STATUS='TRIGGER', TRANSFORMATION_DAG_RUN_ID IS NULL and no matching deterministic run exists. |
+| BBH File Ingestion Framework Design Document v2.0 | §C.1 | specifies this component | Deterministic transformation run id transform__<BUSINESS_DATE>, plus a scheduled reconciliation path that retries when STATUS='TRIGGER', TRANSFORMATION_DAG_RUN_ID IS NULL and no matching deterministic run exists. |
 
 ## 10. Gaps, Risks & What Is Missing
 

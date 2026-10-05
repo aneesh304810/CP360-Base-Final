@@ -103,7 +103,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §C.1 | nothing in the pack covers it | C.1 is the file path's equivalent: a scheduled DAG that discovers work. The event path's listener has no counterpart section in any document. |
+| BBH File Ingestion Framework Design Document v2.0 | §C.1 | nothing in the pack covers it | C.1 is the file path's equivalent: a scheduled DAG that discovers work. The event path's listener has no counterpart section in any document. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -130,7 +130,7 @@ This component does not exist. There is no component between SEI publishing and 
 
 ### Gap against the SEI pack
 
-- C.1 is the file path's equivalent: a scheduled DAG that discovers work. The event path's listener has no counterpart section in any document. *(nearest counterpart: BBH File Ingestion Framework TDD, §C.1)*
+- C.1 is the file path's equivalent: a scheduled DAG that discovers work. The event path's listener has no counterpart section in any document. *(nearest counterpart: BBH File Ingestion Framework Design Document, §C.1)*
 
 ## 11. Recommendation
 

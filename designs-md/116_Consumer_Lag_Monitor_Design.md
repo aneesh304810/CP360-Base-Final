@@ -98,7 +98,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §8.1 | nothing in the pack covers it | The thirteen signals are all file-shaped. Consumer lag — the only intraday health signal there is — appears in none of them. |
+| BBH File Ingestion Framework Design Document v2.0 | §8.1 | nothing in the pack covers it | The thirteen signals are all file-shaped. Consumer lag — the only intraday health signal there is — appears in none of them. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -124,7 +124,7 @@ This component does not exist. Component 34 Observability predates events and ha
 
 ### Gap against the SEI pack
 
-- The thirteen signals are all file-shaped. Consumer lag — the only intraday health signal there is — appears in none of them. *(nearest counterpart: BBH File Ingestion Framework TDD, §8.1)*
+- The thirteen signals are all file-shaped. Consumer lag — the only intraday health signal there is — appears in none of them. *(nearest counterpart: BBH File Ingestion Framework Design Document, §8.1)*
 
 ## 11. Recommendation
 

@@ -114,9 +114,9 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §D.2 | specifies this component | QUARANTINED recovery for a file. |
-| BBH File Ingestion Framework TDD v2.0 | §D.6 | specifies this component | Stale in-progress recovery — a registry row left at LOADING past the timeout. |
-| BBH File Ingestion Framework TDD v2.0 | whole document | nothing in the pack covers it | No event dead-letter and no outbound quarantine. With at-least-once delivery and ordering inside a partition, one unprocessable envelope stalls that partition permanently and redelivery keeps returning it. |
+| BBH File Ingestion Framework Design Document v2.0 | §D.2 | specifies this component | QUARANTINED recovery for a file. |
+| BBH File Ingestion Framework Design Document v2.0 | §D.6 | specifies this component | Stale in-progress recovery — a registry row left at LOADING past the timeout. |
+| BBH File Ingestion Framework Design Document v2.0 | whole document | nothing in the pack covers it | No event dead-letter and no outbound quarantine. With at-least-once delivery and ordering inside a partition, one unprocessable envelope stalls that partition permanently and redelivery keeps returning it. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -140,7 +140,7 @@ No ranked bottleneck or unowned error path touches this component.
 
 ### Gap against the SEI pack
 
-- No event dead-letter and no outbound quarantine. With at-least-once delivery and ordering inside a partition, one unprocessable envelope stalls that partition permanently and redelivery keeps returning it. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*
+- No event dead-letter and no outbound quarantine. With at-least-once delivery and ordering inside a partition, one unprocessable envelope stalls that partition permanently and redelivery keeps returning it. *(nearest counterpart: BBH File Ingestion Framework Design Document, no section — the whole document)*
 
 ## 11. Recommendation
 

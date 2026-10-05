@@ -109,7 +109,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
 | SEI-BBH Integration Architecture v5 | whole document | touches it, does not specify it | Node 12 places the Apigee proxy on the outbound path. |
-| BBH File Ingestion Framework TDD v2.0 | whole document | nothing in the pack covers it | The pack is entirely inbound. There is no outbound section, no submission contract, no acknowledgement model and no error return path anywhere in any of the documents. |
+| BBH File Ingestion Framework Design Document v2.0 | whole document | nothing in the pack covers it | The pack is entirely inbound. There is no outbound section, no submission contract, no acknowledgement model and no error return path anywhere in any of the documents. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -135,7 +135,7 @@ One component carrying a whole framework. It covers generating and sending, and 
 
 ### Gap against the SEI pack
 
-- The pack is entirely inbound. There is no outbound section, no submission contract, no acknowledgement model and no error return path anywhere in any of the documents. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*
+- The pack is entirely inbound. There is no outbound section, no submission contract, no acknowledgement model and no error return path anywhere in any of the documents. *(nearest counterpart: BBH File Ingestion Framework Design Document, no section — the whole document)*
 
 ## 11. Recommendation
 

@@ -31,8 +31,8 @@ import { SEED_ANSWERS, seedRows, materialise, seedId, CONF, SEI_GAP_NOTE }
   from "../src/hubAnswers.js";
 import { FIGS } from "../src/HubAnswerFigs.jsx";
 import { tLight, tDark } from "../src/bbhTheme.js";
-import { TDD_ALIGN, TDD_VERDICTS, TDD_MISSING, TDD_SELF_CONFLICT, TDD_DOC,
-  TDD_SOURCE } from "../src/hubTddAlignment.js";
+import { DBTDOC_ALIGN, DBTDOC_VERDICTS, DBTDOC_MISSING, DBTDOC_SELF_CONFLICT, DBTDOC_NAME,
+  DBTDOC_SOURCE } from "../src/hubDbtDocAlignment.js";
 import DocDrill, { docFor } from "../src/DocDrill.jsx";
 import { TRACKER_COMPONENTS } from "../src/seiDesignTracker.js";
 
@@ -277,10 +277,10 @@ ok(prac.length > 0 && prac.every((a) => !a.quote),
    "no industry-practice answer carries a quote — there is no source text, "
    + "and a quote would make a recommendation look like a citation",
    prac.filter((a) => a.quote).map((a) => a.n));
-// A bare "dbt TDD §6.4.1" on a suggestion reads as though the document
+// A bare "dbt design doc §6.4.1" on a suggestion reads as though the document
 // recommended it. Where a practice answer points at a document it is a
 // cross-reference, and the parenthetical says so. Q76 had a bare one.
-const bare = (e) => /^(dbt TDD|SEI |sql\/)/.test(e) && !e.includes("(");
+const bare = (e) => /^(dbt design document|SEI |sql\/)/.test(e) && !e.includes("(");
 ok(prac.every((a) => !(a.ev || []).some(bare)),
    "its evidence never passes itself off as the source — a document it "
    + "points at is parenthesised as a cross-reference",
@@ -816,25 +816,25 @@ ok(base !== "",
 // on the Hub. Checked by marker rather than by arithmetic.
 // This guard has now outlived its brief twice. "No removed lines" was
 // right while the only ask was to add a tab; then the C4 was asked to be
-// reconciled against the dbt TDD, and the last ask was to REDRAW the
+// reconciled against the dbt design document, and the last ask was to REDRAW the
 // processing band so it matches — which cannot be done by adding lines.
 // Bumping a number each time would leave a guard that says nothing, so
 // the line-count assertions are gone and the structural ones below take
 // over: the tab's edits must survive, and the band must read in the
-// TDD's layer order.
+// design document's layer order.
 ok(added > 0, "HubDesign.jsx has changed", `+${added} -${removed}`);
 const HUB = strip("ui/src/HubDesign.jsx");
 ok(/import HubDiscussion from "\.\/HubDiscussion\.jsx"/.test(HUB)
    && /view === "DISC"/.test(HUB) && /setView\("DISC"\)/.test(HUB),
    "the tab's three edits are the import, the branch and the entry point", "");
-ok(/from "\.\/hubTddAlignment\.jsx?"/.test(HUB) && /tddFor\(c\)/.test(HUB),
-   "and the TDD alignment is read from its own module — the tracker is "
+ok(/from "\.\/hubDbtDocAlignment\.jsx?"/.test(HUB) && /dbtDocFor\(c\)/.test(HUB),
+   "and the design document alignment is read from its own module — the tracker is "
    + "generated from the workbook and must not be edited to carry it", "");
 ok(/onOpenComponent=\{\(id\)/.test(HUB) && /setView\("L3"\)/.test(HUB),
    "and a linked component opens in L3 — the loop back to the architecture "
    + "is what makes this a design record rather than a message board", "");
 
-// ---- the C4 against the dbt TDD -------------------------------------
+// ---- the C4 against the dbt design document -------------------------------------
 //
 // This map makes claims about what a document says, which is the same
 // risk as a `document` answer in hubAnswers.js and gets the same rules:
@@ -842,63 +842,63 @@ ok(/onOpenComponent=\{\(id\)/.test(HUB) && /setView\("L3"\)/.test(HUB),
 // exists or it renders nowhere and nobody notices.
 //
 // The rule underneath all of it: seiDesignTracker.js says at the top of
-// itself that it is generated from the workbook. If a TDD name ever
+// itself that it is generated from the workbook. If a design-document name ever
 // gets written INTO the tracker, the screen starts disagreeing with the
 // thing delivery is tracked against, so that is asserted too.
-const TIDS = Object.keys(TDD_ALIGN);
+const TIDS = Object.keys(DBTDOC_ALIGN);
 const TRK = new Map(TRACKER_COMPONENTS.map((c) => [c.id, c]));
 ok(TIDS.length > 20, "the alignment covers the Hub zone", TIDS.length);
 ok(TIDS.every((id) => TRK.has(id)),
    "every alignment entry points at a component that exists in the tracker "
    + "— one that does not renders nowhere and is never seen to be wrong",
    TIDS.filter((id) => !TRK.has(id)).join(","));
-ok(TIDS.every((id) => TDD_VERDICTS[TDD_ALIGN[id].v]),
+ok(TIDS.every((id) => DBTDOC_VERDICTS[DBTDOC_ALIGN[id].v]),
    "and declares a verdict the screen can colour",
-   TIDS.filter((id) => !TDD_VERDICTS[TDD_ALIGN[id].v])
-     .map((id) => `${id}:${TDD_ALIGN[id].v}`).join(","));
-ok(TIDS.every((id) => /\u00a7|Appendix/.test(TDD_ALIGN[id].ev)),
+   TIDS.filter((id) => !DBTDOC_VERDICTS[DBTDOC_ALIGN[id].v])
+     .map((id) => `${id}:${DBTDOC_ALIGN[id].v}`).join(","));
+ok(TIDS.every((id) => /\u00a7|Appendix/.test(DBTDOC_ALIGN[id].ev)),
    "every entry cites a section or an appendix — a claim about a document "
    + "with no place in it is the vendor's word against ours",
-   TIDS.filter((id) => !/\u00a7|Appendix/.test(TDD_ALIGN[id].ev)).join(","));
-ok(TIDS.every((id) => /p\.\s?\d/.test(TDD_ALIGN[id].ev)),
+   TIDS.filter((id) => !/\u00a7|Appendix/.test(DBTDOC_ALIGN[id].ev)).join(","));
+ok(TIDS.every((id) => /p\.\s?\d/.test(DBTDOC_ALIGN[id].ev)),
    "and a page, so somebody can turn to it in the PDF",
-   TIDS.filter((id) => !/p\.\s?\d/.test(TDD_ALIGN[id].ev)).join(","));
-ok(TIDS.every((id) => (TDD_ALIGN[id].note || "").length > 80),
+   TIDS.filter((id) => !/p\.\s?\d/.test(DBTDOC_ALIGN[id].ev)).join(","));
+ok(TIDS.every((id) => (DBTDOC_ALIGN[id].note || "").length > 80),
    "and says what the difference IS — a verdict with no body is a colour",
-   TIDS.filter((id) => (TDD_ALIGN[id].note || "").length <= 80).join(","));
-// A verdict of "same" that carries no TDD name is pointless: the whole
+   TIDS.filter((id) => (DBTDOC_ALIGN[id].note || "").length <= 80).join(","));
+// A verdict of "same" that carries no document-side name is pointless: the whole
 // value of a matching component is showing the name the code will use.
-ok(TIDS.every((id) => (TDD_ALIGN[id].name || "").length > 3),
-   "every entry names the TDD's counterpart, including the matches — the "
+ok(TIDS.every((id) => (DBTDOC_ALIGN[id].name || "").length > 3),
+   "every entry names the design document's counterpart, including the matches — the "
    + "name in the document is the name that ends up in the code",
-   TIDS.filter((id) => !(TDD_ALIGN[id].name || "").length).join(","));
-const conf = TIDS.filter((id) => TDD_ALIGN[id].v === "conflict");
+   TIDS.filter((id) => !(DBTDOC_ALIGN[id].name || "").length).join(","));
+const conf = TIDS.filter((id) => DBTDOC_ALIGN[id].v === "conflict");
 ok(conf.length > 0 && conf.length < TIDS.length,
    "some components conflict and some do not — an alignment where "
    + "everything disagrees is not an alignment, it is an argument",
    `${conf.length} of ${TIDS.length}`);
-ok(Object.values(TDD_MISSING).flat().every((m) => /\u00a7|Appendix/.test(m.ev)),
-   "and the things the TDD has that the C4 does not are cited the same way",
+ok(Object.values(DBTDOC_MISSING).flat().every((m) => /\u00a7|Appendix/.test(m.ev)),
+   "and the things the design document has that the C4 does not are cited the same way",
    "");
-ok(/\u00a76\.1/.test(TDD_SELF_CONFLICT.ev) && /\u00a72/.test(TDD_SELF_CONFLICT.ev)
-   && /section 2/i.test(TDD_SELF_CONFLICT.body),
-   "the TDD's disagreement with ITSELF cites both sides of it — this is "
-   + "the one claim a reviewer will check first", TDD_SELF_CONFLICT.ev);
+ok(/\u00a76\.1/.test(DBTDOC_SELF_CONFLICT.ev) && /\u00a72/.test(DBTDOC_SELF_CONFLICT.ev)
+   && /section 2/i.test(DBTDOC_SELF_CONFLICT.body),
+   "the design document's disagreement with ITSELF cites both sides of it — this is "
+   + "the one claim a reviewer will check first", DBTDOC_SELF_CONFLICT.ev);
 // WHAT THE COMPONENT MEANS, which is a different question from how it
 // differs. The design documents are per-plane and per-layer, so arriving
 // at one from a component used to open a document that never names it.
-ok(TIDS.every((id) => (TDD_ALIGN[id].what || "").length > 100),
+ok(TIDS.every((id) => (DBTDOC_ALIGN[id].what || "").length > 100),
    "every component has a plain definition, not just a verdict — a reader "
    + "who clicks a box is asking what it IS before asking how it differs",
-   TIDS.filter((id) => (TDD_ALIGN[id].what || "").length <= 100).join(","));
-// A definition that needs the TDD open to be understood has not defined
+   TIDS.filter((id) => (DBTDOC_ALIGN[id].what || "").length <= 100).join(","));
+// A definition that needs the design document open to be understood has not defined
 // anything. These go in front of a business reader.
 const JARG = /\b(materiali[sz]ed|incremental strategy|ShortCircuitOperator|idempotent|DDL|DML|upsert|tag-based)\b/;
-ok(TIDS.every((id) => !JARG.test(TDD_ALIGN[id].what)),
+ok(TIDS.every((id) => !JARG.test(DBTDOC_ALIGN[id].what)),
    "and says it without platform jargon — the verdict note below it is "
    + "where the mechanics belong",
-   TIDS.filter((id) => JARG.test(TDD_ALIGN[id].what))
-     .map((id) => `${id}: ${(JARG.exec(TDD_ALIGN[id].what) || [])[0]}`).join(", "));
+   TIDS.filter((id) => JARG.test(DBTDOC_ALIGN[id].what))
+     .map((id) => `${id}: ${(JARG.exec(DBTDOC_ALIGN[id].what) || [])[0]}`).join(", "));
 // Rendered, not just present: this is the whole point of the change.
 const DD15 = renderToStaticMarkup(
   <DocDrill t={tLight} docKey={docFor(TRK.get("15"))} from={TRK.get("15")}
@@ -915,14 +915,30 @@ ok(/ONE BOX, TWO OBJECTS/.test(DD15) && /Appendix A\.3/.test(DD15),
 // and owner. This page asserted the opposite for a while, and it changes
 // what every "conflict" below MEANS: not BBH's drawing against BBH's
 // spec, but the C4 against SEI's specification of BBH's platform.
-ok(/SEI/.test(TDD_SOURCE),
-   "the TDD's author is recorded, and it is SEI", TDD_SOURCE);
+// "TDD" is retired. It meant two different SEI documents on this
+// screen, it collides with test-driven development, and the reader who
+// has to ask what it stands for is the reader this page is for. The
+// documents are the BBH dbt Transformation Design Document and the BBH
+// File Ingestion Framework Design Document, and the badge on each row
+// says "dbt" rather than an acronym.
+for (const f of ["ui/src/hubAnswers.js", "ui/src/hubDbtDocAlignment.js",
+                 "ui/src/HubDesign.jsx", "ui/src/DocDrill.jsx"]) {
+  const src = fs.readFileSync(path.join(ROOT, f), "utf8");
+  ok(!/\bTDDs?\b/.test(src),
+     `${f} calls them design documents, not TDDs`,
+     (src.match(/.{0,40}\bTDDs?\b.{0,20}/g) || []).slice(0, 3).join(" | "));
+}
+ok(/Design Document/.test(DBTDOC_NAME) && /dbt/.test(DBTDOC_NAME),
+   "and the document's own name says what it is", DBTDOC_NAME);
+
+ok(/SEI/.test(DBTDOC_SOURCE),
+   "the design document's author is recorded, and it is SEI", DBTDOC_SOURCE);
 ok(/SEI/.test(DD15),
    "and travels with the citation on screen, so nobody reads a conflict "
    + "as an internal tidy-up", "");
-const ALIGNSRC = strip("ui/src/hubTddAlignment.js");
+const ALIGNSRC = strip("ui/src/hubDbtDocAlignment.js");
 ok(!/BBH-side|BBH's own/.test(ALIGNSRC + HUB),
-   "and nothing still calls the TDD a BBH-side document",
+   "and nothing still calls the design document a BBH-side document",
    ((ALIGNSRC + HUB).match(/BBH-side|BBH's own/g) || []).join(","));
 const PROMPTDOC = fs.readFileSync(
   path.join(ROOT, "docs", "PROMPT-review-question-sourcing.md"), "utf8");
@@ -931,14 +947,15 @@ ok(!/None of that is SEI's to describe/.test(PROMPTDOC),
    + "DATE_CONTROL and the DAG structure — SEI specified both, down to "
    + "the DDL, and that sentence sent extractions to the wrong document",
    "");
-ok(/SEI wrote the dbt TDD/.test(PROMPTDOC),
+ok(/SEI wrote the dbt design document/.test(PROMPTDOC),
    "and says who wrote it, where the claim used to be", "");
 
-ok(/dbt/i.test(TDD_DOC) && /TDD/.test(TDD_DOC),
+ok(/dbt/i.test(DBTDOC_NAME) && /Design Document/i.test(DBTDOC_NAME)
+   && !/\bTDD\b/.test(DBTDOC_NAME),
    "the document is named once, as a constant, so twenty entries cannot "
-   + "drift into twenty spellings of it", TDD_DOC);
+   + "drift into twenty spellings of it", DBTDOC_NAME);
 
-// The tracker is GENERATED. Carrying the TDD's vocabulary into it would
+// The tracker is GENERATED. Carrying the design document's vocabulary into it would
 // silently fork it from the workbook it is regenerated from.
 const TRKRAW = fs.readFileSync(path.join(ROOT, "ui/src/seiDesignTracker.js"), "utf8");
 const TRKSRC = strip("ui/src/seiDesignTracker.js");
@@ -946,25 +963,25 @@ ok(/generated from/i.test(TRKRAW),
    "the tracker still declares itself generated from the workbook — that "
    + "line is the reason the alignment is a separate file", "");
 ok(!/SWP_RAW|DATE_CONTROL|DQ_VALIDATION_FAILURE|\bINT_|STG_/.test(TRKSRC),
-   "and carries none of the TDD's table names — the alignment lives in "
+   "and carries none of the design document's table names — the alignment lives in "
    + "its own module precisely so the workbook stays the workbook",
    (TRKSRC.match(/SWP_RAW|DATE_CONTROL|DQ_VALIDATION_FAILURE|\bINT_|STG_/g)
      || []).join(","));
 
 // The L3 row's last cell is 196px and already holds the SEI citation
-// chip and the design-doc chip. The first version of the TDD indicator
-// put the full verdict in there — "TDD \u00b7 ANOTHER DOCUMENT OWNS IT" —
+// chip and the design-doc chip. The first version of the design document indicator
+// put the full verdict in there — "dbt \u00b7 ANOTHER DOCUMENT OWNS IT" —
 // and it overlapped the status column on screen while looking perfectly
 // fine in the source. Nothing about a grid cell errors when its content
 // is too wide; it just draws over the neighbour.
-const TDDBADGE = /<span title=\{`dbt TDD: \$\{[^`]*`\}[\s\S]{0,400}?>([^<]{1,40})<\/span>/
+const DBTDOCBADGE = /<span title=\{`dbt design document: \$\{[^`]*`\}[\s\S]{0,400}?>([^<]{1,40})<\/span>/
   .exec(HUB);
-ok(TDDBADGE, "the L3 row carries a TDD badge", "");
-ok(TDDBADGE && TDDBADGE[1].trim().length <= 4,
+ok(DBTDOCBADGE, "the L3 row carries a design-document badge", "");
+ok(DBTDOCBADGE && DBTDOCBADGE[1].trim().length <= 4,
    "and its visible text is at most four characters — the cell has about "
    + "50px spare and the long version drew over the status chip",
-   TDDBADGE && `${TDDBADGE[1].trim().length}: ${TDDBADGE[1].trim()}`);
-ok(TDDBADGE && /title=\{`dbt TDD: \$\{TDD_VERDICTS\[td\.v\]\[1\]\}/.test(HUB),
+   DBTDOCBADGE && `${DBTDOCBADGE[1].trim().length}: ${DBTDOCBADGE[1].trim()}`);
+ok(DBTDOCBADGE && /title=\{`dbt design document: \$\{DBTDOC_VERDICTS\[td\.v\]\[1\]\}/.test(HUB),
    "so the verdict it stands for is on hover, not lost — a four-letter "
    + "badge with no tooltip is decoration", "");
 // Scoped to the ROW, not the panel: the expanded panel is full width and
@@ -974,7 +991,7 @@ const ROWSRC = HUB.slice(
   HUB.indexOf("{isX && (", HUB.indexOf('gridTemplateColumns: "34px minmax(0,1.05fr)')));
 ok(ROWSRC.length > 400 && ROWSRC.length < 4000,
    "the L3 row markup is found to measure", ROWSRC.length);
-ok(!/TDD_VERDICTS\[td\.v\]\[1\]\.toUpperCase\(\)/.test(ROWSRC),
+ok(!/DBTDOC_VERDICTS\[td\.v\]\[1\]\.toUpperCase\(\)/.test(ROWSRC),
    "the full verdict is never put back into the ROW — it belongs in the "
    + "panel below, which has the width for it", "");
 
@@ -992,7 +1009,7 @@ const LAYERS = BAND.map((b) => b.label.split(" \u00b7 ")[0].trim());
 ok(JSON.stringify(LAYERS) === JSON.stringify(
      ["Python Ingestion Fwk", "SWP_RAW", "STG", "INT", "DIM", "FACT",
       "Correction Handling"]),
-   "and reads in the dbt TDD's layer order: SWP_RAW, STG, INT, then DIM "
+   "and reads in the dbt design document's layer order: SWP_RAW, STG, INT, then DIM "
    + "before FACT — this is the reconciliation, not a label change",
    LAYERS.join(" -> "));
 // strip() drops // comments but not JSX {/* ... */} blocks, and the band
@@ -1001,7 +1018,7 @@ ok(JSON.stringify(LAYERS) === JSON.stringify(
 const HUBCODE = HUB.replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
 ok(!/Stage 2 Enriched|Pre-Gold|Exadata/.test(HUBCODE),
    "the old layer model is gone from the drawing — Stage 2 Enriched merged "
-   + "two objects into one and Pre-Gold Exadata is a tier the TDD does not "
+   + "two objects into one and Pre-Gold Exadata is a tier the design document does not "
    + "have", (HUBCODE.match(/Stage 2 Enriched|Pre-Gold|Exadata/g) || []).join(","));
 // STG stores nothing, and the shape says so: every other data box is a
 // cylinder and STG is not. Losing that makes the drawing wrong again in
@@ -1018,7 +1035,7 @@ ok(intBox && /\bcyl\b/.test(intBox.rest),
    "and INT is a cylinder, because it does hold data", intBox && intBox.rest);
 // Every arrow in the chain must land on a box, or the drawing shows a
 // flow that stops in mid-air. Correction Handling is deliberately off
-// the chain: in the TDD it is a rule inside DIM, not a layer.
+// the chain: in the design document it is a rule inside DIM, not a layer.
 const RELS = [...HUB.matchAll(
   /<Rel x1=\{554\} y1=\{(\d+)\} x2=\{554\} y2=\{(\d+)\}/g)]
   .map((m) => ({ from: +m[1], to: +m[2] }));
@@ -1050,8 +1067,8 @@ ok(CAPS.every((c) => c.y > lastBox && c.y < 650),
    + "caption at a stale y is drawn over data quality and still looks fine "
    + "in the source",
    CAPS.filter((c) => !(c.y > lastBox && c.y < 650)).map((c) => c.y).join(","));
-ok(/Aligned to the dbt TDD/.test(HUB) && /Tracker still names/.test(HUB),
-   "and the drawing says both halves out loud: it follows the TDD now, and "
+ok(/Per the dbt design doc/.test(HUB) && /Tracker still names/.test(HUB),
+   "and the drawing says both halves out loud: it follows the design document now, and "
    + "the tracker's component names have not moved with it", "");
 // 226px of group, 10px of inset: ~48 characters at fontSize 8.
 //

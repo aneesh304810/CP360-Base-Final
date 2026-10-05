@@ -102,7 +102,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §5.2 | nothing in the pack covers it | §5.2 leans on required-versus-optional interfaces twice, and §6.1's field list has no such column. EXPECTED_INTERFACE_CALENDAR and REQUIRED_IND remain proposals. |
+| BBH File Ingestion Framework Design Document v2.0 | §5.2 | nothing in the pack covers it | §5.2 leans on required-versus-optional interfaces twice, and §6.1's field list has no such column. EXPECTED_INTERFACE_CALENDAR and REQUIRED_IND remain proposals. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -128,7 +128,7 @@ No ranked bottleneck or unowned error path touches this component.
 
 ### Gap against the SEI pack
 
-- §5.2 leans on required-versus-optional interfaces twice, and §6.1's field list has no such column. EXPECTED_INTERFACE_CALENDAR and REQUIRED_IND remain proposals. *(nearest counterpart: BBH File Ingestion Framework TDD, §5.2)*
+- §5.2 leans on required-versus-optional interfaces twice, and §6.1's field list has no such column. EXPECTED_INTERFACE_CALENDAR and REQUIRED_IND remain proposals. *(nearest counterpart: BBH File Ingestion Framework Design Document, §5.2)*
 
 ## 11. Recommendation
 

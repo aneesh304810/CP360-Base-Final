@@ -99,7 +99,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH dbt Transformation TDD v2 | §B.5 | specifies this component | recon_result with left_count, right_count, source_dq_filtered_count, held_count, held_pct and difference. |
+| BBH dbt Transformation Design Document v2 | §B.5 | specifies this component | recon_result with left_count, right_count, source_dq_filtered_count, held_count, held_pct and difference. |
 
 ## 10. Gaps, Risks & What Is Missing
 

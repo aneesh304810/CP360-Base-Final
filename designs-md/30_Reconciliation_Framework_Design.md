@@ -123,7 +123,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH dbt Transformation TDD v2 | §B.5 | touches it, does not specify it | Three boundaries — STG_TO_INT, INT_TO_DIM, INT_TO_FACT — all downstream of Stage 1 and all inbound. |
+| BBH dbt Transformation Design Document v2 | §B.5 | touches it, does not specify it | Three boundaries — STG_TO_INT, INT_TO_DIM, INT_TO_FACT — all downstream of Stage 1 and all inbound. |
 
 **Disagreement with §B.5.** Nine more are needed: four upstream on the event path and five outbound. Without the upstream four, event loss is undetectable by construction, because STG_TO_INT ties perfectly against a Stage 1 that is itself short.
 

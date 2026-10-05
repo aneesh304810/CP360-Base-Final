@@ -103,7 +103,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §D.2 | nothing in the pack covers it | D.2 recovers a QUARANTINED file. There is no event equivalent, so a poison envelope has no escape route. |
+| BBH File Ingestion Framework Design Document v2.0 | §D.2 | nothing in the pack covers it | D.2 recovers a QUARANTINED file. There is no event equivalent, so a poison envelope has no escape route. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -130,7 +130,7 @@ This component does not exist. Component 29 is a file quarantine. The event path
 
 ### Gap against the SEI pack
 
-- D.2 recovers a QUARANTINED file. There is no event equivalent, so a poison envelope has no escape route. *(nearest counterpart: BBH File Ingestion Framework TDD, §D.2)*
+- D.2 recovers a QUARANTINED file. There is no event equivalent, so a poison envelope has no escape route. *(nearest counterpart: BBH File Ingestion Framework Design Document, §D.2)*
 
 ## 11. Recommendation
 

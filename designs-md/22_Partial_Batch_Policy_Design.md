@@ -104,7 +104,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §C.4 | touches it, does not specify it | Discovery guardrails and partial-batch behaviour for files. Silent on partial view failure inside a micro-batch, which is the equivalent case and the more frequent one. |
+| BBH File Ingestion Framework Design Document v2.0 | §C.4 | touches it, does not specify it | Discovery guardrails and partial-batch behaviour for files. Silent on partial view failure inside a micro-batch, which is the equivalent case and the more frequent one. |
 
 ## 10. Gaps, Risks & What Is Missing
 

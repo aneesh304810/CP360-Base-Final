@@ -100,7 +100,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH dbt Transformation TDD v2 | §B.5 | nothing in the pack covers it | B.5's three boundaries are inbound. Sent versus accepted is a boundary that exists nowhere, so a loader that silently dropped three percent on the way out is invisible. |
+| BBH dbt Transformation Design Document v2 | §B.5 | nothing in the pack covers it | B.5's three boundaries are inbound. Sent versus accepted is a boundary that exists nowhere, so a loader that silently dropped three percent on the way out is invisible. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -126,7 +126,7 @@ No ranked bottleneck or unowned error path touches this component.
 
 ### Gap against the SEI pack
 
-- B.5's three boundaries are inbound. Sent versus accepted is a boundary that exists nowhere, so a loader that silently dropped three percent on the way out is invisible. *(nearest counterpart: BBH dbt Transformation TDD, §B.5)*
+- B.5's three boundaries are inbound. Sent versus accepted is a boundary that exists nowhere, so a loader that silently dropped three percent on the way out is invisible. *(nearest counterpart: BBH dbt Transformation Design Document, §B.5)*
 
 ## 11. Recommendation
 

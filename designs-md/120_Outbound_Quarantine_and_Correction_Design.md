@@ -102,7 +102,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §D.2 | nothing in the pack covers it | D.2 quarantines an inbound file. Rejected outbound records have nowhere to go and no defined route back. |
+| BBH File Ingestion Framework Design Document v2.0 | §D.2 | nothing in the pack covers it | D.2 quarantines an inbound file. Rejected outbound records have nowhere to go and no defined route back. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -128,7 +128,7 @@ No ranked bottleneck or unowned error path touches this component.
 
 ### Gap against the SEI pack
 
-- D.2 quarantines an inbound file. Rejected outbound records have nowhere to go and no defined route back. *(nearest counterpart: BBH File Ingestion Framework TDD, §D.2)*
+- D.2 quarantines an inbound file. Rejected outbound records have nowhere to go and no defined route back. *(nearest counterpart: BBH File Ingestion Framework Design Document, §D.2)*
 
 ## 11. Recommendation
 

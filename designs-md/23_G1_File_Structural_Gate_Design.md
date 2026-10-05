@@ -99,7 +99,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §6.1 | specifies this component | has_header, has_trailer and allow_zero_rows — the structural contract G1 checks against. |
+| BBH File Ingestion Framework Design Document v2.0 | §6.1 | specifies this component | has_header, has_trailer and allow_zero_rows — the structural contract G1 checks against. |
 
 ## 10. Gaps, Risks & What Is Missing
 

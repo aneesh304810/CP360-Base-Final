@@ -2262,7 +2262,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nNo review finding: the events-primary substitution does not change what this component does. What is missing is build detail rather than design. BBH builds nothing here. The deliverable is a **signed interface contract** and the acceptance criteria BBH holds SEI to, not a component. Treating these as design work is how a dependency with no owner ends up on the critical path.\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**The interface list itself.** The architecture says roughly 43 interfaces per business date. The TDDs model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table.\n\n  *Recommended default:* Ask for the list before sizing anything. Until it exists, design for the three that are modelled and mark every count that depends on interface cardinality as provisional.\n\n**Volume per interface.** No file sizes, row counts or growth rates anywhere. Pod sizing, storage, retention and the SLA budget all depend on them.\n\n  *Recommended default:* Ask. Until answered, instrument from day one and publish the observed distribution after two weeks rather than guessing now.\n\n### Gap against the SEI pack\n\nNo absent-coverage citation recorded.",
+"md": "\n### What is missing\n\nNo review finding: the events-primary substitution does not change what this component does. What is missing is build detail rather than design. BBH builds nothing here. The deliverable is a **signed interface contract** and the acceptance criteria BBH holds SEI to, not a component. Treating these as design work is how a dependency with no owner ends up on the critical path.\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**The interface list itself.** The architecture says roughly 43 interfaces per business date. The two design documents model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table.\n\n  *Recommended default:* Ask for the list before sizing anything. Until it exists, design for the three that are modelled and mark every count that depends on interface cardinality as provisional.\n\n**Volume per interface.** No file sizes, row counts or growth rates anywhere. Pod sizing, storage, retention and the SLA budget all depend on them.\n\n  *Recommended default:* Ask. Until answered, instrument from day one and publish the observed distribution after two weeks rather than guessing now.\n\n### Gap against the SEI pack\n\nNo absent-coverage citation recorded.",
 "blocks": [
 {
 "t": "h",
@@ -2286,7 +2286,7 @@ export const DESIGN_DOCS = [
 },
 {
 "t": "p",
-"x": "**The interface list itself.** The architecture says roughly 43 interfaces per business date. The TDDs model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table."
+"x": "**The interface list itself.** The architecture says roughly 43 interfaces per business date. The two design documents model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table."
 },
 {
 "t": "p",
@@ -2554,7 +2554,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nNo review finding: the events-primary substitution does not change what this component does. What is missing is build detail rather than design. BBH builds nothing here. The deliverable is a **signed interface contract** and the acceptance criteria BBH holds SEI to, not a component. Treating these as design work is how a dependency with no owner ends up on the critical path.\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**The interface list itself.** The architecture says roughly 43 interfaces per business date. The TDDs model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table.\n\n  *Recommended default:* Ask for the list before sizing anything. Until it exists, design for the three that are modelled and mark every count that depends on interface cardinality as provisional.\n\n**Volume per interface.** No file sizes, row counts or growth rates anywhere. Pod sizing, storage, retention and the SLA budget all depend on them.\n\n  *Recommended default:* Ask. Until answered, instrument from day one and publish the observed distribution after two weeks rather than guessing now.\n\n### Gap against the SEI pack\n\nNo absent-coverage citation recorded.",
+"md": "\n### What is missing\n\nNo review finding: the events-primary substitution does not change what this component does. What is missing is build detail rather than design. BBH builds nothing here. The deliverable is a **signed interface contract** and the acceptance criteria BBH holds SEI to, not a component. Treating these as design work is how a dependency with no owner ends up on the critical path.\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**The interface list itself.** The architecture says roughly 43 interfaces per business date. The two design documents model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table.\n\n  *Recommended default:* Ask for the list before sizing anything. Until it exists, design for the three that are modelled and mark every count that depends on interface cardinality as provisional.\n\n**Volume per interface.** No file sizes, row counts or growth rates anywhere. Pod sizing, storage, retention and the SLA budget all depend on them.\n\n  *Recommended default:* Ask. Until answered, instrument from day one and publish the observed distribution after two weeks rather than guessing now.\n\n### Gap against the SEI pack\n\nNo absent-coverage citation recorded.",
 "blocks": [
 {
 "t": "h",
@@ -2578,7 +2578,7 @@ export const DESIGN_DOCS = [
 },
 {
 "t": "p",
-"x": "**The interface list itself.** The architecture says roughly 43 interfaces per business date. The TDDs model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table."
+"x": "**The interface list itself.** The architecture says roughly 43 interfaces per business date. The two design documents model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table."
 },
 {
 "t": "p",
@@ -2846,7 +2846,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nNo review finding: the events-primary substitution does not change what this component does. What is missing is build detail rather than design. BBH builds nothing here. The deliverable is a **signed interface contract** and the acceptance criteria BBH holds SEI to, not a component. Treating these as design work is how a dependency with no owner ends up on the critical path.\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**The interface list itself.** The architecture says roughly 43 interfaces per business date. The TDDs model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table.\n\n  *Recommended default:* Ask for the list before sizing anything. Until it exists, design for the three that are modelled and mark every count that depends on interface cardinality as provisional.\n\n**Volume per interface.** No file sizes, row counts or growth rates anywhere. Pod sizing, storage, retention and the SLA budget all depend on them.\n\n  *Recommended default:* Ask. Until answered, instrument from day one and publish the observed distribution after two weeks rather than guessing now.\n\n### Gap against the SEI pack\n\nNo absent-coverage citation recorded.",
+"md": "\n### What is missing\n\nNo review finding: the events-primary substitution does not change what this component does. What is missing is build detail rather than design. BBH builds nothing here. The deliverable is a **signed interface contract** and the acceptance criteria BBH holds SEI to, not a component. Treating these as design work is how a dependency with no owner ends up on the critical path.\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**The interface list itself.** The architecture says roughly 43 interfaces per business date. The two design documents model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table.\n\n  *Recommended default:* Ask for the list before sizing anything. Until it exists, design for the three that are modelled and mark every count that depends on interface cardinality as provisional.\n\n**Volume per interface.** No file sizes, row counts or growth rates anywhere. Pod sizing, storage, retention and the SLA budget all depend on them.\n\n  *Recommended default:* Ask. Until answered, instrument from day one and publish the observed distribution after two weeks rather than guessing now.\n\n### Gap against the SEI pack\n\nNo absent-coverage citation recorded.",
 "blocks": [
 {
 "t": "h",
@@ -2870,7 +2870,7 @@ export const DESIGN_DOCS = [
 },
 {
 "t": "p",
-"x": "**The interface list itself.** The architecture says roughly 43 interfaces per business date. The TDDs model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table."
+"x": "**The interface list itself.** The architecture says roughly 43 interfaces per business date. The two design documents model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table."
 },
 {
 "t": "p",
@@ -3134,7 +3134,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nNo review finding: the events-primary substitution does not change what this component does. What is missing is build detail rather than design. BBH builds nothing here. The deliverable is a **signed interface contract** and the acceptance criteria BBH holds SEI to, not a component. Treating these as design work is how a dependency with no owner ends up on the critical path.\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**The interface list itself.** The architecture says roughly 43 interfaces per business date. The TDDs model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table.\n\n  *Recommended default:* Ask for the list before sizing anything. Until it exists, design for the three that are modelled and mark every count that depends on interface cardinality as provisional.\n\n**Volume per interface.** No file sizes, row counts or growth rates anywhere. Pod sizing, storage, retention and the SLA budget all depend on them.\n\n  *Recommended default:* Ask. Until answered, instrument from day one and publish the observed distribution after two weeks rather than guessing now.\n\n### Gap against the SEI pack\n\nNo absent-coverage citation recorded.",
+"md": "\n### What is missing\n\nNo review finding: the events-primary substitution does not change what this component does. What is missing is build detail rather than design. BBH builds nothing here. The deliverable is a **signed interface contract** and the acceptance criteria BBH holds SEI to, not a component. Treating these as design work is how a dependency with no owner ends up on the critical path.\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**The interface list itself.** The architecture says roughly 43 interfaces per business date. The two design documents model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table.\n\n  *Recommended default:* Ask for the list before sizing anything. Until it exists, design for the three that are modelled and mark every count that depends on interface cardinality as provisional.\n\n**Volume per interface.** No file sizes, row counts or growth rates anywhere. Pod sizing, storage, retention and the SLA budget all depend on them.\n\n  *Recommended default:* Ask. Until answered, instrument from day one and publish the observed distribution after two weeks rather than guessing now.\n\n### Gap against the SEI pack\n\nNo absent-coverage citation recorded.",
 "blocks": [
 {
 "t": "h",
@@ -3158,7 +3158,7 @@ export const DESIGN_DOCS = [
 },
 {
 "t": "p",
-"x": "**The interface list itself.** The architecture says roughly 43 interfaces per business date. The TDDs model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table."
+"x": "**The interface list itself.** The architecture says roughly 43 interfaces per business date. The two design documents model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table."
 },
 {
 "t": "p",
@@ -3426,7 +3426,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nNo review finding: the events-primary substitution does not change what this component does. What is missing is build detail rather than design. BBH builds nothing here. The deliverable is a **signed interface contract** and the acceptance criteria BBH holds SEI to, not a component. Treating these as design work is how a dependency with no owner ends up on the critical path.\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**The interface list itself.** The architecture says roughly 43 interfaces per business date. The TDDs model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table.\n\n  *Recommended default:* Ask for the list before sizing anything. Until it exists, design for the three that are modelled and mark every count that depends on interface cardinality as provisional.\n\n**Volume per interface.** No file sizes, row counts or growth rates anywhere. Pod sizing, storage, retention and the SLA budget all depend on them.\n\n  *Recommended default:* Ask. Until answered, instrument from day one and publish the observed distribution after two weeks rather than guessing now.\n\n### Gap against the SEI pack\n\nNo absent-coverage citation recorded.",
+"md": "\n### What is missing\n\nNo review finding: the events-primary substitution does not change what this component does. What is missing is build detail rather than design. BBH builds nothing here. The deliverable is a **signed interface contract** and the acceptance criteria BBH holds SEI to, not a component. Treating these as design work is how a dependency with no owner ends up on the critical path.\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**The interface list itself.** The architecture says roughly 43 interfaces per business date. The two design documents model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table.\n\n  *Recommended default:* Ask for the list before sizing anything. Until it exists, design for the three that are modelled and mark every count that depends on interface cardinality as provisional.\n\n**Volume per interface.** No file sizes, row counts or growth rates anywhere. Pod sizing, storage, retention and the SLA budget all depend on them.\n\n  *Recommended default:* Ask. Until answered, instrument from day one and publish the observed distribution after two weeks rather than guessing now.\n\n### Gap against the SEI pack\n\nNo absent-coverage citation recorded.",
 "blocks": [
 {
 "t": "h",
@@ -3450,7 +3450,7 @@ export const DESIGN_DOCS = [
 },
 {
 "t": "p",
-"x": "**The interface list itself.** The architecture says roughly 43 interfaces per business date. The TDDs model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table."
+"x": "**The interface list itself.** The architecture says roughly 43 interfaces per business date. The two design documents model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table."
 },
 {
 "t": "p",
@@ -3719,7 +3719,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nNo review finding: the events-primary substitution does not change what this component does. What is missing is build detail rather than design. BBH builds nothing here. The deliverable is a **signed interface contract** and the acceptance criteria BBH holds SEI to, not a component. Treating these as design work is how a dependency with no owner ends up on the critical path.\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**The interface list itself.** The architecture says roughly 43 interfaces per business date. The TDDs model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table.\n\n  *Recommended default:* Ask for the list before sizing anything. Until it exists, design for the three that are modelled and mark every count that depends on interface cardinality as provisional.\n\n**Volume per interface.** No file sizes, row counts or growth rates anywhere. Pod sizing, storage, retention and the SLA budget all depend on them.\n\n  *Recommended default:* Ask. Until answered, instrument from day one and publish the observed distribution after two weeks rather than guessing now.\n\n### Gap against the SEI pack\n\nNo absent-coverage citation recorded.",
+"md": "\n### What is missing\n\nNo review finding: the events-primary substitution does not change what this component does. What is missing is build detail rather than design. BBH builds nothing here. The deliverable is a **signed interface contract** and the acceptance criteria BBH holds SEI to, not a component. Treating these as design work is how a dependency with no owner ends up on the critical path.\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**The interface list itself.** The architecture says roughly 43 interfaces per business date. The two design documents model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table.\n\n  *Recommended default:* Ask for the list before sizing anything. Until it exists, design for the three that are modelled and mark every count that depends on interface cardinality as provisional.\n\n**Volume per interface.** No file sizes, row counts or growth rates anywhere. Pod sizing, storage, retention and the SLA budget all depend on them.\n\n  *Recommended default:* Ask. Until answered, instrument from day one and publish the observed distribution after two weeks rather than guessing now.\n\n### Gap against the SEI pack\n\nNo absent-coverage citation recorded.",
 "blocks": [
 {
 "t": "h",
@@ -3743,7 +3743,7 @@ export const DESIGN_DOCS = [
 },
 {
 "t": "p",
-"x": "**The interface list itself.** The architecture says roughly 43 interfaces per business date. The TDDs model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table."
+"x": "**The interface list itself.** The architecture says roughly 43 interfaces per business date. The two design documents model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table."
 },
 {
 "t": "p",
@@ -4011,7 +4011,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nNo review finding: the events-primary substitution does not change what this component does. What is missing is build detail rather than design. BBH builds nothing here. The deliverable is a **signed interface contract** and the acceptance criteria BBH holds SEI to, not a component. Treating these as design work is how a dependency with no owner ends up on the critical path.\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**The interface list itself.** The architecture says roughly 43 interfaces per business date. The TDDs model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table.\n\n  *Recommended default:* Ask for the list before sizing anything. Until it exists, design for the three that are modelled and mark every count that depends on interface cardinality as provisional.\n\n**Volume per interface.** No file sizes, row counts or growth rates anywhere. Pod sizing, storage, retention and the SLA budget all depend on them.\n\n  *Recommended default:* Ask. Until answered, instrument from day one and publish the observed distribution after two weeks rather than guessing now.\n\n### Gap against the SEI pack\n\nNo absent-coverage citation recorded.",
+"md": "\n### What is missing\n\nNo review finding: the events-primary substitution does not change what this component does. What is missing is build detail rather than design. BBH builds nothing here. The deliverable is a **signed interface contract** and the acceptance criteria BBH holds SEI to, not a component. Treating these as design work is how a dependency with no owner ends up on the critical path.\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**The interface list itself.** The architecture says roughly 43 interfaces per business date. The two design documents model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table.\n\n  *Recommended default:* Ask for the list before sizing anything. Until it exists, design for the three that are modelled and mark every count that depends on interface cardinality as provisional.\n\n**Volume per interface.** No file sizes, row counts or growth rates anywhere. Pod sizing, storage, retention and the SLA budget all depend on them.\n\n  *Recommended default:* Ask. Until answered, instrument from day one and publish the observed distribution after two weeks rather than guessing now.\n\n### Gap against the SEI pack\n\nNo absent-coverage citation recorded.",
 "blocks": [
 {
 "t": "h",
@@ -4035,7 +4035,7 @@ export const DESIGN_DOCS = [
 },
 {
 "t": "p",
-"x": "**The interface list itself.** The architecture says roughly 43 interfaces per business date. The TDDs model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table."
+"x": "**The interface list itself.** The architecture says roughly 43 interfaces per business date. The two design documents model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table."
 },
 {
 "t": "p",
@@ -4182,15 +4182,15 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "3. Design Decisions",
-"md": "\n**Review verdict: demoted.** Becomes the standby path. It also conflicts with the SEI pack: this design uses a manifest written last plus deferrable sensors verifying size and mtime, while the File Ingestion TDD discovers by filename pattern every five minutes with no manifest at all. Two different transport contracts with the same upstream party.\n\n**Direction.** Settle on one before build. The manifest is the stronger guarantee; the TDD is what is being built. Whichever wins, the other document has to change.",
+"md": "\n**Review verdict: demoted.** Becomes the standby path. It also conflicts with the SEI pack: this design uses a manifest written last plus deferrable sensors verifying size and mtime, while the File Ingestion Framework Design Document discovers by filename pattern every five minutes with no manifest at all. Two different transport contracts with the same upstream party.\n\n**Direction.** Settle on one before build. The manifest is the stronger guarantee; the design document is what is being built. Whichever wins, the other document has to change.",
 "blocks": [
 {
 "t": "p",
-"x": "**Review verdict: demoted.** Becomes the standby path. It also conflicts with the SEI pack: this design uses a manifest written last plus deferrable sensors verifying size and mtime, while the File Ingestion TDD discovers by filename pattern every five minutes with no manifest at all. Two different transport contracts with the same upstream party."
+"x": "**Review verdict: demoted.** Becomes the standby path. It also conflicts with the SEI pack: this design uses a manifest written last plus deferrable sensors verifying size and mtime, while the File Ingestion Framework Design Document discovers by filename pattern every five minutes with no manifest at all. Two different transport contracts with the same upstream party."
 },
 {
 "t": "p",
-"x": "**Direction.** Settle on one before build. The manifest is the stronger guarantee; the TDD is what is being built. Whichever wins, the other document has to change."
+"x": "**Direction.** Settle on one before build. The manifest is the stronger guarantee; the design document is what is being built. Whichever wins, the other document has to change."
 }
 ]
 },
@@ -4297,7 +4297,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §6 | specifies this component | Transport and the landing zone: Momentum SFTP into the landing zone, retention, directory layout. |\n| BBH File Ingestion Framework TDD v2.0 | §C.3 | the pack and this design disagree | Discovery every five minutes by filename pattern, with rules for one match, none, many, zero files and an existing key. |\n\n**Disagreement with §C.3.** This codebase designs a manifest written last plus deferrable sensors verifying size and mtime. The pack has no manifest at all. Two different transport contracts with the same upstream party.",
+"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §6 | specifies this component | Transport and the landing zone: Momentum SFTP into the landing zone, retention, directory layout. |\n| BBH File Ingestion Framework Design Document v2.0 | §C.3 | the pack and this design disagree | Discovery every five minutes by filename pattern, with rules for one match, none, many, zero files and an existing key. |\n\n**Disagreement with §C.3.** This codebase designs a manifest written last plus deferrable sensors verifying size and mtime. The pack has no manifest at all. Two different transport contracts with the same upstream party.",
 "blocks": [
 {
 "t": "p",
@@ -4317,13 +4317,13 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§6",
 "specifies this component",
 "Transport and the landing zone: Momentum SFTP into the landing zone, retention, directory layout."
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§C.3",
 "the pack and this design disagree",
 "Discovery every five minutes by filename pattern, with rules for one match, none, many, zero files and an existing key."
@@ -4338,7 +4338,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nBecomes the standby path. It also conflicts with the SEI pack: this design uses a manifest written last plus deferrable sensors verifying size and mtime, while the File Ingestion TDD discovers by filename pattern every five minutes with no manifest at all. Two different transport contracts with the same upstream party.\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**SEI's status API contract.** Endpoint, auth, pagination, rate limits, whether a mid-processing poll returns partial errors, and how long reject detail stays retrievable. The poller's cadence and budget are unsizable without them.\n\n  *Recommended default:* Ask, and treat retention as the urgent one: if SEI purges reject detail after a window, BBH's stored copy becomes the system of record for outbound exceptions and the fetch acquires a deadline.\n\n**Whether loader groups are a sequencing constraint.** Group 2, 3 and 4 appear consistently in the catalogue. If Group 2 must land before Group 3, a Group 2 failure blocks everything behind it — the outbound equivalent of the date gate.\n\n  *Recommended default:* Assume they are ordered until told otherwise, and make the dependency explicit in the submission registry. Discovering it after a failure is the expensive way to learn it.\n\n### Gap against the SEI pack\n\nThe pack specifies this component. The gap is not in the documentation.",
+"md": "\n### What is missing\n\nBecomes the standby path. It also conflicts with the SEI pack: this design uses a manifest written last plus deferrable sensors verifying size and mtime, while the File Ingestion Framework Design Document discovers by filename pattern every five minutes with no manifest at all. Two different transport contracts with the same upstream party.\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**SEI's status API contract.** Endpoint, auth, pagination, rate limits, whether a mid-processing poll returns partial errors, and how long reject detail stays retrievable. The poller's cadence and budget are unsizable without them.\n\n  *Recommended default:* Ask, and treat retention as the urgent one: if SEI purges reject detail after a window, BBH's stored copy becomes the system of record for outbound exceptions and the fetch acquires a deadline.\n\n**Whether loader groups are a sequencing constraint.** Group 2, 3 and 4 appear consistently in the catalogue. If Group 2 must land before Group 3, a Group 2 failure blocks everything behind it — the outbound equivalent of the date gate.\n\n  *Recommended default:* Assume they are ordered until told otherwise, and make the dependency explicit in the submission registry. Discovering it after a failure is the expensive way to learn it.\n\n### Gap against the SEI pack\n\nThe pack specifies this component. The gap is not in the documentation.",
 "blocks": [
 {
 "t": "h",
@@ -4346,7 +4346,7 @@ export const DESIGN_DOCS = [
 },
 {
 "t": "p",
-"x": "Becomes the standby path. It also conflicts with the SEI pack: this design uses a manifest written last plus deferrable sensors verifying size and mtime, while the File Ingestion TDD discovers by filename pattern every five minutes with no manifest at all. Two different transport contracts with the same upstream party."
+"x": "Becomes the standby path. It also conflicts with the SEI pack: this design uses a manifest written last plus deferrable sensors verifying size and mtime, while the File Ingestion Framework Design Document discovers by filename pattern every five minutes with no manifest at all. Two different transport contracts with the same upstream party."
 },
 {
 "t": "h",
@@ -4388,15 +4388,15 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "11. Recommendation",
-"md": "\nSettle on one before build. The manifest is the stronger guarantee; the TDD is what is being built. Whichever wins, the other document has to change.\n\n**Action.** Pick one contract. The manifest protocol is stronger; the TDD is what is being built.\n\n**Hub · ingress and egress.** Split this component set in two on the plan. Inbound standby is small and nearly done; outbound is eight components and has no design at all. Tracking them as one plane hides how unequal they are.",
+"md": "\nSettle on one before build. The manifest is the stronger guarantee; the design document is what is being built. Whichever wins, the other document has to change.\n\n**Action.** Pick one contract. The manifest protocol is stronger; the design document is what is being built.\n\n**Hub · ingress and egress.** Split this component set in two on the plan. Inbound standby is small and nearly done; outbound is eight components and has no design at all. Tracking them as one plane hides how unequal they are.",
 "blocks": [
 {
 "t": "p",
-"x": "Settle on one before build. The manifest is the stronger guarantee; the TDD is what is being built. Whichever wins, the other document has to change."
+"x": "Settle on one before build. The manifest is the stronger guarantee; the design document is what is being built. Whichever wins, the other document has to change."
 },
 {
 "t": "p",
-"x": "**Action.** Pick one contract. The manifest protocol is stronger; the TDD is what is being built."
+"x": "**Action.** Pick one contract. The manifest protocol is stronger; the design document is what is being built."
 },
 {
 "t": "p",
@@ -4631,7 +4631,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §C.1 | specifies this component | The three-task DAG: discover_work_items, process_file.expand(...), evaluate_completeness_and_sla under trigger_rule='all_done'. |\n| BBH File Ingestion Framework TDD v2.0 | §C.4 | touches it, does not specify it | Three guardrails, of which 'no large file contents through XCom' is the one that constrains the loader's shape. |",
+"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §C.1 | specifies this component | The three-task DAG: discover_work_items, process_file.expand(...), evaluate_completeness_and_sla under trigger_rule='all_done'. |\n| BBH File Ingestion Framework Design Document v2.0 | §C.4 | touches it, does not specify it | Three guardrails, of which 'no large file contents through XCom' is the one that constrains the loader's shape. |",
 "blocks": [
 {
 "t": "p",
@@ -4651,13 +4651,13 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§C.1",
 "specifies this component",
 "The three-task DAG: discover_work_items, process_file.expand(...), evaluate_completeness_and_sla under trigger_rule='all_done'."
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§C.4",
 "touches it, does not specify it",
 "Three guardrails, of which 'no large file contents through XCom' is the one that constrains the loader's shape."
@@ -4990,7 +4990,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: SEI** — SEI must answer.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| SEI-BBH Integration Architecture v5 | whole document | touches it, does not specify it | Node 12 places the Apigee proxy on the outbound path. |\n| BBH File Ingestion Framework TDD v2.0 | whole document | nothing in the pack covers it | The pack is entirely inbound. There is no outbound section, no submission contract, no acknowledgement model and no error return path anywhere in any of the documents. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: SEI** — SEI must answer.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| SEI-BBH Integration Architecture v5 | whole document | touches it, does not specify it | Node 12 places the Apigee proxy on the outbound path. |\n| BBH File Ingestion Framework Design Document v2.0 | whole document | nothing in the pack covers it | The pack is entirely inbound. There is no outbound section, no submission contract, no acknowledgement model and no error return path anywhere in any of the documents. |",
 "blocks": [
 {
 "t": "p",
@@ -5016,7 +5016,7 @@ export const DESIGN_DOCS = [
 "Node 12 places the Apigee proxy on the outbound path."
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "whole document",
 "nothing in the pack covers it",
 "The pack is entirely inbound. There is no outbound section, no submission contract, no acknowledgement model and no error return path anywhere in any of the documents."
@@ -5027,7 +5027,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nOne component carrying a whole framework. It covers generating and sending, and nothing else exists: no template registry, no validation before publish, no record of what was sent, no quarantine for rejects, no sent-versus-accepted reconciliation, no receiver, no poller, no submission registry. The inbound path has a gate, a quarantine and reconciliation boundaries; the outbound path has none of the three.\n\n### Risk\n\n- **HIGH · performance (B11).** Outbound validation done per record instead of per extract.\n- **MEDIUM · error path (E11).** Outbound has no error model at all.\n- **CRITICAL · error path (E13).** Nothing validates a loader before it is published.\n\n### Not specified — and what to do until it is\n\n**SEI's status API contract.** Endpoint, auth, pagination, rate limits, whether a mid-processing poll returns partial errors, and how long reject detail stays retrievable. The poller's cadence and budget are unsizable without them.\n\n  *Recommended default:* Ask, and treat retention as the urgent one: if SEI purges reject detail after a window, BBH's stored copy becomes the system of record for outbound exceptions and the fetch acquires a deadline.\n\n**Whether loader groups are a sequencing constraint.** Group 2, 3 and 4 appear consistently in the catalogue. If Group 2 must land before Group 3, a Group 2 failure blocks everything behind it — the outbound equivalent of the date gate.\n\n  *Recommended default:* Assume they are ordered until told otherwise, and make the dependency explicit in the submission registry. Discovering it after a failure is the expensive way to learn it.\n\n### Gap against the SEI pack\n\n- The pack is entirely inbound. There is no outbound section, no submission contract, no acknowledgement model and no error return path anywhere in any of the documents. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*",
+"md": "\n### What is missing\n\nOne component carrying a whole framework. It covers generating and sending, and nothing else exists: no template registry, no validation before publish, no record of what was sent, no quarantine for rejects, no sent-versus-accepted reconciliation, no receiver, no poller, no submission registry. The inbound path has a gate, a quarantine and reconciliation boundaries; the outbound path has none of the three.\n\n### Risk\n\n- **HIGH · performance (B11).** Outbound validation done per record instead of per extract.\n- **MEDIUM · error path (E11).** Outbound has no error model at all.\n- **CRITICAL · error path (E13).** Nothing validates a loader before it is published.\n\n### Not specified — and what to do until it is\n\n**SEI's status API contract.** Endpoint, auth, pagination, rate limits, whether a mid-processing poll returns partial errors, and how long reject detail stays retrievable. The poller's cadence and budget are unsizable without them.\n\n  *Recommended default:* Ask, and treat retention as the urgent one: if SEI purges reject detail after a window, BBH's stored copy becomes the system of record for outbound exceptions and the fetch acquires a deadline.\n\n**Whether loader groups are a sequencing constraint.** Group 2, 3 and 4 appear consistently in the catalogue. If Group 2 must land before Group 3, a Group 2 failure blocks everything behind it — the outbound equivalent of the date gate.\n\n  *Recommended default:* Assume they are ordered until told otherwise, and make the dependency explicit in the submission registry. Discovering it after a failure is the expensive way to learn it.\n\n### Gap against the SEI pack\n\n- The pack is entirely inbound. There is no outbound section, no submission contract, no acknowledgement model and no error return path anywhere in any of the documents. *(nearest counterpart: BBH File Ingestion Framework Design Document, no section — the whole document)*",
 "blocks": [
 {
 "t": "h",
@@ -5076,7 +5076,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"The pack is entirely inbound. There is no outbound section, no submission contract, no acknowledgement model and no error return path anywhere in any of the documents. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*"
+"The pack is entirely inbound. There is no outbound section, no submission contract, no acknowledgement model and no error return path anywhere in any of the documents. *(nearest counterpart: BBH File Ingestion Framework Design Document, no section — the whole document)*"
 ]
 }
 ]
@@ -5953,7 +5953,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §C.1 | specifies this component | The ingestion framework's shape: discover, process per file via dynamic task mapping, then evaluate completeness. |\n| BBH File Ingestion Framework TDD v2.0 | §C.2 | specifies this component | The work-item dict: file_name, src_file_name, business_date, target_raw_table, file_path, delimiter, has_header, has_trailer, allow_zero_rows. |",
+"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §C.1 | specifies this component | The ingestion framework's shape: discover, process per file via dynamic task mapping, then evaluate completeness. |\n| BBH File Ingestion Framework Design Document v2.0 | §C.2 | specifies this component | The work-item dict: file_name, src_file_name, business_date, target_raw_table, file_path, delimiter, has_header, has_trailer, allow_zero_rows. |",
 "blocks": [
 {
 "t": "p",
@@ -5973,13 +5973,13 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§C.1",
 "specifies this component",
 "The ingestion framework's shape: discover, process per file via dynamic task mapping, then evaluate completeness."
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§C.2",
 "specifies this component",
 "The work-item dict: file_name, src_file_name, business_date, target_raw_table, file_path, delimiter, has_header, has_trailer, allow_zero_rows."
@@ -6283,7 +6283,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §6.1 | specifies this component | FILE_SCHEMA_CONFIG holds file-level metadata only and no column mapping, which makes the RAW DDL the schema contract. |\n| BBH dbt Transformation TDD v2 | §Appendix E | specifies this component | The medallion canvas: SWP files to SWP_RAW (Bronze), then STG, INT, DIM and FACT. |",
+"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §6.1 | specifies this component | FILE_SCHEMA_CONFIG holds file-level metadata only and no column mapping, which makes the RAW DDL the schema contract. |\n| BBH dbt Transformation Design Document v2 | §Appendix E | specifies this component | The medallion canvas: SWP files to SWP_RAW (Bronze), then STG, INT, DIM and FACT. |",
 "blocks": [
 {
 "t": "p",
@@ -6303,13 +6303,13 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§6.1",
 "specifies this component",
 "FILE_SCHEMA_CONFIG holds file-level metadata only and no column mapping, which makes the RAW DDL the schema contract."
 ],
 [
-"BBH dbt Transformation TDD v2",
+"BBH dbt Transformation Design Document v2",
 "§Appendix E",
 "specifies this component",
 "The medallion canvas: SWP files to SWP_RAW (Bronze), then STG, INT, DIM and FACT."
@@ -6764,7 +6764,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "6. Performance & Scale",
-"md": "\n### B2 · STG is a view, and events make it run 288 times a day (critical)\n\nThe dbt TDD defines STG as a view, recomputed on read. Under a daily file cycle it is recomputed once. Under intraday events, INT is built incrementally all day, so the STG view is recomputed on every incremental run — and each recomputation scans Stage 1. This is the single largest cost the event substitution introduces, and it comes from a design decision that was entirely reasonable when it was made.\n\n**What to do.** Either materialise STG per micro-batch, or ensure the INT incremental predicate pushes down to Stage 1's partition so the view scans one micro-batch rather than the whole accumulated day. Verify the push-down on the actual plan; do not assume it.\n### B6 · INT's incremental MERGE into a growing current-day partition (high)\n\nINT is partitioned by BUSINESS_DATE with a 7-day window. Under intraday events the current day's partition is written to continuously, and an incremental MERGE against a partition that grows all day degrades as the day goes on. The 6pm micro-batch is materially slower than the 6am one.\n\n**What to do.** Subpartition by micro-batch, or load append-only with a late dedupe at the gate. Measure the degradation curve before choosing; it may be acceptable at real volumes, but nobody knows the real volumes.",
+"md": "\n### B2 · STG is a view, and events make it run 288 times a day (critical)\n\nThe dbt design document defines STG as a view, recomputed on read. Under a daily file cycle it is recomputed once. Under intraday events, INT is built incrementally all day, so the STG view is recomputed on every incremental run — and each recomputation scans Stage 1. This is the single largest cost the event substitution introduces, and it comes from a design decision that was entirely reasonable when it was made.\n\n**What to do.** Either materialise STG per micro-batch, or ensure the INT incremental predicate pushes down to Stage 1's partition so the view scans one micro-batch rather than the whole accumulated day. Verify the push-down on the actual plan; do not assume it.\n### B6 · INT's incremental MERGE into a growing current-day partition (high)\n\nINT is partitioned by BUSINESS_DATE with a 7-day window. Under intraday events the current day's partition is written to continuously, and an incremental MERGE against a partition that grows all day degrades as the day goes on. The 6pm micro-batch is materially slower than the 6am one.\n\n**What to do.** Subpartition by micro-batch, or load append-only with a late dedupe at the gate. Measure the degradation curve before choosing; it may be acceptable at real volumes, but nobody knows the real volumes.",
 "blocks": [
 {
 "t": "h",
@@ -6772,7 +6772,7 @@ export const DESIGN_DOCS = [
 },
 {
 "t": "p",
-"x": "The dbt TDD defines STG as a view, recomputed on read. Under a daily file cycle it is recomputed once. Under intraday events, INT is built incrementally all day, so the STG view is recomputed on every incremental run — and each recomputation scans Stage 1. This is the single largest cost the event substitution introduces, and it comes from a design decision that was entirely reasonable when it was made."
+"x": "The dbt design document defines STG as a view, recomputed on read. Under a daily file cycle it is recomputed once. Under intraday events, INT is built incrementally all day, so the STG view is recomputed on every incremental run — and each recomputation scans Stage 1. This is the single largest cost the event substitution introduces, and it comes from a design decision that was entirely reasonable when it was made."
 },
 {
 "t": "p",
@@ -6832,7 +6832,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: partial** — partly specified — named, not sufficient.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation TDD v2 | §Appendix E | the pack and this design disagree | STG is a view, recomputed on read. INT is Silver, primary key natural key plus BUSINESS_DATE, seven-day retention. |\n\n**Disagreement with §Appendix E.** This codebase names a Stage 2 Enriched layer and a Pre-Gold Exadata tier that the pack does not have. The layer models have to be reconciled before either document is a build spec.",
+"md": "\n**SEI pack coverage: partial** — partly specified — named, not sufficient.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation Design Document v2 | §Appendix E | the pack and this design disagree | STG is a view, recomputed on read. INT is Silver, primary key natural key plus BUSINESS_DATE, seven-day retention. |\n\n**Disagreement with §Appendix E.** This codebase names a Stage 2 Enriched layer and a Pre-Gold Exadata tier that the pack does not have. The layer models have to be reconciled before either document is a build spec.",
 "blocks": [
 {
 "t": "p",
@@ -6852,7 +6852,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH dbt Transformation TDD v2",
+"BBH dbt Transformation Design Document v2",
 "§Appendix E",
 "the pack and this design disagree",
 "STG is a view, recomputed on read. INT is Silver, primary key natural key plus BUSINESS_DATE, seven-day retention."
@@ -7378,7 +7378,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: SEI** — SEI must answer.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation TDD v2 | §B.3 | specifies this component | dim_account.sql — SCD2 by direct compare rather than snapshot, incremental merge on account_key, on_schema_change='fail'. The change predicate lists only account_type and situs_code. |\n| BBH dbt Transformation TDD v2 | §B.4 | specifies this component | int_transaction_for_fact.sql — ephemeral, never persisted. Assembles today's INT rows plus the OPEN replay worklist, then resolves dimension keys and stamps MISSING_DIMENSION_KEY. |",
+"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: SEI** — SEI must answer.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation Design Document v2 | §B.3 | specifies this component | dim_account.sql — SCD2 by direct compare rather than snapshot, incremental merge on account_key, on_schema_change='fail'. The change predicate lists only account_type and situs_code. |\n| BBH dbt Transformation Design Document v2 | §B.4 | specifies this component | int_transaction_for_fact.sql — ephemeral, never persisted. Assembles today's INT rows plus the OPEN replay worklist, then resolves dimension keys and stamps MISSING_DIMENSION_KEY. |",
 "blocks": [
 {
 "t": "p",
@@ -7398,13 +7398,13 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH dbt Transformation TDD v2",
+"BBH dbt Transformation Design Document v2",
 "§B.3",
 "specifies this component",
 "dim_account.sql — SCD2 by direct compare rather than snapshot, incremental merge on account_key, on_schema_change='fail'. The change predicate lists only account_type and situs_code."
 ],
 [
-"BBH dbt Transformation TDD v2",
+"BBH dbt Transformation Design Document v2",
 "§B.4",
 "specifies this component",
 "int_transaction_for_fact.sql — ephemeral, never persisted. Assembles today's INT rows plus the OPEN replay worklist, then resolves dimension keys and stamps MISSING_DIMENSION_KEY."
@@ -7937,7 +7937,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: partial** — partly specified — named, not sufficient.\n**Who answers for the gap: SEI** — SEI must answer.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation TDD v2 | §Appendix C | touches it, does not specify it | The twelve-scenario runbook, including reprocessing an already-closed row by direct UPDATE and never MERGE. |\n| BBH File Ingestion Framework TDD v2.0 | §D.3 | touches it, does not specify it | Approved restatement — the procedure exists and names no approver. |\n| BBH dbt Transformation TDD v2 | whole document | nothing in the pack covers it | Nothing defines the downstream semantics of an event op=D, and nothing defines an outbound correction. Both are written for a file world. |",
+"md": "\n**SEI pack coverage: partial** — partly specified — named, not sufficient.\n**Who answers for the gap: SEI** — SEI must answer.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation Design Document v2 | §Appendix C | touches it, does not specify it | The twelve-scenario runbook, including reprocessing an already-closed row by direct UPDATE and never MERGE. |\n| BBH File Ingestion Framework Design Document v2.0 | §D.3 | touches it, does not specify it | Approved restatement — the procedure exists and names no approver. |\n| BBH dbt Transformation Design Document v2 | whole document | nothing in the pack covers it | Nothing defines the downstream semantics of an event op=D, and nothing defines an outbound correction. Both are written for a file world. |",
 "blocks": [
 {
 "t": "p",
@@ -7957,19 +7957,19 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH dbt Transformation TDD v2",
+"BBH dbt Transformation Design Document v2",
 "§Appendix C",
 "touches it, does not specify it",
 "The twelve-scenario runbook, including reprocessing an already-closed row by direct UPDATE and never MERGE."
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§D.3",
 "touches it, does not specify it",
 "Approved restatement — the procedure exists and names no approver."
 ],
 [
-"BBH dbt Transformation TDD v2",
+"BBH dbt Transformation Design Document v2",
 "whole document",
 "nothing in the pack covers it",
 "Nothing defines the downstream semantics of an event op=D, and nothing defines an outbound correction. Both are written for a file world."
@@ -7980,7 +7980,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nWritten for restatement and in-place merge. A delete arriving as an event has no defined downstream behaviour, and an outbound correction — a new submission referencing the one it corrects — is not modelled at all.\n\n### Risk\n\n- **HIGH · error path (E9).** op = D semantics are undefined downstream.\n- **MEDIUM · error path (E12).** Dimension arriving after fact starts the 7-day clock.\n\n### Not specified — and what to do until it is\n\n**Which layer model is real.** The SEI pack has RAW to STG (a view) to INT to DIM and FACT. This codebase names a Stage 2 Enriched layer and a Pre-Gold Exadata tier that the pack does not have.\n\n  *Recommended default:* Reconcile before build. Two layer models in two documents means whichever one a developer opens first becomes the implementation.\n\n**Volume per micro-batch.** Partition strategy, commit size and the degradation curve on the current-day partition all depend on it, and none of it is stated.\n\n  *Recommended default:* Measure the degradation curve in a lower environment before choosing a partition strategy. It may be acceptable at real volumes — but nobody knows the real volumes.\n\n### Gap against the SEI pack\n\n- Nothing defines the downstream semantics of an event op=D, and nothing defines an outbound correction. Both are written for a file world. *(nearest counterpart: BBH dbt Transformation TDD, no section — the whole document)*",
+"md": "\n### What is missing\n\nWritten for restatement and in-place merge. A delete arriving as an event has no defined downstream behaviour, and an outbound correction — a new submission referencing the one it corrects — is not modelled at all.\n\n### Risk\n\n- **HIGH · error path (E9).** op = D semantics are undefined downstream.\n- **MEDIUM · error path (E12).** Dimension arriving after fact starts the 7-day clock.\n\n### Not specified — and what to do until it is\n\n**Which layer model is real.** The SEI pack has RAW to STG (a view) to INT to DIM and FACT. This codebase names a Stage 2 Enriched layer and a Pre-Gold Exadata tier that the pack does not have.\n\n  *Recommended default:* Reconcile before build. Two layer models in two documents means whichever one a developer opens first becomes the implementation.\n\n**Volume per micro-batch.** Partition strategy, commit size and the degradation curve on the current-day partition all depend on it, and none of it is stated.\n\n  *Recommended default:* Measure the degradation curve in a lower environment before choosing a partition strategy. It may be acceptable at real volumes — but nobody knows the real volumes.\n\n### Gap against the SEI pack\n\n- Nothing defines the downstream semantics of an event op=D, and nothing defines an outbound correction. Both are written for a file world. *(nearest counterpart: BBH dbt Transformation Design Document, no section — the whole document)*",
 "blocks": [
 {
 "t": "h",
@@ -8028,7 +8028,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"Nothing defines the downstream semantics of an event op=D, and nothing defines an outbound correction. Both are written for a file world. *(nearest counterpart: BBH dbt Transformation TDD, no section — the whole document)*"
+"Nothing defines the downstream semantics of an event op=D, and nothing defines an outbound correction. Both are written for a file world. *(nearest counterpart: BBH dbt Transformation Design Document, no section — the whole document)*"
 ]
 }
 ]
@@ -8326,7 +8326,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §C.1 | specifies this component | Deterministic transformation run id transform__<BUSINESS_DATE>, plus a scheduled reconciliation path that retries when STATUS='TRIGGER', TRANSFORMATION_DAG_RUN_ID IS NULL and no matching deterministic run exists. |",
+"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §C.1 | specifies this component | Deterministic transformation run id transform__<BUSINESS_DATE>, plus a scheduled reconciliation path that retries when STATUS='TRIGGER', TRANSFORMATION_DAG_RUN_ID IS NULL and no matching deterministic run exists. |",
 "blocks": [
 {
 "t": "p",
@@ -8346,7 +8346,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§C.1",
 "specifies this component",
 "Deterministic transformation run id transform__<BUSINESS_DATE>, plus a scheduled reconciliation path that retries when STATUS='TRIGGER', TRANSFORMATION_DAG_RUN_ID IS NULL and no matching deterministic run exists."
@@ -8869,7 +8869,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation TDD v2 | §B.4 | specifies this component | Dimension before fact, with fact_transactions.sql taking only dq_reason IS NULL and dq_int_txn_missing_dim.sql reading the failures off the same join, so the two cannot disagree. |",
+"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation Design Document v2 | §B.4 | specifies this component | Dimension before fact, with fact_transactions.sql taking only dq_reason IS NULL and dq_int_txn_missing_dim.sql reading the failures off the same join, so the two cannot disagree. |",
 "blocks": [
 {
 "t": "p",
@@ -8889,7 +8889,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH dbt Transformation TDD v2",
+"BBH dbt Transformation Design Document v2",
 "§B.4",
 "specifies this component",
 "Dimension before fact, with fact_transactions.sql taking only dq_reason IS NULL and dq_int_txn_missing_dim.sql reading the failures off the same join, so the two cannot disagree."
@@ -9210,7 +9210,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §C.3 | nothing in the pack covers it | The pack has a five-minute discovery loop and no intraday cadence model, no intraday SLA and no definition of 'behind' during the day. Its only clock is the EOD cutoff. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §C.3 | nothing in the pack covers it | The pack has a five-minute discovery loop and no intraday cadence model, no intraday SLA and no definition of 'behind' during the day. Its only clock is the EOD cutoff. |",
 "blocks": [
 {
 "t": "p",
@@ -9230,7 +9230,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§C.3",
 "nothing in the pack covers it",
 "The pack has a five-minute discovery loop and no intraday cadence model, no intraday SLA and no definition of 'behind' during the day. Its only clock is the EOD cutoff."
@@ -9241,7 +9241,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nThe one component that anticipated intraday, but defined as a batch lane running more often. Event cadence is not a schedule — it is the stream's own rhythm, and lateness comes from a rolling baseline of the inter-micro-batch interval.\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**How transform__<BUSINESS_DATE> and restatement both hold.** The run already exists and succeeded, so Airflow refuses a second one, and C.1's reconciliation path fires only when no matching run exists — the opposite case. As written the run-id rule and the recovery procedure contradict each other.\n\n  *Recommended default:* Restatement runs as a separate DAG with its own run id, which is how they coexist today. Say so explicitly in the document; the contradiction is only resolved by a convention nobody wrote down.\n\n**Whether there is an intraday SLA at all.** The pack's only clock is the EOD cutoff. Without an intraday definition of 'behind', a micro-batch that failed at 11am is not late, only absent, and nothing escalates.\n\n  *Recommended default:* Derive lateness from the stream's own rhythm — a rolling baseline of the inter-micro-batch interval — rather than waiting for a calendar nobody will write.\n\n### Gap against the SEI pack\n\n- The pack has a five-minute discovery loop and no intraday cadence model, no intraday SLA and no definition of 'behind' during the day. Its only clock is the EOD cutoff. *(nearest counterpart: BBH File Ingestion Framework TDD, §C.3)*",
+"md": "\n### What is missing\n\nThe one component that anticipated intraday, but defined as a batch lane running more often. Event cadence is not a schedule — it is the stream's own rhythm, and lateness comes from a rolling baseline of the inter-micro-batch interval.\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**How transform__<BUSINESS_DATE> and restatement both hold.** The run already exists and succeeded, so Airflow refuses a second one, and C.1's reconciliation path fires only when no matching run exists — the opposite case. As written the run-id rule and the recovery procedure contradict each other.\n\n  *Recommended default:* Restatement runs as a separate DAG with its own run id, which is how they coexist today. Say so explicitly in the document; the contradiction is only resolved by a convention nobody wrote down.\n\n**Whether there is an intraday SLA at all.** The pack's only clock is the EOD cutoff. Without an intraday definition of 'behind', a micro-batch that failed at 11am is not late, only absent, and nothing escalates.\n\n  *Recommended default:* Derive lateness from the stream's own rhythm — a rolling baseline of the inter-micro-batch interval — rather than waiting for a calendar nobody will write.\n\n### Gap against the SEI pack\n\n- The pack has a five-minute discovery loop and no intraday cadence model, no intraday SLA and no definition of 'behind' during the day. Its only clock is the EOD cutoff. *(nearest counterpart: BBH File Ingestion Framework Design Document, §C.3)*",
 "blocks": [
 {
 "t": "h",
@@ -9286,7 +9286,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"The pack has a five-minute discovery loop and no intraday cadence model, no intraday SLA and no definition of 'behind' during the day. Its only clock is the EOD cutoff. *(nearest counterpart: BBH File Ingestion Framework TDD, §C.3)*"
+"The pack has a five-minute discovery loop and no intraday cadence model, no intraday SLA and no definition of 'behind' during the day. Its only clock is the EOD cutoff. *(nearest counterpart: BBH File Ingestion Framework Design Document, §C.3)*"
 ]
 }
 ]
@@ -9578,7 +9578,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: partial** — partly specified — named, not sufficient.\n**Who answers for the gap: SEI** — SEI must answer.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §D.1 | specifies this component | FAILED rerun — reuse the existing registry record. |\n| BBH File Ingestion Framework TDD v2.0 | §D.4 | the pack and this design disagree | Restatement requires a dbt rebuild or rerun for a date already processed. |\n\n**Disagreement with §D.4.** C.1 mandates transform__<BUSINESS_DATE> and that run already succeeded, so Airflow refuses. C.1's reconciliation path fires only when no matching run exists — the opposite case. The run-id rule and the recovery procedure cannot both be satisfied as written.",
+"md": "\n**SEI pack coverage: partial** — partly specified — named, not sufficient.\n**Who answers for the gap: SEI** — SEI must answer.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §D.1 | specifies this component | FAILED rerun — reuse the existing registry record. |\n| BBH File Ingestion Framework Design Document v2.0 | §D.4 | the pack and this design disagree | Restatement requires a dbt rebuild or rerun for a date already processed. |\n\n**Disagreement with §D.4.** C.1 mandates transform__<BUSINESS_DATE> and that run already succeeded, so Airflow refuses. C.1's reconciliation path fires only when no matching run exists — the opposite case. The run-id rule and the recovery procedure cannot both be satisfied as written.",
 "blocks": [
 {
 "t": "p",
@@ -9598,13 +9598,13 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§D.1",
 "specifies this component",
 "FAILED rerun — reuse the existing registry record."
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§D.4",
 "the pack and this design disagree",
 "Restatement requires a dbt rebuild or rerun for a date already processed."
@@ -9935,7 +9935,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: partial** — partly specified — named, not sufficient.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §C.4 | touches it, does not specify it | Discovery guardrails and partial-batch behaviour for files. Silent on partial view failure inside a micro-batch, which is the equivalent case and the more frequent one. |",
+"md": "\n**SEI pack coverage: partial** — partly specified — named, not sufficient.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §C.4 | touches it, does not specify it | Discovery guardrails and partial-batch behaviour for files. Silent on partial view failure inside a micro-batch, which is the equivalent case and the more frequent one. |",
 "blocks": [
 {
 "t": "p",
@@ -9955,7 +9955,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§C.4",
 "touches it, does not specify it",
 "Discovery guardrails and partial-batch behaviour for files. Silent on partial view failure inside a micro-batch, which is the equivalent case and the more frequent one."
@@ -10274,7 +10274,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §6.1 | specifies this component | has_header, has_trailer and allow_zero_rows — the structural contract G1 checks against. |",
+"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §6.1 | specifies this component | has_header, has_trailer and allow_zero_rows — the structural contract G1 checks against. |",
 "blocks": [
 {
 "t": "p",
@@ -10294,7 +10294,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§6.1",
 "specifies this component",
 "has_header, has_trailer and allow_zero_rows — the structural contract G1 checks against."
@@ -10917,7 +10917,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation TDD v2 | §B.4 | specifies this component | dq_reason stamped on the same join the fact model filters, so tests and the fact table cannot diverge. |",
+"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation Design Document v2 | §B.4 | specifies this component | dq_reason stamped on the same join the fact model filters, so tests and the fact table cannot diverge. |",
 "blocks": [
 {
 "t": "p",
@@ -10937,7 +10937,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH dbt Transformation TDD v2",
+"BBH dbt Transformation Design Document v2",
 "§B.4",
 "specifies this component",
 "dq_reason stamped on the same join the fact model filters, so tests and the fact table cannot diverge."
@@ -11248,7 +11248,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation TDD v2 | §B.5 | specifies this component | recon_result with left_count, right_count, source_dq_filtered_count, held_count, held_pct and difference. |",
+"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation Design Document v2 | §B.5 | specifies this component | recon_result with left_count, right_count, source_dq_filtered_count, held_count, held_pct and difference. |",
 "blocks": [
 {
 "t": "p",
@@ -11268,7 +11268,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH dbt Transformation TDD v2",
+"BBH dbt Transformation Design Document v2",
 "§B.5",
 "specifies this component",
 "recon_result with left_count, right_count, source_dq_filtered_count, held_count, held_pct and difference."
@@ -11582,7 +11582,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation TDD v2 | §B.5 | specifies this component | No status column: PASS and WARNING are derived in Splunk and deliberately not stored. |",
+"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation Design Document v2 | §B.5 | specifies this component | No status column: PASS and WARNING are derived in Splunk and deliberately not stored. |",
 "blocks": [
 {
 "t": "p",
@@ -11602,7 +11602,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH dbt Transformation TDD v2",
+"BBH dbt Transformation Design Document v2",
 "§B.5",
 "specifies this component",
 "No status column: PASS and WARNING are derived in Splunk and deliberately not stored."
@@ -11921,7 +11921,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation TDD v2 | §B.4 | specifies this component | dq_validation_failure with resolution_status and reprocess_eligible='Y', driving the OPEN replay worklist. |\n| BBH File Ingestion Framework TDD v2.0 | whole document | nothing in the pack covers it | No rule registry anywhere. The gates exist as code, so which rules ran against which model on which date is unanswerable, and blocking-versus-advisory is a global argument rather than a per-rule attribute. |",
+"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation Design Document v2 | §B.4 | specifies this component | dq_validation_failure with resolution_status and reprocess_eligible='Y', driving the OPEN replay worklist. |\n| BBH File Ingestion Framework Design Document v2.0 | whole document | nothing in the pack covers it | No rule registry anywhere. The gates exist as code, so which rules ran against which model on which date is unanswerable, and blocking-versus-advisory is a global argument rather than a per-rule attribute. |",
 "blocks": [
 {
 "t": "p",
@@ -11941,13 +11941,13 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH dbt Transformation TDD v2",
+"BBH dbt Transformation Design Document v2",
 "§B.4",
 "specifies this component",
 "dq_validation_failure with resolution_status and reprocess_eligible='Y', driving the OPEN replay worklist."
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "whole document",
 "nothing in the pack covers it",
 "No rule registry anywhere. The gates exist as code, so which rules ran against which model on which date is unanswerable, and blocking-versus-advisory is a global argument rather than a per-rule attribute."
@@ -11958,7 +11958,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nNo event DQ taxonomy. The failure modes of an envelope and a pull — unknown view, key not found, pull timeout, sequencer cycle — have no codes and therefore no reporting.\n\n### Risk\n\n- **HIGH · error path (E5).** Not-found key on pull has no disposition.\n\n### Not specified — and what to do until it is\n\n**Which rules exist.** The gates are code with no registry, so which rules ran against which model on which date is unanswerable today.\n\n  *Recommended default:* Extract the existing checks into the registry as the first migration rather than designing a new rule set. The rules already exist; what is missing is that they are not data.\n\n**Whether a failed reconciliation may publish to Gold.** RECON_RESULT stores counts and no status, and the verdict is derived in Splunk, so reconciliation is advisory by construction and the current answer is yes.\n\n  *Recommended default:* Decide explicitly. If the answer is meant to be no, it needs a blocking gate, because nothing stops it today.\n\n### Gap against the SEI pack\n\n- No rule registry anywhere. The gates exist as code, so which rules ran against which model on which date is unanswerable, and blocking-versus-advisory is a global argument rather than a per-rule attribute. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*",
+"md": "\n### What is missing\n\nNo event DQ taxonomy. The failure modes of an envelope and a pull — unknown view, key not found, pull timeout, sequencer cycle — have no codes and therefore no reporting.\n\n### Risk\n\n- **HIGH · error path (E5).** Not-found key on pull has no disposition.\n\n### Not specified — and what to do until it is\n\n**Which rules exist.** The gates are code with no registry, so which rules ran against which model on which date is unanswerable today.\n\n  *Recommended default:* Extract the existing checks into the registry as the first migration rather than designing a new rule set. The rules already exist; what is missing is that they are not data.\n\n**Whether a failed reconciliation may publish to Gold.** RECON_RESULT stores counts and no status, and the verdict is derived in Splunk, so reconciliation is advisory by construction and the current answer is yes.\n\n  *Recommended default:* Decide explicitly. If the answer is meant to be no, it needs a blocking gate, because nothing stops it today.\n\n### Gap against the SEI pack\n\n- No rule registry anywhere. The gates exist as code, so which rules ran against which model on which date is unanswerable, and blocking-versus-advisory is a global argument rather than a per-rule attribute. *(nearest counterpart: BBH File Ingestion Framework Design Document, no section — the whole document)*",
 "blocks": [
 {
 "t": "h",
@@ -12005,7 +12005,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"No rule registry anywhere. The gates exist as code, so which rules ran against which model on which date is unanswerable, and blocking-versus-advisory is a global argument rather than a per-rule attribute. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*"
+"No rule registry anywhere. The gates exist as code, so which rules ran against which model on which date is unanswerable, and blocking-versus-advisory is a global argument rather than a per-rule attribute. *(nearest counterpart: BBH File Ingestion Framework Design Document, no section — the whole document)*"
 ]
 }
 ]
@@ -12310,7 +12310,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §D.2 | specifies this component | QUARANTINED recovery for a file. |\n| BBH File Ingestion Framework TDD v2.0 | §D.6 | specifies this component | Stale in-progress recovery — a registry row left at LOADING past the timeout. |\n| BBH File Ingestion Framework TDD v2.0 | whole document | nothing in the pack covers it | No event dead-letter and no outbound quarantine. With at-least-once delivery and ordering inside a partition, one unprocessable envelope stalls that partition permanently and redelivery keeps returning it. |",
+"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §D.2 | specifies this component | QUARANTINED recovery for a file. |\n| BBH File Ingestion Framework Design Document v2.0 | §D.6 | specifies this component | Stale in-progress recovery — a registry row left at LOADING past the timeout. |\n| BBH File Ingestion Framework Design Document v2.0 | whole document | nothing in the pack covers it | No event dead-letter and no outbound quarantine. With at-least-once delivery and ordering inside a partition, one unprocessable envelope stalls that partition permanently and redelivery keeps returning it. |",
 "blocks": [
 {
 "t": "p",
@@ -12330,19 +12330,19 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§D.2",
 "specifies this component",
 "QUARANTINED recovery for a file."
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§D.6",
 "specifies this component",
 "Stale in-progress recovery — a registry row left at LOADING past the timeout."
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "whole document",
 "nothing in the pack covers it",
 "No event dead-letter and no outbound quarantine. With at-least-once delivery and ordering inside a partition, one unprocessable envelope stalls that partition permanently and redelivery keeps returning it."
@@ -12353,7 +12353,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nA file quarantine. The event path has no dead-letter, so a poison envelope has no escape and stalls its partition.\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**Where a read-only consumer role comes from.** A12 grants the loader DML on RAW plus the registry and DML-only on Gold, and describes no consumer grant at all. Improvised at connection time, that means reusing the loader's account.\n\n  *Recommended default:* Add the role to the security model as part of this plane rather than leaving each consumer to ask for access separately.\n\n**The masking policy for the 786 PII fields in SDC scope.** It is unapproved, so any consumer either masks on its own judgement or shows unmasked business keys.\n\n  *Recommended default:* Default to hashing business keys until the policy lands. A stable hash is still joinable, which is what most consumers actually need.\n\n### Gap against the SEI pack\n\n- No event dead-letter and no outbound quarantine. With at-least-once delivery and ordering inside a partition, one unprocessable envelope stalls that partition permanently and redelivery keeps returning it. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*",
+"md": "\n### What is missing\n\nA file quarantine. The event path has no dead-letter, so a poison envelope has no escape and stalls its partition.\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**Where a read-only consumer role comes from.** A12 grants the loader DML on RAW plus the registry and DML-only on Gold, and describes no consumer grant at all. Improvised at connection time, that means reusing the loader's account.\n\n  *Recommended default:* Add the role to the security model as part of this plane rather than leaving each consumer to ask for access separately.\n\n**The masking policy for the 786 PII fields in SDC scope.** It is unapproved, so any consumer either masks on its own judgement or shows unmasked business keys.\n\n  *Recommended default:* Default to hashing business keys until the policy lands. A stable hash is still joinable, which is what most consumers actually need.\n\n### Gap against the SEI pack\n\n- No event dead-letter and no outbound quarantine. With at-least-once delivery and ordering inside a partition, one unprocessable envelope stalls that partition permanently and redelivery keeps returning it. *(nearest counterpart: BBH File Ingestion Framework Design Document, no section — the whole document)*",
 "blocks": [
 {
 "t": "h",
@@ -12398,7 +12398,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"No event dead-letter and no outbound quarantine. With at-least-once delivery and ordering inside a partition, one unprocessable envelope stalls that partition permanently and redelivery keeps returning it. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*"
+"No event dead-letter and no outbound quarantine. With at-least-once delivery and ordering inside a partition, one unprocessable envelope stalls that partition permanently and redelivery keeps returning it. *(nearest counterpart: BBH File Ingestion Framework Design Document, no section — the whole document)*"
 ]
 }
 ]
@@ -12733,7 +12733,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation TDD v2 | §B.5 | touches it, does not specify it | Three boundaries — STG_TO_INT, INT_TO_DIM, INT_TO_FACT — all downstream of Stage 1 and all inbound. |\n\n**Disagreement with §B.5.** Nine more are needed: four upstream on the event path and five outbound. Without the upstream four, event loss is undetectable by construction, because STG_TO_INT ties perfectly against a Stage 1 that is itself short.",
+"md": "\n**SEI pack coverage: covered** — specified in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation Design Document v2 | §B.5 | touches it, does not specify it | Three boundaries — STG_TO_INT, INT_TO_DIM, INT_TO_FACT — all downstream of Stage 1 and all inbound. |\n\n**Disagreement with §B.5.** Nine more are needed: four upstream on the event path and five outbound. Without the upstream four, event loss is undetectable by construction, because STG_TO_INT ties perfectly against a Stage 1 that is itself short.",
 "blocks": [
 {
 "t": "p",
@@ -12753,7 +12753,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH dbt Transformation TDD v2",
+"BBH dbt Transformation Design Document v2",
 "§B.5",
 "touches it, does not specify it",
 "Three boundaries — STG_TO_INT, INT_TO_DIM, INT_TO_FACT — all downstream of Stage 1 and all inbound."
@@ -13119,7 +13119,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: partial** — partly specified — named, not sufficient.\n**Who answers for the gap: SEI** — SEI must answer.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §6.2 | touches it, does not specify it | FILE_REGISTRY unique on FILE_NAME plus BUSINESS_DATE, with RETRY_COUNT. |\n| BBH File Ingestion Framework TDD v2.0 | §Appendix F | the pack and this design disagree | The glossary says FILE_REGISTRY is versioned per interface and date with one current version. |\n\n**Disagreement with §Appendix F.** §6.2's unique key gives exactly one row; D.1 and D.5 reuse it and D.4 deletes it. History survives only as RETRY_COUNT. Either the schema gains version history or the glossary line goes.",
+"md": "\n**SEI pack coverage: partial** — partly specified — named, not sufficient.\n**Who answers for the gap: SEI** — SEI must answer.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §6.2 | touches it, does not specify it | FILE_REGISTRY unique on FILE_NAME plus BUSINESS_DATE, with RETRY_COUNT. |\n| BBH File Ingestion Framework Design Document v2.0 | §Appendix F | the pack and this design disagree | The glossary says FILE_REGISTRY is versioned per interface and date with one current version. |\n\n**Disagreement with §Appendix F.** §6.2's unique key gives exactly one row; D.1 and D.5 reuse it and D.4 deletes it. History survives only as RETRY_COUNT. Either the schema gains version history or the glossary line goes.",
 "blocks": [
 {
 "t": "p",
@@ -13139,13 +13139,13 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§6.2",
 "touches it, does not specify it",
 "FILE_REGISTRY unique on FILE_NAME plus BUSINESS_DATE, with RETRY_COUNT."
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§Appendix F",
 "the pack and this design disagree",
 "The glossary says FILE_REGISTRY is versioned per interface and date with one current version."
@@ -13855,7 +13855,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: partial** — partly specified — named, not sufficient.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §6.1 | touches it, does not specify it | FILE_SCHEMA_CONFIG — the only configuration store in the pack, and it covers file metadata only. |",
+"md": "\n**SEI pack coverage: partial** — partly specified — named, not sufficient.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §6.1 | touches it, does not specify it | FILE_SCHEMA_CONFIG — the only configuration store in the pack, and it covers file metadata only. |",
 "blocks": [
 {
 "t": "p",
@@ -13875,7 +13875,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§6.1",
 "touches it, does not specify it",
 "FILE_SCHEMA_CONFIG — the only configuration store in the pack, and it covers file metadata only."
@@ -14211,7 +14211,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: partial** — partly specified — named, not sufficient.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §8.1 | touches it, does not specify it | Thirteen operational signals, files_discovered through transformation_triggered. |\n| BBH File Ingestion Framework TDD v2.0 | §E.6 | the pack and this design disagree | Splunk contract for four events, correlation key of event type plus business date, and an explicit prohibition on adding SLA_STATUS, SLA_BREACH_IND or ALERT_SENT_IND to DATE_CONTROL. |\n\n**Disagreement with §E.6.** Nine of the thirteen signals have no payload contract, and none of the thirteen covers the event channel — the primary ingestion path has no observability contract at all.",
+"md": "\n**SEI pack coverage: partial** — partly specified — named, not sufficient.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §8.1 | touches it, does not specify it | Thirteen operational signals, files_discovered through transformation_triggered. |\n| BBH File Ingestion Framework Design Document v2.0 | §E.6 | the pack and this design disagree | Splunk contract for four events, correlation key of event type plus business date, and an explicit prohibition on adding SLA_STATUS, SLA_BREACH_IND or ALERT_SENT_IND to DATE_CONTROL. |\n\n**Disagreement with §E.6.** Nine of the thirteen signals have no payload contract, and none of the thirteen covers the event channel — the primary ingestion path has no observability contract at all.",
 "blocks": [
 {
 "t": "p",
@@ -14231,13 +14231,13 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§8.1",
 "touches it, does not specify it",
 "Thirteen operational signals, files_discovered through transformation_triggered."
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§E.6",
 "the pack and this design disagree",
 "Splunk contract for four events, correlation key of event type plus business date, and an explicit prohibition on adding SLA_STATUS, SLA_BREACH_IND or ALERT_SENT_IND to DATE_CONTROL."
@@ -20556,7 +20556,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §C.1 | touches it, does not specify it | Dynamic task mapping spawns a worker pod per work item, each opening its own connections. Pool sizing is not stated. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §C.1 | touches it, does not specify it | Dynamic task mapping spawns a worker pod per work item, each opening its own connections. Pool sizing is not stated. |",
 "blocks": [
 {
 "t": "p",
@@ -20576,7 +20576,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§C.1",
 "touches it, does not specify it",
 "Dynamic task mapping spawns a worker pod per work item, each opening its own connections. Pool sizing is not stated."
@@ -22830,7 +22830,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §D.1 | nothing in the pack covers it | D.1 to D.6 are data-correction procedures. There is no disaster recovery section in any document — no RPO, no RTO, no failover for Oracle, OpenShift or the landing zone. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §D.1 | nothing in the pack covers it | D.1 to D.6 are data-correction procedures. There is no disaster recovery section in any document — no RPO, no RTO, no failover for Oracle, OpenShift or the landing zone. |",
 "blocks": [
 {
 "t": "p",
@@ -22850,7 +22850,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§D.1",
 "nothing in the pack covers it",
 "D.1 to D.6 are data-correction procedures. There is no disaster recovery section in any document — no RPO, no RTO, no failover for Oracle, OpenShift or the landing zone."
@@ -22861,7 +22861,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nNo RPO or RTO anywhere in the pack. Under events, Event Hub retention *is* the recovery window and therefore the RTO — and retention is unstated.\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**Event Hub retention.** It is the RTO and it is unstated. Every recovery conversation is unanchored without it.\n\n  *Recommended default:* Ask SEI, then write the RPO and RTO from it rather than the other way round. A recovery objective the platform cannot physically meet is worse than none.\n\n**Whether Oracle is HA, and what the failover behaviour is for in-flight transactions.** A micro-batch is one commit. Failover mid-commit decides whether that box is retryable or lost.\n\n  *Recommended default:* Confirm the Oracle topology and test a failover with a micro-batch in flight before go-live. This is a half-day test that prevents a class of incident nobody can debug afterwards.\n\n### Gap against the SEI pack\n\n- D.1 to D.6 are data-correction procedures. There is no disaster recovery section in any document — no RPO, no RTO, no failover for Oracle, OpenShift or the landing zone. *(nearest counterpart: BBH File Ingestion Framework TDD, §D.1)*",
+"md": "\n### What is missing\n\nNo RPO or RTO anywhere in the pack. Under events, Event Hub retention *is* the recovery window and therefore the RTO — and retention is unstated.\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**Event Hub retention.** It is the RTO and it is unstated. Every recovery conversation is unanchored without it.\n\n  *Recommended default:* Ask SEI, then write the RPO and RTO from it rather than the other way round. A recovery objective the platform cannot physically meet is worse than none.\n\n**Whether Oracle is HA, and what the failover behaviour is for in-flight transactions.** A micro-batch is one commit. Failover mid-commit decides whether that box is retryable or lost.\n\n  *Recommended default:* Confirm the Oracle topology and test a failover with a micro-batch in flight before go-live. This is a half-day test that prevents a class of incident nobody can debug afterwards.\n\n### Gap against the SEI pack\n\n- D.1 to D.6 are data-correction procedures. There is no disaster recovery section in any document — no RPO, no RTO, no failover for Oracle, OpenShift or the landing zone. *(nearest counterpart: BBH File Ingestion Framework Design Document, §D.1)*",
 "blocks": [
 {
 "t": "h",
@@ -22906,7 +22906,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"D.1 to D.6 are data-correction procedures. There is no disaster recovery section in any document — no RPO, no RTO, no failover for Oracle, OpenShift or the landing zone. *(nearest counterpart: BBH File Ingestion Framework TDD, §D.1)*"
+"D.1 to D.6 are data-correction procedures. There is no disaster recovery section in any document — no RPO, no RTO, no failover for Oracle, OpenShift or the landing zone. *(nearest counterpart: BBH File Ingestion Framework Design Document, §D.1)*"
 ]
 }
 ]
@@ -24899,7 +24899,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §C.1 | nothing in the pack covers it | C.1 is the file path's equivalent: a scheduled DAG that discovers work. The event path's listener has no counterpart section in any document. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §C.1 | nothing in the pack covers it | C.1 is the file path's equivalent: a scheduled DAG that discovers work. The event path's listener has no counterpart section in any document. |",
 "blocks": [
 {
 "t": "p",
@@ -24919,7 +24919,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§C.1",
 "nothing in the pack covers it",
 "C.1 is the file path's equivalent: a scheduled DAG that discovers work. The event path's listener has no counterpart section in any document."
@@ -24930,7 +24930,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nThis component does not exist. There is no component between SEI publishing and Stage 1 holding rows. Components 8 and 9 are file sensors.\n\n**Priority P1, custom build High.**\n\n### Risk\n\n- **CRITICAL · error path (E1).** Offset committed before the durable write.\n- **HIGH · error path (E7).** Consumer rebalance in the middle of a box.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- C.1 is the file path's equivalent: a scheduled DAG that discovers work. The event path's listener has no counterpart section in any document. *(nearest counterpart: BBH File Ingestion Framework TDD, §C.1)*",
+"md": "\n### What is missing\n\nThis component does not exist. There is no component between SEI publishing and Stage 1 holding rows. Components 8 and 9 are file sensors.\n\n**Priority P1, custom build High.**\n\n### Risk\n\n- **CRITICAL · error path (E1).** Offset committed before the durable write.\n- **HIGH · error path (E7).** Consumer rebalance in the middle of a box.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- C.1 is the file path's equivalent: a scheduled DAG that discovers work. The event path's listener has no counterpart section in any document. *(nearest counterpart: BBH File Ingestion Framework Design Document, §C.1)*",
 "blocks": [
 {
 "t": "h",
@@ -24982,7 +24982,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"C.1 is the file path's equivalent: a scheduled DAG that discovers work. The event path's listener has no counterpart section in any document. *(nearest counterpart: BBH File Ingestion Framework TDD, §C.1)*"
+"C.1 is the file path's equivalent: a scheduled DAG that discovers work. The event path's listener has no counterpart section in any document. *(nearest counterpart: BBH File Ingestion Framework Design Document, §C.1)*"
 ]
 }
 ]
@@ -25223,7 +25223,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: SEI** — SEI must answer.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | whole document | nothing in the pack covers it | No receiver is described. SEI pushes loader status into an endpoint BBH defines, and nothing in the pack defines it. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: SEI** — SEI must answer.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | whole document | nothing in the pack covers it | No receiver is described. SEI pushes loader status into an endpoint BBH defines, and nothing in the pack defines it. |",
 "blocks": [
 {
 "t": "p",
@@ -25243,7 +25243,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "whole document",
 "nothing in the pack covers it",
 "No receiver is described. SEI pushes loader status into an endpoint BBH defines, and nothing in the pack defines it."
@@ -25254,7 +25254,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nThis component does not exist. SEI pushes loader status. Component 10 covers producing outbound payloads, nothing receives.\n\n**Priority P1, custom build Medium.**\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**SEI's status API contract.** Endpoint, auth, pagination, rate limits, whether a mid-processing poll returns partial errors, and how long reject detail stays retrievable. The poller's cadence and budget are unsizable without them.\n\n  *Recommended default:* Ask, and treat retention as the urgent one: if SEI purges reject detail after a window, BBH's stored copy becomes the system of record for outbound exceptions and the fetch acquires a deadline.\n\n**Whether loader groups are a sequencing constraint.** Group 2, 3 and 4 appear consistently in the catalogue. If Group 2 must land before Group 3, a Group 2 failure blocks everything behind it — the outbound equivalent of the date gate.\n\n  *Recommended default:* Assume they are ordered until told otherwise, and make the dependency explicit in the submission registry. Discovering it after a failure is the expensive way to learn it.\n\n### Gap against the SEI pack\n\n- No receiver is described. SEI pushes loader status into an endpoint BBH defines, and nothing in the pack defines it. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*",
+"md": "\n### What is missing\n\nThis component does not exist. SEI pushes loader status. Component 10 covers producing outbound payloads, nothing receives.\n\n**Priority P1, custom build Medium.**\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**SEI's status API contract.** Endpoint, auth, pagination, rate limits, whether a mid-processing poll returns partial errors, and how long reject detail stays retrievable. The poller's cadence and budget are unsizable without them.\n\n  *Recommended default:* Ask, and treat retention as the urgent one: if SEI purges reject detail after a window, BBH's stored copy becomes the system of record for outbound exceptions and the fetch acquires a deadline.\n\n**Whether loader groups are a sequencing constraint.** Group 2, 3 and 4 appear consistently in the catalogue. If Group 2 must land before Group 3, a Group 2 failure blocks everything behind it — the outbound equivalent of the date gate.\n\n  *Recommended default:* Assume they are ordered until told otherwise, and make the dependency explicit in the submission registry. Discovering it after a failure is the expensive way to learn it.\n\n### Gap against the SEI pack\n\n- No receiver is described. SEI pushes loader status into an endpoint BBH defines, and nothing in the pack defines it. *(nearest counterpart: BBH File Ingestion Framework Design Document, no section — the whole document)*",
 "blocks": [
 {
 "t": "h",
@@ -25303,7 +25303,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"No receiver is described. SEI pushes loader status into an endpoint BBH defines, and nothing in the pack defines it. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*"
+"No receiver is described. SEI pushes loader status into an endpoint BBH defines, and nothing in the pack defines it. *(nearest counterpart: BBH File Ingestion Framework Design Document, no section — the whole document)*"
 ]
 }
 ]
@@ -25569,7 +25569,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §6.2 | nothing in the pack covers it | FILE_REGISTRY is the inbound record of a file. The outbound path has no submission registry, so a submission that never reached SEI is indistinguishable from one that succeeded. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §6.2 | nothing in the pack covers it | FILE_REGISTRY is the inbound record of a file. The outbound path has no submission registry, so a submission that never reached SEI is indistinguishable from one that succeeded. |",
 "blocks": [
 {
 "t": "p",
@@ -25589,7 +25589,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§6.2",
 "nothing in the pack covers it",
 "FILE_REGISTRY is the inbound record of a file. The outbound path has no submission registry, so a submission that never reached SEI is indistinguishable from one that succeeded."
@@ -25600,7 +25600,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nThis component does not exist. The outbound path has no FILE_REGISTRY equivalent anywhere in the pack or the 65.\n\n**Priority P1, custom build High.**\n\n### Risk\n\n- **MEDIUM · error path (E11).** Outbound has no error model at all.\n- **HIGH · error path (E14).** No record of what was actually sent.\n\n### Not specified — and what to do until it is\n\n**SEI's status API contract.** Endpoint, auth, pagination, rate limits, whether a mid-processing poll returns partial errors, and how long reject detail stays retrievable. The poller's cadence and budget are unsizable without them.\n\n  *Recommended default:* Ask, and treat retention as the urgent one: if SEI purges reject detail after a window, BBH's stored copy becomes the system of record for outbound exceptions and the fetch acquires a deadline.\n\n**Whether loader groups are a sequencing constraint.** Group 2, 3 and 4 appear consistently in the catalogue. If Group 2 must land before Group 3, a Group 2 failure blocks everything behind it — the outbound equivalent of the date gate.\n\n  *Recommended default:* Assume they are ordered until told otherwise, and make the dependency explicit in the submission registry. Discovering it after a failure is the expensive way to learn it.\n\n### Gap against the SEI pack\n\n- FILE_REGISTRY is the inbound record of a file. The outbound path has no submission registry, so a submission that never reached SEI is indistinguishable from one that succeeded. *(nearest counterpart: BBH File Ingestion Framework TDD, §6.2)*",
+"md": "\n### What is missing\n\nThis component does not exist. The outbound path has no FILE_REGISTRY equivalent anywhere in the pack or the 65.\n\n**Priority P1, custom build High.**\n\n### Risk\n\n- **MEDIUM · error path (E11).** Outbound has no error model at all.\n- **HIGH · error path (E14).** No record of what was actually sent.\n\n### Not specified — and what to do until it is\n\n**SEI's status API contract.** Endpoint, auth, pagination, rate limits, whether a mid-processing poll returns partial errors, and how long reject detail stays retrievable. The poller's cadence and budget are unsizable without them.\n\n  *Recommended default:* Ask, and treat retention as the urgent one: if SEI purges reject detail after a window, BBH's stored copy becomes the system of record for outbound exceptions and the fetch acquires a deadline.\n\n**Whether loader groups are a sequencing constraint.** Group 2, 3 and 4 appear consistently in the catalogue. If Group 2 must land before Group 3, a Group 2 failure blocks everything behind it — the outbound equivalent of the date gate.\n\n  *Recommended default:* Assume they are ordered until told otherwise, and make the dependency explicit in the submission registry. Discovering it after a failure is the expensive way to learn it.\n\n### Gap against the SEI pack\n\n- FILE_REGISTRY is the inbound record of a file. The outbound path has no submission registry, so a submission that never reached SEI is indistinguishable from one that succeeded. *(nearest counterpart: BBH File Ingestion Framework Design Document, §6.2)*",
 "blocks": [
 {
 "t": "h",
@@ -25652,7 +25652,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"FILE_REGISTRY is the inbound record of a file. The outbound path has no submission registry, so a submission that never reached SEI is indistinguishable from one that succeeded. *(nearest counterpart: BBH File Ingestion Framework TDD, §6.2)*"
+"FILE_REGISTRY is the inbound record of a file. The outbound path has no submission registry, so a submission that never reached SEI is indistinguishable from one that succeeded. *(nearest counterpart: BBH File Ingestion Framework Design Document, §6.2)*"
 ]
 }
 ]
@@ -25918,7 +25918,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §C.2 | nothing in the pack covers it | C.2 defines the file work item. Nothing defines a collapsed key set, and the file path has no equivalent problem. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §C.2 | nothing in the pack covers it | C.2 defines the file work item. Nothing defines a collapsed key set, and the file path has no equivalent problem. |",
 "blocks": [
 {
 "t": "p",
@@ -25938,7 +25938,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§C.2",
 "nothing in the pack covers it",
 "C.2 defines the file work item. Nothing defines a collapsed key set, and the file path has no equivalent problem."
@@ -25949,7 +25949,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nThis component does not exist. Nothing in the pack collapses anything; the file path has no equivalent problem.\n\n**Priority P1, custom build High.**\n\n### Risk\n\n- **CRITICAL · performance (B1).** The pull is the system's throughput ceiling.\n- **HIGH · error path (E9).** op = D semantics are undefined downstream.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- C.2 defines the file work item. Nothing defines a collapsed key set, and the file path has no equivalent problem. *(nearest counterpart: BBH File Ingestion Framework TDD, §C.2)*",
+"md": "\n### What is missing\n\nThis component does not exist. Nothing in the pack collapses anything; the file path has no equivalent problem.\n\n**Priority P1, custom build High.**\n\n### Risk\n\n- **CRITICAL · performance (B1).** The pull is the system's throughput ceiling.\n- **HIGH · error path (E9).** op = D semantics are undefined downstream.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- C.2 defines the file work item. Nothing defines a collapsed key set, and the file path has no equivalent problem. *(nearest counterpart: BBH File Ingestion Framework Design Document, §C.2)*",
 "blocks": [
 {
 "t": "h",
@@ -26001,7 +26001,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"C.2 defines the file work item. Nothing defines a collapsed key set, and the file path has no equivalent problem. *(nearest counterpart: BBH File Ingestion Framework TDD, §C.2)*"
+"C.2 defines the file work item. Nothing defines a collapsed key set, and the file path has no equivalent problem. *(nearest counterpart: BBH File Ingestion Framework Design Document, §C.2)*"
 ]
 }
 ]
@@ -26304,7 +26304,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation TDD v2 | §Appendix E | nothing in the pack covers it | The canvas starts at SWP_RAW. How rows get there under events — a set-based pull per view per micro-batch — is not described anywhere. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation Design Document v2 | §Appendix E | nothing in the pack covers it | The canvas starts at SWP_RAW. How rows get there under events — a set-based pull per view per micro-batch — is not described anywhere. |",
 "blocks": [
 {
 "t": "p",
@@ -26324,7 +26324,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH dbt Transformation TDD v2",
+"BBH dbt Transformation Design Document v2",
 "§Appendix E",
 "nothing in the pack covers it",
 "The canvas starts at SWP_RAW. How rows get there under events — a set-based pull per view per micro-batch — is not described anywhere."
@@ -26335,7 +26335,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nThis component does not exist. Per-event retrieval is the default anyone reaches for and it is ruinous — see bottleneck B1.\n\n**Priority P1, custom build High.**\n\n### Risk\n\n- **CRITICAL · performance (B1).** The pull is the system's throughput ceiling.\n- **MEDIUM · performance (B10).** Pull latency is inside the micro-batch's critical path.\n- **CRITICAL · error path (E3).** Replay does not reproduce the original load.\n- **HIGH · error path (E5).** Not-found key on pull has no disposition.\n- **HIGH · error path (E8).** No circuit breaker on the SEI view API.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- The canvas starts at SWP_RAW. How rows get there under events — a set-based pull per view per micro-batch — is not described anywhere. *(nearest counterpart: BBH dbt Transformation TDD, §Appendix E)*",
+"md": "\n### What is missing\n\nThis component does not exist. Per-event retrieval is the default anyone reaches for and it is ruinous — see bottleneck B1.\n\n**Priority P1, custom build High.**\n\n### Risk\n\n- **CRITICAL · performance (B1).** The pull is the system's throughput ceiling.\n- **MEDIUM · performance (B10).** Pull latency is inside the micro-batch's critical path.\n- **CRITICAL · error path (E3).** Replay does not reproduce the original load.\n- **HIGH · error path (E5).** Not-found key on pull has no disposition.\n- **HIGH · error path (E8).** No circuit breaker on the SEI view API.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- The canvas starts at SWP_RAW. How rows get there under events — a set-based pull per view per micro-batch — is not described anywhere. *(nearest counterpart: BBH dbt Transformation Design Document, §Appendix E)*",
 "blocks": [
 {
 "t": "h",
@@ -26390,7 +26390,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"The canvas starts at SWP_RAW. How rows get there under events — a set-based pull per view per micro-batch — is not described anywhere. *(nearest counterpart: BBH dbt Transformation TDD, §Appendix E)*"
+"The canvas starts at SWP_RAW. How rows get there under events — a set-based pull per view per micro-batch — is not described anywhere. *(nearest counterpart: BBH dbt Transformation Design Document, §Appendix E)*"
 ]
 }
 ]
@@ -26591,7 +26591,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "6. Performance & Scale",
-"md": "\nArray insert with a tuned batch size, one commit per micro-batch. Row-by-row insert and per-row commit is the classic first wall and it arrives early.\n### B2 · STG is a view, and events make it run 288 times a day (critical)\n\nThe dbt TDD defines STG as a view, recomputed on read. Under a daily file cycle it is recomputed once. Under intraday events, INT is built incrementally all day, so the STG view is recomputed on every incremental run — and each recomputation scans Stage 1. This is the single largest cost the event substitution introduces, and it comes from a design decision that was entirely reasonable when it was made.\n\n**What to do.** Either materialise STG per micro-batch, or ensure the INT incremental predicate pushes down to Stage 1's partition so the view scans one micro-batch rather than the whole accumulated day. Verify the push-down on the actual plan; do not assume it.\n### B4 · Event staging insert rate (high)\n\nA Python consumer writing envelope rows one at a time is the first wall every event pipeline hits. The unique index on (topic, partition, offset) sits directly on the hot insert path, so the guard that gives idempotency is also the thing that slows the write.\n\n**What to do.** Array insert with a tuned batch size and one commit per micro-batch. Range-partition the staging table by business date with local indexes so index maintenance stays inside the current partition.\n### B6 · INT's incremental MERGE into a growing current-day partition (high)\n\nINT is partitioned by BUSINESS_DATE with a 7-day window. Under intraday events the current day's partition is written to continuously, and an incremental MERGE against a partition that grows all day degrades as the day goes on. The 6pm micro-batch is materially slower than the 6am one.\n\n**What to do.** Subpartition by micro-batch, or load append-only with a late dedupe at the gate. Measure the degradation curve before choosing; it may be acceptable at real volumes, but nobody knows the real volumes.\n### B10 · Pull latency is inside the micro-batch's critical path (medium)\n\nThe box is not complete until every view has been pulled and loaded. A single slow view holds the whole micro-batch, and the next micro-batch is already arriving. Queueing under a fixed cadence is how a small latency regression becomes an unbounded backlog.\n\n**What to do.** Bound the pull with a timeout and an explicit partial disposition, and monitor the ratio of micro-batch duration to cadence interval. Above roughly 0.7 the system has no recovery headroom left.",
+"md": "\nArray insert with a tuned batch size, one commit per micro-batch. Row-by-row insert and per-row commit is the classic first wall and it arrives early.\n### B2 · STG is a view, and events make it run 288 times a day (critical)\n\nThe dbt design document defines STG as a view, recomputed on read. Under a daily file cycle it is recomputed once. Under intraday events, INT is built incrementally all day, so the STG view is recomputed on every incremental run — and each recomputation scans Stage 1. This is the single largest cost the event substitution introduces, and it comes from a design decision that was entirely reasonable when it was made.\n\n**What to do.** Either materialise STG per micro-batch, or ensure the INT incremental predicate pushes down to Stage 1's partition so the view scans one micro-batch rather than the whole accumulated day. Verify the push-down on the actual plan; do not assume it.\n### B4 · Event staging insert rate (high)\n\nA Python consumer writing envelope rows one at a time is the first wall every event pipeline hits. The unique index on (topic, partition, offset) sits directly on the hot insert path, so the guard that gives idempotency is also the thing that slows the write.\n\n**What to do.** Array insert with a tuned batch size and one commit per micro-batch. Range-partition the staging table by business date with local indexes so index maintenance stays inside the current partition.\n### B6 · INT's incremental MERGE into a growing current-day partition (high)\n\nINT is partitioned by BUSINESS_DATE with a 7-day window. Under intraday events the current day's partition is written to continuously, and an incremental MERGE against a partition that grows all day degrades as the day goes on. The 6pm micro-batch is materially slower than the 6am one.\n\n**What to do.** Subpartition by micro-batch, or load append-only with a late dedupe at the gate. Measure the degradation curve before choosing; it may be acceptable at real volumes, but nobody knows the real volumes.\n### B10 · Pull latency is inside the micro-batch's critical path (medium)\n\nThe box is not complete until every view has been pulled and loaded. A single slow view holds the whole micro-batch, and the next micro-batch is already arriving. Queueing under a fixed cadence is how a small latency regression becomes an unbounded backlog.\n\n**What to do.** Bound the pull with a timeout and an explicit partial disposition, and monitor the ratio of micro-batch duration to cadence interval. Above roughly 0.7 the system has no recovery headroom left.",
 "blocks": [
 {
 "t": "p",
@@ -26603,7 +26603,7 @@ export const DESIGN_DOCS = [
 },
 {
 "t": "p",
-"x": "The dbt TDD defines STG as a view, recomputed on read. Under a daily file cycle it is recomputed once. Under intraday events, INT is built incrementally all day, so the STG view is recomputed on every incremental run — and each recomputation scans Stage 1. This is the single largest cost the event substitution introduces, and it comes from a design decision that was entirely reasonable when it was made."
+"x": "The dbt design document defines STG as a view, recomputed on read. Under a daily file cycle it is recomputed once. Under intraday events, INT is built incrementally all day, so the STG view is recomputed on every incremental run — and each recomputation scans Stage 1. This is the single largest cost the event substitution introduces, and it comes from a design decision that was entirely reasonable when it was made."
 },
 {
 "t": "p",
@@ -26695,7 +26695,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §C.1 | nothing in the pack covers it | The file loader runs once per file per day. A continuous micro-batch loader with one commit per box has no counterpart. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §C.1 | nothing in the pack covers it | The file loader runs once per file per day. A continuous micro-batch loader with one commit per box has no counterpart. |",
 "blocks": [
 {
 "t": "p",
@@ -26715,7 +26715,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§C.1",
 "nothing in the pack covers it",
 "The file loader runs once per file per day. A continuous micro-batch loader with one commit per box has no counterpart."
@@ -26726,7 +26726,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nThis component does not exist. Component 13 is a file ingestion framework. The event path loads continuously, not once a day.\n\n**Priority P1, custom build Medium.**\n\n### Risk\n\n- **CRITICAL · performance (B2).** STG is a view, and events make it run 288 times a day.\n- **HIGH · performance (B4).** Event staging insert rate.\n- **HIGH · performance (B6).** INT's incremental MERGE into a growing current-day partition.\n- **MEDIUM · performance (B10).** Pull latency is inside the micro-batch's critical path.\n- **HIGH · error path (E6).** Partial micro-batch failure across views.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- The file loader runs once per file per day. A continuous micro-batch loader with one commit per box has no counterpart. *(nearest counterpart: BBH File Ingestion Framework TDD, §C.1)*",
+"md": "\n### What is missing\n\nThis component does not exist. Component 13 is a file ingestion framework. The event path loads continuously, not once a day.\n\n**Priority P1, custom build Medium.**\n\n### Risk\n\n- **CRITICAL · performance (B2).** STG is a view, and events make it run 288 times a day.\n- **HIGH · performance (B4).** Event staging insert rate.\n- **HIGH · performance (B6).** INT's incremental MERGE into a growing current-day partition.\n- **MEDIUM · performance (B10).** Pull latency is inside the micro-batch's critical path.\n- **HIGH · error path (E6).** Partial micro-batch failure across views.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- The file loader runs once per file per day. A continuous micro-batch loader with one commit per box has no counterpart. *(nearest counterpart: BBH File Ingestion Framework Design Document, §C.1)*",
 "blocks": [
 {
 "t": "h",
@@ -26781,7 +26781,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"The file loader runs once per file per day. A continuous micro-batch loader with one commit per box has no counterpart. *(nearest counterpart: BBH File Ingestion Framework TDD, §C.1)*"
+"The file loader runs once per file per day. A continuous micro-batch loader with one commit per box has no counterpart. *(nearest counterpart: BBH File Ingestion Framework Design Document, §C.1)*"
 ]
 }
 ]
@@ -27048,7 +27048,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation TDD v2 | §B.4 | nothing in the pack covers it | B.4 handles a fact whose dimension is missing, via hold-and-replay. It does not order domains, and SEI assigns cross-domain dependency to the consumer in writing. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation Design Document v2 | §B.4 | nothing in the pack covers it | B.4 handles a fact whose dimension is missing, via hold-and-replay. It does not order domains, and SEI assigns cross-domain dependency to the consumer in writing. |",
 "blocks": [
 {
 "t": "p",
@@ -27068,7 +27068,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH dbt Transformation TDD v2",
+"BBH dbt Transformation Design Document v2",
 "§B.4",
 "nothing in the pack covers it",
 "B.4 handles a fact whose dimension is missing, via hold-and-replay. It does not order domains, and SEI assigns cross-domain dependency to the consumer in writing."
@@ -27079,7 +27079,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nThis component does not exist. SEI assigns cross-domain dependency to the consumer. No component owns it.\n\n**Priority P1, custom build Medium.**\n\n### Risk\n\n- **MEDIUM · performance (B8).** DIM-before-FACT serialisation is now paid per micro-batch.\n- **MEDIUM · error path (E12).** Dimension arriving after fact starts the 7-day clock.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- B.4 handles a fact whose dimension is missing, via hold-and-replay. It does not order domains, and SEI assigns cross-domain dependency to the consumer in writing. *(nearest counterpart: BBH dbt Transformation TDD, §B.4)*",
+"md": "\n### What is missing\n\nThis component does not exist. SEI assigns cross-domain dependency to the consumer. No component owns it.\n\n**Priority P1, custom build Medium.**\n\n### Risk\n\n- **MEDIUM · performance (B8).** DIM-before-FACT serialisation is now paid per micro-batch.\n- **MEDIUM · error path (E12).** Dimension arriving after fact starts the 7-day clock.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- B.4 handles a fact whose dimension is missing, via hold-and-replay. It does not order domains, and SEI assigns cross-domain dependency to the consumer in writing. *(nearest counterpart: BBH dbt Transformation Design Document, §B.4)*",
 "blocks": [
 {
 "t": "h",
@@ -27131,7 +27131,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"B.4 handles a fact whose dimension is missing, via hold-and-replay. It does not order domains, and SEI assigns cross-domain dependency to the consumer in writing. *(nearest counterpart: BBH dbt Transformation TDD, §B.4)*"
+"B.4 handles a fact whose dimension is missing, via hold-and-replay. It does not order domains, and SEI assigns cross-domain dependency to the consumer in writing. *(nearest counterpart: BBH dbt Transformation Design Document, §B.4)*"
 ]
 }
 ]
@@ -27403,7 +27403,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §E.2 | nothing in the pack covers it | The completeness gate is expected active DAILY interfaces MINUS distinct ARCHIVED. Under events there is no interface to count and nothing reaches ARCHIVED, so this query returns nothing meaningful and the pack proposes no replacement. |\n| BBH File Ingestion Framework TDD v2.0 | §E.1 | touches it, does not specify it | UX_DATE_CONTROL_ACTIVE, a function-based unique index on CASE WHEN STATUS <> 'COMPLETE' THEN 1 END. One line, and it is what physically enforces a single active date. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §E.2 | nothing in the pack covers it | The completeness gate is expected active DAILY interfaces MINUS distinct ARCHIVED. Under events there is no interface to count and nothing reaches ARCHIVED, so this query returns nothing meaningful and the pack proposes no replacement. |\n| BBH File Ingestion Framework Design Document v2.0 | §E.1 | touches it, does not specify it | UX_DATE_CONTROL_ACTIVE, a function-based unique index on CASE WHEN STATUS <> 'COMPLETE' THEN 1 END. One line, and it is what physically enforces a single active date. |",
 "blocks": [
 {
 "t": "p",
@@ -27423,13 +27423,13 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§E.2",
 "nothing in the pack covers it",
 "The completeness gate is expected active DAILY interfaces MINUS distinct ARCHIVED. Under events there is no interface to count and nothing reaches ARCHIVED, so this query returns nothing meaningful and the pack proposes no replacement."
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§E.1",
 "touches it, does not specify it",
 "UX_DATE_CONTROL_ACTIVE, a function-based unique index on CASE WHEN STATUS <> 'COMPLETE' THEN 1 END. One line, and it is what physically enforces a single active date."
@@ -27440,7 +27440,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nThis component does not exist. E.2 counts DAILY interfaces MINUS ARCHIVED. Under events there is no interface to count and nothing reaches ARCHIVED.\n\n**Priority P1, custom build Medium.**\n\n### Risk\n\n- **CRITICAL · error path (E4).** The gate cannot detect event loss.\n\n### Not specified — and what to do until it is\n\n**How transform__<BUSINESS_DATE> and restatement both hold.** The run already exists and succeeded, so Airflow refuses a second one, and C.1's reconciliation path fires only when no matching run exists — the opposite case. As written the run-id rule and the recovery procedure contradict each other.\n\n  *Recommended default:* Restatement runs as a separate DAG with its own run id, which is how they coexist today. Say so explicitly in the document; the contradiction is only resolved by a convention nobody wrote down.\n\n**Whether there is an intraday SLA at all.** The pack's only clock is the EOD cutoff. Without an intraday definition of 'behind', a micro-batch that failed at 11am is not late, only absent, and nothing escalates.\n\n  *Recommended default:* Derive lateness from the stream's own rhythm — a rolling baseline of the inter-micro-batch interval — rather than waiting for a calendar nobody will write.\n\n### Gap against the SEI pack\n\n- The completeness gate is expected active DAILY interfaces MINUS distinct ARCHIVED. Under events there is no interface to count and nothing reaches ARCHIVED, so this query returns nothing meaningful and the pack proposes no replacement. *(nearest counterpart: BBH File Ingestion Framework TDD, §E.2)*",
+"md": "\n### What is missing\n\nThis component does not exist. E.2 counts DAILY interfaces MINUS ARCHIVED. Under events there is no interface to count and nothing reaches ARCHIVED.\n\n**Priority P1, custom build Medium.**\n\n### Risk\n\n- **CRITICAL · error path (E4).** The gate cannot detect event loss.\n\n### Not specified — and what to do until it is\n\n**How transform__<BUSINESS_DATE> and restatement both hold.** The run already exists and succeeded, so Airflow refuses a second one, and C.1's reconciliation path fires only when no matching run exists — the opposite case. As written the run-id rule and the recovery procedure contradict each other.\n\n  *Recommended default:* Restatement runs as a separate DAG with its own run id, which is how they coexist today. Say so explicitly in the document; the contradiction is only resolved by a convention nobody wrote down.\n\n**Whether there is an intraday SLA at all.** The pack's only clock is the EOD cutoff. Without an intraday definition of 'behind', a micro-batch that failed at 11am is not late, only absent, and nothing escalates.\n\n  *Recommended default:* Derive lateness from the stream's own rhythm — a rolling baseline of the inter-micro-batch interval — rather than waiting for a calendar nobody will write.\n\n### Gap against the SEI pack\n\n- The completeness gate is expected active DAILY interfaces MINUS distinct ARCHIVED. Under events there is no interface to count and nothing reaches ARCHIVED, so this query returns nothing meaningful and the pack proposes no replacement. *(nearest counterpart: BBH File Ingestion Framework Design Document, §E.2)*",
 "blocks": [
 {
 "t": "h",
@@ -27491,7 +27491,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"The completeness gate is expected active DAILY interfaces MINUS distinct ARCHIVED. Under events there is no interface to count and nothing reaches ARCHIVED, so this query returns nothing meaningful and the pack proposes no replacement. *(nearest counterpart: BBH File Ingestion Framework TDD, §E.2)*"
+"The completeness gate is expected active DAILY interfaces MINUS distinct ARCHIVED. Under events there is no interface to count and nothing reaches ARCHIVED, so this query returns nothing meaningful and the pack proposes no replacement. *(nearest counterpart: BBH File Ingestion Framework Design Document, §E.2)*"
 ]
 }
 ]
@@ -27750,7 +27750,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: SEI** — SEI must answer.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | whole document | nothing in the pack covers it | No SEI status API is described anywhere — no endpoint, no auth, no pagination, no rate limits, no retention window for reject detail. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: SEI** — SEI must answer.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | whole document | nothing in the pack covers it | No SEI status API is described anywhere — no endpoint, no auth, no pagination, no rate limits, no retention window for reject detail. |",
 "blocks": [
 {
 "t": "p",
@@ -27770,7 +27770,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "whole document",
 "nothing in the pack covers it",
 "No SEI status API is described anywhere — no endpoint, no auth, no pagination, no rate limits, no retention window for reject detail."
@@ -27781,7 +27781,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nThis component does not exist. The backstop for a notification that never arrives. Nothing in the 65 calls SEI for status.\n\n**Priority P2, custom build Medium.**\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**How transform__<BUSINESS_DATE> and restatement both hold.** The run already exists and succeeded, so Airflow refuses a second one, and C.1's reconciliation path fires only when no matching run exists — the opposite case. As written the run-id rule and the recovery procedure contradict each other.\n\n  *Recommended default:* Restatement runs as a separate DAG with its own run id, which is how they coexist today. Say so explicitly in the document; the contradiction is only resolved by a convention nobody wrote down.\n\n**Whether there is an intraday SLA at all.** The pack's only clock is the EOD cutoff. Without an intraday definition of 'behind', a micro-batch that failed at 11am is not late, only absent, and nothing escalates.\n\n  *Recommended default:* Derive lateness from the stream's own rhythm — a rolling baseline of the inter-micro-batch interval — rather than waiting for a calendar nobody will write.\n\n### Gap against the SEI pack\n\n- No SEI status API is described anywhere — no endpoint, no auth, no pagination, no rate limits, no retention window for reject detail. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*",
+"md": "\n### What is missing\n\nThis component does not exist. The backstop for a notification that never arrives. Nothing in the 65 calls SEI for status.\n\n**Priority P2, custom build Medium.**\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**How transform__<BUSINESS_DATE> and restatement both hold.** The run already exists and succeeded, so Airflow refuses a second one, and C.1's reconciliation path fires only when no matching run exists — the opposite case. As written the run-id rule and the recovery procedure contradict each other.\n\n  *Recommended default:* Restatement runs as a separate DAG with its own run id, which is how they coexist today. Say so explicitly in the document; the contradiction is only resolved by a convention nobody wrote down.\n\n**Whether there is an intraday SLA at all.** The pack's only clock is the EOD cutoff. Without an intraday definition of 'behind', a micro-batch that failed at 11am is not late, only absent, and nothing escalates.\n\n  *Recommended default:* Derive lateness from the stream's own rhythm — a rolling baseline of the inter-micro-batch interval — rather than waiting for a calendar nobody will write.\n\n### Gap against the SEI pack\n\n- No SEI status API is described anywhere — no endpoint, no auth, no pagination, no rate limits, no retention window for reject detail. *(nearest counterpart: BBH File Ingestion Framework Design Document, no section — the whole document)*",
 "blocks": [
 {
 "t": "h",
@@ -27830,7 +27830,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"No SEI status API is described anywhere — no endpoint, no auth, no pagination, no rate limits, no retention window for reject detail. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*"
+"No SEI status API is described anywhere — no endpoint, no auth, no pagination, no rate limits, no retention window for reject detail. *(nearest counterpart: BBH File Ingestion Framework Design Document, no section — the whole document)*"
 ]
 }
 ]
@@ -28094,7 +28094,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | whole document | nothing in the pack covers it | Event Hub sequence numbers are monotonic per partition, so a gap is a provably lost event — the strongest completeness proof available, and no document mentions it. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | whole document | nothing in the pack covers it | Event Hub sequence numbers are monotonic per partition, so a gap is a provably lost event — the strongest completeness proof available, and no document mentions it. |",
 "blocks": [
 {
 "t": "p",
@@ -28114,7 +28114,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "whole document",
 "nothing in the pack covers it",
 "Event Hub sequence numbers are monotonic per partition, so a gap is a provably lost event — the strongest completeness proof available, and no document mentions it."
@@ -28125,7 +28125,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nThis component does not exist. Absent from the pack and from the 65, despite costing almost nothing.\n\n**Priority P1, custom build Medium.**\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- Event Hub sequence numbers are monotonic per partition, so a gap is a provably lost event — the strongest completeness proof available, and no document mentions it. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*",
+"md": "\n### What is missing\n\nThis component does not exist. Absent from the pack and from the 65, despite costing almost nothing.\n\n**Priority P1, custom build Medium.**\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- Event Hub sequence numbers are monotonic per partition, so a gap is a provably lost event — the strongest completeness proof available, and no document mentions it. *(nearest counterpart: BBH File Ingestion Framework Design Document, no section — the whole document)*",
 "blocks": [
 {
 "t": "h",
@@ -28174,7 +28174,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"Event Hub sequence numbers are monotonic per partition, so a gap is a provably lost event — the strongest completeness proof available, and no document mentions it. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*"
+"Event Hub sequence numbers are monotonic per partition, so a gap is a provably lost event — the strongest completeness proof available, and no document mentions it. *(nearest counterpart: BBH File Ingestion Framework Design Document, no section — the whole document)*"
 ]
 }
 ]
@@ -28429,7 +28429,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §C.4 | nothing in the pack covers it | C.4 validates a file's structure before load. Nothing validates an envelope, so an unknown view or an invalid op reaches the collapser. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §C.4 | nothing in the pack covers it | C.4 validates a file's structure before load. Nothing validates an envelope, so an unknown view or an invalid op reaches the collapser. |",
 "blocks": [
 {
 "t": "p",
@@ -28449,7 +28449,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§C.4",
 "nothing in the pack covers it",
 "C.4 validates a file's structure before load. Nothing validates an envelope, so an unknown view or an invalid op reaches the collapser."
@@ -28460,7 +28460,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nThis component does not exist. G1 validates a file's structure. Nothing validates an envelope.\n\n**Priority P1, custom build Medium.**\n\n### Risk\n\n- **CRITICAL · error path (E2).** Poison envelope stalls a partition indefinitely.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- C.4 validates a file's structure before load. Nothing validates an envelope, so an unknown view or an invalid op reaches the collapser. *(nearest counterpart: BBH File Ingestion Framework TDD, §C.4)*",
+"md": "\n### What is missing\n\nThis component does not exist. G1 validates a file's structure. Nothing validates an envelope.\n\n**Priority P1, custom build Medium.**\n\n### Risk\n\n- **CRITICAL · error path (E2).** Poison envelope stalls a partition indefinitely.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- C.4 validates a file's structure before load. Nothing validates an envelope, so an unknown view or an invalid op reaches the collapser. *(nearest counterpart: BBH File Ingestion Framework Design Document, §C.4)*",
 "blocks": [
 {
 "t": "h",
@@ -28511,7 +28511,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"C.4 validates a file's structure before load. Nothing validates an envelope, so an unknown view or an invalid op reaches the collapser. *(nearest counterpart: BBH File Ingestion Framework TDD, §C.4)*"
+"C.4 validates a file's structure before load. Nothing validates an envelope, so an unknown view or an invalid op reaches the collapser. *(nearest counterpart: BBH File Ingestion Framework Design Document, §C.4)*"
 ]
 }
 ]
@@ -28779,7 +28779,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §6.2 | nothing in the pack covers it | FILE_REGISTRY is the file path's record of receipt. The event path has no staging store specified — and it is entirely BBH-owned, so nobody outside BBH will write it. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §6.2 | nothing in the pack covers it | FILE_REGISTRY is the file path's record of receipt. The event path has no staging store specified — and it is entirely BBH-owned, so nobody outside BBH will write it. |",
 "blocks": [
 {
 "t": "p",
@@ -28799,7 +28799,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§6.2",
 "nothing in the pack covers it",
 "FILE_REGISTRY is the file path's record of receipt. The event path has no staging store specified — and it is entirely BBH-owned, so nobody outside BBH will write it."
@@ -28810,7 +28810,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nThis component does not exist. Entirely BBH-owned and nobody is writing it. Ship it without enqueued_ts and sequence_number and lag and gap detection are not computable at all.\n\n**Priority P1, custom build High.**\n\n### Risk\n\n- **HIGH · performance (B4).** Event staging insert rate.\n- **CRITICAL · error path (E1).** Offset committed before the durable write.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- FILE_REGISTRY is the file path's record of receipt. The event path has no staging store specified — and it is entirely BBH-owned, so nobody outside BBH will write it. *(nearest counterpart: BBH File Ingestion Framework TDD, §6.2)*",
+"md": "\n### What is missing\n\nThis component does not exist. Entirely BBH-owned and nobody is writing it. Ship it without enqueued_ts and sequence_number and lag and gap detection are not computable at all.\n\n**Priority P1, custom build High.**\n\n### Risk\n\n- **HIGH · performance (B4).** Event staging insert rate.\n- **CRITICAL · error path (E1).** Offset committed before the durable write.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- FILE_REGISTRY is the file path's record of receipt. The event path has no staging store specified — and it is entirely BBH-owned, so nobody outside BBH will write it. *(nearest counterpart: BBH File Ingestion Framework Design Document, §6.2)*",
 "blocks": [
 {
 "t": "h",
@@ -28862,7 +28862,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"FILE_REGISTRY is the file path's record of receipt. The event path has no staging store specified — and it is entirely BBH-owned, so nobody outside BBH will write it. *(nearest counterpart: BBH File Ingestion Framework TDD, §6.2)*"
+"FILE_REGISTRY is the file path's record of receipt. The event path has no staging store specified — and it is entirely BBH-owned, so nobody outside BBH will write it. *(nearest counterpart: BBH File Ingestion Framework Design Document, §6.2)*"
 ]
 }
 ]
@@ -29117,7 +29117,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §6.2 | nothing in the pack covers it | The event channel's FILE_REGISTRY. Micro-batch boxing is per partition, and nothing records which partitions reported. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §6.2 | nothing in the pack covers it | The event channel's FILE_REGISTRY. Micro-batch boxing is per partition, and nothing records which partitions reported. |",
 "blocks": [
 {
 "t": "p",
@@ -29137,7 +29137,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§6.2",
 "nothing in the pack covers it",
 "The event channel's FILE_REGISTRY. Micro-batch boxing is per partition, and nothing records which partitions reported."
@@ -29148,7 +29148,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nThis component does not exist. The event channel's FILE_REGISTRY. It does not exist.\n\n**Priority P1, custom build High.**\n\n### Risk\n\n- **HIGH · error path (E7).** Consumer rebalance in the middle of a box.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- The event channel's FILE_REGISTRY. Micro-batch boxing is per partition, and nothing records which partitions reported. *(nearest counterpart: BBH File Ingestion Framework TDD, §6.2)*",
+"md": "\n### What is missing\n\nThis component does not exist. The event channel's FILE_REGISTRY. It does not exist.\n\n**Priority P1, custom build High.**\n\n### Risk\n\n- **HIGH · error path (E7).** Consumer rebalance in the middle of a box.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- The event channel's FILE_REGISTRY. Micro-batch boxing is per partition, and nothing records which partitions reported. *(nearest counterpart: BBH File Ingestion Framework Design Document, §6.2)*",
 "blocks": [
 {
 "t": "h",
@@ -29199,7 +29199,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"The event channel's FILE_REGISTRY. Micro-batch boxing is per partition, and nothing records which partitions reported. *(nearest counterpart: BBH File Ingestion Framework TDD, §6.2)*"
+"The event channel's FILE_REGISTRY. Micro-batch boxing is per partition, and nothing records which partitions reported. *(nearest counterpart: BBH File Ingestion Framework Design Document, §6.2)*"
 ]
 }
 ]
@@ -29443,7 +29443,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | whole document | nothing in the pack covers it | SEI states at-least-once delivery and assigns idempotency to the consumer. No component in the pack accepts it. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | whole document | nothing in the pack covers it | SEI states at-least-once delivery and assigns idempotency to the consumer. No component in the pack accepts it. |",
 "blocks": [
 {
 "t": "p",
@@ -29463,7 +29463,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "whole document",
 "nothing in the pack covers it",
 "SEI states at-least-once delivery and assigns idempotency to the consumer. No component in the pack accepts it."
@@ -29474,7 +29474,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nThis component does not exist. SEI assigns idempotency to the consumer in writing. No component accepts it.\n\n**Priority P1, custom build High.**\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- SEI states at-least-once delivery and assigns idempotency to the consumer. No component in the pack accepts it. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*",
+"md": "\n### What is missing\n\nThis component does not exist. SEI assigns idempotency to the consumer in writing. No component accepts it.\n\n**Priority P1, custom build High.**\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- SEI states at-least-once delivery and assigns idempotency to the consumer. No component in the pack accepts it. *(nearest counterpart: BBH File Ingestion Framework Design Document, no section — the whole document)*",
 "blocks": [
 {
 "t": "h",
@@ -29523,7 +29523,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"SEI states at-least-once delivery and assigns idempotency to the consumer. No component in the pack accepts it. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*"
+"SEI states at-least-once delivery and assigns idempotency to the consumer. No component in the pack accepts it. *(nearest counterpart: BBH File Ingestion Framework Design Document, no section — the whole document)*"
 ]
 }
 ]
@@ -29790,7 +29790,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §D.2 | nothing in the pack covers it | D.2 recovers a QUARANTINED file. There is no event equivalent, so a poison envelope has no escape route. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §D.2 | nothing in the pack covers it | D.2 recovers a QUARANTINED file. There is no event equivalent, so a poison envelope has no escape route. |",
 "blocks": [
 {
 "t": "p",
@@ -29810,7 +29810,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§D.2",
 "nothing in the pack covers it",
 "D.2 recovers a QUARANTINED file. There is no event equivalent, so a poison envelope has no escape route."
@@ -29821,7 +29821,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nThis component does not exist. Component 29 is a file quarantine. The event path has no equivalent and therefore no poison-pill escape.\n\n**Priority P1, custom build High.**\n\n### Risk\n\n- **CRITICAL · error path (E2).** Poison envelope stalls a partition indefinitely.\n- **MEDIUM · error path (E10).** Replay has no attempt limit.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- D.2 recovers a QUARANTINED file. There is no event equivalent, so a poison envelope has no escape route. *(nearest counterpart: BBH File Ingestion Framework TDD, §D.2)*",
+"md": "\n### What is missing\n\nThis component does not exist. Component 29 is a file quarantine. The event path has no equivalent and therefore no poison-pill escape.\n\n**Priority P1, custom build High.**\n\n### Risk\n\n- **CRITICAL · error path (E2).** Poison envelope stalls a partition indefinitely.\n- **MEDIUM · error path (E10).** Replay has no attempt limit.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- D.2 recovers a QUARANTINED file. There is no event equivalent, so a poison envelope has no escape route. *(nearest counterpart: BBH File Ingestion Framework Design Document, §D.2)*",
 "blocks": [
 {
 "t": "h",
@@ -29873,7 +29873,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"D.2 recovers a QUARANTINED file. There is no event equivalent, so a poison envelope has no escape route. *(nearest counterpart: BBH File Ingestion Framework TDD, §D.2)*"
+"D.2 recovers a QUARANTINED file. There is no event equivalent, so a poison envelope has no escape route. *(nearest counterpart: BBH File Ingestion Framework Design Document, §D.2)*"
 ]
 }
 ]
@@ -30127,7 +30127,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §8.1 | nothing in the pack covers it | The thirteen signals are all file-shaped. Consumer lag — the only intraday health signal there is — appears in none of them. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §8.1 | nothing in the pack covers it | The thirteen signals are all file-shaped. Consumer lag — the only intraday health signal there is — appears in none of them. |",
 "blocks": [
 {
 "t": "p",
@@ -30147,7 +30147,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§8.1",
 "nothing in the pack covers it",
 "The thirteen signals are all file-shaped. Consumer lag — the only intraday health signal there is — appears in none of them."
@@ -30158,7 +30158,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nThis component does not exist. Component 34 Observability predates events and has no lag concept.\n\n**Priority P1, custom build Low.**\n\n### Risk\n\n- **MEDIUM · performance (B9).** Splunk ingest volume.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- The thirteen signals are all file-shaped. Consumer lag — the only intraday health signal there is — appears in none of them. *(nearest counterpart: BBH File Ingestion Framework TDD, §8.1)*",
+"md": "\n### What is missing\n\nThis component does not exist. Component 34 Observability predates events and has no lag concept.\n\n**Priority P1, custom build Low.**\n\n### Risk\n\n- **MEDIUM · performance (B9).** Splunk ingest volume.\n\n### Not specified — and what to do until it is\n\n**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.\n\n  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.\n\n**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.\n\n  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.\n\n### Gap against the SEI pack\n\n- The thirteen signals are all file-shaped. Consumer lag — the only intraday health signal there is — appears in none of them. *(nearest counterpart: BBH File Ingestion Framework Design Document, §8.1)*",
 "blocks": [
 {
 "t": "h",
@@ -30209,7 +30209,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"The thirteen signals are all file-shaped. Consumer lag — the only intraday health signal there is — appears in none of them. *(nearest counterpart: BBH File Ingestion Framework TDD, §8.1)*"
+"The thirteen signals are all file-shaped. Consumer lag — the only intraday health signal there is — appears in none of them. *(nearest counterpart: BBH File Ingestion Framework Design Document, §8.1)*"
 ]
 }
 ]
@@ -30818,7 +30818,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: SEI** — SEI must answer.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §C.4 | nothing in the pack covers it | C.4 is the inbound structural gate. G1 to G5 all face inbound; nothing validates a loader before it is published, so today the first validator of a BBH loader is SEI. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: SEI** — SEI must answer.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §C.4 | nothing in the pack covers it | C.4 is the inbound structural gate. G1 to G5 all face inbound; nothing validates a loader before it is published, so today the first validator of a BBH loader is SEI. |",
 "blocks": [
 {
 "t": "p",
@@ -30838,7 +30838,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§C.4",
 "nothing in the pack covers it",
 "C.4 is the inbound structural gate. G1 to G5 all face inbound; nothing validates a loader before it is published, so today the first validator of a BBH loader is SEI."
@@ -30849,7 +30849,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nThis component does not exist. G1 to G5 all face inbound. Nothing validates anything on the way out, so today the first validator of a BBH loader is SEI.\n\n**Priority P1, custom build High.**\n\n### Risk\n\n- **HIGH · performance (B11).** Outbound validation done per record instead of per extract.\n- **CRITICAL · error path (E13).** Nothing validates a loader before it is published.\n\n### Not specified — and what to do until it is\n\n**Which rules exist.** The gates are code with no registry, so which rules ran against which model on which date is unanswerable today.\n\n  *Recommended default:* Extract the existing checks into the registry as the first migration rather than designing a new rule set. The rules already exist; what is missing is that they are not data.\n\n**Whether a failed reconciliation may publish to Gold.** RECON_RESULT stores counts and no status, and the verdict is derived in Splunk, so reconciliation is advisory by construction and the current answer is yes.\n\n  *Recommended default:* Decide explicitly. If the answer is meant to be no, it needs a blocking gate, because nothing stops it today.\n\n### Gap against the SEI pack\n\n- C.4 is the inbound structural gate. G1 to G5 all face inbound; nothing validates a loader before it is published, so today the first validator of a BBH loader is SEI. *(nearest counterpart: BBH File Ingestion Framework TDD, §C.4)*",
+"md": "\n### What is missing\n\nThis component does not exist. G1 to G5 all face inbound. Nothing validates anything on the way out, so today the first validator of a BBH loader is SEI.\n\n**Priority P1, custom build High.**\n\n### Risk\n\n- **HIGH · performance (B11).** Outbound validation done per record instead of per extract.\n- **CRITICAL · error path (E13).** Nothing validates a loader before it is published.\n\n### Not specified — and what to do until it is\n\n**Which rules exist.** The gates are code with no registry, so which rules ran against which model on which date is unanswerable today.\n\n  *Recommended default:* Extract the existing checks into the registry as the first migration rather than designing a new rule set. The rules already exist; what is missing is that they are not data.\n\n**Whether a failed reconciliation may publish to Gold.** RECON_RESULT stores counts and no status, and the verdict is derived in Splunk, so reconciliation is advisory by construction and the current answer is yes.\n\n  *Recommended default:* Decide explicitly. If the answer is meant to be no, it needs a blocking gate, because nothing stops it today.\n\n### Gap against the SEI pack\n\n- C.4 is the inbound structural gate. G1 to G5 all face inbound; nothing validates a loader before it is published, so today the first validator of a BBH loader is SEI. *(nearest counterpart: BBH File Ingestion Framework Design Document, §C.4)*",
 "blocks": [
 {
 "t": "h",
@@ -30901,7 +30901,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"C.4 is the inbound structural gate. G1 to G5 all face inbound; nothing validates a loader before it is published, so today the first validator of a BBH loader is SEI. *(nearest counterpart: BBH File Ingestion Framework TDD, §C.4)*"
+"C.4 is the inbound structural gate. G1 to G5 all face inbound; nothing validates a loader before it is published, so today the first validator of a BBH loader is SEI. *(nearest counterpart: BBH File Ingestion Framework Design Document, §C.4)*"
 ]
 }
 ]
@@ -31157,7 +31157,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | whole document | nothing in the pack covers it | Nothing records what was sent. A rejection names records in a payload nobody kept. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | whole document | nothing in the pack covers it | Nothing records what was sent. A rejection names records in a payload nobody kept. |",
 "blocks": [
 {
 "t": "p",
@@ -31177,7 +31177,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "whole document",
 "nothing in the pack covers it",
 "Nothing records what was sent. A rejection names records in a payload nobody kept."
@@ -31188,7 +31188,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nThis component does not exist. Without it a rejected record cannot be tied to the bytes that caused it, and a disagreement with SEI has no evidence on the BBH side.\n\n**Priority P1, custom build Medium.**\n\n### Risk\n\n- **HIGH · error path (E14).** No record of what was actually sent.\n\n### Not specified — and what to do until it is\n\n**SEI's status API contract.** Endpoint, auth, pagination, rate limits, whether a mid-processing poll returns partial errors, and how long reject detail stays retrievable. The poller's cadence and budget are unsizable without them.\n\n  *Recommended default:* Ask, and treat retention as the urgent one: if SEI purges reject detail after a window, BBH's stored copy becomes the system of record for outbound exceptions and the fetch acquires a deadline.\n\n**Whether loader groups are a sequencing constraint.** Group 2, 3 and 4 appear consistently in the catalogue. If Group 2 must land before Group 3, a Group 2 failure blocks everything behind it — the outbound equivalent of the date gate.\n\n  *Recommended default:* Assume they are ordered until told otherwise, and make the dependency explicit in the submission registry. Discovering it after a failure is the expensive way to learn it.\n\n### Gap against the SEI pack\n\n- Nothing records what was sent. A rejection names records in a payload nobody kept. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*",
+"md": "\n### What is missing\n\nThis component does not exist. Without it a rejected record cannot be tied to the bytes that caused it, and a disagreement with SEI has no evidence on the BBH side.\n\n**Priority P1, custom build Medium.**\n\n### Risk\n\n- **HIGH · error path (E14).** No record of what was actually sent.\n\n### Not specified — and what to do until it is\n\n**SEI's status API contract.** Endpoint, auth, pagination, rate limits, whether a mid-processing poll returns partial errors, and how long reject detail stays retrievable. The poller's cadence and budget are unsizable without them.\n\n  *Recommended default:* Ask, and treat retention as the urgent one: if SEI purges reject detail after a window, BBH's stored copy becomes the system of record for outbound exceptions and the fetch acquires a deadline.\n\n**Whether loader groups are a sequencing constraint.** Group 2, 3 and 4 appear consistently in the catalogue. If Group 2 must land before Group 3, a Group 2 failure blocks everything behind it — the outbound equivalent of the date gate.\n\n  *Recommended default:* Assume they are ordered until told otherwise, and make the dependency explicit in the submission registry. Discovering it after a failure is the expensive way to learn it.\n\n### Gap against the SEI pack\n\n- Nothing records what was sent. A rejection names records in a payload nobody kept. *(nearest counterpart: BBH File Ingestion Framework Design Document, no section — the whole document)*",
 "blocks": [
 {
 "t": "h",
@@ -31239,7 +31239,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"Nothing records what was sent. A rejection names records in a payload nobody kept. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*"
+"Nothing records what was sent. A rejection names records in a payload nobody kept. *(nearest counterpart: BBH File Ingestion Framework Design Document, no section — the whole document)*"
 ]
 }
 ]
@@ -31500,7 +31500,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: SEI** — SEI must answer.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §D.2 | nothing in the pack covers it | D.2 quarantines an inbound file. Rejected outbound records have nowhere to go and no defined route back. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: SEI** — SEI must answer.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §D.2 | nothing in the pack covers it | D.2 quarantines an inbound file. Rejected outbound records have nowhere to go and no defined route back. |",
 "blocks": [
 {
 "t": "p",
@@ -31520,7 +31520,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§D.2",
 "nothing in the pack covers it",
 "D.2 quarantines an inbound file. Rejected outbound records have nowhere to go and no defined route back."
@@ -31531,7 +31531,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nThis component does not exist. Component 29 quarantines inbound files. Rejected outbound records have nowhere to go and no defined route back.\n\n**Priority P1, custom build High.**\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**Where a read-only consumer role comes from.** A12 grants the loader DML on RAW plus the registry and DML-only on Gold, and describes no consumer grant at all. Improvised at connection time, that means reusing the loader's account.\n\n  *Recommended default:* Add the role to the security model as part of this plane rather than leaving each consumer to ask for access separately.\n\n**The masking policy for the 786 PII fields in SDC scope.** It is unapproved, so any consumer either masks on its own judgement or shows unmasked business keys.\n\n  *Recommended default:* Default to hashing business keys until the policy lands. A stable hash is still joinable, which is what most consumers actually need.\n\n### Gap against the SEI pack\n\n- D.2 quarantines an inbound file. Rejected outbound records have nowhere to go and no defined route back. *(nearest counterpart: BBH File Ingestion Framework TDD, §D.2)*",
+"md": "\n### What is missing\n\nThis component does not exist. Component 29 quarantines inbound files. Rejected outbound records have nowhere to go and no defined route back.\n\n**Priority P1, custom build High.**\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**Where a read-only consumer role comes from.** A12 grants the loader DML on RAW plus the registry and DML-only on Gold, and describes no consumer grant at all. Improvised at connection time, that means reusing the loader's account.\n\n  *Recommended default:* Add the role to the security model as part of this plane rather than leaving each consumer to ask for access separately.\n\n**The masking policy for the 786 PII fields in SDC scope.** It is unapproved, so any consumer either masks on its own judgement or shows unmasked business keys.\n\n  *Recommended default:* Default to hashing business keys until the policy lands. A stable hash is still joinable, which is what most consumers actually need.\n\n### Gap against the SEI pack\n\n- D.2 quarantines an inbound file. Rejected outbound records have nowhere to go and no defined route back. *(nearest counterpart: BBH File Ingestion Framework Design Document, §D.2)*",
 "blocks": [
 {
 "t": "h",
@@ -31580,7 +31580,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"D.2 quarantines an inbound file. Rejected outbound records have nowhere to go and no defined route back. *(nearest counterpart: BBH File Ingestion Framework TDD, §D.2)*"
+"D.2 quarantines an inbound file. Rejected outbound records have nowhere to go and no defined route back. *(nearest counterpart: BBH File Ingestion Framework Design Document, §D.2)*"
 ]
 }
 ]
@@ -31847,7 +31847,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: SEI** — SEI must answer.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation TDD v2 | §B.5 | nothing in the pack covers it | B.5's three boundaries are inbound. Sent versus accepted is a boundary that exists nowhere, so a loader that silently dropped three percent on the way out is invisible. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: SEI** — SEI must answer.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH dbt Transformation Design Document v2 | §B.5 | nothing in the pack covers it | B.5's three boundaries are inbound. Sent versus accepted is a boundary that exists nowhere, so a loader that silently dropped three percent on the way out is invisible. |",
 "blocks": [
 {
 "t": "p",
@@ -31867,7 +31867,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH dbt Transformation TDD v2",
+"BBH dbt Transformation Design Document v2",
 "§B.5",
 "nothing in the pack covers it",
 "B.5's three boundaries are inbound. Sent versus accepted is a boundary that exists nowhere, so a loader that silently dropped three percent on the way out is invisible."
@@ -31878,7 +31878,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nThis component does not exist. The outbound counterpart of the four event-side boundaries. Same omission, opposite direction.\n\n**Priority P1, custom build Medium.**\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**Which rules exist.** The gates are code with no registry, so which rules ran against which model on which date is unanswerable today.\n\n  *Recommended default:* Extract the existing checks into the registry as the first migration rather than designing a new rule set. The rules already exist; what is missing is that they are not data.\n\n**Whether a failed reconciliation may publish to Gold.** RECON_RESULT stores counts and no status, and the verdict is derived in Splunk, so reconciliation is advisory by construction and the current answer is yes.\n\n  *Recommended default:* Decide explicitly. If the answer is meant to be no, it needs a blocking gate, because nothing stops it today.\n\n### Gap against the SEI pack\n\n- B.5's three boundaries are inbound. Sent versus accepted is a boundary that exists nowhere, so a loader that silently dropped three percent on the way out is invisible. *(nearest counterpart: BBH dbt Transformation TDD, §B.5)*",
+"md": "\n### What is missing\n\nThis component does not exist. The outbound counterpart of the four event-side boundaries. Same omission, opposite direction.\n\n**Priority P1, custom build Medium.**\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**Which rules exist.** The gates are code with no registry, so which rules ran against which model on which date is unanswerable today.\n\n  *Recommended default:* Extract the existing checks into the registry as the first migration rather than designing a new rule set. The rules already exist; what is missing is that they are not data.\n\n**Whether a failed reconciliation may publish to Gold.** RECON_RESULT stores counts and no status, and the verdict is derived in Splunk, so reconciliation is advisory by construction and the current answer is yes.\n\n  *Recommended default:* Decide explicitly. If the answer is meant to be no, it needs a blocking gate, because nothing stops it today.\n\n### Gap against the SEI pack\n\n- B.5's three boundaries are inbound. Sent versus accepted is a boundary that exists nowhere, so a loader that silently dropped three percent on the way out is invisible. *(nearest counterpart: BBH dbt Transformation Design Document, §B.5)*",
 "blocks": [
 {
 "t": "h",
@@ -31927,7 +31927,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"B.5's three boundaries are inbound. Sent versus accepted is a boundary that exists nowhere, so a loader that silently dropped three percent on the way out is invisible. *(nearest counterpart: BBH dbt Transformation TDD, §B.5)*"
+"B.5's three boundaries are inbound. Sent versus accepted is a boundary that exists nowhere, so a loader that silently dropped three percent on the way out is invisible. *(nearest counterpart: BBH dbt Transformation Design Document, §B.5)*"
 ]
 }
 ]
@@ -33202,7 +33202,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: SEI** — SEI must answer.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §6.1 | nothing in the pack covers it | §6.1 makes the RAW DDL the schema contract by holding no column mapping, and Gold runs on_schema_change='fail'. No section describes how a schema change is notified, with what lead time or what compatibility rule. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: SEI** — SEI must answer.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §6.1 | nothing in the pack covers it | §6.1 makes the RAW DDL the schema contract by holding no column mapping, and Gold runs on_schema_change='fail'. No section describes how a schema change is notified, with what lead time or what compatibility rule. |",
 "blocks": [
 {
 "t": "p",
@@ -33222,7 +33222,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§6.1",
 "nothing in the pack covers it",
 "§6.1 makes the RAW DDL the schema contract by holding no column mapping, and Gold runs on_schema_change='fail'. No section describes how a schema change is notified, with what lead time or what compatibility rule."
@@ -33233,7 +33233,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nThis component does not exist. The most predictable future incident in the pack, and nothing watches for it.\n\n**Priority P1, custom build Medium.**\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**Where a read-only consumer role comes from.** A12 grants the loader DML on RAW plus the registry and DML-only on Gold, and describes no consumer grant at all. Improvised at connection time, that means reusing the loader's account.\n\n  *Recommended default:* Add the role to the security model as part of this plane rather than leaving each consumer to ask for access separately.\n\n**The masking policy for the 786 PII fields in SDC scope.** It is unapproved, so any consumer either masks on its own judgement or shows unmasked business keys.\n\n  *Recommended default:* Default to hashing business keys until the policy lands. A stable hash is still joinable, which is what most consumers actually need.\n\n### Gap against the SEI pack\n\n- §6.1 makes the RAW DDL the schema contract by holding no column mapping, and Gold runs on_schema_change='fail'. No section describes how a schema change is notified, with what lead time or what compatibility rule. *(nearest counterpart: BBH File Ingestion Framework TDD, §6.1)*",
+"md": "\n### What is missing\n\nThis component does not exist. The most predictable future incident in the pack, and nothing watches for it.\n\n**Priority P1, custom build Medium.**\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**Where a read-only consumer role comes from.** A12 grants the loader DML on RAW plus the registry and DML-only on Gold, and describes no consumer grant at all. Improvised at connection time, that means reusing the loader's account.\n\n  *Recommended default:* Add the role to the security model as part of this plane rather than leaving each consumer to ask for access separately.\n\n**The masking policy for the 786 PII fields in SDC scope.** It is unapproved, so any consumer either masks on its own judgement or shows unmasked business keys.\n\n  *Recommended default:* Default to hashing business keys until the policy lands. A stable hash is still joinable, which is what most consumers actually need.\n\n### Gap against the SEI pack\n\n- §6.1 makes the RAW DDL the schema contract by holding no column mapping, and Gold runs on_schema_change='fail'. No section describes how a schema change is notified, with what lead time or what compatibility rule. *(nearest counterpart: BBH File Ingestion Framework Design Document, §6.1)*",
 "blocks": [
 {
 "t": "h",
@@ -33282,7 +33282,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"§6.1 makes the RAW DDL the schema contract by holding no column mapping, and Gold runs on_schema_change='fail'. No section describes how a schema change is notified, with what lead time or what compatibility rule. *(nearest counterpart: BBH File Ingestion Framework TDD, §6.1)*"
+"§6.1 makes the RAW DDL the schema contract by holding no column mapping, and Gold runs on_schema_change='fail'. No section describes how a schema change is notified, with what lead time or what compatibility rule. *(nearest counterpart: BBH File Ingestion Framework Design Document, §6.1)*"
 ]
 }
 ]
@@ -33544,7 +33544,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "9. SEI Source Coverage",
-"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework TDD v2.0 | §5.2 | nothing in the pack covers it | §5.2 leans on required-versus-optional interfaces twice, and §6.1's field list has no such column. EXPECTED_INTERFACE_CALENDAR and REQUIRED_IND remain proposals. |",
+"md": "\n**SEI pack coverage: absent** — nothing in the SEI pack.\n**Who answers for the gap: Joint** — needs both sides.\n\n| Document | Section | Kind | What it says |\n| --- | --- | --- | --- |\n| BBH File Ingestion Framework Design Document v2.0 | §5.2 | nothing in the pack covers it | §5.2 leans on required-versus-optional interfaces twice, and §6.1's field list has no such column. EXPECTED_INTERFACE_CALENDAR and REQUIRED_IND remain proposals. |",
 "blocks": [
 {
 "t": "p",
@@ -33564,7 +33564,7 @@ export const DESIGN_DOCS = [
 "What it says"
 ],
 [
-"BBH File Ingestion Framework TDD v2.0",
+"BBH File Ingestion Framework Design Document v2.0",
 "§5.2",
 "nothing in the pack covers it",
 "§5.2 leans on required-versus-optional interfaces twice, and §6.1's field list has no such column. EXPECTED_INTERFACE_CALENDAR and REQUIRED_IND remain proposals."
@@ -33575,7 +33575,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "10. Gaps, Risks & What Is Missing",
-"md": "\n### What is missing\n\nThis component does not exist. EXPECTED_INTERFACE_CALENDAR and REQUIRED_IND are still proposals, and no channel has an expectation model.\n\n**Priority P1, custom build Medium.**\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**Where a read-only consumer role comes from.** A12 grants the loader DML on RAW plus the registry and DML-only on Gold, and describes no consumer grant at all. Improvised at connection time, that means reusing the loader's account.\n\n  *Recommended default:* Add the role to the security model as part of this plane rather than leaving each consumer to ask for access separately.\n\n**The masking policy for the 786 PII fields in SDC scope.** It is unapproved, so any consumer either masks on its own judgement or shows unmasked business keys.\n\n  *Recommended default:* Default to hashing business keys until the policy lands. A stable hash is still joinable, which is what most consumers actually need.\n\n### Gap against the SEI pack\n\n- §5.2 leans on required-versus-optional interfaces twice, and §6.1's field list has no such column. EXPECTED_INTERFACE_CALENDAR and REQUIRED_IND remain proposals. *(nearest counterpart: BBH File Ingestion Framework TDD, §5.2)*",
+"md": "\n### What is missing\n\nThis component does not exist. EXPECTED_INTERFACE_CALENDAR and REQUIRED_IND are still proposals, and no channel has an expectation model.\n\n**Priority P1, custom build Medium.**\n\n### Risk\n\nNo ranked bottleneck or unowned error path touches this component.\n\n### Not specified — and what to do until it is\n\n**Where a read-only consumer role comes from.** A12 grants the loader DML on RAW plus the registry and DML-only on Gold, and describes no consumer grant at all. Improvised at connection time, that means reusing the loader's account.\n\n  *Recommended default:* Add the role to the security model as part of this plane rather than leaving each consumer to ask for access separately.\n\n**The masking policy for the 786 PII fields in SDC scope.** It is unapproved, so any consumer either masks on its own judgement or shows unmasked business keys.\n\n  *Recommended default:* Default to hashing business keys until the policy lands. A stable hash is still joinable, which is what most consumers actually need.\n\n### Gap against the SEI pack\n\n- §5.2 leans on required-versus-optional interfaces twice, and §6.1's field list has no such column. EXPECTED_INTERFACE_CALENDAR and REQUIRED_IND remain proposals. *(nearest counterpart: BBH File Ingestion Framework Design Document, §5.2)*",
 "blocks": [
 {
 "t": "h",
@@ -33624,7 +33624,7 @@ export const DESIGN_DOCS = [
 {
 "t": "ul",
 "items": [
-"§5.2 leans on required-versus-optional interfaces twice, and §6.1's field list has no such column. EXPECTED_INTERFACE_CALENDAR and REQUIRED_IND remain proposals. *(nearest counterpart: BBH File Ingestion Framework TDD, §5.2)*"
+"§5.2 leans on required-versus-optional interfaces twice, and §6.1's field list has no such column. EXPECTED_INTERFACE_CALENDAR and REQUIRED_IND remain proposals. *(nearest counterpart: BBH File Ingestion Framework Design Document, §5.2)*"
 ]
 }
 ]

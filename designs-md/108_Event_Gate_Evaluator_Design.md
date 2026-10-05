@@ -105,8 +105,8 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §E.2 | nothing in the pack covers it | The completeness gate is expected active DAILY interfaces MINUS distinct ARCHIVED. Under events there is no interface to count and nothing reaches ARCHIVED, so this query returns nothing meaningful and the pack proposes no replacement. |
-| BBH File Ingestion Framework TDD v2.0 | §E.1 | touches it, does not specify it | UX_DATE_CONTROL_ACTIVE, a function-based unique index on CASE WHEN STATUS <> 'COMPLETE' THEN 1 END. One line, and it is what physically enforces a single active date. |
+| BBH File Ingestion Framework Design Document v2.0 | §E.2 | nothing in the pack covers it | The completeness gate is expected active DAILY interfaces MINUS distinct ARCHIVED. Under events there is no interface to count and nothing reaches ARCHIVED, so this query returns nothing meaningful and the pack proposes no replacement. |
+| BBH File Ingestion Framework Design Document v2.0 | §E.1 | touches it, does not specify it | UX_DATE_CONTROL_ACTIVE, a function-based unique index on CASE WHEN STATUS <> 'COMPLETE' THEN 1 END. One line, and it is what physically enforces a single active date. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -132,7 +132,7 @@ This component does not exist. E.2 counts DAILY interfaces MINUS ARCHIVED. Under
 
 ### Gap against the SEI pack
 
-- The completeness gate is expected active DAILY interfaces MINUS distinct ARCHIVED. Under events there is no interface to count and nothing reaches ARCHIVED, so this query returns nothing meaningful and the pack proposes no replacement. *(nearest counterpart: BBH File Ingestion Framework TDD, §E.2)*
+- The completeness gate is expected active DAILY interfaces MINUS distinct ARCHIVED. Under events there is no interface to count and nothing reaches ARCHIVED, so this query returns nothing meaningful and the pack proposes no replacement. *(nearest counterpart: BBH File Ingestion Framework Design Document, §E.2)*
 
 ## 11. Recommendation
 

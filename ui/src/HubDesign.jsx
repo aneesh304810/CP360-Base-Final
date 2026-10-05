@@ -11,8 +11,8 @@ import { FM_SUMMARY, FM_AREAS, FM_STATE, FM_PROVIDED, FM_TABLES, FM_REC }
  from "./hubFoundationModel.js";
 import SourceReference, { citationsFor } from "./SourceReference.jsx";
 import SeiDocModal from "./SeiDocModal.jsx";
-import { TDD_ALIGN, TDD_VERDICTS, TDD_MISSING, TDD_SELF_CONFLICT, TDD_DOC,
- TDD_SOURCE, tddFor, tddCount } from "./hubTddAlignment.js";
+import { DBTDOC_ALIGN, DBTDOC_VERDICTS, DBTDOC_MISSING, DBTDOC_SELF_CONFLICT, DBTDOC_NAME,
+ DBTDOC_SOURCE, dbtDocFor, dbtDocCount } from "./hubDbtDocAlignment.js";
 
 // =====================================================================
 // HubDesign — the CP Integration Hub route: C4 landing (L1 context +
@@ -308,8 +308,8 @@ export default function HubDesign({ t }) {
        </div>);
     })()}
     {(() => {
-      const tds = rows.map(tddFor).filter(Boolean);
-      const miss = TDD_MISSING[cont] || [];
+      const tds = rows.map(dbtDocFor).filter(Boolean);
+      const miss = DBTDOC_MISSING[cont] || [];
       if (!tds.length && !miss.length) return null;
       const order = ["conflict", "split", "absent", "elsewhere", "same"];
       return (
@@ -317,23 +317,23 @@ export default function HubDesign({ t }) {
         borderRadius: 8, padding: "12px 16px", marginBottom: 10 }}>
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap",
          alignItems: "center", fontSize: 10.5, color: t.sub || "#666" }}>
-         <b style={{ fontSize: 11, color: "#0f4775" }}>Against the dbt TDD</b>
-         {order.filter((v) => tddCount(rows, v)).map((v) => (
+         <b style={{ fontSize: 11, color: "#0f4775" }}>Against the dbt design document</b>
+         {order.filter((v) => dbtDocCount(rows, v)).map((v) => (
           <span key={v} style={{ display: "inline-flex", alignItems: "center",
            gap: 5 }}>
            <span style={{ width: 8, height: 8, borderRadius: 2,
-            background: TDD_VERDICTS[v][0] }} />
-           <b style={{ color: TDD_VERDICTS[v][0] }}>{tddCount(rows, v)}</b>
-           {TDD_VERDICTS[v][1]}</span>))}
+            background: DBTDOC_VERDICTS[v][0] }} />
+           <b style={{ color: DBTDOC_VERDICTS[v][0] }}>{dbtDocCount(rows, v)}</b>
+           {DBTDOC_VERDICTS[v][1]}</span>))}
          <span style={{ marginLeft: "auto", fontSize: 9.5 }}>
-          SEI wrote the TDD — a conflict is a position to settle with
+          SEI wrote the design document — a conflict is a position to settle with
           them, not an internal tidy-up</span>
         </div>
         {miss.map((m) => (
          <div key={m.name} style={{ marginTop: 11, background: "#fdf1f2",
           borderRadius: 6, borderLeft: "3px solid #cc3344", padding: "10px 12px" }}>
           <div style={{ fontSize: 8.5, fontWeight: 800, color: "#cc3344",
-           letterSpacing: .4 }}>IN THE TDD, NO COMPONENT HERE · {m.ev}</div>
+           letterSpacing: .4 }}>IN THE DESIGN DOCUMENT, NO COMPONENT HERE · {m.ev}</div>
           <div style={{ fontSize: 11, color: "#33414d", lineHeight: 1.6,
            marginTop: 3 }}><b>{m.name}</b> — {m.why}</div>
          </div>))}
@@ -341,10 +341,10 @@ export default function HubDesign({ t }) {
          <div style={{ marginTop: 11, background: "#fdf7ea", borderRadius: 6,
           borderLeft: "3px solid #a8560f", padding: "10px 12px" }}>
           <div style={{ fontSize: 8.5, fontWeight: 800, color: "#a8560f",
-           letterSpacing: .4 }}>AND THE TDD DISAGREES WITH ITSELF · {TDD_SELF_CONFLICT.ev}</div>
+           letterSpacing: .4 }}>AND THE DESIGN DOCUMENT DISAGREES WITH ITSELF · {DBTDOC_SELF_CONFLICT.ev}</div>
           <div style={{ fontSize: 11, color: "#33414d", lineHeight: 1.6,
-           marginTop: 3 }}><b>{TDD_SELF_CONFLICT.title}</b></div>
-          {TDD_SELF_CONFLICT.body.split("\n\n").map((p, i) => (
+           marginTop: 3 }}><b>{DBTDOC_SELF_CONFLICT.title}</b></div>
+          {DBTDOC_SELF_CONFLICT.body.split("\n\n").map((p, i) => (
            <div key={i} style={{ fontSize: 11, color: "#33414d", lineHeight: 1.6,
             marginTop: 6 }}>{p}</div>))}
          </div>)}
@@ -359,7 +359,7 @@ export default function HubDesign({ t }) {
       const f = FIND[c.id];
       const cv = covOf(c);
       const nCite = citationsFor(c).length;
-      const td = tddFor(c);
+      const td = dbtDocFor(c);
       const hasPanel = c.isNew || !!f || !!cv;
       const vc = c.isNew ? "#cc3344" : f ? (AR_VERDICTS[f.verdict] || ["#5c7c94"])[0] : null;
       const vt = c.isNew ? "NEW · MISSING" : f ? f.verdict.toUpperCase() : null;
@@ -390,11 +390,11 @@ export default function HubDesign({ t }) {
           STCOL[sx.status] || "#8a97a3", `${sx.status.toUpperCase()} · ${sx.pct}%`)}</span>
          <span style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
           {td && (
-           <span title={`dbt TDD: ${TDD_VERDICTS[td.v][1]} \u2014 ${td.name}`}
+           <span title={`dbt design document: ${DBTDOC_VERDICTS[td.v][1]} \u2014 ${td.name}`}
             style={{ fontSize: 9, fontWeight: 800, padding: "3px 7px",
-             borderRadius: 999, background: TDD_VERDICTS[td.v][0] + "1f",
-             color: TDD_VERDICTS[td.v][0], border: `1px solid ${TDD_VERDICTS[td.v][0]}55`,
-             whiteSpace: "nowrap", flex: "0 0 auto" }}>TDD</span>)}
+             borderRadius: 999, background: DBTDOC_VERDICTS[td.v][0] + "1f",
+             color: DBTDOC_VERDICTS[td.v][0], border: `1px solid ${DBTDOC_VERDICTS[td.v][0]}55`,
+             whiteSpace: "nowrap", flex: "0 0 auto" }}>dbt</span>)}
           {nCite > 0 && (
            <span onClick={(e) => { e.stopPropagation(); setSrcOf(c.id); }}
             title={`${nCite} SEI citation${nCite === 1 ? "" : "s"} — read side by side`}
@@ -438,18 +438,18 @@ export default function HubDesign({ t }) {
             borderTop: "1px solid #eef1f4" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8,
              flexWrap: "wrap" }}>
-             {chip(TDD_VERDICTS[td.v][0] + "1f", TDD_VERDICTS[td.v][0],
-              TDD_VERDICTS[td.v][1].toUpperCase())}
+             {chip(DBTDOC_VERDICTS[td.v][0] + "1f", DBTDOC_VERDICTS[td.v][0],
+              DBTDOC_VERDICTS[td.v][1].toUpperCase())}
              <b style={{ fontSize: 11, color: "#0f4775" }}>{td.name}</b>
              <span style={{ fontSize: 9.5, color: t.sub || "#666" }}>
-              {TDD_DOC} · {TDD_SOURCE} · {td.ev}</span>
+              {DBTDOC_NAME} · {DBTDOC_SOURCE} · {td.ev}</span>
             </div>
            </div>
            <Fld k="what this is" v={td.what} />
-           <Fld k="against the dbt TDD"
+           <Fld k="against the dbt design document"
             v={td.note.split("\n\n").map((p, i) => (
              <div key={i} style={{ marginTop: i ? 7 : 0 }}>{p}</div>))}
-            tone={TDD_VERDICTS[td.v][0]} />
+            tone={DBTDOC_VERDICTS[td.v][0]} />
           </>}
          </div>)}
        </div>);
@@ -555,13 +555,13 @@ export default function HubDesign({ t }) {
 
       {/* processing */}
       <Grp x={444} y={180} w={226} h={470} k="PROC" />
-      {/* Layer model per the dbt TDD: SWP_RAW -> STG (view) -> INT ->
+      {/* Layer model per the dbt design document: SWP_RAW -> STG (view) -> INT ->
           DIM -> FACT. This band used to read Stage 1 RAW -> Correction ->
           Stage 2 Enriched -> Pre-Gold Exadata, which is a different
           build: it merged STG and INT into one box and invented a tier
-          the TDD does not have. STG is drawn square, not as a cylinder,
+          the design document does not have. STG is drawn square, not as a cylinder,
           because it is a view and stores nothing — the shape is the
-          point. Corrections come out of the chain: in the TDD they are
+          point. Corrections come out of the chain: in the design document they are
           the MERGE-vs-UPDATE rule applied inside DIM (§6.4.1), not a
           layer between RAW and Silver. */}
       <Mini x={454} y={214} w={200} label="Python Ingestion Fwk" k="python ingestion" />
@@ -577,7 +577,7 @@ export default function HubDesign({ t }) {
       <Rel x1={554} y1={412} x2={554} y2={446} label="" />
       <Rel x1={554} y1={470} x2={554} y2={504} label="" />
       <text x="454" y="598" fontSize="8" fontStyle="italic" fill="#159943">
-       Aligned to the dbt TDD: Silver is STG + INT</text>
+       Per the dbt design doc: Silver is STG + INT</text>
       <text x="454" y="610" fontSize="8" fontStyle="italic" fill="#a8560f">
        STG is the one box here that stores nothing</text>
       <text x="454" y="622" fontSize="8" fontStyle="italic" fill="#a8560f">

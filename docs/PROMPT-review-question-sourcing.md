@@ -21,8 +21,8 @@ So the buckets below are the point of this document, not the prompts.
 
 > **Topics 1 and 2 are done**, and six more questions were answered from a
 > second document. Questions 1–10 went to the SEI pack; 18, 19, 32, 33, 34
-> and 44 were then answered from the **BBH dbt Transformation Framework
-> TDD**, which is **also SEI's** — SEI Professional Services is named on
+> and 44 were then answered from the **BBH dbt Transformation Design
+> Document**, which is **also SEI's** — SEI Professional Services is named on
 > its document-control page as author and owner. It is not a BBH-side
 > document, and this page said for a while that it was. Prompts A1, A2 and A4 have been
 > removed because they have been run.
@@ -31,17 +31,17 @@ So the buckets below are the point of this document, not the prompts.
 > enterprise-wide canonical model — which is the sentence that makes
 > questions 3 and 10 matter.
 
-> **Second update, October 2026.** The full dbt TDD, appendices included,
+> **Second update, October 2026.** The full dbt design document, appendices included,
 > answered four more of these: 28 (the layer mapping end to end), 52
 > (`FILE_SCHEMA_CONFIG` is the expected set, `FILE_REGISTRY` the completed
 > one), and 91 and 92 (`DATE_CONTROL.SLA_CUTOFF_TS` is a tz-aware column per
 > business date, and every SLA target in the document is still `TBC`). They
 > have left this bucket.
 >
-> It also named **a document nobody has asked for yet.** The TDD's scope
+> It also named **a document nobody has asked for yet.** The design document's scope
 > boundary puts file generation, external transfer, physical file discovery,
 > header/trailer validation and the RAW load itself outside itself, and
-> assigns them to a separate **Ingestion Framework TDD**. That is the document
+> assigns them to a separate **File Ingestion Framework Design Document**. That is the document
 > that owns most of what is left in this bucket. Getting hold of it is
 > probably worth more than any prompt on this page.
 
@@ -80,8 +80,8 @@ Still the highest-value prompt in the set, and now a shorter one. The answers
 are contractual rather than architectural — they are what BBH is entitled to
 rely on, and no BBH design document can supply them.
 
-Items 2 and 8 below are kept but marked: the dbt TDD has answered the BBH side
-of both, so what is wanted from SEI is only the half the TDD cannot give — the
+Items 2 and 8 below are kept but marked: the dbt design document has answered the BBH side
+of both, so what is wanted from SEI is only the half the design document cannot give — the
 commitment, not the mechanism.
 
 ```
@@ -142,19 +142,19 @@ worker/pod lifecycle and the Dim/Fact build.
 >
 > This page first said the document that would answer these "is not in this
 > repository — the single biggest blind spot". It exists: the **BBH dbt
-> Transformation Framework TDD**, which has already answered 47, 48, 59, 60
+> Transformation Design Document**, which has already answered 47, 48, 59, 60
 > and 63 and settles several more below.
 >
 > It then said that document was BBH's own, and that **"none of that is
 > SEI's to describe — asking the SEI PDF will produce plausible
 > fiction."** That was wrong, and wrong in the direction that costs most.
-> **SEI wrote the dbt TDD.** SEI Professional Services is named on its
+> **SEI wrote the dbt design document.** SEI Professional Services is named on its
 > document-control page as author and owner, and it is SEI who specifies
 > `DATE_CONTROL`, `FILE_REGISTRY`, the two-DAG handoff and the
 > DIM-before-FACT ordering, down to the DDL.
 >
 > So the split on this page is NOT BBH's documents against SEI's. Both
-> documents are SEI's. It is the architecture pack against the dbt TDD, and
+> documents are SEI's. It is the architecture pack against the dbt design document, and
 > the rule is simply to point each extraction at the right one of the two.
 >
 > **All twenty now carry an industry-practice draft.** Those are
@@ -170,13 +170,13 @@ worker/pod lifecycle and the Dim/Fact build.
 
 | Area | Questions | Ask |
 |---|---|---|
-| Business-date control, triggers, recovery | 58, 61, 65, 66, 67, 68, 69, 70, 71 | **dbt TDD §5** + the DAG code |
-| Restatement and replay | 72, 73, 75, 76 | **dbt TDD §6.4.1, §7.1** |
-| DIM/FACT build, history, effective dating | 45, 46 | **dbt TDD §6.4** + data modelling |
+| Business-date control, triggers, recovery | 58, 61, 65, 66, 67, 68, 69, 70, 71 | **dbt design doc §5** + the DAG code |
+| Restatement and replay | 72, 73, 75, 76 | **dbt design doc §6.4.1, §7.1** |
+| DIM/FACT build, history, effective dating | 45, 46 | **dbt design doc §6.4** + data modelling |
 | OpenShift scheduling and DB limits | 79, 82, 85 | Platform / Sudhakar |
 | Logging standard, alert routing | 88, 89 | BBH observability standards |
 
-The fastest route for the first two rows is now the TDD's appendices: it says
+The fastest route for the first two rows is now the design document's appendices: it says
 the trigger and `DATE_CONTROL` SQL are in Appendix A, and the model SQL in
 Appendix B. Those pages have not been read yet and would likely close most of
 the remaining business-date questions.
@@ -191,7 +191,7 @@ the remaining business-date questions.
 > stay in this bucket for that reason. Question 13 came back `no_data` and
 > has no draft at all.
 
-> **Three have left, October 2026.** The dbt TDD turned out to answer 38 (the
+> **Three have left, October 2026.** The dbt design document turned out to answer 38 (the
 > blocking controls are the STG DQ filter, the per-layer test task and
 > dimension resolution — reconciliation runs *after* the fact build and only
 > alerts), 93 (four measures with four named responses, every target `TBC`)
@@ -253,7 +253,7 @@ drift from what the screen shows.
 | **89** | How are Splunk alerts correlated, escalated, and routed? | Which alerts should escalate to SEI rather than to BBH support, and through what channel? |
 
 **Say it carefully, and more carefully than before.** Both SEI documents —
-the architecture pack and the dbt TDD — are SEI's, so "BBH-side" was never
+the architecture pack and the dbt design document — are SEI's, so "BBH-side" was never
 a statement about who wrote what. These twenty were bucketed as *decisions*
 rather than *lookups*, and SEI's material has not been searched exhaustively
 for them. So the standing note on every recommendation reads *"raised by BBH

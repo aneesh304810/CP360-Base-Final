@@ -103,7 +103,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §C.2 | nothing in the pack covers it | C.2 defines the file work item. Nothing defines a collapsed key set, and the file path has no equivalent problem. |
+| BBH File Ingestion Framework Design Document v2.0 | §C.2 | nothing in the pack covers it | C.2 defines the file work item. Nothing defines a collapsed key set, and the file path has no equivalent problem. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -130,7 +130,7 @@ This component does not exist. Nothing in the pack collapses anything; the file 
 
 ### Gap against the SEI pack
 
-- C.2 defines the file work item. Nothing defines a collapsed key set, and the file path has no equivalent problem. *(nearest counterpart: BBH File Ingestion Framework TDD, §C.2)*
+- C.2 defines the file work item. Nothing defines a collapsed key set, and the file path has no equivalent problem. *(nearest counterpart: BBH File Ingestion Framework Design Document, §C.2)*
 
 ## 11. Recommendation
 

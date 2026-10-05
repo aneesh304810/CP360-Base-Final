@@ -112,8 +112,8 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §D.1 | specifies this component | FAILED rerun — reuse the existing registry record. |
-| BBH File Ingestion Framework TDD v2.0 | §D.4 | the pack and this design disagree | Restatement requires a dbt rebuild or rerun for a date already processed. |
+| BBH File Ingestion Framework Design Document v2.0 | §D.1 | specifies this component | FAILED rerun — reuse the existing registry record. |
+| BBH File Ingestion Framework Design Document v2.0 | §D.4 | the pack and this design disagree | Restatement requires a dbt rebuild or rerun for a date already processed. |
 
 **Disagreement with §D.4.** C.1 mandates transform__<BUSINESS_DATE> and that run already succeeded, so Airflow refuses. C.1's reconciliation path fires only when no matching run exists — the opposite case. The run-id rule and the recovery procedure cannot both be satisfied as written.
 

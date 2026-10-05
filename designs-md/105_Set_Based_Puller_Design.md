@@ -118,7 +118,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH dbt Transformation TDD v2 | §Appendix E | nothing in the pack covers it | The canvas starts at SWP_RAW. How rows get there under events — a set-based pull per view per micro-batch — is not described anywhere. |
+| BBH dbt Transformation Design Document v2 | §Appendix E | nothing in the pack covers it | The canvas starts at SWP_RAW. How rows get there under events — a set-based pull per view per micro-batch — is not described anywhere. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -148,7 +148,7 @@ This component does not exist. Per-event retrieval is the default anyone reaches
 
 ### Gap against the SEI pack
 
-- The canvas starts at SWP_RAW. How rows get there under events — a set-based pull per view per micro-batch — is not described anywhere. *(nearest counterpart: BBH dbt Transformation TDD, §Appendix E)*
+- The canvas starts at SWP_RAW. How rows get there under events — a set-based pull per view per micro-batch — is not described anywhere. *(nearest counterpart: BBH dbt Transformation Design Document, §Appendix E)*
 
 ## 11. Recommendation
 

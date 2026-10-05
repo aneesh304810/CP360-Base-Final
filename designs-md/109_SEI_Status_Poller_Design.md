@@ -100,7 +100,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | whole document | nothing in the pack covers it | No SEI status API is described anywhere — no endpoint, no auth, no pagination, no rate limits, no retention window for reject detail. |
+| BBH File Ingestion Framework Design Document v2.0 | whole document | nothing in the pack covers it | No SEI status API is described anywhere — no endpoint, no auth, no pagination, no rate limits, no retention window for reject detail. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -126,7 +126,7 @@ No ranked bottleneck or unowned error path touches this component.
 
 ### Gap against the SEI pack
 
-- No SEI status API is described anywhere — no endpoint, no auth, no pagination, no rate limits, no retention window for reject detail. *(nearest counterpart: BBH File Ingestion Framework TDD, no section — the whole document)*
+- No SEI status API is described anywhere — no endpoint, no auth, no pagination, no rate limits, no retention window for reject detail. *(nearest counterpart: BBH File Ingestion Framework Design Document, no section — the whole document)*
 
 ## 11. Recommendation
 

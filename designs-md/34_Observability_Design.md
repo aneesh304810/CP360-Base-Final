@@ -109,8 +109,8 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §8.1 | touches it, does not specify it | Thirteen operational signals, files_discovered through transformation_triggered. |
-| BBH File Ingestion Framework TDD v2.0 | §E.6 | the pack and this design disagree | Splunk contract for four events, correlation key of event type plus business date, and an explicit prohibition on adding SLA_STATUS, SLA_BREACH_IND or ALERT_SENT_IND to DATE_CONTROL. |
+| BBH File Ingestion Framework Design Document v2.0 | §8.1 | touches it, does not specify it | Thirteen operational signals, files_discovered through transformation_triggered. |
+| BBH File Ingestion Framework Design Document v2.0 | §E.6 | the pack and this design disagree | Splunk contract for four events, correlation key of event type plus business date, and an explicit prohibition on adding SLA_STATUS, SLA_BREACH_IND or ALERT_SENT_IND to DATE_CONTROL. |
 
 **Disagreement with §E.6.** Nine of the thirteen signals have no payload contract, and none of the thirteen covers the event channel — the primary ingestion path has no observability contract at all.
 

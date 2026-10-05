@@ -32,7 +32,7 @@ export const IMPL_ARCHETYPES = {
     ],
     unknown: [
       ["The interface list itself",
-       "The architecture says roughly 43 interfaces per business date. The TDDs model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table.",
+       "The architecture says roughly 43 interfaces per business date. The two design documents model exactly three RAW tables — RAW_ACCOUNT, RAW_CLIENT, RAW_TRANSACTION — with RAW_POSITION appearing in figures and nowhere else. Either forty are undocumented, or 'interface' counts something other than a table.",
        "Ask for the list before sizing anything. Until it exists, design for the three that are modelled and mark every count that depends on interface cardinality as provisional."],
       ["Volume per interface",
        "No file sizes, row counts or growth rates anywhere. Pod sizing, storage, retention and the SLA budget all depend on them.",

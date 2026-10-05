@@ -95,8 +95,8 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §C.1 | specifies this component | The three-task DAG: discover_work_items, process_file.expand(...), evaluate_completeness_and_sla under trigger_rule='all_done'. |
-| BBH File Ingestion Framework TDD v2.0 | §C.4 | touches it, does not specify it | Three guardrails, of which 'no large file contents through XCom' is the one that constrains the loader's shape. |
+| BBH File Ingestion Framework Design Document v2.0 | §C.1 | specifies this component | The three-task DAG: discover_work_items, process_file.expand(...), evaluate_completeness_and_sla under trigger_rule='all_done'. |
+| BBH File Ingestion Framework Design Document v2.0 | §C.4 | touches it, does not specify it | Three guardrails, of which 'no large file contents through XCom' is the one that constrains the loader's shape. |
 
 ## 10. Gaps, Risks & What Is Missing
 

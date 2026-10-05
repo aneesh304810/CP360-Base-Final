@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { DESIGN_DOCS } from "./designDocsData.js";
-import { TDD_ALIGN, TDD_VERDICTS, TDD_DOC, TDD_SOURCE }
- from "./hubTddAlignment.js";
+import { DBTDOC_ALIGN, DBTDOC_VERDICTS, DBTDOC_NAME, DBTDOC_SOURCE }
+ from "./hubDbtDocAlignment.js";
 
 // =====================================================================
 // DocDrill — the shared design-document viewer/editor. Used by
@@ -89,9 +89,9 @@ export default function DocDrill({ t, docKey, from, onBack }) {
         component used to drop you into a document that never names it.
         This answers "what is #15" before the document starts. */}
     {(() => {
-      const td = doc.from && TDD_ALIGN[doc.from.id];
+      const td = doc.from && DBTDOC_ALIGN[doc.from.id];
       if (!td) return null;
-      const [vc, vl] = TDD_VERDICTS[td.v];
+      const [vc, vl] = DBTDOC_VERDICTS[td.v];
       return (
        <div style={{ background: "#fff", border: "1px solid #dfe6e9",
         borderLeft: `3px solid ${vc}`, borderRadius: 8, padding: "12px 16px",
@@ -106,7 +106,7 @@ export default function DocDrill({ t, docKey, from, onBack }) {
          {chip(vc + "1f", vc, vl.toUpperCase())}
          <b style={{ fontSize: 11, color: "#0f4775" }}>{td.name}</b>
          <span style={{ fontSize: 9.5, color: t.sub || "#666" }}>
-          {TDD_DOC} · {TDD_SOURCE} · {td.ev}</span>
+          {DBTDOC_NAME} · {DBTDOC_SOURCE} · {td.ev}</span>
         </div>
        </div>);
     })()}

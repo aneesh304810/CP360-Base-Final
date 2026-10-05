@@ -168,8 +168,8 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH dbt Transformation TDD v2 | §B.3 | specifies this component | dim_account.sql — SCD2 by direct compare rather than snapshot, incremental merge on account_key, on_schema_change='fail'. The change predicate lists only account_type and situs_code. |
-| BBH dbt Transformation TDD v2 | §B.4 | specifies this component | int_transaction_for_fact.sql — ephemeral, never persisted. Assembles today's INT rows plus the OPEN replay worklist, then resolves dimension keys and stamps MISSING_DIMENSION_KEY. |
+| BBH dbt Transformation Design Document v2 | §B.3 | specifies this component | dim_account.sql — SCD2 by direct compare rather than snapshot, incremental merge on account_key, on_schema_change='fail'. The change predicate lists only account_type and situs_code. |
+| BBH dbt Transformation Design Document v2 | §B.4 | specifies this component | int_transaction_for_fact.sql — ephemeral, never persisted. Assembles today's INT rows plus the OPEN replay worklist, then resolves dimension keys and stamps MISSING_DIMENSION_KEY. |
 
 ## 10. Gaps, Risks & What Is Missing
 

@@ -102,7 +102,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §C.4 | nothing in the pack covers it | C.4 is the inbound structural gate. G1 to G5 all face inbound; nothing validates a loader before it is published, so today the first validator of a BBH loader is SEI. |
+| BBH File Ingestion Framework Design Document v2.0 | §C.4 | nothing in the pack covers it | C.4 is the inbound structural gate. G1 to G5 all face inbound; nothing validates a loader before it is published, so today the first validator of a BBH loader is SEI. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -129,7 +129,7 @@ This component does not exist. G1 to G5 all face inbound. Nothing validates anyt
 
 ### Gap against the SEI pack
 
-- C.4 is the inbound structural gate. G1 to G5 all face inbound; nothing validates a loader before it is published, so today the first validator of a BBH loader is SEI. *(nearest counterpart: BBH File Ingestion Framework TDD, §C.4)*
+- C.4 is the inbound structural gate. G1 to G5 all face inbound; nothing validates a loader before it is published, so today the first validator of a BBH loader is SEI. *(nearest counterpart: BBH File Ingestion Framework Design Document, §C.4)*
 
 ## 11. Recommendation
 

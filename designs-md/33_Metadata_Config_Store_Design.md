@@ -112,7 +112,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §6.1 | touches it, does not specify it | FILE_SCHEMA_CONFIG — the only configuration store in the pack, and it covers file metadata only. |
+| BBH File Ingestion Framework Design Document v2.0 | §6.1 | touches it, does not specify it | FILE_SCHEMA_CONFIG — the only configuration store in the pack, and it covers file metadata only. |
 
 ## 10. Gaps, Risks & What Is Missing
 

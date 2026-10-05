@@ -17,13 +17,13 @@
 
 export const SEI_SOURCE_INDEX = {
   "file-ingestion-tdd": {
-    title: "BBH File Ingestion Framework TDD",
+    title: "BBH File Ingestion Framework Design Document",
     version: "2.0",
     expect: "file-ingestion-tdd-v2.0.pdf",
     covers: "Discovery, registry, state machine, completeness, SLA, recovery — the file path end to end.",
   },
   "dbt-transformation-tdd": {
-    title: "BBH dbt Transformation TDD",
+    title: "BBH dbt Transformation Design Document",
     version: "2",
     expect: "dbt-transformation-tdd-v2.pdf",
     covers: "RAW to STG to INT to DIM and FACT, SCD2, hold-and-replay, reconciliation boundaries.",

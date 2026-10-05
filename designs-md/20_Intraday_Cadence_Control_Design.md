@@ -100,7 +100,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §C.3 | nothing in the pack covers it | The pack has a five-minute discovery loop and no intraday cadence model, no intraday SLA and no definition of 'behind' during the day. Its only clock is the EOD cutoff. |
+| BBH File Ingestion Framework Design Document v2.0 | §C.3 | nothing in the pack covers it | The pack has a five-minute discovery loop and no intraday cadence model, no intraday SLA and no definition of 'behind' during the day. Its only clock is the EOD cutoff. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -124,7 +124,7 @@ No ranked bottleneck or unowned error path touches this component.
 
 ### Gap against the SEI pack
 
-- The pack has a five-minute discovery loop and no intraday cadence model, no intraday SLA and no definition of 'behind' during the day. Its only clock is the EOD cutoff. *(nearest counterpart: BBH File Ingestion Framework TDD, §C.3)*
+- The pack has a five-minute discovery loop and no intraday cadence model, no intraday SLA and no definition of 'behind' during the day. Its only clock is the EOD cutoff. *(nearest counterpart: BBH File Ingestion Framework Design Document, §C.3)*
 
 ## 11. Recommendation
 

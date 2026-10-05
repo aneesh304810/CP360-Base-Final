@@ -47,7 +47,7 @@
 //              AND THEY DO NOT ACCUSE SEI OF AN OMISSION. These questions
 //              have not been put to the SEI pack — they were bucketed as
 //              decisions rather than lookups from the start, and BOTH
-//              SEI documents — the architecture pack and the dbt TDD
+//              SEI documents — the architecture pack and the dbt design document
 //              — are SEI's. So the standing note below says
 //              "raised by BBH", not "SEI left this out", and says plainly
 //              that SEI's text supersedes this if it covers the point.
@@ -117,7 +117,7 @@ export const SEED_ANSWERS = [
 + "So the answerable form of this question is “what is Stage 2”, and that "
 + "is the scope. Reading “enriched” and “Stage 2” as the same thing is "
 + "BBH's inference, not a statement in the pack.\n\n"
-+ "AND THE OTHER DOCUMENT DISAGREES WITH THAT INFERENCE. The dbt TDD does "
++ "AND THE OTHER DOCUMENT DISAGREES WITH THAT INFERENCE. The dbt design document does "
 + "use the word, as a band label: “SILVER (Enriched)”. There it maps the "
 + "CURRENT STG2 onto TWO new objects — STG (a view) plus INT (persistence) "
 + "— not onto one. So “the enriched layer” names two things, one of which "
@@ -125,11 +125,11 @@ export const SEED_ANSWERS = [
   gap:
 "Two things. The pack never uses the word the question is built on, so "
 + "somebody should get SEI to confirm in one line that the enriched layer "
-+ "IS Stage 2 — and, given the TDD, whether it is STG, INT, or both. This "
++ "IS Stage 2 — and, given the design document, whether it is STG, INT, or both. This "
 + "is cheap to settle and expensive to assume. And “business "
 + "transformations” is a category, not a list: no enrichment operation is "
 + "enumerated per interface or domain.",
-  quote: QUOTE_STAGE2, ev: [REF_ARCH, "dbt TDD §2 — What Changes and What Stays the Same"] },
+  quote: QUOTE_STAGE2, ev: [REF_ARCH, "dbt design doc §2 — What Changes and What Stays the Same"] },
 
 { n: 2, conf: "document",
   body:
@@ -202,7 +202,7 @@ export const SEED_ANSWERS = [
 + "open — see questions 6 and 9.",
   quote: "INT reads only PASS rows... map codes (ACCOUNT_TYPE, SITUS_CODE); "
        + "keyed on natural key + BUSINESS_DATE; partition-drop purge.",
-  ev: ["Transformation TDD p.10"] },
+  ev: ["Transformation Design Document p.10"] },
 
 { n: 8, conf: "document",
   body:
@@ -216,7 +216,7 @@ export const SEED_ANSWERS = [
   quote: "Silver STG is a non-persisted view... computes the Source DQ flag "
        + "DQ_STATUS_CD / DQ_FAIL_REASON_CDS. … INT reads only PASS rows and "
        + "is keyed on the natural business key plus BUSINESS_DATE.",
-  ev: ["Transformation TDD p.5", "Transformation TDD p.12"] },
+  ev: ["Transformation Design Document p.5", "Transformation Design Document p.12"] },
 
 { n: 9, conf: "document", fig: "layers",
   body:
@@ -234,7 +234,7 @@ export const SEED_ANSWERS = [
        + "DQ_STATUS_CD / DQ_FAIL_REASON_CDS. … INT... Reads only PASS rows; "
        + "map codes. … Gold DIM... Direct-compare atomic MERGE. … Gold "
        + "FACT... loads only dimension-resolved transactions.",
-  ev: ["Transformation TDD p.10", "Transformation TDD p.12–15"] },
+  ev: ["Transformation Design Document p.10", "Transformation Design Document p.12–15"] },
 
 { n: 10, conf: "absence",
   body:
@@ -247,7 +247,7 @@ export const SEED_ANSWERS = [
 + "a canonical model, so if consumers may read it directly they are "
 + "building on something SEI has said is not a contract. It needs an "
 + "answer before any consumer is pointed at it.",
-  ev: ["SEI Architecture", "Transformation TDD"] },
+  ev: ["SEI Architecture", "Transformation Design Document"] },
 
 { n: 11, conf: "absence",
   body:
@@ -258,7 +258,7 @@ export const SEED_ANSWERS = [
 "This confirms the SEI pack is silent; it does NOT answer who owns it. "
 + "Ownership here is a contract and SOW question, not an architecture one "
 + "— it will not be found in any document and has to be decided.",
-  ev: ["Transformation TDD p.5–7"] },
+  ev: ["Transformation Design Document p.5–7"] },
 
 { n: 12, conf: "absence",
   body:
@@ -269,7 +269,7 @@ export const SEED_ANSWERS = [
 "Same standing as question 11: the search is done, the answer is a "
 + "commercial decision. The two readings differ by a large amount of BBH "
 + "analyst effort, which is why it is worth closing early.",
-  ev: ["Transformation TDD", "SEI Architecture"] },
+  ev: ["Transformation Design Document", "SEI Architecture"] },
 
 { n: 14, conf: "absence",
   body:
@@ -280,7 +280,7 @@ export const SEED_ANSWERS = [
 "The search is recorded so nobody repeats it. The answer is a RACI line, "
 + "and it belongs with questions 11, 12 and 15 as one decision rather than "
 + "four.",
-  ev: ["Transformation TDD", "SEI Architecture"] },
+  ev: ["Transformation Design Document", "SEI Architecture"] },
 
 { n: 15, conf: "absence",
   body:
@@ -294,7 +294,7 @@ export const SEED_ANSWERS = [
 + "hops and the eleven metrics — and that the ODI-side run has not been "
 + "done. So the method is available and both the owner and the run are "
 + "missing.",
-  ev: ["Transformation TDD", "SEI Architecture"] },
+  ev: ["Transformation Design Document", "SEI Architecture"] },
 { n: 18, conf: "document",
   body:
 "It means the Gold tables keep their structure exactly and change only "
@@ -314,11 +314,11 @@ export const SEED_ANSWERS = [
        + "exist and carry live history from ODI. This project changes only how "
        + "they are populated — ODI mappings become dbt MERGE against the "
        + "identical, unmodified structure.",
-  ev: ["dbt TDD §6.4 — Gold Constraint: Pre-Existing Tables", "dbt TDD §3.2 — Design Principles"] },
+  ev: ["dbt design doc §6.4 — Gold Constraint: Pre-Existing Tables", "dbt design doc §3.2 — Design Principles"] },
 
 { n: 19, conf: "document",
   body:
-"Yes — that is exactly the stated intent, and the TDD makes it a design "
+"Yes — that is exactly the stated intent, and the design document makes it a design "
 + "principle rather than an aspiration: “Never alter a pre-existing Gold "
 + "table's schema — all Gold writes are DML-only MERGE against the current "
 + "column list.”\n\n"
@@ -332,7 +332,7 @@ export const SEED_ANSWERS = [
 + "gap and has not been produced.",
   quote: "Never alter a pre-existing Gold table's schema — all Gold writes "
        + "are DML-only MERGE against the current column list.",
-  ev: ["dbt TDD §3.2 — Design Principles (p.8)", "dbt TDD §6.4"] },
+  ev: ["dbt design doc §3.2 — Design Principles (p.8)", "dbt design doc §6.4"] },
 
 { n: 21, conf: "codebase", fig: "envs",
   body:
@@ -361,7 +361,7 @@ export const SEED_ANSWERS = [
 
 { n: 28, conf: "document", fig: "layers",
   body:
-"Layer for layer, and the TDD uses the same phrase this question does: "
+"Layer for layer, and the design document uses the same phrase this question does: "
 + "SWP_RAW \u2192 STG (view) \u2192 INT \u2192 approved DIM/FACT, with dbt "
 + "replacing ODI. What runs at each step:\n\n"
 + "\u2022 SWP_RAW \u2014 the file as delivered. Append-only, with file and "
@@ -388,10 +388,10 @@ export const SEED_ANSWERS = [
 + "success.",
   gap:
 "The SEI half of this question is in a document BBH does not have. The "
-+ "TDD\u2019s own scope boundary puts SWP file generation, external file "
++ "design document\u2019s own scope boundary puts SWP file generation, external file "
 + "transfer, physical file discovery, header and trailer validation, and the "
 + "RAW load itself OUTSIDE it \u2014 the RAW load is owned by a separate "
-+ "Ingestion Framework TDD. So everything above starts at the point the data "
++ "File Ingestion Framework Design Document. So everything above starts at the point the data "
 + "is already sitting in SWP_RAW. How it got that far is that other "
 + "document\u2019s to answer, and getting hold of it would close most of "
 + "topic 10 as well.\n\n"
@@ -400,9 +400,9 @@ export const SEED_ANSWERS = [
   quote: "Like-for-like layer mapping: SWP_RAW \u2192 STG (view) \u2192 INT "
        + "\u2192 approved DIM/FACT, replacing ODI with version-controlled, "
        + "testable dbt SQL.",
-  ev: ["dbt TDD \u00a71.1 \u2014 Key Outcomes (p.5)",
-       "dbt TDD \u00a74.1 \u2014 Medallion Mapping (p.10)",
-       "dbt TDD \u00a71.2 \u2014 Scope Boundary (p.6)"] },
+  ev: ["dbt design document \u00a71.1 \u2014 Key Outcomes (p.5)",
+       "dbt design document \u00a74.1 \u2014 Medallion Mapping (p.10)",
+       "dbt design document \u00a71.2 \u2014 Scope Boundary (p.6)"] },
 
 { n: 32, conf: "document", fig: "dqstore",
   body:
@@ -426,11 +426,11 @@ export const SEED_ANSWERS = [
   quote: "No record that fails a DQ check proceeds to the next layer: "
        + "failures are held in the DQ store and replayed once resolvable — "
        + "never silently dropped and never loaded with placeholder keys.",
-  ev: ["dbt TDD §3.2 — Design Principles (p.8)", "dbt TDD §7.1 — Capture and Publishing (p.17)"] },
+  ev: ["dbt design doc §3.2 — Design Principles (p.8)", "dbt design doc §7.1 — Capture and Publishing (p.17)"] },
 
 { n: 33, conf: "document", fig: "dqstore",
   body:
-"It depends which category the failure is, and the TDD splits them by "
+"It depends which category the failure is, and the design document splits them by "
 + "OWNER:\n\n"
 + "• SOURCE DQ — the incoming record is malformed. Owner: the SWP source "
 + "system. reprocess_eligible = N: nothing BBH does fixes it, so it waits "
@@ -457,7 +457,7 @@ export const SEED_ANSWERS = [
   quote: "On Day N+1 the dimension arrives; the replay step re-derives the "
        + "OPEN row from INT, the fact model resolves it, loads FACT with a "
        + "real ACCOUNT_KEY, and flips resolution_status to RESOLVED.",
-  ev: ["dbt TDD §7.1 — Capture and Publishing (p.17)", "dbt TDD §7 — Figure 5a"] },
+  ev: ["dbt design doc §7.1 — Capture and Publishing (p.17)", "dbt design doc §7 — Figure 5a"] },
 
 { n: 34, conf: "document", fig: "recon",
   body:
@@ -478,7 +478,7 @@ export const SEED_ANSWERS = [
 + "a reconciliation somebody runs.",
   quote: "Eligible INT rows = FACT rows loaded + OPEN missing-dimension rows "
        + "in the DQ store; nothing is loaded with a placeholder key.",
-  ev: ["dbt TDD §7.2 — Reconciliation Boundaries (p.18)"] },
+  ev: ["dbt design doc §7.2 — Reconciliation Boundaries (p.18)"] },
 
 { n: 35, conf: "codebase",
   body:
@@ -529,7 +529,7 @@ export const SEED_ANSWERS = [
        + "loaded + OPEN missing-dimension rows in the DQ store; nothing is "
        + "loaded with a placeholder key.",
   gap:
-"CORRECTED against the dbt TDD. I previously wrote that the design has no "
+"CORRECTED against the dbt design document. I previously wrote that the design has no "
 + "hop for INT. That is true of Variance 360's three hops, and NOT true of "
 + "the design: §7.2 defines FOUR boundaries, each with an equation that "
 + "must hold or it raises a WARNING —\n\n"
@@ -545,7 +545,7 @@ export const SEED_ANSWERS = [
 + "evidence this. Note also that status is derived Splunk-side from the "
 + "published counts and is not stored, so there is no queryable history of "
 + "which boundary warned when.",
-  ev: ["dbt TDD §7.2 — Reconciliation Boundaries (p.18)", "recon_summary (sql/31)",
+  ev: ["dbt design doc §7.2 — Reconciliation Boundaries (p.18)", "recon_summary (sql/31)",
        "Variance 360"] },
 
 { n: 38, conf: "document", fig: "dqstore",
@@ -587,9 +587,9 @@ export const SEED_ANSWERS = [
   quote: "Every failing record is written to one store, DQ_VALIDATION_FAILURE, "
        + "and is held at its failing layer \u2014 it never proceeds to the "
        + "next layer.",
-  ev: ["dbt TDD \u00a77.1 \u2014 Capture and Publishing (p.17)",
-       "dbt TDD \u00a77.2 \u2014 Reconciliation Boundaries (p.18)",
-       "dbt TDD Appendix A.1 \u2014 Two-DAG Task Sequence (p.25)"] },
+  ev: ["dbt design document \u00a77.1 \u2014 Capture and Publishing (p.17)",
+       "dbt design document \u00a77.2 \u2014 Reconciliation Boundaries (p.18)",
+       "dbt design doc Appendix A.1 \u2014 Two-DAG Task Sequence (p.25)"] },
 
 { n: 39, conf: "codebase",
   body:
@@ -698,7 +698,7 @@ export const SEED_ANSWERS = [
 + "asking before the dimension list is treated as final.",
   quote: "DIM_ACCOUNT, DIM_INTERESTED_PARTY, and FACT_TRANSACTIONS already "
        + "exist and carry live history from ODI.",
-  ev: ["dbt TDD §4.1 — Medallion Mapping", "dbt TDD §10 — Figure 6, logical data model"] },
+  ev: ["dbt design doc §4.1 — Medallion Mapping", "dbt design doc §10 — Figure 6, logical data model"] },
 
 { n: 45, conf: "practice",
   seiAsk:
@@ -767,7 +767,7 @@ export const SEED_ANSWERS = [
   quote: "A later change has already closed that interval (ACTIVE_IND=0). → "
        + "Direct UPDATE of the specific closed historical row; must NOT MERGE "
        + "(would reopen a closed interval).",
-  ev: ["dbt TDD §6.4.1 — SCD2 MERGE and the MERGE-vs-UPDATE Reprocessing Rule (p.15)"] },
+  ev: ["dbt design doc §6.4.1 — SCD2 MERGE and the MERGE-vs-UPDATE Reprocessing Rule (p.15)"] },
 
 { n: 48, conf: "document", fig: "scd2",
   body:
@@ -786,7 +786,7 @@ export const SEED_ANSWERS = [
   quote: "a changed account closes its current row (ACTIVE_IND → 0, END_DATE "
        + "set) and opens a new one (ACTIVE_IND = 1, new ACCOUNT_KEY, "
        + "START_DATE = business date)",
-  ev: ["dbt TDD §6.4.1 (p.15)"] },
+  ev: ["dbt design doc §6.4.1 (p.15)"] },
 
 { n: 49, conf: "codebase",
   body:
@@ -852,7 +852,7 @@ export const SEED_ANSWERS = [
 + "next to DATE_CONTROL and the existing sequence.",
   gap:
 "We have the name and not the shape. FILE_SCHEMA_CONFIG has no DDL anywhere "
-+ "in the TDD \u2014 unlike DATE_CONTROL, DQ_VALIDATION_FAILURE and "
++ "in the design document \u2014 unlike DATE_CONTROL, DQ_VALIDATION_FAILURE and "
 + "RECON_RESULT, which all have one. It belongs to the Ingestion Framework, "
 + "which the scope boundary puts outside this document, so the columns, who "
 + "maintains the rows, and whether a row is effective-dated are all "
@@ -863,9 +863,9 @@ export const SEED_ANSWERS = [
 + "interface expected; it does not confirm that it was the right file.",
   quote: "After all load tasks, it compares the expected interface set "
        + "(FILE_SCHEMA_CONFIG) against the completed set (FILE_REGISTRY).",
-  ev: ["dbt TDD \u00a75.3 \u2014 Ingestion-to-Transformation Trigger (p.12)",
-       "dbt TDD \u00a710.2 \u2014 Operational Controls Contract (p.23)",
-       "dbt TDD Appendix A.1 (p.25)"] },
+  ev: ["dbt design document \u00a75.3 \u2014 Ingestion-to-Transformation Trigger (p.12)",
+       "dbt design document \u00a710.2 \u2014 Operational Controls Contract (p.23)",
+       "dbt design doc Appendix A.1 (p.25)"] },
 
 { n: 57, conf: "absence",
   body:
@@ -928,7 +928,7 @@ export const SEED_ANSWERS = [
   quote: "If complete — it updates DATE_CONTROL PENDING → TRIGGER and "
        + "invokes the Transformation DAG … If incomplete — it ends normally; "
        + "the date stays PENDING and the next cycle re-checks.",
-  ev: ["dbt TDD §5.1 — Orchestration State Machine", "dbt TDD §5.3 — Ingestion-to-Transformation Trigger"] },
+  ev: ["dbt design doc §5.1 — Orchestration State Machine", "dbt design doc §5.3 — Ingestion-to-Transformation Trigger"] },
 
 { n: 60, conf: "document", fig: "datectl",
   body:
@@ -949,7 +949,7 @@ export const SEED_ANSWERS = [
 + "anyone reading Gold meanwhile.",
   quote: "On failure the run stops with DATE_CONTROL = TRIGGER and restarts "
        + "from the failed task.",
-  ev: ["dbt TDD §5.2 — Figure 3, layer-barrier execution (p.11)"] },
+  ev: ["dbt design doc §5.2 — Figure 3, layer-barrier execution (p.11)"] },
 
 { n: 61, conf: "practice",
   body:
@@ -969,7 +969,7 @@ export const SEED_ANSWERS = [
 "We need to agree how often that check runs and what it does when the "
 + "same day keeps failing. Retrying forever is the wrong answer. A day that "
 + "has failed to start five times needs a person, not another attempt. ",
-  ev: ["idempotent-trigger practice", "dbt TDD §5.3 (deterministic run_id already specified)"] },
+  ev: ["idempotent-trigger practice", "dbt design doc §5.3 (deterministic run_id already specified)"] },
 
 { n: 62, conf: "codebase", fig: "runstate",
   body:
@@ -990,7 +990,7 @@ export const SEED_ANSWERS = [
 "Add queued_at, heartbeat_at and worker_id, and a reaper that moves stale "
 + "'running' rows to a terminal state with a reason. Without the reaper the "
 + "extra columns only record the stall more precisely.\n\n"
-+ "The dbt TDD confirms this is live rather than theoretical: it states "
++ "The dbt design document confirms this is live rather than theoretical: it states "
 + "that the Ingestion DAG acts only on PENDING rows and therefore never "
 + "re-triggers a stuck TRIGGER date, with recovery owned solely by the "
 + "Transformation DAG — the run that, in this failure, was never created. "
@@ -1017,7 +1017,7 @@ export const SEED_ANSWERS = [
   quote: "The Ingestion DAG only acts on PENDING rows, so it never "
        + "re-triggers a stuck TRIGGER date — recovery is owned solely by the "
        + "Transformation DAG.",
-  ev: ["dbt TDD §5.1 — DATE_CONTROL status table (p.11)"] },
+  ev: ["dbt design doc §5.1 — DATE_CONTROL status table (p.11)"] },
 
 { n: 64, conf: "absence",
   body:
@@ -1239,7 +1239,7 @@ export const SEED_ANSWERS = [
 + "RAW pointer or a copy of the payload in a replay store, with its own "
 + "retention set from the maximum dependency wait rather than from INT's "
 + "needs.\n\n"
-+ "THE dbt TDD CONFIRMS THE RISK RATHER THAN RESOLVING IT, and it does so in "
++ "THE dbt design document CONFIRMS THE RISK RATHER THAN RESOLVING IT, and it does so in "
 + "two separate sections that are never read together. §6.5: INT is "
 + "partitioned by BUSINESS_DATE and purged by DROP PARTITION after seven "
 + "days. §7 / Figure 5a: the replay step RE-DERIVES THE OPEN ROW FROM INT. "
@@ -1266,8 +1266,8 @@ export const SEED_ANSWERS = [
   quote: "INT is partitioned by BUSINESS_DATE and purged with ALTER TABLE … "
        + "DROP PARTITION (near-instant metadata work) rather than a row-level "
        + "DELETE.",
-  ev: ["dbt TDD §6.5 — INT Retention via Partition Drop (p.15)",
-       "dbt TDD §7.1 — Capture and Publishing (p.17)"] },
+  ev: ["dbt design doc §6.5 — INT Retention via Partition Drop (p.15)",
+       "dbt design doc §7.1 — Capture and Publishing (p.17)"] },
 
 { n: 75, conf: "practice",
   body:
@@ -1293,7 +1293,7 @@ export const SEED_ANSWERS = [
   gap:
 "Only the second case is specified today. The other three will be "
 + "whatever defaults the tooling came with until we write them down. ",
-  ev: ["retry-taxonomy practice", "dbt TDD §7.1 (the replay class is specified)"] },
+  ev: ["retry-taxonomy practice", "dbt design doc §7.1 (the replay class is specified)"] },
 
 { n: 76, conf: "practice",
   seiAsk:
@@ -1322,7 +1322,7 @@ export const SEED_ANSWERS = [
   gap:
 "The first, second and fourth parts are not written down anywhere. The "
 + "fourth is the one that turns a controlled correction into a complaint. ",
-  ev: ["restatement-runbook practice", "dbt TDD §6.4.1 (the MERGE-vs-UPDATE rule already exists)"] },
+  ev: ["restatement-runbook practice", "dbt design doc §6.4.1 (the MERGE-vs-UPDATE rule already exists)"] },
 
 { n: 77, conf: "codebase",
   body:
@@ -1610,9 +1610,9 @@ export const SEED_ANSWERS = [
 + "itself make anything happen.",
   quote: "SLA_CUTOFF_TS (tz-aware) gates the Ingestion SLA; the *_DAG_RUN_ID "
        + "columns trace which runs acted.",
-  ev: ["dbt TDD Appendix A.2 \u2014 date_control.sql (p.25)",
-       "dbt TDD \u00a710.3 \u2014 Performance, Volumetrics, and SLAs (p.24)",
-       "dbt TDD \u00a79 \u2014 Decision D5 (p.22)"] },
+  ev: ["dbt design doc Appendix A.2 \u2014 date_control.sql (p.25)",
+       "dbt design document \u00a710.3 \u2014 Performance, Volumetrics, and SLAs (p.24)",
+       "dbt design document \u00a79 \u2014 Decision D5 (p.22)"] },
 
 { n: 92, conf: "document",
   body:
@@ -1641,8 +1641,8 @@ export const SEED_ANSWERS = [
   quote: "sla_cutoff_ts TIMESTAMP WITH TIME ZONE NOT NULL, created_ts "
        + "TIMESTAMP WITH TIME ZONE DEFAULT SYSTIMESTAMP NOT NULL, trigger_ts "
        + "TIMESTAMP WITH TIME ZONE, complete_ts TIMESTAMP WITH TIME ZONE",
-  ev: ["dbt TDD Appendix A.2 \u2014 date_control.sql (p.25)",
-       "dbt TDD \u00a710.3 (p.24)"] },
+  ev: ["dbt design doc Appendix A.2 \u2014 date_control.sql (p.25)",
+       "dbt design document \u00a710.3 (p.24)"] },
 
 { n: 93, conf: "document",
   body:
@@ -1672,8 +1672,8 @@ export const SEED_ANSWERS = [
 + "in PENDING, which nothing watches. See question 97.",
   quote: "Daily run window (last file \u2192 all COMPLETE) | TBC \u2014 "
        + "within N hours | Investigate longest layer; scale threads/pods.",
-  ev: ["dbt TDD \u00a710.3 \u2014 Performance, Volumetrics, and SLAs (p.24)",
-       "dbt TDD \u00a79 \u2014 Decision D5 (p.22)"] },
+  ev: ["dbt design document \u00a710.3 \u2014 Performance, Volumetrics, and SLAs (p.24)",
+       "dbt design document \u00a79 \u2014 Decision D5 (p.22)"] },
 
 { n: 94, conf: "absence",
   body:
@@ -1695,7 +1695,7 @@ export const SEED_ANSWERS = [
 + "a rule, not the people who set it.\n\n"
 + "Searched for: owner, responsible, RACI, approver, holiday, calendar, "
 + "override, exception process. \u201cAccountable\u201d appears only on the "
-+ "document-control page, and it refers to the author of the TDD. The only "
++ "document-control page, and it refers to the author of the design document. The only "
 + "human-side ownership stated anywhere is that BBH owns the Splunk "
 + "dashboards and alerting, and that source DQ belongs to the SWP source "
 + "system while transformation DQ belongs to the transformation team.",
@@ -1710,9 +1710,9 @@ export const SEED_ANSWERS = [
 + "Name the owner first and all four answers come from one person. Leave it "
 + "unowned and the cutoff gets set by whoever happens to be on the call the "
 + "first time a file is late.",
-  ev: ["dbt TDD \u00a710.2 \u2014 Operational Controls Contract (p.23)",
-       "dbt TDD \u00a77 \u2014 the two DQ categories and their owners (p.17)",
-       "dbt TDD Appendix A.2 \u2014 date_control.sql (p.25)"] },
+  ev: ["dbt design document \u00a710.2 \u2014 Operational Controls Contract (p.23)",
+       "dbt design document \u00a77 \u2014 the two DQ categories and their owners (p.17)",
+       "dbt design doc Appendix A.2 \u2014 date_control.sql (p.25)"] },
 
 { n: 97, conf: "document", fig: "datectl",
   body:
@@ -1746,14 +1746,14 @@ export const SEED_ANSWERS = [
 + "is a design change and not a runbook entry.",
   quote: "If incomplete \u2014 it ends normally; the date stays PENDING and "
        + "the next cycle re-checks.",
-  ev: ["dbt TDD \u00a75.3 \u2014 Ingestion-to-Transformation Trigger (p.12)",
-       "dbt TDD \u00a78.3 \u2014 Risks and Mitigations (p.21)",
-       "dbt TDD \u00a710.3 (p.24)",
-       "dbt TDD Appendix A.2 \u2014 date_control.sql (p.25)"] },
+  ev: ["dbt design document \u00a75.3 \u2014 Ingestion-to-Transformation Trigger (p.12)",
+       "dbt design document \u00a78.3 \u2014 Risks and Mitigations (p.21)",
+       "dbt design document \u00a710.3 (p.24)",
+       "dbt design doc Appendix A.2 \u2014 date_control.sql (p.25)"] },
 
 { n: 99, conf: "document",
   body:
-"Partly stated, and only for the Silver layers. The dbt TDD gives: STG "
+"Partly stated, and only for the Silver layers. The dbt design document gives: STG "
 + "none, because it is a view and holds no data; INT seven days, purged by "
 + "partition drop on BUSINESS_DATE. Against today's BBH that is a change — "
 + "STG1 is one day and STG2 is seven.\n\n"
@@ -1769,8 +1769,8 @@ export const SEED_ANSWERS = [
 + "the longest replay (question 74). Set those from their dependents, not "
 + "from storage cost. RAW retention is also the floor for any restatement "
 + "reaching further back than seven days.",
-  ev: ["dbt TDD §2 — What Changes and What Stays the Same",
-       "dbt TDD §6.5 (p.15)"] },
+  ev: ["dbt design doc §2 — What Changes and What Stays the Same",
+       "dbt design doc §6.5 (p.15)"] },
 
 { n: 100, conf: "absence",
   body:

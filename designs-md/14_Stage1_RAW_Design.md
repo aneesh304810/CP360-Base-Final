@@ -96,8 +96,8 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §6.1 | specifies this component | FILE_SCHEMA_CONFIG holds file-level metadata only and no column mapping, which makes the RAW DDL the schema contract. |
-| BBH dbt Transformation TDD v2 | §Appendix E | specifies this component | The medallion canvas: SWP files to SWP_RAW (Bronze), then STG, INT, DIM and FACT. |
+| BBH File Ingestion Framework Design Document v2.0 | §6.1 | specifies this component | FILE_SCHEMA_CONFIG holds file-level metadata only and no column mapping, which makes the RAW DDL the schema contract. |
+| BBH dbt Transformation Design Document v2 | §Appendix E | specifies this component | The medallion canvas: SWP files to SWP_RAW (Bronze), then STG, INT, DIM and FACT. |
 
 ## 10. Gaps, Risks & What Is Missing
 

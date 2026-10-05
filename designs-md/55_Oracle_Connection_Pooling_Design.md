@@ -98,7 +98,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §C.1 | touches it, does not specify it | Dynamic task mapping spawns a worker pod per work item, each opening its own connections. Pool sizing is not stated. |
+| BBH File Ingestion Framework Design Document v2.0 | §C.1 | touches it, does not specify it | Dynamic task mapping spawns a worker pod per work item, each opening its own connections. Pool sizing is not stated. |
 
 ## 10. Gaps, Risks & What Is Missing
 

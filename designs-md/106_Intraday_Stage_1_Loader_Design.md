@@ -71,7 +71,7 @@ No DQ or reconciliation obligation specific to this component. Two estate rules 
 Array insert with a tuned batch size, one commit per micro-batch. Row-by-row insert and per-row commit is the classic first wall and it arrives early.
 ### B2 · STG is a view, and events make it run 288 times a day (critical)
 
-The dbt TDD defines STG as a view, recomputed on read. Under a daily file cycle it is recomputed once. Under intraday events, INT is built incrementally all day, so the STG view is recomputed on every incremental run — and each recomputation scans Stage 1. This is the single largest cost the event substitution introduces, and it comes from a design decision that was entirely reasonable when it was made.
+The dbt design document defines STG as a view, recomputed on read. Under a daily file cycle it is recomputed once. Under intraday events, INT is built incrementally all day, so the STG view is recomputed on every incremental run — and each recomputation scans Stage 1. This is the single largest cost the event substitution introduces, and it comes from a design decision that was entirely reasonable when it was made.
 
 **What to do.** Either materialise STG per micro-batch, or ensure the INT incremental predicate pushes down to Stage 1's partition so the view scans one micro-batch rather than the whole accumulated day. Verify the push-down on the actual plan; do not assume it.
 ### B4 · Event staging insert rate (high)
@@ -118,7 +118,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §C.1 | nothing in the pack covers it | The file loader runs once per file per day. A continuous micro-batch loader with one commit per box has no counterpart. |
+| BBH File Ingestion Framework Design Document v2.0 | §C.1 | nothing in the pack covers it | The file loader runs once per file per day. A continuous micro-batch loader with one commit per box has no counterpart. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -148,7 +148,7 @@ This component does not exist. Component 13 is a file ingestion framework. The e
 
 ### Gap against the SEI pack
 
-- The file loader runs once per file per day. A continuous micro-batch loader with one commit per box has no counterpart. *(nearest counterpart: BBH File Ingestion Framework TDD, §C.1)*
+- The file loader runs once per file per day. A continuous micro-batch loader with one commit per box has no counterpart. *(nearest counterpart: BBH File Ingestion Framework Design Document, §C.1)*
 
 ## 11. Recommendation
 

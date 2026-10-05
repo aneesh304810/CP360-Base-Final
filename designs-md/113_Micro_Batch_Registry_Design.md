@@ -98,7 +98,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §6.2 | nothing in the pack covers it | The event channel's FILE_REGISTRY. Micro-batch boxing is per partition, and nothing records which partitions reported. |
+| BBH File Ingestion Framework Design Document v2.0 | §6.2 | nothing in the pack covers it | The event channel's FILE_REGISTRY. Micro-batch boxing is per partition, and nothing records which partitions reported. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -124,7 +124,7 @@ This component does not exist. The event channel's FILE_REGISTRY. It does not ex
 
 ### Gap against the SEI pack
 
-- The event channel's FILE_REGISTRY. Micro-batch boxing is per partition, and nothing records which partitions reported. *(nearest counterpart: BBH File Ingestion Framework TDD, §6.2)*
+- The event channel's FILE_REGISTRY. Micro-batch boxing is per partition, and nothing records which partitions reported. *(nearest counterpart: BBH File Ingestion Framework Design Document, §6.2)*
 
 ## 11. Recommendation
 

@@ -102,7 +102,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §6.1 | nothing in the pack covers it | §6.1 makes the RAW DDL the schema contract by holding no column mapping, and Gold runs on_schema_change='fail'. No section describes how a schema change is notified, with what lead time or what compatibility rule. |
+| BBH File Ingestion Framework Design Document v2.0 | §6.1 | nothing in the pack covers it | §6.1 makes the RAW DDL the schema contract by holding no column mapping, and Gold runs on_schema_change='fail'. No section describes how a schema change is notified, with what lead time or what compatibility rule. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -128,7 +128,7 @@ No ranked bottleneck or unowned error path touches this component.
 
 ### Gap against the SEI pack
 
-- §6.1 makes the RAW DDL the schema contract by holding no column mapping, and Gold runs on_schema_change='fail'. No section describes how a schema change is notified, with what lead time or what compatibility rule. *(nearest counterpart: BBH File Ingestion Framework TDD, §6.1)*
+- §6.1 makes the RAW DDL the schema contract by holding no column mapping, and Gold runs on_schema_change='fail'. No section describes how a schema change is notified, with what lead time or what compatibility rule. *(nearest counterpart: BBH File Ingestion Framework Design Document, §6.1)*
 
 ## 11. Recommendation
 

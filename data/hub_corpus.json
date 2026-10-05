@@ -1222,15 +1222,15 @@
   {
    "answer_id": "seed1",
    "qid": 1,
-   "body": "The document does not use the word “enriched”. What it describes in that position is STAGE 2, defined as the core transformation and metadata management layer: business transformations, source-to-target mappings, reference data, lineage tracking, audit information and data quality controls.\n\nSo the answerable form of this question is “what is Stage 2”, and that is the scope. Reading “enriched” and “Stage 2” as the same thing is BBH's inference, not a statement in the pack.\n\nAND THE OTHER DOCUMENT DISAGREES WITH THAT INFERENCE. The dbt TDD does use the word, as a band label: “SILVER (Enriched)”. There it maps the CURRENT STG2 onto TWO new objects — STG (a view) plus INT (persistence) — not onto one. So “the enriched layer” names two things, one of which stores nothing at all.",
+   "body": "The document does not use the word “enriched”. What it describes in that position is STAGE 2, defined as the core transformation and metadata management layer: business transformations, source-to-target mappings, reference data, lineage tracking, audit information and data quality controls.\n\nSo the answerable form of this question is “what is Stage 2”, and that is the scope. Reading “enriched” and “Stage 2” as the same thing is BBH's inference, not a statement in the pack.\n\nAND THE OTHER DOCUMENT DISAGREES WITH THAT INFERENCE. The dbt design document does use the word, as a band label: “SILVER (Enriched)”. There it maps the CURRENT STG2 onto TWO new objects — STG (a view) plus INT (persistence) — not onto one. So “the enriched layer” names two things, one of which stores nothing at all.",
    "author": "CP360 · drafted from the codebase",
    "is_draft": "Y",
    "conf": "document",
-   "gap": "Two things. The pack never uses the word the question is built on, so somebody should get SEI to confirm in one line that the enriched layer IS Stage 2 — and, given the TDD, whether it is STG, INT, or both. This is cheap to settle and expensive to assume. And “business transformations” is a category, not a list: no enrichment operation is enumerated per interface or domain.",
+   "gap": "Two things. The pack never uses the word the question is built on, so somebody should get SEI to confirm in one line that the enriched layer IS Stage 2 — and, given the design document, whether it is STG, INT, or both. This is cheap to settle and expensive to assume. And “business transformations” is a category, not a list: no enrichment operation is enumerated per interface or domain.",
    "quote": "Stage 2 serves as the core transformation and metadata management layer, handling business transformations, source-to-target mappings, reference data, lineage tracking, audit information, and data quality controls.",
    "sei_ask": null,
    "fig": "terms",
-   "ev": "SEI Architecture p.6 — Stage 2 Design Principles | dbt TDD §2 — What Changes and What Stays the Same"
+   "ev": "SEI Architecture p.6 — Stage 2 Design Principles | dbt design doc §2 — What Changes and What Stays the Same"
   },
   {
    "answer_id": "seed2",
@@ -1308,7 +1308,7 @@
    "quote": "INT reads only PASS rows... map codes (ACCOUNT_TYPE, SITUS_CODE); keyed on natural key + BUSINESS_DATE; partition-drop purge.",
    "sei_ask": null,
    "fig": "layers",
-   "ev": "Transformation TDD p.10"
+   "ev": "Transformation Design Document p.10"
   },
   {
    "answer_id": "seed8",
@@ -1321,7 +1321,7 @@
    "quote": "Silver STG is a non-persisted view... computes the Source DQ flag DQ_STATUS_CD / DQ_FAIL_REASON_CDS. … INT reads only PASS rows and is keyed on the natural business key plus BUSINESS_DATE.",
    "sei_ask": null,
    "fig": null,
-   "ev": "Transformation TDD p.5 | Transformation TDD p.12"
+   "ev": "Transformation Design Document p.5 | Transformation Design Document p.12"
   },
   {
    "answer_id": "seed9",
@@ -1334,7 +1334,7 @@
    "quote": "STG (view)... Non-persisted view: standardize columns; compute DQ_STATUS_CD / DQ_FAIL_REASON_CDS. … INT... Reads only PASS rows; map codes. … Gold DIM... Direct-compare atomic MERGE. … Gold FACT... loads only dimension-resolved transactions.",
    "sei_ask": null,
    "fig": "layers",
-   "ev": "Transformation TDD p.10 | Transformation TDD p.12–15"
+   "ev": "Transformation Design Document p.10 | Transformation Design Document p.12–15"
   },
   {
    "answer_id": "seed10",
@@ -1347,7 +1347,7 @@
    "quote": null,
    "sei_ask": null,
    "fig": null,
-   "ev": "SEI Architecture | Transformation TDD"
+   "ev": "SEI Architecture | Transformation Design Document"
   },
   {
    "answer_id": "seed11",
@@ -1360,7 +1360,7 @@
    "quote": null,
    "sei_ask": null,
    "fig": null,
-   "ev": "Transformation TDD p.5–7"
+   "ev": "Transformation Design Document p.5–7"
   },
   {
    "answer_id": "seed12",
@@ -1373,7 +1373,7 @@
    "quote": null,
    "sei_ask": null,
    "fig": null,
-   "ev": "Transformation TDD | SEI Architecture"
+   "ev": "Transformation Design Document | SEI Architecture"
   },
   {
    "answer_id": "seed14",
@@ -1386,7 +1386,7 @@
    "quote": null,
    "sei_ask": null,
    "fig": null,
-   "ev": "Transformation TDD | SEI Architecture"
+   "ev": "Transformation Design Document | SEI Architecture"
   },
   {
    "answer_id": "seed15",
@@ -1399,7 +1399,7 @@
    "quote": null,
    "sei_ask": null,
    "fig": null,
-   "ev": "Transformation TDD | SEI Architecture"
+   "ev": "Transformation Design Document | SEI Architecture"
   },
   {
    "answer_id": "seed18",
@@ -1412,12 +1412,12 @@
    "quote": "DIM_ACCOUNT, DIM_INTERESTED_PARTY, and FACT_TRANSACTIONS already exist and carry live history from ODI. This project changes only how they are populated — ODI mappings become dbt MERGE against the identical, unmodified structure.",
    "sei_ask": null,
    "fig": null,
-   "ev": "dbt TDD §6.4 — Gold Constraint: Pre-Existing Tables | dbt TDD §3.2 — Design Principles"
+   "ev": "dbt design doc §6.4 — Gold Constraint: Pre-Existing Tables | dbt design doc §3.2 — Design Principles"
   },
   {
    "answer_id": "seed19",
    "qid": 19,
-   "body": "Yes — that is exactly the stated intent, and the TDD makes it a design principle rather than an aspiration: “Never alter a pre-existing Gold table's schema — all Gold writes are DML-only MERGE against the current column list.”\n\nThe reason given is cutover risk: those tables hold live production history, and a schema change risks breaking downstream consumers mid-migration.",
+   "body": "Yes — that is exactly the stated intent, and the design document makes it a design principle rather than an aspiration: “Never alter a pre-existing Gold table's schema — all Gold writes are DML-only MERGE against the current column list.”\n\nThe reason given is cutover risk: those tables hold live production history, and a schema change risks breaking downstream consumers mid-migration.",
    "author": "CP360 · drafted from the codebase",
    "is_draft": "Y",
    "conf": "document",
@@ -1425,7 +1425,7 @@
    "quote": "Never alter a pre-existing Gold table's schema — all Gold writes are DML-only MERGE against the current column list.",
    "sei_ask": null,
    "fig": null,
-   "ev": "dbt TDD §3.2 — Design Principles (p.8) | dbt TDD §6.4"
+   "ev": "dbt design doc §3.2 — Design Principles (p.8) | dbt design doc §6.4"
   },
   {
    "answer_id": "seed21",
@@ -1456,15 +1456,15 @@
   {
    "answer_id": "seed28",
    "qid": 28,
-   "body": "Layer for layer, and the TDD uses the same phrase this question does: SWP_RAW → STG (view) → INT → approved DIM/FACT, with dbt replacing ODI. What runs at each step:\n\n• SWP_RAW — the file as delivered. Append-only, with file and record lineage carried on SRC_RECORD_ID.\n• STG — a VIEW, not a table. It standardises the source columns and computes the source-DQ flag, DQ_STATUS_CD and DQ_FAIL_REASON_CDS. It stores nothing.\n• INT — reads PASS rows only, maps the code sets, keyed on the natural business key plus BUSINESS_DATE, partitioned, kept seven days.\n• DIM — built FIRST. Direct-compare MERGE into the Gold tables that already exist; ACCOUNT_KEY comes from the Oracle sequence that is already there; no DDL.\n• FACT — built SECOND, and only from transactions whose dimension has resolved. A missing dimension is held in DQ_VALIDATION_FAILURE and replayed later, never written to Gold with a placeholder key.\n\n“Approved” is not an approval step, which is worth saying because the word invites that reading. The glossary defines Gold as the approved DIM/FACT — meaning the Gold tables that already exist and that this design is not permitted to alter.\n\nHolding it together is DATE_CONTROL. The Ingestion DAG loads the files and moves the date PENDING → TRIGGER; the Transformation DAG builds the four layers in order and moves the date to COMPLETE only on full success.",
+   "body": "Layer for layer, and the design document uses the same phrase this question does: SWP_RAW → STG (view) → INT → approved DIM/FACT, with dbt replacing ODI. What runs at each step:\n\n• SWP_RAW — the file as delivered. Append-only, with file and record lineage carried on SRC_RECORD_ID.\n• STG — a VIEW, not a table. It standardises the source columns and computes the source-DQ flag, DQ_STATUS_CD and DQ_FAIL_REASON_CDS. It stores nothing.\n• INT — reads PASS rows only, maps the code sets, keyed on the natural business key plus BUSINESS_DATE, partitioned, kept seven days.\n• DIM — built FIRST. Direct-compare MERGE into the Gold tables that already exist; ACCOUNT_KEY comes from the Oracle sequence that is already there; no DDL.\n• FACT — built SECOND, and only from transactions whose dimension has resolved. A missing dimension is held in DQ_VALIDATION_FAILURE and replayed later, never written to Gold with a placeholder key.\n\n“Approved” is not an approval step, which is worth saying because the word invites that reading. The glossary defines Gold as the approved DIM/FACT — meaning the Gold tables that already exist and that this design is not permitted to alter.\n\nHolding it together is DATE_CONTROL. The Ingestion DAG loads the files and moves the date PENDING → TRIGGER; the Transformation DAG builds the four layers in order and moves the date to COMPLETE only on full success.",
    "author": "CP360 · drafted from the codebase",
    "is_draft": "Y",
    "conf": "document",
-   "gap": "The SEI half of this question is in a document BBH does not have. The TDD’s own scope boundary puts SWP file generation, external file transfer, physical file discovery, header and trailer validation, and the RAW load itself OUTSIDE it — the RAW load is owned by a separate Ingestion Framework TDD. So everything above starts at the point the data is already sitting in SWP_RAW. How it got that far is that other document’s to answer, and getting hold of it would close most of topic 10 as well.\n\nThree interfaces are named — Account, Client, Transaction. Nothing says what happens to the rest.",
+   "gap": "The SEI half of this question is in a document BBH does not have. The design document’s own scope boundary puts SWP file generation, external file transfer, physical file discovery, header and trailer validation, and the RAW load itself OUTSIDE it — the RAW load is owned by a separate File Ingestion Framework Design Document. So everything above starts at the point the data is already sitting in SWP_RAW. How it got that far is that other document’s to answer, and getting hold of it would close most of topic 10 as well.\n\nThree interfaces are named — Account, Client, Transaction. Nothing says what happens to the rest.",
    "quote": "Like-for-like layer mapping: SWP_RAW → STG (view) → INT → approved DIM/FACT, replacing ODI with version-controlled, testable dbt SQL.",
    "sei_ask": null,
    "fig": "layers",
-   "ev": "dbt TDD §1.1 — Key Outcomes (p.5) | dbt TDD §4.1 — Medallion Mapping (p.10) | dbt TDD §1.2 — Scope Boundary (p.6)"
+   "ev": "dbt design document §1.1 — Key Outcomes (p.5) | dbt design document §4.1 — Medallion Mapping (p.10) | dbt design document §1.2 — Scope Boundary (p.6)"
   },
   {
    "answer_id": "seed32",
@@ -1477,12 +1477,12 @@
    "quote": "No record that fails a DQ check proceeds to the next layer: failures are held in the DQ store and replayed once resolvable — never silently dropped and never loaded with placeholder keys.",
    "sei_ask": null,
    "fig": "dqstore",
-   "ev": "dbt TDD §3.2 — Design Principles (p.8) | dbt TDD §7.1 — Capture and Publishing (p.17)"
+   "ev": "dbt design doc §3.2 — Design Principles (p.8) | dbt design doc §7.1 — Capture and Publishing (p.17)"
   },
   {
    "answer_id": "seed33",
    "qid": 33,
-   "body": "It depends which category the failure is, and the TDD splits them by OWNER:\n\n• SOURCE DQ — the incoming record is malformed. Owner: the SWP source system. reprocess_eligible = N: nothing BBH does fixes it, so it waits for a corrected resend.\n• TRANSFORMATION DQ — the record is source-clean but our own mapping or Gold logic could not resolve it (an unmapped ACCOUNT_TYPE, a missing dimension key). Owner: the BBH/SEI transformation team. reprocess_eligible = Y, and it auto-replays once resolvable.\n\nThe worked case: a transaction arrives on Day N whose account is not yet in DIM. It is recorded MISSING_DIMENSION_KEY, eligible, OPEN, and NOT loaded. On Day N+1 the dimension arrives, the replay re-derives the OPEN row from INT, FACT loads with a real ACCOUNT_KEY, and the status flips to RESOLVED.",
+   "body": "It depends which category the failure is, and the design document splits them by OWNER:\n\n• SOURCE DQ — the incoming record is malformed. Owner: the SWP source system. reprocess_eligible = N: nothing BBH does fixes it, so it waits for a corrected resend.\n• TRANSFORMATION DQ — the record is source-clean but our own mapping or Gold logic could not resolve it (an unmapped ACCOUNT_TYPE, a missing dimension key). Owner: the BBH/SEI transformation team. reprocess_eligible = Y, and it auto-replays once resolvable.\n\nThe worked case: a transaction arrives on Day N whose account is not yet in DIM. It is recorded MISSING_DIMENSION_KEY, eligible, OPEN, and NOT loaded. On Day N+1 the dimension arrives, the replay re-derives the OPEN row from INT, FACT loads with a real ACCOUNT_KEY, and the status flips to RESOLVED.",
    "author": "CP360 · drafted from the codebase",
    "is_draft": "Y",
    "conf": "document",
@@ -1490,7 +1490,7 @@
    "quote": "On Day N+1 the dimension arrives; the replay step re-derives the OPEN row from INT, the fact model resolves it, loads FACT with a real ACCOUNT_KEY, and flips resolution_status to RESOLVED.",
    "sei_ask": null,
    "fig": "dqstore",
-   "ev": "dbt TDD §7.1 — Capture and Publishing (p.17) | dbt TDD §7 — Figure 5a"
+   "ev": "dbt design doc §7.1 — Capture and Publishing (p.17) | dbt design doc §7 — Figure 5a"
   },
   {
    "answer_id": "seed34",
@@ -1503,7 +1503,7 @@
    "quote": "Eligible INT rows = FACT rows loaded + OPEN missing-dimension rows in the DQ store; nothing is loaded with a placeholder key.",
    "sei_ask": null,
    "fig": "recon",
-   "ev": "dbt TDD §7.2 — Reconciliation Boundaries (p.18)"
+   "ev": "dbt design doc §7.2 — Reconciliation Boundaries (p.18)"
   },
   {
    "answer_id": "seed35",
@@ -1538,11 +1538,11 @@
    "author": "CP360 · drafted from the codebase",
    "is_draft": "Y",
    "conf": "document",
-   "gap": "CORRECTED against the dbt TDD. I previously wrote that the design has no hop for INT. That is true of Variance 360's three hops, and NOT true of the design: §7.2 defines FOUR boundaries, each with an equation that must hold or it raises a WARNING —\n\n  SWP_RAW → STG   RAW rows = STG rows (the view exposes all; FAIL rows carry the flag rather than being dropped)\n  STG → INT       STG PASS = INT rows; STG = INT + Source-DQ-filtered\n  INT → DIM       NEW + CHANGED = Gold inserts; CHANGED = row closures\n  INT → FACT      eligible INT = FACT loaded + OPEN missing-dimension rows in the DQ store\n\nThe real gap is therefore the opposite of what I wrote: the DESIGN has four boundaries and VARIANCE 360 HAS THREE. The tool is behind the design, and INT→DIM and INT→FACT need their own counters before it can evidence this. Note also that status is derived Splunk-side from the published counts and is not stored, so there is no queryable history of which boundary warned when.",
+   "gap": "CORRECTED against the dbt design document. I previously wrote that the design has no hop for INT. That is true of Variance 360's three hops, and NOT true of the design: §7.2 defines FOUR boundaries, each with an equation that must hold or it raises a WARNING —\n\n  SWP_RAW → STG   RAW rows = STG rows (the view exposes all; FAIL rows carry the flag rather than being dropped)\n  STG → INT       STG PASS = INT rows; STG = INT + Source-DQ-filtered\n  INT → DIM       NEW + CHANGED = Gold inserts; CHANGED = row closures\n  INT → FACT      eligible INT = FACT loaded + OPEN missing-dimension rows in the DQ store\n\nThe real gap is therefore the opposite of what I wrote: the DESIGN has four boundaries and VARIANCE 360 HAS THREE. The tool is behind the design, and INT→DIM and INT→FACT need their own counters before it can evidence this. Note also that status is derived Splunk-side from the published counts and is not stored, so there is no queryable history of which boundary warned when.",
    "quote": "STG → INT: STG PASS rows = INT rows; STG count = INT count + Source-DQ-filtered count. … INT → FACT: Eligible INT rows = FACT rows loaded + OPEN missing-dimension rows in the DQ store; nothing is loaded with a placeholder key.",
    "sei_ask": null,
    "fig": "recon",
-   "ev": "dbt TDD §7.2 — Reconciliation Boundaries (p.18) | recon_summary (sql/31) | Variance 360"
+   "ev": "dbt design doc §7.2 — Reconciliation Boundaries (p.18) | recon_summary (sql/31) | Variance 360"
   },
   {
    "answer_id": "seed38",
@@ -1555,7 +1555,7 @@
    "quote": "Every failing record is written to one store, DQ_VALIDATION_FAILURE, and is held at its failing layer — it never proceeds to the next layer.",
    "sei_ask": null,
    "fig": "dqstore",
-   "ev": "dbt TDD §7.1 — Capture and Publishing (p.17) | dbt TDD §7.2 — Reconciliation Boundaries (p.18) | dbt TDD Appendix A.1 — Two-DAG Task Sequence (p.25)"
+   "ev": "dbt design document §7.1 — Capture and Publishing (p.17) | dbt design document §7.2 — Reconciliation Boundaries (p.18) | dbt design doc Appendix A.1 — Two-DAG Task Sequence (p.25)"
   },
   {
    "answer_id": "seed39",
@@ -1633,7 +1633,7 @@
    "quote": "DIM_ACCOUNT, DIM_INTERESTED_PARTY, and FACT_TRANSACTIONS already exist and carry live history from ODI.",
    "sei_ask": null,
    "fig": "layers",
-   "ev": "dbt TDD §4.1 — Medallion Mapping | dbt TDD §10 — Figure 6, logical data model"
+   "ev": "dbt design doc §4.1 — Medallion Mapping | dbt design doc §10 — Figure 6, logical data model"
   },
   {
    "answer_id": "seed45",
@@ -1672,7 +1672,7 @@
    "quote": "A later change has already closed that interval (ACTIVE_IND=0). → Direct UPDATE of the specific closed historical row; must NOT MERGE (would reopen a closed interval).",
    "sei_ask": null,
    "fig": "scd2",
-   "ev": "dbt TDD §6.4.1 — SCD2 MERGE and the MERGE-vs-UPDATE Reprocessing Rule (p.15)"
+   "ev": "dbt design doc §6.4.1 — SCD2 MERGE and the MERGE-vs-UPDATE Reprocessing Rule (p.15)"
   },
   {
    "answer_id": "seed48",
@@ -1685,7 +1685,7 @@
    "quote": "a changed account closes its current row (ACTIVE_IND → 0, END_DATE set) and opens a new one (ACTIVE_IND = 1, new ACCOUNT_KEY, START_DATE = business date)",
    "sei_ask": null,
    "fig": "scd2",
-   "ev": "dbt TDD §6.4.1 (p.15)"
+   "ev": "dbt design doc §6.4.1 (p.15)"
   },
   {
    "answer_id": "seed49",
@@ -1733,11 +1733,11 @@
    "author": "CP360 · drafted from the codebase",
    "is_draft": "Y",
    "conf": "document",
-   "gap": "We have the name and not the shape. FILE_SCHEMA_CONFIG has no DDL anywhere in the TDD — unlike DATE_CONTROL, DQ_VALIDATION_FAILURE and RECON_RESULT, which all have one. It belongs to the Ingestion Framework, which the scope boundary puts outside this document, so the columns, who maintains the rows, and whether a row is effective-dated are all unanswered here. That last one is question 54 and it cannot be settled from this document.\n\nAlso worth being clear about what the check is NOT. It is a set difference on interfaces. It confirms that something arrived for each interface expected; it does not confirm that it was the right file.",
+   "gap": "We have the name and not the shape. FILE_SCHEMA_CONFIG has no DDL anywhere in the design document — unlike DATE_CONTROL, DQ_VALIDATION_FAILURE and RECON_RESULT, which all have one. It belongs to the Ingestion Framework, which the scope boundary puts outside this document, so the columns, who maintains the rows, and whether a row is effective-dated are all unanswered here. That last one is question 54 and it cannot be settled from this document.\n\nAlso worth being clear about what the check is NOT. It is a set difference on interfaces. It confirms that something arrived for each interface expected; it does not confirm that it was the right file.",
    "quote": "After all load tasks, it compares the expected interface set (FILE_SCHEMA_CONFIG) against the completed set (FILE_REGISTRY).",
    "sei_ask": null,
    "fig": "datectl",
-   "ev": "dbt TDD §5.3 — Ingestion-to-Transformation Trigger (p.12) | dbt TDD §10.2 — Operational Controls Contract (p.23) | dbt TDD Appendix A.1 (p.25)"
+   "ev": "dbt design document §5.3 — Ingestion-to-Transformation Trigger (p.12) | dbt design document §10.2 — Operational Controls Contract (p.23) | dbt design doc Appendix A.1 (p.25)"
   },
   {
    "answer_id": "seed57",
@@ -1776,7 +1776,7 @@
    "quote": "If complete — it updates DATE_CONTROL PENDING → TRIGGER and invokes the Transformation DAG … If incomplete — it ends normally; the date stays PENDING and the next cycle re-checks.",
    "sei_ask": null,
    "fig": "datectl",
-   "ev": "dbt TDD §5.1 — Orchestration State Machine | dbt TDD §5.3 — Ingestion-to-Transformation Trigger"
+   "ev": "dbt design doc §5.1 — Orchestration State Machine | dbt design doc §5.3 — Ingestion-to-Transformation Trigger"
   },
   {
    "answer_id": "seed60",
@@ -1789,7 +1789,7 @@
    "quote": "On failure the run stops with DATE_CONTROL = TRIGGER and restarts from the failed task.",
    "sei_ask": null,
    "fig": "datectl",
-   "ev": "dbt TDD §5.2 — Figure 3, layer-barrier execution (p.11)"
+   "ev": "dbt design doc §5.2 — Figure 3, layer-barrier execution (p.11)"
   },
   {
    "answer_id": "seed61",
@@ -1802,7 +1802,7 @@
    "quote": null,
    "sei_ask": null,
    "fig": null,
-   "ev": "idempotent-trigger practice | dbt TDD §5.3 (deterministic run_id already specified)"
+   "ev": "idempotent-trigger practice | dbt design doc §5.3 (deterministic run_id already specified)"
   },
   {
    "answer_id": "seed62",
@@ -1811,7 +1811,7 @@
    "author": "CP360 · drafted from the codebase",
    "is_draft": "Y",
    "conf": "codebase",
-   "gap": "Add queued_at, heartbeat_at and worker_id, and a reaper that moves stale 'running' rows to a terminal state with a reason. Without the reaper the extra columns only record the stall more precisely.\n\nThe dbt TDD confirms this is live rather than theoretical: it states that the Ingestion DAG acts only on PENDING rows and therefore never re-triggers a stuck TRIGGER date, with recovery owned solely by the Transformation DAG — the run that, in this failure, was never created. See question 63.",
+   "gap": "Add queued_at, heartbeat_at and worker_id, and a reaper that moves stale 'running' rows to a terminal state with a reason. Without the reaper the extra columns only record the stall more precisely.\n\nThe dbt design document confirms this is live rather than theoretical: it states that the Ingestion DAG acts only on PENDING rows and therefore never re-triggers a stuck TRIGGER date, with recovery owned solely by the Transformation DAG — the run that, in this failure, was never created. See question 63.",
    "quote": null,
    "sei_ask": null,
    "fig": "runstate",
@@ -1828,7 +1828,7 @@
    "quote": "The Ingestion DAG only acts on PENDING rows, so it never re-triggers a stuck TRIGGER date — recovery is owned solely by the Transformation DAG.",
    "sei_ask": null,
    "fig": "datectl",
-   "ev": "dbt TDD §5.1 — DATE_CONTROL status table (p.11)"
+   "ev": "dbt design doc §5.1 — DATE_CONTROL status table (p.11)"
   },
   {
    "answer_id": "seed64",
@@ -1963,7 +1963,7 @@
   {
    "answer_id": "seed74",
    "qid": 74,
-   "body": "The structural answer is the one the question already contains: the replay payload must not live in a layer that has a retention clock. An immutable RAW pointer or a copy of the payload in a replay store, with its own retention set from the maximum dependency wait rather than from INT's needs.\n\nTHE dbt TDD CONFIRMS THE RISK RATHER THAN RESOLVING IT, and it does so in two separate sections that are never read together. §6.5: INT is partitioned by BUSINESS_DATE and purged by DROP PARTITION after seven days. §7 / Figure 5a: the replay step RE-DERIVES THE OPEN ROW FROM INT. So the replay source and the thing on a seven-day clock are the same object.\n\nA held transaction whose dimension arrives on day eight has nothing left to re-derive it from.\n\n§7.1 does handle this, and it is worth being precise about HOW: anything still OPEN at the seven-day edge is CLOSED and alerted. So the loss is DETECTED and raised — it is not silent. But closed-and-alerted is not replayed: the transaction is still not in FACT, and the data it was derived from is gone. The control turns a silent loss into a visible one, which is a real improvement and is not the same as durability.",
+   "body": "The structural answer is the one the question already contains: the replay payload must not live in a layer that has a retention clock. An immutable RAW pointer or a copy of the payload in a replay store, with its own retention set from the maximum dependency wait rather than from INT's needs.\n\nTHE dbt design document CONFIRMS THE RISK RATHER THAN RESOLVING IT, and it does so in two separate sections that are never read together. §6.5: INT is partitioned by BUSINESS_DATE and purged by DROP PARTITION after seven days. §7 / Figure 5a: the replay step RE-DERIVES THE OPEN ROW FROM INT. So the replay source and the thing on a seven-day clock are the same object.\n\nA held transaction whose dimension arrives on day eight has nothing left to re-derive it from.\n\n§7.1 does handle this, and it is worth being precise about HOW: anything still OPEN at the seven-day edge is CLOSED and alerted. So the loss is DETECTED and raised — it is not silent. But closed-and-alerted is not replayed: the transaction is still not in FACT, and the data it was derived from is gone. The control turns a silent loss into a visible one, which is a real improvement and is not the same as durability.",
    "author": "CP360 · drafted from the codebase",
    "is_draft": "Y",
    "conf": "document",
@@ -1971,7 +1971,7 @@
    "quote": "INT is partitioned by BUSINESS_DATE and purged with ALTER TABLE … DROP PARTITION (near-instant metadata work) rather than a row-level DELETE.",
    "sei_ask": null,
    "fig": null,
-   "ev": "dbt TDD §6.5 — INT Retention via Partition Drop (p.15) | dbt TDD §7.1 — Capture and Publishing (p.17)"
+   "ev": "dbt design doc §6.5 — INT Retention via Partition Drop (p.15) | dbt design doc §7.1 — Capture and Publishing (p.17)"
   },
   {
    "answer_id": "seed75",
@@ -1984,7 +1984,7 @@
    "quote": null,
    "sei_ask": null,
    "fig": null,
-   "ev": "retry-taxonomy practice | dbt TDD §7.1 (the replay class is specified)"
+   "ev": "retry-taxonomy practice | dbt design doc §7.1 (the replay class is specified)"
   },
   {
    "answer_id": "seed76",
@@ -1997,7 +1997,7 @@
    "quote": null,
    "sei_ask": "What is SEI's part in a correction? Who declares it, who resends the data, and within what timeframe?",
    "fig": null,
-   "ev": "restatement-runbook practice | dbt TDD §6.4.1 (the MERGE-vs-UPDATE rule already exists)"
+   "ev": "restatement-runbook practice | dbt design doc §6.4.1 (the MERGE-vs-UPDATE rule already exists)"
   },
   {
    "answer_id": "seed77",
@@ -2192,7 +2192,7 @@
    "quote": "SLA_CUTOFF_TS (tz-aware) gates the Ingestion SLA; the *_DAG_RUN_ID columns trace which runs acted.",
    "sei_ask": null,
    "fig": "datectl",
-   "ev": "dbt TDD Appendix A.2 — date_control.sql (p.25) | dbt TDD §10.3 — Performance, Volumetrics, and SLAs (p.24) | dbt TDD §9 — Decision D5 (p.22)"
+   "ev": "dbt design doc Appendix A.2 — date_control.sql (p.25) | dbt design document §10.3 — Performance, Volumetrics, and SLAs (p.24) | dbt design document §9 — Decision D5 (p.22)"
   },
   {
    "answer_id": "seed92",
@@ -2205,7 +2205,7 @@
    "quote": "sla_cutoff_ts TIMESTAMP WITH TIME ZONE NOT NULL, created_ts TIMESTAMP WITH TIME ZONE DEFAULT SYSTIMESTAMP NOT NULL, trigger_ts TIMESTAMP WITH TIME ZONE, complete_ts TIMESTAMP WITH TIME ZONE",
    "sei_ask": null,
    "fig": null,
-   "ev": "dbt TDD Appendix A.2 — date_control.sql (p.25) | dbt TDD §10.3 (p.24)"
+   "ev": "dbt design doc Appendix A.2 — date_control.sql (p.25) | dbt design document §10.3 (p.24)"
   },
   {
    "answer_id": "seed93",
@@ -2218,7 +2218,7 @@
    "quote": "Daily run window (last file → all COMPLETE) | TBC — within N hours | Investigate longest layer; scale threads/pods.",
    "sei_ask": null,
    "fig": null,
-   "ev": "dbt TDD §10.3 — Performance, Volumetrics, and SLAs (p.24) | dbt TDD §9 — Decision D5 (p.22)"
+   "ev": "dbt design document §10.3 — Performance, Volumetrics, and SLAs (p.24) | dbt design document §9 — Decision D5 (p.22)"
   },
   {
    "answer_id": "seed94",
@@ -2236,7 +2236,7 @@
   {
    "answer_id": "seed96",
    "qid": 96,
-   "body": "Nobody. The design has an owner column and what it names is software: the business date and its state are owned by “both DAGs”, the expected-versus-completed check by the Ingestion DAG, the DIM-before-FACT ordering by the Transformation DAG. Those are the components that enforce a rule, not the people who set it.\n\nSearched for: owner, responsible, RACI, approver, holiday, calendar, override, exception process. “Accountable” appears only on the document-control page, and it refers to the author of the TDD. The only human-side ownership stated anywhere is that BBH owns the Splunk dashboards and alerting, and that source DQ belongs to the SWP source system while transformation DQ belongs to the transformation team.",
+   "body": "Nobody. The design has an owner column and what it names is software: the business date and its state are owned by “both DAGs”, the expected-versus-completed check by the Ingestion DAG, the DIM-before-FACT ordering by the Transformation DAG. Those are the components that enforce a rule, not the people who set it.\n\nSearched for: owner, responsible, RACI, approver, holiday, calendar, override, exception process. “Accountable” appears only on the document-control page, and it refers to the author of the design document. The only human-side ownership stated anywhere is that BBH owns the Splunk dashboards and alerting, and that source DQ belongs to the SWP source system while transformation DQ belongs to the transformation team.",
    "author": "CP360 · drafted from the codebase",
    "is_draft": "Y",
    "conf": "absence",
@@ -2244,7 +2244,7 @@
    "quote": null,
    "sei_ask": null,
    "fig": null,
-   "ev": "dbt TDD §10.2 — Operational Controls Contract (p.23) | dbt TDD §7 — the two DQ categories and their owners (p.17) | dbt TDD Appendix A.2 — date_control.sql (p.25)"
+   "ev": "dbt design document §10.2 — Operational Controls Contract (p.23) | dbt design document §7 — the two DQ categories and their owners (p.17) | dbt design doc Appendix A.2 — date_control.sql (p.25)"
   },
   {
    "answer_id": "seed97",
@@ -2257,12 +2257,12 @@
    "quote": "If incomplete — it ends normally; the date stays PENDING and the next cycle re-checks.",
    "sei_ask": null,
    "fig": "datectl",
-   "ev": "dbt TDD §5.3 — Ingestion-to-Transformation Trigger (p.12) | dbt TDD §8.3 — Risks and Mitigations (p.21) | dbt TDD §10.3 (p.24) | dbt TDD Appendix A.2 — date_control.sql (p.25)"
+   "ev": "dbt design document §5.3 — Ingestion-to-Transformation Trigger (p.12) | dbt design document §8.3 — Risks and Mitigations (p.21) | dbt design document §10.3 (p.24) | dbt design doc Appendix A.2 — date_control.sql (p.25)"
   },
   {
    "answer_id": "seed99",
    "qid": 99,
-   "body": "Partly stated, and only for the Silver layers. The dbt TDD gives: STG none, because it is a view and holds no data; INT seven days, purged by partition drop on BUSINESS_DATE. Against today's BBH that is a change — STG1 is one day and STG2 is seven.\n\nRAW and the orchestration tables are NOT covered. No retention is stated for SWP_RAW, DATE_CONTROL, FILE_REGISTRY, DQ_VALIDATION_FAILURE or RECON_RESULT, and nothing in the CP360 schema records one either.",
+   "body": "Partly stated, and only for the Silver layers. The dbt design document gives: STG none, because it is a view and holds no data; INT seven days, purged by partition drop on BUSINESS_DATE. Against today's BBH that is a change — STG1 is one day and STG2 is seven.\n\nRAW and the orchestration tables are NOT covered. No retention is stated for SWP_RAW, DATE_CONTROL, FILE_REGISTRY, DQ_VALIDATION_FAILURE or RECON_RESULT, and nothing in the CP360 schema records one either.",
    "author": "CP360 · drafted from the codebase",
    "is_draft": "Y",
    "conf": "document",
@@ -2270,7 +2270,7 @@
    "quote": "Silver retention | STG 1 day; STG2 7 days | STG none (view); INT 7 days (partition drop) | STG holds no data.",
    "sei_ask": null,
    "fig": null,
-   "ev": "dbt TDD §2 — What Changes and What Stays the Same | dbt TDD §6.5 (p.15)"
+   "ev": "dbt design doc §2 — What Changes and What Stays the Same | dbt design doc §6.5 (p.15)"
   },
   {
    "answer_id": "seed100",

@@ -103,7 +103,7 @@ Estate defaults apply: a dedicated read-only account for any consumer, business 
 
 | Document | Section | Kind | What it says |
 | --- | --- | --- | --- |
-| BBH File Ingestion Framework TDD v2.0 | §6.2 | nothing in the pack covers it | FILE_REGISTRY is the file path's record of receipt. The event path has no staging store specified — and it is entirely BBH-owned, so nobody outside BBH will write it. |
+| BBH File Ingestion Framework Design Document v2.0 | §6.2 | nothing in the pack covers it | FILE_REGISTRY is the file path's record of receipt. The event path has no staging store specified — and it is entirely BBH-owned, so nobody outside BBH will write it. |
 
 ## 10. Gaps, Risks & What Is Missing
 
@@ -130,7 +130,7 @@ This component does not exist. Entirely BBH-owned and nobody is writing it. Ship
 
 ### Gap against the SEI pack
 
-- FILE_REGISTRY is the file path's record of receipt. The event path has no staging store specified — and it is entirely BBH-owned, so nobody outside BBH will write it. *(nearest counterpart: BBH File Ingestion Framework TDD, §6.2)*
+- FILE_REGISTRY is the file path's record of receipt. The event path has no staging store specified — and it is entirely BBH-owned, so nobody outside BBH will write it. *(nearest counterpart: BBH File Ingestion Framework Design Document, §6.2)*
 
 ## 11. Recommendation
 
