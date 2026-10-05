@@ -165,12 +165,94 @@ record on {today} · not yet agreed</p>
 </div></body></html>"""
 
 
+CLASS = {
+    "document":  ("from a document",    "cls-doc"),
+    "codebase":  ("verified in the platform", "cls-code"),
+    "absence":   ("nothing recorded",   "cls-abs"),
+    "inference": ("reasoned, not read", "cls-inf"),
+    "practice":  ("BBH recommendation", "cls-rec"),
+}
+
+
+def build_answers(corpus):
+    """Just the answers and recommendations, grouped by topic.
+
+    No statistics, no chart, no progress bars. This is the reading view:
+    what was asked, what we answered, and what each answer rests on.
+    """
+    Q = {q["qid"]: q for q in corpus["questions"]}
+    A = {a["qid"]: a for a in corpus["answers"]}
+    T = {t["topic_no"]: t["title"] for t in corpus["topics"]}
+    O = {o["owner_code"]: o["name"] for o in corpus["owners"]}
+
+    e = html.escape
+    para = lambda t: "".join(f"<p>{e(p.strip())}</p>"
+                             for p in (t or "").split("\n\n") if p.strip())
+
+    out = []
+    for no in sorted(T):
+        qs = sorted((q for q in Q.values() if q["topic"] == no),
+                    key=lambda x: x["qid"])
+        done = [q for q in qs if q["qid"] in A]
+        if not done:
+            continue
+        out.append(f'<section><h2>{no} · {e(T[no])}</h2>')
+        for q in done:
+            a = A[q["qid"]]
+            label, cls = CLASS.get(a["conf"], (a["conf"], ""))
+            out.append(f"""
+<article class="rec">
+  <header><span class="qn">Q{q['qid']}</span><h3>{e(q['body'])}</h3></header>
+  <p class="meta">raised by {e(O.get(q['owner_code'], ''))}
+     · <span class="badge {cls}">{e(label)}</span></p>
+  {para(a['body'])}
+  {'<blockquote class="quote">' + e(a['quote']) + '</blockquote>'
+   if a.get('quote') else ''}
+  {'<div class="note">' + e(a['gap']) + '</div>' if a.get('gap') else ''}
+  {'<blockquote class="small"><b>Ask SEI ·</b> ' + e(a['sei_ask']) + '</blockquote>'
+   if a.get('sei_ask') else ''}
+  <p class="src">{e(' · '.join(a['ev'].split(' | ')) if a.get('ev') else '')}</p>
+</article>""")
+        still = [q["qid"] for q in qs if q["qid"] not in A]
+        if still:
+            out.append('<p class="foot">Still open in this topic: '
+                       + ", ".join(f"Q{n}" for n in still) + ".</p>")
+        out.append("</section>")
+
+    css = open(os.path.join(ROOT, "tools", "review_pack.css"), encoding="utf-8").read()
+    css += """
+.quote{margin:4px 0 10px 44px;padding:8px 13px;font-size:12.5px;font-style:italic;
+  color:var(--mut);border-left:3px solid var(--line);max-width:68ch}
+.badge.cls-doc{border-color:#9cc2e4;color:#1d3c57}
+.badge.cls-rec{border-color:var(--line)}
+.badge.cls-abs{border-color:var(--warnline);color:var(--warnink)}
+.src{font-size:11px!important;color:var(--mut)!important;margin-top:-2px!important}
+.src:empty{display:none}
+section h2{font-size:13px;margin-bottom:14px}
+"""
+    return ("""<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Review answers</title><style>%s</style></head><body><div class="wrap">
+<h1>CP Integration Hub — answers and recommendations</h1>
+<p class="sub">%d of 108 questions · draft, nothing agreed · %s</p>
+%s
+</div></body></html>""" % (css, len(A), f"{datetime.date.today():%d %B %Y}",
+                           "\n".join(out)))
+
+
 if __name__ == "__main__":
+    import sys
     with open(os.path.join(ROOT, "data", "hub_corpus.json"), encoding="utf-8") as fh:
         corpus = json.load(fh)
-    dest = os.path.join(ROOT, "docs", "review-pack.html")
+    if "--answers" in sys.argv:
+        dest = os.path.join(ROOT, "docs", "answers.html")
+        page = build_answers(corpus)
+    else:
+        dest = os.path.join(ROOT, "docs", "review-pack.html")
+        page = build(corpus)
     with open(dest, "w", encoding="utf-8") as fh:
-        fh.write(build(corpus))
+        fh.write(page)
     print(f"{dest}: {len(corpus['questions'])} questions, "
           f"{len(corpus['answers'])} answered, "
           f"{sum(1 for a in corpus['answers'] if a.get('sei_ask'))} SEI asks")
