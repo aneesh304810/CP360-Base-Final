@@ -1716,40 +1716,44 @@ export const SEED_ANSWERS = [
 
 { n: 97, conf: "document", fig: "datectl",
   body:
-"Nothing happens. That is worth stating flatly, because the design looks "
-+ "like it covers this and it does not.\n\n"
-+ "The ingestion flow has five steps and the fourth one is the answer: if the "
-+ "expected files are incomplete the run ends normally, the date stays "
-+ "PENDING, and the next cycle re-checks. No timer, no escalation, no alert. "
-+ "The date will sit there across as many cycles as it takes.\n\n"
-+ "The alert that does exist is watching the other state. The risk register "
-+ "lists \u201crun stuck in TRIGGER, stalling the pipeline\u201d and "
-+ "mitigates it with an alert on any row in TRIGGER beyond the SLA, and the "
-+ "SLA table carries a stuck-in-TRIGGER alert that pages on-call. But TRIGGER "
-+ "means every file arrived and the transformation is running or has failed. "
-+ "A late file never gets that far, so none of it fires.\n\n"
-+ "And the queue is blocked while this is true. At most one non-COMPLETE row "
-+ "may exist in DATE_CONTROL at any moment, enforced by a unique index, so a "
-+ "date stuck in PENDING also stops the next business date from opening.",
+"CORRECTED. This answer previously said nothing happens, and that was "
++ "wrong \u2014 it was written from the dbt design document alone, which "
++ "scopes this out. The File Ingestion Framework design document owns it, "
++ "and it is specified.\n\n"
++ "At or after the cutoff with files still missing: the date stays PENDING, "
++ "transformation is NOT triggered, and ingestion publishes a correlated "
++ "Splunk breach alert, daily_file_sla_breached, carrying the business "
++ "date, the cutoff, the missing files, the run id, severity and a "
++ "correlation key. The correlation key is event type plus business date, "
++ "so a breach that persists across the five-minute discovery cycle raises "
++ "one alert and not one every five minutes.\n\n"
++ "When the date later completes: publish daily_file_sla_recovered, then "
++ "take the guarded PENDING \u2192 TRIGGER transition and invoke "
++ "transformation. Late is allowed; silent is not.\n\n"
++ "The cutoff itself is SLA_CUTOFF_TS, resolved per business date and "
++ "stored on the DATE_CONTROL row when the next date is seeded. SLA status "
++ "is deliberately NOT a column \u2014 it is derived at run time from the "
++ "status, the cutoff and the missing set, with Splunk doing the "
++ "correlation.",
   gap:
-"This is the cheapest thing on the list to fix. SLA_CUTOFF_TS is already on "
-+ "the row, already time-zone aware, already described as gating the "
-+ "ingestion SLA, and nothing reads it. A stuck-in-PENDING alert is the same "
-+ "shape as the stuck-in-TRIGGER one that is already specified \u2014 "
-+ "compare now against SLA_CUTOFF_TS for the open PENDING date \u2014 and it "
-+ "is the difference between knowing at 07:00 and finding out when somebody "
-+ "asks why yesterday\u2019s report is missing.\n\n"
-+ "What should happen AFTER the alert is a business decision, not a technical "
-+ "one: wait, run on what arrived, or roll the date forward. Note that "
-+ "running on a partial set is not currently possible \u2014 TRIGGER is set "
-+ "only when the expected set is complete \u2014 so if that is the answer it "
-+ "is a design change and not a runbook entry.",
-  quote: "If incomplete \u2014 it ends normally; the date stays PENDING and "
-       + "the next cycle re-checks.",
-  ev: ["dbt design document \u00a75.3 \u2014 Ingestion-to-Transformation Trigger (p.12)",
-       "dbt design document \u00a78.3 \u2014 Risks and Mitigations (p.21)",
-       "dbt design document \u00a710.3 (p.24)",
-       "dbt design doc Appendix A.2 \u2014 date_control.sql (p.25)"] },
+"The alert exists; the number does not. Open decision O5 is to confirm the "
++ "common daily-file SLA time, its timezone and the holiday or exception "
++ "override process, and O7 is to confirm the correlation key, severity, "
++ "routing and recovery handling. So the mechanism is designed and "
++ "unconfigured.\n\n"
++ "What is still genuinely unanswered is the operational decision behind "
++ "the alert: somebody is paged, and then what? Wait, chase SEI, or run on "
++ "what arrived. Running on a partial set is not possible as designed \u2014 "
++ "the guarded transition fires only on an empty missing-set \u2014 so if "
++ "that is ever the answer it is a design change, not a runbook entry.",
+  quote: "Incomplete at/after SLA | Keep PENDING; do not trigger; publish "
+       + "correlated Splunk SLA breach alert.",
+  ev: ["File Ingestion design doc \u00a75.2 \u2014 Evaluate Completeness "
+       + "and SLA (p.10)",
+       "File Ingestion design doc \u00a77.3 \u2014 SLA recovery event "
+       + "contract (p.14)",
+       "File Ingestion design doc Appendix E.4 \u2014 SLA decision (p.24)",
+       "File Ingestion design doc \u00a710 \u2014 open decisions O5, O7 (p.17)"] },
 
 { n: 99, conf: "document",
   body:

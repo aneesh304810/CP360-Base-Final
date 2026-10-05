@@ -34,6 +34,9 @@ import { tLight, tDark } from "../src/bbhTheme.js";
 import { DBTDOC_ALIGN, DBTDOC_VERDICTS, DBTDOC_MISSING, DBTDOC_SELF_CONFLICT, DBTDOC_NAME,
   DBTDOC_SOURCE } from "../src/hubDbtDocAlignment.js";
 import DocDrill, { docFor } from "../src/DocDrill.jsx";
+import { SEI_DOCS, SEI_BOUNDARY, SEI_STAGES, SEI_COMPONENTS, SEI_TABLES,
+  SEI_STATES, SEI_OPEN, SEI_ASSUMPTIONS, SEI_NOT_BUILT }
+  from "../src/seiBaseline.js";
 import { TRACKER_COMPONENTS } from "../src/seiDesignTracker.js";
 
 let bad = 0;
@@ -1092,6 +1095,100 @@ const ys = CAPS.map((c) => c.y);
 ok(ys.every((y, i) => i === 0 || y - ys[i - 1] >= 12),
    "and no two captions are drawn on top of each other",
    ys.join(","));
+
+// ---- the SEI baseline -----------------------------------------------
+//
+// The instruction was to make SEI's own design the base and set the
+// BBH-generated material aside. The value of that is entirely in the
+// discipline: if one inferred box creeps in, the page stops being "what
+// SEI committed to" and becomes another opinion with better typography.
+// So the rules are asserted rather than intended.
+const SEIALL = [...SEI_COMPONENTS, ...SEI_TABLES];
+ok(SEI_COMPONENTS.length > 15 && SEI_TABLES.length >= 8,
+   "the baseline covers both documents end to end",
+   `${SEI_COMPONENTS.length} components, ${SEI_TABLES.length} tables`);
+ok(SEIALL.every((x) => /\u00a7|Appendix|Glossary|Figure/.test(x.ev)),
+   "every entry cites a section, appendix, glossary entry or figure — an "
+   + "uncited box on this page is exactly the thing it exists to exclude",
+   SEIALL.filter((x) => !/\u00a7|Appendix|Glossary|Figure/.test(x.ev))
+     .map((x) => x.id).join(","));
+ok(SEIALL.every((x) => /p\.\s?\d/.test(x.ev)),
+   "and a page number, so a reader can turn to it",
+   SEIALL.filter((x) => !/p\.\s?\d/.test(x.ev)).map((x) => x.id).join(","));
+ok(SEI_NOT_BUILT.every((x) => /p\.\s?\d/.test(x.ev)),
+   "including the exclusions — 'SEI says they are not building it' is a "
+   + "strong claim and needs the strongest citation", "");
+// Every component belongs to a stage that exists, or it renders nowhere.
+const STK = new Set(SEI_STAGES.map((x) => x.k));
+ok(SEI_COMPONENTS.every((c) => STK.has(c.s)),
+   "every component sits in a declared stage",
+   SEI_COMPONENTS.filter((c) => !STK.has(c.s)).map((c) => c.id).join(","));
+ok(SEI_STAGES.every((st) => SEI_COMPONENTS.some((c) => c.s === st.k)),
+   "and every stage has at least one, so no empty band renders",
+   SEI_STAGES.filter((st) => !SEI_COMPONENTS.some((c) => c.s === st.k))
+     .map((st) => st.k).join(","));
+
+// THE RULE THAT MATTERS: no BBH-generated component name may appear.
+// Checked against the tracker itself rather than against a list I keep
+// in my head, because the tracker is where those names come from.
+const BBHNAMES = TRACKER_COMPONENTS
+  .map((c) => c.component)
+  .filter((n) => n && n.length > 7
+    && !/^Gold$|^Oracle|^Splunk|^Airflow/i.test(n));
+const blob = JSON.stringify([SEI_COMPONENTS, SEI_TABLES, SEI_NOT_BUILT,
+                             SEI_ASSUMPTIONS, SEI_BOUNDARY]);
+const leaked = BBHNAMES.filter((n) => blob.includes(n));
+ok(leaked.length === 0,
+   "no BBH tracker component name appears in the SEI baseline — the two "
+   + "models are kept apart on purpose, and the gap between them is a "
+   + "later exercise", leaked.slice(0, 5).join(" | "));
+
+// Both documents are SEI's, and the page says so rather than implying it.
+ok(Object.values(SEI_DOCS).every((d) => /SEI/.test(d.author)),
+   "both design documents name SEI as their author",
+   Object.values(SEI_DOCS).map((d) => `${d.id}:${d.author}`).join(", "));
+ok(Object.values(SEI_DOCS).every((d) => d.scope && d.hands_over),
+   "and each says what it owns AND what it hands over — two documents "
+   + "with no stated seam is how a gap goes unnoticed between them", "");
+ok(/PENDING/.test(SEI_BOUNDARY.line) && /TRIGGER/.test(SEI_BOUNDARY.line),
+   "the seam between them is named as a specific transition, not as a "
+   + "vague boundary", SEI_BOUNDARY.line);
+
+// SEI's open items keep SEI's ids: O-something from ingestion, D-something
+// from the dbt document. A renumbered list cannot be put back to them.
+ok(SEI_OPEN.every((o) => /^[OD]\d+$/.test(o.id)),
+   "open decisions keep SEI's own ids, so they can be quoted back",
+   SEI_OPEN.filter((o) => !/^[OD]\d+$/.test(o.id)).map((o) => o.id).join(","));
+ok(SEI_OPEN.some((o) => o.doc === "ingest") && SEI_OPEN.some((o) => o.doc === "dbt"),
+   "and both documents contribute some", "");
+ok(SEI_ASSUMPTIONS.every((a) => a.a && a.x),
+   "every assumption carries what breaks if it is wrong — an assumption "
+   + "with no consequence is a sentence nobody acts on", "");
+// The two state machines are the operational heart of the design.
+ok(SEI_STATES.date_control.rows.length === 3
+   && SEI_STATES.file_registry.rows.length === 7,
+   "both state machines are complete: three business-date states and "
+   + "seven file lifecycle states",
+   `${SEI_STATES.date_control.rows.length} / ${SEI_STATES.file_registry.rows.length}`);
+ok(SEI_STATES.file_registry.rows.some(([k]) => k === "ARCHIVE_FAILED"),
+   "including ARCHIVE_FAILED — the one that must never reload RAW, and "
+   + "the one a simplified lifecycle always drops", "");
+
+// The screen: a branch, and a way in that says what it is.
+ok(/view === "SEIBASE"/.test(HUB) && /setView\("SEIBASE"\)/.test(HUB),
+   "the baseline has a view and an entry point", "");
+ok(/the SEI baseline/.test(HUB),
+   "and the way in says whose design it is", "");
+
+// THIRD TIME. \uXXXX is an escape in a JS string and six literal
+// characters in JSX text or a JSX attribute, and the two are
+// indistinguishable in a diff. It has shipped twice. The file now holds
+// real characters everywhere and this says so.
+ok(!/\\u[0-9a-fA-F]{4}/.test(HUB),
+   "HubDesign.jsx contains no \\uXXXX escape anywhere — in JSX text and "
+   + "in a JSX attribute it is not an escape, it is six characters on "
+   + "the screen",
+   (HUB.match(/.{0,30}\\u[0-9a-fA-F]{4}.{0,10}/g) || []).slice(0, 3).join(" | "));
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\nhub-discussion assertions pass");
 if (bad) process.exit(1);

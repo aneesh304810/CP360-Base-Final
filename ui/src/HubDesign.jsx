@@ -13,6 +13,9 @@ import SourceReference, { citationsFor } from "./SourceReference.jsx";
 import SeiDocModal from "./SeiDocModal.jsx";
 import { DBTDOC_ALIGN, DBTDOC_VERDICTS, DBTDOC_MISSING, DBTDOC_SELF_CONFLICT, DBTDOC_NAME,
  DBTDOC_SOURCE, dbtDocFor, dbtDocCount } from "./hubDbtDocAlignment.js";
+import { SEI_DOCS, SEI_BOUNDARY, SEI_STAGES, SEI_COMPONENTS, SEI_TABLES,
+ SEI_STATES, SEI_OPEN, SEI_ASSUMPTIONS, SEI_NOT_BUILT, seiCompsIn }
+ from "./seiBaseline.js";
 
 // =====================================================================
 // HubDesign — the CP Integration Hub route: C4 landing (L1 context +
@@ -390,7 +393,7 @@ export default function HubDesign({ t }) {
           STCOL[sx.status] || "#8a97a3", `${sx.status.toUpperCase()} · ${sx.pct}%`)}</span>
          <span style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
           {td && (
-           <span title={`dbt design document: ${DBTDOC_VERDICTS[td.v][1]} \u2014 ${td.name}`}
+           <span title={`dbt design document: ${DBTDOC_VERDICTS[td.v][1]} — ${td.name}`}
             style={{ fontSize: 9, fontWeight: 800, padding: "3px 7px",
              borderRadius: 999, background: DBTDOC_VERDICTS[td.v][0] + "1f",
              color: DBTDOC_VERDICTS[td.v][0], border: `1px solid ${DBTDOC_VERDICTS[td.v][0]}55`,
@@ -654,6 +657,197 @@ export default function HubDesign({ t }) {
          background: STCOL[k], display: "inline-block" }} />{k}</span>))}
       <span>dot on each component = delivery status (edit on the L1 dashboard)</span>
      </div>
+    </div>
+   </div>);
+ }
+
+ /* ---------- The SEI baseline — only what SEI has specified -------
+    Deliberately NOT built from TRACKER_COMPONENTS. The tracker is BBH's
+    workbook and the design documents under it are BBH-generated; this
+    screen is the other thing, the design SEI has actually committed to
+    in its two documents. Keeping them apart is the point — a reader has
+    to be able to tell which boxes SEI will build. The gap between the
+    two is a later exercise, deliberately. */
+ if (view === "SEIBASE") {
+  const Bar = ({ icon, title, note, n, label, bg }) => (
+   <div style={{ display: "flex", alignItems: "center", gap: 12,
+    background: bg || (t.navy || "#10193b"), color: "#fff", borderRadius: 10,
+    padding: "13px 18px", margin: "16px 0 10px" }}>
+    <span style={{ fontSize: 22 }}>{icon}</span>
+    <div><b>{title}</b>
+     <div style={{ fontSize: 10, color: "#a9c1de", marginTop: 2 }}>{note}</div></div>
+    {n !== undefined && (
+     <div style={{ marginLeft: "auto", textAlign: "center", fontSize: 10,
+      color: "#a9c1de" }}><b style={{ display: "block", fontSize: 19,
+      color: "#fff" }}>{n}</b>{label}</div>)}
+   </div>);
+  const Card = ({ children }) => (
+   <div style={{ background: "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+    borderRadius: 8, padding: "12px 16px", marginBottom: 8 }}>{children}</div>);
+  const Cite = ({ v }) => (
+   <div style={{ fontSize: 9.5, color: t.muted || "#999", marginTop: 5 }}>{v}</div>);
+  const DOCC = { ingest: "#0b5e83", dbt: "#6d3ac0", both: "#a8560f",
+   shared: "#a8560f" };
+  return (
+   <div>
+    <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <span onClick={() => setView("L1")} style={{ fontSize: 11.5, fontWeight: 700,
+     padding: "7px 16px", borderRadius: 5, background: t.navy || "#10193b",
+     color: "#fff", cursor: "pointer", display: "inline-block",
+     marginBottom: 12 }}>← context + dashboard</span>
+
+    <div style={{ background: "#0f4775", color: "#fff", borderRadius: 10,
+     padding: "16px 20px", marginBottom: 12 }}>
+     <b style={{ fontSize: 15 }}>The design SEI has specified</b>
+     <div style={{ fontSize: 11.5, color: "#cfe0f2", lineHeight: 1.65,
+      marginTop: 6, maxWidth: 940 }}>
+      Everything on this page comes from one of SEI's two design documents
+      and names the section and page it came from. Nothing is inferred and
+      no BBH component names appear. Where SEI has not decided, it shows
+      as SEI's own open decision rather than as a guess.
+      <br /><br />
+      The 65-component tracker and the design documents generated from it
+      are BBH's, and they are still there — but they are not this. The
+      difference between the two is the gap exercise, and it comes later.
+     </div>
+    </div>
+
+    <div style={{ display: "grid", gap: 8,
+     gridTemplateColumns: "repeat(auto-fit,minmax(360px,1fr))" }}>
+     {Object.values(SEI_DOCS).map((d) => (
+      <Card key={d.id}>
+       <div style={{ display: "flex", alignItems: "center", gap: 8,
+        flexWrap: "wrap" }}>
+        <span style={{ width: 9, height: 9, borderRadius: 2,
+         background: DOCC[d.id] }} />
+        <b style={{ fontSize: 12, color: t.navy || "#10193b" }}>{d.title}</b>
+        {chip("#eef3f8", "#0f4775", `v${d.version}`)}
+       </div>
+       <div style={{ fontSize: 10, color: t.sub || "#666", marginTop: 4 }}>
+        {d.author}{d.date ? ` · ${d.date}` : ""} · {d.stack}</div>
+       <div style={{ fontSize: 11, color: "#33414d", lineHeight: 1.6,
+        marginTop: 7 }}><b>Owns.</b> {d.scope}</div>
+       <div style={{ fontSize: 11, color: "#33414d", lineHeight: 1.6,
+        marginTop: 5 }}><b>Hands over.</b> {d.hands_over}</div>
+      </Card>))}
+    </div>
+
+    <div style={{ background: "#fdf7ea", borderRadius: 8,
+     borderLeft: "3px solid #a8560f", padding: "12px 16px", margin: "4px 0 2px" }}>
+     <div style={{ fontSize: 8.5, fontWeight: 800, color: "#a8560f",
+      letterSpacing: .4 }}>WHERE ONE DOCUMENT ENDS AND THE OTHER BEGINS</div>
+     <div style={{ fontSize: 12, color: "#33414d", lineHeight: 1.65,
+      marginTop: 5 }}>The line is <b>{SEI_BOUNDARY.line}</b>. {SEI_BOUNDARY.note}</div>
+     <Cite v={SEI_BOUNDARY.ev.join(" · ")} />
+    </div>
+
+    {SEI_STAGES.map((st) => {
+     const cs = seiCompsIn(st.k);
+     if (!cs.length) return null;
+     return (
+      <div key={st.k}>
+       <Bar icon="◆" title={st.n} note={st.d} n={cs.length} label="components" />
+       <div style={{ display: "grid", gap: 8 }}>
+        {cs.map((c) => (
+         <Card key={c.id}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8,
+           flexWrap: "wrap" }}>
+           <span style={{ fontFamily: "Roboto Mono, monospace", fontSize: 10,
+            fontWeight: 700, color: "#8a97a3" }}>{c.id}</span>
+           <b style={{ fontSize: 12, color: t.navy || "#10193b" }}>{c.n}</b>
+           {chip("#eef3f8", "#5c7c94", c.tech)}
+          </div>
+          <div style={{ fontSize: 11.5, color: "#33414d", lineHeight: 1.65,
+           marginTop: 5, maxWidth: 940 }}>{c.w}</div>
+          <Cite v={c.ev} />
+         </Card>))}
+       </div>
+      </div>);
+    })}
+
+    <Bar icon="▤" title="The Oracle objects" n={SEI_TABLES.length}
+     label="tables" note="with the columns SEI actually gives" />
+    <div style={{ display: "grid", gap: 8 }}>
+     {SEI_TABLES.map((tb) => (
+      <Card key={tb.id}>
+       <div style={{ display: "flex", alignItems: "center", gap: 8,
+        flexWrap: "wrap" }}>
+        <span style={{ width: 9, height: 9, borderRadius: 2,
+         background: DOCC[tb.doc] || "#8a97a3" }} />
+        <b style={{ fontFamily: "Roboto Mono, monospace", fontSize: 11.5,
+         color: t.navy || "#10193b" }}>{tb.n}</b>
+        {chip("#eef3f8", "#5c7c94", tb.owner)}
+       </div>
+       <div style={{ fontSize: 11.5, color: "#33414d", lineHeight: 1.65,
+        marginTop: 5, maxWidth: 940 }}>{tb.w}</div>
+       <div style={{ fontSize: 10, fontFamily: "Roboto Mono, monospace",
+        color: "#5c7c94", lineHeight: 1.6, marginTop: 6, background: "#f6f9fb",
+        borderRadius: 5, padding: "7px 10px" }}>{tb.cols}</div>
+       <Cite v={tb.ev} />
+      </Card>))}
+    </div>
+
+    {Object.values(SEI_STATES).map((sm) => (
+     <div key={sm.n}>
+      <Bar icon="⥁" title={`${sm.n} — the states`} note={sm.ev}
+       n={sm.rows.length} label="states" />
+      <div style={{ background: "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+       borderRadius: 8, overflow: "hidden" }}>
+       {sm.rows.map(([k, mean, own]) => (
+        <div key={k} style={{ display: "grid",
+         gridTemplateColumns: "150px minmax(0,1fr) minmax(0,1fr)", gap: 12,
+         padding: "10px 14px", fontSize: 11, borderTop: "1px solid #eef1f4" }}>
+         <b style={{ fontFamily: "Roboto Mono, monospace", fontSize: 10.5,
+          color: "#0f4775" }}>{k}</b>
+         <span style={{ color: "#33414d", lineHeight: 1.55 }}>{mean}</span>
+         <span style={{ color: t.sub || "#666", lineHeight: 1.55 }}>{own}</span>
+        </div>))}
+      </div>
+     </div>))}
+
+    <Bar icon="✕" title="Stated as deliberately not built" bg="#5c3030"
+     note="each one is something a reader will otherwise assume is there"
+     n={SEI_NOT_BUILT.length} label="exclusions" />
+    <div style={{ display: "grid", gap: 6 }}>
+     {SEI_NOT_BUILT.map((x) => (
+      <div key={x.t} style={{ background: "#fff", borderRadius: 8,
+       border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderLeft: "3px solid #cc3344",
+       padding: "9px 14px", fontSize: 11.5, color: "#33414d", lineHeight: 1.6 }}>
+       {x.t}<Cite v={x.ev} /></div>))}
+    </div>
+
+    <Bar icon="⚠" title="What the design rests on" bg="#6b5420"
+     note="an assumption that fails here changes the design, not the configuration"
+     n={SEI_ASSUMPTIONS.length} label="assumptions" />
+    <div style={{ background: "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+     borderRadius: 8, overflow: "hidden" }}>
+     {SEI_ASSUMPTIONS.map((a) => (
+      <div key={a.a} style={{ display: "grid",
+       gridTemplateColumns: "74px minmax(0,1fr) minmax(0,1fr)", gap: 12,
+       padding: "10px 14px", fontSize: 11, borderTop: "1px solid #eef1f4" }}>
+       <span>{chip(DOCC[a.doc] + "1f", DOCC[a.doc],
+        a.doc === "ingest" ? "INGEST" : "DBT")}</span>
+       <span style={{ color: "#33414d", lineHeight: 1.55 }}>{a.a}</span>
+       <span style={{ color: "#a8560f", lineHeight: 1.55 }}>
+        <b style={{ fontSize: 9 }}>IF NOT: </b>{a.x}</span>
+      </div>))}
+    </div>
+
+    <Bar icon="○" title="Open with SEI" bg="#4a2f6b"
+     note="SEI's own open items, with SEI's own ids — not BBH's gap list"
+     n={SEI_OPEN.length} label="decisions" />
+    <div style={{ background: "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+     borderRadius: 8, overflow: "hidden", marginBottom: 20 }}>
+     {SEI_OPEN.map((o) => (
+      <div key={o.id} style={{ display: "grid",
+       gridTemplateColumns: "48px 74px minmax(0,1fr)", gap: 12,
+       padding: "10px 14px", fontSize: 11, borderTop: "1px solid #eef1f4" }}>
+       <b style={{ fontFamily: "Roboto Mono, monospace", fontSize: 10.5,
+        color: "#6d3ac0" }}>{o.id}</b>
+       <span>{chip(DOCC[o.doc] + "1f", DOCC[o.doc],
+        o.doc === "ingest" ? "INGEST" : "DBT")}</span>
+       <span style={{ color: "#33414d", lineHeight: 1.55 }}>{o.t}</span>
+      </div>))}
     </div>
    </div>);
  }
@@ -936,6 +1130,11 @@ export default function HubDesign({ t }) {
   <div>
    <SectionHeader t={t}>CP Integration Hub</SectionHeader>
    <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center" }}>
+    <span onClick={() => { setView("SEIBASE"); setExpand(null); }}
+     style={{ fontSize: 10.5, fontWeight: 800, padding: "5px 14px",
+      borderRadius: 999, cursor: "pointer", background: "#0f4775",
+      color: "#fff" }}>
+     ◆ the SEI baseline · {SEI_COMPONENTS.length} components · {SEI_OPEN.length} open with SEI</span>
     <span onClick={() => setView("XC")} style={{ marginLeft: "auto", fontSize: 10.5,
      fontWeight: 700, padding: "5px 14px", borderRadius: 999, cursor: "pointer",
      background: "#fdf1f2", color: "#cc3344", border: "1px solid #f0c9ce" }}>
