@@ -97,7 +97,7 @@ export const SEI_COMPONENTS = [
     + "load-bearing too — every worker pod has to see the same Landing, "
     + "Archive and Quarantine folders.",
    ev: "ingest Glossary (p.25) · §2.1 (p.5)" },
- { id: "S4", s: "deliver", n: "Archive and Quarantine folders", tech: "shared storage",
+ { id: "S4", s: "deliver", n: "Archive and Quarantine", tech: "shared storage",
    tbl: [], open: ["O1"],
    w: "Where a file goes after processing. Archive on success, "
     + "Quarantine when validation fails before anything is written.",
