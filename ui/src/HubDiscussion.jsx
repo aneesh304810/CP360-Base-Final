@@ -482,16 +482,17 @@ function Row({ t, x, S, answers, onOpen, own }) {
     <div onClick={onOpen} style={S.row}>
       <span style={S.qn}>{x.n}</span>
       <span style={S.qt} title={x.body}>{x.body}</span>
-      <span style={S.chips}>{x.comps.slice(0, 2).map((c) =>
+      <span style={S.chips}>{x.comps.slice(0, 1).map((c) =>
         <i key={c} style={S.chip}>{compLabel(c)}</i>)}
-        {x.comps.length > 2 && <i style={S.chip}>+{x.comps.length - 2}</i>}
+        {x.comps.length > 1 && <i style={S.chipN}>+{x.comps.length - 1}</i>}
         {!x.comps.length && <i style={{ ...S.chip, borderStyle: "dashed",
           color: "#b4620f" }}>unlinked</i>}</span>
       <span style={S.own}>{((own || OWNERS)[x.owner] || {}).name || x.owner}</span>
-      <Badge S={S} s={x.status} />
-      <span style={S.sigN} title={signed
+      <span style={S.stat} title={signed
         ? `signed off by ${signed.acceptedBy} on ${signed.acceptedAt}` : ""}>
-        {signed ? `✓ ${signed.acceptedBy}` : ""}</span>
+        <Badge S={S} s={x.status} />
+        {signed && <span style={S.sigN}>{signed.acceptedBy}</span>}
+      </span>
       <span style={S.ansN}>{n || ""}</span>
     </div>);
 }
@@ -749,7 +750,11 @@ export const sty = (t) => ({
   grpN: { fontSize: 10.5, color: t.textMuted },
   row: { display: "grid", gap: 10, alignItems: "center", padding: "9px 0",
     borderTop: `1px solid ${t.bg}`, fontSize: 12.5, cursor: "pointer",
-    gridTemplateColumns: "32px minmax(0,1.4fr) minmax(0,0.9fr) 118px 78px 20px" },
+    // SIX columns and six children. Adding a seventh child without a
+    // seventh column puts it on an implicit second row, which is how
+    // every question ended up with its answer count dangling
+    // underneath it. The sign-off shares the status cell instead.
+    gridTemplateColumns: "30px minmax(0,1.9fr) minmax(0,0.75fr) 104px 92px 18px" },
   qn: { fontFamily: "monospace", fontSize: 11, color: t.textMuted, fontWeight: 700 },
   qnBig: { fontFamily: "monospace", fontSize: 17, fontWeight: 700,
     color: t.accent || "#0f4775" },
@@ -759,6 +764,9 @@ export const sty = (t) => ({
   chip: { fontStyle: "normal", fontSize: 9.5, overflow: "hidden",
     textOverflow: "ellipsis", maxWidth: 190, border: `1px solid ${t.panel2 || "#dfe6e9"}`,
     borderRadius: 3, padding: "2px 6px", color: t.sub, whiteSpace: "nowrap" },
+  chipN: { fontStyle: "normal", fontSize: 9.5, flex: "none",
+    border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderRadius: 3,
+    padding: "2px 5px", color: t.textMuted },
   own: { fontSize: 11, color: t.sub, overflow: "hidden",
     textOverflow: "ellipsis", whiteSpace: "nowrap" },
   badge: { fontSize: 9.5, fontWeight: 800, borderRadius: 3, padding: "2px 7px",
@@ -810,7 +818,9 @@ export const sty = (t) => ({
     fontSize: 12.5, color: "#15803d" },
   signedQ: { marginTop: 4, fontSize: 11.5, fontStyle: "italic",
     color: "#3b6b4c" },
-  sigN: { fontSize: 10.5, color: "#15803d", flex: "none", width: 112,
+  stat: { display: "flex", flexDirection: "column", alignItems: "stretch",
+    gap: 2, minWidth: 0 },
+  sigN: { fontSize: 9.5, color: "#15803d", textAlign: "center",
     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
   // Grey and quiet: provenance, not a finding.
   prov: { fontSize: 11, lineHeight: 1.5, marginTop: 10, maxWidth: "76ch",

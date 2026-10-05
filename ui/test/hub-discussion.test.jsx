@@ -483,6 +483,30 @@ for (const [name, F] of Object.entries(FIGS)) {
      vb ? `${Math.max(...ys)} vs ${vb[2]}` : "no viewBox");
 }
 
+// ---- the list row is a grid, so the counts have to agree ------------
+//
+// Adding a seventh child to a six-column grid does not error. It puts
+// the child on an implicit second row, and every question in the list
+// grew a stray answer count dangling underneath it. Nothing in the
+// suite noticed, because the markup was valid and the component
+// rendered.
+const rowSrc = DISC.slice(DISC.indexOf("function Row("),
+                          DISC.indexOf("function Row(") + 1600);
+const rowKids = (rowSrc.match(/^ {6}<(span|Badge|i|div)/gm) || []).length;
+const gridCols = ((DISC.match(/gridTemplateColumns: "([^"]+)"/) || [])[1] || "")
+  .trim().split(/\s+/).filter(Boolean).length;
+ok(gridCols > 0, "the list row declares a column template", gridCols);
+ok(rowKids === gridCols,
+   "the list row has exactly as many children as the grid has columns — "
+   + "one more and the extra wraps onto a second line under every question",
+   `${rowKids} children vs ${gridCols} columns`);
+
+// And the signed-off name shares the status cell rather than claiming
+// a column of its own.
+const listH = renderToStaticMarkup(
+  <HubDiscussion t={tLight} />);
+ok(listH.length > 2000, "the list still renders", listH.length);
+
 // ---- the dark-theme surface trap ------------------------------------
 ok(!/t\.navy/.test(DISC),
    "t.navy is never used in this file — it is #0a0f24 in the dark theme, a "
