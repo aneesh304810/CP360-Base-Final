@@ -12,7 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { OWNERS, OWNER_TOTALS, TOPICS, QUESTIONS, compsFor }
   from "../src/hubQuestions.js";
-import { SEED_ANSWERS, seedId, SEED_AUTHOR } from "../src/hubAnswers.js";
+import { SEED_ANSWERS, seedId, authorFor } from "../src/hubAnswers.js";
 
 const out = {
   generated_from: "ui/src/hubQuestions.js + ui/src/hubAnswers.js",
@@ -30,8 +30,9 @@ const out = {
     comps: compsFor(q).join(","), note: q.note || null,
   })),
   answers: SEED_ANSWERS.map((a) => ({
-    answer_id: seedId(a.n), qid: a.n, body: a.body, author: SEED_AUTHOR,
+    answer_id: seedId(a.n), qid: a.n, body: a.body, author: authorFor(a.conf),
     is_draft: "Y", conf: a.conf, gap: a.gap || null, quote: a.quote || null,
+    sei_ask: a.seiAsk || null,
     fig: a.fig || null, ev: (a.ev || []).join(" | "),
   })),
 };

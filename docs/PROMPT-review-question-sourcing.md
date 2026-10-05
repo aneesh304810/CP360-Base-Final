@@ -185,3 +185,46 @@ whether SEI guarantees one delivery per interface per business date. If that
 guarantee exists, the file-path design simplifies sharply. If it does not,
 `(FILE_NAME, BUSINESS_DATE)` is the wrong key and that is a schema change, so
 it is worth knowing before the ingestion framework is built rather than after.
+
+---
+
+## The eight questions that need SEI, not BBH
+
+Twenty of these questions now carry a **BBH recommendation** — what a
+comparable platform does, badged `BBH recommendation · gap vs SEI analysis`
+on screen. They are BBH's position, not SEI's design.
+
+Eight of the twenty cannot be closed by BBH alone: they turn on what SEI
+delivers or agrees. Those carry an **Ask SEI** line, and this is the list —
+it is generated from the corpus rather than maintained by hand, so it cannot
+drift from what the screen shows.
+
+| # | Question | Ask SEI |
+|---|---|---|
+| **45** | How will the transformed DIM/FACT data be checked against source/AddVant… | Which population and which freeze point will SEI agree for a parity run, and will SEI produce the ODI-era baseline or will BBH? |
+| **58** | How are weekends and non-business days handled? Will BBH process Saturda… | Does SWP deliver on Saturdays, Sundays and market holidays — per interface, not globally — and against which calendar? |
+| **66** | How can operations prove for certain whether RAW should be reloaded? | Will each delivery carry a checksum or manifest (row count and content hash)? Without one, a resend cannot be distinguished from the original. |
+| **67** | Once DATE_CONTROL = COMPLETE, can ingestion still accept a file for that… | Does the delivery contract permit a file for a business date BBH has already closed, and with what notice? |
+| **68** | If so, how do we stop RAW from going out of sync with Gold data that is … | When SEI restates a delivery, how is BBH told — and how far back may a restatement reach? |
+| **73** | Should we keep the original lifecycle for audit and add a version/restat… | Does SEI resend a corrected file under the SAME filename and business date? If so, (FILE_NAME, BUSINESS_DATE) is not a key and a delivery sequence has to come from SEI, not be invented by BBH. |
+| **76** | How are business corrections and data restatements handled? | What is SEI's role in a restatement — who declares it, who re-delivers, and within what window? |
+| **89** | How are Splunk alerts correlated, escalated, and routed? | Which alerts should escalate to SEI rather than to BBH support, and through what channel? |
+
+**Say it carefully.** None of these questions has been searched for in the
+SEI pack — they were bucketed as BBH-side from the start. So the standing
+note on every recommendation reads *"raised by BBH … not a statement that
+SEI omitted it … if SEI has covered it, their text supersedes this"*.
+Claiming a gap nobody looked for is how a review loses an argument it was
+winning.
+
+Regenerate this list after changing the corpus:
+
+```bash
+node ui/scripts/export_hub_corpus.mjs
+python3 - <<'EOF'
+import json
+c = json.load(open("data/hub_corpus.json"))
+for a in sorted((a for a in c["answers"] if a.get("sei_ask")), key=lambda x: x["qid"]):
+    print(f'{a["qid"]:>4}  {a["sei_ask"]}')
+EOF
+```

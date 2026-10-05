@@ -315,6 +315,7 @@ Order matters once, on first setup:
 ```bash
 sqlplus ... @sql/70_hub_discussion.sql          # questions, answers, attachments, events
 sqlplus ... @sql/71_hub_discussion_corpus.sql   # topics, owners, the corpus columns
+sqlplus ... @sql/72_hub_sei_ask.sql             # the question to put to SEI, per answer
 python -m ingestion.run                         # the corpus loads as the hub_corpus step
 ```
 

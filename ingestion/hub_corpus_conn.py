@@ -65,7 +65,7 @@ QUESTION_SQL = _merge("hub_question", ("qid",),
                       where=QUESTION_PRISTINE)
 ANSWER_SQL = _merge("hub_answer", ("answer_id",),
                     ("answer_id", "qid", "body", "author", "is_draft",
-                     "conf", "gap", "quote", "fig", "ev"),
+                     "conf", "gap", "quote", "fig", "ev", "sei_ask"),
                     where=ANSWER_PRISTINE)
 
 PLAN = [("owners", OWNER_SQL), ("topics", TOPIC_SQL),

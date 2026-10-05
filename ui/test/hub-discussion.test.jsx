@@ -26,7 +26,7 @@ import HubDiscussion, { statusOf, acceptAnswer, editAnswer, compLabel,
 import { QUESTIONS, TOPICS, OWNERS, OWNER_TOTALS, compsFor }
   from "../src/hubQuestions.js";
 import { emptyStore, attachKindFor } from "../src/hub_discussion_api.js";
-import { SEED_ANSWERS, seedRows, materialise, seedId, CONF }
+import { SEED_ANSWERS, seedRows, materialise, seedId, CONF, SEI_GAP_NOTE }
   from "../src/hubAnswers.js";
 import { FIGS } from "../src/HubAnswerFigs.jsx";
 import { tLight, tDark } from "../src/bbhTheme.js";
@@ -240,9 +240,68 @@ ok(prac.every((a) => a.gap && a.gap.length > 30),
    "and every one names what BBH still has to decide — a recommendation "
    + "that hides the choice is worse than no recommendation",
    prac.filter((a) => !a.gap).map((a) => a.n));
-ok(CONF.practice && /not BBH/.test(CONF.practice.label),
-   "the badge says out loud that it is not BBH's position",
-   CONF.practice && CONF.practice.label);
+ok(CONF.practice && /BBH/.test(CONF.practice.label)
+   && /SEI/.test(CONF.practice.label),
+   "the badge names both sides: BBH's recommendation, against the SEI "
+   + "analysis", CONF.practice && CONF.practice.label);
+
+// The provenance note is ONE constant, not twenty bodies, so it cannot
+// drift into twenty slightly different claims about what SEI did.
+ok(/Raised by BBH/.test(SEI_GAP_NOTE) && /supersedes/.test(SEI_GAP_NOTE),
+   "the standing note says the recommendation is BBH's and that SEI's text "
+   + "wins if it covers the point", SEI_GAP_NOTE);
+ok(/not .{0,24}statement that SEI omitted/.test(SEI_GAP_NOTE)
+   || /not a statement that SEI/.test(SEI_GAP_NOTE),
+   "and it does NOT accuse SEI of an omission — these questions were never "
+   + "put to the SEI pack, and claiming a gap nobody searched for is how a "
+   + "review loses an argument it was winning", SEI_GAP_NOTE);
+const accuses = /SEI (does not|fails to|omits|has not|never) /i;
+ok(!prac.some((a) => accuses.test(a.body) || accuses.test(a.gap || "")),
+   "and no individual recommendation claims the SEI document lacks "
+   + "something — the standing note is the only place provenance is "
+   + "asserted", prac.filter((a) => accuses.test(a.body)).map((a) => a.n));
+
+const asks = prac.filter((a) => a.seiAsk);
+ok(asks.length >= 6 && asks.length < prac.length,
+   "some recommendations carry a question for SEI and some do not — if "
+   + "every one did, the distinction between a BBH-internal design choice "
+   + "and an SEI contract question would be lost",
+   `${asks.length} of ${prac.length}`);
+ok(asks.every((a) => /\?/.test(a.seiAsk)),
+   "and each SEI ask is phrased as a question somebody can put in an "
+   + "email", asks.filter((a) => !/\?/.test(a.seiAsk)).map((a) => a.n));
+// Asserted on the RENDERED THREAD, not on SEED_ANSWERS. seiAsk was
+// dropped by seedRows and by the exporter on the first pass, so the data
+// was perfect and the screen showed nothing — a guard that reads the
+// corpus would have passed throughout.
+const q58 = { ...QUESTIONS.find((x) => x.n === 58),
+  comps: compsFor(QUESTIONS.find((x) => x.n === 58)), over: {}, status: "answered" };
+const praH = renderToStaticMarkup(
+  <Expanded t={tLight} x={q58} S={sty(tLight)} answers={seedRows(emptyStore())}
+    actor="tester" store={emptyStore()} commit={() => {}} onClose={() => {}}
+    onOpenComponent={() => {}} setStatus={() => {}} addAnswer={() => {}}
+    saveQuestionEdit={() => {}} />);
+ok(/Raised by BBH/.test(praH),
+   "the provenance note reaches the screen — not just the data", "");
+ok(/Ask SEI/.test(praH) && /Saturdays/.test(praH),
+   "and so does the SEI ask, with its text — seedRows dropped this field "
+   + "on the first pass and the corpus looked perfect", "");
+ok(/BBH recommendation/.test(praH),
+   "and the badge names it a BBH recommendation", "");
+ok(/drafted from industry practice/.test(praH)
+   && !/drafted from the codebase/.test(praH),
+   "its byline says industry practice, not codebase — a byline that "
+   + "argues with the badge beside it is the kind of detail a reviewer "
+   + "notices and then distrusts the rest", "");
+const seedRow58 = seedRows(emptyStore()).find((r) => r.qid === 58);
+ok(seedRow58 && seedRow58.seiAsk,
+   "seedRows carries seiAsk through — the field has to survive every hop, "
+   + "not just exist in the source", JSON.stringify(Object.keys(seedRow58 || {})));
+
+ok(SEED_ANSWERS.filter((a) => a.conf !== "practice").every((a) => !a.seiAsk),
+   "only a BBH recommendation carries one — an SEI ask on an answer that "
+   + "is already settled from a document is a question already answered",
+   SEED_ANSWERS.filter((a) => a.conf !== "practice" && a.seiAsk).map((a) => a.n));
 
 // A draft is an answer, never a resolution.
 const fresh = emptyStore();
@@ -413,6 +472,11 @@ const absH = renderToStaticMarkup(
 ok(/nothing recorded/.test(absH),
    "the evidence class is on screen beside the draft badge, so a reader can "
    + "see what an answer rests on without opening the file it cites", "");
+// Lives here, not up with the other byline check: exH is declared on
+// the line above, and referencing it earlier gave `undefined` rather
+// than throwing, so the assertion failed for the wrong reason.
+ok(/drafted from the codebase/.test(exH),
+   "a codebase answer still says codebase in its byline", "");
 ok((exH.match(/from the codebase/g) || []).length === 2,
    "and a codebase answer shows it twice — once as the author, once as the "
    + "class; one occurrence means the badge is gone",
@@ -458,6 +522,13 @@ if (fs.existsSync(CORPUS)) {
      "and every answer's evidence class survives the export",
      SEED_ANSWERS.filter((a) => (aById.get(a.n) || {}).conf !== a.conf)
        .map((a) => a.n));
+  ok(SEED_ANSWERS.filter((a) => a.seiAsk)
+       .every((a) => (aById.get(a.n) || {}).sei_ask),
+     "every SEI ask survives the export into Oracle — it was dropped by "
+     + "the exporter on the first pass, which would have left the column "
+     + "empty in the database while the screen looked right",
+     SEED_ANSWERS.filter((a) => a.seiAsk
+       && !(aById.get(a.n) || {}).sei_ask).map((a) => a.n));
   ok(SEED_ANSWERS.filter((a) => a.conf === "document")
        .every((a) => (aById.get(a.n) || {}).quote),
      "a document answer keeps its quote through the export — the rule has "

@@ -43,6 +43,14 @@
 //              this estate. Every one names the decision BBH still owns,
 //              because a recommendation that hides the choice is worse
 //              than no recommendation. These never carry a quote.
+//
+//              AND THEY DO NOT ACCUSE SEI OF AN OMISSION. These questions
+//              have not been put to the SEI pack — they were bucketed as
+//              BBH-side from the start. So the standing note below says
+//              "raised by BBH", not "SEI left this out", and says plainly
+//              that SEI's text supersedes this if it covers the point.
+//              Claiming a gap nobody searched for is how a review loses
+//              an argument it was winning.
 export const CONF = {
   codebase:  { label: "from the codebase", c: "#0f4775", bg: "#e4f0fb" },
   absence:   { label: "nothing recorded",  c: "#8c6a1f", bg: "#fdf2e3" },
@@ -52,14 +60,30 @@ export const CONF = {
   // SUGGESTION — what comparable platforms do — and it must never read
   // as something BBH has decided or a document has stated. It carries no
   // quote, because there is no source text to quote.
-  practice:  { label: "industry practice · not BBH's", c: "#475569", bg: "#f1f5f9" },
+  practice:  { label: "BBH recommendation · gap vs SEI analysis",
+               c: "#475569", bg: "#f1f5f9" },
 };
+
+// Rendered under every BBH recommendation, from one constant rather than
+// repeated in twenty bodies, so it cannot drift into twenty slightly
+// different claims about what SEI did or did not do.
+export const SEI_GAP_NOTE =
+  "Raised by BBH as a gap in the SEI analysis. This is BBH's recommended "
+  + "position, not SEI's design and not a statement that SEI omitted it — "
+  + "the SEI pack has not been searched for this point. If SEI has covered "
+  + "it, their text supersedes this answer.";
 
 export const SEED_PREFIX = "seed";
 export const seedId = (n) => `${SEED_PREFIX}${n}`;
 export const isSeedId = (id) => typeof id === "string" && id.startsWith(SEED_PREFIX);
 
 export const SEED_AUTHOR = "CP360 · drafted from the codebase";
+// A recommendation is not drafted from the codebase, so it does not say
+// it was. The byline has to match the class or the badge is arguing with
+// the line next to it.
+export const PRACTICE_AUTHOR = "CP360 · drafted from industry practice";
+export const authorFor = (conf) =>
+  (conf === "practice" ? PRACTICE_AUTHOR : SEED_AUTHOR);
 
 const QUOTE_STAGE2 =
   "Stage 2 serves as the core transformation and metadata management layer, handling business transformations, source-to-target mappings, reference data, lineage tracking, audit information, and data quality controls.";
@@ -586,6 +610,8 @@ export const SEED_ANSWERS = [
   ev: ["dbt TDD §4.1 — Medallion Mapping", "dbt TDD §10 — Figure 6, logical data model"] },
 
 { n: 45, conf: "practice",
+  seiAsk:
+"Which population and which freeze point will SEI agree for a parity run, and will SEI produce the ODI-era baseline or will BBH?",
   body:
 "The usual shape is a three-tier comparison, cheapest first, because a "
 + "row-by-row diff of a full history does not finish:\n\n"
@@ -742,6 +768,8 @@ export const SEED_ANSWERS = [
   ev: ["Environment 360 → Topology (CIFS 445 → RWX PVC)"] },
 
 { n: 58, conf: "practice",
+  seiAsk:
+"Does SWP deliver on Saturdays, Sundays and market holidays — per interface, not globally — and against which calendar?",
   body:
 "The standard answer is a BUSINESS CALENDAR TABLE, not logic in a DAG. "
 + "One row per date per calendar, saying whether it is a processing day, "
@@ -908,6 +936,8 @@ export const SEED_ANSWERS = [
   ev: ["lease/heartbeat practice", "idempotent-load practice"] },
 
 { n: 66, conf: "practice",
+  seiAsk:
+"Will each delivery carry a checksum or manifest (row count and content hash)? Without one, a resend cannot be distinguished from the original.",
   body:
 "By making the file's identity and its loaded footprint both recorded, "
 + "so the question is answered by comparison rather than by judgement.\n\n"
@@ -927,6 +957,8 @@ export const SEED_ANSWERS = [
   ev: ["content-addressable ingestion practice"] },
 
 { n: 67, conf: "practice",
+  seiAsk:
+"Does the delivery contract permit a file for a business date BBH has already closed, and with what notice?",
   body:
 "Three policies are defensible and the choice is a business one, not a "
 + "technical one:\n\n"
@@ -950,6 +982,8 @@ export const SEED_ANSWERS = [
   ev: ["late-arriving-data practice"] },
 
 { n: 68, conf: "practice",
+  seiAsk:
+"When SEI restates a delivery, how is BBH told — and how far back may a restatement reach?",
   body:
 "By making restatement a FIRST-CLASS, VERSIONED operation rather than a "
 + "reload.\n\n"
@@ -1046,6 +1080,8 @@ export const SEED_ANSWERS = [
   ev: ["append-only audit practice"] },
 
 { n: 73, conf: "practice",
+  seiAsk:
+"Does SEI resend a corrected file under the SAME filename and business date? If so, (FILE_NAME, BUSINESS_DATE) is not a key and a delivery sequence has to come from SEI, not be invented by BBH.",
   body:
 "Yes — and this is the same change as question 72, which is worth "
 + "treating as one piece of work rather than two.\n\n"
@@ -1125,6 +1161,8 @@ export const SEED_ANSWERS = [
   ev: ["retry-taxonomy practice", "dbt TDD §7.1 (the replay class is specified)"] },
 
 { n: 76, conf: "practice",
+  seiAsk:
+"What is SEI's role in a restatement — who declares it, who re-delivers, and within what window?",
   body:
 "As a named, auditable operation with four parts — and the TDD already "
 + "has the hardest one.\n\n"
@@ -1356,6 +1394,8 @@ export const SEED_ANSWERS = [
   ev: ["structured-logging practice"] },
 
 { n: 89, conf: "practice",
+  seiAsk:
+"Which alerts should escalate to SEI rather than to BBH support, and through what channel?",
   body:
 "Three mechanisms, and the first is the one most estates skip:\n\n"
 + "• A DEDUPLICATION KEY per alert condition — here naturally (rule, "
@@ -1564,7 +1604,8 @@ export function seedRows(store) {
     .filter((s) => !a[seedId(s.n)])
     .map((s) => ({ id: seedId(s.n), qid: s.n, body: s.body, gap: s.gap,
       fig: s.fig, ev: s.ev, conf: s.conf, quote: s.quote,
-      author: SEED_AUTHOR, draft: true, accepted: false }));
+      seiAsk: s.seiAsk,
+      author: authorFor(s.conf), draft: true, accepted: false }));
 }
 
 // Acting on a seed writes it into the store first, so accept and edit —

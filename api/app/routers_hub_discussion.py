@@ -165,7 +165,7 @@ def _store():
 
     for r in _safe("SELECT answer_id, qid, body, author, created_at, updated_by, "
                    "updated_at, accepted, accepted_by, accepted_at, seed_key, "
-                   "conf, gap, quote, fig, ev, is_draft FROM hub_answer"):
+                   "conf, gap, quote, fig, ev, is_draft, sei_ask FROM hub_answer"):
         a = {"qid": int(r["QID"]), "body": _clob(r.get("BODY")) or "",
              "author": r.get("AUTHOR"), "createdAt": _ts(r.get("CREATED_AT")),
              "accepted": (r.get("ACCEPTED") or "N") == "Y"}
@@ -182,6 +182,7 @@ def _store():
             a["draft"] = True
             a.update(conf=r.get("CONF"), gap=_clob(r.get("GAP")),
                      quote=_clob(r.get("QUOTE")), fig=r.get("FIG"),
+                     seiAsk=r.get("SEI_ASK"),
                      ev=[e.strip() for e in (r.get("EV") or "").split("|") if e.strip()])
         out["a"][r["ANSWER_ID"]] = a
 

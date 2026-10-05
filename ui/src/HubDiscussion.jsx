@@ -24,7 +24,8 @@ import { QUESTIONS, TOPICS, OWNERS, compsFor } from "./hubQuestions.js";
 import { TRACKER_COMPONENTS } from "./seiDesignTracker.js";
 import { HUB_EVENT_COMPONENTS } from "./hubEventComponents.js";
 import discussionApi, { emptyStore } from "./hub_discussion_api.js";
-import { seedRows, materialise, SEED_ANSWERS, CONF } from "./hubAnswers.js";
+import { seedRows, materialise, SEED_ANSWERS, CONF, SEI_GAP_NOTE }
+  from "./hubAnswers.js";
 import { FIGS } from "./HubAnswerFigs.jsx";
 
 const ST = {
@@ -553,6 +554,10 @@ export function Expanded({ t, x, S, answers, actor, store, commit, onClose, live
                   {a.fig && FIGS[a.fig] && (
                     <div style={S.fig}>{React.createElement(FIGS[a.fig])}</div>)}
                   {a.quote && <blockquote style={S.quote}>“{a.quote}”</blockquote>}
+                  {a.conf === "practice" && (
+                    <div style={S.prov}>{SEI_GAP_NOTE}</div>)}
+                  {a.seiAsk && <div style={S.ask}>
+                    <b style={{ color: "#0f4775" }}>Ask SEI · </b>{a.seiAsk}</div>}
                   {a.gap && <div style={S.gap}>
                     <b style={{ color: "#8c6a1f" }}>What this does not settle · </b>
                     {a.gap}</div>}
@@ -671,6 +676,15 @@ export const sty = (t) => ({
     background: "#e8f6ed", color: "#15803d" },
   aMet: { fontSize: 10.5, color: t.textMuted },
   conf: { fontSize: 9, fontWeight: 800, borderRadius: 3, padding: "2px 7px" },
+  // Grey and quiet: provenance, not a finding.
+  prov: { fontSize: 11, lineHeight: 1.5, marginTop: 10, maxWidth: "76ch",
+    color: t.textMuted, background: t.hoverBg || "#f1f5f9",
+    border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderRadius: 6,
+    padding: "8px 11px" },
+  // Blue and loud: this one is a question somebody has to put to SEI.
+  ask: { fontSize: 12, lineHeight: 1.55, marginTop: 8, maxWidth: "76ch",
+    color: "#1d3c57", background: "#e4f0fb", border: "1px solid #9cc2e4",
+    borderRadius: 6, padding: "9px 12px" },
   quote: { margin: "10px 0 0", padding: "7px 12px", fontSize: 12,
     lineHeight: 1.55, maxWidth: "74ch", fontStyle: "italic",
     color: t.textMuted, borderLeft: `3px solid ${t.panel2 || "#dfe6e9"}` },

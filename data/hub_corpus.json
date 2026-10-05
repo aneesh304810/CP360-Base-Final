@@ -1228,6 +1228,7 @@
    "conf": "document",
    "gap": "Two things. The pack never uses the word the question is built on, so somebody should get SEI to confirm in one line that the enriched layer IS Stage 2 — and, given the TDD, whether it is STG, INT, or both. This is cheap to settle and expensive to assume. And “business transformations” is a category, not a list: no enrichment operation is enumerated per interface or domain.",
    "quote": "Stage 2 serves as the core transformation and metadata management layer, handling business transformations, source-to-target mappings, reference data, lineage tracking, audit information, and data quality controls.",
+   "sei_ask": null,
    "fig": "terms",
    "ev": "SEI Architecture p.6 — Stage 2 Design Principles | dbt TDD §2 — What Changes and What Stays the Same"
   },
@@ -1240,6 +1241,7 @@
    "conf": "document",
    "gap": "The AddVantage half of the question is unanswered. The quote supports “more than normalisation” and nothing more — the pack neither includes nor excludes AddVantage-specific transformation, and does not break transformations down per feed.",
    "quote": "Stage 2 serves as the core transformation and metadata management layer, handling business transformations, source-to-target mappings, reference data, lineage tracking, audit information, and data quality controls.",
+   "sei_ask": null,
    "fig": null,
    "ev": "SEI Architecture p.6 — Stage 2 Design Principles"
   },
@@ -1252,6 +1254,7 @@
    "conf": "absence",
    "gap": "So the question stands, and it is a decision rather than a lookup: nothing says whether consumers may build against Stage 2 as a long-term contract. Read together with question 4, the pack leans against it.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "SEI Architecture p.6–7"
   },
@@ -1264,6 +1267,7 @@
    "conf": "document",
    "gap": "It says what Stage 2 is not. It does not say what BBH should use instead, or whether a further model is expected downstream.",
    "quote": "Stage 2 is specifically designed to meet IMDS Staging and PBDW data delivery requirements. It is not intended to function as an enterprise-wide canonical data model; instead, it focuses on preparing, validating, and structuring SWP data for IMDS Stage and PBDW tables.",
+   "sei_ask": null,
    "fig": null,
    "ev": "SEI Architecture p.6 — Stage 2 Design Principles"
   },
@@ -1276,6 +1280,7 @@
    "conf": "document",
    "gap": "The second half of that is an absence, not a denial: the pack is silent on PB DWH modelling rather than ruling it out. The boundary between enrichment and PBDW-specific modelling is undefined, which is the same gap question 16 asks about from the other side.",
    "quote": "Stage 2 serves as the core transformation and metadata management layer, handling business transformations, source-to-target mappings, reference data, lineage tracking, audit information, and data quality controls.",
+   "sei_ask": null,
    "fig": null,
    "ev": "SEI Architecture p.6 — Stage 2 Design Principles"
   },
@@ -1288,6 +1293,7 @@
    "conf": "document",
    "gap": "No row-level processing flow inside Stage 2 is given. More importantly for this review, the pack does not place Stage 2 against BBH's own Stage/INT layers — two naming schemes, reconciled nowhere, and question 7 is the other half of the same problem.",
    "quote": "Stage 2 serves as the core transformation and metadata management layer, handling business transformations, source-to-target mappings, reference data, lineage tracking, audit information, and data quality controls. Stage 2 is specifically designed to meet IMDS Staging and PBDW data delivery requirements. It is not intended to function as an enterprise-wide canonical data model; instead, it focuses on preparing, validating, and structuring SWP data for IMDS Stage and PBDW tables.",
+   "sei_ask": null,
    "fig": "terms",
    "ev": "SEI Architecture p.6 — Stage 2 Design Principles"
   },
@@ -1300,6 +1306,7 @@
    "conf": "document",
    "gap": "The relationship between SEI's Stage 2 and BBH's INT is not mapped in any one document, so whether they overlap, abut or duplicate is still open — see questions 6 and 9.",
    "quote": "INT reads only PASS rows... map codes (ACCOUNT_TYPE, SITUS_CODE); keyed on natural key + BUSINESS_DATE; partition-drop purge.",
+   "sei_ask": null,
    "fig": "layers",
    "ev": "Transformation TDD p.10"
   },
@@ -1312,6 +1319,7 @@
    "conf": "document",
    "gap": "No single sentence in the pack states the end-to-end sequence — this is two statements read together. It holds, but it is a synthesis, and if one layer later changes the summary will not obviously be wrong.",
    "quote": "Silver STG is a non-persisted view... computes the Source DQ flag DQ_STATUS_CD / DQ_FAIL_REASON_CDS. … INT reads only PASS rows and is keyed on the natural business key plus BUSINESS_DATE.",
+   "sei_ask": null,
    "fig": null,
    "ev": "Transformation TDD p.5 | Transformation TDD p.12"
   },
@@ -1324,6 +1332,7 @@
    "conf": "document",
    "gap": "The pack does not give a complete matrix of which business rule lives in which layer — only the shape of each layer.",
    "quote": "STG (view)... Non-persisted view: standardize columns; compute DQ_STATUS_CD / DQ_FAIL_REASON_CDS. … INT... Reads only PASS rows; map codes. … Gold DIM... Direct-compare atomic MERGE. … Gold FACT... loads only dimension-resolved transactions.",
+   "sei_ask": null,
    "fig": "layers",
    "ev": "Transformation TDD p.10 | Transformation TDD p.12–15"
   },
@@ -1336,6 +1345,7 @@
    "conf": "absence",
    "gap": "This is the question question 4 makes urgent: Stage 2 is explicitly not a canonical model, so if consumers may read it directly they are building on something SEI has said is not a contract. It needs an answer before any consumer is pointed at it.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "SEI Architecture | Transformation TDD"
   },
@@ -1348,6 +1358,7 @@
    "conf": "absence",
    "gap": "This confirms the SEI pack is silent; it does NOT answer who owns it. Ownership here is a contract and SOW question, not an architecture one — it will not be found in any document and has to be decided.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "Transformation TDD p.5–7"
   },
@@ -1360,6 +1371,7 @@
    "conf": "absence",
    "gap": "Same standing as question 11: the search is done, the answer is a commercial decision. The two readings differ by a large amount of BBH analyst effort, which is why it is worth closing early.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "Transformation TDD | SEI Architecture"
   },
@@ -1372,6 +1384,7 @@
    "conf": "absence",
    "gap": "The search is recorded so nobody repeats it. The answer is a RACI line, and it belongs with questions 11, 12 and 15 as one decision rather than four.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "Transformation TDD | SEI Architecture"
   },
@@ -1384,6 +1397,7 @@
    "conf": "absence",
    "gap": "Note this is not only an ownership gap. Question 107's answer says the tooling to PROVE parity exists — Recon 360 and Variance 360, with the hops and the eleven metrics — and that the ODI-side run has not been done. So the method is available and both the owner and the run are missing.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "Transformation TDD | SEI Architecture"
   },
@@ -1396,6 +1410,7 @@
    "conf": "document",
    "gap": "It is a constraint on the Gold tables, not a statement about the logic that fills them. Whether each rule behaves as ODI did is question 15, and nothing here demonstrates it.",
    "quote": "DIM_ACCOUNT, DIM_INTERESTED_PARTY, and FACT_TRANSACTIONS already exist and carry live history from ODI. This project changes only how they are populated — ODI mappings become dbt MERGE against the identical, unmodified structure.",
+   "sei_ask": null,
    "fig": null,
    "ev": "dbt TDD §6.4 — Gold Constraint: Pre-Existing Tables | dbt TDD §3.2 — Design Principles"
   },
@@ -1408,6 +1423,7 @@
    "conf": "document",
    "gap": "“Business logic recreated as-is” is asserted for the TABLE, not proven for the RULES. The parity evidence that would show it — a record-level and value-level comparison against the ODI output — is question 107's gap and has not been produced.",
    "quote": "Never alter a pre-existing Gold table's schema — all Gold writes are DML-only MERGE against the current column list.",
+   "sei_ask": null,
    "fig": null,
    "ev": "dbt TDD §3.2 — Design Principles (p.8) | dbt TDD §6.4"
   },
@@ -1420,6 +1436,7 @@
    "conf": "codebase",
    "gap": "The production cluster and namespace are both recorded as TBD.",
    "quote": null,
+   "sei_ask": null,
    "fig": "envs",
    "ev": "Environment 360 → Topology (sizing sheet, 4 environments) | DevOps 360"
   },
@@ -1432,6 +1449,7 @@
    "conf": "codebase",
    "gap": "No cutover date or dual-run period is recorded for SFTP → SDC.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "Environment 360 → Topology | Event 360 → Micro-batch"
   },
@@ -1444,6 +1462,7 @@
    "conf": "document",
    "gap": "CORRECTED: §7.1 does give the store an end state, which I first recorded as missing. Anything still OPEN at the seven-day retention edge is CLOSED and alerted, and Splunk reports directly from resolution_status. So nothing sits OPEN forever.\n\nWhat remains open is what CLOSED means for the business: the record is out of the DQ store and was never loaded to Gold, so the alert is the only trace that a transaction was dropped. Who acts on that alert, and within what window, is not stated — and after the partition is gone there is nothing left to replay from.",
    "quote": "No record that fails a DQ check proceeds to the next layer: failures are held in the DQ store and replayed once resolvable — never silently dropped and never loaded with placeholder keys.",
+   "sei_ask": null,
    "fig": "dqstore",
    "ev": "dbt TDD §3.2 — Design Principles (p.8) | dbt TDD §7.1 — Capture and Publishing (p.17)"
   },
@@ -1456,6 +1475,7 @@
    "conf": "document",
    "gap": "CORRECTED: I first wrote that nothing produces CLOSED. §7.1 does — anything still OPEN at the seven-day retention edge is CLOSED and alerted. Replay is worklist-driven: OPEN eligible rows are re-derived from INT, the current dimensions re-checked, and rows that now resolve are loaded to FACT and marked RESOLVED.\n\nThe real gap is narrower and worse: the seven-day window is set by INT's partition drop, not by how long a dimension actually takes to arrive. Nobody has stated the latter, so nobody can say whether seven days is generous or short — see question 74.",
    "quote": "On Day N+1 the dimension arrives; the replay step re-derives the OPEN row from INT, the fact model resolves it, loads FACT with a real ACCOUNT_KEY, and flips resolution_status to RESOLVED.",
+   "sei_ask": null,
    "fig": "dqstore",
    "ev": "dbt TDD §7.1 — Capture and Publishing (p.17) | dbt TDD §7 — Figure 5a"
   },
@@ -1468,6 +1488,7 @@
    "conf": "document",
    "gap": "Any consumer reading FACT for a business date is reading an incomplete picture while rows sit OPEN, and nothing in the design flags that to them. Whether a date is safe to report on needs a published signal, not a reconciliation somebody runs.",
    "quote": "Eligible INT rows = FACT rows loaded + OPEN missing-dimension rows in the DQ store; nothing is loaded with a placeholder key.",
+   "sei_ask": null,
    "fig": "recon",
    "ev": "dbt TDD §7.2 — Reconciliation Boundaries (p.18)"
   },
@@ -1480,6 +1501,7 @@
    "conf": "codebase",
    "gap": "guardrail_events has severity but no owner, assignee, acknowledged-by or closed-at column. There is therefore no record of who looked at an exception, or whether anyone did. Until that exists, 'who monitors and resolves' cannot be evidenced from the platform.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "guardrail_events (sql/24) | Guardrails 360"
   },
@@ -1492,6 +1514,7 @@
    "conf": "codebase",
    "gap": "What this repo does not contain is the writer. The Jenkins pipeline publishes to the guardrail tables, but the runtime DQ engine that would populate guardrail_events per business date lives outside it.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "guardrail_events (sql/24) | recon_pr_break (sql/35) | recon_summary (sql/31)"
   },
@@ -1504,6 +1527,7 @@
    "conf": "document",
    "gap": "CORRECTED against the dbt TDD. I previously wrote that the design has no hop for INT. That is true of Variance 360's three hops, and NOT true of the design: §7.2 defines FOUR boundaries, each with an equation that must hold or it raises a WARNING —\n\n  SWP_RAW → STG   RAW rows = STG rows (the view exposes all; FAIL rows carry the flag rather than being dropped)\n  STG → INT       STG PASS = INT rows; STG = INT + Source-DQ-filtered\n  INT → DIM       NEW + CHANGED = Gold inserts; CHANGED = row closures\n  INT → FACT      eligible INT = FACT loaded + OPEN missing-dimension rows in the DQ store\n\nThe real gap is therefore the opposite of what I wrote: the DESIGN has four boundaries and VARIANCE 360 HAS THREE. The tool is behind the design, and INT→DIM and INT→FACT need their own counters before it can evidence this. Note also that status is derived Splunk-side from the published counts and is not stored, so there is no queryable history of which boundary warned when.",
    "quote": "STG → INT: STG PASS rows = INT rows; STG count = INT count + Source-DQ-filtered count. … INT → FACT: Eligible INT rows = FACT rows loaded + OPEN missing-dimension rows in the DQ store; nothing is loaded with a placeholder key.",
+   "sei_ask": null,
    "fig": "recon",
    "ev": "dbt TDD §7.2 — Reconciliation Boundaries (p.18) | recon_summary (sql/31) | Variance 360"
   },
@@ -1516,6 +1540,7 @@
    "conf": "codebase",
    "gap": "(1) No business date — see question 42; the string 'business_date' does not appear anywhere in this schema, so 'compared to yesterday' has no key to compare on. (2) No baseline store: nothing persists an expected range or a prior-day value to test against. (3) The tolerance itself is a Data Management input, not an engineering one — which is what this question is actually asking for.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "recon_profile (sql/31) | Variance 360"
   },
@@ -1528,6 +1553,7 @@
    "conf": "codebase",
    "gap": "Needs a run-over-run baseline keyed by (table, metric, business_date), and a volume control that is evaluated at ingestion rather than between stages. Stage-to-stage reconciliation can never detect it by construction.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "recon_profile (sql/31) | recon_summary (sql/31)"
   },
@@ -1540,6 +1566,7 @@
    "conf": "codebase",
    "gap": "Decide the grain before building the control: table-level is nearly free, account-level is not, and the two have very different storage and runtime costs.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "recon_profile (sql/31)"
   },
@@ -1552,6 +1579,7 @@
    "conf": "codebase",
    "gap": "Add business_date to guardrail_events, and resolve against the tuple (source record, business_date, run_id) rather than the business key alone.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "guardrail_events (sql/24)"
   },
@@ -1564,6 +1592,7 @@
    "conf": "codebase",
    "gap": "Three of the six things you list are NOT covered. Duplicates: NDV against CNT hints at them but nothing asserts key uniqueness. Relationship validity: there is no referential check between a FACT and its dimensions. Replay: nothing reconciles a replayed run against the run it replaced. Rejects are covered only insofar as they appear as MISSING.",
    "quote": null,
+   "sei_ask": null,
    "fig": "hops",
    "ev": "recon_profile (sql/31) | recon_pr_break (sql/35) | Recon 360 | Variance 360"
   },
@@ -1576,6 +1605,7 @@
    "conf": "document",
    "gap": "The ingestion DAG in the same document loads FOUR interfaces — Account, Client, Transaction AND POSITION — but no RAW, STG, INT or Gold object for Position appears anywhere in the model. Either the model is incomplete or Position is loaded and not transformed. That is worth asking before the dimension list is treated as final.",
    "quote": "DIM_ACCOUNT, DIM_INTERESTED_PARTY, and FACT_TRANSACTIONS already exist and carry live history from ODI.",
+   "sei_ask": null,
    "fig": "layers",
    "ev": "dbt TDD §4.1 — Medallion Mapping | dbt TDD §10 — Figure 6, logical data model"
   },
@@ -1583,11 +1613,12 @@
    "answer_id": "seed45",
    "qid": 45,
    "body": "The usual shape is a three-tier comparison, cheapest first, because a row-by-row diff of a full history does not finish:\n\n1. COUNTS per table per business date. Catches whole-file and whole-partition losses and costs almost nothing.\n2. AGGREGATES per table per date — SUM of every monetary column, MIN/MAX of dates, COUNT DISTINCT of each key. Catches sign flips, scale errors and duplicate explosions that counts miss.\n3. ROW HASHES for a sampled or targeted population — a hash of the concatenated business columns per key, compared both sides. Catches field-level drift. Run full-population once at cutover, sampled thereafter.\n\nVariance 360 already computes exactly these metrics per column per stage (CNT, SUM, HASHSUM, NDV, MIN_D, MAX_D), so tier 1 and 2 are available now against an ODI-era snapshot.",
-   "author": "CP360 · drafted from the codebase",
+   "author": "CP360 · drafted from industry practice",
    "is_draft": "Y",
    "conf": "practice",
    "gap": "The decisions BBH owns: the tolerance (is a 1-cent rounding difference a break?), the population (all accounts, or a stratified sample including the awkward ones — closed accounts, multi-currency, corrections), and WHEN the ODI side is frozen to compare against. Parity against a moving target proves nothing.",
    "quote": null,
+   "sei_ask": "Which population and which freeze point will SEI agree for a parity run, and will SEI produce the ODI-era baseline or will BBH?",
    "fig": null,
    "ev": "standard migration-parity practice | Variance 360 (metrics already exist)"
   },
@@ -1595,11 +1626,12 @@
    "answer_id": "seed46",
    "qid": 46,
    "body": "Three controls, all cheap, and the TDD already has the first:\n\n• BUILD ORDER AS A BARRIER. Dimensions complete and pass their tests before facts start, so a fact never resolves against a stale dimension. The TDD does this (build_dim → test_dim → build_fact).\n• A DECLARED GRAIN PER FACT, written down and tested. One row per what? The test is a uniqueness assertion on the declared key — if the grain is ever violated the build fails rather than the numbers doubling quietly.\n• CONFORMED DIMENSION OWNERSHIP. One model owns each dimension; everything else references it. Two models writing DIM_ACCOUNT is how upstream changes reach downstream facts invisibly.\n\nFor fact-to-fact dependencies the convention is to forbid them: derive from the shared dimension, not from another fact, so one fact's rebuild cannot silently change another's numbers.",
-   "author": "CP360 · drafted from the codebase",
+   "author": "CP360 · drafted from industry practice",
    "is_draft": "Y",
    "conf": "practice",
    "gap": "Whether any fact here depends on another is not stated anywhere — with one fact table today it may be moot, but it is the thing to rule on before a second one is added.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "Kimball conformed-dimension practice | dbt uniqueness/relationship tests"
   },
@@ -1612,6 +1644,7 @@
    "conf": "document",
    "gap": "The rule is stated; the EVIDENCE is not. Nothing shows a test that replays a Monday transaction after a Wednesday change and asserts the Monday attributes were used. Given that the wrong branch silently rewrites history, that test is worth insisting on as an acceptance criterion.",
    "quote": "A later change has already closed that interval (ACTIVE_IND=0). → Direct UPDATE of the specific closed historical row; must NOT MERGE (would reopen a closed interval).",
+   "sei_ask": null,
    "fig": "scd2",
    "ev": "dbt TDD §6.4.1 — SCD2 MERGE and the MERGE-vs-UPDATE Reprocessing Rule (p.15)"
   },
@@ -1624,6 +1657,7 @@
    "conf": "document",
    "gap": "Interval SPLITTING is not covered. The document gives the two-branch rule for correcting a row, not what happens when a correction lands in the middle of a closed interval and should divide it in two, nor what happens to FACTs already pointing at the ACCOUNT_KEY being corrected. Both are real and neither is addressed.",
    "quote": "a changed account closes its current row (ACTIVE_IND → 0, END_DATE set) and opens a new one (ACTIVE_IND = 1, new ACCOUNT_KEY, START_DATE = business date)",
+   "sei_ask": null,
    "fig": "scd2",
    "ev": "dbt TDD §6.4.1 (p.15)"
   },
@@ -1636,6 +1670,7 @@
    "conf": "codebase",
    "gap": "No calendar exists. Turning the catalogue into one needs an effective-dated expected-set per business date (see questions 52 and 54), holiday and month-end handling (question 53), and a named owner for the content — which is the 'who decides it' half of this question and is not an engineering choice.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "Interface 360 (frequency, intraday)"
   },
@@ -1648,6 +1683,7 @@
    "conf": "codebase",
    "gap": "For files, pick one: a trailer record with a row count, a .done sentinel written after close, or a manifest per business date. Size-stable polling is the usual fallback and is the weakest of the options.",
    "quote": null,
+   "sei_ask": null,
    "fig": "markers",
    "ev": "ref_micro_batch_marker (sql/63) | Event 360 → Micro-batch"
   },
@@ -1660,6 +1696,7 @@
    "conf": "codebase",
    "gap": "The file path needs the same third element — a delivery sequence or batch key — making it (FILE_NAME, BUSINESS_DATE, DELIVERY_SEQ). This is the same underlying issue as questions 55, 56 and 72.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "ref_micro_batch_marker (sql/63)"
   },
@@ -1672,6 +1709,7 @@
    "conf": "absence",
    "gap": "The two standard fixes: an atomic rename into a per-worker directory before reading (POSIX rename is atomic; over CIFS this needs checking against the storage backend), or an insert into FILE_REGISTRY under a unique constraint on (file_name, business_date) before any read, so the second worker loses the race at the database. FILE_REGISTRY is referenced throughout these questions but its DDL is not in this repository.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "Environment 360 → Topology (CIFS 445 → RWX PVC)"
   },
@@ -1679,11 +1717,12 @@
    "answer_id": "seed58",
    "qid": 58,
    "body": "The standard answer is a BUSINESS CALENDAR TABLE, not logic in a DAG. One row per date per calendar, saying whether it is a processing day, and which calendar applies to which interface — because a multi-currency estate has more than one. Currency and market holidays do not coincide, and a single “is it a weekday” test is the usual source of month-end surprises.\n\nThe orchestration then asks the calendar rather than computing the answer: a non-processing date is seeded COMPLETE with zero expected interfaces, or not seeded at all, and both are defensible as long as the choice is explicit. The first keeps the date series continuous, which makes gap detection trivial, so it is usually preferred.",
-   "author": "CP360 · drafted from the codebase",
+   "author": "CP360 · drafted from industry practice",
    "is_draft": "Y",
    "conf": "practice",
    "gap": "BBH owns two decisions nobody has made: whether SWP delivers on Saturday and Sunday at all, and if it does, whether BBH processes those dates or holds them for the next business day. Those are different answers for transactions than for positions, so it is probably per-interface rather than global.",
    "quote": null,
+   "sei_ask": "Does SWP deliver on Saturdays, Sundays and market holidays — per interface, not globally — and against which calendar?",
    "fig": null,
    "ev": "standard business-calendar practice"
   },
@@ -1696,6 +1735,7 @@
    "conf": "document",
    "gap": "One thing your summary adds that the document does not: “until all data arrives” is bounded by an SLA cutoff. If the cutoff passes while interfaces are missing, the date STAYS PENDING, transformation is not triggered, and an SLA breach alert goes to Splunk. So the date can sit PENDING indefinitely — see question 97.",
    "quote": "If complete — it updates DATE_CONTROL PENDING → TRIGGER and invokes the Transformation DAG … If incomplete — it ends normally; the date stays PENDING and the next cycle re-checks.",
+   "sei_ask": null,
    "fig": "datectl",
    "ev": "dbt TDD §5.1 — Orchestration State Machine | dbt TDD §5.3 — Ingestion-to-Transformation Trigger"
   },
@@ -1708,6 +1748,7 @@
    "conf": "document",
    "gap": "“Restarts from the failed task” is an Airflow clear-and-rerun, which assumes the partial write is safe to repeat. That holds for INT (partition drop, date-specific) and for DIM/FACT (MERGE), but a run that failed BETWEEN build_dim and build_fact leaves the dimension advanced and the fact not — recoverable, but the intermediate state is visible to anyone reading Gold meanwhile.",
    "quote": "On failure the run stops with DATE_CONTROL = TRIGGER and restarts from the failed task.",
+   "sei_ask": null,
    "fig": "datectl",
    "ev": "dbt TDD §5.2 — Figure 3, layer-barrier execution (p.11)"
   },
@@ -1715,11 +1756,12 @@
    "answer_id": "seed61",
    "qid": 61,
    "body": "The pattern is to make the trigger an OBSERVED FACT rather than a fire-and-forget call.\n\nThe caller writes its intent durably first (status = TRIGGER with a run id it generated), then invokes. If the invoke fails, the row already records that a run was intended and a reconciler can act on it. The downstream run is given a DETERMINISTIC id derived from the business date — the TDD does this (transform_{business_date}) — so re-invoking is naturally idempotent: either it creates the run or it collides with the existing one, and both outcomes are correct.\n\nA sweeper then runs on a schedule, finds dates in TRIGGER with no live downstream run, and re-invokes. That is the piece questions 62 and 63 are both asking for.",
-   "author": "CP360 · drafted from the codebase",
+   "author": "CP360 · drafted from industry practice",
    "is_draft": "Y",
    "conf": "practice",
    "gap": "BBH owns the sweep interval and what it does on repeated failure — re-invoke forever, or stop after N and page somebody. Forever is the wrong default: a date that has failed to start five times is not a transient fault.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "idempotent-trigger practice | dbt TDD §5.3 (deterministic run_id already specified)"
   },
@@ -1732,6 +1774,7 @@
    "conf": "codebase",
    "gap": "Add queued_at, heartbeat_at and worker_id, and a reaper that moves stale 'running' rows to a terminal state with a reason. Without the reaper the extra columns only record the stall more precisely.\n\nThe dbt TDD confirms this is live rather than theoretical: it states that the Ingestion DAG acts only on PENDING rows and therefore never re-triggers a stuck TRIGGER date, with recovery owned solely by the Transformation DAG — the run that, in this failure, was never created. See question 63.",
    "quote": null,
+   "sei_ask": null,
    "fig": "runstate",
    "ev": "guardrail_gate_run (sql/67)"
   },
@@ -1744,6 +1787,7 @@
    "conf": "document",
    "gap": "This is the clearest confirmation in the pack that question 62's concern is real and currently unaddressed. The guarded UPDATE (SQL%ROWCOUNT = 1) correctly stops TWO runs triggering; it does nothing about ZERO. What is missing is a reaper: a scheduled check for dates in TRIGGER with no live Transformation run, which needs the run-state columns question 62 asks for.",
    "quote": "The Ingestion DAG only acts on PENDING rows, so it never re-triggers a stuck TRIGGER date — recovery is owned solely by the Transformation DAG.",
+   "sei_ask": null,
    "fig": "datectl",
    "ev": "dbt TDD §5.1 — DATE_CONTROL status table (p.11)"
   },
@@ -1756,6 +1800,7 @@
    "conf": "absence",
    "gap": "Ownership needs to be a column before it can be a process.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "guardrail_events (sql/24) | guardrail_gate_run (sql/67)"
   },
@@ -1763,11 +1808,12 @@
    "answer_id": "seed65",
    "qid": 65,
    "body": "The standard fix is to make LOADING a CLAIM WITH AN EXPIRY rather than a status somebody sets.\n\nThe worker writes LOADING together with a lease: who holds it (worker/pod id), when it was taken, and a heartbeat it refreshes while working. A crashed worker stops refreshing. A sweeper then finds rows in LOADING whose heartbeat is stale, and that is an unambiguous signal — not a guess about whether somebody is still going.\n\nWhat the sweeper does next depends on the load being IDEMPOTENT, which is the more important half: if the RAW insert is keyed so that re-running it cannot duplicate (a natural key plus file identity, or a delete-by-file-then-insert inside one transaction), recovery is simply “run it again” and the crash needs no special case.",
-   "author": "CP360 · drafted from the codebase",
+   "author": "CP360 · drafted from industry practice",
    "is_draft": "Y",
    "conf": "practice",
    "gap": "BBH owns the heartbeat interval and the stale threshold, and they have to exceed the longest legitimate pause — a large file, a slow volume. Set too short, the sweeper fights a working pod.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "lease/heartbeat practice | idempotent-load practice"
   },
@@ -1775,11 +1821,12 @@
    "answer_id": "seed66",
    "qid": 66,
    "body": "By making the file's identity and its loaded footprint both recorded, so the question is answered by comparison rather than by judgement.\n\nOn arrival, record the file's CONTENT HASH and byte size. On load, record the ROW COUNT inserted and the hash of the key set. Then “should RAW be reloaded?” is three checks: does a registry row exist for this file, does its content hash match the file on disk, and does the RAW row count for that file identity match what the registry says. All three agreeing means loaded; any disagreeing names what went wrong.\n\nWithout the hash, a resend with the same name is indistinguishable from the original, which is also question 51.",
-   "author": "CP360 · drafted from the codebase",
+   "author": "CP360 · drafted from industry practice",
    "is_draft": "Y",
    "conf": "practice",
    "gap": "The content hash is the piece that does not exist. It is cheap to add at arrival and impossible to reconstruct later, so it is worth doing before go-live rather than after the first incident.",
    "quote": null,
+   "sei_ask": "Will each delivery carry a checksum or manifest (row count and content hash)? Without one, a resend cannot be distinguished from the original.",
    "fig": null,
    "ev": "content-addressable ingestion practice"
   },
@@ -1787,11 +1834,12 @@
    "answer_id": "seed67",
    "qid": 67,
    "body": "Three policies are defensible and the choice is a business one, not a technical one:\n\n• REJECT. The date is closed; a late file is an exception requiring a restatement. Simplest, and the only one where a published figure never changes under a consumer.\n• ACCEPT INTO A NEW CYCLE. The file is loaded against the same business date as a new delivery, the date reopens to PENDING, and everything downstream reruns. Safe only if every downstream consumer can tolerate a restated date.\n• ACCEPT AS NEXT-DAY. The rows are loaded with the next business date and flagged as late. Keeps published history immutable, moves the distortion forward.\n\nMost custody and fund platforms land on REJECT plus an explicit restatement path, because silent reopening of a closed date is what breaks downstream reconciliations.",
-   "author": "CP360 · drafted from the codebase",
+   "author": "CP360 · drafted from industry practice",
    "is_draft": "Y",
    "conf": "practice",
    "gap": "Whichever is chosen, the design must ENFORCE it — today nothing in DATE_CONTROL stops a load against a COMPLETE date, so the answer is currently “whatever the ingestion code happens to do”.",
    "quote": null,
+   "sei_ask": "Does the delivery contract permit a file for a business date BBH has already closed, and with what notice?",
    "fig": null,
    "ev": "late-arriving-data practice"
   },
@@ -1799,11 +1847,12 @@
    "answer_id": "seed68",
    "qid": 68,
    "body": "By making restatement a FIRST-CLASS, VERSIONED operation rather than a reload.\n\nThe pattern: RAW is append-only and never edited — a corrected file is a new delivery with its own identity, not an overwrite. The business date is reopened explicitly, with a recorded reason and actor. Downstream is rebuilt from RAW deterministically, so Gold is always a pure function of RAW plus the code version. And the restatement is announced: consumers are told that date changed, rather than discovering it.\n\nThe property that keeps RAW and Gold in step is determinism — if rebuilding from RAW cannot reproduce Gold, they are already out of sync and nobody can tell.",
-   "author": "CP360 · drafted from the codebase",
+   "author": "CP360 · drafted from industry practice",
    "is_draft": "Y",
    "conf": "practice",
    "gap": "The announcement is the part teams skip and then regret. A restatement nobody downstream was told about is indistinguishable from a bug in their own reconciliation.",
    "quote": null,
+   "sei_ask": "When SEI restates a delivery, how is BBH told — and how far back may a restatement reach?",
    "fig": null,
    "ev": "append-only RAW / deterministic rebuild practice"
   },
@@ -1811,11 +1860,12 @@
    "answer_id": "seed69",
    "qid": 69,
    "body": "Treat the archive move as a cleanup that may be repeated, never as the thing that records success.\n\nOrder matters: commit the data AND the registry row in one transaction, then move the file. If the worker dies between the two, the database already says the file is loaded and the file is still in landing — which is a recoverable, self-describing state. A sweeper finds files in landing that the registry says are loaded, and moves them.\n\nThe failure to avoid is the reverse order: move first, commit second. Then a crash leaves a file that is archived and not loaded, and nothing in landing to notice.",
-   "author": "CP360 · drafted from the codebase",
+   "author": "CP360 · drafted from industry practice",
    "is_draft": "Y",
    "conf": "practice",
    "gap": "Which order the implementation uses is not recorded anywhere, and it is the single most consequential detail in this question. Worth confirming in one line of the DAG code.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "commit-then-move practice"
   },
@@ -1823,11 +1873,12 @@
    "answer_id": "seed70",
    "qid": 70,
    "body": "Same answer as question 69 and it generalises, which is the point: on OpenShift a pod can vanish at any instruction — OOM kill, eviction, node drain, a rolling deploy — so recovery cannot depend on anything running after the crash.\n\nSo: the database transaction is the commit point, the file move is idempotent cleanup, and every step is safe to repeat. The pod gets a termination grace period and handles SIGTERM to finish or abandon cleanly, but that is an optimisation — correctness must not rely on it, because an OOM kill gives no signal at all.\n\nDetection is the lease from question 65: a claim with a stale heartbeat is a crashed worker, whatever killed it.",
-   "author": "CP360 · drafted from the codebase",
+   "author": "CP360 · drafted from industry practice",
    "is_draft": "Y",
    "conf": "practice",
    "gap": "Eviction and OOM are the realistic causes here given the 4 GB non-production namespaces (question 84), so this is not a once-a-year scenario — it is a weekly one until the sizing is settled.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "Kubernetes pod-lifecycle practice | crash-only design"
   },
@@ -1835,11 +1886,12 @@
    "answer_id": "seed71",
    "qid": 71,
    "body": "Two shapes are normal, and they behave very differently under load:\n\n• TASK-PARALLEL within the DAG — Airflow fans out one task per interface, bounded by a pool. Visible in the UI, retried per task, and the concurrency ceiling is the pool size. This is what the proposed pool of 8–10 implies (question 84).\n• QUEUE-AND-WORKER — the DAG enqueues work and long-lived workers consume it. Better for uneven arrival, worse for observability, and it needs its own retry and dead-letter handling.\n\nFor a daily batch with a known interface list, task-parallel is almost always right: the work is bounded, the fan-out is knowable in advance, and Airflow already gives per-task retry and visibility for free.",
-   "author": "CP360 · drafted from the codebase",
+   "author": "CP360 · drafted from industry practice",
    "is_draft": "Y",
    "conf": "practice",
    "gap": "Whichever it is, the concurrency limit has to be set from the Oracle connection ceiling and the namespace CPU, not chosen independently — see questions 83 and 84.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "Airflow fan-out practice"
   },
@@ -1847,11 +1899,12 @@
    "answer_id": "seed72",
    "qid": 72,
    "body": "It should not, and this is the clearest smell in the questions.\n\nA registry is an audit record of what arrived and what was done with it. Deleting the row to allow a reload destroys the only evidence that the first delivery happened, which is exactly the evidence an auditor asks for after a restatement. It also makes the reload indistinguishable from a first load.\n\nThe standard shape is append-only with a version or sequence per (interface, business date): the original row stays, is marked SUPERSEDED, and the corrected delivery is a new row pointing at it. The question “what did we receive and when” then still answers correctly a year later.",
-   "author": "CP360 · drafted from the codebase",
+   "author": "CP360 · drafted from industry practice",
    "is_draft": "Y",
    "conf": "practice",
    "gap": "If the delete exists to satisfy a unique constraint on (FILE_NAME, BUSINESS_DATE), the fix is the constraint, not the delete — add the delivery sequence from question 51 and the conflict disappears.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "append-only audit practice"
   },
@@ -1859,11 +1912,12 @@
    "answer_id": "seed73",
    "qid": 73,
    "body": "Yes — and this is the same change as question 72, which is worth treating as one piece of work rather than two.\n\nKeep the original lifecycle intact and add two things: a version or delivery sequence that makes a resend a new row, and a status that can express SUPERSEDED alongside the existing terminal states. Current state is then “the highest-sequence row that is not superseded”, which is one predicate rather than a story somebody reconstructs.\n\nThe cost is one column and one index. The benefit is that “how many times did this interface get restated last quarter” becomes a query instead of a Splunk archaeology exercise.",
-   "author": "CP360 · drafted from the codebase",
+   "author": "CP360 · drafted from industry practice",
    "is_draft": "Y",
    "conf": "practice",
    "gap": "Decide whether restatement is per-file or per-business-date. Per-file is finer and matches how corrections actually arrive; per-date is simpler and matches how DATE_CONTROL already thinks. They disagree when one of five interfaces is restated.",
    "quote": null,
+   "sei_ask": "Does SEI resend a corrected file under the SAME filename and business date? If so, (FILE_NAME, BUSINESS_DATE) is not a key and a delivery sequence has to come from SEI, not be invented by BBH.",
    "fig": null,
    "ev": "append-only audit practice | SCD-style versioning"
   },
@@ -1876,6 +1930,7 @@
    "conf": "document",
    "gap": "Retention cannot be set independently of replay, and the seven days comes from INT's partition drop rather than from any measured dependency wait — nobody has stated the latter, so nobody can say whether seven days is generous or short.\n\nYour original point stands: keeping the replay payload, or an immutable RAW pointer, OUTSIDE INT is what makes the window a choice rather than a side effect of a storage decision. The alert at the edge tells you how often it would have mattered, which is the cheap way to find out before building it.",
    "quote": "INT is partitioned by BUSINESS_DATE and purged with ALTER TABLE … DROP PARTITION (near-instant metadata work) rather than a row-level DELETE.",
+   "sei_ask": null,
    "fig": null,
    "ev": "dbt TDD §6.5 — INT Retention via Partition Drop (p.15) | dbt TDD §7.1 — Capture and Publishing (p.17)"
   },
@@ -1883,11 +1938,12 @@
    "answer_id": "seed75",
    "qid": 75,
    "body": "The usual governance is a short matrix saying, for each failure class, who retries and how many times before a human is involved:\n\n• TRANSIENT infrastructure (connection reset, pod evicted, lock timeout) — automatic retry with bounded exponential backoff, no notification unless the bound is hit.\n• DATA THAT MAY RESOLVE ITSELF (a missing dimension) — no task retry; the row goes to the DQ store as reprocess-eligible and is replayed on a later cycle. The TDD specifies exactly this.\n• DATA THAT CANNOT RESOLVE ITSELF (a malformed source record) — no retry at all; it waits for a corrected delivery.\n• CODE DEFECT — no retry; the run fails and somebody fixes it.\n\nThe discipline that matters: retrying something that cannot succeed turns a clear failure into a slow one, and it is the most common mistake in batch orchestration.",
-   "author": "CP360 · drafted from the codebase",
+   "author": "CP360 · drafted from industry practice",
    "is_draft": "Y",
    "conf": "practice",
    "gap": "Only the second class is specified. The other three are Airflow defaults until somebody writes them down — which means they are whatever the first developer typed.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "retry-taxonomy practice | dbt TDD §7.1 (the replay class is specified)"
   },
@@ -1895,11 +1951,12 @@
    "answer_id": "seed76",
    "qid": 76,
    "body": "As a named, auditable operation with four parts — and the TDD already has the hardest one.\n\n1. TRIGGER AND AUTHORITY — who may declare a restatement, on what evidence, recorded rather than verbal.\n2. SCOPE — which dates and which interfaces. Narrow by default: restating a week because one file was wrong is how a correction becomes an incident.\n3. MECHANISM — reopen the date, reload the corrected delivery, rebuild deterministically. For dimensions the MERGE-vs-UPDATE rule in §6.4.1 decides whether the correction may MERGE at all, which is the part most designs get wrong and this one does not.\n4. NOTIFICATION — consumers are told which dates changed and why, before they reconcile and find it themselves.\n\nBusiness corrections differ from technical restatements in one respect: the original value was not wrong when published, so history usually has to show both.",
-   "author": "CP360 · drafted from the codebase",
+   "author": "CP360 · drafted from industry practice",
    "is_draft": "Y",
    "conf": "practice",
    "gap": "Parts 1, 2 and 4 are not recorded anywhere. Part 4 is the one that turns a controlled correction into a support call.",
    "quote": null,
+   "sei_ask": "What is SEI's role in a restatement — who declares it, who re-delivers, and within what window?",
    "fig": null,
    "ev": "restatement-runbook practice | dbt TDD §6.4.1 (the MERGE-vs-UPDATE rule already exists)"
   },
@@ -1912,6 +1969,7 @@
    "conf": "codebase",
    "gap": "The OpenShift storage class and the provisioner behind the PVC are not recorded anywhere in this estate. Quarantine and archive are not sized separately either — the 20 GB is the share as a whole, so the three directories compete for one allocation.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "Environment 360 → Topology (CIFS 445 → RWX PVC)"
   },
@@ -1924,6 +1982,7 @@
    "conf": "absence",
    "gap": "Name the storage class, then test it for concurrent access specifically — including whether rename is atomic across pods, which question 57 depends on.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "Environment 360 → Topology"
   },
@@ -1931,11 +1990,12 @@
    "answer_id": "seed79",
    "qid": 79,
    "body": "With a genuine RWX volume this is not a failure mode — that is what ReadWriteMany means: every pod on every node mounts the same filesystem. The landing share here is CIFS-backed, and network filesystems are node-independent by construction, so a worker landing on a different node is the normal case rather than an edge case.\n\nThe documented failure is the OPPOSITE arrangement: a ReadWriteOnce volume binds to one node, so a pod scheduled elsewhere stays Pending — and the symptom is a DAG that hangs rather than errors. The usual guards are asserting the access mode in the manifest and alerting on pods Pending beyond a threshold.\n\nWhat a network filesystem does change is semantics, not reachability: locking and atomic rename behave differently over CIFS than on local disk, which is question 57's problem rather than this one.",
-   "author": "CP360 · drafted from the codebase",
+   "author": "CP360 · drafted from industry practice",
    "is_draft": "Y",
    "conf": "practice",
    "gap": "Nobody has named the storage class (question 78), so “RWX” is an assertion on a diagram. One `kubectl get sc` and one `kubectl get pvc -o wide` settle this and question 82 in a minute.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "Kubernetes access-mode semantics"
   },
@@ -1948,6 +2008,7 @@
    "conf": "absence",
    "gap": "A utilisation probe plus a threshold, and — more urgently — an archive purge rule, because an alert on a volume nobody is allowed to empty only tells you the outage is coming.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "env_probe / env_probe_result (sql/44) | env_workload (sql/48)"
   },
@@ -1960,6 +2021,7 @@
    "conf": "codebase",
    "gap": "Volumetrics first — largest file, daily total, archive retention period — then the PVC sizes fall out of them. Doing it the other way round is how a landing share fills on a month-end.",
    "quote": null,
+   "sei_ask": null,
    "fig": "sizing",
    "ev": "Environment 360 → Topology (Growth = TBD on all rows)"
   },
@@ -1967,11 +2029,12 @@
    "answer_id": "seed82",
    "qid": 82,
    "body": "It is guaranteed by the access mode and by nothing else. ReadWriteMany means every pod sees the same volume; ReadWriteOnce means one node does, and a second pod elsewhere never starts.\n\nThe topology models the landing share as RWX over CIFS, which is consistent with multiple Airflow workers. So the guarantee is exactly as good as the provisioner actually delivering RWX — which is unverified (question 78).\n\nWorth adopting: assert it rather than assume it. A start-up check in the worker image that writes and reads back a sentinel file turns a silent mis-provision into a clear failure at deploy time rather than a mysterious one at month-end.",
-   "author": "CP360 · drafted from the codebase",
+   "author": "CP360 · drafted from industry practice",
    "is_draft": "Y",
    "conf": "practice",
    "gap": "Quarantine and archive are the same share as landing (question 77), so they inherit this answer and the same single point of failure.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "Kubernetes access-mode semantics"
   },
@@ -1984,6 +2047,7 @@
    "conf": "absence",
    "gap": "All four need to come from the source systems; none is derivable here.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "Environment 360 → Topology"
   },
@@ -1996,6 +2060,7 @@
    "conf": "absence",
    "gap": "Needs the concurrency the workload actually requires (from question 83's arrival profile), and then a namespace request sized to it — or an explicit decision that non-production runs at reduced concurrency.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "Environment 360 → Topology (4 GB / 2 CPU non-prod)"
   },
@@ -2003,11 +2068,12 @@
    "answer_id": "seed85",
    "qid": 85,
    "body": "By measuring, not by reasoning — and the measurement is small.\n\nThe ceiling is SESSIONS on the database, and it is shared: Airflow workers, dbt runs, the API and anything else on that service all draw from the same pool. So the validation is a load test at the intended concurrency, watching sessions against the limit, plus a check of what else already consumes it.\n\nThe arithmetic that catches most problems before any test: pods × threads per pod × connections per thread. dbt opens one connection per thread, so a `threads: 8` profile in four concurrent pods is 32 sessions from dbt alone — before Airflow's own metadata connections, which are separate.\n\nThe two settings to pin are dbt's thread count and the Airflow pool size, and they multiply rather than add.",
-   "author": "CP360 · drafted from the codebase",
+   "author": "CP360 · drafted from industry practice",
    "is_draft": "Y",
    "conf": "practice",
    "gap": "The Oracle session limit is not recorded (question 83) and neither is the dbt thread count. Those two numbers plus the pool size are the whole calculation, and none of the three is written down.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "connection-pool sizing practice | dbt threads semantics"
   },
@@ -2020,6 +2086,7 @@
    "conf": "codebase",
    "gap": "Either size a performance environment to production shape for the test window, or state explicitly what UAT timings are and are not evidence for. Scaling beyond that — horizontal pod autoscaling, pool growth — is not addressed anywhere.",
    "quote": null,
+   "sei_ask": null,
    "fig": "sizing",
    "ev": "Environment 360 → Topology"
   },
@@ -2032,6 +2099,7 @@
    "conf": "codebase",
    "gap": "Mint a correlation id at file arrival and carry it on every row written downstream, including into the log lines. This depends on question 42's business_date as well — a correlation id without a business date still cannot distinguish a run from its replay.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "guardrail_events (sql/24) | recon_profile (sql/31) | guardrail_gate_run (sql/67)"
   },
@@ -2039,11 +2107,12 @@
    "answer_id": "seed88",
    "qid": 88,
    "body": "The convention that matters more than the tool: STRUCTURED, machine-readable log lines — JSON, one event per line — with a fixed set of fields on every line.\n\nThe fields that earn their place here: timestamp, level, service, environment, business_date, correlation_id, interface, dag_id, task_id, run_id, and a stable event name. Free text goes in a message field and nothing is ever parsed back out of it, because a log a human wrote is a log a dashboard cannot aggregate.\n\nWhether Dynatrace or Splunk consumes it is a routing decision and can change. The FIELD CONTRACT cannot, because every dashboard and alert depends on it — so that is the thing to agree, and to agree before the first DAG is written rather than retrofitted after.",
-   "author": "CP360 · drafted from the codebase",
+   "author": "CP360 · drafted from industry practice",
    "is_draft": "Y",
    "conf": "practice",
    "gap": "business_date and correlation_id are the two fields missing everywhere else as well (questions 42 and 87). Agreeing the field list here would settle all three at once.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "structured-logging practice"
   },
@@ -2051,11 +2120,12 @@
    "answer_id": "seed89",
    "qid": 89,
    "body": "Three mechanisms, and the first is the one most estates skip:\n\n• A DEDUPLICATION KEY per alert condition — here naturally (rule, dataset, business_date). A repeat occurrence updates the existing alert rather than raising a new one, which is what stops one bad file generating a thousand pages.\n• SEVERITY TIED TO ACTION, not to how bad it sounds. Critical means somebody is woken; warning means next working day; info means it is only read during an investigation. An alert with no action at its severity should not exist.\n• EXPLICIT RECOVERY. The alert closes when the condition clears and the closure is recorded — without it nobody can tell a resolved incident from an ignored one.\n\nRouting then follows severity and time of day, with one owning rota per severity rather than per system.",
-   "author": "CP360 · drafted from the codebase",
+   "author": "CP360 · drafted from industry practice",
    "is_draft": "Y",
    "conf": "practice",
    "gap": "None of this is persisted on the Oracle side (question 90), so suppression and closure would live entirely in the alerting tool. Workable, but it means alert history cannot be reconciled against what actually failed.",
    "quote": null,
+   "sei_ask": "Which alerts should escalate to SEI rather than to BBH support, and through what channel?",
    "fig": null,
    "ev": "alert-taxonomy practice | deduplication-key practice"
   },
@@ -2068,6 +2138,7 @@
    "conf": "absence",
    "gap": "If alert delivery needs to be auditable, alert state has to be persisted where the audit lives. A suppression key of (rule, dataset, business_date) would be the natural grain — which again needs business_date (question 42).",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "guardrail_events (sql/24)"
   },
@@ -2080,6 +2151,7 @@
    "conf": "absence",
    "gap": "The targets themselves are a business decision, not a platform fact.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "API 360 (no SLA columns in sql/07, sql/36)"
   },
@@ -2092,6 +2164,7 @@
    "conf": "document",
    "gap": "The two that are missing are the two that bind other answers: orchestration-table retention bounds how far back an incident can be investigated (question 42), and the DQ store's retention has to outlast the longest replay (question 74). Set those from their dependents, not from storage cost. RAW retention is also the floor for any restatement reaching further back than seven days.",
    "quote": "Silver retention | STG 1 day; STG2 7 days | STG none (view); INT 7 days (partition drop) | STG holds no data.",
+   "sei_ask": null,
    "fig": null,
    "ev": "dbt TDD §2 — What Changes and What Stays the Same | dbt TDD §6.5 (p.15)"
   },
@@ -2104,6 +2177,7 @@
    "conf": "absence",
    "gap": "Needs a retention period per artefact class with its justification recorded — compliance, audit or operational — because the three will give different answers and the longest one wins.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "Environment 360 → Topology (20 GB shared allocation)"
   },
@@ -2116,6 +2190,7 @@
    "conf": "inference",
    "gap": "Derive every retention period from its longest consumer and record which consumer that was. A purge rule with no stated dependant will be shortened by whoever next needs the space.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "Environment 360 → Topology"
   },
@@ -2128,6 +2203,7 @@
    "conf": "absence",
    "gap": "No procedure, no runbook, and no recorded test of either.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "env_infra (sql/43) | env_workload (sql/48) | Environment 360"
   },
@@ -2140,6 +2216,7 @@
    "conf": "absence",
    "gap": "Both are business inputs. Nothing here can derive them.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "sql/ (no RTO/RPO recorded) | Environment 360"
   },
@@ -2152,6 +2229,7 @@
    "conf": "codebase",
    "gap": "guardrail_deployment has no image_digest, so a database tag cannot currently be tied to the exact application image it was deployed alongside. The digest is the one identifier that is identical in every environment, which makes it the right join key.",
    "quote": null,
+   "sei_ask": null,
    "fig": "deploy",
    "ev": "guardrail_changeset (sql/69) | guardrail_changeset_applied (sql/69) | Guardrails → Compare"
   },
@@ -2164,6 +2242,7 @@
    "conf": "codebase",
    "gap": "Two things you asked for do not exist. (1) No tested compensation or restore process is recorded anywhere in this estate, and no RTO to size one against (question 103). Detection without a rehearsed restore is half a control. (2) No ODI-to-dbt parity evidence. Recon 360 and Variance 360 are the right tools to produce it — the hops, the eleven metrics and the row-level break typing are all there (questions 37 and 43) — but the ODI-side run has not been done, and record-and-value parity is a claim until it has.",
    "quote": null,
+   "sei_ask": null,
    "fig": "rollback",
    "ev": "guardrail_changeset (sql/69) | Guardrails → Compare | Recon 360 | Variance 360"
   },
@@ -2176,6 +2255,7 @@
    "conf": "absence",
    "gap": "Anything to do with throughput should be stated carefully: UAT runs at one-eighth of production CPU (question 86), so a UAT timing is not evidence for a production SLA.",
    "quote": null,
+   "sei_ask": null,
    "fig": null,
    "ev": "guardrail_gate_run (sql/67) | Recon 360 | Variance 360"
   }
