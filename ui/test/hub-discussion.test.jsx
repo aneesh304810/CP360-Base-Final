@@ -37,6 +37,8 @@ import DocDrill, { docFor } from "../src/DocDrill.jsx";
 import { SEI_DOCS, SEI_BOUNDARY, SEI_STAGES, SEI_COMPONENTS, SEI_TABLES,
   SEI_STATES, SEI_OPEN, SEI_ASSUMPTIONS, SEI_NOT_BUILT }
   from "../src/seiBaseline.js";
+import { REGISTRY, REG_STATE, BBH_LAYERS, BBH_EXTENSION }
+  from "../src/hubComponentRegistry.js";
 import { TRACKER_COMPONENTS } from "../src/seiDesignTracker.js";
 
 let bad = 0;
@@ -940,9 +942,12 @@ ok(/SEI/.test(DD15),
    "and travels with the citation on screen, so nobody reads a conflict "
    + "as an internal tidy-up", "");
 const ALIGNSRC = strip("ui/src/hubDbtDocAlignment.js");
-ok(!/BBH-side|BBH's own/.test(ALIGNSRC + HUB),
-   "and nothing still calls the design document a BBH-side document",
-   ((ALIGNSRC + HUB).match(/BBH-side|BBH's own/g) || []).join(","));
+// Tightened: the claim this guards is "the design documents are BBH's",
+// not the words "BBH's own", which appear innocently ("BBH's own tools").
+const MISATTRIB = /BBH-side document|BBH's own design document|BBH's own design doc/;
+ok(!MISATTRIB.test(ALIGNSRC + HUB),
+   "and nothing still attributes a design document to BBH",
+   ((ALIGNSRC + HUB).match(MISATTRIB) || []).join(","));
 const PROMPTDOC = fs.readFileSync(
   path.join(ROOT, "docs", "PROMPT-review-question-sourcing.md"), "utf8");
 ok(!/None of that is SEI's to describe/.test(PROMPTDOC),
@@ -1000,101 +1005,109 @@ ok(!/DBTDOC_VERDICTS\[td\.v\]\[1\]\.toUpperCase\(\)/.test(ROWSRC),
 
 // The two divergences that are visible on the L2 drawing itself, which
 // is the half of this a reviewer actually looks at.
-// The L2 processing band IS the layer model, so it is asserted as one:
-// the boxes in order, top to bottom, by their y coordinate. A band that
-// still reads "Stage 2 Enriched" or "Pre-Gold Exadata" is the old build.
-const BAND = [...HUB.matchAll(
-  /<Mini x=\{454\} y=\{(\d+)\}[^>]*label="([^"]+)"/g)]
-  .map((m) => ({ y: +m[1], label: m[2] }))
-  .sort((a, b) => a.y - b.y);
-ok(BAND.length === 7, "the processing band has seven boxes", BAND.length);
-const LAYERS = BAND.map((b) => b.label.split(" \u00b7 ")[0].trim());
-ok(JSON.stringify(LAYERS) === JSON.stringify(
-     ["Python Ingestion Fwk", "SWP_RAW", "STG", "INT", "DIM", "FACT",
-      "Correction Handling"]),
-   "and reads in the dbt design document's layer order: SWP_RAW, STG, INT, then DIM "
-   + "before FACT — this is the reconciliation, not a label change",
-   LAYERS.join(" -> "));
-// strip() drops // comments but not JSX {/* ... */} blocks, and the band
-// carries one recording what it used to say. That is documentation, not
-// a label, so it is removed before looking for the old names.
-const HUBCODE = HUB.replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
-ok(!/Stage 2 Enriched|Pre-Gold|Exadata/.test(HUBCODE),
-   "the old layer model is gone from the drawing — Stage 2 Enriched merged "
-   + "two objects into one and Pre-Gold Exadata is a tier the design document does not "
-   + "have", (HUBCODE.match(/Stage 2 Enriched|Pre-Gold|Exadata/g) || []).join(","));
-// STG stores nothing, and the shape says so: every other data box is a
-// cylinder and STG is not. Losing that makes the drawing wrong again in
-// the one way the split was meant to fix.
-const stg = [...HUB.matchAll(/<Mini x=\{454\} y=\{(\d+)\} w=\{200\}([^>]*)>/g)]
-  .map((m) => ({ y: +m[1], rest: m[2] }));
-const stgBox = stg.find((b) => /label="STG/.test(b.rest));
-const intBox = stg.find((b) => /label="INT/.test(b.rest));
-ok(stgBox && !/\bcyl\b/.test(stgBox.rest),
-   "STG is drawn square, not as a cylinder — it is a view and holds no "
-   + "data, and the shape is the only place that is visible at a glance",
-   stgBox && stgBox.rest);
-ok(intBox && /\bcyl\b/.test(intBox.rest),
-   "and INT is a cylinder, because it does hold data", intBox && intBox.rest);
-// Every arrow in the chain must land on a box, or the drawing shows a
-// flow that stops in mid-air. Correction Handling is deliberately off
-// the chain: in the design document it is a rule inside DIM, not a layer.
-const RELS = [...HUB.matchAll(
-  /<Rel x1=\{554\} y1=\{(\d+)\} x2=\{554\} y2=\{(\d+)\}/g)]
-  .map((m) => ({ from: +m[1], to: +m[2] }));
-const tops = new Set(BAND.map((b) => b.y));
-const bottoms = new Set(BAND.map((b) => b.y + 24));
-ok(RELS.length === 5,
-   "six boxes in the chain means five arrows", RELS.length);
-ok(RELS.every((r) => bottoms.has(r.from) && tops.has(r.to)),
-   "and every arrow runs from one box's bottom edge to the next box's top "
-   + "— an arrow at a stale y draws into empty space and still renders",
-   RELS.filter((r) => !(bottoms.has(r.from) && tops.has(r.to)))
-     .map((r) => `${r.from}->${r.to}`).join(","));
-// SVG text that leaves its box still renders; it is just drawn over the
-// neighbouring group. The figure suite caught that once by overlap maths
-// and this is the same check by hand, because these six captions were
-// placed by arithmetic rather than by looking.
-//   PROC group: <Grp x={444} y={180} w={226} h={470} />  ->  444..670, 180..650
-//   last Mini in it: y={478}, height 24               ->  bottom 502
-const CAPS = [...HUB.matchAll(
-  /<text x="(\d+)" y="(\d+)" fontSize="8" fontStyle="italic" fill="#(?:cc3344|a8560f|159943)">\s*\n?\s*([^<]+)</g)]
-  .map((m) => ({ x: +m[1], y: +m[2], txt: m[3].trim() }))
-  .filter((c) => c.x === 454);
-ok(CAPS.length === 4, "four captions under the processing band", CAPS.length);
-// The band's last box is Correction Handling at y 562, bottom 586; the
-// group is <Grp y={180} h={470}>, so it ends at 650.
-const lastBox = Math.max(...BAND.map((b) => b.y)) + 24;
-ok(CAPS.every((c) => c.y > lastBox && c.y < 650),
-   "every one sits below the last box and inside the processing group — a "
-   + "caption at a stale y is drawn over data quality and still looks fine "
-   + "in the source",
-   CAPS.filter((c) => !(c.y > lastBox && c.y < 650)).map((c) => c.y).join(","));
-ok(/Per the dbt design doc/.test(HUB) && /Tracker still names/.test(HUB),
-   "and the drawing says both halves out loud: it follows the design document now, and "
-   + "the tracker's component names have not moved with it", "");
-// 226px of group, 10px of inset: ~48 characters at fontSize 8.
+// ---- the L2 diagram, rebuilt on SEI's documents ---------------------
 //
-// This guard earned its place twice over. It first failed on a caption
-// that was 50 characters, and the "fix" was to stop counting the six
-// characters of a \uXXXX escape — which was the wrong fix, because a
-// \uXXXX sequence inside JSX TEXT is not an escape at all. It renders
-// literally, as a backslash and five characters. So the caption was
-// over-long AND wrong, and the second failure is the one that found it.
-// The em dashes below are real characters now, and this counts them.
-ok(CAPS.every((c) => c.txt.length <= 48),
-   "and is short enough not to run out of the group's right edge",
-   CAPS.filter((c) => c.txt.length > 48)
-     .map((c) => `${c.txt.length}: ${c.txt}`).join(" | "));
-ok(!/<text[^>]*>[^<]*\\u[0-9a-fA-F]{4}/.test(HUB)
-   && !/}}>[^<{]*\\u[0-9a-fA-F]{4}/.test(HUB),
-   "and no JSX TEXT node carries a \\uXXXX sequence — inside a string it "
-   + "is an escape, between tags it is six literal characters on the "
-   + "screen, and the two look identical in a diff", "");
-const ys = CAPS.map((c) => c.y);
-ok(ys.every((y, i) => i === 0 || y - ys[i - 1] >= 12),
-   "and no two captions are drawn on top of each other",
-   ys.join(","));
+// The old guards here asserted a seven-box processing band that no
+// longer exists. The diagram is now generated from seiBaseline.js, so
+// what is worth pinning changed with it: that the boxes ARE the
+// baseline, that SEI's and BBH's are visually distinguishable, and
+// that the event group stays collapsed by default.
+const SB_IDS = [...HUB.matchAll(/<SB id="(S\d+)"/g)].map((m) => m[1]);
+const BASE_IDS = new Set(SEI_COMPONENTS.map((c) => c.id));
+ok(SB_IDS.length > 0 && SB_IDS.every((id) => BASE_IDS.has(id)),
+   "every solid box on the diagram is a baseline component by id — the "
+   + "drawing cannot drift from the citations because it does not carry "
+   + "its own labels", SB_IDS.filter((id) => !BASE_IDS.has(id)).join(","));
+const missingFromDiagram = [...BASE_IDS].filter((id) => !SB_IDS.includes(id));
+ok(missingFromDiagram.length === 0,
+   "and every baseline component is drawn — a component SEI specified "
+   + "that is missing from the picture is the failure this replaces",
+   missingFromDiagram.join(","));
+// SEI solid, BBH dashed. The whole point of the redraw.
+const BBHBOXES = [...HUB.matchAll(/<Box[^>]*id="(B\d+)"[^>]*\sbbh\b/g)]
+  .map((m) => m[1]);
+ok(BBHBOXES.length === BBH_EXTENSION.length,
+   "BBH's own layers are drawn, and drawn dashed",
+   `${BBHBOXES.length} of ${BBH_EXTENSION.length}`);
+ok(!/<SB [^>]*\sbbh\b/.test(HUB),
+   "and no baseline component is ever drawn as BBH's", "");
+ok(!/Exadata/.test(HUB),
+   "the Exadata tier is gone — it is in neither SEI document",
+   (HUB.match(/.{0,40}Exadata.{0,20}/g) || []).join(" | "));
+ok(/Pre-Gold/.test(HUB) && /mirror of IMDS and PBDW/.test(HUB),
+   "but Pre-Gold survives as what BBH actually described: a mirror of "
+   + "IMDS and PBDW, dashed and labelled as BBH's", "");
+// The layer naming BBH gave, said on the drawing rather than buried.
+ok(/one layer, three names/.test(HUB),
+   "the drawing says Stage 2, Silver and Enriched are one layer", "");
+ok(/normalised SWP data model/.test(HUB),
+   "and that INT, DIM and FACT together are the normalised SWP model", "");
+ok(/source DQ check/.test(HUB),
+   "and that STG is the in-memory view whose job is the source DQ check", "");
+// The seam between the two documents, on the picture.
+ok(/only the run whose UPDATE changes one row/.test(HUB),
+   "the handoff is drawn, not just described — it is the one place the "
+   + "two documents touch", "");
+// Events: kept, collapsed, expandable. The ask was explicit.
+ok(/const \[evtOpen, setEvtOpen\] = useState\(false\)/.test(HUB),
+   "the event group starts COLLAPSED — it used to dominate a diagram it "
+   + "is only a proposal within", "");
+ok(/setEvtOpen\(!evtOpen\)/.test(HUB) && /evtOpen && \(/.test(HUB),
+   "and expands on click", "");
+
+// ---- the component registry ------------------------------------------
+const REGIDS = Object.keys(REGISTRY);
+const BASEALL = new Set([...SEI_COMPONENTS.map((c) => c.id),
+                         ...SEI_TABLES.map((x) => x.id)]);
+ok(REGIDS.length >= 65, "every tracker component has a registry verdict",
+   REGIDS.length);
+ok(TRACKER_COMPONENTS.every((c) => REGISTRY[c.id]),
+   "and none is missing — a component with no verdict is the silent "
+   + "omission this replaces",
+   TRACKER_COMPONENTS.filter((c) => !REGISTRY[c.id]).map((c) => c.id).join(","));
+ok(REGIDS.every((id) => REG_STATE[REGISTRY[id].st]),
+   "each carries a state the screen can render",
+   REGIDS.filter((id) => !REG_STATE[REGISTRY[id].st]).join(","));
+ok(REGIDS.every((id) => (REGISTRY[id].sei || []).every((x) => BASEALL.has(x))),
+   "and every cross-reference points at a real baseline entry",
+   REGIDS.filter((id) => (REGISTRY[id].sei || []).some((x) => !BASEALL.has(x)))
+     .join(","));
+ok(REGIDS.filter((id) => REGISTRY[id].st === "specified")
+     .every((id) => (REGISTRY[id].sei || []).length),
+   "a SPECIFIED verdict names where in the baseline it is specified — "
+   + "without that it is an assertion, not a cross-reference",
+   REGIDS.filter((id) => REGISTRY[id].st === "specified"
+     && !(REGISTRY[id].sei || []).length).join(","));
+ok(REGIDS.filter((id) => REGISTRY[id].st === "absent")
+     .every((id) => (REGISTRY[id].why || "").length > 20),
+   "and an ABSENT verdict says why, because 'not in SEI' with no reason "
+   + "reads as an oversight rather than a finding",
+   REGIDS.filter((id) => REGISTRY[id].st === "absent"
+     && (REGISTRY[id].why || "").length <= 20).join(","));
+ok(REGIDS.filter((id) => REGISTRY[id].st === "differs")
+     .every((id) => (REGISTRY[id].why || "").length > 40
+       && (REGISTRY[id].sei || []).length),
+   "a DIFFERS verdict carries both halves: what SEI does instead, and "
+   + "where", REGIDS.filter((id) => REGISTRY[id].st === "differs"
+     && !((REGISTRY[id].why || "").length > 40
+       && (REGISTRY[id].sei || []).length)).join(","));
+const differs = REGIDS.filter((id) => REGISTRY[id].st === "differs");
+ok(differs.length >= 3 && differs.length < 20,
+   "some components differ and most do not — if everything differed the "
+   + "registry would be an argument rather than a reconciliation",
+   `${differs.length} of ${REGIDS.length}`);
+// BBH's layer model is recorded where it belongs: beside the registry,
+// not inside the baseline, because SEI did not write it.
+ok(/normalised SWP data model/.test(BBH_LAYERS.note)
+   && /mirror of IMDS and PBDW/.test(BBH_LAYERS.beyond),
+   "BBH's layer model is recorded in full", "");
+ok(/not from either SEI document/.test(BBH_LAYERS.src),
+   "and says plainly that it is not from SEI", BBH_LAYERS.src);
+const BASESRC = strip("ui/src/seiBaseline.js");
+ok(!/mirror of IMDS|Pre-Gold/.test(BASESRC),
+   "and does not leak into the baseline — the baseline is SEI's text "
+   + "only, and BBH's own reading of the layers is not in it",
+   (BASESRC.match(/.{0,30}(mirror of IMDS|Pre-Gold).{0,20}/g) || []).join(" | "));
 
 // ---- the SEI baseline -----------------------------------------------
 //

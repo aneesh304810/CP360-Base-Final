@@ -16,6 +16,8 @@ import { DBTDOC_ALIGN, DBTDOC_VERDICTS, DBTDOC_MISSING, DBTDOC_SELF_CONFLICT, DB
 import { SEI_DOCS, SEI_BOUNDARY, SEI_STAGES, SEI_COMPONENTS, SEI_TABLES,
  SEI_STATES, SEI_OPEN, SEI_ASSUMPTIONS, SEI_NOT_BUILT, seiCompsIn }
  from "./seiBaseline.js";
+import { REGISTRY, REG_STATE, REG_ORIGIN, REG_REVIEW_NOTE, BBH_LAYERS,
+ BBH_EXTENSION } from "./hubComponentRegistry.js";
 
 // =====================================================================
 // HubDesign — the CP Integration Hub route: C4 landing (L1 context +
@@ -75,7 +77,8 @@ export default function HubDesign({ t }) {
  const [store, setStoreState] = useState(loadStore);
  const [dc, setDc] = useState("");
  const [dq, setDq] = useState("");
- const [flat, setFlat] = useState(false);       // "all components" flat tracker
+ const [flat, setFlat] = useState(false);
+ const [evtOpen, setEvtOpen] = useState(false);  // L2 event group       // "all components" flat tracker
  const [expand, setExpand] = useState(null);    // L3 component detail panel
  const [srcOf, setSrcOf] = useState(null);      // component shown beside its SEI source
  const [seiDoc, setSeiDoc] = useState(null);    // {doc, section} open in the popup
@@ -461,202 +464,201 @@ export default function HubDesign({ t }) {
    </div>);
  }
 
- /* ---------- L2 ---------- */
+
+ /* ---------- L2 — the architecture, rebuilt on SEI's documents -----
+    Replaces a diagram that mixed three sources without saying so: the
+    delivery workbook, this programme's events review, and SEI's two
+    design documents. A reader could not tell which boxes SEI will
+    build, which was the whole problem.
+    Now: SOLID boxes are SEI's design, cited. DASHED boxes are BBH's
+    and say so on the drawing. Everything with no box at all is in the
+    component registry, one click away, with a verdict on each.
+    The event components are kept, collapsed, and expand on click —
+    they are a proposal, not a commitment, and they used to dominate
+    the picture. */
  if (view === "L2") {
-  const openC = (key) => {
-   const c = COMPS.find((x) => x.component.toLowerCase().includes(key));
-   if (!c) return;
-   setCont(c.container);
-   setDoc({ key: docFor(c), from: c });
+  const evt = COMPS.filter((c) => c.container === "EVT");
+  const H = evtOpen ? 1180 : 880;
+  const T = (x, y, s, o) => (
+   <text x={x} y={y} fontSize={(o && o.fs) || 8.5}
+    fontWeight={(o && o.fw) || 400} fill={(o && o.fill) || "#5c7c94"}
+    textAnchor={(o && o.anchor) || "start"}
+    fontStyle={(o && o.italic) ? "italic" : "normal"}>{s}</text>);
+  const Box = ({ x, y, w, h, id, label, sub, bbh, onClick }) => (
+   <g onClick={onClick} style={onClick ? { cursor: "pointer" } : undefined}>
+    <rect x={x} y={y} width={w} height={h || 38} rx="5"
+     fill={bbh ? "#fff" : "#1168bd"} stroke={bbh ? "#a8560f" : "none"}
+     strokeDasharray={bbh ? "5 3" : undefined} strokeWidth={bbh ? 1.4 : 0} />
+    {id && T(x + 8, y + 15, id, { fs: 7.5, fw: 800,
+      fill: bbh ? "#a8560f" : "#9ec6ee" })}
+    {T(x + (id ? 34 : 10), y + 15, label,
+      { fs: 9, fw: 700, fill: bbh ? "#a8560f" : "#fff" })}
+    {sub && T(x + (id ? 34 : 10), y + 28, sub,
+      { fs: 7.5, fill: bbh ? "#b9875a" : "#bcd6f0" })}
+   </g>);
+  const Band = ({ x, y, w, h, label, note, bbh }) => (
+   <g>
+    <rect x={x} y={y} width={w} height={h} rx="8" fill={bbh ? "#fdf7ea" : "#f4f8fb"}
+     stroke={bbh ? "#dfa96a" : "#7fa8c9"} strokeDasharray="5 4" strokeWidth="1.2" />
+    {T(x + 12, y + 17, label, { fs: 9.5, fw: 800,
+      fill: bbh ? "#a8560f" : "#0f4775" })}
+    {note && T(x + w - 12, y + 17, note, { fs: 8, anchor: "end", italic: true,
+      fill: bbh ? "#b9875a" : "#5c7c94" })}
+   </g>);
+  const Down = (x, y1, y2) => (
+   <line x1={x} y1={y1} x2={x} y2={y2} stroke="#5c7c94" strokeWidth="1.3"
+    markerEnd="url(#hubarr)" />);
+  const comp = (id) => SEI_COMPONENTS.find((c) => c.id === id) || {};
+  const SB = ({ id, x, y, w, h, sub }) => {
+   const c = comp(id);
+   return <Box x={x} y={y} w={w} h={h} id={id} label={c.n}
+    sub={sub === undefined ? c.tech : sub} />;
   };
-  const Mini = ({ x, y, w, label, cyl, k }) => {
-   const c = k ? COMPS.find((z) => z.component.toLowerCase().includes(k)) : null;
-   const sx = c ? stOf(c) : null;
-   return (
-    <g onClick={k ? () => openC(k) : undefined}
-     style={k ? { cursor: "pointer" } : undefined}>
-     <rect x={x} y={y} width={w} height={24} rx={cyl ? 11 : 4}
-      fill={cyl ? "#0d5296" : "#1168bd"} />
-     <text x={x + w / 2} y={y + 15} fontSize="8.5" fontWeight="600" fill="#fff"
-      textAnchor="middle">{label}</text>
-     {sx && <circle cx={x + w - 9} cy={y + 7} r="4"
-      fill={STCOL[sx.status] || "#9aa7b2"} stroke="#fff" strokeWidth="1.2">
-      <title>{`${c.component} — ${sx.status} · ${sx.pct}%`}</title></circle>}
-    </g>);
-  };
-  const Grp = ({ x, y, w, h: gh, k }) => (
-   <g onClick={() => { setCont(k); setView("L3"); }} style={{ cursor: "pointer" }}>
-    <rect x={x} y={y} width={w} height={gh} rx="9" fill="#f4f8fb" stroke="#7fa8c9"
-     strokeDasharray="5 4" strokeWidth="1.3" />
-    <text x={x + 12} y={y + 18} fontSize="10.5" fontWeight="800" fill="#0f4775">
-     {CONTAINERS[k][1]} {CONTAINERS[k][0]}</text>
-    <text x={x + w - 10} y={y + 18} fontSize="8.5" fontWeight="800" fill="#5c7c94"
-     textAnchor="end">▼ {cnt(k)} components · {overall(k).avg}%</text>
-    <rect x={x + w - 104} y={y + 24} width="94" height="4" rx="2" fill="#dde6ee" />
-    <rect x={x + w - 104} y={y + 24} width={Math.round((94 * overall(k).avg) / 100)}
-     height="4" rx="2" fill={overall(k).avg === 100 ? "#159943" : "#31bced"} /></g>);
   return (
    <div>
     <SectionHeader t={t}>CP Integration Hub</SectionHeader>
-    <span onClick={() => setView("L1")} style={{ fontSize: 11.5, fontWeight: 700,
-     padding: "7px 16px", borderRadius: 5, background: t.navy || "#10193b",
-     color: "#fff", cursor: "pointer", display: "inline-block", marginBottom: 12 }}>
-     ← context + dashboard</span>
+    <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap",
+     alignItems: "center" }}>
+     <span onClick={() => setView("L1")} style={{ fontSize: 11.5, fontWeight: 700,
+      padding: "7px 16px", borderRadius: 5, background: t.navy || "#10193b",
+      color: "#fff", cursor: "pointer" }}>← context + dashboard</span>
+     <span onClick={() => { setView("SEIBASE"); setExpand(null); }}
+      style={{ fontSize: 10.5, fontWeight: 800, padding: "6px 14px",
+       borderRadius: 999, cursor: "pointer", background: "#0f4775",
+       color: "#fff" }}>◆ the SEI baseline · cited</span>
+     <span onClick={() => { setView("REGISTRY"); setExpand(null); }}
+      style={{ fontSize: 10.5, fontWeight: 800, padding: "6px 14px",
+       borderRadius: 999, cursor: "pointer", background: "#f3eefb",
+       color: "#6d3ac0", border: "1px solid #d9c9f0" }}>
+      ▦ component registry · {Object.values(REGISTRY).filter((r) => r.st !== "specified").length + evt.length} not in SEI's documents</span>
+     <span onClick={() => setEvtOpen(!evtOpen)} style={{ fontSize: 10.5,
+      fontWeight: 700, padding: "6px 14px", borderRadius: 999, cursor: "pointer",
+      background: "#eef3f8", color: t.accent || "#0f4775" }}>
+      {evtOpen ? "▴ collapse" : "▾ expand"} event ingestion · {evt.length}</span>
+    </div>
+
     <div style={{ background: "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
      borderRadius: 10, padding: 16, overflowX: "auto" }}>
-     <svg viewBox="0 0 1240 1070" style={{ minWidth: 940, display: "block" }}>
+     <svg viewBox={`0 0 1240 ${H}`} style={{ minWidth: 960, display: "block" }}>
       <Defs />
-      <rect x="196" y="24" width="740" height="1016" rx="10" fill="none"
-       stroke="#1168bd" strokeDasharray="8 5" strokeWidth="1.5" />
-      <text x="212" y="46" fontSize="10.5" fontWeight="800" fill="#1168bd">
-       CP INTEGRATION HUB · zone 2</text>
+      {T(24, 22, "CP INTEGRATION HUB — the design SEI has specified",
+        { fs: 11, fw: 800, fill: "#0f4775" })}
+      {T(24, 38, "Solid boxes are SEI's two design documents. Dashed boxes are BBH's and are not in them. Everything else is in the registry.",
+        { fs: 8.5, italic: true })}
 
-      {/* orchestration band */}
-      <Grp x={212} y={78} w={708} h={58} k="ORCH" />
-      <Mini x={216} y={108} w={94} label="DAG Fan-out" k="fan-out" />
-      <Mini x={317} y={108} w={94} label="Dim→Fact" k="dim-before" />
-      <Mini x={418} y={108} w={94} label="Intraday Cadence" k="intraday cadence" />
-      <Mini x={519} y={108} w={94} label="Replay / Rerun" k="replay" />
-      <Mini x={620} y={108} w={94} label="Partial-Batch" k="partial" />
-      <Mini x={721} y={108} w={94} label="Gate Evaluator" k="gate evaluator" />
-      <Mini x={822} y={108} w={94} label="Status Poller" k="status poller" />
+      {/* delivery, left column */}
+      <Band x={24} y={58} w={200} h={246} label="DELIVERY" />
+      <SB id="S1" x={34} y={80} w={180} />
+      <SB id="S2" x={34} y={132} w={180} />
+      <SB id="S3" x={34} y={184} w={180} />
+      <SB id="S4" x={34} y={236} w={180} />
 
-      {/* external sources */}
-      <Sys x={24} y={250} w={150} label="SDC Event Hub"
-       sub="PRIMARY · 4-field envelope|micro-batch boxed" kind="ext" />
-      <Sys x={24} y={430} w={150} label="SEI source views"
-       sub="current state only|read by the pull" kind="ext" />
-      <Sys x={24} y={740} w={150} label="SEI SWP"
-       sub="STANDBY files|+ loader endpoint" kind="ext"
-       onClick={() => { setCont("EXT"); setView("L3"); }} />
+      {/* ingestion */}
+      <Band x={248} y={58} w={660} h={130} label="INGESTION"
+       note="Airflow 3.0 on OpenShift · scan every five minutes" />
+      <SB id="S5" x={258} y={80} w={320} />
+      <SB id="S6" x={588} y={80} w={310} />
+      <SB id="S7" x={258} y={132} w={320} />
+      <SB id="S8" x={588} y={132} w={310} />
 
-      {/* event ingestion */}
-      <Grp x={212} y={180} w={214} h={470} k="EVT" />
-      <Mini x={222} y={214} w={190} label="SDC Event Listener" k="event listener" />
-      <Mini x={222} y={250} w={190} label="G0 Envelope Gate" k="envelope gate" />
-      <Mini x={222} y={286} w={190} label="Event Staging Store" cyl k="event staging" />
-      <Mini x={222} y={322} w={190} label="Micro-Batch Registry" cyl k="micro-batch registry" />
-      <Mini x={222} y={358} w={190} label="Key-Set Collapser" k="key-set collapser" />
-      <Mini x={222} y={394} w={190} label="Idempotency Service" k="idempotency" />
-      <Mini x={222} y={430} w={190} label="Domain Sequencer" k="domain sequencer" />
-      <Mini x={222} y={466} w={190} label="Set-Based Puller" k="set-based puller" />
-      <Mini x={222} y={502} w={190} label="Intraday Stage-1 Loader" k="intraday stage-1" />
-      <Mini x={222} y={538} w={190} label="Event Quarantine" k="event quarantine" />
-      <Mini x={222} y={574} w={190} label="Sequence Gap Detector" k="sequence gap" />
-      <Mini x={222} y={610} w={190} label="Consumer Lag Monitor" k="consumer lag" />
+      {/* the gate */}
+      <Band x={248} y={200} w={660} h={130} label="COMPLETENESS AND SLA"
+       note="the handoff between the two documents" />
+      <SB id="S9" x={258} y={222} w={320} />
+      <SB id="S10" x={588} y={222} w={310} />
+      <SB id="S11" x={258} y={274} w={320} />
+      <SB id="S12" x={588} y={274} w={310} />
+      {Down(578, 188, 200)}
+      {Down(578, 330, 352)}
+      {T(590, 346, "the seam: only the run whose UPDATE changes one row may trigger transformation",
+        { fs: 8, italic: true, fill: "#a8560f" })}
 
-      {/* file ingress, now standby, plus the outbound loop */}
-      <Grp x={212} y={672} w={214} h={248} k="IE" />
-      <Mini x={222} y={702} w={190} label="Landing + Transport" k="landing" />
-      <Mini x={222} y={729} w={190} label="File Arrival Sensors" k="arrival" />
-      <Mini x={222} y={756} w={190} label="API Gateway" k="gateway" />
-      <Mini x={222} y={783} w={190} label="Apigee Proxy" k="apigee" />
-      <Mini x={222} y={810} w={190} label="Outbound Producers" k="outbound produc" />
-      <Mini x={222} y={837} w={190} label="Loader Payload Store" cyl k="loader payload" />
-      <Mini x={222} y={864} w={190} label="Callback Receiver" k="callback receiver" />
-      <Mini x={222} y={891} w={190} label="Submission Registry" cyl k="submission registry" />
+      {/* silver — one layer, three names */}
+      <Band x={248} y={360} w={660} h={196}
+       label="SILVER · STAGE 2 · ENRICHED — one layer, three names"
+       note="dbt" />
+      <SB id="S14" x={258} y={382} w={640}
+       sub="a view, held in memory — its job is the source DQ check" />
+      <SB id="S15" x={258} y={434} w={206} />
+      <SB id="S16" x={474} y={434} w={206} />
+      <SB id="S17" x={690} y={434} w={208} />
+      {T(258, 500, "INT, DIM and FACT together are the normalised SWP data model,",
+        { fs: 8.5, italic: true, fill: "#0f4775" })}
+      {T(258, 512, "with reference mapping and translation applied. BBH's reading, not SEI's wording.",
+        { fs: 8.5, italic: true })}
+      {T(258, 530, "SEI's documents call DIM and FACT the approved Gold tables and stop there — see the registry.",
+        { fs: 8, italic: true, fill: "#a8560f" })}
 
-      {/* processing */}
-      <Grp x={444} y={180} w={226} h={470} k="PROC" />
-      {/* Layer model per the dbt design document: SWP_RAW -> STG (view) -> INT ->
-          DIM -> FACT. This band used to read Stage 1 RAW -> Correction ->
-          Stage 2 Enriched -> Pre-Gold Exadata, which is a different
-          build: it merged STG and INT into one box and invented a tier
-          the design document does not have. STG is drawn square, not as a cylinder,
-          because it is a view and stores nothing — the shape is the
-          point. Corrections come out of the chain: in the design document they are
-          the MERGE-vs-UPDATE rule applied inside DIM (§6.4.1), not a
-          layer between RAW and Silver. */}
-      <Mini x={454} y={214} w={200} label="Python Ingestion Fwk" k="python ingestion" />
-      <Mini x={454} y={272} w={200} label="SWP_RAW · Bronze" cyl k="stage 1" />
-      <Mini x={454} y={330} w={200} label="STG · view, stores nothing" k="stage 2" />
-      <Mini x={454} y={388} w={200} label="INT · 7 days, PASS only" cyl k="stage 2" />
-      <Mini x={454} y={446} w={200} label="DIM · built first" cyl k="gold" />
-      <Mini x={454} y={504} w={200} label="FACT · built second" cyl k="gold" />
-      <Mini x={454} y={562} w={200} label="Correction Handling" k="correction" />
-      <Rel x1={554} y1={238} x2={554} y2={272} label="" />
-      <Rel x1={554} y1={296} x2={554} y2={330} label="" />
-      <Rel x1={554} y1={354} x2={554} y2={388} label="" />
-      <Rel x1={554} y1={412} x2={554} y2={446} label="" />
-      <Rel x1={554} y1={470} x2={554} y2={504} label="" />
-      <text x="454" y="598" fontSize="8" fontStyle="italic" fill="#159943">
-       Per the dbt design doc: Silver is STG + INT</text>
-      <text x="454" y="610" fontSize="8" fontStyle="italic" fill="#a8560f">
-       STG is the one box here that stores nothing</text>
-      <text x="454" y="622" fontSize="8" fontStyle="italic" fill="#a8560f">
-       Gold pre-exists — dbt MERGEs, DML-only, no DDL</text>
-      <text x="454" y="634" fontSize="8" fontStyle="italic" fill="#a8560f">
-       Tracker still names 15 Stage 2 and 16 Gold</text>
+      {/* the run */}
+      <Band x={248} y={568} w={660} h={130} label="THE TRANSFORMATION RUN" />
+      <SB id="S13" x={258} y={590} w={320} />
+      <SB id="S18" x={588} y={590} w={310} />
+      <SB id="S19" x={258} y={642} w={320} />
+      <SB id="S20" x={588} y={642} w={310} />
 
-      {/* data quality */}
-      <Grp x={688} y={180} w={232} h={470} k="DQ" />
-      <Mini x={700} y={214} w={208} label="G1 Structural" k="g1" />
-      <Mini x={700} y={250} w={208} label="G2 RAW Profiling" k="g2" />
-      <Mini x={700} y={286} w={208} label="G3 dbt + Business" k="g3" />
-      <Mini x={700} y={322} w={208} label="G4 Tie-out" k="g4" />
-      <Mini x={700} y={358} w={208} label="G5 Post-Publish Recon" k="g5" />
-      <Mini x={700} y={394} w={208} label="DQ Framework" k="dq framework" />
-      <Mini x={700} y={430} w={208} label="G6 Outbound Validation" k="g6 outbound" />
-      <Mini x={700} y={466} w={208} label="Outbound Reconciliation" k="outbound reconcil" />
-      <text x="700" y="514" fontSize="8" fontStyle="italic" fill="#a8560f">
-       G0/G1/G3 per micro-batch · G2/G4/G5 at the EOD gate only</text>
-      <text x="700" y="528" fontSize="8" fontStyle="italic" fill="#a8560f">
-       running the set-level gates per box is 288× a day [B5]</text>
-      <text x="700" y="548" fontSize="8" fontStyle="italic" fill="#cc3344">
-       G1–G5 all face inbound. G6 is the only gate before a loader</text>
-      <text x="700" y="562" fontSize="8" fontStyle="italic" fill="#cc3344">
-       reaches SEI — today SEI is the first validator [E13]</text>
-      <text x="700" y="582" fontSize="8" fontStyle="italic" fill="#a8560f">
-       G6 blocks Outbound Producers; the payload is recorded</text>
-      <text x="700" y="596" fontSize="8" fontStyle="italic" fill="#a8560f">
-       before the send, never after [E14]</text>
+      {/* BBH's own layers, dashed */}
+      <Band x={248} y={710} w={660} h={96} bbh
+       label="BBH — ABOVE WHAT SEI SPECIFIES"
+       note="not in either design document" />
+      <Box x={258} y={732} w={320} h={38} id="B1" bbh
+       label="Pre-Gold · mirror of IMDS and PBDW"
+       sub="consumer-shaped, built from the model above" />
+      <Box x={588} y={732} w={310} h={38} id="B2" bbh
+       label="Movement into the warehouse"
+       sub="extract, transport, load, verify — no transformation" />
+      {T(258, 790, "SEI's design publishes from DIM and FACT and ends. These two layers are BBH's and nothing cites them.",
+        { fs: 8, italic: true, fill: "#a8560f" })}
 
-      {/* foundation */}
-      <Grp x={212} y={930} w={708} h={110} k="FND" />
-      <Mini x={222} y={968} w={96} label="Errors/Quar." k="error handling" />
-      <Mini x={326} y={968} w={82} label="Recon Fwk" k="reconcil" />
-      <Mini x={416} y={968} w={96} label="Audit/Lineage" k="audit" />
-      <Mini x={520} y={968} w={74} label="Security" k="security" />
-      <Mini x={602} y={968} w={112} label="Metadata/Config" k="metadata" />
-      <Mini x={722} y={968} w={96} label="Observability" k="observab" />
-      <Mini x={826} y={968} w={84} label="Integr.360" k="integration360" />
-      <Mini x={222} y={1000} w={44} label="SSO" k="sso" />
-      <Mini x={274} y={1000} w={150} label="Schema Contract Registry" k="schema contract" />
-      <Mini x={432} y={1000} w={128} label="Expectation Store" cyl k="expectation store" />
-      <Mini x={568} y={1000} w={150} label="Loader Template Registry" cyl k="loader template" />
-      <Mini x={726} y={1000} w={150} label="Outbound Quarantine" k="outbound quarantine" />
+      {/* Oracle objects */}
+      <Band x={932} y={58} w={284} h={420} label="ORACLE"
+       note="no FKs declared" />
+      {SEI_TABLES.map((tb, i) => (
+       <Box key={tb.id} x={942} y={80 + i * 48} w={264} h={38}
+        label={tb.n} sub={tb.owner} />))}
+      {T(942, 496, "Every line between these is a join a model runs,",
+        { fs: 8, italic: true })}
+      {T(942, 508, "not a constraint the database enforces.", { fs: 8, italic: true })}
 
-      {/* consumers + platform */}
-      <Sys x={970} y={300} w={210} label="PBDW · IMDS · Pivotal"
-       sub={`FINAL GOLD · consumers|▼ ${cnt("CONS")} components`}
-       onClick={() => { setCont("CONS"); setView("L3"); }} />
-      <Sys x={970} y={930} w={210} label={CONTAINERS.PLAT[0]}
-       sub={`runtime · CI/CD · ops|▼ ${cnt("PLAT")} components`}
-       onClick={() => { setCont("PLAT"); setView("L3"); }} />
+      {/* evidence + consumers */}
+      <Band x={932} y={530} w={284} h={82} label="EVIDENCE" />
+      <SB id="S21" x={942} y={552} w={264} />
+      <Box x={942} y={640} w={264} h={44} bbh
+       label="PBDW · IMDS · Pivotal"
+       sub="downstream of Gold — outside both documents" />
 
-      {/* relationships */}
-      <Ortho pts={[[176,285],[212,285]]} label="events [primary]" lx={194} ly={272} />
-      <Ortho pts={[[212,470],[192,470],[192,466],[176,466]]} label="set-based pull" lx={196} ly={500} />
-      <Ortho pts={[[176,775],[212,775]]} label="files [standby]" lx={194} ly={762} />
-      <Ortho pts={[[212,905],[190,905],[190,800],[176,800]]} label="submit · push + poll" kind="out" lx={186} ly={932} />
-      <Ortho pts={[[426,514],[436,514],[436,284],[452,284]]} label="" />
-      <text x="222" y="644" fontSize="8" fontStyle="italic" fill="#159943">
-       one commit per micro-batch → Stage 1</text>
-      <Ortho pts={[[426,712],[557,712],[557,654]]} label="standby load" lx={600} ly={706} />
-      <Ortho pts={[[670,232],[688,232]]} label="" kind="gate" />
-      <Ortho pts={[[688,300],[670,300]]} label="blocks publish [G4]" kind="gate" lx={672} ly={324} />
-      <Ortho pts={[[554,652],[554,692],[952,692],[952,412],[968,412]]} label="publish final Gold" kind="move" thick lx={780} ly={686} />
-      <Ortho pts={[[554,140],[554,178]]} label="orchestrates" kind="ctl" lx={606} ly={166} />
-      <Ortho pts={[[566,928],[566,896]]} label="drives · config" kind="ctl" lx={620} ly={916} />
+      {/* events: kept, collapsed, expandable */}
+      <g onClick={() => setEvtOpen(!evtOpen)} style={{ cursor: "pointer" }}>
+       <rect x={24} y={826} width={1192} height={evtOpen ? 330 : 44} rx="8"
+        fill="#fdf1f2" stroke="#e0a9b0" strokeDasharray="5 4" strokeWidth="1.2" />
+       {T(38, 845, `${evtOpen ? "▾" : "▸"}  EVENT INGESTION — ${evt.length} components, proposed by this programme's review`,
+         { fs: 9.5, fw: 800, fill: "#cc3344" })}
+       {T(1202, 845, evtOpen ? "click to collapse" : "click to expand",
+         { fs: 8, anchor: "end", italic: true, fill: "#cc3344" })}
+      </g>
+      {evtOpen && (
+       <g>
+        {T(38, 866, "Not in SEI's documents and not in the delivery workbook. Kept here because the events-primary question is still open, and drawn apart because it is a proposal.",
+          { fs: 8, italic: true, fill: "#b4707a" })}
+        {evt.map((c, i) => (
+         <Box key={c.id} x={38 + (i % 4) * 295} y={880 + Math.floor(i / 4) * 48}
+          w={285} h={38} id={String(c.id)} label={c.component} bbh
+          onClick={(e) => { e.stopPropagation();
+            setCont("EVT"); setExpand(c.id); setView("L3"); }} />))}
+       </g>)}
      </svg>
-     <div style={{ display: "flex", gap: 14, marginTop: 10, fontSize: 9.5,
-      color: "#5c6b7a", flexWrap: "wrap" }}>
-      {STATUSES.map((k) => (
-       <span key={k} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <span style={{ width: 9, height: 9, borderRadius: "50%",
-         background: STCOL[k], display: "inline-block" }} />{k}</span>))}
-      <span>dot on each component = delivery status (edit on the L1 dashboard)</span>
-     </div>
+    </div>
+
+    <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 10,
+     fontSize: 10, color: t.sub || "#666", alignItems: "center" }}>
+     <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      <span style={{ width: 16, height: 10, borderRadius: 2,
+       background: "#1168bd" }} /> specified by SEI, cited on the baseline</span>
+     <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      <span style={{ width: 16, height: 10, borderRadius: 2, background: "#fff",
+       border: "1.4px dashed #a8560f" }} /> BBH's, not in either document</span>
+     <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      <span style={{ width: 16, height: 10, borderRadius: 2, background: "#fdf1f2",
+       border: "1.4px dashed #e0a9b0" }} /> proposed by this review</span>
     </div>
    </div>);
  }
@@ -848,6 +850,130 @@ export default function HubDesign({ t }) {
         o.doc === "ingest" ? "INGEST" : "DBT")}</span>
        <span style={{ color: "#33414d", lineHeight: 1.55 }}>{o.t}</span>
       </div>))}
+    </div>
+   </div>);
+ }
+
+ /* ---------- Component registry — everything that is not SEI's ----
+    The diagram carries SEI's design. This carries the rest, with a
+    verdict on each rather than a silent omission: specified, differs,
+    or absent. "Differs" is the one worth the exercise — SEI covers the
+    need and answers it another way, and somebody has to pick. */
+ if (view === "REGISTRY") {
+  const rows = COMPS.map((c) => {
+   const review = Number(c.id) >= 101;
+   const r = review ? { st: "absent", why: c.questions || c.deliverable }
+                    : (REGISTRY[c.id] || { st: "absent", why: "" });
+   return { c, r, origin: review ? "review" : "workbook" };
+  });
+  const order = ["differs", "absent", "specified"];
+  const Bar = ({ icon, title, note, n, label, bg }) => (
+   <div style={{ display: "flex", alignItems: "center", gap: 12,
+    background: bg || (t.navy || "#10193b"), color: "#fff", borderRadius: 10,
+    padding: "13px 18px", margin: "16px 0 10px" }}>
+    <span style={{ fontSize: 22 }}>{icon}</span>
+    <div><b>{title}</b>
+     <div style={{ fontSize: 10, color: "#dfe7f2", marginTop: 2 }}>{note}</div></div>
+    {n !== undefined && (
+     <div style={{ marginLeft: "auto", textAlign: "center", fontSize: 10,
+      color: "#dfe7f2" }}><b style={{ display: "block", fontSize: 19,
+      color: "#fff" }}>{n}</b>{label}</div>)}
+   </div>);
+  return (
+   <div>
+    <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+     <span onClick={() => setView("L2")} style={{ fontSize: 11.5, fontWeight: 700,
+      padding: "7px 16px", borderRadius: 5, background: t.navy || "#10193b",
+      color: "#fff", cursor: "pointer" }}>← architecture</span>
+     <span onClick={() => { setView("SEIBASE"); setExpand(null); }}
+      style={{ fontSize: 10.5, fontWeight: 800, padding: "6px 14px",
+       borderRadius: 999, cursor: "pointer", background: "#0f4775",
+       color: "#fff" }}>◆ the SEI baseline</span>
+    </div>
+
+    <div style={{ background: "#4a2f6b", color: "#fff", borderRadius: 10,
+     padding: "16px 20px", marginBottom: 12 }}>
+     <b style={{ fontSize: 15 }}>Everything that is not the SEI baseline</b>
+     <div style={{ fontSize: 11.5, color: "#ddd2ec", lineHeight: 1.65,
+      marginTop: 6, maxWidth: 940 }}>
+      The architecture diagram carries what SEI specified. These are the
+      rest of the components the programme has on its books, each with a
+      verdict instead of a silent omission. They keep their ids and their
+      design documents; they go back on the diagram when SEI's documents
+      cover them or BBH formally adopts them.
+     </div>
+     <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 11 }}>
+      {order.map((k) => (
+       <span key={k} style={{ display: "inline-flex", alignItems: "center",
+        gap: 6, fontSize: 11 }}>
+        <span style={{ width: 9, height: 9, borderRadius: 2,
+         background: REG_STATE[k][0] }} />
+        <b>{rows.filter((x) => x.r.st === k).length}</b>
+        <span style={{ color: "#ddd2ec" }}>{REG_STATE[k][1]}</span></span>))}
+     </div>
+    </div>
+
+    <div style={{ background: "#fdf7ea", borderRadius: 8,
+     borderLeft: "3px solid #a8560f", padding: "12px 16px", marginBottom: 4 }}>
+     <div style={{ fontSize: 8.5, fontWeight: 800, color: "#a8560f",
+      letterSpacing: .4 }}>THE LAYER MODEL · {BBH_LAYERS.src}</div>
+     <div style={{ fontSize: 11.5, color: "#33414d", lineHeight: 1.65,
+      marginTop: 5, maxWidth: 940 }}>{BBH_LAYERS.note}</div>
+     <div style={{ fontSize: 11.5, color: "#33414d", lineHeight: 1.65,
+      marginTop: 7, maxWidth: 940 }}>{BBH_LAYERS.beyond}</div>
+     <div style={{ fontSize: 11.5, color: "#a8560f", lineHeight: 1.65,
+      marginTop: 7, maxWidth: 940 }}><b>Why it matters. </b>
+      {BBH_LAYERS.why_it_matters}</div>
+     <div style={{ display: "grid", gap: 6, marginTop: 10 }}>
+      {BBH_EXTENSION.map((b) => (
+       <div key={b.id} style={{ background: "#fff", borderRadius: 6,
+        border: "1px dashed #dfa96a", padding: "9px 12px" }}>
+        <b style={{ fontSize: 11, color: "#a8560f" }}>{b.id} · {b.n}</b>
+        <div style={{ fontSize: 11, color: "#33414d", lineHeight: 1.6,
+         marginTop: 3 }}>{b.w}</div>
+        <div style={{ fontSize: 10.5, color: "#8a6a3a", lineHeight: 1.55,
+         marginTop: 3 }}>{b.why}</div>
+       </div>))}
+     </div>
+    </div>
+
+    {order.map((st) => {
+     const rs = rows.filter((x) => x.r.st === st);
+     if (!rs.length) return null;
+     const [col, label, blurb] = REG_STATE[st];
+     return (
+      <div key={st}>
+       <Bar icon={st === "specified" ? "✓" : st === "differs" ? "⇄" : "○"}
+        title={label} note={blurb} n={rs.length} label="components"
+        bg={st === "specified" ? "#1f6b45" : st === "differs" ? "#6b5420" : "#4a2f6b"} />
+       <div style={{ background: "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+        borderRadius: 8, overflow: "hidden" }}>
+        {rs.map(({ c, r, origin }) => (
+         <div key={c.id} style={{ display: "grid",
+          gridTemplateColumns: "44px minmax(0,1.1fr) 92px minmax(0,2fr) 120px",
+          gap: 12, padding: "10px 14px", fontSize: 11,
+          borderTop: "1px solid #eef1f4", alignItems: "start" }}>
+          <b style={{ fontFamily: "Roboto Mono, monospace", fontSize: 10,
+           color: col }}>{c.id}</b>
+          <b style={{ color: t.navy || "#10193b" }}>{c.component}</b>
+          <span>{chip(REG_ORIGIN[origin][0] + "1f", REG_ORIGIN[origin][0],
+           origin === "review" ? "REVIEW" : "WORKBOOK")}</span>
+          <span style={{ color: "#33414d", lineHeight: 1.55 }}>
+           {r.why || (r.sei ? "" : "—")}</span>
+          <span style={{ fontSize: 9.5, color: t.sub || "#666" }}>
+           {(r.sei || []).length ? `baseline ${(r.sei || []).join(", ")}` : ""}</span>
+         </div>))}
+       </div>
+      </div>);
+    })}
+
+    <div style={{ background: "#fdf1f2", borderRadius: 8,
+     borderLeft: "3px solid #cc3344", padding: "12px 16px", margin: "16px 0 24px" }}>
+     <div style={{ fontSize: 8.5, fontWeight: 800, color: "#cc3344",
+      letterSpacing: .4 }}>ON THE REVIEW'S OWN PROPOSALS</div>
+     <div style={{ fontSize: 11.5, color: "#33414d", lineHeight: 1.65,
+      marginTop: 5, maxWidth: 940 }}>{REG_REVIEW_NOTE}</div>
     </div>
    </div>);
  }

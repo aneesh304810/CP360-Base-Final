@@ -245,19 +245,27 @@ export const SEI_TABLES = [
  { id: "T6", n: "Gold DIM / FACT", doc: "dbt", owner: "pre-existing",
    w: "Already exist and already carry history from the current system. "
     + "This programme changes only how they are populated.",
-   cols: "DIM: ACCOUNT_KEY · ACTIVE_IND · START_DATE · END_DATE",
+   cols: "DIM_ACCOUNT: ACCOUNT_KEY (PK) · ACCOUNT_NUMBER · "
+       + "ACCOUNT_TYPE · SITUS_CODE · START_DATE · END_DATE · "
+       + "ACTIVE_IND  │  FACT_TRANSACTIONS: TRANSACTION_ID (PK) · "
+       + "BUSINESS_DATE · TRANSACTION_AMOUNT · ACCOUNT_KEY",
    ev: "dbt §6.4 (p.15) · §10.1 (p.23)" },
  { id: "T7", n: "DQ_VALIDATION_FAILURE", doc: "dbt", owner: "dbt",
    w: "One store for both failure categories, carrying whether the row "
     + "can replay itself and whether it is still open.",
-   cols: "reprocess_eligible · resolution_status (OPEN / RESOLVED / "
-       + "CLOSED) · lineage only, no payload",
+   cols: "DQ_FAILURE_ID (PK) · DQ_CATEGORY (SOURCE_DQ | "
+       + "TRANSFORMATION_DQ) · BUSINESS_DATE · LAYER_NAME (STG | INT | "
+       + "DIM | FACT) · MODEL_NAME · BUSINESS_KEY · SRC_RECORD_ID · "
+       + "COLUMN_NAME · FAILURE_REASON · REPROCESS_ELIGIBLE · "
+       + "RESOLUTION_STATUS · RETRY_COUNT · RESOLVED_TS · DETECTED_TS",
    ev: "dbt §7.1 (p.17)" },
  { id: "T8", n: "RECON_RESULT", doc: "dbt", owner: "dbt",
    w: "One immutable row per boundary per business date, replaced rather "
     + "than updated. No status column — the verdict is derived in "
     + "Splunk.",
-   cols: "boundary · business date · counts",
+   cols: "RECON_ID (PK) · BUSINESS_DATE · BOUNDARY · LEFT_COUNT · "
+       + "RIGHT_COUNT · SOURCE_DQ_FILTERED_COUNT · HELD_COUNT · "
+       + "HELD_PCT · DIFFERENCE · DETECTED_TS",
    ev: "dbt §7.2.1 (p.18)" },
 ];
 
@@ -361,6 +369,38 @@ export const SEI_NOT_BUILT = [
  { t: "No payload copy of a failed record — lineage only, re-derived from INT.",
    ev: "dbt §7.1 (p.17) · §8.2 assumption A4 (p.20)" },
 ];
+
+
+// How the objects join. NO FOREIGN KEY IS DECLARED in either document's
+// DDL — these are the logical joins the completeness check, the replay
+// worklist and the reconciliation models actually run. Worth drawing
+// precisely because nothing in the database enforces any of it.
+export const SEI_TABLE_LINKS = [
+ { a: "T1", b: "T2", on: "FILE_NAME — the logical interface",
+   ev: "ingest \u00a76.2 (p.12)" },
+ { a: "T3", b: "T2", on: "BUSINESS_DATE — the completeness comparison",
+   ev: "ingest Appendix E.2 (p.24)" },
+ { a: "T2", b: "T4", on: "FILE_NAME + BUSINESS_DATE — load lineage",
+   ev: "ingest \u00a74.1 (p.7)" },
+ { a: "T4", b: "T5", on: "SRC_RECORD_ID, through the STG view",
+   ev: "dbt \u00a74.1 (p.10) · \u00a76.3 (p.15)" },
+ { a: "T4", b: "T7", on: "Source DQ — rows the STG view marks FAIL",
+   ev: "dbt \u00a76.3 (p.15)" },
+ { a: "T5", b: "T7", on: "Transformation DQ, and the missing-dimension hold",
+   ev: "dbt \u00a77.1 (p.17)" },
+ { a: "T5", b: "T6", on: "SCD2 MERGE on ACCOUNT_KEY, never the natural key",
+   ev: "dbt \u00a76.4.1 (p.15)" },
+ { a: "T3", b: "T8", on: "BUSINESS_DATE — one row per boundary per date",
+   ev: "dbt \u00a77.2.1 (p.18)" },
+ { a: "T3", b: "T7", on: "BUSINESS_DATE",
+   ev: "dbt \u00a77.1 (p.17)" },
+];
+
+export const SEI_TABLE_LINKS_NOTE =
+ "Foreign keys are not declared in either document's DDL. Every line "
+ + "above is a join some model or query performs, not a constraint the "
+ + "database enforces — so nothing stops a DQ row referencing a "
+ + "business date that DATE_CONTROL has never seen.";
 
 export const seiDocOf = (k) => SEI_DOCS[k] || null;
 export const seiCompsIn = (stage) => SEI_COMPONENTS.filter((c) => c.s === stage);
