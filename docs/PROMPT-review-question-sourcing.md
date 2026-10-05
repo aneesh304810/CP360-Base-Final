@@ -22,8 +22,9 @@ So the buckets below are the point of this document, not the prompts.
 > **Topics 1 and 2 are done**, and six more questions were answered from a
 > second document. Questions 1–10 went to the SEI pack; 18, 19, 32, 33, 34
 > and 44 were then answered from the **BBH dbt Transformation Framework
-> TDD**, which turned out to be the missing BBH-side design document this
-> page used to say was nowhere to be found. Prompts A1, A2 and A4 have been
+> TDD**, which is **also SEI's** — SEI Professional Services is named on
+> its document-control page as author and owner. It is not a BBH-side
+> document, and this page said for a while that it was. Prompts A1, A2 and A4 have been
 > removed because they have been run.
 >
 > The strongest result remains question 4 — Stage 2 is explicitly *not* an
@@ -132,17 +133,29 @@ checkable at all.
 
 ---
 
-## Bucket B — BBH's own design documents, not SEI's (20)
+## Bucket B — the design documents, not the architecture pack (20)
 
 These reference `DATE_CONTROL`, `FILE_REGISTRY`, the Airflow DAG structure, the
-worker/pod lifecycle and the Dim/Fact build. **None of that is SEI's to
-describe.** Asking the SEI PDF will produce plausible fiction.
+worker/pod lifecycle and the Dim/Fact build.
 
-> **Correction, October 2026.** This page previously said the document that
-> would answer these "is not in this repository — the single biggest blind
-> spot". It exists: the **BBH dbt Transformation Framework TDD**. It has
-> already answered 47, 48, 59, 60 and 63, and it settles several more below.
-> Point extractions at *that* document, not at the SEI pack.
+> **Correction, October 2026 — and the second half of it matters more.**
+>
+> This page first said the document that would answer these "is not in this
+> repository — the single biggest blind spot". It exists: the **BBH dbt
+> Transformation Framework TDD**, which has already answered 47, 48, 59, 60
+> and 63 and settles several more below.
+>
+> It then said that document was BBH's own, and that **"none of that is
+> SEI's to describe — asking the SEI PDF will produce plausible
+> fiction."** That was wrong, and wrong in the direction that costs most.
+> **SEI wrote the dbt TDD.** SEI Professional Services is named on its
+> document-control page as author and owner, and it is SEI who specifies
+> `DATE_CONTROL`, `FILE_REGISTRY`, the two-DAG handoff and the
+> DIM-before-FACT ordering, down to the DDL.
+>
+> So the split on this page is NOT BBH's documents against SEI's. Both
+> documents are SEI's. It is the architecture pack against the dbt TDD, and
+> the rule is simply to point each extraction at the right one of the two.
 >
 > **All twenty now carry an industry-practice draft.** Those are
 > *suggestions* — what a comparable platform normally does — and they are
@@ -239,12 +252,14 @@ drift from what the screen shows.
 | **76** | How are business corrections and data restatements handled? | What is SEI's role in a restatement — who declares it, who re-delivers, and within what window? |
 | **89** | How are Splunk alerts correlated, escalated, and routed? | Which alerts should escalate to SEI rather than to BBH support, and through what channel? |
 
-**Say it carefully.** None of these questions has been searched for in the
-SEI pack — they were bucketed as BBH-side from the start. So the standing
-note on every recommendation reads *"raised by BBH … not a statement that
-SEI omitted it … if SEI has covered it, their text supersedes this"*.
-Claiming a gap nobody looked for is how a review loses an argument it was
-winning.
+**Say it carefully, and more carefully than before.** Both SEI documents —
+the architecture pack and the dbt TDD — are SEI's, so "BBH-side" was never
+a statement about who wrote what. These twenty were bucketed as *decisions*
+rather than *lookups*, and SEI's material has not been searched exhaustively
+for them. So the standing note on every recommendation reads *"raised by BBH
+… not a statement that SEI omitted it … if SEI has covered it, their
+text supersedes this"*. Claiming a gap nobody looked for is how a review
+loses an argument it was winning.
 
 Regenerate this list after changing the corpus:
 

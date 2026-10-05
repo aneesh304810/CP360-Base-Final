@@ -46,7 +46,9 @@
 //
 //              AND THEY DO NOT ACCUSE SEI OF AN OMISSION. These questions
 //              have not been put to the SEI pack — they were bucketed as
-//              BBH-side from the start. So the standing note below says
+//              decisions rather than lookups from the start, and BOTH
+//              SEI documents — the architecture pack and the dbt TDD
+//              — are SEI's. So the standing note below says
 //              "raised by BBH", not "SEI left this out", and says plainly
 //              that SEI's text supersedes this if it covers the point.
 //              Claiming a gap nobody searched for is how a review loses
@@ -70,8 +72,9 @@ export const CONF = {
 export const SEI_GAP_NOTE =
   "Raised by BBH as a gap in the SEI analysis. This is BBH's recommended "
   + "position, not SEI's design and not a statement that SEI omitted it — "
-  + "the SEI pack has not been searched for this point. If SEI has covered "
-  + "it, their text supersedes this answer.";
+  + "these points were bucketed as decisions rather than lookups, and SEI's "
+  + "material has not been searched exhaustively for them. If SEI has "
+  + "covered it, their text supersedes this answer.";
 
 export const SEED_PREFIX = "seed";
 export const seedId = (n) => `${SEED_PREFIX}${n}`;

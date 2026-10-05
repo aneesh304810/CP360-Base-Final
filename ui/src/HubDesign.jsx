@@ -12,7 +12,7 @@ import { FM_SUMMARY, FM_AREAS, FM_STATE, FM_PROVIDED, FM_TABLES, FM_REC }
 import SourceReference, { citationsFor } from "./SourceReference.jsx";
 import SeiDocModal from "./SeiDocModal.jsx";
 import { TDD_ALIGN, TDD_VERDICTS, TDD_MISSING, TDD_SELF_CONFLICT, TDD_DOC,
- tddFor, tddCount } from "./hubTddAlignment.js";
+ TDD_SOURCE, tddFor, tddCount } from "./hubTddAlignment.js";
 
 // =====================================================================
 // HubDesign — the CP Integration Hub route: C4 landing (L1 context +
@@ -326,7 +326,8 @@ export default function HubDesign({ t }) {
            <b style={{ color: TDD_VERDICTS[v][0] }}>{tddCount(rows, v)}</b>
            {TDD_VERDICTS[v][1]}</span>))}
          <span style={{ marginLeft: "auto", fontSize: 9.5 }}>
-          the tracker names stay; the TDD's sit beside them</span>
+          SEI wrote the TDD — a conflict is a position to settle with
+          them, not an internal tidy-up</span>
         </div>
         {miss.map((m) => (
          <div key={m.name} style={{ marginTop: 11, background: "#fdf1f2",
@@ -441,9 +442,10 @@ export default function HubDesign({ t }) {
               TDD_VERDICTS[td.v][1].toUpperCase())}
              <b style={{ fontSize: 11, color: "#0f4775" }}>{td.name}</b>
              <span style={{ fontSize: 9.5, color: t.sub || "#666" }}>
-              {TDD_DOC} · {td.ev}</span>
+              {TDD_DOC} · {TDD_SOURCE} · {td.ev}</span>
             </div>
            </div>
+           <Fld k="what this is" v={td.what} />
            <Fld k="against the dbt TDD"
             v={td.note.split("\n\n").map((p, i) => (
              <div key={i} style={{ marginTop: i ? 7 : 0 }}>{p}</div>))}

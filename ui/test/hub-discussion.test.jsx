@@ -31,8 +31,9 @@ import { SEED_ANSWERS, seedRows, materialise, seedId, CONF, SEI_GAP_NOTE }
   from "../src/hubAnswers.js";
 import { FIGS } from "../src/HubAnswerFigs.jsx";
 import { tLight, tDark } from "../src/bbhTheme.js";
-import { TDD_ALIGN, TDD_VERDICTS, TDD_MISSING, TDD_SELF_CONFLICT, TDD_DOC }
-  from "../src/hubTddAlignment.js";
+import { TDD_ALIGN, TDD_VERDICTS, TDD_MISSING, TDD_SELF_CONFLICT, TDD_DOC,
+  TDD_SOURCE } from "../src/hubTddAlignment.js";
+import DocDrill, { docFor } from "../src/DocDrill.jsx";
 import { TRACKER_COMPONENTS } from "../src/seiDesignTracker.js";
 
 let bad = 0;
@@ -883,6 +884,56 @@ ok(/\u00a76\.1/.test(TDD_SELF_CONFLICT.ev) && /\u00a72/.test(TDD_SELF_CONFLICT.e
    && /section 2/i.test(TDD_SELF_CONFLICT.body),
    "the TDD's disagreement with ITSELF cites both sides of it — this is "
    + "the one claim a reviewer will check first", TDD_SELF_CONFLICT.ev);
+// WHAT THE COMPONENT MEANS, which is a different question from how it
+// differs. The design documents are per-plane and per-layer, so arriving
+// at one from a component used to open a document that never names it.
+ok(TIDS.every((id) => (TDD_ALIGN[id].what || "").length > 100),
+   "every component has a plain definition, not just a verdict — a reader "
+   + "who clicks a box is asking what it IS before asking how it differs",
+   TIDS.filter((id) => (TDD_ALIGN[id].what || "").length <= 100).join(","));
+// A definition that needs the TDD open to be understood has not defined
+// anything. These go in front of a business reader.
+const JARG = /\b(materiali[sz]ed|incremental strategy|ShortCircuitOperator|idempotent|DDL|DML|upsert|tag-based)\b/;
+ok(TIDS.every((id) => !JARG.test(TDD_ALIGN[id].what)),
+   "and says it without platform jargon — the verdict note below it is "
+   + "where the mechanics belong",
+   TIDS.filter((id) => JARG.test(TDD_ALIGN[id].what))
+     .map((id) => `${id}: ${(JARG.exec(TDD_ALIGN[id].what) || [])[0]}`).join(", "));
+// Rendered, not just present: this is the whole point of the change.
+const DD15 = renderToStaticMarkup(
+  <DocDrill t={tLight} docKey={docFor(TRK.get("15"))} from={TRK.get("15")}
+   onBack={() => {}} />);
+ok(/WHAT #15/.test(DD15) && /STG is a view/.test(DD15),
+   "and opening a component's design document leads with what that "
+   + "component is — the documents are per-plane, so one arrived at from "
+   + "#15 never used to name #15", "");
+ok(/ONE BOX, TWO OBJECTS/.test(DD15) && /Appendix A\.3/.test(DD15),
+   "with its verdict and a citation beside it", "");
+
+// PROVENANCE. The title says BBH and the document is SEI's — SEI
+// Professional Services is named on its document-control page as author
+// and owner. This page asserted the opposite for a while, and it changes
+// what every "conflict" below MEANS: not BBH's drawing against BBH's
+// spec, but the C4 against SEI's specification of BBH's platform.
+ok(/SEI/.test(TDD_SOURCE),
+   "the TDD's author is recorded, and it is SEI", TDD_SOURCE);
+ok(/SEI/.test(DD15),
+   "and travels with the citation on screen, so nobody reads a conflict "
+   + "as an internal tidy-up", "");
+const ALIGNSRC = strip("ui/src/hubTddAlignment.js");
+ok(!/BBH-side|BBH's own/.test(ALIGNSRC + HUB),
+   "and nothing still calls the TDD a BBH-side document",
+   ((ALIGNSRC + HUB).match(/BBH-side|BBH's own/g) || []).join(","));
+const PROMPTDOC = fs.readFileSync(
+  path.join(ROOT, "docs", "PROMPT-review-question-sourcing.md"), "utf8");
+ok(!/None of that is SEI's to describe/.test(PROMPTDOC),
+   "the sourcing page no longer tells anyone that SEI cannot describe "
+   + "DATE_CONTROL and the DAG structure — SEI specified both, down to "
+   + "the DDL, and that sentence sent extractions to the wrong document",
+   "");
+ok(/SEI wrote the dbt TDD/.test(PROMPTDOC),
+   "and says who wrote it, where the claim used to be", "");
+
 ok(/dbt/i.test(TDD_DOC) && /TDD/.test(TDD_DOC),
    "the document is named once, as a constant, so twenty entries cannot "
    + "drift into twenty spellings of it", TDD_DOC);
