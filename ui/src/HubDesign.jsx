@@ -18,6 +18,8 @@ import { SEI_DOCS, SEI_BOUNDARY, SEI_STAGES, SEI_COMPONENTS, SEI_TABLES,
  from "./seiBaseline.js";
 import { REGISTRY, REG_STATE, REG_ORIGIN, REG_REVIEW_NOTE, BBH_LAYERS,
  BBH_EXTENSION } from "./hubComponentRegistry.js";
+import { GROUPS, PROC_STAGES, groupOfTracker, stageOfTracker, groupById,
+ stageById } from "./hubGroups.js";
 
 // =====================================================================
 // HubDesign — the CP Integration Hub route: C4 landing (L1 context +
@@ -80,7 +82,8 @@ export default function HubDesign({ t }) {
  const [flat, setFlat] = useState(false);
  const [evtOpen, setEvtOpen] = useState(false);  // L2 event group
  const [seiStage, setSeiStage] = useState(null);   // C4 L3: which band
- const [seiComp, setSeiComp] = useState(null);     // C4 L4: which component       // "all components" flat tracker
+ const [seiComp, setSeiComp] = useState(null);     // C4 L4: which component
+ const [grp, setGrp] = useState(null);             // C4 L3: which container       // "all components" flat tracker
  const [expand, setExpand] = useState(null);    // L3 component detail panel
  const [srcOf, setSrcOf] = useState(null);      // component shown beside its SEI source
  const [seiDoc, setSeiDoc] = useState(null);    // {doc, section} open in the popup
@@ -495,7 +498,7 @@ export default function HubDesign({ t }) {
     The event components are kept, collapsed, and expand on click —
     they are a proposal, not a commitment, and they used to dominate
     the picture. */
- if (view === "L2") {
+ if (view === "SEIFLOW") {
   const evt = COMPS.filter((c) => c.container === "EVT");
   const H = evtOpen ? 1180 : 880;
   const T = (x, y, s, o) => (
@@ -543,9 +546,9 @@ export default function HubDesign({ t }) {
     <SectionHeader t={t}>CP Integration Hub</SectionHeader>
     <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap",
      alignItems: "center" }}>
-     <span onClick={() => setView("L1")} style={{ fontSize: 11.5, fontWeight: 700,
+     <span onClick={() => setView("L2")} style={{ fontSize: 11.5, fontWeight: 700,
       padding: "7px 16px", borderRadius: 5, background: t.navy || "#10193b",
-      color: "#fff", cursor: "pointer" }}>← context + dashboard</span>
+      color: "#fff", cursor: "pointer" }}>← containers</span>
      <span onClick={() => { setView("SEIBASE"); setExpand(null); }}
       style={{ fontSize: 10.5, fontWeight: 800, padding: "6px 14px",
        borderRadius: 999, cursor: "pointer", background: "#0f4775",
@@ -683,6 +686,183 @@ export default function HubDesign({ t }) {
      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
       <span style={{ width: 16, height: 10, borderRadius: 2, background: "#fdf1f2",
        border: "1.4px dashed #e0a9b0" }} /> proposed by this review</span>
+    </div>
+   </div>);
+ }
+
+ /* ---------- L2 — the containers, one picture of the whole flow ---
+    The level that was missing. Everything under it was already right:
+    the records are cited, the registry has a verdict on the rest. What
+    there was nowhere to see was the SHAPE, once, in the words the
+    programme uses rather than the words SEI's documents use.
+    Click any container and it opens with its components. */
+ if (view === "L2") {
+  const cnt = (g) => {
+   const trk = COMPS.filter((c) => groupOfTracker(c) === g.id);
+   return { sei: g.sei.length, bbh: (g.bbh || []).length, trk: trk.length,
+     open: g.sei.reduce((n, id) => n
+       + (((SEI_COMPONENTS.find((c) => c.id === id) || {}).open || []).length),
+       0) };
+  };
+  const evt = COMPS.filter((c) => groupOfTracker(c) === "events");
+  const G = (id) => GROUPS.find((g) => g.id === id);
+  const T = (x, y, str, o) => (
+   <text x={x} y={y} fontSize={(o && o.fs) || 8.5}
+    fontWeight={(o && o.fw) || 400} fill={(o && o.fill) || "#5c7c94"}
+    textAnchor={(o && o.anchor) || "start"}
+    fontStyle={(o && o.italic) ? "italic" : "normal"}>{str}</text>);
+  const Tally = ({ x, y, g }) => {
+   const c = cnt(g);
+   const bits = [
+    c.sei ? [`${c.sei} specified by SEI`, "#1168bd"] : null,
+    c.bbh ? [`${c.bbh} BBH`, "#a8560f"] : null,
+    [`${c.trk} tracked`, "#5c7c94"],
+    c.open ? [`${c.open} open with SEI`, "#6d3ac0"] : null,
+   ].filter(Boolean);
+   let dx = 0;
+   return (<g>{bits.map(([label, col], i) => {
+    const w = label.length * 4.7 + 14;
+    const el = (
+     <g key={label}>
+      <rect x={x + dx} y={y} width={w} height={15} rx="7.5" fill={col + "22"} />
+      {T(x + dx + 7, y + 11, label, { fs: 7.5, fw: 800, fill: col })}
+     </g>);
+    dx += w + 6;
+    return el;
+   })}</g>);
+  };
+  const Group = ({ id, x, y, w, h }) => {
+   const g = G(id);
+   return (
+    <g onClick={() => { setGrp(id); setView("GRP"); }} style={{ cursor: "pointer" }}>
+     <rect x={x} y={y} width={w} height={h} rx="10" fill="#fff"
+      stroke="#7fa8c9" strokeWidth="1.4" />
+     <rect x={x} y={y} width={w} height={30} rx="10" fill="#0f4775" />
+     <rect x={x} y={y + 20} width={w} height={10} fill="#0f4775" />
+     {T(x + 14, y + 20, `${g.icon}  ${g.n.toUpperCase()}`,
+       { fs: 10, fw: 800, fill: "#fff" })}
+     {T(x + w - 14, y + 20, "▸ open", { fs: 8, fw: 800, anchor: "end",
+       fill: "#9ec6ee" })}
+     {T(x + 14, y + 48, g.sub, { fs: 8.5, italic: true })}
+     <Tally x={x + 14} y={y + 58} g={g} />
+    </g>);
+  };
+  const Stage = ({ st, x, y, w }) => (
+   <g onClick={(e) => { e.stopPropagation(); setGrp("processing"); setView("GRP"); }}
+    style={{ cursor: "pointer" }}>
+    <rect x={x} y={y} width={w} height={62} rx="7"
+     fill={st.bbh.length ? "#fff" : "#1168bd"}
+     stroke={st.bbh.length ? "#a8560f" : "none"}
+     strokeDasharray={st.bbh.length ? "5 3" : undefined}
+     strokeWidth={st.bbh.length ? 1.4 : 0} />
+    {T(x + 10, y + 18, st.n, { fs: 10, fw: 800,
+      fill: st.bbh.length ? "#a8560f" : "#fff" })}
+    {T(x + 10, y + 32, st.sub, { fs: 8,
+      fill: st.bbh.length ? "#b9875a" : "#bcd6f0" })}
+    {T(x + 10, y + 50, [...st.sei, ...st.tbl, ...st.bbh].join(" · "),
+      { fs: 7.5, fw: 800, fill: st.bbh.length ? "#c79a62" : "#9ec6ee" })}
+   </g>);
+  const Arrow = (x1, y1, x2, y2) => (
+   <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#5c7c94" strokeWidth="1.6"
+    markerEnd="url(#hubarr)" />);
+  return (
+   <div>
+    <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+     <span onClick={() => setView("L1")} style={{ fontSize: 11.5, fontWeight: 700,
+      padding: "7px 16px", borderRadius: 5, background: t.navy || "#10193b",
+      color: "#fff", cursor: "pointer" }}>← context + dashboard</span>
+     <span onClick={() => setView("SEIFLOW")} style={{ fontSize: 10.5,
+      fontWeight: 800, padding: "6px 14px", borderRadius: 999, cursor: "pointer",
+      background: "#0f4775", color: "#fff" }}>
+      ◆ the SEI pipeline, box by box</span>
+     <span onClick={() => { setView("SEIBASE"); setExpand(null); }}
+      style={{ fontSize: 10.5, fontWeight: 800, padding: "6px 14px",
+       borderRadius: 999, cursor: "pointer", background: "#eef3f8",
+       color: "#0f4775" }}>▤ the baseline, cited</span>
+     <span onClick={() => { setView("REGISTRY"); setExpand(null); }}
+      style={{ fontSize: 10.5, fontWeight: 800, padding: "6px 14px",
+       borderRadius: 999, cursor: "pointer", background: "#f3eefb",
+       color: "#6d3ac0", border: "1px solid #d9c9f0" }}>
+      ▦ component registry</span>
+    </div>
+    <div style={{ background: "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+     borderRadius: 10, padding: 16, overflowX: "auto" }}>
+     <svg viewBox="0 0 1240 800" style={{ minWidth: 960, display: "block" }}>
+      <Defs />
+      {T(24, 22, "CP INTEGRATION HUB — the whole flow",
+        { fs: 11, fw: 800, fill: "#0f4775" })}
+      {T(24, 38, "Six containers. Open any one for its components, then a component for its record and the document behind it.",
+        { fs: 8.5, italic: true })}
+
+      {/* context strip */}
+      <rect x={24} y={56} width={240} height={40} rx="6" fill="#eef3f8"
+       stroke="#c3d4e4" />
+      {T(38, 74, "SEI · SWP", { fs: 9.5, fw: 800, fill: "#5c7c94" })}
+      {T(38, 88, "files on SFTP, and the APIs", { fs: 7.5 })}
+      {Arrow(264, 76, 296, 76)}
+      <rect x={300} y={56} width={600} height={40} rx="6" fill="#0f4775" />
+      {T(316, 80, "CP INTEGRATION HUB", { fs: 11, fw: 800, fill: "#fff" })}
+      {T(884, 80, "zone 2", { fs: 8, anchor: "end", fill: "#9ec6ee" })}
+      {Arrow(900, 76, 932, 76)}
+      <rect x={936} y={56} width={280} height={40} rx="6" fill="#fff"
+       stroke="#a8560f" strokeDasharray="5 3" strokeWidth="1.4" />
+      {T(950, 74, "PBDW · IMDS · Pivotal",
+        { fs: 9.5, fw: 800, fill: "#a8560f" })}
+      {T(950, 88, "the warehouses, downstream of Stage 3",
+        { fs: 7.5, fill: "#b9875a" })}
+
+      {/* the chain down the left */}
+      <Group id="ingress" x={24} y={120} w={876} h={86} />
+      {Arrow(462, 206, 462, 230)}
+      <Group id="ingestion" x={24} y={234} w={876} h={86} />
+      {Arrow(462, 320, 462, 344)}
+      <Group id="orchestration" x={24} y={348} w={876} h={86} />
+      {Arrow(462, 434, 462, 458)}
+
+      {/* processing, with the stage chain drawn inside it */}
+      <g onClick={() => { setGrp("processing"); setView("GRP"); }}
+       style={{ cursor: "pointer" }}>
+       <rect x={24} y={462} width={876} height={192} rx="10" fill="#fff"
+        stroke="#7fa8c9" strokeWidth="1.4" />
+       <rect x={24} y={462} width={876} height={30} rx="10" fill="#0f4775" />
+       <rect x={24} y={482} width={876} height={10} fill="#0f4775" />
+       {T(38, 482, "⚙  PROCESSING", { fs: 10, fw: 800, fill: "#fff" })}
+       {T(886, 482, "▸ open", { fs: 8, fw: 800, anchor: "end",
+         fill: "#9ec6ee" })}
+       <Tally x={38} y={500} g={G("processing")} />
+      </g>
+      {PROC_STAGES.map((st, i) => (
+       <Stage key={st.id} st={st} x={38 + i * 215} y={524} w={201} />))}
+      {[0, 1, 2].map((i) => (
+       <g key={i}>{Arrow(38 + i * 215 + 201, 555, 38 + (i + 1) * 215 - 3, 555)}</g>))}
+      {T(38, 612, "Stage 2 and Stage 2 INT are the one layer also called Silver or Enriched. Stage 3 is BBH's: SEI's documents end at DIM and FACT.",
+        { fs: 8, italic: true, fill: "#a8560f" })}
+      {T(38, 626, "Reconciliation and DQ capture run across the chain rather than inside one stage — both are in this container.",
+        { fs: 8, italic: true })}
+
+      {/* the two that sit beside everything */}
+      <Group id="openshift" x={936} y={120} w={280} h={140} />
+      <Group id="foundation" x={936} y={288} w={280} h={140} />
+      {T(936, 452, "These two are not a step in the flow.", { fs: 8, italic: true })}
+      {T(936, 464, "Everything above runs on one and", { fs: 8, italic: true })}
+      {T(936, 476, "records itself in the other.", { fs: 8, italic: true })}
+
+      {/* the proposal, kept apart */}
+      <g onClick={() => { setGrp("events"); setView("GRP"); }}
+       style={{ cursor: "pointer" }}>
+       <rect x={24} y={678} width={1192} height={52} rx="10" fill="#fdf1f2"
+        stroke="#e0a9b0" strokeDasharray="5 4" strokeWidth="1.3" />
+       {T(40, 700, `▸  EVENT INGESTION — ${evt.length} components`,
+         { fs: 10, fw: 800, fill: "#cc3344" })}
+       {T(40, 716, "Proposed by this programme's review. Not in SEI's documents and not in the delivery workbook — open it to see what it would add.",
+         { fs: 8, italic: true, fill: "#b4707a" })}
+       {T(1202, 700, "▸ open", { fs: 8, fw: 800, anchor: "end",
+         fill: "#cc3344" })}
+      </g>
+      {T(24, 760, "Solid blue is specified by SEI and cited. Dashed amber is BBH's and is not in either document. Dashed red is this review's proposal.",
+        { fs: 8, italic: true })}
+     </svg>
     </div>
    </div>);
  }
@@ -878,6 +1058,170 @@ export default function HubDesign({ t }) {
    </div>);
  }
 
+ /* ---------- The container, opened ------------------------------
+    What a group actually contains, in two halves that are never mixed:
+    what SEI specified, cited; then what BBH has in that container and
+    the verdict on each. Processing also shows its stage chain, because
+    that is the part people came for. */
+ if (view === "GRP" && grp) {
+  const g = groupById(grp);
+  const evts = grp === "events";
+  const trk = COMPS.filter((c) => groupOfTracker(c) === grp);
+  const seis = (g ? g.sei : []).map((id) =>
+    SEI_COMPONENTS.find((c) => c.id === id)).filter(Boolean);
+  const bbhs = (g ? g.bbh : []).map((id) =>
+    BBH_EXTENSION.find((b) => b.id === id)).filter(Boolean);
+  const Head = ({ title, note, n, label, bg }) => (
+   <div style={{ display: "flex", alignItems: "center", gap: 12,
+    background: bg, color: "#fff", borderRadius: 10, padding: "13px 18px",
+    margin: "16px 0 10px" }}>
+    <div><b>{title}</b>
+     <div style={{ fontSize: 10, color: "#dfe7f2", marginTop: 2 }}>{note}</div></div>
+    {n !== undefined && (
+     <div style={{ marginLeft: "auto", textAlign: "center", fontSize: 10,
+      color: "#dfe7f2" }}><b style={{ display: "block", fontSize: 19,
+      color: "#fff" }}>{n}</b>{label}</div>)}
+   </div>);
+  return (
+   <div>
+    <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <Crumb trail={[["containers", () => setView("L2")],
+                   [evts ? "Event Ingestion" : g.n, null]]} />
+    <div style={{ background: evts ? "#5c3030" : "#0f4775", color: "#fff",
+     borderRadius: 10, padding: "16px 20px", marginBottom: 4 }}>
+     <b style={{ fontSize: 16 }}>{evts ? "Event Ingestion" : g.n}</b>
+     <div style={{ fontSize: 11.5, color: "#dfe7f2", lineHeight: 1.6,
+      marginTop: 5 }}>
+      {evts ? "Proposed by this programme's events-primary review. Not in "
+            + "SEI's documents and not in the delivery workbook, so none of "
+            + "it is cited and none of it is committed."
+            : g.sub}</div>
+    </div>
+
+    {grp === "processing" && (
+     <>
+      <Head title="The stage chain" bg="#1f4f7a"
+       note="Stage 2 and Stage 2 INT are the one layer also called Silver or Enriched"
+       n={PROC_STAGES.length} label="stages" />
+      <div style={{ display: "grid", gap: 8,
+       gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))" }}>
+       {PROC_STAGES.map((st) => (
+        <div key={st.id} style={{ background: "#fff", borderRadius: 8,
+         border: st.bbh.length ? "1px dashed #dfa96a"
+           : `1px solid ${t.panel2 || "#dfe6e9"}`,
+         borderLeft: `3px solid ${st.bbh.length ? "#a8560f" : "#1168bd"}`,
+         padding: "12px 15px" }}>
+         <b style={{ fontSize: 12.5,
+          color: st.bbh.length ? "#a8560f" : (t.navy || "#10193b") }}>{st.n}</b>
+         <div style={{ fontSize: 10, color: t.sub || "#666", marginTop: 2 }}>
+          {st.sub}</div>
+         <div style={{ fontSize: 11.5, color: "#33414d", lineHeight: 1.6,
+          marginTop: 7 }}>{st.w}</div>
+         {st.note && <div style={{ fontSize: 10.5, color: "#a8560f",
+          lineHeight: 1.55, marginTop: 6 }}>{st.note}</div>}
+         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+          {[...st.sei, ...st.bbh].map((id) => (
+           <span key={id} onClick={() => { if (id[0] === "S") {
+             setSeiComp(id); setView("SEIL4"); } }}
+            style={{ cursor: id[0] === "S" ? "pointer" : "default" }}>
+            {chip(id[0] === "S" ? "#e4f0fb" : "#fdf2e3",
+              id[0] === "S" ? "#0f4775" : "#a8560f", id)}</span>))}
+          {st.tbl.map((id) => (
+           <span key={id}>{chip("#eef1f4", "#5c6b7a",
+            (SEI_TABLES.find((x) => x.id === id) || {}).n || id)}</span>))}
+         </div>
+        </div>))}
+      </div>
+     </>)}
+
+    {seis.length > 0 && (
+     <>
+      <Head title="Specified by SEI" bg="#1f6b45"
+       note="each cited to a section and a page; click for the full record"
+       n={seis.length} label="components" />
+      <div style={{ display: "grid", gap: 8 }}>
+       {seis.map((c) => (
+        <div key={c.id} onClick={() => { setSeiComp(c.id); setView("SEIL4"); }}
+         style={{ background: "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+          borderLeft: "3px solid #1168bd", borderRadius: 8, padding: "12px 16px",
+          cursor: "pointer" }}>
+         <div style={{ display: "flex", alignItems: "center", gap: 8,
+          flexWrap: "wrap" }}>
+          <span style={{ fontFamily: "Roboto Mono, monospace", fontSize: 10,
+           fontWeight: 700, color: "#8a97a3" }}>{c.id}</span>
+          <b style={{ fontSize: 12.5, color: t.navy || "#10193b" }}>{c.n}</b>
+          {chip("#eef3f8", "#5c7c94", c.tech)}
+          {(c.open || []).length > 0 && chip("#f3eefb", "#6d3ac0",
+            `${(c.open || []).length} open with SEI`)}
+          <span style={{ marginLeft: "auto", fontSize: 9.5, fontWeight: 800,
+           color: "#0f4775" }}>open record →</span>
+         </div>
+         <div style={{ fontSize: 11.5, color: "#33414d", lineHeight: 1.6,
+          marginTop: 6, maxWidth: 940 }}>{c.w}</div>
+         <div style={{ fontSize: 9.5, color: t.muted || "#999", marginTop: 5 }}>
+          {c.ev}</div>
+        </div>))}
+      </div>
+     </>)}
+
+    {bbhs.length > 0 && (
+     <>
+      <Head title="BBH's own, in this container" bg="#6b5420"
+       note="not in either SEI document" n={bbhs.length} label="layers" />
+      <div style={{ display: "grid", gap: 8 }}>
+       {bbhs.map((b) => (
+        <div key={b.id} style={{ background: "#fff", borderRadius: 8,
+         border: "1px dashed #dfa96a", borderLeft: "3px solid #a8560f",
+         padding: "12px 16px" }}>
+         <b style={{ fontSize: 12.5, color: "#a8560f" }}>{b.id} · {b.n}</b>
+         <div style={{ fontSize: 11.5, color: "#33414d", lineHeight: 1.6,
+          marginTop: 5 }}>{b.w}</div>
+         <div style={{ fontSize: 10.5, color: "#8a6a3a", lineHeight: 1.55,
+          marginTop: 5 }}>{b.why}</div>
+        </div>))}
+      </div>
+     </>)}
+
+    {trk.length > 0 && (
+     <>
+      <Head title={evts ? "What it would add" : "What BBH tracks here"}
+       bg={evts ? "#5c3030" : "#4a2f6b"}
+       note={evts ? "ids from 101, so they can never be mistaken for a tracker component"
+         : "from the delivery workbook, with the verdict against SEI's documents"}
+       n={trk.length} label="components" />
+      <div style={{ background: "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+       borderRadius: 8, overflow: "hidden" }}>
+       {trk.map((c) => {
+        const r = evts ? { st: "absent" } : (REGISTRY[c.id] || { st: "absent" });
+        const [col, label] = REG_STATE[r.st];
+        const dk = docFor(c), d = DOCS[dk];
+        const st2 = stageOfTracker(c);
+        return (
+         <div key={c.id} style={{ display: "grid",
+          gridTemplateColumns: "44px minmax(0,1.2fr) 104px minmax(0,2fr) 128px",
+          gap: 12, padding: "10px 14px", fontSize: 11,
+          borderTop: "1px solid #eef1f4", alignItems: "start" }}>
+          <b style={{ fontFamily: "Roboto Mono, monospace", fontSize: 10,
+           color: col }}>{c.id}</b>
+          <div><b style={{ color: t.navy || "#10193b" }}>{c.component}</b>
+           {st2 && <div style={{ fontSize: 9, fontWeight: 800, color: "#1168bd",
+            marginTop: 2 }}>{(stageById(st2) || {}).n}</div>}</div>
+          <span>{chip(col + "1f", col, label.toUpperCase())}</span>
+          <span style={{ color: "#33414d", lineHeight: 1.55 }}>
+           {r.why || (r.sei ? `baseline ${r.sei.join(", ")}` : "—")}</span>
+          <span onClick={() => setDoc({ key: dk, from: c })}
+           style={{ fontSize: 9, fontWeight: 800, padding: "3px 9px",
+            borderRadius: 999, cursor: "pointer", background: d.bg, color: d.color,
+            border: `1px solid ${d.color}`, textAlign: "center",
+            whiteSpace: "nowrap", justifySelf: "end" }}>
+           {d.icon} design doc →</span>
+         </div>);
+       })}
+      </div>
+     </>)}
+   </div>);
+ }
+
  /* ---------- C4 L3 — the components inside one container -------
     Reached by clicking a band on L2. Lists what SEI puts in that part
     of the design, and nothing else; each one opens its record. */
@@ -888,7 +1232,7 @@ export default function HubDesign({ t }) {
    <div>
     <SectionHeader t={t}>CP Integration Hub</SectionHeader>
     <Crumb trail={[
-      ["architecture", () => setView("L2")],
+      ["architecture", () => setView("SEIFLOW")],
       [st.n, null]]} />
     <div style={{ display: "flex", alignItems: "center", gap: 12,
      background: "#0f4775", color: "#fff", borderRadius: 10,
@@ -959,7 +1303,7 @@ export default function HubDesign({ t }) {
    <div>
     <SectionHeader t={t}>CP Integration Hub</SectionHeader>
     <Crumb trail={[
-      ["architecture", () => setView("L2")],
+      ["architecture", () => setView("SEIFLOW")],
       [st.n, () => { setSeiStage(c.s); setView("SEIL3"); }],
       [c.id, null]]} />
     <div style={{ background: "#0f4775", color: "#fff", borderRadius: 10,

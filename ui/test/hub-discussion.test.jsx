@@ -39,6 +39,8 @@ import { SEI_DOCS, SEI_BOUNDARY, SEI_STAGES, SEI_COMPONENTS, SEI_TABLES,
   from "../src/seiBaseline.js";
 import { REGISTRY, REG_STATE, BBH_LAYERS, BBH_EXTENSION }
   from "../src/hubComponentRegistry.js";
+import { GROUPS, PROC_STAGES, groupOfTracker, stageOfTracker }
+  from "../src/hubGroups.js";
 import { TRACKER_COMPONENTS } from "../src/seiDesignTracker.js";
 
 let bad = 0;
@@ -1054,6 +1056,64 @@ ok(/const \[evtOpen, setEvtOpen\] = useState\(false\)/.test(HUB),
    + "is only a proposal within", "");
 ok(/setEvtOpen\(!evtOpen\)/.test(HUB) && /evtOpen && \(/.test(HUB),
    "and expands on click", "");
+
+// ---- the container layer --------------------------------------------
+//
+// The level between the dashboard and the detail, in BBH's own
+// grouping rather than SEI's. Two models of the same components, which
+// is fine and deliberate — but only while every component is in
+// exactly one group and every group can be opened.
+const GSEI = GROUPS.flatMap((g) => g.sei);
+const BASEC = new Set(SEI_COMPONENTS.map((c) => c.id));
+ok(GROUPS.length === 6, "six containers, as asked", GROUPS.length);
+ok(GSEI.every((id) => BASEC.has(id)),
+   "every component a container claims exists in the baseline",
+   GSEI.filter((id) => !BASEC.has(id)).join(","));
+ok([...BASEC].every((id) => GSEI.includes(id)),
+   "and every baseline component lands in a container — one that lands "
+   + "nowhere is invisible at this level and nobody notices",
+   [...BASEC].filter((id) => !GSEI.includes(id)).join(","));
+ok(GSEI.length === new Set(GSEI).size,
+   "and in exactly one, because a component in two containers is "
+   + "counted twice on the tallies",
+   GSEI.filter((x, i) => GSEI.indexOf(x) !== i).join(","));
+// Every tracker component must land somewhere too, or the counts on the
+// diagram quietly understate what the programme is carrying.
+const GROUPIDS = new Set([...GROUPS.map((g) => g.id), "events"]);
+ok(TRACKER_COMPONENTS.every((c) => GROUPIDS.has(groupOfTracker(c))),
+   "every tracker component resolves to a container",
+   TRACKER_COMPONENTS.filter((c) => !GROUPIDS.has(groupOfTracker(c)))
+     .map((c) => `${c.id}:${groupOfTracker(c)}`).slice(0, 6).join(","));
+// The stage chain is the part everyone argues about, so it is pinned.
+ok(PROC_STAGES.map((x) => x.n).join(" -> ")
+     === "Stage 1 -> Stage 2 -> Stage 2 INT -> Stage 3",
+   "the stage chain reads Stage 1, Stage 2, Stage 2 INT, Stage 3",
+   PROC_STAGES.map((x) => x.n).join(" -> "));
+ok(PROC_STAGES.every((x) => [...x.sei, ...x.bbh].every((id) =>
+     BASEC.has(id) || BBH_EXTENSION.some((b) => b.id === id))),
+   "and every box on it resolves to a baseline component or a BBH layer",
+   "");
+const st3 = PROC_STAGES.find((x) => x.id === "stage3");
+ok(st3 && st3.sei.length === 0 && st3.bbh.length > 0 && st3.note,
+   "Stage 3 carries nothing of SEI's and says so — it is the warehouse, "
+   + "and SEI's documents end at DIM and FACT", "");
+const s2 = PROC_STAGES.find((x) => x.id === "stage2");
+ok(s2 && /view/.test(s2.sub) && /source DQ check/.test(s2.w),
+   "Stage 2 is the in-memory view whose job is the source DQ check", "");
+const s2i = PROC_STAGES.find((x) => x.id === "stage2int");
+ok(s2i && /normalised SWP/.test(s2i.sub),
+   "and Stage 2 INT is the normalised SWP model", s2i && s2i.sub);
+// Reachability: a container you cannot open is a picture, not a level.
+ok(/view === "GRP"/.test(HUB),
+   "the container opens into its own view", "");
+ok(GROUPS.every((g) => HUB.includes(`setGrp("${g.id}")`))
+   || /setGrp\(id\)/.test(HUB),
+   "and every container on the diagram is wired to open", "");
+ok(/\["containers", \(\) => setView\("L2"\)\]/.test(HUB),
+   "with a breadcrumb back to the containers", "");
+// The SEI pipeline drawing is not lost, just moved below this level.
+ok(/view === "SEIFLOW"/.test(HUB) && /setView\("SEIFLOW"\)/.test(HUB),
+   "the box-by-box SEI pipeline is still reachable from here", "");
 
 // ---- the C4 drill-down ----------------------------------------------
 //
