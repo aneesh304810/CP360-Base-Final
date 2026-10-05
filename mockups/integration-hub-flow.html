@@ -512,6 +512,131 @@ const OPEN = [
    who:"BBH" },
 ];
 
+
+/* ---- 9. The C4 model — BBH's own grouping ------------------------------
+   Containers, lanes and members come from hubGroups.js and the component
+   registry; names come from the tracker and the SEI baseline. The ladder is
+   Context -> Container -> Lane -> Component, and the detailed views
+   (the gate, the loader loop, the Stage 2 model) hang off the lane that
+   owns them rather than floating beside the diagram. */
+const TRK = {
+ "1": { n:"SWP Platform", plane:"Source", tech:"Contract", pri:"P1", st:"specified", sei:["S1"], why:"", deliv:"Interface spec: domains, entities, extract triggers" },
+ "2": { n:"SWP UI", plane:"Source", tech:"Contract", pri:"P3", st:"absent", sei:[], why:"SWP's own user interface. Neither document describes it.", deliv:"Access model + SSO handshake spec" },
+ "3": { n:"SWP APIs", plane:"Source", tech:"Contract", pri:"P1", st:"absent", sei:[], why:"The real-time API lane. Both documents are batch, end to end.", deliv:"API contract: endpoints, auth, rate limits, SLAs" },
+ "4": { n:"SWP Loaders", plane:"Source", tech:"Contract", pri:"P2", st:"absent", sei:[], why:"The loader endpoints BBH submits to. Outbound, and neither document covers outbound at all.", deliv:"Loader file format + submission/ack contract" },
+ "5": { n:"Extract Generation", plane:"Source", tech:"Contract", pri:"P1", st:"absent", sei:[], why:"How SEI produces the files. The ingestion document puts file generation outside itself in as many words.", deliv:"File spec: layout, naming, manifest, EOD + intraday cadence" },
+ "6": { n:"Orchestration API / Data Ingestion / ODM / Workflows / Config", plane:"PS-Orchestration", tech:"Contract", pri:"P3", st:"absent", sei:[], why:"SEI's own orchestration. Out of scope for both.", deliv:"Outbound orchestration design (SEI-owned, BBH-reviewed)" },
+ "7": { n:"Status Monitoring Dashboard", plane:"PS-Orchestration", tech:"Contract", pri:"P2", st:"absent", sei:[], why:"SEI's monitoring surface. Out of scope for both.", deliv:"Status event contract to Integration360" },
+ "8": { n:"Landing Zone + Transport", plane:"Ingress/Egress", tech:"Infra", pri:"P1", st:"specified", sei:["S2", "S3", "S4"], why:"", deliv:"Transport design: protocol, auth, dirs, retention, completeness signal" },
+ "9": { n:"File Arrival Sensors", plane:"Ingress/Egress", tech:"Airflow", pri:"P1", st:"differs", sei:["S6"], why:"SEI does not use arrival sensors. It runs a scheduled scan every five minutes and decides completeness at the END of the run, as a set difference. A sensor per interface is the pattern it was written to avoid.", deliv:"Per-file sensor design; start-on-arrival not batch-complete" },
+ "10": { n:"Outbound Producers", plane:"Ingress/Egress", tech:"Python", pri:"P3", st:"absent", sei:[], why:"Outbound to SEI. Neither document has an outbound path.", deliv:"Design for Data Extracts, JSON payloads, Loader File" },
+ "11": { n:"Apigee Proxy", plane:"Ingress/Egress", tech:"Vendor/Infra", pri:"P3", st:"absent", sei:[], why:"The API lane. Both SEI documents are batch from end to end — files in, Gold out — and neither mentions a proxy, a gateway or a synchronous call.", deliv:"Proxy design: submit path + status-return path" },
+ "12": { n:"API Gateway / Data Plane", plane:"Ingress/Egress", tech:"Vendor/Infra", pri:"P2", st:"absent", sei:[], why:"The API lane, as above. Nothing in either document describes real-time access to this data.", deliv:"Real-time route design, independent of batch" },
+ "13": { n:"Python Ingestion Framework", plane:"Processing", tech:"Python", pri:"P1", st:"specified", sei:["S5", "S6", "S7", "S8"], why:"", deliv:"Module design: validation, profiling, metadata capture, RAW load" },
+ "14": { n:"Stage 1 RAW", plane:"Processing", tech:"Oracle DDL", pri:"P1", st:"specified", sei:["T4"], why:"", deliv:"Physical model: 7 RAW_* tables, 8 audit cols, partitioning, retention" },
+ "15": { n:"Stage 2 Enriched (dbt)", plane:"Processing", tech:"dbt", pri:"P1", st:"specified", sei:["S14", "S15", "T5"], why:"One tracker component, two SEI objects: STG is a view that stores nothing, INT is a table kept seven days.", deliv:"5 STG2_* models, 8 processing steps, tests" },
+ "16": { n:"Gold (dbt)", plane:"Processing", tech:"dbt", pri:"P1", st:"specified", sei:["S16", "S17", "T6"], why:"One tracker component, two ordered SEI layers — and the tables already exist, so dbt populates rather than builds them.", deliv:"2 SCD2 dims + 3 facts; SCD2 and merge logic" },
+ "17": { n:"Correction Handling", plane:"Processing", tech:"dbt", pri:"P1", st:"specified", sei:["S16"], why:"SEI gives it the rule it was missing: a closed interval is corrected by direct UPDATE, never by MERGE.", deliv:"Bitemporal vs merge design, applied across Stage 2 and Gold" },
+ "18": { n:"Airflow DAG + Per-Domain Fan-out", plane:"Orchestration", tech:"Airflow", pri:"P1", st:"differs", sei:["S5", "S13"], why:"SEI has two DAGs, not one, and no per-domain fan-out: parallelism comes from one mapped task per FILE, created at run time.", deliv:"DAG design: 7 parallel branches, join points, retries" },
+ "19": { n:"Dim-before-Fact / dbt Threads", plane:"Orchestration", tech:"Airflow + dbt", pri:"P2", st:"specified", sei:["S13", "S16", "S17"], why:"", deliv:"Build-order and concurrency design" },
+ "20": { n:"Intraday Cadence Control", plane:"Orchestration", tech:"Airflow", pri:"P1", st:"absent", sei:[], why:"Directly contradicted rather than merely absent: SEI permits one non-COMPLETE business date at a time, enforced by a unique index. An intraday cadence does not fit that state machine.", deliv:"Cadence design and lane assignment" },
+ "21": { n:"Replay / Rerun Engine", plane:"Orchestration", tech:"Python + Airflow", pri:"P1", st:"differs", sei:["S18"], why:"SEI's replay is not an engine. It is one task at the end of the transformation run, driven by the open rows in the DQ store and bounded by INT's seven days.", deliv:"Replay design from LOAD_ID; scope, idempotency, downstream impact" },
+ "22": { n:"Partial-Batch Policy", plane:"Orchestration", tech:"Airflow", pri:"P1", st:"absent", sei:[], why:"SEI has no partial-set path: the transition fires only on an empty missing set. Running on what arrived would be a design change.", deliv:"Policy + implementation: halt-all vs per-domain proceed" },
+ "23": { n:"G1 File / Structural Gate", plane:"Data Quality", tech:"Python", pri:"P1", st:"specified", sei:["S8"], why:"The ingestion document specifies exactly this: readable, header, trailer, zero-row and the date, all before any RAW write, and a failure goes to QUARANTINED.", deliv:"Check set + quarantine design. BLOCKS RAW insert" },
+ "24": { n:"G2 RAW Profiling Gate", plane:"Data Quality", tech:"Airflow + SQL", pri:"P2", st:"absent", sei:[], why:"Nothing profiles RAW. The first thing that reads a row's content in SEI's design is the STG view, already past the load.", deliv:"Profiling checks. BLOCKS Stage 2" },
+ "25": { n:"G3 dbt Tests + Business Rules", plane:"Data Quality", tech:"dbt", pri:"P1", st:"specified", sei:["S13", "S14"], why:"", deliv:"Test suite + rule design. BLOCKS Gold" },
+ "26": { n:"G4 Tie-out / Control Totals", plane:"Data Quality", tech:"Airflow + SQL", pri:"P1", st:"differs", sei:["S19"], why:"SEI reconciles, but not as a gate. The counts are computed and published AFTER the fact build and the verdict is derived in Splunk, so a mismatch alerts rather than blocks.", deliv:"RAW-to-Gold reconciliation. BLOCKS Gold publish. Per-target" },
+ "27": { n:"G5 Post-Publish Recon", plane:"Data Quality", tech:"Airflow + SQL", pri:"P2", st:"specified", sei:["S19", "T8"], why:"", deliv:"Advisory recon; triggers replay" },
+ "28": { n:"DQ Framework", plane:"Data Quality", tech:"Python", pri:"P1", st:"specified", sei:["S18", "T7"], why:"", deliv:"Rule registry, severity tiers, results store, audited override path" },
+ "29": { n:"Error Handling & Quarantine", plane:"Foundation", tech:"Python", pri:"P1", st:"differs", sei:["S4", "T7"], why:"Two different quarantines. SEI quarantines FILES before load, and for failed ROWS keeps lineage only — no payload copy — on the assumption that anything held resolves inside seven days.", deliv:"Error taxonomy, quarantine store, resubmission path" },
+ "30": { n:"Reconciliation Framework", plane:"Foundation", tech:"Python", pri:"P1", st:"specified", sei:["S19", "T8"], why:"", deliv:"Recon model: control totals, exception lifecycle" },
+ "31": { n:"Audit & Lineage", plane:"Foundation", tech:"Python + dbt", pri:"P1", st:"specified", sei:["T2", "T3"], why:"Business date, run ids, the source record id and the failure category are correlated; the control tables are the ledger.", deliv:"End-to-end lineage design, evidence retention" },
+ "32": { n:"Security & Access Control", plane:"Foundation", tech:"Infra", pri:"P1", st:"specified", sei:["S21"], why:"Credentials in OpenShift secrets, and the loader account holds only the DML it needs — no ALTER, DROP or CREATE.", deliv:"AuthN/AuthZ model, data classification, masking" },
+ "33": { n:"Metadata & Configuration Store", plane:"Foundation", tech:"Oracle DDL + Python", pri:"P1", st:"specified", sei:["T1", "T2", "T3"], why:"", deliv:"Config model: rules, thresholds, mappings, schedules" },
+ "34": { n:"Observability", plane:"Foundation", tech:"Infra", pri:"P2", st:"specified", sei:["S21"], why:"", deliv:"Logs, metrics, traces; SLIs and alerting" },
+ "35": { n:"Integration360", plane:"Foundation", tech:"Vendor/BBH", pri:"P1", st:"absent", sei:[], why:"This catalogue. SEI gives all reporting to Splunk, so 360 reading the same tables directly is BBH's addition — defensible, and nobody has written down who owns which.", deliv:"Monitoring, exception mgmt, process tracking, recon" },
+ "36": { n:"SSO", plane:"Foundation", tech:"Infra", pri:"P3", st:"absent", sei:[], why:"Sign-on for BBH's own tools. Out of scope for both.", deliv:"SSO design to SWP UI" },
+ "37": { n:"PBDW", plane:"Consumers", tech:"Oracle DDL + dbt", pri:"P1", st:"absent", sei:[], why:"Downstream of Gold. Both documents stop at Gold.", deliv:"Publication design + change control" },
+ "38": { n:"IMDS Stage -> IMDS", plane:"Consumers", tech:"Oracle DDL + dbt", pri:"P2", st:"absent", sei:[], why:"Downstream of Gold. Both documents stop once DIM and FACT are written, so how IMDS is fed is BBH's to design.", deliv:"Staging DB + load design from Stage 2" },
+ "39": { n:"Pivotal Database", plane:"Consumers", tech:"dbt", pri:"P2", st:"absent", sei:[], why:"Downstream of Gold, as above — and SEI's design has no notion of a consumer-specific shape at all.", deliv:"Feed design from Stage 2" },
+ "40": { n:"CP DW Canonical Model", plane:"Consumers", tech:"Design only", pri:"P3", st:"absent", sei:[], why:"Not built this phase, and not in either document.", deliv:"Forward-compatibility design only (future)" },
+ "41": { n:"BI / Analytics", plane:"Consumers", tech:"BI tooling", pri:"P2", st:"absent", sei:[], why:"Reporting off the warehouse. Outside both documents, which end at the Gold tables.", deliv:"Semantic layer + access design" },
+ "42": { n:"Real-time Consumers", plane:"Consumers", tech:"Contract", pri:"P2", st:"absent", sei:[], why:"The real-time lane again. Neither document has a consumer that is not fed from a completed business date.", deliv:"Consumer contract on the API lane" },
+ "43": { n:"BBH Existing Systems", plane:"Consumers", tech:"Analysis", pri:"P3", st:"absent", sei:[], why:"The existing BBH estate. Both documents describe what arrives and what is built, never who consumes it.", deliv:"Impact assessment: front/back office, trade, custody" },
+ "44": { n:"Projects / Namespaces", plane:"Platform", tech:"Infra", pri:"P1", st:"absent", sei:[], why:"Platform build. Neither document covers it.", deliv:"Environment topology: dev, test, UAT, prod" },
+ "45": { n:"Container Images", plane:"Platform", tech:"Infra", pri:"P1", st:"absent", sei:[], why:"Container images. Both documents assume OpenShift and neither specifies how images are built or versioned — only that rollback is redeploying the prior one.", deliv:"Base image standard: Python, dbt, Airflow" },
+ "46": { n:"Registry, Scanning, Signing", plane:"Platform", tech:"Infra", pri:"P2", st:"absent", sei:[], why:"Registry, scanning and signing. Not mentioned, and it is the supply-chain half of a design that is otherwise explicit about least privilege.", deliv:"Image supply-chain design + promotion policy" },
+ "47": { n:"Service Accounts, RBAC, SCCs", plane:"Platform", tech:"Infra", pri:"P1", st:"specified", sei:["S21"], why:"Named, and narrowly: least privilege, and DML only on the Gold tables.", deliv:"Cluster access model" },
+ "48": { n:"Secrets Management", plane:"Platform", tech:"Infra", pri:"P1", st:"specified", sei:["S21"], why:"Oracle, SFTP and storage credentials in OpenShift secrets, referenced through Airflow connections.", deliv:"Secrets design: Oracle creds, sFTP keys, API tokens" },
+ "49": { n:"Network Policy & Egress", plane:"Platform", tech:"Infra", pri:"P1", st:"absent", sei:[], why:"Network policy and egress. Neither document says what the pipeline is allowed to reach, which matters given it pulls from SFTP and pushes to Splunk.", deliv:"Egress to SEI/Apigee/Oracle; ingress rules" },
+ "50": { n:"Persistent Storage", plane:"Platform", tech:"Infra", pri:"P2", st:"differs", sei:["S3"], why:"SEI needs one specific thing from storage and states it as an assumption: Landing, Archive and Quarantine must be shared across worker pods, or mapped tasks cannot reliably read or move files.", deliv:"Volume design: landing, quarantine, dbt artifacts, logs" },
+ "51": { n:"Airflow Deployment", plane:"Runtime", tech:"Infra + Airflow", pri:"P1", st:"specified", sei:["S5"], why:"A starting configuration is given: schedule every five minutes, catchup off, one active run, pool 8 to 10, one or two retries.", deliv:"Scheduler HA, KubernetesExecutor, pod operator design" },
+ "52": { n:"Worker Pod Autoscaling", plane:"Runtime", tech:"Infra", pri:"P1", st:"specified", sei:["S7"], why:"Worker pods are how file-level concurrency scales, bounded by pools and Oracle connections.", deliv:"Autoscaling design sized to the fan-out" },
+ "53": { n:"Resource Quotas & Priority", plane:"Runtime", tech:"Infra", pri:"P2", st:"absent", sei:[], why:"Resource quotas and priority. The documents give a starting pool size and worker count and leave the cluster-level envelope open — see open decision O2.", deliv:"Requests/limits, quotas, priority classes for EOD" },
+ "54": { n:"Warm-start / Pre-pulled Images", plane:"Runtime", tech:"Infra", pri:"P2", st:"absent", sei:[], why:"Warm start and pre-pulled images. A latency optimisation for a five-minute discovery cycle that neither document considers.", deliv:"Cold-start mitigation design" },
+ "55": { n:"Oracle Connection Pooling", plane:"Runtime", tech:"Python + Infra", pri:"P1", st:"specified", sei:["S7"], why:"Pool size is sized against Oracle connection capacity, and the document says the number is a starting position to confirm.", deliv:"Pooling design; the real parallelism ceiling" },
+ "56": { n:"Node Placement", plane:"Runtime", tech:"Infra", pri:"P2", st:"absent", sei:[], why:"Node placement. Not mentioned, though the shared-storage assumption for Landing, Archive and Quarantine constrains it.", deliv:"Taints/affinity: batch burst vs always-on API" },
+ "57": { n:"CI/CD Pipelines", plane:"Deployment", tech:"CI/CD", pri:"P1", st:"specified", sei:["S13"], why:"Git-versioned models and DAGs; the pipeline compiles and runs unit and DQ tests before promotion.", deliv:"Build, test, scan, promote pipeline design" },
+ "58": { n:"GitOps / ArgoCD", plane:"Deployment", tech:"CI/CD", pri:"P2", st:"absent", sei:[], why:"GitOps and ArgoCD. The dbt document says models and DAGs are Git-versioned and promoted as tagged images; it does not name a deployment tool.", deliv:"Manifest promotion and drift control" },
+ "59": { n:"dbt Release & Rollback", plane:"Deployment", tech:"dbt + CI/CD", pri:"P1", st:"specified", sei:["S13"], why:"Rollback is redeploying the prior image, and it is safe only because Gold writes are idempotent merges with no DDL.", deliv:"dbt versioning, release cadence, rollback design" },
+ "60": { n:"Database Change Management", plane:"Deployment", tech:"Process + DDL", pri:"P1", st:"absent", sei:[], why:"Nothing covers schema change management, which matters more here than usual: SEI's design forbids DDL against Gold, so whatever does change those tables sits outside it.", deliv:"DDL control for RAW/STG2/Gold + PBDW/IMDS" },
+ "61": { n:"Blue-Green / Canary (API lane)", plane:"Deployment", tech:"Infra", pri:"P3", st:"absent", sei:[], why:"Blue-green and canary for the API lane, which neither document has.", deliv:"Zero-downtime release design for real-time" },
+ "62": { n:"HA / DR", plane:"Operations", tech:"Infra", pri:"P2", st:"absent", sei:[], why:"Neither document covers availability or recovery of the platform itself.", deliv:"DR topology, RTO/RPO for the batch window" },
+ "63": { n:"Backup & Restore", plane:"Operations", tech:"Infra", pri:"P2", st:"absent", sei:[], why:"Backup and restore is not in either document.", deliv:"Airflow metadata DB, config store, quarantine volumes" },
+ "64": { n:"Monitoring Stack", plane:"Operations", tech:"Infra", pri:"P2", st:"differs", sei:["S21"], why:"SEI gives every dashboard, trend and alert to Splunk. A separate monitoring stack is a second place for the same job.", deliv:"Prometheus/Grafana/log aggregation wired into item 34" },
+ "65": { n:"Cost & Capacity Monitoring", plane:"Operations", tech:"Infra", pri:"P3", st:"absent", sei:[], why:"Cost and capacity are not in either document.", deliv:"Capacity model for a sharply peaked EOD burst" },
+};
+const SEIN = {"S1": "SWP source files on SFTP", "S2": "Momentum", "S3": "Landing Zone", "S4": "Archive and Quarantine", "S5": "Ingestion DAG (one, metadata-driven)", "S6": "Scheduled discovery", "S7": "Mapped file task (one per file)", "S8": "Python loader", "S9": "Evaluate Completeness and SLA", "S10": "Guarded PENDING → TRIGGER", "S11": "Trigger-recovery path", "S12": "SLA breach and recovery events", "S13": "Transformation DAG", "S14": "STG — view", "S15": "INT — 7 days", "S16": "DIM — built first", "S17": "FACT — built second", "S18": "DQ capture and replay", "S19": "Reconciliation", "S20": "TRIGGER → COMPLETE and seed next", "S21": "Splunk"};
+const CONTAINERS = [
+ { id:"ingress", n:"Ingress and Egress", icon:"⇆", sub:"how data arrives, and how anything goes back", sei:["S1", "S2", "S3", "S4"], stages:false, lanes:[
+   { id:"landing", n:"Landing and transport", tech:"SFTP · Momentum · shared storage", w:"Files arrive on SFTP, Momentum copies the complete ones into a Landing Zone every worker pod can see, and Archive and Quarantine sit beside it.", sei:["S1", "S2", "S3", "S4"], reg:["8"], primary:false, view:null },
+   { id:"gateway", n:"API gateway and Apigee proxy", tech:"vendor", w:"The real-time lane. Neither SEI document mentions it — both are batch from end to end — so nothing here is cited.", sei:[], reg:["11", "12"], primary:false, view:null },
+   { id:"loader", n:"Loader framework", tech:"Python · outbound", w:"Everything going back to SEI. A consumer such as CRM calls the Hub's API with the loader details and the data; the Hub validates it and transforms it into loader format; SEI PS processes the loader; the Hub calls the consumer's own API with the response. Two APIs, one each way, and neither SEI design document has an outbound path at all.", sei:[], reg:["10", "4"], primary:false, view:null },
+   { id:"seisrc", n:"SEI-side source", tech:"SEI", w:"SWP itself and what SEI runs around it. Only the platform and the files it produces touch this design.", sei:[], reg:["1", "2", "3", "5", "6", "7"], primary:false, view:null },
+ ]},
+ { id:"ingestion", n:"Ingestion", icon:"⬇", sub:"discover, validate, load RAW", sei:["S5", "S6", "S7", "S8"], stages:false, lanes:[
+   { id:"eventbased", n:"Event-based ingestion", tech:"PRIMARY · SDC events", w:"BBH's primary inbound route. Neither SEI design document describes it — both describe the file path and only the file path — so the primary way data arrives has no design document behind it. Its components are in the event container.", sei:[], reg:[], primary:true, view:null },
+   { id:"filebased", n:"File-based ingestion", tech:"SECONDARY · Airflow · Python", w:"The path both SEI documents describe: a scheduled scan, one mapped task per file, validate, load RAW in one transaction, reconcile three counts, archive.", sei:["S5", "S6", "S7", "S8"], reg:["13", "9", "23"], primary:false, view:null },
+   { id:"profiling", n:"RAW profiling", tech:"SQL", w:"Looking at what landed before anything is done to it. Not in SEI's design — the first thing that reads a row's content there is the STG view.", sei:[], reg:["24"], primary:false, view:null },
+ ]},
+ { id:"orchestration", n:"Orchestration", icon:"⚙", sub:"the business date, the gate, and what runs when", sei:["S9", "S10", "S11", "S12", "S13", "S20"], stages:false, lanes:[
+   { id:"ingdag", n:"Ingestion DAG", tech:"Airflow 3.0", w:"Owns the business date up to the handoff: evaluate completeness and the SLA, take the guarded transition, invoke transformation, and recover a trigger that never started.", sei:["S9", "S10", "S11", "S12"], reg:["18", "22"], primary:false, view:null },
+   { id:"xfdag", n:"Transformation DAG", tech:"Airflow 3.0 · dbt", w:"Re-checks before it starts, builds the layers in order with a test task between each, and advances the date only on full success.", sei:["S13", "S20"], reg:["19", "21"], primary:false, view:null },
+   { id:"datectl", n:"Business-date state machine", tech:"Oracle", w:"DATE_CONTROL: one row per business date, PENDING to TRIGGER to COMPLETE, at most one date open at a time.", sei:[], reg:["20"], primary:false, view:null },
+ ]},
+ { id:"processing", n:"Processing", icon:"⚙", sub:"Stage 1 → Stage 2 → Stage 2 INT → Stage 3", sei:["S14", "S15", "S16", "S17", "S18", "S19"], stages:true, lanes:[
+   { id:"dbt", n:"dbt models", tech:"dbt · Oracle", w:"The stage chain itself — the view, the persisted middle and the two Gold layers, all as version-controlled SQL.", sei:["S14", "S15", "S16", "S17"], reg:["15", "16", "14", "17"], primary:false, view:null },
+   { id:"dq", n:"Data quality and reconciliation", tech:"dbt · Splunk", w:"The row-level pass or fail, the store that holds what failed, the replay that clears it, and the counts across four boundaries.", sei:["S18", "S19"], reg:["25", "26", "27", "28"], primary:false, view:null },
+   { id:"warehouse", n:"Warehouse and consumers", tech:"BBH", w:"Stage 3 and what reads it. SEI's documents end at DIM and FACT, so nothing in this lane is cited.", sei:[], reg:["37", "38", "39", "40", "41", "43"], primary:false, view:null },
+ ]},
+ { id:"foundation", n:"Foundation", icon:"▤", sub:"control tables, evidence, audit, security", sei:["S21"], stages:false, lanes:[
+   { id:"control", n:"Control and metadata", tech:"Oracle", w:"The small tables the run depends on: what is expected, what arrived, and which date is open.", sei:[], reg:["33"], primary:false, view:null },
+   { id:"evidence", n:"Evidence and observability", tech:"Splunk · 360", w:"Where the run proves what it did. SEI gives every dashboard and alert to Splunk; 360 reads the same tables directly.", sei:["S21"], reg:["34", "35", "30"], primary:false, view:null },
+   { id:"errors", n:"Errors, audit and lineage", tech:"Python · dbt", w:"What happens to a bad record, and how a number is traced back to the file it came from.", sei:[], reg:["29", "31"], primary:false, view:null },
+   { id:"sec", n:"Security and access", tech:"OpenShift · Oracle", w:"Credentials in secrets, and a loader account that can change rows in Gold but cannot create, alter or drop anything.", sei:[], reg:["32", "36"], primary:false, view:null },
+ ]},
+ { id:"openshift", n:"OpenShift Platform", icon:"☸", sub:"runtime, deployment, operations", sei:[], stages:false, lanes:[
+   { id:"platform", n:"Platform", tech:"OpenShift", w:"Namespaces, images, registry, RBAC, secrets, network policy and storage.", sei:[], reg:[], primary:false, view:null },
+   { id:"runtime", n:"Runtime", tech:"OpenShift", w:"The Airflow deployment, worker pods, quotas, and the Oracle connection envelope the pool size is sized against.", sei:[], reg:[], primary:false, view:null },
+   { id:"deployment", n:"Deployment", tech:"CI/CD", w:"Git-versioned models and DAGs, compiled and tested before promotion; rollback is redeploying the prior image.", sei:[], reg:[], primary:false, view:null },
+   { id:"operations", n:"Operations", tech:"OpenShift", w:"Availability, recovery, monitoring and cost — none of it in either SEI document.", sei:[], reg:[], primary:false, view:null },
+ ]},
+ { id:"events", n:"Event Ingestion", icon:"◈",
+   sub:"the primary inbound route — listen, collapse, pull, load",
+   sei:[], stages:false, lanes:[
+   { id:"listen", n:"Listen and box", tech:"Python · SDC topics",
+     w:"Consume the domain topics and track the micro-batch boundary. Markers 1000 and 1001 bracket one commit on one topic; the commit is whole only when the last topic closes.",
+     sei:[], reg:[], primary:true, view:"events" },
+   { id:"pull", n:"Collapse and pull", tech:"Python · SEI view API",
+     w:"Fold repeat keys over the window into one key set, then make one bound set-based retrieval per view per micro-batch, out through the gateway.",
+     sei:[], reg:[], primary:false, view:"intraday" },
+   { id:"land", n:"Land and register", tech:"Python · Oracle",
+     w:"Array insert with one commit per micro-batch, idempotent on key and version, and a registry row per micro-batch — the event path's FILE_REGISTRY.",
+     sei:[], reg:[], primary:false, view:"intraday" },
+ ]},
+];
+const PROCSTAGES = [{"id": "stage1", "n": "Stage 1", "sub": "RAW — as delivered", "sei": [], "tbl": ["T4"], "bbh": [], "w": "The file exactly as it arrived, append-only, tagged with the business date and lineage. Nothing is cleaned here."}, {"id": "stage2", "n": "Stage 2", "sub": "STG — a view, in memory", "sei": ["S14"], "tbl": [], "bbh": [], "w": "Standardises the columns and marks every row pass or fail. It is a view: it holds nothing and is recomputed on read. Its job is the source DQ check."}, {"id": "stage2int", "n": "Stage 2 INT", "sub": "the normalised SWP model", "sei": ["S15", "S16", "S17"], "tbl": ["T5", "T6"], "bbh": [], "w": "INT, DIM and FACT together, with reference mapping and translation applied. Passing rows only; INT keeps seven days; dimensions are built before facts so a transaction can always find its account."}, {"id": "stage3", "n": "Stage 3", "sub": "the actual data warehouse", "sei": [], "tbl": [], "bbh": ["B1", "B2"], "w": "A Pre-Gold layer shaped as a mirror of IMDS and PBDW, then a simple movement of that data into the warehouse itself.", "note": "BBH's. SEI's documents publish from DIM and FACT and stop, so nothing on this stage is cited."}];
+
 /* =========================================================================
    RENDER
    ========================================================================= */
@@ -521,15 +646,18 @@ const byName = {}; T.forEach((r) => { byName[r[1]] = r; });
 const dName = {}; DOMAINS.forEach((d) => { dName[d.k] = d.n; });
 
 const VIEWS = [
-  ["flow",     "The whole picture"],
-  ["hub",      "Inside the Hub"],
+  ["c4",       "C4 — context to component"],
   ["gate",     "Events and the gate"],
   ["layers",   "Layers and data"],
   ["outbound", "The loader loop"],
   ["open",     "Open questions"],
 ];
+/* hubchain is reachable but not a tab: it is where a box picked out of a
+   chain strip lands, and it has no place of its own in the C4 ladder. */
+const ALLVIEWS = VIEWS.concat([["hubchain", "Pipeline step"]]);
 
-let S = { view:"flow", chan:null, comp:null, layer:null, dom:null, tbl:null };
+let S = { view:"c4", chan:null, cont:null, lane:null, comp:null,
+          layer:null, dom:null, tbl:null };
 
 /* ---------- small svg helpers ---------- */
 function box(x, y, w, h, label, sub, opt) {
@@ -765,6 +893,264 @@ function svgOut() {
   return s;
 }
 
+
+/* ---------- a reusable chain strip ---------- */
+function strip(list, opt) {
+  const o = opt || {};
+  const w = o.w || 150, pitch = w + 14;
+  const width = 24 + list.length * pitch;
+  let s = `<svg viewBox="0 0 ${width} 96" role="img" aria-label="${esc(o.alt || "")}">${DEFS}`;
+  s += `<rect x="4" y="6" width="${width - 8}" height="84" rx="8" fill="var(--sunk)"
+    stroke="var(--panel2)"${o.dash ? ' stroke-dasharray="6 4"' : ""}/>`;
+  list.forEach((c, i) => {
+    const x = 16 + i * pitch;
+    s += box(x, 26, w, 48, c.n, "", { pick:o.pick ? o.pick + c.id : null, fs:11.5,
+      dim:o.dim, dash:o.dash });
+    if (i < list.length - 1) {
+      s += arrow(x + w + 1, 50, x + w + 12, 50, { dash:o.dash,
+        color:o.dim ? "var(--muted)" : "var(--sub)" });
+    }
+  });
+  return s + `</svg>`;
+}
+
+/* Which lane owns which detailed view. A lane that owns one shows it in
+   place rather than sending the reader to a separate tab. */
+const LANE_VIEW = {
+  "ingress/loader":        "loader",
+  "ingestion/eventbased":  "intraday",
+  "ingestion/filebased":   "standby",
+  "orchestration/ingdag":  "gate",
+  "orchestration/datectl": "gate",
+  "processing/dbt":        "stages",
+  "events/listen":         "evkinds",
+  "events/pull":           "intraday",
+  "events/land":           "intraday",
+};
+const contById = (id) => CONTAINERS.find((c) => c.id === id) || null;
+const laneById = (c, lid) => (c ? c.lanes.find((l) => l.id === lid) : null) || null;
+
+const ST_LABEL = {
+  specified: ["ok",   "Specified by SEI"],
+  differs:   ["warn", "SEI differs"],
+  absent:    ["std",  "Not in SEI's documents"],
+};
+function stChip(st) {
+  const s = ST_LABEL[st] || ST_LABEL.absent;
+  return `<span class="chip ${s[0]}">${esc(s[1])}</span>`;
+}
+/* Membership is by exception, exactly as hubGroups.js has it: a component
+   names its lane or falls into the container's last one. Deriving it here
+   rather than listing 65 rows keeps the two from drifting — and it is the
+   only way OpenShift's 22 components land anywhere at all. */
+const BY_PLANE = {
+  "Source":"ingress", "Ingress/Egress":"ingress", "Processing":"processing",
+  "Orchestration":"orchestration", "Data Quality":"processing",
+  "Foundation":"foundation", "Consumers":"processing", "Platform":"openshift",
+  "Runtime":"openshift", "Deployment":"openshift", "Operations":"openshift",
+  "Event Ingestion":"events", "PS-Orchestration":"ingress",
+};
+/* The handful where the plane misleads: both gates are filed under Data
+   Quality but run inside ingestion, before anything is loaded. */
+const OVERRIDE = { "23":"ingestion", "24":"ingestion", "9":"ingestion", "13":"ingestion" };
+const OCP_PLANE = { Platform:"platform", Runtime:"runtime",
+  Deployment:"deployment", Operations:"operations" };
+
+function groupOf(id) {
+  if (OVERRIDE[id]) return OVERRIDE[id];
+  const t = TRK[id];
+  return t ? (BY_PLANE[t.plane] || "foundation") : null;
+}
+function laneOf(id, gid) {
+  const c = contById(gid);
+  if (!c) return null;
+  if (gid === "openshift") return OCP_PLANE[(TRK[id] || {}).plane] || "platform";
+  const hit = c.lanes.find((l) => (l.reg || []).indexOf(id) >= 0);
+  return hit ? hit.id : (c.lanes.length ? c.lanes[c.lanes.length - 1].id : null);
+}
+function membersOf(c, l) {
+  const sei = (l.sei || []).map((id) =>
+    ({ k:"S", id, n:SEIN[id] || id, st:"specified" }));
+  const reg = Object.keys(TRK)
+    .filter((id) => groupOf(id) === c.id && laneOf(id, c.id) === l.id)
+    .sort((a, b) => Number(a) - Number(b))
+    .map((id) => ({ k:"R", id, n:TRK[id].n, st:TRK[id].st }));
+  return sei.concat(reg);
+}
+
+/* ---------- C4 L1 — context ---------- */
+function c4Context() {
+  const cards = CONTAINERS.map((c) => {
+    const n = c.lanes.reduce((a, l) => a + membersOf(c, l).length, 0);
+    return `<div class="card" style="cursor:pointer" data-cont="${c.id}">
+      <div style="display:flex;gap:9px;align-items:baseline">
+        <span style="font-size:17px;line-height:1">${c.icon}</span>
+        <h3 style="margin:0">${esc(c.n)}</h3></div>
+      <p class="sm sub" style="margin:5px 0 8px">${esc(c.sub)}</p>
+      <span class="chip std">${c.lanes.length} lanes</span>
+      ${n ? `<span class="chip std">${n} components</span>`
+          : '<span class="chip warn">no component rows yet</span>'}
+      ${c.stages ? '<span class="chip std">stage chain</span>' : ""}</div>`;
+  }).join("");
+  return `<figure class="card">${svgL1()}
+    <figcaption><b>Level 1 — context.</b> Two parties, three transports, four
+    channels. Everything API-shaped crosses Apigee and the API Gateway; that
+    band is a wall, not a step in a chain. Click a channel for its legs, or a
+    container below to go down a level.</figcaption></figure>
+    ${S.chan ? chanPanel(S.chan) : ""}
+    <div class="card"><div class="eyebrow">Level 2 — containers</div>
+      <p class="sm sub max">BBH's own grouping, in the words the programme
+      uses. It is not the five stages SEI's documents are organised by; both
+      are true, and a component sits in one of each.</p></div>
+    <div class="grid g3">${cards}</div>`;
+}
+
+/* ---------- C4 L2 — one container ---------- */
+function c4Container(c) {
+  const lanes = c.lanes.map((l) => {
+    const m = membersOf(c, l);
+    const v = LANE_VIEW[c.id + "/" + l.id];
+    return `<div class="card" style="cursor:pointer${
+      l.primary ? ";border-left:3px solid var(--ev-data)" : ""}"
+      data-lane="${l.id}">
+      <h3 style="margin:0">${esc(l.n)}</h3>
+      <p class="xs mut mono" style="margin:3px 0 7px">${esc(l.tech)}</p>
+      <p class="sm sub" style="margin:0">${esc(l.w)}</p>
+      <div style="margin-top:9px;display:flex;gap:7px;flex-wrap:wrap">
+        ${m.length ? `<span class="chip std">${m.length} component${
+          m.length > 1 ? "s" : ""}</span>` : ""}
+        ${v ? '<span class="chip pri">has a diagram</span>' : ""}
+      </div></div>`;
+  }).join("");
+  const stages = c.stages ? `<div class="card"><div class="eyebrow">
+    The stage chain inside this container</div>
+    <p class="sm sub max" style="margin:4px 0 12px">The spine of the whole
+    picture, in BBH's numbering.</p>
+    <div class="grid g4">${PROCSTAGES.map((p) => `<div class="card"
+      style="margin:0;cursor:pointer" data-stage="${p.id}">
+      <div class="eyebrow">${esc(p.n)}</div>
+      <h3 style="margin:3px 0 5px">${esc(p.sub)}</h3>
+      <p class="sm sub" style="margin:0">${esc(p.w)}</p>
+      ${p.id === "stage2int"
+        ? '<p class="xs" style="color:var(--accent);margin:8px 0 0">52 canonical tables &rarr;</p>' : ""}
+      ${p.note ? `<p class="xs mut" style="margin:7px 0 0">${esc(p.note)}</p>` : ""}
+      </div>`).join("")}</div></div>` : "";
+  return `<div class="card">
+    <div class="eyebrow">Level 2 — container</div>
+    <div style="display:flex;gap:11px;align-items:baseline">
+      <span style="font-size:21px;line-height:1">${c.icon}</span>
+      <h2 style="margin:0">${esc(c.n)}</h2></div>
+    <p class="sm sub" style="margin:6px 0 0">${esc(c.sub)}</p></div>
+    ${stages}
+    <div class="card"><div class="eyebrow">Level 3 — lanes</div>
+      <p class="sm sub max">The named parts inside the container, each with the
+      technology that actually runs it.</p></div>
+    <div class="grid g2">${lanes}</div>`;
+}
+
+/* ---------- C4 L3 — one lane ---------- */
+function laneDiagram(key) {
+  const v = LANE_VIEW[key];
+  if (!v) return "";
+  if (v === "intraday") return `<figure class="card">${
+    strip(INTRADAY, { pick:"H:", alt:"the intraday chain" })}
+    <figcaption>Runs continuously — about 288 micro-batches a day. Click a
+    box.</figcaption></figure>`;
+  if (v === "standby") return `<figure class="card">${
+    strip(STANDBY, { pick:"F:", dim:true, dash:true, alt:"the file chain" })}
+    <figcaption>Drawn dashed: under the event-primary posture this set is
+    produced each day and loaded only when it is needed.</figcaption></figure>`;
+  if (v === "stages") return `<figure class="card">${
+    strip(XFORM, { pick:"T:", alt:"the transformation chain" })}
+    <figcaption>Runs once, after the gate opens. Each build task has a test
+    task behind it; the business date moves only at the end.</figcaption></figure>`;
+  if (v === "loader") return `<figure class="card">${svgOut()}
+    <figcaption>Four legs and two transports. The consumer is answered only
+    once the status and the detail file agree.</figcaption></figure>
+    <p class="sm"><button class="ghost" data-view="outbound">Open the full
+    loader loop &rarr;</button></p>`;
+  if (v === "gate") return `<figure class="card">${svgL2()}
+    <figcaption>Two clocks meeting at one gate, and nowhere else.</figcaption></figure>
+    <p class="sm"><button class="ghost" data-view="gate">Open the gate in
+    full &rarr;</button></p>`;
+  if (v === "evkinds") return `<div class="grid g3">${EVKINDS.map((k) =>
+    `<div class="card"><span class="chip ${k.cls}">${esc(k.k)}</span>
+     <span class="xs mut" style="margin-left:8px">${esc(k.cadence)}</span>
+     <h3 style="margin-top:9px">${esc(k.tells)}</h3>
+     <p class="sm mono mut">${esc(k.carries)}</p></div>`).join("")}</div>
+    <p class="sm"><button class="ghost" data-view="gate">All three kinds, and
+    the gate &rarr;</button></p>`;
+  return "";
+}
+function c4Lane(c, l) {
+  const m = membersOf(c, l);
+  const comps = m.length ? `<div class="grid g3">${m.map((x) => `<div class="card"
+    style="cursor:pointer;margin:0" data-comp="${x.k}${x.id}">
+    <p class="xs mut mono" style="margin:0">${x.k === "S" ? "SEI " : ""}${esc(x.id)}</p>
+    <h3 style="margin:3px 0 7px">${esc(x.n)}</h3>
+    ${stChip(x.st)}</div>`).join("")}</div>`
+    : `<div class="card"><p class="sm mut">No component rows are filed
+       against this lane. Its parts live in another container — follow the
+       diagram.</p></div>`;
+  return `<div class="card">
+    <div class="eyebrow">Level 3 — lane ${l.primary ? "· primary route" : ""}</div>
+    <h2>${esc(l.n)}</h2>
+    <p class="xs mut mono">${esc(l.tech)}</p>
+    <p class="max sub" style="margin-top:9px">${esc(l.w)}</p></div>
+    ${laneDiagram(c.id + "/" + l.id)}
+    <div class="card"><div class="eyebrow">Level 4 — components in this lane</div></div>
+    ${comps}`;
+}
+
+/* ---------- C4 L4 — one component ---------- */
+function c4Comp(key) {
+  const kind = key[0], id = key.slice(1);
+  if (kind === "S") {
+    const n = SEIN[id];
+    if (!n) return `<div class="card">Unknown component.</div>`;
+    const claims = Object.keys(TRK).filter((t) => (TRK[t].sei || []).indexOf(id) >= 0);
+    return `<div class="card">
+      <div class="eyebrow">Level 4 — component · SEI baseline</div>
+      <h2>${esc(n)}</h2>
+      <p class="sm mono mut">${esc(id)}</p>
+      ${stChip("specified")}
+      <p class="max sub" style="margin-top:11px">Specified in the SEI design
+      documents. The baseline holds its citation, its state model and the
+      tables it touches.</p>
+      ${claims.length ? `<p class="sm" style="margin-top:11px">Delivered at BBH
+        by ${claims.map((t) => `<button class="ghost" data-comp="R${t}"
+        style="margin:2px">${esc(TRK[t].n)}</button>`).join(" ")}</p>` : ""}
+      </div>`;
+  }
+  const t = TRK[id];
+  if (!t) return `<div class="card">Unknown component.</div>`;
+  return `<div class="card">
+    <div class="eyebrow">Level 4 — component · ${esc(t.plane)}</div>
+    <h2>${esc(t.n)}</h2>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 12px">
+      ${stChip(t.st)}
+      <span class="chip std">${esc(t.pri)}</span>
+      <span class="chip std">${esc(t.tech)}</span></div>
+    <dl class="kv">
+      <dt>Deliverable</dt><dd>${esc(t.deliv) || '<span class="mut">—</span>'}</dd>
+      <dt>Against SEI</dt><dd>${t.sei.length
+        ? t.sei.map((s) => `<button class="ghost" data-comp="S${s}"
+            style="margin:2px">${esc(SEIN[s] || s)}</button>`).join(" ")
+        : '<span class="mut">Nothing in either document covers it.</span>'}</dd>
+      ${t.why ? `<dt>${t.st === "differs" ? "Where it differs" : "Why"}</dt>
+        <dd class="sub">${esc(t.why)}</dd>` : ""}
+    </dl></div>`;
+}
+
+function viewC4() {
+  if (S.comp) return c4Comp(S.comp);
+  const c = contById(S.cont);
+  if (!c) return c4Context();
+  const l = laneById(c, S.lane);
+  if (!l) return c4Container(c);
+  return c4Lane(c, l);
+}
+
 /* ---------- panels ---------- */
 function chanPanel(id) {
   const c = CHANNELS.find((x) => x.id === id);
@@ -796,39 +1182,6 @@ function compPanel(key) {
     : "Runs once, after the gate opens";
   return `<div class="card"><div class="eyebrow">${esc(clock)}</div>
     <h2>${esc(c.n)}</h2><p class="max">${esc(c.t)}</p></div>`;
-}
-
-function viewFlow() {
-  return `<figure class="card">${svgL1()}
-    <figcaption><b>Three transports, four channels.</b> Events and files cross
-    on their own transports. Everything API-shaped — the data fetch, the loader
-    push, the status coming back, and every consumer call — crosses through
-    Apigee and the API Gateway. That band is a wall, not a step in a chain.
-    Click any channel, or anything inside BBH.</figcaption></figure>
-    ${S.chan ? chanPanel(S.chan) : `<div class="card">
-      <div class="eyebrow">The pattern underneath</div>
-      <p class="max">One idea, applied four times: <b>a thin signal on one
-      transport, the payload on another.</b> Inbound, the event says a row
-      changed and the API fetches it. Outbound, the status API gives the
-      verdict and a file carries the per-record detail. Learn it once and all
-      four channels read the same way.</p></div>`}`;
-}
-
-function viewHub() {
-  return `<figure class="card">${svgL2()}
-    <figcaption><b>Two clocks, meeting at one gate.</b> The intraday consumer
-    runs about 288 times a day and owns the event path. The end-of-day DAG runs
-    once and owns the transformation. The daily DAG is not extended to 288 runs;
-    the two meet at the gate and nowhere else. The standby lane is drawn dashed
-    because it is produced each day and loaded only when it is
-    needed.</figcaption></figure>
-    ${S.comp ? compPanel(S.comp) : `<div class="card">
-      <div class="eyebrow">Why the gate sits between them</div>
-      <p class="max">A micro-batch that fails at 11am and goes unnoticed means
-      the transformation runs on a short Stage 1 — and STG to INT still
-      reconciles cleanly, because it ties against a Stage 1 that is itself
-      short. Every existing reconciliation boundary is downstream of the loss
-      and cannot see it. The gate is the only place that can.</p></div>`}`;
 }
 
 function viewGate() {
@@ -1125,25 +1478,34 @@ function tablePanel(n) {
     </div>`;
 }
 
+
 /* ---------- breadcrumb, router, wiring ---------- */
 function crumb() {
   const parts = [];
-  const label = (VIEWS.find((v) => v[0] === S.view) || ["", ""])[1];
-  const root = () => { S.chan = S.comp = S.layer = S.dom = S.tbl = null; draw(); };
+  const label = (ALLVIEWS.find((v) => v[0] === S.view) || ["", ""])[1];
+  const root = () => {
+    S.chan = S.comp = S.cont = S.lane = S.layer = S.dom = S.tbl = null; draw();
+  };
   parts.push({ t:label, go:root });
-  if (S.view === "flow" && S.chan) {
-    const c = CHANNELS.find((x) => x.id === S.chan);
-    if (c) parts.push({ t:c.name });
+
+  if (S.view === "c4") {
+    const c = contById(S.cont);
+    if (c) parts.push({ t:c.n, go:() => { S.lane = S.comp = null; draw(); } });
+    const l = laneById(c, S.lane);
+    if (l) parts.push({ t:l.n, go:() => { S.comp = null; draw(); } });
+    if (S.comp) {
+      const k = S.comp[0], id = S.comp.slice(1);
+      parts.push({ t:k === "S" ? (SEIN[id] || id) : ((TRK[id] || {}).n || id) });
+    }
   }
-  if (S.view === "hub" && S.comp) {
+  if (S.view === "hubchain" && S.comp) {
     const [k, id] = S.comp.split(":");
     const l = (k === "H" ? INTRADAY : k === "F" ? STANDBY : XFORM).find((x) => x.id === id);
     if (l) parts.push({ t:l.n });
   }
   if (S.view === "layers" && S.layer) {
     const l = LAYERS.find((x) => x.id === S.layer);
-    parts.push({ t:l.stage + " " + l.name,
-      go:() => { S.dom = S.tbl = null; draw(); } });
+    parts.push({ t:l.stage + " " + l.name, go:() => { S.dom = S.tbl = null; draw(); } });
     if (S.dom) parts.push({ t:dName[S.dom], go:() => { S.tbl = null; draw(); } });
     if (S.tbl) parts.push({ t:S.tbl });
   }
@@ -1159,16 +1521,23 @@ function crumb() {
   });
 }
 
+/* A component picked from a chain strip has no C4 home of its own, so it
+   renders on its own screen rather than pretending to be a lane member. */
+function viewHubChain() {
+  if (S.comp) return compPanel(S.comp);
+  return `<div class="card"><h2>Pick a step</h2></div>`;
+}
+
 function draw() {
   document.getElementById("views").innerHTML = VIEWS.map((v) =>
     `<button data-view="${v[0]}" aria-pressed="${S.view === v[0]}">${esc(v[1])}</button>`
   ).join("");
   const m = document.getElementById("main");
-  m.innerHTML = S.view === "flow" ? viewFlow()
-    : S.view === "hub" ? viewHub()
+  m.innerHTML = S.view === "c4" ? viewC4()
     : S.view === "gate" ? viewGate()
     : S.view === "layers" ? viewLayers()
     : S.view === "outbound" ? viewOut()
+    : S.view === "hubchain" ? viewHubChain()
     : viewOpen();
   crumb();
   wire();
@@ -1177,28 +1546,38 @@ function draw() {
 
 function go(view) {
   S.view = view; S.chan = S.comp = null;
+  if (view !== "c4") { S.cont = S.lane = null; }
   if (view !== "layers") { S.layer = S.dom = S.tbl = null; }
   draw();
 }
 
-/* Deep links, so a view can be sent to someone rather than described to them.
-   #hub, #layers/L_INT, #layers/L_INT/PH/TAXLOT, #gate ... */
+/* Deep links, so a screen can be sent to someone rather than described.
+   #c4/ingress/loader, #c4//-/R10, #layers/L_INT/PH/TAXLOT, #gate */
 function fromHash() {
   const raw = location.hash.replace(/^#/, "");
   if (!raw) return false;
-  const [v, layer, dom, tbl] = raw.split("/").map(decodeURIComponent);
-  if (!VIEWS.some((x) => x[0] === v)) return false;
-  S.view = v; S.chan = S.comp = null;
-  S.layer = layer || null; S.dom = dom || null; S.tbl = tbl || null;
+  const p = raw.split("/").map(decodeURIComponent);
+  if (!ALLVIEWS.some((x) => x[0] === p[0])) return false;
+  S.view = p[0]; S.chan = null;
+  S.cont = S.lane = S.comp = S.layer = S.dom = S.tbl = null;
+  if (S.view === "c4") { S.cont = p[1] || null; S.lane = p[2] || null; S.comp = p[3] || null; }
+  else if (S.view === "layers") { S.layer = p[1] || null; S.dom = p[2] || null; S.tbl = p[3] || null; }
+  else if (S.view === "hubchain") { S.comp = p[1] || null; }
   return true;
 }
 function toHash() {
   const p = [S.view];
+  if (S.view === "c4" && S.cont) {
+    p.push(S.cont);
+    if (S.lane) p.push(S.lane);
+    if (S.comp) { if (!S.lane) p.push("-"); p.push(S.comp); }
+  }
   if (S.view === "layers" && S.layer) {
     p.push(S.layer);
     if (S.dom) p.push(S.dom);
     if (S.tbl) p.push(S.tbl);
   }
+  if (S.view === "hubchain" && S.comp) p.push(S.comp);
   const h = "#" + p.map(encodeURIComponent).join("/");
   if (location.hash !== h) history.replaceState(null, "", h);
 }
@@ -1207,17 +1586,38 @@ function wire() {
   document.querySelectorAll("[data-view]").forEach((b) => {
     b.onclick = () => go(b.dataset.view);
   });
+  document.querySelectorAll("[data-cont]").forEach((d) => {
+    d.onclick = () => { S.view = "c4"; S.cont = d.dataset.cont;
+      S.lane = S.comp = null; draw(); };
+  });
+  document.querySelectorAll("[data-lane]").forEach((d) => {
+    d.onclick = () => { S.lane = d.dataset.lane; S.comp = null; draw(); };
+  });
+  document.querySelectorAll("[data-comp]").forEach((d) => {
+    d.onclick = (e) => { e.stopPropagation(); S.view = "c4";
+      S.comp = d.dataset.comp; draw(); };
+  });
+  document.querySelectorAll("[data-stage]").forEach((d) => {
+    d.onclick = () => {
+      if (d.dataset.stage === "stage2int") {
+        S.view = "layers"; S.layer = "L_INT"; S.dom = S.tbl = null;
+      } else {
+        S.view = "layers"; S.layer = null;
+      }
+      draw();
+    };
+  });
   document.querySelectorAll("[data-pick]").forEach((g) => {
     const act = () => {
       const p = g.dataset.pick;
-      if (p === "HUB") return go("hub");
+      if (p === "HUB") { S.view = "c4"; S.cont = "events"; S.lane = null; return draw(); }
       if (p === "OUT") return go("outbound");
-      if (p === "GATE") return go("gate");
+      if (p === "GATE") { S.view = "c4"; S.cont = "orchestration"; S.lane = null; return draw(); }
       if (p.slice(0, 3) === "LAY") {
         S.view = "layers"; S.layer = null; S.dom = S.tbl = null; return draw();
       }
-      if (p.indexOf(":") > 0) { S.comp = p; return draw(); }
-      S.chan = p; draw();
+      if (p.indexOf(":") > 0) { S.view = "hubchain"; S.comp = p; return draw(); }
+      S.view = "c4"; S.cont = S.lane = null; S.chan = p; draw();
     };
     g.onclick = act;
     g.onkeydown = (e) => {
