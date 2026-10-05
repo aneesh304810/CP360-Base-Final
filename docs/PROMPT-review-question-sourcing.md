@@ -17,22 +17,23 @@ So the buckets below are the point of this document, not the prompts.
 
 ---
 
-## Bucket A — the SEI document should answer these (15)
+## Bucket A — the SEI document should answer these (9)
 
-> **Topics 1 and 2 are done.** Questions 1–10 were put to the SEI pack in
-> October 2026 and now carry drafts: eight answered from the document, two
-> recorded as absences. Prompts A1 and A2 have been removed because they
-> have been run. The strongest result was question 4 — Stage 2 is explicitly
-> *not* an enterprise-wide canonical model, which is the sentence that makes
+> **Topics 1 and 2 are done**, and six more questions were answered from a
+> second document. Questions 1–10 went to the SEI pack; 18, 19, 32, 33, 34
+> and 44 were then answered from the **BBH dbt Transformation Framework
+> TDD**, which turned out to be the missing BBH-side design document this
+> page used to say was nowhere to be found. Prompts A1, A2 and A4 have been
+> removed because they have been run.
+>
+> The strongest result remains question 4 — Stage 2 is explicitly *not* an
+> enterprise-wide canonical model — which is the sentence that makes
 > questions 3 and 10 matter.
 
 | Topic | Questions |
 |---|---|
-| 4 · "unchanged except for how they are populated" | 18, 19 |
 | 6 · SDC vs SFTP | 26 |
 | 7 · How SEI data feeds the framework | 28 |
-| 8 · Stage 2 DQ behaviour | 32, 33, 34 |
-| 9 · The delivered model | 44 |
 | 10 · Delivery contract | 52, 53, 54, 55, 56 |
 | 15 · Delivery SLA and time zones | 91, 92 |
 
@@ -89,26 +90,6 @@ Attached is SEI's design document. Answer only from it.
 <the two rules above>
 ```
 
-### A4 · Stage 2 DQ and the delivered model (questions 32–34, 44, 18, 19, 28)
-
-```
-Attached is SEI's design document. Answer only from it.
-
-1. What happens to records that FAIL Stage 2 DQ checks? Where are they held,
-   in what structure, and for how long?
-2. How are failed records corrected and reprocessed — resubmitted by the
-   source, reprocessed by SEI, or picked up in a later feed?
-3. If records fail DQ, what does the document say about the completeness of
-   the downstream (Gold) layer for that business date?
-4. List every dimension and every fact the document names, with its grain.
-5. Quote in full any statement that existing structures are "unchanged except
-   for how they are populated", and say exactly which structures it refers to.
-6. How does the document describe SEI data feeding a Stage → INT → Dim/Fact
-   framework downstream?
-
-<the two rules above>
-```
-
 ### Return format
 
 Ask for this at the end of each prompt. It drops straight into
@@ -130,26 +111,30 @@ checkable at all.
 
 ---
 
-## Bucket B — BBH's ingestion-framework design, not SEI's (25)
+## Bucket B — BBH's own design documents, not SEI's (20)
 
 These reference `DATE_CONTROL`, `FILE_REGISTRY`, the Airflow DAG structure, the
 worker/pod lifecycle and the Dim/Fact build. **None of that is SEI's to
-describe** — it is the BBH framework Ganender's team designed. Asking the SEI
-PDF will produce plausible fiction.
+describe.** Asking the SEI PDF will produce plausible fiction.
+
+> **Correction, October 2026.** This page previously said the document that
+> would answer these "is not in this repository — the single biggest blind
+> spot". It exists: the **BBH dbt Transformation Framework TDD**. It has
+> already answered 47, 48, 59, 60 and 63, and it settles several more below.
+> Point extractions at *that* document, not at the SEI pack.
 
 | Area | Questions | Ask |
 |---|---|---|
-| Business-date control, triggers, recovery | 58, 59, 60, 61, 63, 65, 66, 67, 68, 69, 70, 71 | Ingestion framework design + the DAG code |
-| Restatement and replay | 72, 73, 75, 76 | Same |
-| DIM/FACT build, history, effective dating | 45, 46, 47, 48 | Data modelling |
+| Business-date control, triggers, recovery | 58, 61, 65, 66, 67, 68, 69, 70, 71 | **dbt TDD §5** + the DAG code |
+| Restatement and replay | 72, 73, 75, 76 | **dbt TDD §6.4.1, §7.1** |
+| DIM/FACT build, history, effective dating | 45, 46 | **dbt TDD §6.4** + data modelling |
 | OpenShift scheduling and DB limits | 79, 82, 85 | Platform / Sudhakar |
 | Logging standard, alert routing | 88, 89 | BBH observability standards |
 
-The fastest route for the first two rows is not a document at all: the DDL for
-`DATE_CONTROL` and `FILE_REGISTRY` plus the Airflow DAG source would answer
-most of those twelve directly, the same way the guardrail tables answered
-question 62. **Neither is in this repository** — that is the single biggest
-blind spot in the drafts I was able to write.
+The fastest route for the first two rows is now the TDD's appendices: it says
+the trigger and `DATE_CONTROL` SQL are in Appendix A, and the model SQL in
+Appendix B. Those pages have not been read yet and would likely close most of
+the remaining business-date questions.
 
 ---
 

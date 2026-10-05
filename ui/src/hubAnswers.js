@@ -69,7 +69,7 @@ export const SEED_ANSWERS = [
 // the word, and q6 behind a sentence that does not say what its body
 // says. The quotes are the reason that was visible at all.
 
-{ n: 1, conf: "document",
+{ n: 1, conf: "document", fig: "terms",
   body:
 "The document does not use the word “enriched”. What it describes in that "
 + "position is STAGE 2, defined as the core transformation and metadata "
@@ -78,14 +78,20 @@ export const SEED_ANSWERS = [
 + "controls.\n\n"
 + "So the answerable form of this question is “what is Stage 2”, and that "
 + "is the scope. Reading “enriched” and “Stage 2” as the same thing is "
-+ "BBH's inference, not a statement in the pack.",
++ "BBH's inference, not a statement in the pack.\n\n"
++ "AND THE OTHER DOCUMENT DISAGREES WITH THAT INFERENCE. The dbt TDD does "
++ "use the word, as a band label: “SILVER (Enriched)”. There it maps the "
++ "CURRENT STG2 onto TWO new objects — STG (a view) plus INT (persistence) "
++ "— not onto one. So “the enriched layer” names two things, one of which "
++ "stores nothing at all.",
   gap:
 "Two things. The pack never uses the word the question is built on, so "
 + "somebody should get SEI to confirm in one line that the enriched layer "
-+ "IS Stage 2 — this is cheap to settle and expensive to assume. And "
-+ "“business transformations” is a category, not a list: no enrichment "
-+ "operation is enumerated per interface or domain.",
-  quote: QUOTE_STAGE2, ev: [REF_ARCH] },
++ "IS Stage 2 — and, given the TDD, whether it is STG, INT, or both. This "
++ "is cheap to settle and expensive to assume. And “business "
++ "transformations” is a category, not a list: no enrichment operation is "
++ "enumerated per interface or domain.",
+  quote: QUOTE_STAGE2, ev: [REF_ARCH, "dbt TDD §2 — What Changes and What Stays the Same"] },
 
 { n: 2, conf: "document",
   body:
@@ -135,7 +141,7 @@ export const SEED_ANSWERS = [
 + "gap question 16 asks about from the other side.",
   quote: QUOTE_STAGE2, ev: [REF_ARCH] },
 
-{ n: 6, conf: "document",
+{ n: 6, conf: "document", fig: "terms",
   body:
 "Stage 2 is the central transformation and metadata management layer of "
 + "the inbound architecture, scoped specifically to IMDS Staging and PBDW "
@@ -147,7 +153,7 @@ export const SEED_ANSWERS = [
 + "7 is the other half of the same problem.",
   quote: QUOTE_STAGE2 + " " + QUOTE_NOT_CANONICAL, ev: [REF_ARCH] },
 
-{ n: 7, conf: "document",
+{ n: 7, conf: "document", fig: "layers",
   body:
 "INT is a persisted layer. It consumes only PASS rows, applies code "
 + "mappings, is keyed on the natural business key plus BUSINESS_DATE, and "
@@ -174,7 +180,7 @@ export const SEED_ANSWERS = [
        + "is keyed on the natural business key plus BUSINESS_DATE.",
   ev: ["Transformation TDD p.5", "Transformation TDD p.12"] },
 
-{ n: 9, conf: "document",
+{ n: 9, conf: "document", fig: "layers",
   body:
 "STG — a non-persisted view: standardise columns, compute DQ status and "
 + "fail reasons. INT — persisted: PASS rows only, code mapping. Gold DIM — "
@@ -251,6 +257,45 @@ export const SEED_ANSWERS = [
 + "done. So the method is available and both the owner and the run are "
 + "missing.",
   ev: ["Transformation TDD", "SEI Architecture"] },
+{ n: 18, conf: "document",
+  body:
+"It means the Gold tables keep their structure exactly and change only "
++ "their writer. DIM_ACCOUNT, DIM_INTERESTED_PARTY and FACT_TRANSACTIONS "
++ "already exist and already carry live history from ODI; the ODI mappings "
++ "become dbt MERGE statements against the identical, unmodified "
++ "structure.\n\n"
++ "So: no DDL against those three tables, every write is DML-only MERGE "
++ "matched to the current column list, and ACCOUNT_KEY continues to come "
++ "from the existing Oracle sequence so one key series spans the ODI era "
++ "and the dbt era.",
+  gap:
+"It is a constraint on the Gold tables, not a statement about the logic "
++ "that fills them. Whether each rule behaves as ODI did is question 15, "
++ "and nothing here demonstrates it.",
+  quote: "DIM_ACCOUNT, DIM_INTERESTED_PARTY, and FACT_TRANSACTIONS already "
+       + "exist and carry live history from ODI. This project changes only how "
+       + "they are populated — ODI mappings become dbt MERGE against the "
+       + "identical, unmodified structure.",
+  ev: ["dbt TDD §6.4 — Gold Constraint: Pre-Existing Tables", "dbt TDD §3.2 — Design Principles"] },
+
+{ n: 19, conf: "document",
+  body:
+"Yes — that is exactly the stated intent, and the TDD makes it a design "
++ "principle rather than an aspiration: “Never alter a pre-existing Gold "
++ "table's schema — all Gold writes are DML-only MERGE against the current "
++ "column list.”\n\n"
++ "The reason given is cutover risk: those tables hold live production "
++ "history, and a schema change risks breaking downstream consumers "
++ "mid-migration.",
+  gap:
+"“Business logic recreated as-is” is asserted for the TABLE, not proven "
++ "for the RULES. The parity evidence that would show it — a record-level "
++ "and value-level comparison against the ODI output — is question 107's "
++ "gap and has not been produced.",
+  quote: "Never alter a pre-existing Gold table's schema — all Gold writes "
+       + "are DML-only MERGE against the current column list.",
+  ev: ["dbt TDD §3.2 — Design Principles (p.8)", "dbt TDD §6.4"] },
+
 { n: 21, conf: "codebase", fig: "envs",
   body:
 "BBH. Airflow runs inside the CP Integration Hub OpenShift namespace, "
@@ -275,6 +320,82 @@ export const SEED_ANSWERS = [
 + "the diagram, which is a decision this codebase cannot make for you.",
   gap: "No cutover date or dual-run period is recorded for SFTP → SDC.",
   ev: ["Environment 360 → Topology", "Event 360 → Micro-batch"] },
+
+{ n: 32, conf: "document", fig: "dqstore",
+  body:
+"They are held, not dropped. Every failing record is written to ONE Oracle "
++ "store, DQ_VALIDATION_FAILURE, and does not proceed to the next layer. "
++ "The store carries the exact failed rows plus two markers: a static "
++ "reprocess_eligible flag saying whether this kind of failure can "
++ "auto-replay, and a resolution_status moving OPEN → RESOLVED / CLOSED.\n\n"
++ "The principle is stated flatly: nothing that fails is silently dropped, "
++ "and nothing is loaded with a placeholder key to keep a count up.",
+  gap:
+"CORRECTED: §7.1 does give the store an end state, which I first recorded "
++ "as missing. Anything still OPEN at the seven-day retention edge is "
++ "CLOSED and alerted, and Splunk reports directly from resolution_status. "
++ "So nothing sits OPEN forever.\n\n"
++ "What remains open is what CLOSED means for the business: the record is "
++ "out of the DQ store and was never loaded to Gold, so the alert is the "
++ "only trace that a transaction was dropped. Who acts on that alert, and "
++ "within what window, is not stated — and after the partition is gone "
++ "there is nothing left to replay from.",
+  quote: "No record that fails a DQ check proceeds to the next layer: "
+       + "failures are held in the DQ store and replayed once resolvable — "
+       + "never silently dropped and never loaded with placeholder keys.",
+  ev: ["dbt TDD §3.2 — Design Principles (p.8)", "dbt TDD §7.1 — Capture and Publishing (p.17)"] },
+
+{ n: 33, conf: "document", fig: "dqstore",
+  body:
+"It depends which category the failure is, and the TDD splits them by "
++ "OWNER:\n\n"
++ "• SOURCE DQ — the incoming record is malformed. Owner: the SWP source "
++ "system. reprocess_eligible = N: nothing BBH does fixes it, so it waits "
++ "for a corrected resend.\n"
++ "• TRANSFORMATION DQ — the record is source-clean but our own mapping or "
++ "Gold logic could not resolve it (an unmapped ACCOUNT_TYPE, a missing "
++ "dimension key). Owner: the BBH/SEI transformation team. "
++ "reprocess_eligible = Y, and it auto-replays once resolvable.\n\n"
++ "The worked case: a transaction arrives on Day N whose account is not yet "
++ "in DIM. It is recorded MISSING_DIMENSION_KEY, eligible, OPEN, and NOT "
++ "loaded. On Day N+1 the dimension arrives, the replay re-derives the OPEN "
++ "row from INT, FACT loads with a real ACCOUNT_KEY, and the status flips "
++ "to RESOLVED.",
+  gap:
+"CORRECTED: I first wrote that nothing produces CLOSED. §7.1 does — "
++ "anything still OPEN at the seven-day retention edge is CLOSED and "
++ "alerted. Replay is worklist-driven: OPEN eligible rows are re-derived "
++ "from INT, the current dimensions re-checked, and rows that now resolve "
++ "are loaded to FACT and marked RESOLVED.\n\n"
++ "The real gap is narrower and worse: the seven-day window is set by INT's "
++ "partition drop, not by how long a dimension actually takes to arrive. "
++ "Nobody has stated the latter, so nobody can say whether seven days is "
++ "generous or short — see question 74.",
+  quote: "On Day N+1 the dimension arrives; the replay step re-derives the "
+       + "OPEN row from INT, the fact model resolves it, loads FACT with a "
+       + "real ACCOUNT_KEY, and flips resolution_status to RESOLVED.",
+  ev: ["dbt TDD §7.1 — Capture and Publishing (p.17)", "dbt TDD §7 — Figure 5a"] },
+
+{ n: 34, conf: "document", fig: "recon",
+  body:
+"It does not stay complete on the day — and that is deliberate, with an "
++ "equation to prove where the missing rows went.\n\n"
++ "The INT → FACT boundary control is: eligible INT rows = FACT rows loaded "
++ "+ OPEN missing-dimension rows in the DQ store. So a row that is not in "
++ "Gold is accounted for in the DQ store, and the two sides add back to the "
++ "input. Nothing is loaded with a placeholder key to make the count look "
++ "right.\n\n"
++ "Completeness is therefore a property of Gold PLUS the DQ store, not of "
++ "Gold alone — which is the thing a report reading only Gold will get "
++ "wrong.",
+  gap:
+"Any consumer reading FACT for a business date is reading an incomplete "
++ "picture while rows sit OPEN, and nothing in the design flags that to "
++ "them. Whether a date is safe to report on needs a published signal, not "
++ "a reconciliation somebody runs.",
+  quote: "Eligible INT rows = FACT rows loaded + OPEN missing-dimension rows "
+       + "in the DQ store; nothing is loaded with a placeholder key.",
+  ev: ["dbt TDD §7.2 — Reconciliation Boundaries (p.18)"] },
 
 { n: 35, conf: "codebase",
   body:
@@ -309,7 +430,7 @@ export const SEED_ANSWERS = [
 + "populate guardrail_events per business date lives outside it.",
   ev: ["guardrail_events (sql/24)", "recon_pr_break (sql/35)", "recon_summary (sql/31)"] },
 
-{ n: 37, conf: "codebase", fig: "hops",
+{ n: 37, conf: "document", fig: "recon",
   body:
 "Variance 360 profiles every column at every stage and compares adjacent "
 + "stages. recon_profile records, per run / lineage id / stage / column, "
@@ -320,14 +441,29 @@ export const SEED_ANSWERS = [
 + "Completeness is CNT compared across a hop. Value integrity is SUM and "
 + "HASHSUM compared across the same hop — which is the part that catches "
 + "what record counts cannot.",
+  quote: "STG → INT: STG PASS rows = INT rows; STG count = INT count + "
+       + "Source-DQ-filtered count. … INT → FACT: Eligible INT rows = FACT rows "
+       + "loaded + OPEN missing-dimension rows in the DQ store; nothing is "
+       + "loaded with a placeholder key.",
   gap:
-"The model has THREE hops (SRC→STG1, STG1→STG2, STG2→DWH) and this question "
-+ "names FOUR layers (Raw → Stage → INT → Dim/Fact). STG2→DWH currently "
-+ "collapses the INT layer and the Dim/Fact load into a single hop. If INT "
-+ "is a persisted layer it needs its own hop and its own break counter, "
-+ "otherwise a break introduced in INT is indistinguishable from one "
-+ "introduced by the Dim/Fact load.",
-  ev: ["recon_profile (sql/31)", "recon_summary (sql/31)", "Variance 360"] },
+"CORRECTED against the dbt TDD. I previously wrote that the design has no "
++ "hop for INT. That is true of Variance 360's three hops, and NOT true of "
++ "the design: §7.2 defines FOUR boundaries, each with an equation that "
++ "must hold or it raises a WARNING —\n\n"
++ "  SWP_RAW → STG   RAW rows = STG rows (the view exposes all; FAIL rows "
++ "carry the flag rather than being dropped)\n"
++ "  STG → INT       STG PASS = INT rows; STG = INT + Source-DQ-filtered\n"
++ "  INT → DIM       NEW + CHANGED = Gold inserts; CHANGED = row closures\n"
++ "  INT → FACT      eligible INT = FACT loaded + OPEN missing-dimension "
++ "rows in the DQ store\n\n"
++ "The real gap is therefore the opposite of what I wrote: the DESIGN has "
++ "four boundaries and VARIANCE 360 HAS THREE. The tool is behind the "
++ "design, and INT→DIM and INT→FACT need their own counters before it can "
++ "evidence this. Note also that status is derived Splunk-side from the "
++ "published counts and is not stored, so there is no queryable history of "
++ "which boundary warned when.",
+  ev: ["dbt TDD §7.2 — Reconciliation Boundaries (p.18)", "recon_summary (sql/31)",
+       "Variance 360"] },
 
 { n: 39, conf: "codebase",
   body:
@@ -419,6 +555,68 @@ export const SEED_ANSWERS = [
 + "replaced. Rejects are covered only insofar as they appear as MISSING.",
   ev: ["recon_profile (sql/31)", "recon_pr_break (sql/35)", "Recon 360", "Variance 360"] },
 
+{ n: 44, conf: "document", fig: "layers",
+  body:
+"Three, in the model as drawn: two dimensions — DIM_ACCOUNT and "
++ "DIM_INTERESTED_PARTY — and one fact, FACT_TRANSACTIONS. They correspond "
++ "to the three INT models (INT_ACCOUNT, INT_INTERESTED_PARTY, "
++ "INT_TRANSACTIONS) and the three RAW objects above them.\n\n"
++ "Grain: each dimension is keyed on its natural key with one ACTIVE_IND=1 "
++ "row at a time; FACT_TRANSACTIONS carries ACCOUNT_KEY resolved against "
++ "DIM_ACCOUNT.",
+  gap:
+"The ingestion DAG in the same document loads FOUR interfaces — Account, "
++ "Client, Transaction AND POSITION — but no RAW, STG, INT or Gold object "
++ "for Position appears anywhere in the model. Either the model is "
++ "incomplete or Position is loaded and not transformed. That is worth "
++ "asking before the dimension list is treated as final.",
+  quote: "DIM_ACCOUNT, DIM_INTERESTED_PARTY, and FACT_TRANSACTIONS already "
+       + "exist and carry live history from ODI.",
+  ev: ["dbt TDD §4.1 — Medallion Mapping", "dbt TDD §10 — Figure 6, logical data model"] },
+
+{ n: 47, conf: "document", fig: "scd2",
+  body:
+"The document addresses this directly, and the answer is a rule about "
++ "which WRITE to use — not about lookups.\n\n"
++ "When a corrected record is reprocessed, the mechanism depends on the "
++ "state of the dimension row it belongs to. If the account's ACTIVE_IND=1 "
++ "row is still the one open on the failed business date, a normal MERGE is "
++ "correct. If a later change has already closed that interval "
++ "(ACTIVE_IND=0), the fix must be a direct UPDATE of that specific closed "
++ "historical row and must NOT be a MERGE — a MERGE would reopen a closed "
++ "interval.\n\n"
++ "That is exactly the Monday-replayed-after-Wednesday case you describe, "
++ "and the design names it rather than leaving it to the implementer.",
+  gap:
+"The rule is stated; the EVIDENCE is not. Nothing shows a test that "
++ "replays a Monday transaction after a Wednesday change and asserts the "
++ "Monday attributes were used. Given that the wrong branch silently "
++ "rewrites history, that test is worth insisting on as an acceptance "
++ "criterion.",
+  quote: "A later change has already closed that interval (ACTIVE_IND=0). → "
+       + "Direct UPDATE of the specific closed historical row; must NOT MERGE "
+       + "(would reopen a closed interval).",
+  ev: ["dbt TDD §6.4.1 — SCD2 MERGE and the MERGE-vs-UPDATE Reprocessing Rule (p.15)"] },
+
+{ n: 48, conf: "document", fig: "scd2",
+  body:
+"The same rule in §6.4.1 is the mechanism: a mid-period correction to a "
++ "closed interval is applied as a direct UPDATE of that historical row, "
++ "because MERGE joins on ACCOUNT_KEY and would reopen the interval.\n\n"
++ "The MERGE path itself is the normal SCD2 shape: a changed account closes "
++ "its current row (ACTIVE_IND → 0, END_DATE set) and opens a new one with "
++ "a new ACCOUNT_KEY and START_DATE = business date.",
+  gap:
+"Interval SPLITTING is not covered. The document gives the two-branch rule "
++ "for correcting a row, not what happens when a correction lands in the "
++ "middle of a closed interval and should divide it in two, nor what "
++ "happens to FACTs already pointing at the ACCOUNT_KEY being corrected. "
++ "Both are real and neither is addressed.",
+  quote: "a changed account closes its current row (ACTIVE_IND → 0, END_DATE "
+       + "set) and opens a new one (ACTIVE_IND = 1, new ACCOUNT_KEY, "
+       + "START_DATE = business date)",
+  ev: ["dbt TDD §6.4.1 (p.15)"] },
+
 { n: 49, conf: "codebase",
   body:
 "Interface 360 is the nearest thing that exists and is the natural home for "
@@ -486,6 +684,50 @@ export const SEED_ANSWERS = [
 + "throughout these questions but its DDL is not in this repository.",
   ev: ["Environment 360 → Topology (CIFS 445 → RWX PVC)"] },
 
+{ n: 59, conf: "document", fig: "datectl",
+  body:
+"Confirmed, and that is precisely the design. DATE_CONTROL holds one row "
++ "per business date with a STATUS moving PENDING → TRIGGER → COMPLETE.\n\n"
++ "The Ingestion DAG loads files, then compares the expected interface set "
++ "(FILE_SCHEMA_CONFIG) against the completed set (FILE_REGISTRY). If "
++ "complete it moves PENDING → TRIGGER under a guarded UPDATE "
++ "(SQL%ROWCOUNT = 1, so only one DAG run can trigger) and invokes the "
++ "Transformation DAG. If incomplete it ends normally, the date stays "
++ "PENDING, and the next cycle re-checks.\n\n"
++ "The next date is seeded only by the Transformation DAG, only on success, "
++ "together with its SLA cutoff.",
+  gap:
+"One thing your summary adds that the document does not: “until all data "
++ "arrives” is bounded by an SLA cutoff. If the cutoff passes while "
++ "interfaces are missing, the date STAYS PENDING, transformation is not "
++ "triggered, and an SLA breach alert goes to Splunk. So the date can sit "
++ "PENDING indefinitely — see question 97.",
+  quote: "If complete — it updates DATE_CONTROL PENDING → TRIGGER and "
+       + "invokes the Transformation DAG … If incomplete — it ends normally; "
+       + "the date stays PENDING and the next cycle re-checks.",
+  ev: ["dbt TDD §5.1 — Orchestration State Machine", "dbt TDD §5.3 — Ingestion-to-Transformation Trigger"] },
+
+{ n: 60, conf: "document", fig: "datectl",
+  body:
+"Yes to both halves, and they are the same mechanism.\n\n"
++ "On failure the run stops with DATE_CONTROL = TRIGGER and restarts from "
++ "the failed task. The date cannot advance because only the FINAL task of "
++ "the Transformation DAG moves it to COMPLETE — so any failure before that "
++ "point leaves it at TRIGGER by construction, rather than by a guard "
++ "somebody remembered to add.\n\n"
++ "Each layer is a build task followed by its own test task, so a restart "
++ "resumes at the layer that failed rather than rebuilding from STG.",
+  gap:
+"“Restarts from the failed task” is an Airflow clear-and-rerun, which "
++ "assumes the partial write is safe to repeat. That holds for INT "
++ "(partition drop, date-specific) and for DIM/FACT (MERGE), but a run that "
++ "failed BETWEEN build_dim and build_fact leaves the dimension advanced "
++ "and the fact not — recoverable, but the intermediate state is visible to "
++ "anyone reading Gold meanwhile.",
+  quote: "On failure the run stops with DATE_CONTROL = TRIGGER and restarts "
+       + "from the failed task.",
+  ev: ["dbt TDD §5.2 — Figure 3, layer-barrier execution (p.11)"] },
+
 { n: 62, conf: "codebase", fig: "runstate",
   body:
 "The state vocabulary is already there; the liveness is not.\n\n"
@@ -504,8 +746,35 @@ export const SEED_ANSWERS = [
   gap:
 "Add queued_at, heartbeat_at and worker_id, and a reaper that moves stale "
 + "'running' rows to a terminal state with a reason. Without the reaper the "
-+ "extra columns only record the stall more precisely.",
++ "extra columns only record the stall more precisely.\n\n"
++ "The dbt TDD confirms this is live rather than theoretical: it states "
++ "that the Ingestion DAG acts only on PENDING rows and therefore never "
++ "re-triggers a stuck TRIGGER date, with recovery owned solely by the "
++ "Transformation DAG — the run that, in this failure, was never created. "
++ "See question 63.",
   ev: ["guardrail_gate_run (sql/67)"] },
+
+{ n: 63, conf: "document", fig: "datectl",
+  body:
+"The document confirms the gap rather than closing it, and says so in one "
++ "sentence: the Ingestion DAG only acts on PENDING rows, so it never "
++ "re-triggers a stuck TRIGGER date — recovery is owned SOLELY by the "
++ "Transformation DAG.\n\n"
++ "So in the crash you describe — PENDING → TRIGGER committed, Airflow dies "
++ "before the Transformation DAG exists — nothing is watching. Ingestion "
++ "will not pick the date up again by design, and the owner of recovery is "
++ "a DAG run that was never created.",
+  gap:
+"This is the clearest confirmation in the pack that question 62's concern "
++ "is real and currently unaddressed. The guarded UPDATE (SQL%ROWCOUNT = 1) "
++ "correctly stops TWO runs triggering; it does nothing about ZERO. What is "
++ "missing is a reaper: a scheduled check for dates in TRIGGER with no live "
++ "Transformation run, which needs the run-state columns question 62 asks "
++ "for.",
+  quote: "The Ingestion DAG only acts on PENDING rows, so it never "
+       + "re-triggers a stuck TRIGGER date — recovery is owned solely by the "
+       + "Transformation DAG.",
+  ev: ["dbt TDD §5.1 — DATE_CONTROL status table (p.11)"] },
 
 { n: 64, conf: "absence",
   body:
@@ -519,23 +788,42 @@ export const SEED_ANSWERS = [
   gap: "Ownership needs to be a column before it can be a process.",
   ev: ["guardrail_events (sql/24)", "guardrail_gate_run (sql/67)"] },
 
-{ n: 74, conf: "inference",
+{ n: 74, conf: "document",
   body:
 "The structural answer is the one the question already contains: the replay "
 + "payload must not live in a layer that has a retention clock. An immutable "
 + "RAW pointer or a copy of the payload in a replay store, with its own "
 + "retention set from the maximum dependency wait rather than from INT's "
 + "needs.\n\n"
-+ "What this codebase adds is a sharper version of the risk. No retention "
-+ "policy is recorded anywhere in this schema — for INT or for anything else "
-+ "(see questions 99 and 100). So the 7-day figure is an operating "
-+ "assumption rather than a declared property, and it could be changed by "
-+ "someone tuning storage without any visibility that replay depends on it.",
++ "THE dbt TDD CONFIRMS THE RISK RATHER THAN RESOLVING IT, and it does so in "
++ "two separate sections that are never read together. §6.5: INT is "
++ "partitioned by BUSINESS_DATE and purged by DROP PARTITION after seven "
++ "days. §7 / Figure 5a: the replay step RE-DERIVES THE OPEN ROW FROM INT. "
++ "So the replay source and the thing on a seven-day clock are the same "
++ "object.\n\n"
++ "A held transaction whose dimension arrives on day eight has nothing left "
++ "to re-derive it from.\n\n"
++ "§7.1 does handle this, and it is worth being precise about HOW: anything "
++ "still OPEN at the seven-day edge is CLOSED and alerted. So the loss is "
++ "DETECTED and raised — it is not silent. But closed-and-alerted is not "
++ "replayed: the transaction is still not in FACT, and the data it was "
++ "derived from is gone. The control turns a silent loss into a visible "
++ "one, which is a real improvement and is not the same as durability.",
   gap:
-"Retention cannot be set independently of replay. Whoever sets the INT "
-+ "retention needs to know the maximum dependency wait, and today neither "
-+ "number is written down.",
-  ev: ["Environment 360 → Topology (no retention recorded)"] },
+"Retention cannot be set independently of replay, and the seven days comes "
++ "from INT's partition drop rather than from any measured dependency wait "
++ "— nobody has stated the latter, so nobody can say whether seven days is "
++ "generous or short.\n\n"
++ "Your original point stands: keeping the replay payload, or an immutable "
++ "RAW pointer, OUTSIDE INT is what makes the window a choice rather than a "
++ "side effect of a storage decision. The alert at the edge tells you how "
++ "often it would have mattered, which is the cheap way to find out before "
++ "building it.",
+  quote: "INT is partitioned by BUSINESS_DATE and purged with ALTER TABLE … "
+       + "DROP PARTITION (near-instant metadata work) rather than a row-level "
+       + "DELETE.",
+  ev: ["dbt TDD §6.5 — INT Retention via Partition Drop (p.15)",
+       "dbt TDD §7.1 — Capture and Publishing (p.17)"] },
 
 { n: 77, conf: "codebase",
   body:
@@ -693,19 +981,26 @@ export const SEED_ANSWERS = [
   gap: "The targets themselves are a business decision, not a platform fact.",
   ev: ["API 360 (no SLA columns in sql/07, sql/36)"] },
 
-{ n: 99, conf: "absence",
+{ n: 99, conf: "document",
   body:
-"None is recorded. No retention period, purge rule or archive policy exists "
-+ "in this schema for any table — RAW, Stage 2, the orchestration tables or "
-+ "the guardrail tables. Several tables carry updated_at, which is enough to "
-+ "implement a purge against, but no policy says what the value should be "
-+ "and no purge job exists.",
+"Partly stated, and only for the Silver layers. The dbt TDD gives: STG "
++ "none, because it is a view and holds no data; INT seven days, purged by "
++ "partition drop on BUSINESS_DATE. Against today's BBH that is a change — "
++ "STG1 is one day and STG2 is seven.\n\n"
++ "RAW and the orchestration tables are NOT covered. No retention is stated "
++ "for SWP_RAW, DATE_CONTROL, FILE_REGISTRY, DQ_VALIDATION_FAILURE or "
++ "RECON_RESULT, and nothing in the CP360 schema records one either.",
+  quote: "Silver retention | STG 1 day; STG2 7 days | STG none (view); INT 7 "
+       + "days (partition drop) | STG holds no data.",
   gap:
-"Two of these are not independent of other answers: orchestration-table "
-+ "retention bounds how far back an incident can be investigated (question "
-+ "42), and INT retention bounds replay (question 74). Set those two from "
-+ "their dependents, not from storage cost.",
-  ev: ["sql/ (no retention policy in any table)"] },
+"The two that are missing are the two that bind other answers: "
++ "orchestration-table retention bounds how far back an incident can be "
++ "investigated (question 42), and the DQ store's retention has to outlast "
++ "the longest replay (question 74). Set those from their dependents, not "
++ "from storage cost. RAW retention is also the floor for any restatement "
++ "reaching further back than seven days.",
+  ev: ["dbt TDD §2 — What Changes and What Stays the Same",
+       "dbt TDD §6.5 (p.15)"] },
 
 { n: 100, conf: "absence",
   body:

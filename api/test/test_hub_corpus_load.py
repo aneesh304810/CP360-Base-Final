@@ -148,12 +148,26 @@ class SchemaConn(FakeConn):
         return C(self.sent)
 
 
+# Derived from the CORPUS, not from PLAN. Two earlier versions were
+# wrong in opposite directions: the first hardcoded 179 statements and
+# broke whenever a draft was added, and the second derived the
+# expectation from PLAN itself — so deleting a section from PLAN deleted
+# it from the expectation too, and the guard passed while the loader
+# silently stopped loading owners.
+SECTIONS = {k for k, v in corpus.items() if isinstance(v, list)}
+ok({k for k, _ in PLAN} == SECTIONS,
+   "PLAN covers every section the export contains — a section in the file "
+   "that no statement loads is data that never reaches Oracle",
+   f"PLAN {sorted(k for k, _ in PLAN)} vs export {sorted(SECTIONS)}")
+EXPECTED = {k: len(corpus[k]) for k in SECTIONS}
+TOTAL = sum(EXPECTED.values())
+
 c1 = SchemaConn()
 counts = load(c1, corpus)
-ok(counts == {"owners": 5, "topics": 17, "questions": 108, "answers": 49},
-   "the loader applies every section", counts)
-ok(len(c1.sent) == 179 and c1.commits == 1,
-   "in one committed transaction", f"{len(c1.sent)} statements, {c1.commits} commits")
+ok(counts == EXPECTED, "the loader applies every section", counts)
+ok(len(c1.sent) == TOTAL and c1.commits == 1,
+   f"one statement per row ({TOTAL}) in one committed transaction",
+   f"{len(c1.sent)} statements, {c1.commits} commits")
 
 c2 = SchemaConn()
 load(c2, corpus)
@@ -257,9 +271,9 @@ ok(RUN.STEPS.index("hub_corpus") < RUN.STEPS.index("search_index"),
 
 c3 = SchemaConn()
 RUN._run_step("hub_corpus", c3, None, None)
-ok(len(c3.sent) == 179 and c3.commits == 1,
-   "python -m ingestion.run actually loads the corpus — 179 MERGEs in one "
-   "transaction, reached through the real dispatcher",
+ok(len(c3.sent) == TOTAL and c3.commits == 1,
+   f"python -m ingestion.run actually loads the corpus — {TOTAL} MERGEs in "
+   "one transaction, reached through the real dispatcher",
    f"{len(c3.sent)} statements, {c3.commits} commits")
 ok(all("MERGE INTO" in sql for sql, _ in c3.sent),
    "and every one of them is a MERGE", "")

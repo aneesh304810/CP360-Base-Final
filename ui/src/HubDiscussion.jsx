@@ -540,10 +540,6 @@ export function Expanded({ t, x, S, answers, actor, store, commit, onClose, live
               {a.accepted && <div style={S.warn}>Saving this withdraws the
                 acceptance — the question goes back to answered and the
                 acceptor has to look again.</div>}
-              <Attachments t={t} S={S} items={(store.atts || {})[a.id]}
-                onRemove={(id) => discussionApi.deleteAttachment(id).then(refresh)} />
-              <Attach t={t} S={S} live={live} onDone={refresh}
-                target={{ answerId: a.id, qid: x.n }} />
               <div style={{ marginTop: 6 }}>
                 <span onClick={() => { commit(onAnswer(store, a,
                   (st) => editAnswer(st, a.id, text, actor)),
@@ -562,9 +558,15 @@ export function Expanded({ t, x, S, answers, actor, store, commit, onClose, live
                     {a.gap}</div>}
                   {a.ev && a.ev.length > 0 && <div style={S.ev}>
                     {a.ev.map((e) => <i key={e} style={S.evChip}>{e}</i>)}</div>}
-                  <Attachments t={t} S={S}
-                    items={(store.atts || {})[a.id]} />
                 </div>}
+            {/* Outside the edit branch on purpose. The first version put
+                the attach control inside it, so a diagram could only be
+                added by someone who had first clicked "edit" — which is
+                also the one action that withdraws an acceptance. */}
+            <Attachments t={t} S={S} items={(store.atts || {})[a.id]}
+              onRemove={(id) => discussionApi.deleteAttachment(id).then(refresh)} />
+            <Attach t={t} S={S} live={live} onDone={refresh}
+              target={{ answerId: a.id, qid: x.n }} />
             {a.accepted && x.comps.length > 0 && (
               <div style={S.aFoot}>→ this answer is the documentation for{" "}
                 {x.comps.map((c) => <i key={c} style={{ ...S.chip,
