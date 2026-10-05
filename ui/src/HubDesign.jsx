@@ -19,7 +19,7 @@ import { SEI_DOCS, SEI_BOUNDARY, SEI_STAGES, SEI_COMPONENTS, SEI_TABLES,
 import { REGISTRY, REG_STATE, REG_ORIGIN, REG_REVIEW_NOTE, BBH_LAYERS,
  BBH_EXTENSION } from "./hubComponentRegistry.js";
 import { GROUPS, PROC_STAGES, groupOfTracker, stageOfTracker, groupById,
- stageById } from "./hubGroups.js";
+ stageById, LANES, lanesOf, laneOfTracker, laneById } from "./hubGroups.js";
 
 // =====================================================================
 // HubDesign — the CP Integration Hub route: C4 landing (L1 context +
@@ -731,8 +731,35 @@ export default function HubDesign({ t }) {
     return el;
    })}</g>);
   };
+  // A lane is the named part inside a container — "landing and
+  // transport", "the API gateway", "file-based". Drawn on the
+  // container itself so the top level answers what is in there, not
+  // just how much.
+  const Lane = ({ l, x, y, w, h }) => (
+   <g onClick={(e) => { e.stopPropagation(); setGrp(l.gid); setView("GRP"); }}
+    style={{ cursor: "pointer" }}>
+    <rect x={x} y={y} width={w} height={h} rx="6"
+     fill={l.proposal ? "#fdf1f2" : "#eef3f8"}
+     stroke={l.proposal ? "#e0a9b0" : "#c3d4e4"}
+     strokeDasharray={l.proposal ? "4 3" : undefined} strokeWidth="1" />
+    {T(x + 9, y + 15, l.n, { fs: 8.5, fw: 800,
+      fill: l.proposal ? "#cc3344" : "#0f4775" })}
+    {T(x + 9, y + 27, l.tech, { fs: 7.5,
+      fill: l.proposal ? "#b4707a" : "#5c7c94" })}
+   </g>);
+  const LaneRow = ({ id, x, y, w }) => {
+   const ls = lanesOf(id);
+   if (!ls.length) return null;
+   const gap = 8;
+   const lw = (w - gap * (ls.length - 1)) / ls.length;
+   return (<g>{ls.map((l, i) => (
+    <Lane key={l.id} l={{ ...l, gid: id }} x={x + i * (lw + gap)} y={y}
+     w={lw} h={34} />))}</g>);
+  };
   const Group = ({ id, x, y, w, h }) => {
    const g = G(id);
+   const stack = w < 400;              // the right-hand column is narrow
+   const ls = lanesOf(id);
    return (
     <g onClick={() => { setGrp(id); setView("GRP"); }} style={{ cursor: "pointer" }}>
      <rect x={x} y={y} width={w} height={h} rx="10" fill="#fff"
@@ -743,8 +770,13 @@ export default function HubDesign({ t }) {
        { fs: 10, fw: 800, fill: "#fff" })}
      {T(x + w - 14, y + 20, "▸ open", { fs: 8, fw: 800, anchor: "end",
        fill: "#9ec6ee" })}
-     {T(x + 14, y + 48, g.sub, { fs: 8.5, italic: true })}
-     <Tally x={x + 14} y={y + 58} g={g} />
+     {T(x + 14, y + 46, g.sub, { fs: 8.5, italic: true })}
+     <Tally x={x + 14} y={y + 54} g={g} />
+     {stack
+       ? ls.map((l, i) => (
+          <Lane key={l.id} l={{ ...l, gid: id }} x={x + 14} y={y + 78 + i * 38}
+           w={w - 28} h={34} />))
+       : <LaneRow id={id} x={x + 14} y={y + 78} w={w - 28} />}
     </g>);
   };
   const Stage = ({ st, x, y, w }) => (
@@ -788,7 +820,7 @@ export default function HubDesign({ t }) {
     </div>
     <div style={{ background: "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
      borderRadius: 10, padding: 16, overflowX: "auto" }}>
-     <svg viewBox="0 0 1240 800" style={{ minWidth: 960, display: "block" }}>
+     <svg viewBox="0 0 1240 940" style={{ minWidth: 960, display: "block" }}>
       <Defs />
       {T(24, 22, "CP INTEGRATION HUB — the whole flow",
         { fs: 11, fw: 800, fill: "#0f4775" })}
@@ -813,54 +845,55 @@ export default function HubDesign({ t }) {
         { fs: 7.5, fill: "#b9875a" })}
 
       {/* the chain down the left */}
-      <Group id="ingress" x={24} y={120} w={876} h={86} />
-      {Arrow(462, 206, 462, 230)}
-      <Group id="ingestion" x={24} y={234} w={876} h={86} />
-      {Arrow(462, 320, 462, 344)}
-      <Group id="orchestration" x={24} y={348} w={876} h={86} />
-      {Arrow(462, 434, 462, 458)}
+      <Group id="ingress" x={24} y={120} w={876} h={124} />
+      {Arrow(462, 244, 462, 266)}
+      <Group id="ingestion" x={24} y={270} w={876} h={124} />
+      {Arrow(462, 394, 462, 416)}
+      <Group id="orchestration" x={24} y={420} w={876} h={124} />
+      {Arrow(462, 544, 462, 566)}
 
       {/* processing, with the stage chain drawn inside it */}
       <g onClick={() => { setGrp("processing"); setView("GRP"); }}
        style={{ cursor: "pointer" }}>
-       <rect x={24} y={462} width={876} height={192} rx="10" fill="#fff"
+       <rect x={24} y={570} width={876} height={232} rx="10" fill="#fff"
         stroke="#7fa8c9" strokeWidth="1.4" />
-       <rect x={24} y={462} width={876} height={30} rx="10" fill="#0f4775" />
-       <rect x={24} y={482} width={876} height={10} fill="#0f4775" />
-       {T(38, 482, "⚙  PROCESSING", { fs: 10, fw: 800, fill: "#fff" })}
-       {T(886, 482, "▸ open", { fs: 8, fw: 800, anchor: "end",
+       <rect x={24} y={570} width={876} height={30} rx="10" fill="#0f4775" />
+       <rect x={24} y={590} width={876} height={10} fill="#0f4775" />
+       {T(38, 590, "⚙  PROCESSING", { fs: 10, fw: 800, fill: "#fff" })}
+       {T(886, 590, "▸ open", { fs: 8, fw: 800, anchor: "end",
          fill: "#9ec6ee" })}
-       <Tally x={38} y={500} g={G("processing")} />
+       <Tally x={38} y={608} g={G("processing")} />
+       <LaneRow id="processing" x={38} y={630} w={848} />
       </g>
       {PROC_STAGES.map((st, i) => (
-       <Stage key={st.id} st={st} x={38 + i * 215} y={524} w={201} />))}
+       <Stage key={st.id} st={st} x={38 + i * 215} y={674} w={201} />))}
       {[0, 1, 2].map((i) => (
-       <g key={i}>{Arrow(38 + i * 215 + 201, 555, 38 + (i + 1) * 215 - 3, 555)}</g>))}
-      {T(38, 612, "Stage 2 and Stage 2 INT are the one layer also called Silver or Enriched. Stage 3 is BBH's: SEI's documents end at DIM and FACT.",
+       <g key={i}>{Arrow(38 + i * 215 + 201, 705, 38 + (i + 1) * 215 - 3, 705)}</g>))}
+      {T(38, 762, "Stage 2 and Stage 2 INT are the one layer also called Silver or Enriched. Stage 3 is BBH's: SEI's documents end at DIM and FACT.",
         { fs: 8, italic: true, fill: "#a8560f" })}
-      {T(38, 626, "Reconciliation and DQ capture run across the chain rather than inside one stage — both are in this container.",
+      {T(38, 776, "Reconciliation and DQ capture run across the chain rather than inside one stage — both are in this container.",
         { fs: 8, italic: true })}
 
       {/* the two that sit beside everything */}
-      <Group id="openshift" x={936} y={120} w={280} h={140} />
-      <Group id="foundation" x={936} y={288} w={280} h={140} />
-      {T(936, 452, "These two are not a step in the flow.", { fs: 8, italic: true })}
-      {T(936, 464, "Everything above runs on one and", { fs: 8, italic: true })}
-      {T(936, 476, "records itself in the other.", { fs: 8, italic: true })}
+      <Group id="openshift" x={936} y={120} w={280} h={240} />
+      <Group id="foundation" x={936} y={388} w={280} h={274} />
+      {T(936, 686, "These two are not a step in the flow.", { fs: 8, italic: true })}
+      {T(936, 698, "Everything above runs on one and", { fs: 8, italic: true })}
+      {T(936, 710, "records itself in the other.", { fs: 8, italic: true })}
 
       {/* the proposal, kept apart */}
       <g onClick={() => { setGrp("events"); setView("GRP"); }}
        style={{ cursor: "pointer" }}>
-       <rect x={24} y={678} width={1192} height={52} rx="10" fill="#fdf1f2"
+       <rect x={24} y={826} width={1192} height={52} rx="10" fill="#fdf1f2"
         stroke="#e0a9b0" strokeDasharray="5 4" strokeWidth="1.3" />
-       {T(40, 700, `▸  EVENT INGESTION — ${evt.length} components`,
+       {T(40, 848, `▸  EVENT INGESTION — ${evt.length} components`,
          { fs: 10, fw: 800, fill: "#cc3344" })}
-       {T(40, 716, "Proposed by this programme's review. Not in SEI's documents and not in the delivery workbook — open it to see what it would add.",
+       {T(40, 864, "Proposed by this programme's review. Not in SEI's documents and not in the delivery workbook — open it to see what it would add.",
          { fs: 8, italic: true, fill: "#b4707a" })}
-       {T(1202, 700, "▸ open", { fs: 8, fw: 800, anchor: "end",
+       {T(1202, 848, "▸ open", { fs: 8, fw: 800, anchor: "end",
          fill: "#cc3344" })}
       </g>
-      {T(24, 760, "Solid blue is specified by SEI and cited. Dashed amber is BBH's and is not in either document. Dashed red is this review's proposal.",
+      {T(24, 906, "Solid blue is specified by SEI and cited. Dashed amber is BBH's and is not in either document. Dashed red is this review's proposal.",
         { fs: 8, italic: true })}
      </svg>
     </div>
@@ -1134,6 +1167,40 @@ export default function HubDesign({ t }) {
       </div>
      </>)}
 
+    {!evts && lanesOf(grp).length > 0 && (
+     <>
+      <Head title="What is in here" bg="#1f4f7a"
+       note="the named parts, each with what it runs on"
+       n={lanesOf(grp).length} label="lanes" />
+      <div style={{ display: "grid", gap: 8,
+       gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))" }}>
+       {lanesOf(grp).map((l) => {
+        const lt = trk.filter((c) => laneOfTracker(c, grp) === l.id);
+        const lsei = (l.sei || []).length;
+        return (
+         <div key={l.id} style={{ background: "#fff", borderRadius: 8,
+          border: l.proposal ? "1px dashed #e0a9b0"
+            : `1px solid ${t.panel2 || "#dfe6e9"}`,
+          borderLeft: `3px solid ${l.proposal ? "#cc3344" : "#1168bd"}`,
+          padding: "12px 15px" }}>
+          <b style={{ fontSize: 12.5,
+           color: l.proposal ? "#cc3344" : (t.navy || "#10193b") }}>{l.n}</b>
+          <div style={{ fontSize: 10, color: t.sub || "#666", marginTop: 2 }}>
+           {l.tech}</div>
+          <div style={{ fontSize: 11.5, color: "#33414d", lineHeight: 1.6,
+           marginTop: 7 }}>{l.w}</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap",
+           marginTop: 8 }}>
+           {lsei > 0 && chip("#e4f0fb", "#0f4775", `${lsei} specified by SEI`)}
+           {(l.bbh || []).length > 0 && chip("#fdf2e3", "#a8560f",
+             `${(l.bbh || []).length} BBH`)}
+           {lt.length > 0 && chip("#eef1f4", "#5c6b7a", `${lt.length} tracked`)}
+          </div>
+         </div>);
+       })}
+      </div>
+     </>)}
+
     {seis.length > 0 && (
      <>
       <Head title="Specified by SEI" bg="#1f6b45"
@@ -1204,8 +1271,11 @@ export default function HubDesign({ t }) {
           <b style={{ fontFamily: "Roboto Mono, monospace", fontSize: 10,
            color: col }}>{c.id}</b>
           <div><b style={{ color: t.navy || "#10193b" }}>{c.component}</b>
-           {st2 && <div style={{ fontSize: 9, fontWeight: 800, color: "#1168bd",
-            marginTop: 2 }}>{(stageById(st2) || {}).n}</div>}</div>
+           <div style={{ fontSize: 9, fontWeight: 800, color: "#1168bd",
+            marginTop: 2 }}>
+            {[(laneById(grp, laneOfTracker(c, grp)) || {}).n,
+              st2 ? (stageById(st2) || {}).n : null]
+              .filter(Boolean).join("  ·  ")}</div></div>
           <span>{chip(col + "1f", col, label.toUpperCase())}</span>
           <span style={{ color: "#33414d", lineHeight: 1.55 }}>
            {r.why || (r.sei ? `baseline ${r.sei.join(", ")}` : "—")}</span>

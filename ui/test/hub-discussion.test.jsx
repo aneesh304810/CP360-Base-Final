@@ -39,8 +39,8 @@ import { SEI_DOCS, SEI_BOUNDARY, SEI_STAGES, SEI_COMPONENTS, SEI_TABLES,
   from "../src/seiBaseline.js";
 import { REGISTRY, REG_STATE, BBH_LAYERS, BBH_EXTENSION }
   from "../src/hubComponentRegistry.js";
-import { GROUPS, PROC_STAGES, groupOfTracker, stageOfTracker }
-  from "../src/hubGroups.js";
+import { GROUPS, PROC_STAGES, groupOfTracker, stageOfTracker, LANES,
+  lanesOf, laneOfTracker } from "../src/hubGroups.js";
 import { TRACKER_COMPONENTS } from "../src/seiDesignTracker.js";
 
 let bad = 0;
@@ -1114,6 +1114,61 @@ ok(/\["containers", \(\) => setView\("L2"\)\]/.test(HUB),
 // The SEI pipeline drawing is not lost, just moved below this level.
 ok(/view === "SEIFLOW"/.test(HUB) && /setView\("SEIFLOW"\)/.test(HUB),
    "the box-by-box SEI pipeline is still reachable from here", "");
+
+// ---- lanes: the named parts inside a container -----------------------
+//
+// A container with a count on it says how much is in there and nothing
+// about what. The lanes are the names people use — landing and
+// transport, the gateway, file-based versus event-based — so the top
+// level answers "what is in Ingress?" without a click.
+ok(GROUPS.every((g) => lanesOf(g.id).length >= 3),
+   "every container names at least three parts — one or two lanes is a "
+   + "label, not a breakdown",
+   GROUPS.filter((g) => lanesOf(g.id).length < 3)
+     .map((g) => `${g.id}:${lanesOf(g.id).length}`).join(","));
+const ALLLANES = GROUPS.flatMap((g) => lanesOf(g.id));
+ok(ALLLANES.every((l) => l.tech && l.tech.length > 2),
+   "and each says what it runs on, which is usually the real question",
+   ALLLANES.filter((l) => !l.tech).map((l) => l.id).join(","));
+ok(ALLLANES.every((l) => (l.w || "").length > 60),
+   "and what it is, in a sentence someone outside the build can read",
+   ALLLANES.filter((l) => (l.w || "").length <= 60).map((l) => l.id).join(","));
+// The lanes must account for everything the container claims, or the
+// breakdown says less than the tally above it.
+for (const g of GROUPS) {
+  const laneSei = lanesOf(g.id).flatMap((l) => l.sei || []);
+  ok(g.sei.every((id) => laneSei.includes(id)),
+     `${g.id}: every component the container claims is in one of its lanes`,
+     g.sei.filter((id) => !laneSei.includes(id)).join(","));
+}
+const LSEI = ALLLANES.flatMap((l) => l.sei || []);
+ok(LSEI.every((id) => BASEC.has(id)),
+   "every lane's components exist in the baseline",
+   LSEI.filter((id) => !BASEC.has(id)).join(","));
+ok(LSEI.length === new Set(LSEI).size,
+   "and no component is in two lanes",
+   LSEI.filter((x, i) => LSEI.indexOf(x) !== i).join(","));
+// Membership is by exception, so the fallback must actually catch.
+ok(TRACKER_COMPONENTS.filter((c) => groupOfTracker(c) !== "events")
+     .every((c) => laneOfTracker(c, groupOfTracker(c))),
+   "and every tracked component falls into a lane — membership is by "
+   + "exception, so a row nobody filed must still land somewhere",
+   TRACKER_COMPONENTS.filter((c) => groupOfTracker(c) !== "events"
+     && !laneOfTracker(c, groupOfTracker(c))).map((c) => c.id).join(","));
+// The two the ask named by name.
+const ingress = lanesOf("ingress").map((l) => l.n).join(" | ");
+ok(/Landing and transport/.test(ingress) && /API gateway/.test(ingress)
+   && /Loader framework/.test(ingress),
+   "Ingress names landing and transport, the gateway and the loader "
+   + "framework", ingress);
+const ing = lanesOf("ingestion").map((l) => l.n).join(" | ");
+ok(/File-based/.test(ing) && /Event-based/.test(ing),
+   "and Ingestion splits file-based from event-based", ing);
+ok(lanesOf("ingestion").find((l) => /Event-based/.test(l.n)).proposal === true,
+   "with the event half marked a proposal, because it is one", "");
+// Drawn, not just declared.
+ok(/const Lane = /.test(HUB) && /lanesOf\(id\)/.test(HUB),
+   "the lanes are drawn on the container layer", "");
 
 // ---- the C4 drill-down ----------------------------------------------
 //

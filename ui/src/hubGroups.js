@@ -119,3 +119,136 @@ export const stageOfTracker = (c) => (c ? STAGE_OF[c.id] || null : null);
 
 export const groupById = (id) => GROUPS.find((g) => g.id === id) || null;
 export const stageById = (id) => PROC_STAGES.find((x) => x.id === id) || null;
+
+// ---------------------------------------------------------------------
+// LANES: the named parts inside a container.
+//
+// A container with a count on it says how much is in there and nothing
+// about what. These are the names people actually use for the parts —
+// "landing and transport", "the API gateway", "the loader framework",
+// "file-based versus event-based" — so the top-level picture answers
+// "what is in Ingress?" without a click.
+//
+// A lane carries its technology because that is usually the real
+// question: ingestion is Python, orchestration is Airflow, processing
+// is dbt, and the gateway lane is vendor kit nobody here writes.
+//
+// Membership is by exception. Tracker components name their lane
+// below; anything in the container that names none falls into the
+// container's last lane, so nothing is lost by forgetting a row.
+export const LANES = {
+ ingress: [
+  { id: "landing", n: "Landing and transport", tech: "SFTP \u00b7 Momentum \u00b7 shared storage",
+    sei: ["S1", "S2", "S3", "S4"], reg: ["8"],
+    w: "Files arrive on SFTP, Momentum copies the complete ones into a "
+     + "Landing Zone every worker pod can see, and Archive and Quarantine "
+     + "sit beside it." },
+  { id: "gateway", n: "API gateway and Apigee proxy", tech: "vendor",
+    sei: [], reg: ["11", "12"],
+    w: "The real-time lane. Neither SEI document mentions it \u2014 both are "
+     + "batch from end to end \u2014 so nothing here is cited." },
+  { id: "loader", n: "Loader framework", tech: "Python \u00b7 outbound",
+    sei: [], reg: ["10", "4"],
+    w: "Everything going back to SEI: producing a submission, sending it, "
+     + "and tracking what came back. Outbound is in neither document." },
+  { id: "seisrc", n: "SEI-side source", tech: "SEI",
+    sei: [], reg: ["1", "2", "3", "5", "6", "7"],
+    w: "SWP itself and what SEI runs around it. Only the platform and the "
+     + "files it produces touch this design." },
+ ],
+ ingestion: [
+  { id: "filebased", n: "File-based ingestion", tech: "Airflow \u00b7 Python \u00b7 Oracle",
+    sei: ["S5", "S6", "S7", "S8"], reg: ["13", "9", "23"],
+    w: "The path both SEI documents describe: a scheduled scan, one mapped "
+     + "task per file, validate, load RAW in one transaction, reconcile "
+     + "three counts, archive." },
+  { id: "eventbased", n: "Event-based ingestion", tech: "proposal",
+    sei: [], reg: [],
+    w: "Continuous intake rather than a five-minute scan. Proposed by this "
+     + "programme's review; not in either document and not in the "
+     + "workbook. Its components are in the event container.",
+    proposal: true },
+  { id: "profiling", n: "RAW profiling", tech: "SQL",
+    sei: [], reg: ["24"],
+    w: "Looking at what landed before anything is done to it. Not in "
+     + "SEI's design \u2014 the first thing that reads a row's content "
+     + "there is the STG view." },
+ ],
+ orchestration: [
+  { id: "ingdag", n: "Ingestion DAG", tech: "Airflow 3.0",
+    sei: ["S9", "S10", "S11", "S12"], reg: ["18", "22"],
+    w: "Owns the business date up to the handoff: evaluate completeness "
+     + "and the SLA, take the guarded transition, invoke transformation, "
+     + "and recover a trigger that never started." },
+  { id: "xfdag", n: "Transformation DAG", tech: "Airflow 3.0 \u00b7 dbt",
+    sei: ["S13", "S20"], reg: ["19", "21"],
+    w: "Re-checks before it starts, builds the layers in order with a test "
+     + "task between each, and advances the date only on full success." },
+  { id: "datectl", n: "Business-date state machine", tech: "Oracle",
+    sei: [], reg: ["20"],
+    w: "DATE_CONTROL: one row per business date, PENDING to TRIGGER to "
+     + "COMPLETE, at most one date open at a time." },
+ ],
+ processing: [
+  { id: "dbt", n: "dbt models", tech: "dbt \u00b7 Oracle",
+    sei: ["S14", "S15", "S16", "S17"], reg: ["15", "16", "14", "17"],
+    w: "The stage chain itself \u2014 the view, the persisted middle and the "
+     + "two Gold layers, all as version-controlled SQL." },
+  { id: "dq", n: "Data quality and reconciliation", tech: "dbt \u00b7 Splunk",
+    sei: ["S18", "S19"], reg: ["25", "26", "27", "28"],
+    w: "The row-level pass or fail, the store that holds what failed, the "
+     + "replay that clears it, and the counts across four boundaries." },
+  { id: "warehouse", n: "Warehouse and consumers", tech: "BBH",
+    sei: [], bbh: ["B1", "B2"], reg: ["37", "38", "39", "40", "41", "43"],
+    w: "Stage 3 and what reads it. SEI's documents end at DIM and FACT, so "
+     + "nothing in this lane is cited." },
+ ],
+ foundation: [
+  { id: "control", n: "Control and metadata", tech: "Oracle",
+    sei: [], reg: ["33"],
+    w: "The small tables the run depends on: what is expected, what "
+     + "arrived, and which date is open." },
+  { id: "evidence", n: "Evidence and observability", tech: "Splunk \u00b7 360",
+    sei: ["S21"], reg: ["34", "35", "30"],
+    w: "Where the run proves what it did. SEI gives every dashboard and "
+     + "alert to Splunk; 360 reads the same tables directly." },
+  { id: "errors", n: "Errors, audit and lineage", tech: "Python \u00b7 dbt",
+    sei: [], reg: ["29", "31"],
+    w: "What happens to a bad record, and how a number is traced back to "
+     + "the file it came from." },
+  { id: "sec", n: "Security and access", tech: "OpenShift \u00b7 Oracle",
+    sei: [], reg: ["32", "36"],
+    w: "Credentials in secrets, and a loader account that can change rows "
+     + "in Gold but cannot create, alter or drop anything." },
+ ],
+ openshift: [
+  { id: "platform", n: "Platform", tech: "OpenShift", sei: [], reg: [],
+    w: "Namespaces, images, registry, RBAC, secrets, network policy and "
+     + "storage." },
+  { id: "runtime", n: "Runtime", tech: "OpenShift", sei: [], reg: [],
+    w: "The Airflow deployment, worker pods, quotas, and the Oracle "
+     + "connection envelope the pool size is sized against." },
+  { id: "deployment", n: "Deployment", tech: "CI/CD", sei: [], reg: [],
+    w: "Git-versioned models and DAGs, compiled and tested before "
+     + "promotion; rollback is redeploying the prior image." },
+  { id: "operations", n: "Operations", tech: "OpenShift", sei: [], reg: [],
+    w: "Availability, recovery, monitoring and cost \u2014 none of it in "
+     + "either SEI document." },
+ ],
+};
+
+// OpenShift's lanes are exactly the tracker's own planes, so they are
+// derived rather than listed.
+const OCP_PLANE = { Platform: "platform", Runtime: "runtime",
+ Deployment: "deployment", Operations: "operations" };
+
+export const laneOfTracker = (c, gid) => {
+ if (!c) return null;
+ if (gid === "openshift") return OCP_PLANE[c.plane] || "platform";
+ const ls = LANES[gid] || [];
+ const hit = ls.find((l) => (l.reg || []).includes(String(c.id)));
+ return hit ? hit.id : (ls.length ? ls[ls.length - 1].id : null);
+};
+export const lanesOf = (gid) => LANES[gid] || [];
+export const laneById = (gid, lid) =>
+ (LANES[gid] || []).find((l) => l.id === lid) || null;
