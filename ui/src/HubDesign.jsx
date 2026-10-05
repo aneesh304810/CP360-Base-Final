@@ -11,6 +11,8 @@ import { FM_SUMMARY, FM_AREAS, FM_STATE, FM_PROVIDED, FM_TABLES, FM_REC }
  from "./hubFoundationModel.js";
 import SourceReference, { citationsFor } from "./SourceReference.jsx";
 import SeiDocModal from "./SeiDocModal.jsx";
+import { TDD_ALIGN, TDD_VERDICTS, TDD_MISSING, TDD_SELF_CONFLICT, TDD_DOC,
+ tddFor, tddCount } from "./hubTddAlignment.js";
 
 // =====================================================================
 // HubDesign — the CP Integration Hub route: C4 landing (L1 context +
@@ -305,6 +307,48 @@ export default function HubDesign({ t }) {
          </div>)}
        </div>);
     })()}
+    {(() => {
+      const tds = rows.map(tddFor).filter(Boolean);
+      const miss = TDD_MISSING[cont] || [];
+      if (!tds.length && !miss.length) return null;
+      const order = ["conflict", "split", "absent", "elsewhere", "same"];
+      return (
+       <div style={{ background: "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+        borderRadius: 8, padding: "12px 16px", marginBottom: 10 }}>
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap",
+         alignItems: "center", fontSize: 10.5, color: t.sub || "#666" }}>
+         <b style={{ fontSize: 11, color: "#0f4775" }}>Against the dbt TDD</b>
+         {order.filter((v) => tddCount(rows, v)).map((v) => (
+          <span key={v} style={{ display: "inline-flex", alignItems: "center",
+           gap: 5 }}>
+           <span style={{ width: 8, height: 8, borderRadius: 2,
+            background: TDD_VERDICTS[v][0] }} />
+           <b style={{ color: TDD_VERDICTS[v][0] }}>{tddCount(rows, v)}</b>
+           {TDD_VERDICTS[v][1]}</span>))}
+         <span style={{ marginLeft: "auto", fontSize: 9.5 }}>
+          the tracker names stay; the TDD's sit beside them</span>
+        </div>
+        {miss.map((m) => (
+         <div key={m.name} style={{ marginTop: 11, background: "#fdf1f2",
+          borderRadius: 6, borderLeft: "3px solid #cc3344", padding: "10px 12px" }}>
+          <div style={{ fontSize: 8.5, fontWeight: 800, color: "#cc3344",
+           letterSpacing: .4 }}>IN THE TDD, NO COMPONENT HERE · {m.ev}</div>
+          <div style={{ fontSize: 11, color: "#33414d", lineHeight: 1.6,
+           marginTop: 3 }}><b>{m.name}</b> — {m.why}</div>
+         </div>))}
+        {cont === "PROC" && (
+         <div style={{ marginTop: 11, background: "#fdf7ea", borderRadius: 6,
+          borderLeft: "3px solid #a8560f", padding: "10px 12px" }}>
+          <div style={{ fontSize: 8.5, fontWeight: 800, color: "#a8560f",
+           letterSpacing: .4 }}>AND THE TDD DISAGREES WITH ITSELF · {TDD_SELF_CONFLICT.ev}</div>
+          <div style={{ fontSize: 11, color: "#33414d", lineHeight: 1.6,
+           marginTop: 3 }}><b>{TDD_SELF_CONFLICT.title}</b></div>
+          {TDD_SELF_CONFLICT.body.split("\n\n").map((p, i) => (
+           <div key={i} style={{ fontSize: 11, color: "#33414d", lineHeight: 1.6,
+            marginTop: 6 }}>{p}</div>))}
+         </div>)}
+       </div>);
+    })()}
     <div style={{ border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderRadius: 8,
      overflow: "hidden", background: "#fff" }}>
      {rows.map((c) => {
@@ -314,6 +358,7 @@ export default function HubDesign({ t }) {
       const f = FIND[c.id];
       const cv = covOf(c);
       const nCite = citationsFor(c).length;
+      const td = tddFor(c);
       const hasPanel = c.isNew || !!f || !!cv;
       const vc = c.isNew ? "#cc3344" : f ? (AR_VERDICTS[f.verdict] || ["#5c7c94"])[0] : null;
       const vt = c.isNew ? "NEW · MISSING" : f ? f.verdict.toUpperCase() : null;
@@ -343,6 +388,8 @@ export default function HubDesign({ t }) {
          <span>{chip((STCOL[sx.status] || "#eef1f4") + "22",
           STCOL[sx.status] || "#8a97a3", `${sx.status.toUpperCase()} · ${sx.pct}%`)}</span>
          <span style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+          {td && chip(TDD_VERDICTS[td.v][0] + "1f", TDD_VERDICTS[td.v][0],
+           `TDD \u00b7 ${TDD_VERDICTS[td.v][1].toUpperCase()}`)}
           {nCite > 0 && (
            <span onClick={(e) => { e.stopPropagation(); setSrcOf(c.id); }}
             title={`${nCite} SEI citation${nCite === 1 ? "" : "s"} — read side by side`}
@@ -380,6 +427,23 @@ export default function HubDesign({ t }) {
            {cv.ask && <Fld k={cv.owner === "SEI" ? "ask SEI" : "ask — both sides"}
             v={cv.ask} tone={AR_OWNER[cv.owner][0]} />}
            <Fld k="recommendation" v={cv.rec} tone="#0b5e83" />
+          </>}
+          {td && <>
+           <div style={{ marginTop: 13, paddingTop: 11,
+            borderTop: "1px solid #eef1f4" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8,
+             flexWrap: "wrap" }}>
+             {chip(TDD_VERDICTS[td.v][0] + "1f", TDD_VERDICTS[td.v][0],
+              TDD_VERDICTS[td.v][1].toUpperCase())}
+             <b style={{ fontSize: 11, color: "#0f4775" }}>{td.name}</b>
+             <span style={{ fontSize: 9.5, color: t.sub || "#666" }}>
+              {TDD_DOC} · {td.ev}</span>
+            </div>
+           </div>
+           <Fld k="against the dbt TDD"
+            v={td.note.split("\n\n").map((p, i) => (
+             <div key={i} style={{ marginTop: i ? 7 : 0 }}>{p}</div>))}
+            tone={TDD_VERDICTS[td.v][0]} />
           </>}
          </div>)}
        </div>);
@@ -494,6 +558,18 @@ export default function HubDesign({ t }) {
       <Rel x1={554} y1={304} x2={554} y2={346} label="" />
       <Rel x1={554} y1={370} x2={554} y2={412} label="" />
       <Rel x1={554} y1={436} x2={554} y2={478} label="" />
+      <text x="454" y="528" fontSize="8" fontStyle="italic" fill="#cc3344">
+       Against the dbt TDD: Stage 2 is TWO objects —</text>
+      <text x="454" y="540" fontSize="8" fontStyle="italic" fill="#cc3344">
+       STG (a view, stores nothing) + INT (7 days)</text>
+      <text x="454" y="558" fontSize="8" fontStyle="italic" fill="#cc3344">
+       No Exadata tier in the TDD: dbt MERGEs into</text>
+      <text x="454" y="570" fontSize="8" fontStyle="italic" fill="#cc3344">
+       the Oracle Gold tables that already exist,</text>
+      <text x="454" y="582" fontSize="8" fontStyle="italic" fill="#cc3344">
+       DML-only, no DDL, ODI history preserved</text>
+      <text x="454" y="600" fontSize="8" fontStyle="italic" fill="#a8560f">
+       DIM then FACT — two ordered layers, not one</text>
 
       {/* data quality */}
       <Grp x={688} y={180} w={232} h={470} k="DQ" />

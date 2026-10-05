@@ -31,6 +31,9 @@ import { SEED_ANSWERS, seedRows, materialise, seedId, CONF, SEI_GAP_NOTE }
   from "../src/hubAnswers.js";
 import { FIGS } from "../src/HubAnswerFigs.jsx";
 import { tLight, tDark } from "../src/bbhTheme.js";
+import { TDD_ALIGN, TDD_VERDICTS, TDD_MISSING, TDD_SELF_CONFLICT, TDD_DOC }
+  from "../src/hubTddAlignment.js";
+import { TRACKER_COMPONENTS } from "../src/seiDesignTracker.js";
 
 let bad = 0;
 const ok = (cond, msg, got) => {
@@ -810,16 +813,139 @@ ok(base !== "",
 ok(removed === 0,
    "HubDesign.jsx has NO removed lines since before the tab existed — the "
    + "brief was to add a tab, not to change the Hub", `+${added} -${removed}`);
-ok(added > 0 && added < 25,
-   "and only a handful of added ones: an import, a branch and a pill",
+// The cap used to be 25 and read "an import, a branch and a pill",
+// which was right while the only brief was to add a tab. It is not any
+// more: the C4 was asked to be reconciled against the dbt TDD, and that
+// is a change to the Hub by request. So the cap moved once, deliberately,
+// and the thing actually holding the line is `removed === 0` plus the
+// marker assertions below — a number that gets bumped every time is a
+// guard that has stopped saying anything.
+ok(added > 0 && added < 130,
+   "and the additions are still bounded: the Discussion tab's three edits "
+   + "plus the TDD alignment, and nothing else has crept into this file",
    `+${added}`);
 const HUB = strip("ui/src/HubDesign.jsx");
 ok(/import HubDiscussion from "\.\/HubDiscussion\.jsx"/.test(HUB)
    && /view === "DISC"/.test(HUB) && /setView\("DISC"\)/.test(HUB),
-   "the three edits are the import, the branch and the entry point", "");
+   "the tab's three edits are the import, the branch and the entry point", "");
+ok(/from "\.\/hubTddAlignment\.jsx?"/.test(HUB) && /tddFor\(c\)/.test(HUB),
+   "and the TDD alignment is read from its own module — the tracker is "
+   + "generated from the workbook and must not be edited to carry it", "");
 ok(/onOpenComponent=\{\(id\)/.test(HUB) && /setView\("L3"\)/.test(HUB),
    "and a linked component opens in L3 — the loop back to the architecture "
    + "is what makes this a design record rather than a message board", "");
+
+// ---- the C4 against the dbt TDD -------------------------------------
+//
+// This map makes claims about what a document says, which is the same
+// risk as a `document` answer in hubAnswers.js and gets the same rules:
+// cite the section or it is not checkable, and point at a component that
+// exists or it renders nowhere and nobody notices.
+//
+// The rule underneath all of it: seiDesignTracker.js says at the top of
+// itself that it is generated from the workbook. If a TDD name ever
+// gets written INTO the tracker, the screen starts disagreeing with the
+// thing delivery is tracked against, so that is asserted too.
+const TIDS = Object.keys(TDD_ALIGN);
+const TRK = new Map(TRACKER_COMPONENTS.map((c) => [c.id, c]));
+ok(TIDS.length > 20, "the alignment covers the Hub zone", TIDS.length);
+ok(TIDS.every((id) => TRK.has(id)),
+   "every alignment entry points at a component that exists in the tracker "
+   + "— one that does not renders nowhere and is never seen to be wrong",
+   TIDS.filter((id) => !TRK.has(id)).join(","));
+ok(TIDS.every((id) => TDD_VERDICTS[TDD_ALIGN[id].v]),
+   "and declares a verdict the screen can colour",
+   TIDS.filter((id) => !TDD_VERDICTS[TDD_ALIGN[id].v])
+     .map((id) => `${id}:${TDD_ALIGN[id].v}`).join(","));
+ok(TIDS.every((id) => /\u00a7|Appendix/.test(TDD_ALIGN[id].ev)),
+   "every entry cites a section or an appendix — a claim about a document "
+   + "with no place in it is the vendor's word against ours",
+   TIDS.filter((id) => !/\u00a7|Appendix/.test(TDD_ALIGN[id].ev)).join(","));
+ok(TIDS.every((id) => /p\.\s?\d/.test(TDD_ALIGN[id].ev)),
+   "and a page, so somebody can turn to it in the PDF",
+   TIDS.filter((id) => !/p\.\s?\d/.test(TDD_ALIGN[id].ev)).join(","));
+ok(TIDS.every((id) => (TDD_ALIGN[id].note || "").length > 80),
+   "and says what the difference IS — a verdict with no body is a colour",
+   TIDS.filter((id) => (TDD_ALIGN[id].note || "").length <= 80).join(","));
+// A verdict of "same" that carries no TDD name is pointless: the whole
+// value of a matching component is showing the name the code will use.
+ok(TIDS.every((id) => (TDD_ALIGN[id].name || "").length > 3),
+   "every entry names the TDD's counterpart, including the matches — the "
+   + "name in the document is the name that ends up in the code",
+   TIDS.filter((id) => !(TDD_ALIGN[id].name || "").length).join(","));
+const conf = TIDS.filter((id) => TDD_ALIGN[id].v === "conflict");
+ok(conf.length > 0 && conf.length < TIDS.length,
+   "some components conflict and some do not — an alignment where "
+   + "everything disagrees is not an alignment, it is an argument",
+   `${conf.length} of ${TIDS.length}`);
+ok(Object.values(TDD_MISSING).flat().every((m) => /\u00a7|Appendix/.test(m.ev)),
+   "and the things the TDD has that the C4 does not are cited the same way",
+   "");
+ok(/\u00a76\.1/.test(TDD_SELF_CONFLICT.ev) && /\u00a72/.test(TDD_SELF_CONFLICT.ev)
+   && /section 2/i.test(TDD_SELF_CONFLICT.body),
+   "the TDD's disagreement with ITSELF cites both sides of it — this is "
+   + "the one claim a reviewer will check first", TDD_SELF_CONFLICT.ev);
+ok(/dbt/i.test(TDD_DOC) && /TDD/.test(TDD_DOC),
+   "the document is named once, as a constant, so twenty entries cannot "
+   + "drift into twenty spellings of it", TDD_DOC);
+
+// The tracker is GENERATED. Carrying the TDD's vocabulary into it would
+// silently fork it from the workbook it is regenerated from.
+const TRKRAW = fs.readFileSync(path.join(ROOT, "ui/src/seiDesignTracker.js"), "utf8");
+const TRKSRC = strip("ui/src/seiDesignTracker.js");
+ok(/generated from/i.test(TRKRAW),
+   "the tracker still declares itself generated from the workbook — that "
+   + "line is the reason the alignment is a separate file", "");
+ok(!/SWP_RAW|DATE_CONTROL|DQ_VALIDATION_FAILURE|\bINT_|STG_/.test(TRKSRC),
+   "and carries none of the TDD's table names — the alignment lives in "
+   + "its own module precisely so the workbook stays the workbook",
+   (TRKSRC.match(/SWP_RAW|DATE_CONTROL|DQ_VALIDATION_FAILURE|\bINT_|STG_/g)
+     || []).join(","));
+
+// The two divergences that are visible on the L2 drawing itself, which
+// is the half of this a reviewer actually looks at.
+ok(/Stage 2 is TWO objects/.test(HUB) && /No Exadata tier in the TDD/.test(HUB),
+   "the L2 processing band says on the drawing that Stage 2 is two objects "
+   + "and that there is no Exadata tier — a divergence only visible after "
+   + "clicking into a panel is a divergence nobody reads", "");
+// SVG text that leaves its box still renders; it is just drawn over the
+// neighbouring group. The figure suite caught that once by overlap maths
+// and this is the same check by hand, because these six captions were
+// placed by arithmetic rather than by looking.
+//   PROC group: <Grp x={444} y={180} w={226} h={470} />  ->  444..670, 180..650
+//   last Mini in it: y={478}, height 24               ->  bottom 502
+const CAPS = [...HUB.matchAll(
+  /<text x="(\d+)" y="(\d+)" fontSize="8" fontStyle="italic" fill="#(?:cc3344|a8560f)">\s*\n?\s*([^<]*(?:TDD|Exadata|Oracle Gold|DML-only|DIM then FACT|STG \()[^<]*)</g)]
+  .map((m) => ({ x: +m[1], y: +m[2], txt: m[3].trim() }))
+  .filter((c) => c.x === 454);
+ok(CAPS.length === 6, "six TDD captions on the processing band", CAPS.length);
+ok(CAPS.every((c) => c.y > 502 && c.y < 650),
+   "every one sits below the last component box and inside the processing "
+   + "group — a caption at the wrong y is drawn over data quality and still "
+   + "looks fine in the source",
+   CAPS.filter((c) => !(c.y > 502 && c.y < 650)).map((c) => c.y).join(","));
+// 226px of group, 10px of inset: ~48 characters at fontSize 8.
+//
+// This guard earned its place twice over. It first failed on a caption
+// that was 50 characters, and the "fix" was to stop counting the six
+// characters of a \uXXXX escape — which was the wrong fix, because a
+// \uXXXX sequence inside JSX TEXT is not an escape at all. It renders
+// literally, as a backslash and five characters. So the caption was
+// over-long AND wrong, and the second failure is the one that found it.
+// The em dashes below are real characters now, and this counts them.
+ok(CAPS.every((c) => c.txt.length <= 48),
+   "and is short enough not to run out of the group's right edge",
+   CAPS.filter((c) => c.txt.length > 48)
+     .map((c) => `${c.txt.length}: ${c.txt}`).join(" | "));
+ok(!/<text[^>]*>[^<]*\\u[0-9a-fA-F]{4}/.test(HUB)
+   && !/}}>[^<{]*\\u[0-9a-fA-F]{4}/.test(HUB),
+   "and no JSX TEXT node carries a \\uXXXX sequence — inside a string it "
+   + "is an escape, between tags it is six literal characters on the "
+   + "screen, and the two look identical in a diff", "");
+const ys = CAPS.map((c) => c.y);
+ok(ys.every((y, i) => i === 0 || y - ys[i - 1] >= 12),
+   "and no two captions are drawn on top of each other",
+   ys.join(","));
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\nhub-discussion assertions pass");
 if (bad) process.exit(1);
