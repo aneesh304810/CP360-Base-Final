@@ -14,135 +14,45 @@ origin: events-primary architect review
 sei_coverage: absent
 gap_owner: Joint
 in_scope: true
+withdrawn: true
 ---
 
 # Sequence Gap Detector
 
-## 1. Purpose & Scope
+## Withdrawn
 
-**Monotonic sequence numbers per partition; a gap is a provably lost event**
+**This design document has been withdrawn. Do not build from it.**
 
-Absent from the pack and from the 65, despite costing almost nothing.
+It was written before SEI's two design documents were the base for this
+architecture. Reading back through it, the content is wrong often
+enough that correcting it line by line is not worth doing, so it is
+being rewritten from the drawing rather than patched.
 
-This component does not exist in the SEI design pack and has no entry in the original 65-component tracker. It is required by one substituted assumption: **SDC events are the primary ingestion path**, with everything from Stage 1 onward exactly as the pack specifies it.
+What was wrong was not one fact. The layer model was the old one, it
+described a Pre-Gold Exadata tier that is in neither SEI document, it
+treated components as settled that SEI has not specified at all, and it
+read as though every statement in it had a source. None of that is
+repairable by editing.
 
-**Custom build: Medium.** Configuration and glue over an existing capability. The risk is not writing it; it is that the configuration lives in code rather than in the metadata store, where it cannot be changed without a release.
+## Where the current answer is
 
-**Where it sits.** Hub · event ingestion. The chain between SEI publishing and Stage 1 holding rows. None of it exists in any document, all of it is BBH-owned, and it is the path that carries the daily load. Build it as one deployable unit with one owner, not as six components discovered separately.
+- **The architecture is the drawing.** The Hub's C4 goes containers,
+  then the lane a component sits in, then the component itself.
+- **For a component SEI specifies**, its record carries what SEI says,
+  the section and the page it says it on, the Oracle objects it
+  touches, and what is still open with SEI against it.
+- **For everything else**, the component registry carries a verdict —
+  specified, differs, or absent — and the reason for it.
 
-## 2. Context & Dependencies
+## What replaces this page
 
-- **No recorded dependency either way.** Either it is genuinely standalone, or the tracker's depends_on column was never filled for it — worth confirming, because an unrecorded dependency is the one that surfaces during integration testing.
-- Technology: Python · SQL
-- Custom build: Medium — High means a design document is mandatory before code.
-- Source of record: Architect review — events-primary
-- **Before the gate.** Its output is counted by the completeness gate, so a silent failure here makes the business date close on incomplete data.
+Nothing yet, and that is deliberate. The drawing comes first; these
+documents are rewritten from it afterwards, against SEI's text, with a
+citation on every claim. Until then the record in the Hub is the
+design, and this page exists only so that a link does not lead
+nowhere.
 
-## 3. Design Decisions
+## Recovering the old text
 
-No prior design decisions exist — this component has never been specified.
-
-**Direction.** If yes, this is the strongest completeness proof in the estate and it costs almost nothing. Build it first.
-
-## 4. Detailed Design
-
-**Deliverable.** Monotonic sequence numbers per partition; a gap is a provably lost event
-
-**Technology.** Python · SQL
-
-### Implementation — Hub · event ingestion
-
-The chain between SEI publishing and Stage 1 holding rows. None of it exists in any document, all of it is BBH-owned, and it is the path that carries the daily load. Build it as one deployable unit with one owner, not as six components discovered separately.
-
-| Concern | How to build it |
-| --- | --- |
-| **Process shape** | A long-running consumer, not a scheduled job. Ordering position lives in the consumer's offset, and a process that exits and restarts 288 times a day re-establishes that position 288 times. |
-| **Commit discipline** | Durable write, then offset commit. One commit per micro-batch, array insert rather than row-by-row. This is the first wall every event pipeline hits and it arrives early. |
-| **Back-pressure** | When the puller falls behind, staging keeps accepting and the pull queue grows. Bound the queue and shed to the next cycle rather than letting one slow view stall the box behind it. |
-| **Idempotency** | Two layers, because they catch different things. Offset uniqueness stops a consumer replay; collapsing to a distinct key set per view per micro-batch stops a producer retry, which arrives at a different offset with identical content. |
-| **Observability from day one** | enqueued_ts and sequence_number captured at receipt, or lag and gap detection are not computable at all — not harder, not computable. This is the single decision that cannot be retrofitted. |
-
-## 5. Data Quality, Reconciliation & Lineage
-
-Twelve reconciliation boundaries are required, against the three the pack specifies:
-
-| Group | Boundaries |
-| --- | --- |
-| Event | `EVENTS_TO_KEYS` · `KEYS_TO_PULLED` · `PULLED_TO_STAGE1` · `STAGE1_TO_MICROBATCH` |
-| Pipeline | `STG_TO_INT` · `INT_TO_DIM` · `INT_TO_FACT` |
-| Outbound | `GENERATED_TO_VALIDATED` · `VALIDATED_TO_SUBMITTED` · `SUBMITTED_TO_ACKED` · `ACKED_TO_ACCEPTED` · `ACCEPTED_TO_REJECTED` |
-
-## 6. Performance & Scale
-
-One ordered scan per partition per micro-batch. Cheap.
-
-## 7. Error Handling, Failure & Replay
-
-This is the strongest completeness proof in the whole estate and it currently has no owner. The file channel has nothing comparable.
-
-## 8. Security & Access Control
-
-Estate defaults apply: a dedicated read-only account for any consumer, business keys masked on read rather than at rest, and secrets from the platform secret store.
-
-### Estate conventions this component inherits
-
-- **Configuration, not code.** Thresholds, mappings, calendars and status vocabularies live in tables and are read at run time. An unknown value raises; it is never mapped to its nearest neighbour or defaulted silently.
-- **Reproducible verdicts.** Anything derived stores the input it was derived from — the threshold in force, the ruleset version, the counts. A verdict that cannot be reproduced three months later cannot be defended.
-- **Bound everything that fans out.** Pods per micro-batch, connections per pod, retries per work item, calls per poll window. Every unbounded fan-out in this design eventually lands on the same Oracle.
-- **Write then acknowledge.** Durable write first, then commit the offset or return the 202. The reverse order loses data silently in both the event path and the callback path.
-- **Absence is a state.** NOT_RUN, STATUS_UNRESOLVED and 'no partition count known' are values to record, not gaps to infer. Most of the silent failure modes in this estate come from treating an empty result as a healthy one.
-
-## 9. SEI Source Coverage
-
-**SEI pack coverage: absent** — nothing in the SEI pack.
-**Who answers for the gap: Joint** — needs both sides.
-
-| Document | Section | Kind | What it says |
-| --- | --- | --- | --- |
-| BBH File Ingestion Framework Design Document v2.0 | whole document | nothing in the pack covers it | Event Hub sequence numbers are monotonic per partition, so a gap is a provably lost event — the strongest completeness proof available, and no document mentions it. |
-
-## 10. Gaps, Risks & What Is Missing
-
-### What is missing
-
-This component does not exist. Absent from the pack and from the 65, despite costing almost nothing.
-
-**Priority P1, custom build Medium.**
-
-### Risk
-
-No ranked bottleneck or unowned error path touches this component.
-
-### Not specified — and what to do until it is
-
-**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.
-
-  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.
-
-**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.
-
-  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.
-
-### Gap against the SEI pack
-
-- Event Hub sequence numbers are monotonic per partition, so a gap is a provably lost event — the strongest completeness proof available, and no document mentions it. *(nearest counterpart: BBH File Ingestion Framework Design Document, no section — the whole document)*
-
-## 11. Recommendation
-
-If yes, this is the strongest completeness proof in the estate and it costs almost nothing. Build it first.
-
-**Hub · event ingestion.** Build the staging store and the micro-batch registry first, before the listener. They are the two artefacts that make everything after them observable, and a listener shipped without them produces a pipeline nobody can debug.
-
-## 12. Open Questions & Acceptance Criteria
-
-### Open questions
-
-- **For both sides.** Are Event Hub sequence numbers monotonic per partition and gap-free under normal operation?
-- **Partition count per domain topic** — unanswered. Until it is: Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.
-- **Whether the pull can retrieve state as of the event** — unanswered. Until it is: Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.
-
-### Acceptance criteria
-
-- The deliverable above exists and is reviewed.
-- The open question above has a written answer from the named owner.
-- The component appears in the tracker with a status other than Not Started.
+It is in git. `git log --follow` on this file reaches the last version
+before withdrawal if any of it is wanted as a starting point.

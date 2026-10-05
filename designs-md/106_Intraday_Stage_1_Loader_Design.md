@@ -14,158 +14,45 @@ origin: events-primary architect review
 sei_coverage: absent
 gap_owner: BBH
 in_scope: true
+withdrawn: true
 ---
 
 # Intraday Stage-1 Loader
 
-## 1. Purpose & Scope
+## Withdrawn
 
-**Continuous micro-batch load into Stage 1 with one commit per micro-batch**
+**This design document has been withdrawn. Do not build from it.**
 
-Component 13 is a file ingestion framework. The event path loads continuously, not once a day.
+It was written before SEI's two design documents were the base for this
+architecture. Reading back through it, the content is wrong often
+enough that correcting it line by line is not worth doing, so it is
+being rewritten from the drawing rather than patched.
 
-This component does not exist in the SEI design pack and has no entry in the original 65-component tracker. It is required by one substituted assumption: **SDC events are the primary ingestion path**, with everything from Stage 1 onward exactly as the pack specifies it.
+What was wrong was not one fact. The layer model was the old one, it
+described a Pre-Gold Exadata tier that is in neither SEI document, it
+treated components as settled that SEI has not specified at all, and it
+read as though every statement in it had a source. None of that is
+repairable by editing.
 
-**Custom build: Medium.** Configuration and glue over an existing capability. The risk is not writing it; it is that the configuration lives in code rather than in the metadata store, where it cannot be changed without a release.
+## Where the current answer is
 
-**Where it sits.** Hub · event ingestion. The chain between SEI publishing and Stage 1 holding rows. None of it exists in any document, all of it is BBH-owned, and it is the path that carries the daily load. Build it as one deployable unit with one owner, not as six components discovered separately.
+- **The architecture is the drawing.** The Hub's C4 goes containers,
+  then the lane a component sits in, then the component itself.
+- **For a component SEI specifies**, its record carries what SEI says,
+  the section and the page it says it on, the Oracle objects it
+  touches, and what is still open with SEI against it.
+- **For everything else**, the component registry carries a verdict —
+  specified, differs, or absent — and the reason for it.
 
-## 2. Context & Dependencies
+## What replaces this page
 
-- **No recorded dependency either way.** Either it is genuinely standalone, or the tracker's depends_on column was never filled for it — worth confirming, because an unrecorded dependency is the one that surfaces during integration testing.
-- Technology: Python · Oracle array insert
-- Custom build: Medium — High means a design document is mandatory before code.
-- Source of record: Architect review — events-primary
-- **Before the gate.** Its output is counted by the completeness gate, so a silent failure here makes the business date close on incomplete data.
+Nothing yet, and that is deliberate. The drawing comes first; these
+documents are rewritten from it afterwards, against SEI's text, with a
+citation on every claim. Until then the record in the Hub is the
+design, and this page exists only so that a link does not lead
+nowhere.
 
-## 3. Design Decisions
+## Recovering the old text
 
-No prior design decisions exist — this component has never been specified.
-
-**Direction.** BBH-owned. Array insert, one commit per micro-batch.
-
-## 4. Detailed Design
-
-**Deliverable.** Continuous micro-batch load into Stage 1 with one commit per micro-batch
-
-**Technology.** Python · Oracle array insert
-
-### Implementation — Hub · event ingestion
-
-The chain between SEI publishing and Stage 1 holding rows. None of it exists in any document, all of it is BBH-owned, and it is the path that carries the daily load. Build it as one deployable unit with one owner, not as six components discovered separately.
-
-| Concern | How to build it |
-| --- | --- |
-| **Process shape** | A long-running consumer, not a scheduled job. Ordering position lives in the consumer's offset, and a process that exits and restarts 288 times a day re-establishes that position 288 times. |
-| **Commit discipline** | Durable write, then offset commit. One commit per micro-batch, array insert rather than row-by-row. This is the first wall every event pipeline hits and it arrives early. |
-| **Back-pressure** | When the puller falls behind, staging keeps accepting and the pull queue grows. Bound the queue and shed to the next cycle rather than letting one slow view stall the box behind it. |
-| **Idempotency** | Two layers, because they catch different things. Offset uniqueness stops a consumer replay; collapsing to a distinct key set per view per micro-batch stops a producer retry, which arrives at a different offset with identical content. |
-| **Observability from day one** | enqueued_ts and sequence_number captured at receipt, or lag and gap detection are not computable at all — not harder, not computable. This is the single decision that cannot be retrofitted. |
-
-## 5. Data Quality, Reconciliation & Lineage
-
-No DQ or reconciliation obligation specific to this component. Two estate rules bind it: anything derived stores the input it was derived from — the threshold in force, the ruleset version, the counts — so a verdict can be reproduced months later; and an unknown value raises rather than being mapped to its nearest neighbour.
-
-## 6. Performance & Scale
-
-Array insert with a tuned batch size, one commit per micro-batch. Row-by-row insert and per-row commit is the classic first wall and it arrives early.
-### B2 · STG is a view, and events make it run 288 times a day (critical)
-
-The dbt design document defines STG as a view, recomputed on read. Under a daily file cycle it is recomputed once. Under intraday events, INT is built incrementally all day, so the STG view is recomputed on every incremental run — and each recomputation scans Stage 1. This is the single largest cost the event substitution introduces, and it comes from a design decision that was entirely reasonable when it was made.
-
-**What to do.** Either materialise STG per micro-batch, or ensure the INT incremental predicate pushes down to Stage 1's partition so the view scans one micro-batch rather than the whole accumulated day. Verify the push-down on the actual plan; do not assume it.
-### B4 · Event staging insert rate (high)
-
-A Python consumer writing envelope rows one at a time is the first wall every event pipeline hits. The unique index on (topic, partition, offset) sits directly on the hot insert path, so the guard that gives idempotency is also the thing that slows the write.
-
-**What to do.** Array insert with a tuned batch size and one commit per micro-batch. Range-partition the staging table by business date with local indexes so index maintenance stays inside the current partition.
-### B6 · INT's incremental MERGE into a growing current-day partition (high)
-
-INT is partitioned by BUSINESS_DATE with a 7-day window. Under intraday events the current day's partition is written to continuously, and an incremental MERGE against a partition that grows all day degrades as the day goes on. The 6pm micro-batch is materially slower than the 6am one.
-
-**What to do.** Subpartition by micro-batch, or load append-only with a late dedupe at the gate. Measure the degradation curve before choosing; it may be acceptable at real volumes, but nobody knows the real volumes.
-### B10 · Pull latency is inside the micro-batch's critical path (medium)
-
-The box is not complete until every view has been pulled and loaded. A single slow view holds the whole micro-batch, and the next micro-batch is already arriving. Queueing under a fixed cadence is how a small latency regression becomes an unbounded backlog.
-
-**What to do.** Bound the pull with a timeout and an explicit partial disposition, and monitor the ratio of micro-batch duration to cadence interval. Above roughly 0.7 the system has no recovery headroom left.
-
-## 7. Error Handling, Failure & Replay
-
-A failed micro-batch rolls back whole. A partially loaded micro-batch marked LOADED is the defect that makes the EOD gate lie.
-### E6 · Partial micro-batch failure across views (high)
-
-If three of five views pull successfully and the fourth times out, is the micro-batch FAILED and rolled back whole, or PARTIAL and advanced? Component 22 sets a partial-batch policy for files and says nothing about views inside a box.
-
-**Who owns it today.** Unowned. The safe default is roll back whole; the useful default is not, and somebody has to choose.
-
-## 8. Security & Access Control
-
-Estate defaults apply: a dedicated read-only account for any consumer, business keys masked on read rather than at rest, and secrets from the platform secret store.
-
-### Estate conventions this component inherits
-
-- **Configuration, not code.** Thresholds, mappings, calendars and status vocabularies live in tables and are read at run time. An unknown value raises; it is never mapped to its nearest neighbour or defaulted silently.
-- **Reproducible verdicts.** Anything derived stores the input it was derived from — the threshold in force, the ruleset version, the counts. A verdict that cannot be reproduced three months later cannot be defended.
-- **Bound everything that fans out.** Pods per micro-batch, connections per pod, retries per work item, calls per poll window. Every unbounded fan-out in this design eventually lands on the same Oracle.
-- **Write then acknowledge.** Durable write first, then commit the offset or return the 202. The reverse order loses data silently in both the event path and the callback path.
-- **Absence is a state.** NOT_RUN, STATUS_UNRESOLVED and 'no partition count known' are values to record, not gaps to infer. Most of the silent failure modes in this estate come from treating an empty result as a healthy one.
-
-## 9. SEI Source Coverage
-
-**SEI pack coverage: absent** — nothing in the SEI pack.
-**Who answers for the gap: BBH** — BBH-owned — do not ask SEI.
-
-| Document | Section | Kind | What it says |
-| --- | --- | --- | --- |
-| BBH File Ingestion Framework Design Document v2.0 | §C.1 | nothing in the pack covers it | The file loader runs once per file per day. A continuous micro-batch loader with one commit per box has no counterpart. |
-
-## 10. Gaps, Risks & What Is Missing
-
-### What is missing
-
-This component does not exist. Component 13 is a file ingestion framework. The event path loads continuously, not once a day.
-
-**Priority P1, custom build Medium.**
-
-### Risk
-
-- **CRITICAL · performance (B2).** STG is a view, and events make it run 288 times a day.
-- **HIGH · performance (B4).** Event staging insert rate.
-- **HIGH · performance (B6).** INT's incremental MERGE into a growing current-day partition.
-- **MEDIUM · performance (B10).** Pull latency is inside the micro-batch's critical path.
-- **HIGH · error path (E6).** Partial micro-batch failure across views.
-
-### Not specified — and what to do until it is
-
-**Partition count per domain topic.** It is the denominator for 'every partition reported MB End' and the ceiling on consumer parallelism. Without it, completeness on the event channel is unprovable and throughput is unknown.
-
-  *Recommended default:* Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.
-
-**Whether the pull can retrieve state as of the event.** If it can only read current state, replaying a micro-batch returns today's values and the file model's replay guarantees do not carry over. Every recovery procedure depends on this answer.
-
-  *Recommended default:* Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.
-
-### Gap against the SEI pack
-
-- The file loader runs once per file per day. A continuous micro-batch loader with one commit per box has no counterpart. *(nearest counterpart: BBH File Ingestion Framework Design Document, §C.1)*
-
-## 11. Recommendation
-
-BBH-owned. Array insert, one commit per micro-batch.
-
-**Hub · event ingestion.** Build the staging store and the micro-batch registry first, before the listener. They are the two artefacts that make everything after them observable, and a listener shipped without them produces a pipeline nobody can debug.
-
-## 12. Open Questions & Acceptance Criteria
-
-### Open questions
-
-- **Partition count per domain topic** — unanswered. Until it is: Ask SEI. Until answered, record partitions_expected as null and never render a completeness verdict from a null denominator — show UNKNOWN rather than GOOD.
-- **Whether the pull can retrieve state as of the event** — unanswered. Until it is: Ask before designing recovery. If as-of retrieval does not exist, store the pulled payload — it is the only other way to make a restatement reproduce the original load.
-
-### Acceptance criteria
-
-- The deliverable above exists and is reviewed.
-- Each unowned error path above has a named owner and a disposition in `ERROR_CATALOG`.
-- The bottleneck above has a measured figure at production volume, not an estimate.
-- The component appears in the tracker with a status other than Not Started.
+It is in git. `git log --follow` on this file reaches the last version
+before withdrawal if any of it is wanted as a starting point.

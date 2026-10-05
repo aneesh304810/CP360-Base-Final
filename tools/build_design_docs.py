@@ -105,7 +105,9 @@ def adapt_component_doc(front, path):
                f"custom {front.get('custom_build','')} · status {front.get('status','')}",
         "match": "", "zone_default": "", "default": False,
         "component_ids": [cid],
-        "chip": f"#{cid} design",
+        "withdrawn": front.get('withdrawn', False) is True,
+        "chip": f"#{cid} withdrawn" if front.get('withdrawn') is True
+                else f"#{cid} design",
         "meta": {
             "status": front.get('status',''), "owner": front.get('owner',''),
             "priority": front.get('priority',''), "custom": front.get('custom_build',''),
@@ -130,6 +132,7 @@ for path in sorted(glob.glob('designs-md/*.md')):
             "match": front.get("match", ""), "zone_default": front.get("zone_default", ""),
             "default": front.get("default", False) is True,
             "component_ids": [x.strip() for x in str(front.get("component_ids", "")).split(",") if x.strip()],
+            "withdrawn": front.get("withdrawn", False) is True,
             "chip": "", "meta": {},
             "src": os.path.basename(path),
         }

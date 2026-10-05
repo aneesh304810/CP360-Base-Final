@@ -84,6 +84,22 @@ export default function DocDrill({ t, docKey, from, onBack }) {
        source: designs-md/{d.src}</span>
      </span>
     </div>
+    {d.withdrawn && (
+     <div style={{ background: "#fdf1f2", border: "1px solid #e0a9b0",
+      borderLeft: "4px solid #cc3344", borderRadius: 8, padding: "14px 18px",
+      marginBottom: 12 }}>
+      <div style={{ fontSize: 8.5, fontWeight: 800, color: "#cc3344",
+       letterSpacing: .4 }}>WITHDRAWN — DO NOT BUILD FROM THIS</div>
+      <div style={{ fontSize: 12, color: "#33414d", lineHeight: 1.65,
+       marginTop: 6, maxWidth: 940 }}>
+       Written before SEI's two design documents were the base for this
+       architecture. It is being rewritten from the drawing rather than
+       patched, because what was wrong was the layer model and the
+       sourcing, not a handful of facts. The current record for this
+       component is in the Hub: containers, then its lane, then the
+       component.
+      </div>
+     </div>)}
     {/* What the component the reader clicked actually IS. The design
         documents are per-PLANE and per-LAYER, so arriving from a
         component used to drop you into a document that never names it.

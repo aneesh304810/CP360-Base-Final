@@ -34,6 +34,7 @@ import { tLight, tDark } from "../src/bbhTheme.js";
 import { DBTDOC_ALIGN, DBTDOC_VERDICTS, DBTDOC_MISSING, DBTDOC_SELF_CONFLICT, DBTDOC_NAME,
   DBTDOC_SOURCE } from "../src/hubDbtDocAlignment.js";
 import DocDrill, { docFor } from "../src/DocDrill.jsx";
+import { DESIGN_DOCS } from "../src/designDocsData.js";
 import { SEI_DOCS, SEI_BOUNDARY, SEI_STAGES, SEI_COMPONENTS, SEI_TABLES,
   SEI_STATES, SEI_OPEN, SEI_ASSUMPTIONS, SEI_NOT_BUILT }
   from "../src/seiBaseline.js";
@@ -1114,6 +1115,46 @@ ok(/\["containers", \(\) => setView\("L2"\)\]/.test(HUB),
 // The SEI pipeline drawing is not lost, just moved below this level.
 ok(/view === "SEIFLOW"/.test(HUB) && /setView\("SEIFLOW"\)/.test(HUB),
    "the box-by-box SEI pipeline is still reachable from here", "");
+
+// ---- the design documents are withdrawn ------------------------------
+//
+// All 96 were written before SEI's documents were the base. What was
+// wrong was the layer model and the sourcing, not a handful of facts,
+// so they are withdrawn whole and will be rewritten from the drawing.
+//
+// They are NOT deleted: the front matter is what routes a component to
+// its document, so deleting them would break every link in the Hub and
+// leave the reader with nothing rather than with the truth. The body is
+// replaced by a notice that says so.
+ok(DESIGN_DOCS.length > 90, "the design documents are still routable",
+   DESIGN_DOCS.length);
+ok(DESIGN_DOCS.every((d) => d.withdrawn === true),
+   "and every one of them is marked withdrawn — one that is not is one "
+   + "somebody will build from",
+   DESIGN_DOCS.filter((d) => !d.withdrawn).map((d) => d.id).join(","));
+ok(DESIGN_DOCS.every((d) => d.sections.length <= 5),
+   "none still carries its old body — a long one means the rewrite "
+   + "missed it",
+   DESIGN_DOCS.filter((d) => d.sections.length > 5)
+     .map((d) => `${d.id}:${d.sections.length}`).join(","));
+ok(DESIGN_DOCS.every((d) =>
+     d.sections.some((x) => /Withdrawn/i.test(x.h))),
+   "and each says so in its first section", "");
+// Routing must still work, or the withdrawal breaks the Hub instead of
+// correcting it.
+ok(TRACKER_COMPONENTS.every((c) => DESIGN_DOCS.some((d) => d.id === docFor(c))),
+   "every component still routes to a document, so no link goes nowhere",
+   TRACKER_COMPONENTS.filter((c) => !DESIGN_DOCS.some((d) => d.id === docFor(c)))
+     .map((c) => c.id).join(","));
+// The chip should not invite a click that promises a design.
+ok(DESIGN_DOCS.filter((d) => d.chip).every((d) => /withdrawn/.test(d.chip)),
+   "and the chip says withdrawn rather than design",
+   DESIGN_DOCS.filter((d) => d.chip && !/withdrawn/.test(d.chip))
+     .map((d) => d.chip).slice(0, 4).join(","));
+const DD = strip("ui/src/DocDrill.jsx");
+ok(/d\.withdrawn &&/.test(DD) && /DO NOT BUILD FROM THIS/.test(DD),
+   "opening one leads with the warning, before anything else on the page",
+   "");
 
 // ---- lanes: the named parts inside a container -----------------------
 //
