@@ -40,6 +40,11 @@ import { S2_DOMAINS, S2_TABLES, S2_RELS, S2_TESTED, S2_GAPS, S2_CONTRACT,
   s2Blocked, s2TablesIn } from "../src/hubStage2Model.js";
 import { FILE_CHAIN, FILE_VALIDATIONS, COUNT_RULE, FAIL_MODES, FILE_POSTURE }
   from "../src/hubFileIngestion.js";
+import { S1_TABLES, S1_RULES, S1_COLS, S1_CONFLICT, S1_NOT_HERE, s1Both,
+  s1ArchOnly } from "../src/hubStage1Model.js";
+import { DB_PATH, DB_CONTROL, DB_ABSENT, DB_LINKS, DB_NOTE, dbNode }
+  from "../src/hubDbModel.js";
+import { Stage1Model, DbModelView } from "../src/HubContext.jsx";
 import { SEI_COMPONENTS, SEI_TABLES, SEI_STATES } from "../src/seiBaseline.js";
 import { FileIngestionView } from "../src/HubContext.jsx";
 import { tLight, tDark } from "../src/bbhTheme.js";
@@ -392,5 +397,105 @@ ok(/<Crumb trail=/.test(HUBSRC.slice(HUBSRC.indexOf('view === "FILE"'),
 ok(/onFile=\{\(\) => setView\("FILE"\)\}/.test(HUBSRC),
    "the gate's file arm links straight to it", "");
 
-console.log(bad ? `\n${bad} assertion(s) failed` : "\nhub-c4-context file assertions pass");
+
+/* ------------------------------------------ Stage 1 and the database */
+// Stage 1's answer to "what does the data look like here" is "unmodelled,
+// deliberately". A reader who leaves without knowing that goes looking
+// for entities that do not exist.
+ok(S1_RULES.length === 5 && S1_RULES.some(([k]) => /append-only/i.test(k))
+   && S1_RULES.some(([k]) => /no keys/i.test(k)),
+   "Stage 1 states its five rules, append-only and keyless among them",
+   S1_RULES.map((r) => r[0]).join(" | "));
+ok(S1_NOT_HERE.some((x) => /first normalised model is Stage 2 INT/i.test(x)),
+   "and points at where the first normalised model actually is", "");
+ok(S1_COLS.length === 4
+   && S1_COLS.every(([c]) => /^[A-Z_]+$/.test(c))
+   && S1_COLS.some(([c]) => c === "FILE_REGISTRY_ID"),
+   "the only four columns Stage 1 adds are named, lineage among them",
+   S1_COLS.map((c) => c[0]).join(" "));
+// THE FINDING. Seven named, three agreed - four feeds with no
+// transformation designed for them.
+ok(S1_TABLES.length === 7 && s1Both() === 3 && s1ArchOnly() === 4,
+   "seven RAW tables named, three agreed by both sources, four by the "
+   + "architecture alone", `${S1_TABLES.length}/${s1Both()}/${s1ArchOnly()}`);
+ok(S1_CONFLICT.id === "C1" && /under half/i.test(S1_CONFLICT.why),
+   "and the conflict says what it costs, not just that it exists",
+   S1_CONFLICT.why.slice(0, 60));
+
+// The database picture: two bands, and nothing dangling.
+const dbIds = new Set([...DB_PATH, ...DB_CONTROL].map((x) => x.id));
+ok(DB_LINKS.every((l) => dbIds.has(l.from) && dbIds.has(l.to)),
+   "every link in the database picture joins two tables that are on it",
+   DB_LINKS.filter((l) => !dbIds.has(l.from) || !dbIds.has(l.to))
+     .map((l) => l.from + "->" + l.to).join(" "));
+ok(DB_PATH.every((p) => p.writes && p.reads)
+   && DB_CONTROL.every((c) => c.writes && c.reads),
+   "every table says who writes it and who reads it - the property the "
+   + "picture exists to show", "");
+ok(DB_CONTROL.length === 5 && DB_PATH.length === 6,
+   "five control tables under six data-path layers",
+   `${DB_CONTROL.length}/${DB_PATH.length}`);
+ok(DB_PATH.find((p) => p.id === "stg").kind === "view"
+   && /stores nothing/i.test(DB_PATH.find((p) => p.id === "stg").w),
+   "STG is drawn as a view, because it stores nothing and every retention "
+   + "and replay answer follows from that", "");
+ok(DB_ABSENT.length === 2
+   && DB_ABSENT.some((a) => /event/i.test(a.route))
+   && DB_ABSENT.some((a) => /loader/i.test(a.route)),
+   "the two routes with no bookkeeping are ON the picture, not left off "
+   + "it - leaving them off makes the database look complete",
+   DB_ABSENT.map((a) => a.n).join(" "));
+ok(/one writer/i.test(DB_NOTE) && /guarded update/i.test(DB_NOTE),
+   "and the one-writer property is stated with why the guarded update "
+   + "exists anyway", "");
+ok(DB_PATH.filter((p) => p.open).map((p) => p.open).sort().join(",") === "s1,s2",
+   "exactly two layers open a model of their own - RAW and INT",
+   DB_PATH.filter((p) => p.open).map((p) => p.id).join(" "));
+
+try {
+  const h = render(<Stage1Model t={t} />);
+  ok(/RAW_CORRECTED_POSITION/.test(h) && /architecture only/.test(h)
+     && /append-only/i.test(h),
+     "the Stage 1 screen draws the table list, the disagreement and the "
+     + "rules", h.length);
+  render(<Stage1Model t={tDark} />);
+  ok(true, "and renders in dark too", "");
+} catch (e) { ok(false, "Stage1Model renders", e.message); }
+
+try {
+  const h = render(<DbModelView t={t} pick={null} setPick={() => {}}
+    onOpen={() => {}} />);
+  ok(/THE DATA PATH/.test(h) && /THE CONTROL PLANE/.test(h)
+     && /NOT BUILT/.test(h),
+     "the database picture draws all three bands", h.length);
+  ok(/DATE_CONTROL/.test(h) && /FILE_REGISTRY/.test(h),
+     "with the control tables named on it", "");
+  [...DB_PATH, ...DB_CONTROL, ...DB_ABSENT].forEach((n) => {
+    const p = render(<DbModelView t={t} pick={n.id} setPick={() => {}}
+      onOpen={() => {}} />);
+    if (!p.length) ok(false, `selecting ${n.id} renders`, "");
+  });
+  ok(true, "and every table on it opens a panel without throwing", "");
+  render(<DbModelView t={tDark} pick="date" setPick={() => {}} onOpen={() => {}} />);
+  ok(true, "dark too", "");
+} catch (e) { ok(false, "DbModelView renders", e.message); }
+
+["DBM", "S1M"].forEach((v) => {
+  if (!new RegExp(`view === "${v}"`).test(HUBSRC))
+    ok(false, `HubDesign routes ${v}`, "");
+});
+ok(/view === "DBM"/.test(HUBSRC) && /view === "S1M"/.test(HUBSRC)
+   && /setView\("DBM"\)/.test(HUBSRC) && /setView\("S1M"\)/.test(HUBSRC),
+   "both new models are routed and clickable", "");
+// The ask was a box inside Processing, not a link buried on a stage card.
+ok(/Data models/.test(HUBSRC)
+   && /Stage 2 \/ Silver \/ Enriched data model/.test(HUBSRC)
+   && /Stage 1 data model/.test(HUBSRC),
+   "Processing carries a data-models band naming Stage 1 and "
+   + "Stage 2 / Silver / Enriched", "");
+ok(!/canonical tables, 10 domains →/.test(HUBSRC),
+   "and the old link on the Stage 2 INT stage card is gone, so there is "
+   + "one way in rather than two", "");
+
+console.log(bad ? `\n${bad} assertion(s) failed` : "\nhub-c4-context assertions pass");
 if (bad) process.exit(1);

@@ -24,7 +24,7 @@ import { SEI_ARCH_DOC, ARCH_FEEDS, ARCH_LAYERS, ARCH_ORCHESTRATION,
  ARCH_PRINCIPLES, ARCH_CONFLICTS, OUTBOUND_FLOW, INBOUND_POSTURE,
  conflictsAt } from "./seiArchitecture.js";
 import { ContextView, GateView, LoaderLoopView, Stage2Model,
- FileIngestionView } from "./HubContext.jsx";
+ FileIngestionView, Stage1Model, DbModelView } from "./HubContext.jsx";
 import { s2DomainName, s2DomainOf, S2_TABLES, S2_RELS, S2_INFERRED_COUNT }
  from "./hubStage2Model.js";
 
@@ -94,6 +94,7 @@ export default function HubDesign({ t }) {
  const [chan, setChan] = useState(null);           // C4 L1: which boundary channel
  const [s2dom, setS2dom] = useState(null);         // Stage 2 model: which domain
  const [s2tbl, setS2tbl] = useState(null);         // Stage 2 model: which table
+ const [dbPick, setDbPick] = useState(null);       // database model: which table
  const [expand, setExpand] = useState(null);    // L3 component detail panel
  const [srcOf, setSrcOf] = useState(null);      // component shown beside its SEI source
  const [seiDoc, setSeiDoc] = useState(null);    // {doc, section} open in the popup
@@ -750,6 +751,32 @@ export default function HubDesign({ t }) {
     onComp={(id) => { setSeiComp(id); setView("SEIL4"); }} />
   </div>);
 
+ /* ---------- DBM: the database, as one picture, in the flow ---------- */
+ if (view === "DBM") return (
+  <div>
+   <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+   <Popup />
+   <Crumb trail={[["containers", () => setView("L2")],
+                  ["Processing", () => { setGrp("processing"); setView("GRP"); }],
+                  ["the database model", null]]} />
+   <DbModelView t={t} pick={dbPick} setPick={setDbPick}
+    onOpen={(k) => { setDbPick(null);
+      if (k === "s1") setView("S1M");
+      else { setS2dom(null); setS2tbl(null); setView("S2M"); } }} />
+  </div>);
+
+ /* ---------- S1M: Stage 1, the RAW data model ---------- */
+ if (view === "S1M") return (
+  <div>
+   <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+   <Popup />
+   <Crumb trail={[["containers", () => setView("L2")],
+                  ["Processing", () => { setGrp("processing"); setView("GRP"); }],
+                  ["the database model", () => setView("DBM")],
+                  ["Stage 1 data model", null]]} />
+   <Stage1Model t={t} />
+  </div>);
+
  /* ---------- S2M: Stage 2 INT, the canonical model ---------- */
  if (view === "S2M") return (
   <div>
@@ -757,7 +784,8 @@ export default function HubDesign({ t }) {
    <Popup />
    <Crumb trail={[["containers", () => setView("L2")],
     ["Processing", () => { setGrp("processing"); setView("GRP"); }],
-    ["Stage 2 INT", s2dom || s2tbl
+    ["the database model", () => setView("DBM")],
+    ["Stage 2 / Silver / Enriched", s2dom || s2tbl
       ? () => { setS2dom(null); setS2tbl(null); } : null],
     ...(s2dom && !s2tbl ? [[s2DomainName(s2dom), null]] : []),
     ...(s2tbl ? [[s2DomainName(s2dom || ""), () => setS2tbl(null)],
@@ -1411,8 +1439,14 @@ export default function HubDesign({ t }) {
     {/* A container that owns a detailed screen offers it here rather than
         leaving the reader to find it from the top. */}
     {(grp === "orchestration" || grp === "ingress" || grp === "events"
-      || grp === "ingestion") && (
+      || grp === "ingestion" || grp === "foundation") && (
      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "10px 0 2px" }}>
+      {grp === "foundation" && (
+       <span onClick={() => { setDbPick(null); setView("DBM"); }}
+        style={{ fontSize: 10.5, fontWeight: 800, padding: "6px 14px",
+         borderRadius: 999, cursor: "pointer", background: "#eef1f4",
+         color: "#5c6b7a" }}>
+        ▤ the database model &middot; control plane and data path</span>)}
       {grp === "ingestion" && (
        <span onClick={() => setView("FILE")} style={{ fontSize: 10.5,
         fontWeight: 800, padding: "6px 14px", borderRadius: 999,
@@ -1455,11 +1489,6 @@ export default function HubDesign({ t }) {
           marginTop: 7 }}>{st.w}</div>
          {st.note && <div style={{ fontSize: 10.5, color: "#a8560f",
           lineHeight: 1.55, marginTop: 6 }}>{st.note}</div>}
-         {st.id === "stage2int" && (
-          <div onClick={() => { setS2dom(null); setS2tbl(null); setView("S2M"); }}
-           style={{ fontSize: 11, fontWeight: 700, color: "#0f4775",
-            cursor: "pointer", marginTop: 8 }}>
-           {S2_TABLES.length} canonical tables, 10 domains →</div>)}
          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
           {[...st.sei, ...st.bbh].map((id) => (
            <span key={id} onClick={() => { if (id[0] === "S") {
@@ -1471,6 +1500,46 @@ export default function HubDesign({ t }) {
            <span key={id}>{chip("#eef1f4", "#5c6b7a",
             (SEI_TABLES.find((x) => x.id === id) || {}).n || id)}</span>))}
          </div>
+        </div>))}
+      </div>
+     </>)}
+
+    {grp === "processing" && (
+     <>
+      <Head title="Data models" bg="#1f4f7a"
+       note="what the database actually looks like at each stage"
+       n={3} label="models" />
+      <div style={{ display: "grid", gap: 8,
+       gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))" }}>
+       {[
+        { k: "db", n: "The database, in the flow",
+          sub: "the data path and the control plane, as one picture",
+          w: "Where rows live, which tables decide whether they move, and "
+           + "who writes each one. Two routes still have no bookkeeping.",
+          go: () => { setDbPick(null); setView("DBM"); } },
+        { k: "s1", n: "Stage 1 data model",
+          sub: "RAW — one table per inbound interface",
+          w: "Append-only, as delivered, no keys and nothing cleaned. The "
+           + "two sources do not name the same set of RAW tables.",
+          go: () => setView("S1M") },
+        { k: "s2", n: "Stage 2 / Silver / Enriched data model",
+          sub: `the normalised SWP model — ${S2_TABLES.length} canonical tables`,
+          w: "Three names for one layer. 10 domains, 3NF, fed only by STG "
+           + "PASS rows. Every relationship is declared, tested, or "
+           + "enforced nowhere.",
+          go: () => { setS2dom(null); setS2tbl(null); setView("S2M"); } },
+       ].map((m) => (
+        <div key={m.k} onClick={m.go} style={{ background: "#fff",
+         borderRadius: 8, border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+         borderLeft: "3px solid #1168bd", padding: "12px 15px",
+         cursor: "pointer" }}>
+         <b style={{ fontSize: 12.5, color: t.navy || "#10193b" }}>{m.n}</b>
+         <div style={{ fontSize: 10, color: t.sub || "#666", marginTop: 2 }}>
+          {m.sub}</div>
+         <div style={{ fontSize: 11.5, color: "#33414d", lineHeight: 1.6,
+          marginTop: 7 }}>{m.w}</div>
+         <div style={{ fontSize: 11, fontWeight: 700, color: "#0f4775",
+          marginTop: 8 }}>open &rarr;</div>
         </div>))}
       </div>
      </>)}

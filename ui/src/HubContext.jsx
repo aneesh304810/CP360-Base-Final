@@ -16,6 +16,10 @@ import { EV_KINDS, EV_RULES, EV_GATE, CLOCKS } from "./hubEventModel.js";
 import { LOOP_LEGS, SUB_STATES, LOOP_RULES, LOOP_GAP } from "./hubLoaderLoop.js";
 import { FILE_CHAIN, FILE_VALIDATIONS, COUNT_RULE, FAIL_MODES, FILE_POSTURE }
  from "./hubFileIngestion.js";
+import { S1_SHAPE, S1_RULES, S1_COLS, S1_TABLES, S1_CONFLICT, S1_NOT_HERE,
+ s1Both, s1ArchOnly } from "./hubStage1Model.js";
+import { DB_PATH, DB_CONTROL, DB_ABSENT, DB_LINKS, DB_NOTE, dbNode }
+ from "./hubDbModel.js";
 import { SEI_STATES, SEI_TABLES, SEI_COMPONENTS } from "./seiBaseline.js";
 import { S2_DOMAINS, S2_CONTRACT, S2_STD_COLS, S2_GAPS, S2_INFERRED_COUNT,
  S2_RELS, S2_TESTED, s2Table, s2DomainOf, s2DomainName, s2IsAnchor, s2IntKey,
@@ -785,5 +789,223 @@ export function FileIngestionView({ t, onComp }) {
      margin: "9px 0 0", paddingLeft: 17 }}>
      {FILE_POSTURE.turns.map((x) => <li key={x}>{x}</li>)}</ul>
    </div>
+  </div>);
+}
+
+/* ===================================================================
+   Stage 1 - the RAW data model. Its own screen, beside Stage 2's, so
+   "what does the data look like here" has the same answer shape at
+   both layers.
+   =================================================================== */
+export function Stage1Model({ t }) {
+ const both = s1Both(), only = s1ArchOnly();
+ return (
+  <div>
+   <div style={card()}>
+    <div style={eyebrow}>Stage 1 - RAW - bronze</div>
+    <b style={{ fontSize: 16, color: INK }}>{S1_SHAPE.n}</b>
+    <Body><div style={{ marginTop: 6 }}>{S1_SHAPE.w}</div></Body>
+    <div style={{ fontSize: 10.5, color: MUT, marginTop: 9 }}>{S1_SHAPE.ev}</div>
+   </div>
+
+   <div style={card({ borderLeft: `3px solid ${ACC}` })}>
+    <div style={eyebrow}>There is no canonical model here, and that is the design</div>
+    <Body><div style={{ marginTop: 5 }}>Stage 1 holds what arrived, in the
+     shape it arrived in. No entities, no relationships, no keys. The first
+     normalised model is Stage 2 INT.</div></Body>
+   </div>
+
+   <Head title="The five rules" note="what Stage 1 does, and refuses to do" />
+   <div style={card()}>
+    {S1_RULES.map((r, i) => (
+     <div key={r[0]} style={{ display: "flex", gap: 14, padding: "8px 0",
+      borderTop: i ? "1px solid #eef3f5" : "none" }}>
+      <span style={{ fontSize: 12.5, fontWeight: 500, color: INK,
+       flex: "0 0 180px" }}>{r[0]}</span>
+      <span style={{ fontSize: 12.5, color: SUB, lineHeight: 1.6 }}>{r[1]}</span>
+     </div>))}
+   </div>
+
+   <Head title="The only columns Stage 1 adds"
+    note="everything else in the row is as the file delivered it" />
+   <div style={card()}>
+    {S1_COLS.map((c, i) => (
+     <div key={c[0]} style={{ display: "flex", gap: 14, padding: "7px 0",
+      borderTop: i ? "1px solid #eef3f5" : "none" }}>
+      <span style={{ fontFamily: MONO, fontSize: 11.5, color: INK,
+       flex: "0 0 170px" }}>{c[0]}</span>
+      <span style={{ fontSize: 11, color: MUT, flex: "0 0 85px" }}>{c[1]}</span>
+      <span style={{ fontSize: 12.5, color: SUB, lineHeight: 1.6 }}>{c[2]}</span>
+     </div>))}
+   </div>
+
+   <Head title={`The RAW tables - ${S1_TABLES.length} named, ${both} agreed`}
+    note="the two sources do not name the same set" />
+   <div style={{ display: "grid", gap: 8,
+    gridTemplateColumns: "repeat(auto-fit,minmax(250px,1fr))",
+    alignItems: "start" }}>
+    {S1_TABLES.map((x) => (
+     <div key={x.n} style={{ background: "#fff", border: `1px solid ${RULE}`,
+      borderLeft: `3px solid ${x.doc ? OK : WARN}`, borderRadius: 6,
+      padding: "10px 12px" }}>
+      <div style={{ fontFamily: MONO, fontSize: 12, fontWeight: 500,
+       color: INK, overflowWrap: "anywhere" }}>{x.n}</div>
+      <div style={{ marginTop: 7 }}>
+       {x.doc ? <Chip bg={OK} fg="#fff">both sources</Chip>
+              : <Chip bg={WARN} fg="#fff">architecture only</Chip>}
+      </div>
+     </div>))}
+   </div>
+
+   <div style={card({ borderLeft: `3px solid ${BAD}`, marginTop: 11 })}>
+    <div style={eyebrow}>Conflict {S1_CONFLICT.id} - {S1_CONFLICT.t}</div>
+    <Body><div style={{ marginTop: 5 }}>{S1_CONFLICT.w}</div>
+     <div style={{ marginTop: 8, color: INK }}>{S1_CONFLICT.why}</div></Body>
+    <div style={{ fontSize: 12, color: SUB, marginTop: 9 }}>
+     <b>{both}</b> of {S1_TABLES.length} tables are named by both sources.
+     Those {both} are the only set safe to build against today;
+     the other {only} need SEI to say which document holds.</div>
+   </div>
+
+   <Head title="What Stage 1 does not answer"
+    note="so nobody goes looking for it here" />
+   <div style={card()}>
+    <ul style={{ fontSize: 12.5, color: SUB, lineHeight: 1.7, margin: 0,
+     paddingLeft: 17 }}>
+     {S1_NOT_HERE.map((x) => <li key={x}>{x}</li>)}</ul>
+   </div>
+  </div>);
+}
+
+/* ===================================================================
+   The database, in the flow. Two bands: the data path rows actually
+   live in, and the control plane that decides whether they move.
+   =================================================================== */
+const DBX = { raw: 120, stg: 300, int: 480, gold: 660, pre: 840, wh: 1020 };
+const DBC = { cfg: 100, reg: 285, dq: 470, date: 655, recon: 840 };
+const PATH_Y = 80, PATH_H = 76, CTL_Y = 330, CTL_H = 84;
+
+export function DbModelView({ t, pick, setPick, onOpen }) {
+ const sel = pick ? dbNode(pick) : null;
+ const node = (x, y, w, h, n, sub, o) => {
+  const opt = o || {};
+  return (
+   <g key={n} onClick={opt.onClick} style={{ cursor: opt.onClick ? "pointer" : "default" }}>
+    <rect x={x - w / 2} y={y} width={w} height={h} rx={6}
+     fill={opt.fill || "#fff"} stroke={opt.stroke || RULE}
+     strokeWidth={opt.sel ? 2.4 : 1.4}
+     strokeDasharray={opt.dash ? "5 4" : undefined} />
+    <text x={x} y={y + 24} textAnchor="middle" fontSize={opt.fs || 12.5}
+     fontWeight="500" fill={INK}>{n}</text>
+    {sub && <text x={x} y={y + 40} textAnchor="middle" fontSize="10"
+     fill={MUT}>{sub}</text>}
+    {opt.foot && <text x={x} y={y + h - 10} textAnchor="middle" fontSize="9.5"
+     fill={opt.footC || MUT}>{opt.foot}</text>}
+   </g>);
+ };
+ return (
+  <div>
+   <div style={card()}>
+    <svg viewBox="0 0 1200 560" style={{ width: "100%", height: "auto" }}
+     role="img" aria-label="The database: the data path and the control plane">
+     <defs><marker id="dbarr" viewBox="0 0 10 10" refX="9" refY="5"
+      markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill={SUB} /></marker>
+      <marker id="dbgov" viewBox="0 0 10 10" refX="9" refY="5"
+       markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+       <path d="M 0 0 L 10 5 L 0 10 z" fill={MUT} /></marker></defs>
+
+     <text x="40" y="52" fontSize="10" fontWeight="700" fill={ACC}>
+      THE DATA PATH - where rows live</text>
+     <rect x="24" y="62" width="1152" height="112" rx="9" fill="#f4f7f9"
+      stroke="#e4eaef" />
+     {DB_PATH.map((p) => node(DBX[p.id], PATH_Y, 150, PATH_H, p.n, p.layer, {
+       stroke: p.kind === "view" ? MUT : ACC,
+       dash: p.kind === "view",
+       sel: pick === p.id,
+       foot: p.kind === "view" ? "a view" : (p.open ? "model" : null),
+       footC: p.open ? ACC : MUT,
+       onClick: () => setPick(pick === p.id ? null : p.id) }))}
+     {DB_LINKS.filter((l) => l.kind === "flow").map((l) => (
+      <line key={l.from + l.to} x1={DBX[l.from] + 76} y1={PATH_Y + PATH_H / 2}
+       x2={DBX[l.to] - 78} y2={PATH_Y + PATH_H / 2} stroke={SUB}
+       strokeWidth="1.6" markerEnd="url(#dbarr)" />))}
+
+     <text x="40" y="302" fontSize="10" fontWeight="700" fill={MUT}>
+      THE CONTROL PLANE - what decides whether they move</text>
+     <rect x="24" y="314" width="1152" height="116" rx="9" fill="#f4f7f9"
+      stroke="#e4eaef" />
+     {DB_CONTROL.map((c) => node(DBC[c.id], CTL_Y, 170, CTL_H, c.n, c.role, {
+       fs: 11.5,
+       stroke: pick === c.id ? ACC : "#b9c6d1",
+       sel: pick === c.id,
+       onClick: () => setPick(pick === c.id ? null : c.id) }))}
+     <line x1={DBC.cfg + 86} y1={CTL_Y + CTL_H / 2} x2={DBC.reg - 88}
+      y2={CTL_Y + CTL_H / 2} stroke={MUT} strokeWidth="1.4"
+      strokeDasharray="5 4" markerEnd="url(#dbgov)" />
+
+     {/* governance and write links, drawn short so none of them cross */}
+     {[["reg", "raw"], ["dq", "stg"], ["date", "int"], ["recon", "int"]]
+      .map(([c, p]) => (
+       <line key={c + p} x1={DBC[c]} y1={CTL_Y - 2} x2={DBX[p]}
+        y2={PATH_Y + PATH_H + 2} stroke={MUT} strokeWidth="1.3"
+        strokeDasharray="4 4" />))}
+
+     <text x="40" y="470" fontSize="10" fontWeight="700" fill={BAD}>
+      NOT BUILT - the other two routes have no bookkeeping at all</text>
+     {DB_ABSENT.map((a, i) => node(180 + i * 330, 482, 300, 56, a.n, a.route, {
+       stroke: BAD, dash: true, fill: "#fdf7f8",
+       sel: pick === a.id,
+       onClick: () => setPick(pick === a.id ? null : a.id) }))}
+     <text x="700" y="516" fontSize="10.5" fill={SUB}>
+      Every table above has exactly one writer. Neither of these exists.</text>
+    </svg>
+    <div style={{ display: "flex", gap: 9, flexWrap: "wrap", marginTop: 4 }}>
+     {DB_LINKS.filter((l) => l.kind !== "flow").map((l) => (
+      <span key={l.from + l.to} style={{ fontSize: 11, color: SUB,
+       border: `1px solid ${RULE}`, borderRadius: 999, padding: "3px 11px" }}>
+       <span style={{ fontFamily: MONO, fontSize: 10.5, color: INK }}>
+        {(dbNode(l.from) || {}).n}</span>
+       <span style={{ color: MUT }}> {l.kind === "governs" ? "governs" : "writes"} </span>
+       <span style={{ fontFamily: MONO, fontSize: 10.5, color: INK }}>
+        {(dbNode(l.to) || {}).n}</span>
+       <span style={{ color: MUT }}> &mdash; {l.w}</span>
+      </span>))}
+    </div>
+    <div style={{ fontSize: 11.5, color: SUB, lineHeight: 1.6, marginTop: 9,
+     maxWidth: "92ch" }}>
+     <b>The data path is what a business reader follows; the control plane is
+     what an operator follows at 3am.</b> Click any table. RAW and INT open
+     their own data models.
+    </div>
+   </div>
+
+   {sel ? (
+    <div style={card({ borderLeft: `3px solid ${sel.route ? BAD : ACC}` })}>
+     <div style={eyebrow}>
+      {sel.route ? `Not built - ${sel.route}`
+                 : (sel.layer || sel.role || "control table")}</div>
+     <div style={{ fontFamily: MONO, fontSize: 15, fontWeight: 500, color: INK,
+      margin: "4px 0 6px", overflowWrap: "anywhere" }}>{sel.n}</div>
+     <Body>{sel.w}</Body>
+     {!sel.route && (
+      <div style={{ display: "flex", gap: 22, flexWrap: "wrap", marginTop: 11,
+       fontSize: 12, color: SUB }}>
+       <span><b style={{ ...eyebrow, display: "block" }}>Written by</b>
+        {sel.writes}</span>
+       <span><b style={{ ...eyebrow, display: "block" }}>Read by</b>
+        {sel.reads}</span>
+      </div>)}
+     {sel.open && onOpen && (
+      <div onClick={() => onOpen(sel.open)} style={{ fontSize: 11.5,
+       fontWeight: 700, color: ACC, cursor: "pointer", marginTop: 11 }}>
+       {sel.open === "s1" ? "the Stage 1 data model"
+                          : "the Stage 2 canonical model, 52 tables"} -&gt;</div>)}
+    </div>
+   ) : (
+    <div style={card()}>
+     <div style={eyebrow}>One writer each</div>
+     <Body>{DB_NOTE}</Body>
+    </div>)}
   </div>);
 }
