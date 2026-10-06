@@ -27,6 +27,7 @@ import { NavStyles, Trail, SvgGo } from "./HubNav.jsx";
 import { GatewayView, SdcEndToEnd, NetworkView, SystemIntegrationView }
  from "./HubContext.jsx";
 import { SI_ABSENT } from "./hubSystemIntegration.js";
+import { EndToEndDiagram } from "./HubEndToEnd.jsx";
 import { NET_COUNTS } from "./hubNetwork.js";
 import { ContextView, GateView, LoaderLoopView, Stage2Model,
  FileIngestionView, Stage1Model, DbModelView, GapSupplementView }
@@ -785,6 +786,17 @@ export default function HubDesign({ t }) {
     filter={gapF} setFilter={setGapF} />
   </div>);
 
+ /* ---------- E2E: the one picture ---------- */
+ if (view === "E2E") return (
+  <div>
+   <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+   <NavStyles />
+   <Popup />
+   <Crumb trail={[["containers", () => setView("L2")],
+                  ["end to end, one picture", null]]} />
+   <EndToEndDiagram t={t} />
+  </div>);
+
  /* ---------- SI: SEI's own integration diagram, and what it omits ---------- */
  if (view === "SI") return (
   <div>
@@ -1017,6 +1029,11 @@ export default function HubDesign({ t }) {
        borderRadius: 999, cursor: "pointer", background: "#0f4775",
        color: "#fff" }}>
       ⇆ the boundary · 3 transports, 4 channels</span>
+     <span onClick={() => setView("E2E")}
+      style={{ fontSize: 10.5, fontWeight: 800, padding: "6px 14px",
+       borderRadius: 999, cursor: "pointer", background: "#10193b",
+       color: "#fff" }}>
+      ◈ end to end · one picture</span>
      <span onClick={() => { setView("SI"); setSiPick(null); }}
       style={{ fontSize: 10.5, fontWeight: 800, padding: "6px 14px",
        borderRadius: 999, cursor: "pointer", background: "#fdf1f2",
