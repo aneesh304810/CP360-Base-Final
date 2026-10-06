@@ -257,9 +257,18 @@ export const GAP_HADR_OPEN = [
 //
 // Keyed by container so the generator can place it without matching on
 // names. Every entry is {h, rows} for a table or {h, items} for a list.
+//
+// A BLOCK MAY ALSO NAME ITS LANE. Keying by container alone put the
+// Landing Zone contract into the Apigee design document and made the
+// Apigee and API Gateway documents byte-identical - two components whose
+// whole relationship is that they are different layers. Where a block
+// describes one lane rather than the whole container it says so, and the
+// generator places it only there. A block with no lane still goes to
+// every component in the container, which is right for the ones that
+// genuinely are container-wide.
 export const GAP_DESIGN = {
  ingress: [
-  { h: "Landing Zone contract",
+  { h: "Landing Zone contract", lane: "landing",
     cols: ["Contract", "Requirement"],
     rows: [
      ["File readiness", "Only complete files are visible, or a final rename or marker convention is used"],
@@ -268,23 +277,23 @@ export const GAP_DESIGN = {
      ["Discovery", "The ingestion scanner reads active file configuration before scanning"],
      ["Unknown files", "An unmatched file produces an operational event and follows the approved exception-location policy"],
      ["Ambiguous files", "More than one configuration match is a configuration error and the file is NOT loaded"]] },
-  { h: "Landing failure modes",
+  { h: "Landing failure modes", lane: "landing",
     items: ["Partial file exposure",
      "Duplicate physical delivery for the same logical interface and business date",
      "Filename does not match an active configuration",
      "Filename matches more than one configuration",
      "Storage unavailable or permission denied"] },
-  { h: "Transfer evidence required from Momentum",
+  { h: "Transfer evidence required from Momentum", lane: "landing",
     items: ["Source and destination filename",
      "Transfer start and completion timestamps", "Transfer outcome",
      "Checksum, where the approved transfer contract includes one",
      "Correlation with the receiving ingestion record, where available"] },
-  { h: "Gateway design constraints",
+  { h: "Gateway design constraints", lane: "gateway",
     items: ["No direct source-system-to-SEI service coupling across the trust boundary",
      "An idempotent request keeps the same idempotency key during safe retry",
      "Authentication secrets resolve from the platform secret service and are never stored in workflow metadata",
      "Gateway rejection is recorded separately from downstream SEI rejection"] },
-  { h: "Loader framework responsibilities",
+  { h: "Loader framework responsibilities", lane: "loader",
     items: ["Select the approved workflow and loader definition",
      "Read prepared Hub-owned outbound data",
      "Render the SEI-approved loader format",
@@ -292,7 +301,7 @@ export const GAP_DESIGN = {
      "Assign delivery and correlation identifiers",
      "Submit through the approved egress route",
      "Record acknowledgement, rejection and retry status"] },
-  { h: "Boundary rule",
+  { h: "Boundary rule", lane: "loader",
     items: ["Consumer movement and loader delivery introduce no uncontrolled "
      + "transformation in flight. Business transformation and packaging are "
      + "complete before delivery."] },

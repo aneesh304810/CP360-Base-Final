@@ -99,27 +99,6 @@ SEI's own ids, so they can be quoted straight back.
 - Checksum, where the approved transfer contract includes one
 - Correlation with the receiving ingestion record, where available
 
-### Gateway design constraints
-
-- No direct source-system-to-SEI service coupling across the trust boundary
-- An idempotent request keeps the same idempotency key during safe retry
-- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata
-- Gateway rejection is recorded separately from downstream SEI rejection
-
-### Loader framework responsibilities
-
-- Select the approved workflow and loader definition
-- Read prepared Hub-owned outbound data
-- Render the SEI-approved loader format
-- Validate required fields, file structure and control totals
-- Assign delivery and correlation identifiers
-- Submit through the approved egress route
-- Record acknowledgement, rejection and retry status
-
-### Boundary rule
-
-- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.
-
 ## Open against this component
 
 **1 unresolved conflict and 8 other open items** — `GAP-03`, `R6`, `R8`, `R14`, `R20`, `R21`, `R22`, `R23`, `R24`. Stated in full, with both readings and the decision each needs, in the gap supplement.

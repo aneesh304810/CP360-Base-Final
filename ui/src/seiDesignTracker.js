@@ -225,7 +225,7 @@ export const TRACKER_COMPONENTS = [
 "plane": "Ingress/Egress",
 "component": "Apigee Proxy",
 "deliverable": "Proxy design: submit path + status-return path",
-"questions": "Is Apigee a decision or a placeholder? (AD-3)",
+"questions": "AD-3 closed: this is the BBH Apigee network the CP-Integration-Gateway wraps, not an alternative to it. Open: whether proxy policy or the wrapper enforces the inbound trust boundary (GW-GAP-01).",
 "depends": "10, 35",
 "source": "SEI v5",
 "priority": "P3",
@@ -243,7 +243,7 @@ export const TRACKER_COMPONENTS = [
 "plane": "Ingress/Egress",
 "component": "API Gateway / Data Plane",
 "deliverable": "Real-time route design, independent of batch",
-"questions": "Does intraday run here or on batch? (AD-4)",
+"questions": "Does intraday run here or on batch? (AD-4). AD-3 closed: this is the consumer-facing wrapper over BBH Apigee, not an alternative to it.",
 "depends": "3, 42",
 "source": "BBH V4.2",
 "priority": "P2",
@@ -1236,8 +1236,10 @@ export const TRACKER_DECISIONS = [
 "sei": "BBH runs an Apigee proxy (two nodes)",
 "bbh": "Vendor-neutral 'API Gateway / Data Plane'",
 "consequence": "SEI presumes a BBH decision",
-"blocks": "11, 12",
-"recommendation": "Pin explicitly or correct SEI diagram"
+"blocks": "",
+"recommendation": "Closed - not a conflict. The API Gateway is a wrapper over BBH's Apigee network, isolating that infrastructure and its security from the consumer. SEI sees the request arriving from Apigee because on the egress path it does; what SEI names as one proxy is the gateway plus Apigee behind it. Both descriptions are correct at their own vantage point, so nothing needs pinning and SEI's diagram is not wrong.",
+"resolved": "BBH, this programme",
+"supersededBy": "GW-GAP-01 - where the inbound trust boundary is enforced, and by which layer"
 },
 {
 "id": "AD-4",

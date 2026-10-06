@@ -1207,13 +1207,14 @@
    {
     "id": "gateway",
     "n": "API gateway and Apigee proxy",
-    "tech": "vendor",
+    "tech": "two layers · one door",
     "sei": [],
     "reg": [
      "11",
      "12"
     ],
-    "w": "The real-time lane. Neither SEI document mentions it — both are batch from end to end — so nothing here is cited."
+    "view": "GW",
+    "w": "Two layers, not two options. The CP-Integration-Gateway is a wrapper over BBH's Apigee network and isolates that infrastructure and its security from the consumer; the call still leaves through Apigee, which is why SEI sees the request arriving from it. Neither SEI document describes the real-time lane — both are batch from end to end — but the gateway has a readiness review of its own."
    },
    {
     "id": "loader",
@@ -2258,7 +2259,7 @@
    "plane": "Ingress/Egress",
    "component": "Apigee Proxy",
    "deliverable": "Proxy design: submit path + status-return path",
-   "questions": "Is Apigee a decision or a placeholder? (AD-3)",
+   "questions": "AD-3 closed: this is the BBH Apigee network the CP-Integration-Gateway wraps, not an alternative to it. Open: whether proxy policy or the wrapper enforces the inbound trust boundary (GW-GAP-01).",
    "depends": "10, 35",
    "source": "SEI v5",
    "priority": "P3",
@@ -2276,7 +2277,7 @@
    "plane": "Ingress/Egress",
    "component": "API Gateway / Data Plane",
    "deliverable": "Real-time route design, independent of batch",
-   "questions": "Does intraday run here or on batch? (AD-4)",
+   "questions": "Does intraday run here or on batch? (AD-4). AD-3 closed: this is the consumer-facing wrapper over BBH Apigee, not an alternative to it.",
    "depends": "3, 42",
    "source": "BBH V4.2",
    "priority": "P2",
@@ -3763,6 +3764,7 @@
   "ingress": [
    {
     "h": "Landing Zone contract",
+    "lane": "landing",
     "cols": [
      "Contract",
      "Requirement"
@@ -3796,6 +3798,7 @@
    },
    {
     "h": "Landing failure modes",
+    "lane": "landing",
     "items": [
      "Partial file exposure",
      "Duplicate physical delivery for the same logical interface and business date",
@@ -3806,6 +3809,7 @@
    },
    {
     "h": "Transfer evidence required from Momentum",
+    "lane": "landing",
     "items": [
      "Source and destination filename",
      "Transfer start and completion timestamps",
@@ -3816,6 +3820,7 @@
    },
    {
     "h": "Gateway design constraints",
+    "lane": "gateway",
     "items": [
      "No direct source-system-to-SEI service coupling across the trust boundary",
      "An idempotent request keeps the same idempotency key during safe retry",
@@ -3825,6 +3830,7 @@
    },
    {
     "h": "Loader framework responsibilities",
+    "lane": "loader",
     "items": [
      "Select the approved workflow and loader definition",
      "Read prepared Hub-owned outbound data",
@@ -3837,6 +3843,7 @@
    },
    {
     "h": "Boundary rule",
+    "lane": "loader",
     "items": [
      "Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery."
     ]
@@ -4104,6 +4111,61 @@
     ]
    }
   ]
+ },
+ "GW_LAYERS": [
+  {
+   "id": "edge",
+   "n": "CP-Integration-Gateway",
+   "sub": "the wrapper",
+   "face": "consumer-facing",
+   "w": "Spring Boot WebFlux. The only thing a consumer addresses. It terminates the caller's request, applies the inbound trust boundary, and forwards to the vendor endpoint it is configured for. BBH-built, and the component this programme's readiness review is about.",
+   "isolates": [
+    "BBH Apigee network topology",
+    "BBH Apigee security posture",
+    "vendor endpoint addresses and credentials",
+    "which BBH node answered"
+   ],
+   "reg": "12"
+  },
+  {
+   "id": "apigee",
+   "n": "BBH Apigee",
+   "sub": "the network behind it",
+   "face": "BBH infrastructure",
+   "w": "Two nodes, run by BBH as platform infrastructure rather than by this programme. Carries the call out to SEI, and is the identity SEI observes on the far side. Vendor kit: proxy configuration and policy, no application code.",
+   "isolates": [],
+   "reg": "11"
+  }
+ ],
+ "GW_VANTAGE": [
+  {
+   "who": "A consumer",
+   "sees": "CP-Integration-Gateway only",
+   "blind": "That BBH Apigee exists at all, where it is, or how it is secured"
+  },
+  {
+   "who": "SEI",
+   "sees": "BBH Apigee - the request arrives from it",
+   "blind": "That a wrapper in front of it terminated the caller first"
+  },
+  {
+   "who": "BBH",
+   "sees": "Both, as one path: gateway, then Apigee, then SEI",
+   "blind": "Nothing - this is the only vantage point from which the stack is whole"
+  }
+ ],
+ "GW_AD3": {
+  "id": "AD-3",
+  "was": "Apigee: firm decision or placeholder",
+  "seiSaid": "BBH runs an Apigee proxy (two nodes)",
+  "bbhSaid": "Vendor-neutral 'API Gateway / Data Plane'",
+  "verdict": "Not a conflict. Both are true at their own vantage point.",
+  "w": "The API Gateway is a wrapper over BBH's Apigee network, there to isolate BBH's Apigee infrastructure and security from the consumer. SEI sees requests arriving from Apigee because on the egress path they do. What SEI names as one proxy is, on BBH's side, the gateway plus Apigee behind it. Nothing needs pinning and SEI's diagram is not wrong - it is drawn from outside the boundary the wrapper exists to create.",
+  "unblocks": [
+   "11",
+   "12"
+  ],
+  "leaves": "The question AD-3 was standing in for is still open, but it is a different question: where the inbound trust boundary is enforced, and by which layer. That is GW-GAP-01, and it blocks production approval."
  },
  "GW_DOC": {
   "n": "CP-Integration-Gateway",

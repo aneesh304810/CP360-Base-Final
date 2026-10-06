@@ -143,10 +143,19 @@ export const LANES = {
     w: "Files arrive on SFTP, Momentum copies the complete ones into a "
      + "Landing Zone every worker pod can see, and Archive and Quarantine "
      + "sit beside it." },
-  { id: "gateway", n: "API gateway and Apigee proxy", tech: "vendor",
-    sei: [], reg: ["11", "12"],
-    w: "The real-time lane. Neither SEI document mentions it \u2014 both are "
-     + "batch from end to end \u2014 so nothing here is cited." },
+  // The only lane with a screen of its own. A lane that opens the whole
+  // container is right where the lane is just a grouping; here there are
+  // two layers, a trust boundary between them and a readiness review, and
+  // none of that fits in a component list.
+  { id: "gateway", n: "API gateway and Apigee proxy", tech: "two layers \u00b7 one door",
+    sei: [], reg: ["11", "12"], view: "GW",
+    w: "Two layers, not two options. The CP-Integration-Gateway is a "
+     + "wrapper over BBH's Apigee network and isolates that infrastructure "
+     + "and its security from the consumer; the call still leaves through "
+     + "Apigee, which is why SEI sees the request arriving from it. "
+     + "Neither SEI document describes the real-time lane \u2014 both are "
+     + "batch from end to end \u2014 but the gateway has a readiness "
+     + "review of its own." },
   { id: "loader", n: "Loader framework", tech: "Python \u00b7 outbound",
     sei: [], reg: ["10", "4"],
     w: "Everything going back to SEI. A consumer such as CRM calls the "

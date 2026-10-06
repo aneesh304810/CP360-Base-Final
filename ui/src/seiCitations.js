@@ -66,7 +66,7 @@ export const SEI_CITATIONS = {
   ],
   "11": [
     { doc: "integration-architecture", section: "front", kind: "partial",
-      what: "Node 12, the Apigee proxy, on both the submit and status-return paths. Whether it is a decision or a placeholder is open as AD-3." },
+      what: "Node 12, the Apigee proxy, on both the submit and status-return paths. SEI draws one box because one box is what SEI can see: the call reaches it from BBH Apigee. On BBH's side that is the CP-Integration-Gateway wrapping BBH Apigee, which is why AD-3 reads as a conflict and is not one." },
   ],
 
   /* ---------------- Processing ---------------- */

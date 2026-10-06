@@ -57,40 +57,6 @@ adopts it. Until then it is in the event container, drawn apart.
 
 ## How this works, from the architecture supplement
 
-### Landing Zone contract
-
-| Contract | Requirement |
-|---|---|
-| File readiness | Only complete files are visible, or a final rename or marker convention is used |
-| Shared access | Landing, Archive and Quarantine are visible consistently to worker pods |
-| Immutability | File contents are not modified in Landing |
-| Discovery | The ingestion scanner reads active file configuration before scanning |
-| Unknown files | An unmatched file produces an operational event and follows the approved exception-location policy |
-| Ambiguous files | More than one configuration match is a configuration error and the file is NOT loaded |
-
-### Landing failure modes
-
-- Partial file exposure
-- Duplicate physical delivery for the same logical interface and business date
-- Filename does not match an active configuration
-- Filename matches more than one configuration
-- Storage unavailable or permission denied
-
-### Transfer evidence required from Momentum
-
-- Source and destination filename
-- Transfer start and completion timestamps
-- Transfer outcome
-- Checksum, where the approved transfer contract includes one
-- Correlation with the receiving ingestion record, where available
-
-### Gateway design constraints
-
-- No direct source-system-to-SEI service coupling across the trust boundary
-- An idempotent request keeps the same idempotency key during safe retry
-- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata
-- Gateway rejection is recorded separately from downstream SEI rejection
-
 ### Loader framework responsibilities
 
 - Select the approved workflow and loader definition

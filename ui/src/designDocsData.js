@@ -4534,116 +4534,6 @@ export const DESIGN_DOCS = [
 ]
 },
 {
-"h": "How this works, from the architecture supplement",
-"md": "\n### Landing Zone contract\n\n| Contract | Requirement |\n|---|---|\n| File readiness | Only complete files are visible, or a final rename or marker convention is used |\n| Shared access | Landing, Archive and Quarantine are visible consistently to worker pods |\n| Immutability | File contents are not modified in Landing |\n| Discovery | The ingestion scanner reads active file configuration before scanning |\n| Unknown files | An unmatched file produces an operational event and follows the approved exception-location policy |\n| Ambiguous files | More than one configuration match is a configuration error and the file is NOT loaded |\n\n### Landing failure modes\n\n- Partial file exposure\n- Duplicate physical delivery for the same logical interface and business date\n- Filename does not match an active configuration\n- Filename matches more than one configuration\n- Storage unavailable or permission denied\n\n### Transfer evidence required from Momentum\n\n- Source and destination filename\n- Transfer start and completion timestamps\n- Transfer outcome\n- Checksum, where the approved transfer contract includes one\n- Correlation with the receiving ingestion record, where available\n\n### Gateway design constraints\n\n- No direct source-system-to-SEI service coupling across the trust boundary\n- An idempotent request keeps the same idempotency key during safe retry\n- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata\n- Gateway rejection is recorded separately from downstream SEI rejection\n\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
-"blocks": [
-{
-"t": "h",
-"x": "Landing Zone contract"
-},
-{
-"t": "tbl",
-"rows": [
-[
-"Contract",
-"Requirement"
-],
-[
-"File readiness",
-"Only complete files are visible, or a final rename or marker convention is used"
-],
-[
-"Shared access",
-"Landing, Archive and Quarantine are visible consistently to worker pods"
-],
-[
-"Immutability",
-"File contents are not modified in Landing"
-],
-[
-"Discovery",
-"The ingestion scanner reads active file configuration before scanning"
-],
-[
-"Unknown files",
-"An unmatched file produces an operational event and follows the approved exception-location policy"
-],
-[
-"Ambiguous files",
-"More than one configuration match is a configuration error and the file is NOT loaded"
-]
-]
-},
-{
-"t": "h",
-"x": "Landing failure modes"
-},
-{
-"t": "ul",
-"items": [
-"Partial file exposure",
-"Duplicate physical delivery for the same logical interface and business date",
-"Filename does not match an active configuration",
-"Filename matches more than one configuration",
-"Storage unavailable or permission denied"
-]
-},
-{
-"t": "h",
-"x": "Transfer evidence required from Momentum"
-},
-{
-"t": "ul",
-"items": [
-"Source and destination filename",
-"Transfer start and completion timestamps",
-"Transfer outcome",
-"Checksum, where the approved transfer contract includes one",
-"Correlation with the receiving ingestion record, where available"
-]
-},
-{
-"t": "h",
-"x": "Gateway design constraints"
-},
-{
-"t": "ul",
-"items": [
-"No direct source-system-to-SEI service coupling across the trust boundary",
-"An idempotent request keeps the same idempotency key during safe retry",
-"Authentication secrets resolve from the platform secret service and are never stored in workflow metadata",
-"Gateway rejection is recorded separately from downstream SEI rejection"
-]
-},
-{
-"t": "h",
-"x": "Loader framework responsibilities"
-},
-{
-"t": "ul",
-"items": [
-"Select the approved workflow and loader definition",
-"Read prepared Hub-owned outbound data",
-"Render the SEI-approved loader format",
-"Validate required fields, file structure and control totals",
-"Assign delivery and correlation identifiers",
-"Submit through the approved egress route",
-"Record acknowledgement, rejection and retry status"
-]
-},
-{
-"t": "h",
-"x": "Boundary rule"
-},
-{
-"t": "ul",
-"items": [
-"Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery."
-]
-}
-]
-},
-{
 "h": "Open against this component",
 "md": "\n**1 unresolved conflict and 8 other open items** — `GAP-03`, `R6`, `R8`, `R14`, `R20`, `R21`, `R22`, `R23`, `R24`. Stated in full, with both readings and the decision each needs, in the gap supplement.",
 "blocks": [
@@ -4756,116 +4646,6 @@ export const DESIGN_DOCS = [
 ]
 },
 {
-"h": "How this works, from the architecture supplement",
-"md": "\n### Landing Zone contract\n\n| Contract | Requirement |\n|---|---|\n| File readiness | Only complete files are visible, or a final rename or marker convention is used |\n| Shared access | Landing, Archive and Quarantine are visible consistently to worker pods |\n| Immutability | File contents are not modified in Landing |\n| Discovery | The ingestion scanner reads active file configuration before scanning |\n| Unknown files | An unmatched file produces an operational event and follows the approved exception-location policy |\n| Ambiguous files | More than one configuration match is a configuration error and the file is NOT loaded |\n\n### Landing failure modes\n\n- Partial file exposure\n- Duplicate physical delivery for the same logical interface and business date\n- Filename does not match an active configuration\n- Filename matches more than one configuration\n- Storage unavailable or permission denied\n\n### Transfer evidence required from Momentum\n\n- Source and destination filename\n- Transfer start and completion timestamps\n- Transfer outcome\n- Checksum, where the approved transfer contract includes one\n- Correlation with the receiving ingestion record, where available\n\n### Gateway design constraints\n\n- No direct source-system-to-SEI service coupling across the trust boundary\n- An idempotent request keeps the same idempotency key during safe retry\n- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata\n- Gateway rejection is recorded separately from downstream SEI rejection\n\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
-"blocks": [
-{
-"t": "h",
-"x": "Landing Zone contract"
-},
-{
-"t": "tbl",
-"rows": [
-[
-"Contract",
-"Requirement"
-],
-[
-"File readiness",
-"Only complete files are visible, or a final rename or marker convention is used"
-],
-[
-"Shared access",
-"Landing, Archive and Quarantine are visible consistently to worker pods"
-],
-[
-"Immutability",
-"File contents are not modified in Landing"
-],
-[
-"Discovery",
-"The ingestion scanner reads active file configuration before scanning"
-],
-[
-"Unknown files",
-"An unmatched file produces an operational event and follows the approved exception-location policy"
-],
-[
-"Ambiguous files",
-"More than one configuration match is a configuration error and the file is NOT loaded"
-]
-]
-},
-{
-"t": "h",
-"x": "Landing failure modes"
-},
-{
-"t": "ul",
-"items": [
-"Partial file exposure",
-"Duplicate physical delivery for the same logical interface and business date",
-"Filename does not match an active configuration",
-"Filename matches more than one configuration",
-"Storage unavailable or permission denied"
-]
-},
-{
-"t": "h",
-"x": "Transfer evidence required from Momentum"
-},
-{
-"t": "ul",
-"items": [
-"Source and destination filename",
-"Transfer start and completion timestamps",
-"Transfer outcome",
-"Checksum, where the approved transfer contract includes one",
-"Correlation with the receiving ingestion record, where available"
-]
-},
-{
-"t": "h",
-"x": "Gateway design constraints"
-},
-{
-"t": "ul",
-"items": [
-"No direct source-system-to-SEI service coupling across the trust boundary",
-"An idempotent request keeps the same idempotency key during safe retry",
-"Authentication secrets resolve from the platform secret service and are never stored in workflow metadata",
-"Gateway rejection is recorded separately from downstream SEI rejection"
-]
-},
-{
-"t": "h",
-"x": "Loader framework responsibilities"
-},
-{
-"t": "ul",
-"items": [
-"Select the approved workflow and loader definition",
-"Read prepared Hub-owned outbound data",
-"Render the SEI-approved loader format",
-"Validate required fields, file structure and control totals",
-"Assign delivery and correlation identifiers",
-"Submit through the approved egress route",
-"Record acknowledgement, rejection and retry status"
-]
-},
-{
-"t": "h",
-"x": "Boundary rule"
-},
-{
-"t": "ul",
-"items": [
-"Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery."
-]
-}
-]
-},
-{
 "h": "Open against this component",
 "md": "\n**1 unresolved conflict and 8 other open items** — `GAP-03`, `R6`, `R8`, `R14`, `R20`, `R21`, `R22`, `R23`, `R24`. Stated in full, with both readings and the decision each needs, in the gap supplement.",
 "blocks": [
@@ -4974,116 +4754,6 @@ export const DESIGN_DOCS = [
 {
 "t": "p",
 "x": "SEI's to confirm."
-}
-]
-},
-{
-"h": "How this works, from the architecture supplement",
-"md": "\n### Landing Zone contract\n\n| Contract | Requirement |\n|---|---|\n| File readiness | Only complete files are visible, or a final rename or marker convention is used |\n| Shared access | Landing, Archive and Quarantine are visible consistently to worker pods |\n| Immutability | File contents are not modified in Landing |\n| Discovery | The ingestion scanner reads active file configuration before scanning |\n| Unknown files | An unmatched file produces an operational event and follows the approved exception-location policy |\n| Ambiguous files | More than one configuration match is a configuration error and the file is NOT loaded |\n\n### Landing failure modes\n\n- Partial file exposure\n- Duplicate physical delivery for the same logical interface and business date\n- Filename does not match an active configuration\n- Filename matches more than one configuration\n- Storage unavailable or permission denied\n\n### Transfer evidence required from Momentum\n\n- Source and destination filename\n- Transfer start and completion timestamps\n- Transfer outcome\n- Checksum, where the approved transfer contract includes one\n- Correlation with the receiving ingestion record, where available\n\n### Gateway design constraints\n\n- No direct source-system-to-SEI service coupling across the trust boundary\n- An idempotent request keeps the same idempotency key during safe retry\n- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata\n- Gateway rejection is recorded separately from downstream SEI rejection\n\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
-"blocks": [
-{
-"t": "h",
-"x": "Landing Zone contract"
-},
-{
-"t": "tbl",
-"rows": [
-[
-"Contract",
-"Requirement"
-],
-[
-"File readiness",
-"Only complete files are visible, or a final rename or marker convention is used"
-],
-[
-"Shared access",
-"Landing, Archive and Quarantine are visible consistently to worker pods"
-],
-[
-"Immutability",
-"File contents are not modified in Landing"
-],
-[
-"Discovery",
-"The ingestion scanner reads active file configuration before scanning"
-],
-[
-"Unknown files",
-"An unmatched file produces an operational event and follows the approved exception-location policy"
-],
-[
-"Ambiguous files",
-"More than one configuration match is a configuration error and the file is NOT loaded"
-]
-]
-},
-{
-"t": "h",
-"x": "Landing failure modes"
-},
-{
-"t": "ul",
-"items": [
-"Partial file exposure",
-"Duplicate physical delivery for the same logical interface and business date",
-"Filename does not match an active configuration",
-"Filename matches more than one configuration",
-"Storage unavailable or permission denied"
-]
-},
-{
-"t": "h",
-"x": "Transfer evidence required from Momentum"
-},
-{
-"t": "ul",
-"items": [
-"Source and destination filename",
-"Transfer start and completion timestamps",
-"Transfer outcome",
-"Checksum, where the approved transfer contract includes one",
-"Correlation with the receiving ingestion record, where available"
-]
-},
-{
-"t": "h",
-"x": "Gateway design constraints"
-},
-{
-"t": "ul",
-"items": [
-"No direct source-system-to-SEI service coupling across the trust boundary",
-"An idempotent request keeps the same idempotency key during safe retry",
-"Authentication secrets resolve from the platform secret service and are never stored in workflow metadata",
-"Gateway rejection is recorded separately from downstream SEI rejection"
-]
-},
-{
-"t": "h",
-"x": "Loader framework responsibilities"
-},
-{
-"t": "ul",
-"items": [
-"Select the approved workflow and loader definition",
-"Read prepared Hub-owned outbound data",
-"Render the SEI-approved loader format",
-"Validate required fields, file structure and control totals",
-"Assign delivery and correlation identifiers",
-"Submit through the approved egress route",
-"Record acknowledgement, rejection and retry status"
-]
-},
-{
-"t": "h",
-"x": "Boundary rule"
-},
-{
-"t": "ul",
-"items": [
-"Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery."
-]
 }
 ]
 },
@@ -5202,86 +4872,8 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "How this works, from the architecture supplement",
-"md": "\n### Landing Zone contract\n\n| Contract | Requirement |\n|---|---|\n| File readiness | Only complete files are visible, or a final rename or marker convention is used |\n| Shared access | Landing, Archive and Quarantine are visible consistently to worker pods |\n| Immutability | File contents are not modified in Landing |\n| Discovery | The ingestion scanner reads active file configuration before scanning |\n| Unknown files | An unmatched file produces an operational event and follows the approved exception-location policy |\n| Ambiguous files | More than one configuration match is a configuration error and the file is NOT loaded |\n\n### Landing failure modes\n\n- Partial file exposure\n- Duplicate physical delivery for the same logical interface and business date\n- Filename does not match an active configuration\n- Filename matches more than one configuration\n- Storage unavailable or permission denied\n\n### Transfer evidence required from Momentum\n\n- Source and destination filename\n- Transfer start and completion timestamps\n- Transfer outcome\n- Checksum, where the approved transfer contract includes one\n- Correlation with the receiving ingestion record, where available\n\n### Gateway design constraints\n\n- No direct source-system-to-SEI service coupling across the trust boundary\n- An idempotent request keeps the same idempotency key during safe retry\n- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata\n- Gateway rejection is recorded separately from downstream SEI rejection\n\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
+"md": "\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
 "blocks": [
-{
-"t": "h",
-"x": "Landing Zone contract"
-},
-{
-"t": "tbl",
-"rows": [
-[
-"Contract",
-"Requirement"
-],
-[
-"File readiness",
-"Only complete files are visible, or a final rename or marker convention is used"
-],
-[
-"Shared access",
-"Landing, Archive and Quarantine are visible consistently to worker pods"
-],
-[
-"Immutability",
-"File contents are not modified in Landing"
-],
-[
-"Discovery",
-"The ingestion scanner reads active file configuration before scanning"
-],
-[
-"Unknown files",
-"An unmatched file produces an operational event and follows the approved exception-location policy"
-],
-[
-"Ambiguous files",
-"More than one configuration match is a configuration error and the file is NOT loaded"
-]
-]
-},
-{
-"t": "h",
-"x": "Landing failure modes"
-},
-{
-"t": "ul",
-"items": [
-"Partial file exposure",
-"Duplicate physical delivery for the same logical interface and business date",
-"Filename does not match an active configuration",
-"Filename matches more than one configuration",
-"Storage unavailable or permission denied"
-]
-},
-{
-"t": "h",
-"x": "Transfer evidence required from Momentum"
-},
-{
-"t": "ul",
-"items": [
-"Source and destination filename",
-"Transfer start and completion timestamps",
-"Transfer outcome",
-"Checksum, where the approved transfer contract includes one",
-"Correlation with the receiving ingestion record, where available"
-]
-},
-{
-"t": "h",
-"x": "Gateway design constraints"
-},
-{
-"t": "ul",
-"items": [
-"No direct source-system-to-SEI service coupling across the trust boundary",
-"An idempotent request keeps the same idempotency key during safe retry",
-"Authentication secrets resolve from the platform secret service and are never stored in workflow metadata",
-"Gateway rejection is recorded separately from downstream SEI rejection"
-]
-},
 {
 "t": "h",
 "x": "Loader framework responsibilities"
@@ -5423,116 +5015,6 @@ export const DESIGN_DOCS = [
 ]
 },
 {
-"h": "How this works, from the architecture supplement",
-"md": "\n### Landing Zone contract\n\n| Contract | Requirement |\n|---|---|\n| File readiness | Only complete files are visible, or a final rename or marker convention is used |\n| Shared access | Landing, Archive and Quarantine are visible consistently to worker pods |\n| Immutability | File contents are not modified in Landing |\n| Discovery | The ingestion scanner reads active file configuration before scanning |\n| Unknown files | An unmatched file produces an operational event and follows the approved exception-location policy |\n| Ambiguous files | More than one configuration match is a configuration error and the file is NOT loaded |\n\n### Landing failure modes\n\n- Partial file exposure\n- Duplicate physical delivery for the same logical interface and business date\n- Filename does not match an active configuration\n- Filename matches more than one configuration\n- Storage unavailable or permission denied\n\n### Transfer evidence required from Momentum\n\n- Source and destination filename\n- Transfer start and completion timestamps\n- Transfer outcome\n- Checksum, where the approved transfer contract includes one\n- Correlation with the receiving ingestion record, where available\n\n### Gateway design constraints\n\n- No direct source-system-to-SEI service coupling across the trust boundary\n- An idempotent request keeps the same idempotency key during safe retry\n- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata\n- Gateway rejection is recorded separately from downstream SEI rejection\n\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
-"blocks": [
-{
-"t": "h",
-"x": "Landing Zone contract"
-},
-{
-"t": "tbl",
-"rows": [
-[
-"Contract",
-"Requirement"
-],
-[
-"File readiness",
-"Only complete files are visible, or a final rename or marker convention is used"
-],
-[
-"Shared access",
-"Landing, Archive and Quarantine are visible consistently to worker pods"
-],
-[
-"Immutability",
-"File contents are not modified in Landing"
-],
-[
-"Discovery",
-"The ingestion scanner reads active file configuration before scanning"
-],
-[
-"Unknown files",
-"An unmatched file produces an operational event and follows the approved exception-location policy"
-],
-[
-"Ambiguous files",
-"More than one configuration match is a configuration error and the file is NOT loaded"
-]
-]
-},
-{
-"t": "h",
-"x": "Landing failure modes"
-},
-{
-"t": "ul",
-"items": [
-"Partial file exposure",
-"Duplicate physical delivery for the same logical interface and business date",
-"Filename does not match an active configuration",
-"Filename matches more than one configuration",
-"Storage unavailable or permission denied"
-]
-},
-{
-"t": "h",
-"x": "Transfer evidence required from Momentum"
-},
-{
-"t": "ul",
-"items": [
-"Source and destination filename",
-"Transfer start and completion timestamps",
-"Transfer outcome",
-"Checksum, where the approved transfer contract includes one",
-"Correlation with the receiving ingestion record, where available"
-]
-},
-{
-"t": "h",
-"x": "Gateway design constraints"
-},
-{
-"t": "ul",
-"items": [
-"No direct source-system-to-SEI service coupling across the trust boundary",
-"An idempotent request keeps the same idempotency key during safe retry",
-"Authentication secrets resolve from the platform secret service and are never stored in workflow metadata",
-"Gateway rejection is recorded separately from downstream SEI rejection"
-]
-},
-{
-"t": "h",
-"x": "Loader framework responsibilities"
-},
-{
-"t": "ul",
-"items": [
-"Select the approved workflow and loader definition",
-"Read prepared Hub-owned outbound data",
-"Render the SEI-approved loader format",
-"Validate required fields, file structure and control totals",
-"Assign delivery and correlation identifiers",
-"Submit through the approved egress route",
-"Record acknowledgement, rejection and retry status"
-]
-},
-{
-"t": "h",
-"x": "Boundary rule"
-},
-{
-"t": "ul",
-"items": [
-"Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery."
-]
-}
-]
-},
-{
 "h": "Open against this component",
 "md": "\n**1 unresolved conflict and 8 other open items** — `GAP-03`, `R6`, `R8`, `R14`, `R20`, `R21`, `R22`, `R23`, `R24`. Stated in full, with both readings and the decision each needs, in the gap supplement.",
 "blocks": [
@@ -5646,116 +5128,6 @@ export const DESIGN_DOCS = [
 ]
 },
 {
-"h": "How this works, from the architecture supplement",
-"md": "\n### Landing Zone contract\n\n| Contract | Requirement |\n|---|---|\n| File readiness | Only complete files are visible, or a final rename or marker convention is used |\n| Shared access | Landing, Archive and Quarantine are visible consistently to worker pods |\n| Immutability | File contents are not modified in Landing |\n| Discovery | The ingestion scanner reads active file configuration before scanning |\n| Unknown files | An unmatched file produces an operational event and follows the approved exception-location policy |\n| Ambiguous files | More than one configuration match is a configuration error and the file is NOT loaded |\n\n### Landing failure modes\n\n- Partial file exposure\n- Duplicate physical delivery for the same logical interface and business date\n- Filename does not match an active configuration\n- Filename matches more than one configuration\n- Storage unavailable or permission denied\n\n### Transfer evidence required from Momentum\n\n- Source and destination filename\n- Transfer start and completion timestamps\n- Transfer outcome\n- Checksum, where the approved transfer contract includes one\n- Correlation with the receiving ingestion record, where available\n\n### Gateway design constraints\n\n- No direct source-system-to-SEI service coupling across the trust boundary\n- An idempotent request keeps the same idempotency key during safe retry\n- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata\n- Gateway rejection is recorded separately from downstream SEI rejection\n\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
-"blocks": [
-{
-"t": "h",
-"x": "Landing Zone contract"
-},
-{
-"t": "tbl",
-"rows": [
-[
-"Contract",
-"Requirement"
-],
-[
-"File readiness",
-"Only complete files are visible, or a final rename or marker convention is used"
-],
-[
-"Shared access",
-"Landing, Archive and Quarantine are visible consistently to worker pods"
-],
-[
-"Immutability",
-"File contents are not modified in Landing"
-],
-[
-"Discovery",
-"The ingestion scanner reads active file configuration before scanning"
-],
-[
-"Unknown files",
-"An unmatched file produces an operational event and follows the approved exception-location policy"
-],
-[
-"Ambiguous files",
-"More than one configuration match is a configuration error and the file is NOT loaded"
-]
-]
-},
-{
-"t": "h",
-"x": "Landing failure modes"
-},
-{
-"t": "ul",
-"items": [
-"Partial file exposure",
-"Duplicate physical delivery for the same logical interface and business date",
-"Filename does not match an active configuration",
-"Filename matches more than one configuration",
-"Storage unavailable or permission denied"
-]
-},
-{
-"t": "h",
-"x": "Transfer evidence required from Momentum"
-},
-{
-"t": "ul",
-"items": [
-"Source and destination filename",
-"Transfer start and completion timestamps",
-"Transfer outcome",
-"Checksum, where the approved transfer contract includes one",
-"Correlation with the receiving ingestion record, where available"
-]
-},
-{
-"t": "h",
-"x": "Gateway design constraints"
-},
-{
-"t": "ul",
-"items": [
-"No direct source-system-to-SEI service coupling across the trust boundary",
-"An idempotent request keeps the same idempotency key during safe retry",
-"Authentication secrets resolve from the platform secret service and are never stored in workflow metadata",
-"Gateway rejection is recorded separately from downstream SEI rejection"
-]
-},
-{
-"t": "h",
-"x": "Loader framework responsibilities"
-},
-{
-"t": "ul",
-"items": [
-"Select the approved workflow and loader definition",
-"Read prepared Hub-owned outbound data",
-"Render the SEI-approved loader format",
-"Validate required fields, file structure and control totals",
-"Assign delivery and correlation identifiers",
-"Submit through the approved egress route",
-"Record acknowledgement, rejection and retry status"
-]
-},
-{
-"t": "h",
-"x": "Boundary rule"
-},
-{
-"t": "ul",
-"items": [
-"Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery."
-]
-}
-]
-},
-{
 "h": "Open against this component",
 "md": "\n**1 unresolved conflict and 8 other open items** — `GAP-03`, `R6`, `R8`, `R14`, `R20`, `R21`, `R22`, `R23`, `R24`. Stated in full, with both readings and the decision each needs, in the gap supplement.",
 "blocks": [
@@ -5864,116 +5236,6 @@ export const DESIGN_DOCS = [
 {
 "t": "p",
 "x": "SEI's to confirm."
-}
-]
-},
-{
-"h": "How this works, from the architecture supplement",
-"md": "\n### Landing Zone contract\n\n| Contract | Requirement |\n|---|---|\n| File readiness | Only complete files are visible, or a final rename or marker convention is used |\n| Shared access | Landing, Archive and Quarantine are visible consistently to worker pods |\n| Immutability | File contents are not modified in Landing |\n| Discovery | The ingestion scanner reads active file configuration before scanning |\n| Unknown files | An unmatched file produces an operational event and follows the approved exception-location policy |\n| Ambiguous files | More than one configuration match is a configuration error and the file is NOT loaded |\n\n### Landing failure modes\n\n- Partial file exposure\n- Duplicate physical delivery for the same logical interface and business date\n- Filename does not match an active configuration\n- Filename matches more than one configuration\n- Storage unavailable or permission denied\n\n### Transfer evidence required from Momentum\n\n- Source and destination filename\n- Transfer start and completion timestamps\n- Transfer outcome\n- Checksum, where the approved transfer contract includes one\n- Correlation with the receiving ingestion record, where available\n\n### Gateway design constraints\n\n- No direct source-system-to-SEI service coupling across the trust boundary\n- An idempotent request keeps the same idempotency key during safe retry\n- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata\n- Gateway rejection is recorded separately from downstream SEI rejection\n\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
-"blocks": [
-{
-"t": "h",
-"x": "Landing Zone contract"
-},
-{
-"t": "tbl",
-"rows": [
-[
-"Contract",
-"Requirement"
-],
-[
-"File readiness",
-"Only complete files are visible, or a final rename or marker convention is used"
-],
-[
-"Shared access",
-"Landing, Archive and Quarantine are visible consistently to worker pods"
-],
-[
-"Immutability",
-"File contents are not modified in Landing"
-],
-[
-"Discovery",
-"The ingestion scanner reads active file configuration before scanning"
-],
-[
-"Unknown files",
-"An unmatched file produces an operational event and follows the approved exception-location policy"
-],
-[
-"Ambiguous files",
-"More than one configuration match is a configuration error and the file is NOT loaded"
-]
-]
-},
-{
-"t": "h",
-"x": "Landing failure modes"
-},
-{
-"t": "ul",
-"items": [
-"Partial file exposure",
-"Duplicate physical delivery for the same logical interface and business date",
-"Filename does not match an active configuration",
-"Filename matches more than one configuration",
-"Storage unavailable or permission denied"
-]
-},
-{
-"t": "h",
-"x": "Transfer evidence required from Momentum"
-},
-{
-"t": "ul",
-"items": [
-"Source and destination filename",
-"Transfer start and completion timestamps",
-"Transfer outcome",
-"Checksum, where the approved transfer contract includes one",
-"Correlation with the receiving ingestion record, where available"
-]
-},
-{
-"t": "h",
-"x": "Gateway design constraints"
-},
-{
-"t": "ul",
-"items": [
-"No direct source-system-to-SEI service coupling across the trust boundary",
-"An idempotent request keeps the same idempotency key during safe retry",
-"Authentication secrets resolve from the platform secret service and are never stored in workflow metadata",
-"Gateway rejection is recorded separately from downstream SEI rejection"
-]
-},
-{
-"t": "h",
-"x": "Loader framework responsibilities"
-},
-{
-"t": "ul",
-"items": [
-"Select the approved workflow and loader definition",
-"Read prepared Hub-owned outbound data",
-"Render the SEI-approved loader format",
-"Validate required fields, file structure and control totals",
-"Assign delivery and correlation identifiers",
-"Submit through the approved egress route",
-"Record acknowledgement, rejection and retry status"
-]
-},
-{
-"t": "h",
-"x": "Boundary rule"
-},
-{
-"t": "ul",
-"items": [
-"Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery."
-]
 }
 ]
 },
@@ -6159,7 +5421,7 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "How this works, from the architecture supplement",
-"md": "\n### Landing Zone contract\n\n| Contract | Requirement |\n|---|---|\n| File readiness | Only complete files are visible, or a final rename or marker convention is used |\n| Shared access | Landing, Archive and Quarantine are visible consistently to worker pods |\n| Immutability | File contents are not modified in Landing |\n| Discovery | The ingestion scanner reads active file configuration before scanning |\n| Unknown files | An unmatched file produces an operational event and follows the approved exception-location policy |\n| Ambiguous files | More than one configuration match is a configuration error and the file is NOT loaded |\n\n### Landing failure modes\n\n- Partial file exposure\n- Duplicate physical delivery for the same logical interface and business date\n- Filename does not match an active configuration\n- Filename matches more than one configuration\n- Storage unavailable or permission denied\n\n### Transfer evidence required from Momentum\n\n- Source and destination filename\n- Transfer start and completion timestamps\n- Transfer outcome\n- Checksum, where the approved transfer contract includes one\n- Correlation with the receiving ingestion record, where available\n\n### Gateway design constraints\n\n- No direct source-system-to-SEI service coupling across the trust boundary\n- An idempotent request keeps the same idempotency key during safe retry\n- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata\n- Gateway rejection is recorded separately from downstream SEI rejection\n\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
+"md": "\n### Landing Zone contract\n\n| Contract | Requirement |\n|---|---|\n| File readiness | Only complete files are visible, or a final rename or marker convention is used |\n| Shared access | Landing, Archive and Quarantine are visible consistently to worker pods |\n| Immutability | File contents are not modified in Landing |\n| Discovery | The ingestion scanner reads active file configuration before scanning |\n| Unknown files | An unmatched file produces an operational event and follows the approved exception-location policy |\n| Ambiguous files | More than one configuration match is a configuration error and the file is NOT loaded |\n\n### Landing failure modes\n\n- Partial file exposure\n- Duplicate physical delivery for the same logical interface and business date\n- Filename does not match an active configuration\n- Filename matches more than one configuration\n- Storage unavailable or permission denied\n\n### Transfer evidence required from Momentum\n\n- Source and destination filename\n- Transfer start and completion timestamps\n- Transfer outcome\n- Checksum, where the approved transfer contract includes one\n- Correlation with the receiving ingestion record, where available",
 "blocks": [
 {
 "t": "h",
@@ -6224,45 +5486,6 @@ export const DESIGN_DOCS = [
 "Transfer outcome",
 "Checksum, where the approved transfer contract includes one",
 "Correlation with the receiving ingestion record, where available"
-]
-},
-{
-"t": "h",
-"x": "Gateway design constraints"
-},
-{
-"t": "ul",
-"items": [
-"No direct source-system-to-SEI service coupling across the trust boundary",
-"An idempotent request keeps the same idempotency key during safe retry",
-"Authentication secrets resolve from the platform secret service and are never stored in workflow metadata",
-"Gateway rejection is recorded separately from downstream SEI rejection"
-]
-},
-{
-"t": "h",
-"x": "Loader framework responsibilities"
-},
-{
-"t": "ul",
-"items": [
-"Select the approved workflow and loader definition",
-"Read prepared Hub-owned outbound data",
-"Render the SEI-approved loader format",
-"Validate required fields, file structure and control totals",
-"Assign delivery and correlation identifiers",
-"Submit through the approved egress route",
-"Record acknowledgement, rejection and retry status"
-]
-},
-{
-"t": "h",
-"x": "Boundary rule"
-},
-{
-"t": "ul",
-"items": [
-"Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery."
 ]
 }
 ]
@@ -6630,86 +5853,8 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "How this works, from the architecture supplement",
-"md": "\n### Landing Zone contract\n\n| Contract | Requirement |\n|---|---|\n| File readiness | Only complete files are visible, or a final rename or marker convention is used |\n| Shared access | Landing, Archive and Quarantine are visible consistently to worker pods |\n| Immutability | File contents are not modified in Landing |\n| Discovery | The ingestion scanner reads active file configuration before scanning |\n| Unknown files | An unmatched file produces an operational event and follows the approved exception-location policy |\n| Ambiguous files | More than one configuration match is a configuration error and the file is NOT loaded |\n\n### Landing failure modes\n\n- Partial file exposure\n- Duplicate physical delivery for the same logical interface and business date\n- Filename does not match an active configuration\n- Filename matches more than one configuration\n- Storage unavailable or permission denied\n\n### Transfer evidence required from Momentum\n\n- Source and destination filename\n- Transfer start and completion timestamps\n- Transfer outcome\n- Checksum, where the approved transfer contract includes one\n- Correlation with the receiving ingestion record, where available\n\n### Gateway design constraints\n\n- No direct source-system-to-SEI service coupling across the trust boundary\n- An idempotent request keeps the same idempotency key during safe retry\n- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata\n- Gateway rejection is recorded separately from downstream SEI rejection\n\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
+"md": "\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
 "blocks": [
-{
-"t": "h",
-"x": "Landing Zone contract"
-},
-{
-"t": "tbl",
-"rows": [
-[
-"Contract",
-"Requirement"
-],
-[
-"File readiness",
-"Only complete files are visible, or a final rename or marker convention is used"
-],
-[
-"Shared access",
-"Landing, Archive and Quarantine are visible consistently to worker pods"
-],
-[
-"Immutability",
-"File contents are not modified in Landing"
-],
-[
-"Discovery",
-"The ingestion scanner reads active file configuration before scanning"
-],
-[
-"Unknown files",
-"An unmatched file produces an operational event and follows the approved exception-location policy"
-],
-[
-"Ambiguous files",
-"More than one configuration match is a configuration error and the file is NOT loaded"
-]
-]
-},
-{
-"t": "h",
-"x": "Landing failure modes"
-},
-{
-"t": "ul",
-"items": [
-"Partial file exposure",
-"Duplicate physical delivery for the same logical interface and business date",
-"Filename does not match an active configuration",
-"Filename matches more than one configuration",
-"Storage unavailable or permission denied"
-]
-},
-{
-"t": "h",
-"x": "Transfer evidence required from Momentum"
-},
-{
-"t": "ul",
-"items": [
-"Source and destination filename",
-"Transfer start and completion timestamps",
-"Transfer outcome",
-"Checksum, where the approved transfer contract includes one",
-"Correlation with the receiving ingestion record, where available"
-]
-},
-{
-"t": "h",
-"x": "Gateway design constraints"
-},
-{
-"t": "ul",
-"items": [
-"No direct source-system-to-SEI service coupling across the trust boundary",
-"An idempotent request keeps the same idempotency key during safe retry",
-"Authentication secrets resolve from the platform secret service and are never stored in workflow metadata",
-"Gateway rejection is recorded separately from downstream SEI rejection"
-]
-},
 {
 "t": "h",
 "x": "Loader framework responsibilities"
@@ -6815,7 +5960,7 @@ export const DESIGN_DOCS = [
 "sections": [
 {
 "h": "What this component is",
-"md": "\nThe API lane. Both SEI documents are batch from end to end — files in, Gold out — and neither mentions a proxy, a gateway or a synchronous call.\n\nIt sits in **Ingress and Egress**, in the **API gateway and Apigee proxy** lane (vendor).",
+"md": "\nThe API lane. Both SEI documents are batch from end to end — files in, Gold out — and neither mentions a proxy, a gateway or a synchronous call.\n\nIt sits in **Ingress and Egress**, in the **API gateway and Apigee proxy** lane (two layers · one door).",
 "blocks": [
 {
 "t": "p",
@@ -6823,7 +5968,7 @@ export const DESIGN_DOCS = [
 },
 {
 "t": "p",
-"x": "It sits in **Ingress and Egress**, in the **API gateway and Apigee proxy** lane (vendor)."
+"x": "It sits in **Ingress and Egress**, in the **API gateway and Apigee proxy** lane (two layers · one door)."
 }
 ]
 },
@@ -6855,71 +6000,18 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "How this works, from the architecture supplement",
-"md": "\n### Landing Zone contract\n\n| Contract | Requirement |\n|---|---|\n| File readiness | Only complete files are visible, or a final rename or marker convention is used |\n| Shared access | Landing, Archive and Quarantine are visible consistently to worker pods |\n| Immutability | File contents are not modified in Landing |\n| Discovery | The ingestion scanner reads active file configuration before scanning |\n| Unknown files | An unmatched file produces an operational event and follows the approved exception-location policy |\n| Ambiguous files | More than one configuration match is a configuration error and the file is NOT loaded |\n\n### Landing failure modes\n\n- Partial file exposure\n- Duplicate physical delivery for the same logical interface and business date\n- Filename does not match an active configuration\n- Filename matches more than one configuration\n- Storage unavailable or permission denied\n\n### Transfer evidence required from Momentum\n\n- Source and destination filename\n- Transfer start and completion timestamps\n- Transfer outcome\n- Checksum, where the approved transfer contract includes one\n- Correlation with the receiving ingestion record, where available\n\n### Gateway design constraints\n\n- No direct source-system-to-SEI service coupling across the trust boundary\n- An idempotent request keeps the same idempotency key during safe retry\n- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata\n- Gateway rejection is recorded separately from downstream SEI rejection\n\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.\n\n### Header policy\n\n| Header category | Required behaviour |\n|---|---|\n| Caller identity | Trust only values asserted by the approved upstream boundary; prevent spoofing |\n| Vendor Authorization | Generate from the vendor token; do not blindly forward caller authorization |\n| AppKey | Resolve using the approved precedence and fallback policy |\n| Correlation identifier | Validate a trusted incoming value or generate one; propagate to outbound calls, logs, metrics and traces |\n| Hop-by-hop headers | Suppress |\n| Host and forwarding headers | Generate or normalize under gateway control |\n| Vendor response headers | Return only an explicit allowlist |\n\n### A governed operation declares\n\n- `operation_id`\n- `allowed_method`\n- `allowed_path_pattern`\n- `vendor_target_path`\n- `request_schema_version`\n- `required_request_headers`\n- `allowed_request_headers`\n- `allowed_response_headers`\n- `timeout_policy`\n- `retry_policy`\n- `circuit_breaker_policy`\n\n### Vendor token cache\n\n| State | Meaning | Transitions |\n|---|---|---|\n| EMPTY | No token held | to REFRESHING when a token is requested |\n| REFRESHING | Token request in flight | to VALID on receipt, to FAILED on error |\n| VALID | Cached and inside the safe expiry boundary | cache hit, or to REFRESHING at safe expiry, or to EMPTY on invalidation |\n| FAILED | Token request failed | to REFRESHING on approved retry |\n\n### Configuration split\n\n- **ConfigMap, non-secret.** `VENDOR_CLIENT_HOST`, `VENDOR_TOKEN_HOST`, `CONNECT_TIMEOUT`, `RESPONSE_TIMEOUT`, `TOKEN_EXPIRY_SKEW`, `ALLOWED_OPERATION_CONFIGURATION`, `LOG_LEVEL_DEFAULTS`, `OTEL_EXPORT_CONFIGURATION`\n- **Secret, sensitive.** `VENDOR_APP_KEY`, `VENDOR_BASIC_AUTHORIZATION`, `TRUSTSTORE_PASSWORD`, `TRUSTSTORE_FILE`\n- Production startup fails when a mandatory secret is absent.",
+"md": "\n### Where this sits\n\n- Two nodes, run by BBH as platform infrastructure rather than by this programme. Carries the call out to SEI, and is the identity SEI observes on the far side. Vendor kit: proxy configuration and policy, no application code.\n- The other layer is **CP-Integration-Gateway** (the wrapper), tracked as component 12.\n- Not a conflict. Both are true at their own vantage point. The API Gateway is a wrapper over BBH's Apigee network, there to isolate BBH's Apigee infrastructure and security from the consumer. SEI sees requests arriving from Apigee because on the egress path they do. What SEI names as one proxy is, on BBH's side, the gateway plus Apigee behind it. Nothing needs pinning and SEI's diagram is not wrong - it is drawn from outside the boundary the wrapper exists to create.\n\n### Gateway design constraints\n\n- No direct source-system-to-SEI service coupling across the trust boundary\n- An idempotent request keeps the same idempotency key during safe retry\n- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata\n- Gateway rejection is recorded separately from downstream SEI rejection",
 "blocks": [
 {
 "t": "h",
-"x": "Landing Zone contract"
-},
-{
-"t": "tbl",
-"rows": [
-[
-"Contract",
-"Requirement"
-],
-[
-"File readiness",
-"Only complete files are visible, or a final rename or marker convention is used"
-],
-[
-"Shared access",
-"Landing, Archive and Quarantine are visible consistently to worker pods"
-],
-[
-"Immutability",
-"File contents are not modified in Landing"
-],
-[
-"Discovery",
-"The ingestion scanner reads active file configuration before scanning"
-],
-[
-"Unknown files",
-"An unmatched file produces an operational event and follows the approved exception-location policy"
-],
-[
-"Ambiguous files",
-"More than one configuration match is a configuration error and the file is NOT loaded"
-]
-]
-},
-{
-"t": "h",
-"x": "Landing failure modes"
+"x": "Where this sits"
 },
 {
 "t": "ul",
 "items": [
-"Partial file exposure",
-"Duplicate physical delivery for the same logical interface and business date",
-"Filename does not match an active configuration",
-"Filename matches more than one configuration",
-"Storage unavailable or permission denied"
-]
-},
-{
-"t": "h",
-"x": "Transfer evidence required from Momentum"
-},
-{
-"t": "ul",
-"items": [
-"Source and destination filename",
-"Transfer start and completion timestamps",
-"Transfer outcome",
-"Checksum, where the approved transfer contract includes one",
-"Correlation with the receiving ingestion record, where available"
+"Two nodes, run by BBH as platform infrastructure rather than by this programme. Carries the call out to SEI, and is the identity SEI observes on the far side. Vendor kit: proxy configuration and policy, no application code.",
+"The other layer is **CP-Integration-Gateway** (the wrapper), tracked as component 12.",
+"Not a conflict. Both are true at their own vantage point. The API Gateway is a wrapper over BBH's Apigee network, there to isolate BBH's Apigee infrastructure and security from the consumer. SEI sees requests arriving from Apigee because on the egress path they do. What SEI names as one proxy is, on BBH's side, the gateway plus Apigee behind it. Nothing needs pinning and SEI's diagram is not wrong - it is drawn from outside the boundary the wrapper exists to create."
 ]
 },
 {
@@ -6933,139 +6025,6 @@ export const DESIGN_DOCS = [
 "An idempotent request keeps the same idempotency key during safe retry",
 "Authentication secrets resolve from the platform secret service and are never stored in workflow metadata",
 "Gateway rejection is recorded separately from downstream SEI rejection"
-]
-},
-{
-"t": "h",
-"x": "Loader framework responsibilities"
-},
-{
-"t": "ul",
-"items": [
-"Select the approved workflow and loader definition",
-"Read prepared Hub-owned outbound data",
-"Render the SEI-approved loader format",
-"Validate required fields, file structure and control totals",
-"Assign delivery and correlation identifiers",
-"Submit through the approved egress route",
-"Record acknowledgement, rejection and retry status"
-]
-},
-{
-"t": "h",
-"x": "Boundary rule"
-},
-{
-"t": "ul",
-"items": [
-"Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery."
-]
-},
-{
-"t": "h",
-"x": "Header policy"
-},
-{
-"t": "tbl",
-"rows": [
-[
-"Header category",
-"Required behaviour"
-],
-[
-"Caller identity",
-"Trust only values asserted by the approved upstream boundary; prevent spoofing"
-],
-[
-"Vendor Authorization",
-"Generate from the vendor token; do not blindly forward caller authorization"
-],
-[
-"AppKey",
-"Resolve using the approved precedence and fallback policy"
-],
-[
-"Correlation identifier",
-"Validate a trusted incoming value or generate one; propagate to outbound calls, logs, metrics and traces"
-],
-[
-"Hop-by-hop headers",
-"Suppress"
-],
-[
-"Host and forwarding headers",
-"Generate or normalize under gateway control"
-],
-[
-"Vendor response headers",
-"Return only an explicit allowlist"
-]
-]
-},
-{
-"t": "h",
-"x": "A governed operation declares"
-},
-{
-"t": "ul",
-"items": [
-"`operation_id`",
-"`allowed_method`",
-"`allowed_path_pattern`",
-"`vendor_target_path`",
-"`request_schema_version`",
-"`required_request_headers`",
-"`allowed_request_headers`",
-"`allowed_response_headers`",
-"`timeout_policy`",
-"`retry_policy`",
-"`circuit_breaker_policy`"
-]
-},
-{
-"t": "h",
-"x": "Vendor token cache"
-},
-{
-"t": "tbl",
-"rows": [
-[
-"State",
-"Meaning",
-"Transitions"
-],
-[
-"EMPTY",
-"No token held",
-"to REFRESHING when a token is requested"
-],
-[
-"REFRESHING",
-"Token request in flight",
-"to VALID on receipt, to FAILED on error"
-],
-[
-"VALID",
-"Cached and inside the safe expiry boundary",
-"cache hit, or to REFRESHING at safe expiry, or to EMPTY on invalidation"
-],
-[
-"FAILED",
-"Token request failed",
-"to REFRESHING on approved retry"
-]
-]
-},
-{
-"t": "h",
-"x": "Configuration split"
-},
-{
-"t": "ul",
-"items": [
-"**ConfigMap, non-secret.** `VENDOR_CLIENT_HOST`, `VENDOR_TOKEN_HOST`, `CONNECT_TIMEOUT`, `RESPONSE_TIMEOUT`, `TOKEN_EXPIRY_SKEW`, `ALLOWED_OPERATION_CONFIGURATION`, `LOG_LEVEL_DEFAULTS`, `OTEL_EXPORT_CONFIGURATION`",
-"**Secret, sensitive.** `VENDOR_APP_KEY`, `VENDOR_BASIC_AUTHORIZATION`, `TRUSTSTORE_PASSWORD`, `TRUSTSTORE_FILE`",
-"Production startup fails when a mandatory secret is absent."
 ]
 }
 ]
@@ -7150,7 +6109,7 @@ export const DESIGN_DOCS = [
 "sections": [
 {
 "h": "What this component is",
-"md": "\nThe API lane, as above. Nothing in either document describes real-time access to this data.\n\nIt sits in **Ingress and Egress**, in the **API gateway and Apigee proxy** lane (vendor).",
+"md": "\nThe API lane, as above. Nothing in either document describes real-time access to this data.\n\nIt sits in **Ingress and Egress**, in the **API gateway and Apigee proxy** lane (two layers · one door).",
 "blocks": [
 {
 "t": "p",
@@ -7158,7 +6117,7 @@ export const DESIGN_DOCS = [
 },
 {
 "t": "p",
-"x": "It sits in **Ingress and Egress**, in the **API gateway and Apigee proxy** lane (vendor)."
+"x": "It sits in **Ingress and Egress**, in the **API gateway and Apigee proxy** lane (two layers · one door)."
 }
 ]
 },
@@ -7190,71 +6149,31 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "How this works, from the architecture supplement",
-"md": "\n### Landing Zone contract\n\n| Contract | Requirement |\n|---|---|\n| File readiness | Only complete files are visible, or a final rename or marker convention is used |\n| Shared access | Landing, Archive and Quarantine are visible consistently to worker pods |\n| Immutability | File contents are not modified in Landing |\n| Discovery | The ingestion scanner reads active file configuration before scanning |\n| Unknown files | An unmatched file produces an operational event and follows the approved exception-location policy |\n| Ambiguous files | More than one configuration match is a configuration error and the file is NOT loaded |\n\n### Landing failure modes\n\n- Partial file exposure\n- Duplicate physical delivery for the same logical interface and business date\n- Filename does not match an active configuration\n- Filename matches more than one configuration\n- Storage unavailable or permission denied\n\n### Transfer evidence required from Momentum\n\n- Source and destination filename\n- Transfer start and completion timestamps\n- Transfer outcome\n- Checksum, where the approved transfer contract includes one\n- Correlation with the receiving ingestion record, where available\n\n### Gateway design constraints\n\n- No direct source-system-to-SEI service coupling across the trust boundary\n- An idempotent request keeps the same idempotency key during safe retry\n- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata\n- Gateway rejection is recorded separately from downstream SEI rejection\n\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.\n\n### Header policy\n\n| Header category | Required behaviour |\n|---|---|\n| Caller identity | Trust only values asserted by the approved upstream boundary; prevent spoofing |\n| Vendor Authorization | Generate from the vendor token; do not blindly forward caller authorization |\n| AppKey | Resolve using the approved precedence and fallback policy |\n| Correlation identifier | Validate a trusted incoming value or generate one; propagate to outbound calls, logs, metrics and traces |\n| Hop-by-hop headers | Suppress |\n| Host and forwarding headers | Generate or normalize under gateway control |\n| Vendor response headers | Return only an explicit allowlist |\n\n### A governed operation declares\n\n- `operation_id`\n- `allowed_method`\n- `allowed_path_pattern`\n- `vendor_target_path`\n- `request_schema_version`\n- `required_request_headers`\n- `allowed_request_headers`\n- `allowed_response_headers`\n- `timeout_policy`\n- `retry_policy`\n- `circuit_breaker_policy`\n\n### Vendor token cache\n\n| State | Meaning | Transitions |\n|---|---|---|\n| EMPTY | No token held | to REFRESHING when a token is requested |\n| REFRESHING | Token request in flight | to VALID on receipt, to FAILED on error |\n| VALID | Cached and inside the safe expiry boundary | cache hit, or to REFRESHING at safe expiry, or to EMPTY on invalidation |\n| FAILED | Token request failed | to REFRESHING on approved retry |\n\n### Configuration split\n\n- **ConfigMap, non-secret.** `VENDOR_CLIENT_HOST`, `VENDOR_TOKEN_HOST`, `CONNECT_TIMEOUT`, `RESPONSE_TIMEOUT`, `TOKEN_EXPIRY_SKEW`, `ALLOWED_OPERATION_CONFIGURATION`, `LOG_LEVEL_DEFAULTS`, `OTEL_EXPORT_CONFIGURATION`\n- **Secret, sensitive.** `VENDOR_APP_KEY`, `VENDOR_BASIC_AUTHORIZATION`, `TRUSTSTORE_PASSWORD`, `TRUSTSTORE_FILE`\n- Production startup fails when a mandatory secret is absent.",
+"md": "\n### Where this sits\n\n- Spring Boot WebFlux. The only thing a consumer addresses. It terminates the caller's request, applies the inbound trust boundary, and forwards to the vendor endpoint it is configured for. BBH-built, and the component this programme's readiness review is about.\n- The other layer is **BBH Apigee** (the network behind it), tracked as component 11.\n- Not a conflict. Both are true at their own vantage point. The API Gateway is a wrapper over BBH's Apigee network, there to isolate BBH's Apigee infrastructure and security from the consumer. SEI sees requests arriving from Apigee because on the egress path they do. What SEI names as one proxy is, on BBH's side, the gateway plus Apigee behind it. Nothing needs pinning and SEI's diagram is not wrong - it is drawn from outside the boundary the wrapper exists to create.\n\n### What this layer isolates from the consumer\n\n- BBH Apigee network topology\n- BBH Apigee security posture\n- vendor endpoint addresses and credentials\n- which BBH node answered\n\n### Gateway design constraints\n\n- No direct source-system-to-SEI service coupling across the trust boundary\n- An idempotent request keeps the same idempotency key during safe retry\n- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata\n- Gateway rejection is recorded separately from downstream SEI rejection\n\n### Header policy\n\n| Header category | Required behaviour |\n|---|---|\n| Caller identity | Trust only values asserted by the approved upstream boundary; prevent spoofing |\n| Vendor Authorization | Generate from the vendor token; do not blindly forward caller authorization |\n| AppKey | Resolve using the approved precedence and fallback policy |\n| Correlation identifier | Validate a trusted incoming value or generate one; propagate to outbound calls, logs, metrics and traces |\n| Hop-by-hop headers | Suppress |\n| Host and forwarding headers | Generate or normalize under gateway control |\n| Vendor response headers | Return only an explicit allowlist |\n\n### A governed operation declares\n\n- `operation_id`\n- `allowed_method`\n- `allowed_path_pattern`\n- `vendor_target_path`\n- `request_schema_version`\n- `required_request_headers`\n- `allowed_request_headers`\n- `allowed_response_headers`\n- `timeout_policy`\n- `retry_policy`\n- `circuit_breaker_policy`\n\n### Vendor token cache\n\n| State | Meaning | Transitions |\n|---|---|---|\n| EMPTY | No token held | to REFRESHING when a token is requested |\n| REFRESHING | Token request in flight | to VALID on receipt, to FAILED on error |\n| VALID | Cached and inside the safe expiry boundary | cache hit, or to REFRESHING at safe expiry, or to EMPTY on invalidation |\n| FAILED | Token request failed | to REFRESHING on approved retry |\n\n### Configuration split\n\n- **ConfigMap, non-secret.** `VENDOR_CLIENT_HOST`, `VENDOR_TOKEN_HOST`, `CONNECT_TIMEOUT`, `RESPONSE_TIMEOUT`, `TOKEN_EXPIRY_SKEW`, `ALLOWED_OPERATION_CONFIGURATION`, `LOG_LEVEL_DEFAULTS`, `OTEL_EXPORT_CONFIGURATION`\n- **Secret, sensitive.** `VENDOR_APP_KEY`, `VENDOR_BASIC_AUTHORIZATION`, `TRUSTSTORE_PASSWORD`, `TRUSTSTORE_FILE`\n- Production startup fails when a mandatory secret is absent.",
 "blocks": [
 {
 "t": "h",
-"x": "Landing Zone contract"
-},
-{
-"t": "tbl",
-"rows": [
-[
-"Contract",
-"Requirement"
-],
-[
-"File readiness",
-"Only complete files are visible, or a final rename or marker convention is used"
-],
-[
-"Shared access",
-"Landing, Archive and Quarantine are visible consistently to worker pods"
-],
-[
-"Immutability",
-"File contents are not modified in Landing"
-],
-[
-"Discovery",
-"The ingestion scanner reads active file configuration before scanning"
-],
-[
-"Unknown files",
-"An unmatched file produces an operational event and follows the approved exception-location policy"
-],
-[
-"Ambiguous files",
-"More than one configuration match is a configuration error and the file is NOT loaded"
-]
-]
-},
-{
-"t": "h",
-"x": "Landing failure modes"
+"x": "Where this sits"
 },
 {
 "t": "ul",
 "items": [
-"Partial file exposure",
-"Duplicate physical delivery for the same logical interface and business date",
-"Filename does not match an active configuration",
-"Filename matches more than one configuration",
-"Storage unavailable or permission denied"
+"Spring Boot WebFlux. The only thing a consumer addresses. It terminates the caller's request, applies the inbound trust boundary, and forwards to the vendor endpoint it is configured for. BBH-built, and the component this programme's readiness review is about.",
+"The other layer is **BBH Apigee** (the network behind it), tracked as component 11.",
+"Not a conflict. Both are true at their own vantage point. The API Gateway is a wrapper over BBH's Apigee network, there to isolate BBH's Apigee infrastructure and security from the consumer. SEI sees requests arriving from Apigee because on the egress path they do. What SEI names as one proxy is, on BBH's side, the gateway plus Apigee behind it. Nothing needs pinning and SEI's diagram is not wrong - it is drawn from outside the boundary the wrapper exists to create."
 ]
 },
 {
 "t": "h",
-"x": "Transfer evidence required from Momentum"
+"x": "What this layer isolates from the consumer"
 },
 {
 "t": "ul",
 "items": [
-"Source and destination filename",
-"Transfer start and completion timestamps",
-"Transfer outcome",
-"Checksum, where the approved transfer contract includes one",
-"Correlation with the receiving ingestion record, where available"
+"BBH Apigee network topology",
+"BBH Apigee security posture",
+"vendor endpoint addresses and credentials",
+"which BBH node answered"
 ]
 },
 {
@@ -7268,32 +6187,6 @@ export const DESIGN_DOCS = [
 "An idempotent request keeps the same idempotency key during safe retry",
 "Authentication secrets resolve from the platform secret service and are never stored in workflow metadata",
 "Gateway rejection is recorded separately from downstream SEI rejection"
-]
-},
-{
-"t": "h",
-"x": "Loader framework responsibilities"
-},
-{
-"t": "ul",
-"items": [
-"Select the approved workflow and loader definition",
-"Read prepared Hub-owned outbound data",
-"Render the SEI-approved loader format",
-"Validate required fields, file structure and control totals",
-"Assign delivery and correlation identifiers",
-"Submit through the approved egress route",
-"Record acknowledgement, rejection and retry status"
-]
-},
-{
-"t": "h",
-"x": "Boundary rule"
-},
-{
-"t": "ul",
-"items": [
-"Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery."
 ]
 },
 {
@@ -20828,86 +19721,8 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "How this works, from the architecture supplement",
-"md": "\n### Landing Zone contract\n\n| Contract | Requirement |\n|---|---|\n| File readiness | Only complete files are visible, or a final rename or marker convention is used |\n| Shared access | Landing, Archive and Quarantine are visible consistently to worker pods |\n| Immutability | File contents are not modified in Landing |\n| Discovery | The ingestion scanner reads active file configuration before scanning |\n| Unknown files | An unmatched file produces an operational event and follows the approved exception-location policy |\n| Ambiguous files | More than one configuration match is a configuration error and the file is NOT loaded |\n\n### Landing failure modes\n\n- Partial file exposure\n- Duplicate physical delivery for the same logical interface and business date\n- Filename does not match an active configuration\n- Filename matches more than one configuration\n- Storage unavailable or permission denied\n\n### Transfer evidence required from Momentum\n\n- Source and destination filename\n- Transfer start and completion timestamps\n- Transfer outcome\n- Checksum, where the approved transfer contract includes one\n- Correlation with the receiving ingestion record, where available\n\n### Gateway design constraints\n\n- No direct source-system-to-SEI service coupling across the trust boundary\n- An idempotent request keeps the same idempotency key during safe retry\n- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata\n- Gateway rejection is recorded separately from downstream SEI rejection\n\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
+"md": "\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
 "blocks": [
-{
-"t": "h",
-"x": "Landing Zone contract"
-},
-{
-"t": "tbl",
-"rows": [
-[
-"Contract",
-"Requirement"
-],
-[
-"File readiness",
-"Only complete files are visible, or a final rename or marker convention is used"
-],
-[
-"Shared access",
-"Landing, Archive and Quarantine are visible consistently to worker pods"
-],
-[
-"Immutability",
-"File contents are not modified in Landing"
-],
-[
-"Discovery",
-"The ingestion scanner reads active file configuration before scanning"
-],
-[
-"Unknown files",
-"An unmatched file produces an operational event and follows the approved exception-location policy"
-],
-[
-"Ambiguous files",
-"More than one configuration match is a configuration error and the file is NOT loaded"
-]
-]
-},
-{
-"t": "h",
-"x": "Landing failure modes"
-},
-{
-"t": "ul",
-"items": [
-"Partial file exposure",
-"Duplicate physical delivery for the same logical interface and business date",
-"Filename does not match an active configuration",
-"Filename matches more than one configuration",
-"Storage unavailable or permission denied"
-]
-},
-{
-"t": "h",
-"x": "Transfer evidence required from Momentum"
-},
-{
-"t": "ul",
-"items": [
-"Source and destination filename",
-"Transfer start and completion timestamps",
-"Transfer outcome",
-"Checksum, where the approved transfer contract includes one",
-"Correlation with the receiving ingestion record, where available"
-]
-},
-{
-"t": "h",
-"x": "Gateway design constraints"
-},
-{
-"t": "ul",
-"items": [
-"No direct source-system-to-SEI service coupling across the trust boundary",
-"An idempotent request keeps the same idempotency key during safe retry",
-"Authentication secrets resolve from the platform secret service and are never stored in workflow metadata",
-"Gateway rejection is recorded separately from downstream SEI rejection"
-]
-},
 {
 "t": "h",
 "x": "Loader framework responsibilities"
@@ -21091,86 +19906,8 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "How this works, from the architecture supplement",
-"md": "\n### Landing Zone contract\n\n| Contract | Requirement |\n|---|---|\n| File readiness | Only complete files are visible, or a final rename or marker convention is used |\n| Shared access | Landing, Archive and Quarantine are visible consistently to worker pods |\n| Immutability | File contents are not modified in Landing |\n| Discovery | The ingestion scanner reads active file configuration before scanning |\n| Unknown files | An unmatched file produces an operational event and follows the approved exception-location policy |\n| Ambiguous files | More than one configuration match is a configuration error and the file is NOT loaded |\n\n### Landing failure modes\n\n- Partial file exposure\n- Duplicate physical delivery for the same logical interface and business date\n- Filename does not match an active configuration\n- Filename matches more than one configuration\n- Storage unavailable or permission denied\n\n### Transfer evidence required from Momentum\n\n- Source and destination filename\n- Transfer start and completion timestamps\n- Transfer outcome\n- Checksum, where the approved transfer contract includes one\n- Correlation with the receiving ingestion record, where available\n\n### Gateway design constraints\n\n- No direct source-system-to-SEI service coupling across the trust boundary\n- An idempotent request keeps the same idempotency key during safe retry\n- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata\n- Gateway rejection is recorded separately from downstream SEI rejection\n\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
+"md": "\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
 "blocks": [
-{
-"t": "h",
-"x": "Landing Zone contract"
-},
-{
-"t": "tbl",
-"rows": [
-[
-"Contract",
-"Requirement"
-],
-[
-"File readiness",
-"Only complete files are visible, or a final rename or marker convention is used"
-],
-[
-"Shared access",
-"Landing, Archive and Quarantine are visible consistently to worker pods"
-],
-[
-"Immutability",
-"File contents are not modified in Landing"
-],
-[
-"Discovery",
-"The ingestion scanner reads active file configuration before scanning"
-],
-[
-"Unknown files",
-"An unmatched file produces an operational event and follows the approved exception-location policy"
-],
-[
-"Ambiguous files",
-"More than one configuration match is a configuration error and the file is NOT loaded"
-]
-]
-},
-{
-"t": "h",
-"x": "Landing failure modes"
-},
-{
-"t": "ul",
-"items": [
-"Partial file exposure",
-"Duplicate physical delivery for the same logical interface and business date",
-"Filename does not match an active configuration",
-"Filename matches more than one configuration",
-"Storage unavailable or permission denied"
-]
-},
-{
-"t": "h",
-"x": "Transfer evidence required from Momentum"
-},
-{
-"t": "ul",
-"items": [
-"Source and destination filename",
-"Transfer start and completion timestamps",
-"Transfer outcome",
-"Checksum, where the approved transfer contract includes one",
-"Correlation with the receiving ingestion record, where available"
-]
-},
-{
-"t": "h",
-"x": "Gateway design constraints"
-},
-{
-"t": "ul",
-"items": [
-"No direct source-system-to-SEI service coupling across the trust boundary",
-"An idempotent request keeps the same idempotency key during safe retry",
-"Authentication secrets resolve from the platform secret service and are never stored in workflow metadata",
-"Gateway rejection is recorded separately from downstream SEI rejection"
-]
-},
 {
 "t": "h",
 "x": "Loader framework responsibilities"
@@ -21730,86 +20467,8 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "How this works, from the architecture supplement",
-"md": "\n### Landing Zone contract\n\n| Contract | Requirement |\n|---|---|\n| File readiness | Only complete files are visible, or a final rename or marker convention is used |\n| Shared access | Landing, Archive and Quarantine are visible consistently to worker pods |\n| Immutability | File contents are not modified in Landing |\n| Discovery | The ingestion scanner reads active file configuration before scanning |\n| Unknown files | An unmatched file produces an operational event and follows the approved exception-location policy |\n| Ambiguous files | More than one configuration match is a configuration error and the file is NOT loaded |\n\n### Landing failure modes\n\n- Partial file exposure\n- Duplicate physical delivery for the same logical interface and business date\n- Filename does not match an active configuration\n- Filename matches more than one configuration\n- Storage unavailable or permission denied\n\n### Transfer evidence required from Momentum\n\n- Source and destination filename\n- Transfer start and completion timestamps\n- Transfer outcome\n- Checksum, where the approved transfer contract includes one\n- Correlation with the receiving ingestion record, where available\n\n### Gateway design constraints\n\n- No direct source-system-to-SEI service coupling across the trust boundary\n- An idempotent request keeps the same idempotency key during safe retry\n- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata\n- Gateway rejection is recorded separately from downstream SEI rejection\n\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
+"md": "\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
 "blocks": [
-{
-"t": "h",
-"x": "Landing Zone contract"
-},
-{
-"t": "tbl",
-"rows": [
-[
-"Contract",
-"Requirement"
-],
-[
-"File readiness",
-"Only complete files are visible, or a final rename or marker convention is used"
-],
-[
-"Shared access",
-"Landing, Archive and Quarantine are visible consistently to worker pods"
-],
-[
-"Immutability",
-"File contents are not modified in Landing"
-],
-[
-"Discovery",
-"The ingestion scanner reads active file configuration before scanning"
-],
-[
-"Unknown files",
-"An unmatched file produces an operational event and follows the approved exception-location policy"
-],
-[
-"Ambiguous files",
-"More than one configuration match is a configuration error and the file is NOT loaded"
-]
-]
-},
-{
-"t": "h",
-"x": "Landing failure modes"
-},
-{
-"t": "ul",
-"items": [
-"Partial file exposure",
-"Duplicate physical delivery for the same logical interface and business date",
-"Filename does not match an active configuration",
-"Filename matches more than one configuration",
-"Storage unavailable or permission denied"
-]
-},
-{
-"t": "h",
-"x": "Transfer evidence required from Momentum"
-},
-{
-"t": "ul",
-"items": [
-"Source and destination filename",
-"Transfer start and completion timestamps",
-"Transfer outcome",
-"Checksum, where the approved transfer contract includes one",
-"Correlation with the receiving ingestion record, where available"
-]
-},
-{
-"t": "h",
-"x": "Gateway design constraints"
-},
-{
-"t": "ul",
-"items": [
-"No direct source-system-to-SEI service coupling across the trust boundary",
-"An idempotent request keeps the same idempotency key during safe retry",
-"Authentication secrets resolve from the platform secret service and are never stored in workflow metadata",
-"Gateway rejection is recorded separately from downstream SEI rejection"
-]
-},
 {
 "t": "h",
 "x": "Loader framework responsibilities"
@@ -22369,86 +21028,8 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "How this works, from the architecture supplement",
-"md": "\n### Landing Zone contract\n\n| Contract | Requirement |\n|---|---|\n| File readiness | Only complete files are visible, or a final rename or marker convention is used |\n| Shared access | Landing, Archive and Quarantine are visible consistently to worker pods |\n| Immutability | File contents are not modified in Landing |\n| Discovery | The ingestion scanner reads active file configuration before scanning |\n| Unknown files | An unmatched file produces an operational event and follows the approved exception-location policy |\n| Ambiguous files | More than one configuration match is a configuration error and the file is NOT loaded |\n\n### Landing failure modes\n\n- Partial file exposure\n- Duplicate physical delivery for the same logical interface and business date\n- Filename does not match an active configuration\n- Filename matches more than one configuration\n- Storage unavailable or permission denied\n\n### Transfer evidence required from Momentum\n\n- Source and destination filename\n- Transfer start and completion timestamps\n- Transfer outcome\n- Checksum, where the approved transfer contract includes one\n- Correlation with the receiving ingestion record, where available\n\n### Gateway design constraints\n\n- No direct source-system-to-SEI service coupling across the trust boundary\n- An idempotent request keeps the same idempotency key during safe retry\n- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata\n- Gateway rejection is recorded separately from downstream SEI rejection\n\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
+"md": "\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
 "blocks": [
-{
-"t": "h",
-"x": "Landing Zone contract"
-},
-{
-"t": "tbl",
-"rows": [
-[
-"Contract",
-"Requirement"
-],
-[
-"File readiness",
-"Only complete files are visible, or a final rename or marker convention is used"
-],
-[
-"Shared access",
-"Landing, Archive and Quarantine are visible consistently to worker pods"
-],
-[
-"Immutability",
-"File contents are not modified in Landing"
-],
-[
-"Discovery",
-"The ingestion scanner reads active file configuration before scanning"
-],
-[
-"Unknown files",
-"An unmatched file produces an operational event and follows the approved exception-location policy"
-],
-[
-"Ambiguous files",
-"More than one configuration match is a configuration error and the file is NOT loaded"
-]
-]
-},
-{
-"t": "h",
-"x": "Landing failure modes"
-},
-{
-"t": "ul",
-"items": [
-"Partial file exposure",
-"Duplicate physical delivery for the same logical interface and business date",
-"Filename does not match an active configuration",
-"Filename matches more than one configuration",
-"Storage unavailable or permission denied"
-]
-},
-{
-"t": "h",
-"x": "Transfer evidence required from Momentum"
-},
-{
-"t": "ul",
-"items": [
-"Source and destination filename",
-"Transfer start and completion timestamps",
-"Transfer outcome",
-"Checksum, where the approved transfer contract includes one",
-"Correlation with the receiving ingestion record, where available"
-]
-},
-{
-"t": "h",
-"x": "Gateway design constraints"
-},
-{
-"t": "ul",
-"items": [
-"No direct source-system-to-SEI service coupling across the trust boundary",
-"An idempotent request keeps the same idempotency key during safe retry",
-"Authentication secrets resolve from the platform secret service and are never stored in workflow metadata",
-"Gateway rejection is recorded separately from downstream SEI rejection"
-]
-},
 {
 "t": "h",
 "x": "Loader framework responsibilities"
@@ -23948,86 +22529,8 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "How this works, from the architecture supplement",
-"md": "\n### Landing Zone contract\n\n| Contract | Requirement |\n|---|---|\n| File readiness | Only complete files are visible, or a final rename or marker convention is used |\n| Shared access | Landing, Archive and Quarantine are visible consistently to worker pods |\n| Immutability | File contents are not modified in Landing |\n| Discovery | The ingestion scanner reads active file configuration before scanning |\n| Unknown files | An unmatched file produces an operational event and follows the approved exception-location policy |\n| Ambiguous files | More than one configuration match is a configuration error and the file is NOT loaded |\n\n### Landing failure modes\n\n- Partial file exposure\n- Duplicate physical delivery for the same logical interface and business date\n- Filename does not match an active configuration\n- Filename matches more than one configuration\n- Storage unavailable or permission denied\n\n### Transfer evidence required from Momentum\n\n- Source and destination filename\n- Transfer start and completion timestamps\n- Transfer outcome\n- Checksum, where the approved transfer contract includes one\n- Correlation with the receiving ingestion record, where available\n\n### Gateway design constraints\n\n- No direct source-system-to-SEI service coupling across the trust boundary\n- An idempotent request keeps the same idempotency key during safe retry\n- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata\n- Gateway rejection is recorded separately from downstream SEI rejection\n\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
+"md": "\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
 "blocks": [
-{
-"t": "h",
-"x": "Landing Zone contract"
-},
-{
-"t": "tbl",
-"rows": [
-[
-"Contract",
-"Requirement"
-],
-[
-"File readiness",
-"Only complete files are visible, or a final rename or marker convention is used"
-],
-[
-"Shared access",
-"Landing, Archive and Quarantine are visible consistently to worker pods"
-],
-[
-"Immutability",
-"File contents are not modified in Landing"
-],
-[
-"Discovery",
-"The ingestion scanner reads active file configuration before scanning"
-],
-[
-"Unknown files",
-"An unmatched file produces an operational event and follows the approved exception-location policy"
-],
-[
-"Ambiguous files",
-"More than one configuration match is a configuration error and the file is NOT loaded"
-]
-]
-},
-{
-"t": "h",
-"x": "Landing failure modes"
-},
-{
-"t": "ul",
-"items": [
-"Partial file exposure",
-"Duplicate physical delivery for the same logical interface and business date",
-"Filename does not match an active configuration",
-"Filename matches more than one configuration",
-"Storage unavailable or permission denied"
-]
-},
-{
-"t": "h",
-"x": "Transfer evidence required from Momentum"
-},
-{
-"t": "ul",
-"items": [
-"Source and destination filename",
-"Transfer start and completion timestamps",
-"Transfer outcome",
-"Checksum, where the approved transfer contract includes one",
-"Correlation with the receiving ingestion record, where available"
-]
-},
-{
-"t": "h",
-"x": "Gateway design constraints"
-},
-{
-"t": "ul",
-"items": [
-"No direct source-system-to-SEI service coupling across the trust boundary",
-"An idempotent request keeps the same idempotency key during safe retry",
-"Authentication secrets resolve from the platform secret service and are never stored in workflow metadata",
-"Gateway rejection is recorded separately from downstream SEI rejection"
-]
-},
 {
 "t": "h",
 "x": "Loader framework responsibilities"
@@ -24211,86 +22714,8 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "How this works, from the architecture supplement",
-"md": "\n### Landing Zone contract\n\n| Contract | Requirement |\n|---|---|\n| File readiness | Only complete files are visible, or a final rename or marker convention is used |\n| Shared access | Landing, Archive and Quarantine are visible consistently to worker pods |\n| Immutability | File contents are not modified in Landing |\n| Discovery | The ingestion scanner reads active file configuration before scanning |\n| Unknown files | An unmatched file produces an operational event and follows the approved exception-location policy |\n| Ambiguous files | More than one configuration match is a configuration error and the file is NOT loaded |\n\n### Landing failure modes\n\n- Partial file exposure\n- Duplicate physical delivery for the same logical interface and business date\n- Filename does not match an active configuration\n- Filename matches more than one configuration\n- Storage unavailable or permission denied\n\n### Transfer evidence required from Momentum\n\n- Source and destination filename\n- Transfer start and completion timestamps\n- Transfer outcome\n- Checksum, where the approved transfer contract includes one\n- Correlation with the receiving ingestion record, where available\n\n### Gateway design constraints\n\n- No direct source-system-to-SEI service coupling across the trust boundary\n- An idempotent request keeps the same idempotency key during safe retry\n- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata\n- Gateway rejection is recorded separately from downstream SEI rejection\n\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
+"md": "\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
 "blocks": [
-{
-"t": "h",
-"x": "Landing Zone contract"
-},
-{
-"t": "tbl",
-"rows": [
-[
-"Contract",
-"Requirement"
-],
-[
-"File readiness",
-"Only complete files are visible, or a final rename or marker convention is used"
-],
-[
-"Shared access",
-"Landing, Archive and Quarantine are visible consistently to worker pods"
-],
-[
-"Immutability",
-"File contents are not modified in Landing"
-],
-[
-"Discovery",
-"The ingestion scanner reads active file configuration before scanning"
-],
-[
-"Unknown files",
-"An unmatched file produces an operational event and follows the approved exception-location policy"
-],
-[
-"Ambiguous files",
-"More than one configuration match is a configuration error and the file is NOT loaded"
-]
-]
-},
-{
-"t": "h",
-"x": "Landing failure modes"
-},
-{
-"t": "ul",
-"items": [
-"Partial file exposure",
-"Duplicate physical delivery for the same logical interface and business date",
-"Filename does not match an active configuration",
-"Filename matches more than one configuration",
-"Storage unavailable or permission denied"
-]
-},
-{
-"t": "h",
-"x": "Transfer evidence required from Momentum"
-},
-{
-"t": "ul",
-"items": [
-"Source and destination filename",
-"Transfer start and completion timestamps",
-"Transfer outcome",
-"Checksum, where the approved transfer contract includes one",
-"Correlation with the receiving ingestion record, where available"
-]
-},
-{
-"t": "h",
-"x": "Gateway design constraints"
-},
-{
-"t": "ul",
-"items": [
-"No direct source-system-to-SEI service coupling across the trust boundary",
-"An idempotent request keeps the same idempotency key during safe retry",
-"Authentication secrets resolve from the platform secret service and are never stored in workflow metadata",
-"Gateway rejection is recorded separately from downstream SEI rejection"
-]
-},
 {
 "t": "h",
 "x": "Loader framework responsibilities"
@@ -24474,86 +22899,8 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "How this works, from the architecture supplement",
-"md": "\n### Landing Zone contract\n\n| Contract | Requirement |\n|---|---|\n| File readiness | Only complete files are visible, or a final rename or marker convention is used |\n| Shared access | Landing, Archive and Quarantine are visible consistently to worker pods |\n| Immutability | File contents are not modified in Landing |\n| Discovery | The ingestion scanner reads active file configuration before scanning |\n| Unknown files | An unmatched file produces an operational event and follows the approved exception-location policy |\n| Ambiguous files | More than one configuration match is a configuration error and the file is NOT loaded |\n\n### Landing failure modes\n\n- Partial file exposure\n- Duplicate physical delivery for the same logical interface and business date\n- Filename does not match an active configuration\n- Filename matches more than one configuration\n- Storage unavailable or permission denied\n\n### Transfer evidence required from Momentum\n\n- Source and destination filename\n- Transfer start and completion timestamps\n- Transfer outcome\n- Checksum, where the approved transfer contract includes one\n- Correlation with the receiving ingestion record, where available\n\n### Gateway design constraints\n\n- No direct source-system-to-SEI service coupling across the trust boundary\n- An idempotent request keeps the same idempotency key during safe retry\n- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata\n- Gateway rejection is recorded separately from downstream SEI rejection\n\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
+"md": "\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
 "blocks": [
-{
-"t": "h",
-"x": "Landing Zone contract"
-},
-{
-"t": "tbl",
-"rows": [
-[
-"Contract",
-"Requirement"
-],
-[
-"File readiness",
-"Only complete files are visible, or a final rename or marker convention is used"
-],
-[
-"Shared access",
-"Landing, Archive and Quarantine are visible consistently to worker pods"
-],
-[
-"Immutability",
-"File contents are not modified in Landing"
-],
-[
-"Discovery",
-"The ingestion scanner reads active file configuration before scanning"
-],
-[
-"Unknown files",
-"An unmatched file produces an operational event and follows the approved exception-location policy"
-],
-[
-"Ambiguous files",
-"More than one configuration match is a configuration error and the file is NOT loaded"
-]
-]
-},
-{
-"t": "h",
-"x": "Landing failure modes"
-},
-{
-"t": "ul",
-"items": [
-"Partial file exposure",
-"Duplicate physical delivery for the same logical interface and business date",
-"Filename does not match an active configuration",
-"Filename matches more than one configuration",
-"Storage unavailable or permission denied"
-]
-},
-{
-"t": "h",
-"x": "Transfer evidence required from Momentum"
-},
-{
-"t": "ul",
-"items": [
-"Source and destination filename",
-"Transfer start and completion timestamps",
-"Transfer outcome",
-"Checksum, where the approved transfer contract includes one",
-"Correlation with the receiving ingestion record, where available"
-]
-},
-{
-"t": "h",
-"x": "Gateway design constraints"
-},
-{
-"t": "ul",
-"items": [
-"No direct source-system-to-SEI service coupling across the trust boundary",
-"An idempotent request keeps the same idempotency key during safe retry",
-"Authentication secrets resolve from the platform secret service and are never stored in workflow metadata",
-"Gateway rejection is recorded separately from downstream SEI rejection"
-]
-},
 {
 "t": "h",
 "x": "Loader framework responsibilities"
@@ -24737,86 +23084,8 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "How this works, from the architecture supplement",
-"md": "\n### Landing Zone contract\n\n| Contract | Requirement |\n|---|---|\n| File readiness | Only complete files are visible, or a final rename or marker convention is used |\n| Shared access | Landing, Archive and Quarantine are visible consistently to worker pods |\n| Immutability | File contents are not modified in Landing |\n| Discovery | The ingestion scanner reads active file configuration before scanning |\n| Unknown files | An unmatched file produces an operational event and follows the approved exception-location policy |\n| Ambiguous files | More than one configuration match is a configuration error and the file is NOT loaded |\n\n### Landing failure modes\n\n- Partial file exposure\n- Duplicate physical delivery for the same logical interface and business date\n- Filename does not match an active configuration\n- Filename matches more than one configuration\n- Storage unavailable or permission denied\n\n### Transfer evidence required from Momentum\n\n- Source and destination filename\n- Transfer start and completion timestamps\n- Transfer outcome\n- Checksum, where the approved transfer contract includes one\n- Correlation with the receiving ingestion record, where available\n\n### Gateway design constraints\n\n- No direct source-system-to-SEI service coupling across the trust boundary\n- An idempotent request keeps the same idempotency key during safe retry\n- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata\n- Gateway rejection is recorded separately from downstream SEI rejection\n\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
+"md": "\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
 "blocks": [
-{
-"t": "h",
-"x": "Landing Zone contract"
-},
-{
-"t": "tbl",
-"rows": [
-[
-"Contract",
-"Requirement"
-],
-[
-"File readiness",
-"Only complete files are visible, or a final rename or marker convention is used"
-],
-[
-"Shared access",
-"Landing, Archive and Quarantine are visible consistently to worker pods"
-],
-[
-"Immutability",
-"File contents are not modified in Landing"
-],
-[
-"Discovery",
-"The ingestion scanner reads active file configuration before scanning"
-],
-[
-"Unknown files",
-"An unmatched file produces an operational event and follows the approved exception-location policy"
-],
-[
-"Ambiguous files",
-"More than one configuration match is a configuration error and the file is NOT loaded"
-]
-]
-},
-{
-"t": "h",
-"x": "Landing failure modes"
-},
-{
-"t": "ul",
-"items": [
-"Partial file exposure",
-"Duplicate physical delivery for the same logical interface and business date",
-"Filename does not match an active configuration",
-"Filename matches more than one configuration",
-"Storage unavailable or permission denied"
-]
-},
-{
-"t": "h",
-"x": "Transfer evidence required from Momentum"
-},
-{
-"t": "ul",
-"items": [
-"Source and destination filename",
-"Transfer start and completion timestamps",
-"Transfer outcome",
-"Checksum, where the approved transfer contract includes one",
-"Correlation with the receiving ingestion record, where available"
-]
-},
-{
-"t": "h",
-"x": "Gateway design constraints"
-},
-{
-"t": "ul",
-"items": [
-"No direct source-system-to-SEI service coupling across the trust boundary",
-"An idempotent request keeps the same idempotency key during safe retry",
-"Authentication secrets resolve from the platform secret service and are never stored in workflow metadata",
-"Gateway rejection is recorded separately from downstream SEI rejection"
-]
-},
 {
 "t": "h",
 "x": "Loader framework responsibilities"
@@ -25000,86 +23269,8 @@ export const DESIGN_DOCS = [
 },
 {
 "h": "How this works, from the architecture supplement",
-"md": "\n### Landing Zone contract\n\n| Contract | Requirement |\n|---|---|\n| File readiness | Only complete files are visible, or a final rename or marker convention is used |\n| Shared access | Landing, Archive and Quarantine are visible consistently to worker pods |\n| Immutability | File contents are not modified in Landing |\n| Discovery | The ingestion scanner reads active file configuration before scanning |\n| Unknown files | An unmatched file produces an operational event and follows the approved exception-location policy |\n| Ambiguous files | More than one configuration match is a configuration error and the file is NOT loaded |\n\n### Landing failure modes\n\n- Partial file exposure\n- Duplicate physical delivery for the same logical interface and business date\n- Filename does not match an active configuration\n- Filename matches more than one configuration\n- Storage unavailable or permission denied\n\n### Transfer evidence required from Momentum\n\n- Source and destination filename\n- Transfer start and completion timestamps\n- Transfer outcome\n- Checksum, where the approved transfer contract includes one\n- Correlation with the receiving ingestion record, where available\n\n### Gateway design constraints\n\n- No direct source-system-to-SEI service coupling across the trust boundary\n- An idempotent request keeps the same idempotency key during safe retry\n- Authentication secrets resolve from the platform secret service and are never stored in workflow metadata\n- Gateway rejection is recorded separately from downstream SEI rejection\n\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
+"md": "\n### Loader framework responsibilities\n\n- Select the approved workflow and loader definition\n- Read prepared Hub-owned outbound data\n- Render the SEI-approved loader format\n- Validate required fields, file structure and control totals\n- Assign delivery and correlation identifiers\n- Submit through the approved egress route\n- Record acknowledgement, rejection and retry status\n\n### Boundary rule\n\n- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.",
 "blocks": [
-{
-"t": "h",
-"x": "Landing Zone contract"
-},
-{
-"t": "tbl",
-"rows": [
-[
-"Contract",
-"Requirement"
-],
-[
-"File readiness",
-"Only complete files are visible, or a final rename or marker convention is used"
-],
-[
-"Shared access",
-"Landing, Archive and Quarantine are visible consistently to worker pods"
-],
-[
-"Immutability",
-"File contents are not modified in Landing"
-],
-[
-"Discovery",
-"The ingestion scanner reads active file configuration before scanning"
-],
-[
-"Unknown files",
-"An unmatched file produces an operational event and follows the approved exception-location policy"
-],
-[
-"Ambiguous files",
-"More than one configuration match is a configuration error and the file is NOT loaded"
-]
-]
-},
-{
-"t": "h",
-"x": "Landing failure modes"
-},
-{
-"t": "ul",
-"items": [
-"Partial file exposure",
-"Duplicate physical delivery for the same logical interface and business date",
-"Filename does not match an active configuration",
-"Filename matches more than one configuration",
-"Storage unavailable or permission denied"
-]
-},
-{
-"t": "h",
-"x": "Transfer evidence required from Momentum"
-},
-{
-"t": "ul",
-"items": [
-"Source and destination filename",
-"Transfer start and completion timestamps",
-"Transfer outcome",
-"Checksum, where the approved transfer contract includes one",
-"Correlation with the receiving ingestion record, where available"
-]
-},
-{
-"t": "h",
-"x": "Gateway design constraints"
-},
-{
-"t": "ul",
-"items": [
-"No direct source-system-to-SEI service coupling across the trust boundary",
-"An idempotent request keeps the same idempotency key during safe retry",
-"Authentication secrets resolve from the platform secret service and are never stored in workflow metadata",
-"Gateway rejection is recorded separately from downstream SEI rejection"
-]
-},
 {
 "t": "h",
 "x": "Loader framework responsibilities"

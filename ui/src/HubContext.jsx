@@ -28,6 +28,7 @@ import { GAP_DOC, GAP_SCOPE, GAP_PRECEDENCE, GAP_TIERS, GAP_REGISTER,
  GAP_IDENTIFIERS, GAP_FOUNDATION, GAP_OUTBOUND_ERD, GAP_RECON, GAP_MOVEMENT,
  GAP_DECISIONS, GAP_ACCEPTANCE, GAP_CODE_FINDING, GAP_NAMING, GAP_HADR_OPEN,
  BUILD_LABEL, buildStatus, BUILD_SUMMARY } from "./hubGapSupplement.js";
+import { GW_LAYERS, GW_VANTAGE, GW_AD3 } from "./hubGatewayLayers.js";
 import { GW_DOC, GW_STRENGTHS, GW_GAPS, GW_RISKS, GW_OPERATION, GW_HEADERS,
  GW_TOKEN_STATES, GW_TOKEN_TESTS, GW_SECRETS, GW_RUNTIME_OBJECTS,
  GW_METRICS, GW_RUNBOOKS, GW_APPROVAL, GW_PLAN, GW_BLOCKING }
@@ -134,13 +135,25 @@ export function ContextView({ t, chan, setChan }) {
 
      <Pbox x={470} y={98} w={140} h={50} n="SDC consumer"
       s="topic subscription" stroke="#2a78d6" />
+     {/* Two layers, not one box. The wrapper is the only thing a consumer
+         addresses; the call still leaves through BBH Apigee, which is the
+         identity SEI observes. Drawn as one box there was nowhere to put
+         the trust boundary, which is where the blocking readiness gap is. */}
      <rect x="470" y="190" width="140" height="130" rx="6" fill="#fff"
       stroke={ACC} strokeWidth="1.3" />
-     <text x="540" y="243" textAnchor="middle" fontSize="12.5"
-      fontWeight="500" fill={INK}>Apigee</text>
-     <text x="540" y="260" textAnchor="middle" fontSize="12.5"
-      fontWeight="500" fill={INK}>+ API Gateway</text>
-     <text x="540" y="279" textAnchor="middle" fontSize="10" fill={MUT}>
+     <line x1="470" y1="255" x2="610" y2="255" stroke={ACC} strokeWidth="1.1"
+      strokeDasharray="4 3" />
+     <text x="540" y="212" textAnchor="middle" fontSize="11.5"
+      fontWeight="500" fill={INK}>API Gateway</text>
+     <text x="540" y="226" textAnchor="middle" fontSize="8.5" fill={MUT}>
+      the wrapper</text>
+     <text x="540" y="239" textAnchor="middle" fontSize="8.5" fill={MUT}>
+      consumers see only this</text>
+     <text x="540" y="276" textAnchor="middle" fontSize="11.5"
+      fontWeight="500" fill={INK}>BBH Apigee</text>
+     <text x="540" y="290" textAnchor="middle" fontSize="8.5" fill={MUT}>
+      the identity SEI sees</text>
+     <text x="540" y="308" textAnchor="middle" fontSize="9" fill={ACC}>
       every API, both ways</text>
      <g opacity="0.62"><Pbox x={470} y={345} w={140} h={75} n="File transport"
       s="SFTP / Momentum" /></g>
@@ -194,8 +207,11 @@ export function ContextView({ t, chan, setChan }) {
      maxWidth: "92ch" }}>
      <b>Three transports, four channels.</b> Events and files cross on their
      own transports. Everything API-shaped - the data fetch, the loader push,
-     the status coming back, and every consumer call - crosses through Apigee
-     and the API Gateway. That band is a wall, not a step in a chain.
+     the status coming back, and every consumer call - crosses through the
+     gateway band. That band is a wall, not a step in a chain, and it is two
+     layers: the API Gateway is a wrapper that isolates BBH&apos;s Apigee
+     network and its security from the consumer, and the call still leaves
+     through Apigee, which is why SEI sees requests arriving from it.
     </div>
     <ClickHint>Each of the six numbered channels opens what crosses on it,
      which transport carries it, and what breaks when it stops.</ClickHint>
@@ -349,6 +365,171 @@ export function GateView({ t, onFile }) {
     <ul style={{ fontSize: 12.5, color: SUB, lineHeight: 1.7, margin: 0,
      paddingLeft: 17 }}>
      {EV_RULES.map((r) => <li key={r}>{r}</li>)}</ul>
+   </div>
+  </div>);
+}
+
+/* ===================================================================
+   The gateway, as two layers rather than two options.
+
+   WHAT THIS SCREEN EXISTS TO CORRECT. The design tracker carried AD-3 as
+   an open architecture conflict for months: SEI says BBH runs an Apigee
+   proxy, BBH says a vendor-neutral API Gateway, pick one. They are the
+   same door seen from two sides. Drawing it as one box leaves the trust
+   boundary nowhere to live, and the trust boundary is where the blocking
+   readiness gap sits.
+   =================================================================== */
+export function GatewayView({ t, onReview, onComp }) {
+ // Geometry note: the dashed box wraps BBH Apigee ONLY. The wrapper is
+ // the one thing a consumer can address, so enclosing it in the isolation
+ // boundary says the opposite of what the screen is for.
+ const by = 54, bh = 128;
+ const cx = 40, cw = 190, gx = 330, gwW = 270, ax = 700, aw = 230,
+       sx = 1020, sw = 150;
+ const blocking = GW_GAPS.filter((g) => g.sev === "block");
+ const box = { edge: [gx, gwW], apigee: [ax, aw] };
+ return (
+  <div>
+   <NavStyles />
+   <div style={card()}>
+    <svg viewBox="0 0 1200 290" style={{ width: "100%", height: "auto" }}
+     role="img" aria-label="The consumer, the gateway wrapper, BBH Apigee behind it, and SEI">
+     <defs><marker id="gwarr" viewBox="0 0 10 10" refX="9" refY="5"
+      markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill={SUB} /></marker></defs>
+
+     <rect x={ax - 28} y={by - 30} width={aw + 56} height={bh + 60} rx="11"
+      fill="#f4f7f9" stroke={ACC} strokeWidth="1.4" strokeDasharray="6 4" />
+     <text x={ax - 28} y={by - 38} fontSize="10" fontWeight="800" fill={ACC}>
+      ISOLATED FROM THE CONSUMER</text>
+
+     <rect x={cx} y={by} width={cw} height={bh} rx={7} fill="#fff"
+      stroke="#b9c6d1" strokeWidth="1.3" />
+     <text x={cx + cw / 2} y={by + 40} textAnchor="middle" fontSize="13"
+      fontWeight="500" fill={INK}>Consumer</text>
+     <text x={cx + cw / 2} y={by + 59} textAnchor="middle" fontSize="10"
+      fill={MUT}>CRM and every other caller</text>
+     <text x={cx + cw / 2} y={by + 88} textAnchor="middle" fontSize="10"
+      fill={SUB}>Addresses one host.</text>
+     <text x={cx + cw / 2} y={by + 104} textAnchor="middle" fontSize="10"
+      fill={SUB}>Cannot see past it.</text>
+
+     {GW_LAYERS.map((L) => {
+      const [x, w] = box[L.id];
+      return (
+       <g key={L.id} className="cp-hit" tabIndex={0} role="button"
+        onClick={() => onComp && onComp(L.reg)}>
+        <rect className="cp-bx" x={x} y={by} width={w} height={bh} rx={7}
+         fill="#fff" stroke={ACC} strokeWidth={L.id === "edge" ? 2.2 : 1.4} />
+        <text x={x + w / 2} y={by + 34} textAnchor="middle" fontSize="12.5"
+         fontWeight="500" fill={INK}>{L.n}</text>
+        <text x={x + w / 2} y={by + 51} textAnchor="middle" fontSize="10"
+         fill={ACC}>{L.sub}</text>
+        <text x={x + w / 2} y={by + 73} textAnchor="middle" fontSize="9.5"
+         fill={MUT}>{L.face}</text>
+        <text x={x + w / 2} y={by + bh - 12} textAnchor="middle" fontSize="9"
+         fill={MUT}>tracked as component {L.reg}</text>
+        <SvgGo x={x + w - 8} y={by + 17} />
+       </g>);
+     })}
+
+     <rect x={sx} y={by} width={sw} height={bh} rx={7} fill="#f4f7f9"
+      stroke="#0091bf" strokeWidth="1.3" />
+     <text x={sx + sw / 2} y={by + 44} textAnchor="middle" fontSize="13"
+      fontWeight="500" fill={INK}>SEI</text>
+     <text x={sx + sw / 2} y={by + 70} textAnchor="middle" fontSize="9.5"
+      fill={MUT}>sees the request</text>
+     <text x={sx + sw / 2} y={by + 84} textAnchor="middle" fontSize="9.5"
+      fill={MUT}>arriving from Apigee</text>
+
+     {[[cx + cw, gx], [gx + gwW, ax], [ax + aw, sx]].map(([x1, x2], i) => (
+      <line key={i} x1={x1} y1={by + bh / 2} x2={x2 - 2} y2={by + bh / 2}
+       stroke={SUB} strokeWidth="1.6" markerEnd="url(#gwarr)" />))}
+
+     <text x="600" y={by + bh + 56} textAnchor="middle" fontSize="10.5"
+      fill={SUB}>What SEI names as one proxy is these two.</text>
+     <text x="600" y={by + bh + 72} textAnchor="middle" fontSize="10.5"
+      fill={SUB}>Both descriptions are right; neither is complete on its own.</text>
+    </svg>
+    <ClickHint>Either layer opens the component record behind it.</ClickHint>
+   </div>
+
+   <div style={card({ borderLeft: `3px solid ${OK}` })}>
+    <div style={{ display: "flex", gap: 9, alignItems: "baseline",
+     flexWrap: "wrap" }}>
+     <Chip bg={OK} fg="#fff">{GW_AD3.id} closed</Chip>
+     <b style={{ fontSize: 14, color: INK }}>{GW_AD3.verdict}</b>
+    </div>
+    <Body><div style={{ marginTop: 7 }}>{GW_AD3.w}</div></Body>
+    <div style={{ display: "flex", gap: 22, flexWrap: "wrap", marginTop: 11 }}>
+     <span><b style={{ ...eyebrow, display: "block" }}>SEI v5 said</b>
+      <span style={{ fontSize: 12, color: SUB }}>{GW_AD3.seiSaid}</span></span>
+     <span><b style={{ ...eyebrow, display: "block" }}>BBH V4.2 said</b>
+      <span style={{ fontSize: 12, color: SUB }}>{GW_AD3.bbhSaid}</span></span>
+     <span><b style={{ ...eyebrow, display: "block" }}>No longer blocks</b>
+      <span style={{ fontSize: 12, color: SUB }}>
+       components {GW_AD3.unblocks.join(" and ")}</span></span>
+    </div>
+   </div>
+
+   <div style={card({ borderLeft: `3px solid ${WARN}` })}>
+    <div style={eyebrow}>What it does not close</div>
+    <Body><div style={{ marginTop: 5 }}>{GW_AD3.leaves}</div></Body>
+   </div>
+
+   <Head title="Who can see what" note="the whole content of AD-3, once it stops being a disagreement" />
+   <div style={card()}>
+    {GW_VANTAGE.map((v, i) => (
+     <div key={v.who} style={{ display: "flex", gap: 14, padding: "9px 0",
+      borderTop: i ? "1px solid #eef3f5" : "none", flexWrap: "wrap" }}>
+      <span style={{ fontSize: 12.5, fontWeight: 500, color: INK,
+       flex: "0 0 120px" }}>{v.who}</span>
+      <span style={{ fontSize: 12.5, color: SUB, flex: "1 1 240px" }}>
+       <b style={{ ...eyebrow, display: "block" }}>sees</b>{v.sees}</span>
+      <span style={{ fontSize: 12.5, color: MUT, flex: "1 1 240px" }}>
+       <b style={{ ...eyebrow, display: "block" }}>cannot see</b>{v.blind}</span>
+     </div>))}
+   </div>
+
+   <Head title="What the wrapper hides" note="the reason it exists, not a side effect of it" />
+   <div style={{ display: "grid", gap: 9,
+    gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))" }}>
+    {GW_LAYERS.map((L) => (
+     <OpenCard key={L.id} onClick={() => onComp && onComp(L.reg)}
+      opens={`component ${L.reg}`} style={card({ marginBottom: 0 })}>
+      <div style={eyebrow}>{L.face}</div>
+      <b style={{ fontSize: 13.5, color: INK }}>{L.n}</b>
+      <div style={{ fontSize: 11, color: ACC, marginTop: 2 }}>{L.sub}</div>
+      <Body><div style={{ marginTop: 7 }}>{L.w}</div></Body>
+      {L.isolates.length > 0 && (
+       <ul style={{ fontSize: 12, color: SUB, lineHeight: 1.65,
+        margin: "9px 0 0", paddingLeft: 17 }}>
+        {L.isolates.map((x) => <li key={x}>{x}</li>)}</ul>)}
+     </OpenCard>))}
+   </div>
+
+   <div style={card({ borderLeft: `3px solid ${BAD}`, marginTop: 11 })}>
+    <div style={eyebrow}>The readiness review of the wrapper</div>
+    <Body><div style={{ marginTop: 5 }}>
+     <b style={{ color: INK }}>{GW_DOC.n}</b> has a review of its own:
+     {" "}{GW_GAPS.length} gaps, {blocking.length} of them blocking
+     production approval, {GW_RISKS.length} risks and a
+     {" "}{GW_APPROVAL.length}-item approval checklist. {GW_DOC.verdict}
+    </div></Body>
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+     {blocking.map((g) => (
+      <span key={g.id} style={{ fontSize: 10.5, fontFamily: MONO,
+       border: `1px solid ${BAD}`, color: BAD, borderRadius: 3,
+       padding: "2px 7px" }}>{g.id}</span>))}
+    </div>
+    {onReview && (
+     <OpenCard onClick={onReview} opens="the gateway review"
+      style={{ ...card({ marginBottom: 0, marginTop: 11 }),
+       borderLeft: `3px solid ${ACC}` }}>
+      <b style={{ fontSize: 12.5, color: INK }}>
+       Gaps, risks, the governed-operation contract, header policy, the
+       token state machine and the approval checklist</b>
+     </OpenCard>)}
    </div>
   </div>);
 }

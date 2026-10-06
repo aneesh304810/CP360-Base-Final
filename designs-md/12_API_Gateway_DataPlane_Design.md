@@ -33,7 +33,7 @@ supplement: CP360-GAP-DESIGN-SUPPLEMENT
 
 The API lane, as above. Nothing in either document describes real-time access to this data.
 
-It sits in **Ingress and Egress**, in the **API gateway and Apigee proxy** lane (vendor).
+It sits in **Ingress and Egress**, in the **API gateway and Apigee proxy** lane (two layers · one door).
 
 ## What SEI specifies
 
@@ -47,32 +47,18 @@ SEI's to confirm.
 
 ## How this works, from the architecture supplement
 
-### Landing Zone contract
+### Where this sits
 
-| Contract | Requirement |
-|---|---|
-| File readiness | Only complete files are visible, or a final rename or marker convention is used |
-| Shared access | Landing, Archive and Quarantine are visible consistently to worker pods |
-| Immutability | File contents are not modified in Landing |
-| Discovery | The ingestion scanner reads active file configuration before scanning |
-| Unknown files | An unmatched file produces an operational event and follows the approved exception-location policy |
-| Ambiguous files | More than one configuration match is a configuration error and the file is NOT loaded |
+- Spring Boot WebFlux. The only thing a consumer addresses. It terminates the caller's request, applies the inbound trust boundary, and forwards to the vendor endpoint it is configured for. BBH-built, and the component this programme's readiness review is about.
+- The other layer is **BBH Apigee** (the network behind it), tracked as component 11.
+- Not a conflict. Both are true at their own vantage point. The API Gateway is a wrapper over BBH's Apigee network, there to isolate BBH's Apigee infrastructure and security from the consumer. SEI sees requests arriving from Apigee because on the egress path they do. What SEI names as one proxy is, on BBH's side, the gateway plus Apigee behind it. Nothing needs pinning and SEI's diagram is not wrong - it is drawn from outside the boundary the wrapper exists to create.
 
-### Landing failure modes
+### What this layer isolates from the consumer
 
-- Partial file exposure
-- Duplicate physical delivery for the same logical interface and business date
-- Filename does not match an active configuration
-- Filename matches more than one configuration
-- Storage unavailable or permission denied
-
-### Transfer evidence required from Momentum
-
-- Source and destination filename
-- Transfer start and completion timestamps
-- Transfer outcome
-- Checksum, where the approved transfer contract includes one
-- Correlation with the receiving ingestion record, where available
+- BBH Apigee network topology
+- BBH Apigee security posture
+- vendor endpoint addresses and credentials
+- which BBH node answered
 
 ### Gateway design constraints
 
@@ -80,20 +66,6 @@ SEI's to confirm.
 - An idempotent request keeps the same idempotency key during safe retry
 - Authentication secrets resolve from the platform secret service and are never stored in workflow metadata
 - Gateway rejection is recorded separately from downstream SEI rejection
-
-### Loader framework responsibilities
-
-- Select the approved workflow and loader definition
-- Read prepared Hub-owned outbound data
-- Render the SEI-approved loader format
-- Validate required fields, file structure and control totals
-- Assign delivery and correlation identifiers
-- Submit through the approved egress route
-- Record acknowledgement, rejection and retry status
-
-### Boundary rule
-
-- Consumer movement and loader delivery introduce no uncontrolled transformation in flight. Business transformation and packaging are complete before delivery.
 
 ### Header policy
 

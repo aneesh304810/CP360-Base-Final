@@ -64,6 +64,13 @@ export const TRANSPORTS = [
    dir: "in",  role: "standby" },
 ];
 
+// TWO LAYERS, ONE DOOR. "Apigee + API Gateway" is one transport and two
+// components: the CP-Integration-Gateway wraps BBH's Apigee network and is
+// the only thing a consumer addresses, and the call still leaves through
+// Apigee, which is the identity SEI observes. The design tracker carried
+// that as an open conflict (AD-3) for months because nobody had written
+// down that both descriptions are true from their own side.
+//
 // What the gateway buys, and what it costs. Both belong on the same screen:
 // a single managed door is the right answer AND a shared quota that can
 // starve the puller, and only naming the second gets the quota tiers built.

@@ -135,7 +135,32 @@ def findings_for(gid):
 def gaps_for_domain(dom):
     return [g for g in M["GAP_REGISTER"] if g["dom"] == dom]
 
-def _design_blocks(gid, name):
+def _lane_of(gid, cid, name=""):
+    """Which lane inside a container a tracked component sits in.
+
+    The lane rosters in LANES are explicit `reg` lists, so this is exact
+    where it answers at all, and None where the component is not rostered
+    - in which case container-wide blocks still reach it and lane-scoped
+    ones do not, which is the safe way round.
+    """
+    for lane in (M["LANES"].get(gid) or []):
+        if str(cid) in [str(x) for x in (lane.get("reg") or [])]:
+            return lane["id"]
+    # The proposals this programme added are in no roster - the rosters
+    # are SEI's and BBH's component lists, and a proposal is neither. Their
+    # names are unambiguous, so they fall back to the name. Without this a
+    # proposal silently loses every lane-scoped block, which is how the
+    # loader submission registry ended up with no loader design in it.
+    for pat, lid in [(r'gateway|apigee', "gateway"),
+                     (r'loader|outbound|submission|payload|template|'
+                      r'quarantine|reconcil|callback|status', "loader"),
+                     (r'landing|momentum|sftp|arrival|transport', "landing")]:
+        if re.search(pat, name or "", re.I):
+            return lid
+    return None
+
+
+def _design_blocks(gid, name, cid=None):
     """The DESIGN the supplement adds - contracts, rules and policies.
 
     This is not the gap analysis. It is content that belongs inside the
@@ -146,9 +171,32 @@ def _design_blocks(gid, name):
     """
     L = []
     A = L.append
-    blocks = list(M["GAP_DESIGN"].get(gid) or [])
-    # The gateway review describes exactly one component.
-    if gid == "ingress" and re.search(r'gateway|apigee', name, re.I):
+    lane = _lane_of(gid, cid, name) if cid is not None else None
+    blocks = [b for b in (M["GAP_DESIGN"].get(gid) or [])
+              if not b.get("lane") or b["lane"] == lane]
+
+    # The two gateway layers are not interchangeable, so neither is their
+    # design content. The readiness review is of the BBH-built wrapper;
+    # the proxy behind it is vendor configuration this programme does not
+    # write. Giving both documents the same body said they were the same
+    # component, which is the misreading AD-3 was stuck on.
+    if str(cid) in ("11", "12"):
+        layer = [l for l in M["GW_LAYERS"] if str(l["reg"]) == str(cid)]
+        if layer:
+            L0 = layer[0]
+            other = [l for l in M["GW_LAYERS"] if str(l["reg"]) != str(cid)][0]
+            blocks = [{"h": "Where this sits",
+                       "items": [L0["w"],
+                                 "The other layer is **%s** (%s), tracked as "
+                                 "component %s." % (other["n"], other["sub"],
+                                                    other["reg"]),
+                                 M["GW_AD3"]["verdict"] + " " + M["GW_AD3"]["w"]]}] \
+                     + ([{"h": "What this layer isolates from the consumer",
+                          "items": L0["isolates"]}] if L0["isolates"] else []) \
+                     + blocks
+
+    # The readiness review describes the wrapper, not the proxy behind it.
+    if str(cid) == "12":
         blocks = blocks + [
             {"h": "Header policy", "cols": ["Header category", "Required behaviour"],
              "rows": [[h[0], h[1]] for h in M["GW_HEADERS"]]},
@@ -397,7 +445,7 @@ def build(tid, name):
     # ---- 6b. the design the supplement adds, in place; the analysis as
     #          one line pointing at the one document that carries it
     dom = GROUP_TO_DOMAIN.get(gid)
-    blocks = _design_blocks(gid, name)
+    blocks = _design_blocks(gid, name, cid)
     if blocks:
         A("## How this works, from the architecture supplement")
         A("")
@@ -1132,7 +1180,7 @@ for f in sorted(glob.glob("designs-md/*.md")):
             r'loader|callback|outbound|submission|gateway|status',
             name, re.I) else "events"
         body = proposal(cid, name)
-        blocks = _design_blocks(pg, name)
+        blocks = _design_blocks(pg, name, cid)
         extra = ((["## How this works, from the architecture supplement", ""]
                   + blocks) if blocks else []) \
                 + _open_line(pg, GROUP_TO_DOMAIN[pg], name)

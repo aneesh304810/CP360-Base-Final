@@ -24,6 +24,7 @@ import { SEI_ARCH_DOC, ARCH_FEEDS, ARCH_LAYERS, ARCH_ORCHESTRATION,
  ARCH_PRINCIPLES, ARCH_CONFLICTS, OUTBOUND_FLOW, INBOUND_POSTURE,
  conflictsAt } from "./seiArchitecture.js";
 import { NavStyles, Trail, SvgGo } from "./HubNav.jsx";
+import { GatewayView } from "./HubContext.jsx";
 import { ContextView, GateView, LoaderLoopView, Stage2Model,
  FileIngestionView, Stage1Model, DbModelView, GapSupplementView }
  from "./HubContext.jsx";
@@ -102,6 +103,10 @@ export default function HubDesign({ t }) {
  const [s2erd, setS2erd] = useState(true);         // Stage 2 domain: ERD or list
  const [gapTab, setGapTab] = useState("reconcile"); // gap supplement: which tab
  const [gapF, setGapF] = useState("all");           // gap supplement: verdict filter
+ // Where the reader was when they opened the supplements. The review is
+ // reachable from the gateway as well as from the top level, and a trail
+ // that forgets which only leaves them the browser's back button.
+ const [gapFrom, setGapFrom] = useState(null);
  const [expand, setExpand] = useState(null);    // L3 component detail panel
  const [srcOf, setSrcOf] = useState(null);      // component shown beside its SEI source
  const [seiDoc, setSeiDoc] = useState(null);    // {doc, section} open in the popup
@@ -764,9 +769,27 @@ export default function HubDesign({ t }) {
    <NavStyles />
    <Popup />
    <Crumb trail={[["containers", () => setView("L2")],
+                  ...(gapFrom === "GW"
+                    ? [["Ingress and egress",
+                        () => { setGrp("ingress"); setView("GRP"); }],
+                       ["the API gateway", () => setView("GW")]] : []),
                   ["gap supplements", null]]} />
    <GapSupplementView t={t} tab={gapTab} setTab={setGapTab}
     filter={gapF} setFilter={setGapF} />
+  </div>);
+
+ /* ---------- GW: the gateway, as two layers ---------- */
+ if (view === "GW") return (
+  <div>
+   <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+   <NavStyles />
+   <Popup />
+   <Crumb trail={[["containers", () => setView("L2")],
+                  ["Ingress and egress", () => { setGrp("ingress"); setView("GRP"); }],
+                  ["the API gateway", null]]} />
+   <GatewayView t={t}
+    onReview={() => { setGapTab("gateway"); setGapFrom("GW"); setView("GAPS"); }}
+    onComp={(id) => { setGrp("ingress"); setExpand(id); setView("GRP"); }} />
   </div>);
 
  /* ---------- DBM: the database, as one picture, in the flow ---------- */
@@ -859,7 +882,9 @@ export default function HubDesign({ t }) {
   // just how much.
   const Lane = ({ l, x, y, w, h }) => (
    <g className="cp-hit" tabIndex={0} role="button"
-    onClick={(e) => { e.stopPropagation(); setGrp(l.gid); setView("GRP"); }}>
+    onClick={(e) => { e.stopPropagation();
+      if (l.view) { setView(l.view); return; }
+      setGrp(l.gid); setView("GRP"); }}>
     <rect className="cp-bx" x={x} y={y} width={w} height={h} rx="6"
      fill={l.proposal ? "#fdf1f2" : "#eef3f8"}
      stroke={l.proposal ? "#e0a9b0" : "#c3d4e4"}
@@ -968,7 +993,7 @@ export default function HubDesign({ t }) {
       border: "1px solid #f0c9ce" }}>
       ⚠ architecture v5 · {ARCH_CONFLICTS.length} conflicts with the design documents</span>
      <span onClick={() => { setGapTab("reconcile"); setGapF("all");
-       setView("GAPS"); }}
+       setGapFrom(null); setView("GAPS"); }}
       style={{ fontSize: 10.5, fontWeight: 800, padding: "6px 14px",
        borderRadius: 999, cursor: "pointer", background: "#fff7ec",
        color: "#a8560f", border: "1px solid #e8c9a6" }}>

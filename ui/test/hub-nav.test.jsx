@@ -31,7 +31,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { NAV_CSS, NavStyles, OpenCard, ClickHint, SvgGo, Trail }
   from "../src/HubNav.jsx";
 import { ContextView, Stage2Model, DbModelView, Stage2Erd, Stage2Lineage,
-  Stage2Feeds, Stage2Atlas } from "../src/HubContext.jsx";
+  Stage2Feeds, Stage2Atlas, GatewayView } from "../src/HubContext.jsx";
+import { GW_LAYERS, GW_VANTAGE, GW_AD3 } from "../src/hubGatewayLayers.js";
+import { LANES } from "../src/hubGroups.js";
 import { S2_DOMAINS, S2_TABLES, S2_RELS, s2TablesIn, s2DomainOf }
   from "../src/hubStage2Model.js";
 import { DB_PATH, DB_CONTROL, DB_ABSENT } from "../src/hubDbModel.js";
@@ -278,6 +280,72 @@ ok(!/\\u[0-9a-fA-F]{4}/.test(CTXSRC) && !/\\u[0-9a-fA-F]{4}/.test(NAVSRC),
      "panel backgrounds are painted before the arcs that sit in them", "");
   ok(/cross-domain lines first[\s\S]{0,300}toSpine\.map/.test(CTXSRC),
      "and the cross-domain lines before both, so they run behind", "");
+}
+
+/* ------------------------------- the gateway, as two layers not two options */
+// AD-3 sat open for months because nobody had written down that SEI's
+// "BBH runs an Apigee proxy" and BBH's "API Gateway / Data Plane" are the
+// same door seen from two sides. The cost of getting this wrong is not
+// cosmetic: drawn as one box there is nowhere to put the trust boundary,
+// and the trust boundary is where the blocking readiness gap lives.
+{
+  const h = render(<GatewayView t={t} onReview={() => {}} onComp={() => {}} />);
+  ok(GW_LAYERS.length === 2 && GW_LAYERS.map((l) => l.reg).join() === "12,11",
+     "two layers, mapped to the two tracked components",
+     GW_LAYERS.map((l) => l.reg).join());
+  ok(GW_LAYERS[0].isolates.length > 0 && GW_LAYERS[1].isolates.length === 0,
+     "the wrapper hides things and the thing behind it hides nothing - "
+     + "a symmetric pair would be two proxies, not a wrapper", "");
+  ok(count(h, /class="cp-hit"/g) === 2,
+     "both layers open their component record", count(h, /class="cp-hit"/g));
+  ok(/ISOLATED FROM THE CONSUMER/.test(h) && /What SEI names as one proxy/.test(h),
+     "the picture states the vantage point rather than leaving it inferred", "");
+  ok(GW_VANTAGE.length === 3
+     && GW_VANTAGE.some((v) => /SEI/.test(v.who) && /Apigee/.test(v.sees)),
+     "and the table says what SEI sees, which is the half that read as a conflict",
+     "");
+  ok(/GW-GAP-01/.test(h),
+     "the question AD-3 was standing in for is named, not dropped with it", "");
+
+  // The whole point is that the two documents stop being identical.
+  const d11 = fs.readFileSync(path.join(SRC, "..", "..", "designs-md",
+    "11_Apigee_Proxy_Design.md"), "utf8");
+  const d12 = fs.readFileSync(path.join(SRC, "..", "..", "designs-md",
+    "12_API_Gateway_DataPlane_Design.md"), "utf8");
+  const body = (x) => (x.split("## How this works")[1] || "").split("## Open against")[0];
+  ok(body(d11) && body(d12) && body(d11) !== body(d12),
+     "the Apigee and API Gateway documents have different bodies - keyed by "
+     + "container they were byte-identical", "");
+  ok(/Header policy/.test(d12) && !/Header policy/.test(d11),
+     "the readiness review lands on the wrapper, not on the proxy behind it", "");
+  ok(!/Landing Zone contract/.test(d11) && !/Landing Zone contract/.test(d12),
+     "and the landing-zone contract is out of both - it is a different lane",
+     "");
+  ok(/Landing Zone contract/.test(fs.readFileSync(path.join(SRC, "..", "..",
+      "designs-md", "08_Landing_Zone_Transport_Design.md"), "utf8")),
+     "but still in the landing document, where it belongs", "");
+
+  // A stale "open" somewhere else re-opens the question for whoever reads it.
+  const TRK = fs.readFileSync(path.join(SRC, "seiDesignTracker.js"), "utf8");
+  ok(!/Is Apigee a decision or a placeholder\? \(AD-3\)/.test(TRK),
+     "no component still asks AD-3 as an open question", "");
+  for (const [f, re] of [["hubArchitectReview.js", /Settle AD-3/],
+                         ["seiCitations.js", /is open as AD-3/]])
+    ok(!re.test(fs.readFileSync(path.join(SRC, f), "utf8")),
+       `${f} no longer carries AD-3 as unresolved`, "");
+}
+
+// A lane that opens a screen of its own has to be routed, or the lane is a
+// dead click that silently falls through to its container.
+{
+  const laneViews = Object.values(LANES).flat().filter((l) => l.view);
+  ok(laneViews.length > 0, "at least one lane owns a screen", "");
+  for (const l of laneViews) {
+    ok(new RegExp(`view === "${l.view}"`).test(HUBSRC),
+       `the ${l.id} lane's view (${l.view}) is a route HubDesign answers`, "");
+    ok(/if \(l\.view\) \{ setView\(l\.view\); return; \}/.test(HUBSRC),
+       "and the lane click honours it before falling back to the container", "");
+  }
 }
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\nhub-nav assertions pass");
