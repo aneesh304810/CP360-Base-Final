@@ -31,6 +31,9 @@ import { GAP_DOC, GAP_SCOPE, GAP_PRECEDENCE, GAP_TIERS, GAP_REGISTER,
 import { GW_LAYERS, GW_VANTAGE, GW_AD3 } from "./hubGatewayLayers.js";
 import { SDC_NET_DOC, SDC_ENVS, SDC_NET_FACTS, SDC_PATHS, SDC_LEGS,
  SDC_OPEN, SDC_TRANSPORT_NOTE, SDC_BLOCKING, sdcLeg } from "./hubSdcNetwork.js";
+import { NET_DOC, NET_STATE, NET_ZONES, NET_LINKS, NET_DNS, NET_TAG_ROUTE,
+ NET_WORK, NET_UNKNOWN, NET_SETTLED, NET_COUNTS, netZone, netLinksFor }
+ from "./hubNetwork.js";
 import { GW_DOC, GW_STRENGTHS, GW_GAPS, GW_RISKS, GW_OPERATION, GW_HEADERS,
  GW_TOKEN_STATES, GW_TOKEN_TESTS, GW_SECRETS, GW_RUNTIME_OBJECTS,
  GW_METRICS, GW_RUNBOOKS, GW_APPROVAL, GW_PLAN, GW_BLOCKING }
@@ -555,7 +558,14 @@ export function GatewayView({ t, onReview, onComp }) {
    SEI subnets and VPN only. That sentence only exists when the two
    pictures are on the same page.
    =================================================================== */
-const ST_TONE = { settled: OK, open: BAD };
+// Three states, because "not finished" covers two very different
+// situations and collapsing them is how a review concludes the network
+// is either done or hopeless. `design` is agreed and unbuilt; `open` is
+// nobody has said how. The event transport moved from the second to the
+// first the moment SEI named the Kafka.
+const ST_TONE = { settled: OK, design: WARN, open: BAD };
+const ST_LABEL = { settled: "network settled", design: "agreed, not built",
+ open: "no mechanism agreed" };
 
 export function SdcEndToEnd({ t, pick, setPick, onGate }) {
  // The SEI column was 102px and truncated every label it held, which on
@@ -571,7 +581,8 @@ export function SdcEndToEnd({ t, pick, setPick, onGate }) {
    <NavStyles />
    <div style={card()}>
     <b style={{ fontSize: 15, color: INK }}>
-     Nine legs, two networks, and three of the legs have no network yet</b>
+     Nine legs, two networks, and the gap is now build rather than
+     unknown</b>
     <Body><div style={{ marginTop: 6 }}>{SDC_TRANSPORT_NOTE}</div></Body>
    </div>
 
@@ -590,24 +601,24 @@ export function SdcEndToEnd({ t, pick, setPick, onGate }) {
       const y = 40 + i * RH, sei = l.side === "SEI";
       const x = sei ? 18 : X0;
       const w = sei ? SEIW - 20 : BW2;
-      const open = l.st === "open";
+      const done = l.st === "settled";
       return (
        <g key={l.n} className="cp-hit" tabIndex={0} role="button"
         onClick={() => setPick(pick === l.n ? null : l.n)}>
         <rect className="cp-bx" x={x} y={y} width={w} height={RH - 12} rx={6}
          fill={pick === l.n ? "#eef3f8" : "#fff"}
-         stroke={pick === l.n ? ACC : (open ? BAD : "#dfe6e9")}
-         strokeWidth={pick === l.n ? 2.2 : (open ? 1.6 : 1.2)}
-         strokeDasharray={open ? "5 3" : undefined} />
+         stroke={pick === l.n ? ACC : (done ? "#dfe6e9" : ST_TONE[l.st])}
+         strokeWidth={pick === l.n ? 2.2 : (done ? 1.2 : 1.6)}
+         strokeDasharray={done ? undefined : "5 3"} />
         <text x={x + 9} y={y + 18} fontSize="10.5" fontWeight="600" fill={INK}>
          {l.n}. {l.a}</text>
         <text x={x + 9} y={y + 33} fontSize="9" fill={MUT}>
          {clip(l.t, sei ? 30 : 46)}</text>
-        {/* Every open leg says why on the leg, SEI's included. A dashed
-            red box with no reason on it is an alarm with no message. */}
+        {/* Every unfinished leg says why on the leg, SEI's included. A
+            dashed box with no reason on it is an alarm with no message. */}
         <text x={x + w - 10} y={y + 18} textAnchor="end" fontSize="9"
-         fontWeight="700" fill={open ? BAD : OK}>
-         {open ? `network open - ${l.ask}` : "network settled"}</text>
+         fontWeight="700" fill={ST_TONE[l.st]}>
+         {done ? ST_LABEL.settled : `${ST_LABEL[l.st]} - ${l.ask}`}</text>
         {!sei && <text x={x + w - 10} y={y + 33} textAnchor="end" fontSize="8.5"
          fill={MUT}>{l.short}</text>}
         <SvgGo x={x + w - 10} y={y + 45} />
@@ -622,8 +633,16 @@ export function SdcEndToEnd({ t, pick, setPick, onGate }) {
         fill="none" stroke={MUT} strokeWidth="1.2" />);
      })}
     </svg>
-    <ClickHint>Every BBH leg opens what it does and the network it needs.
-     A dashed red leg has no network path agreed yet.</ClickHint>
+    <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 8,
+     fontSize: 11, color: SUB }}>
+     {Object.keys(ST_LABEL).map((k) => (
+      <span key={k} style={{ display: "inline-flex", alignItems: "center",
+       gap: 6 }}>
+       <span style={{ display: "inline-block", width: 16, height: 0,
+        borderTop: `2px ${k === "settled" ? "solid" : "dashed"} ${ST_TONE[k]}`
+        }} />{ST_LABEL[k]}</span>))}
+    </div>
+    <ClickHint>Every leg opens what it does and the network it needs.</ClickHint>
    </div>
 
    {sel && (
@@ -714,6 +733,220 @@ export function SdcEndToEnd({ t, pick, setPick, onGate }) {
       Both arms of the gate, and why the event arm needs the micro-batches
       as well as the EOD event</b>
     </OpenCard>)}
+  </div>);
+}
+
+/* ===================================================================
+   The network, end to end, for security, infrastructure and network
+   engineering.
+
+   WHY A TABLE AND NOT ONLY A PICTURE. A network engineer does not work
+   from a diagram, they work from a list of things that have to exist in
+   a firewall, a route table, a private DNS zone and an allow-list. The
+   picture orients; the table is the deliverable. Both carry the same
+   three states, because "not finished" covers agreed-and-unbuilt and
+   nobody-has-said-how, and a review that cannot tell them apart
+   escalates the wrong one.
+   =================================================================== */
+export function NetworkView({ t, zone, setZone }) {
+ const ZW = 206, ZGAP = 42, ZY = 46, ZH = 128, ROWH = 170;
+ const colX = (c) => 24 + c * (ZW + ZGAP);
+ const zoneBox = (z) => ({ x: colX(z.col), y: ZY + (z.row || 0) * ROWH });
+ const rows = Math.max(...NET_ZONES.map((z) => (z.row || 0))) + 1;
+ const W = colX(Math.max(...NET_ZONES.map((z) => z.col))) + ZW + 24;
+ const H = ZY + rows * ROWH + 10;
+ const sel = zone ? netZone(zone) : null;
+ const tone = (st) => NET_STATE[st].c;
+ return (
+  <div>
+   <NavStyles />
+   <div style={card()}>
+    <b style={{ fontSize: 15, color: INK }}>{NET_DOC.w}</b>
+    <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginTop: 8 }}>
+     {NET_DOC.aud.map((a) => (
+      <Chip key={a} bg="#e4f0fb" fg={ACC}>{a}</Chip>))}
+    </div>
+    <div style={{ display: "flex", gap: 22, flexWrap: "wrap", marginTop: 13 }}>
+     {Object.keys(NET_STATE).map((k) => (
+      <span key={k} style={{ textAlign: "center" }}>
+       <b style={{ fontSize: 23, color: NET_STATE[k].c, display: "block" }}>
+        {NET_COUNTS[k]}</b>
+       <span style={{ fontSize: 10, color: MUT }}>{NET_STATE[k].n}</span></span>))}
+    </div>
+   </div>
+
+   <div style={card()}>
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }}
+     role="img" aria-label="Network zones from SEI through Snowflake and the Private Link fabric to BBH">
+     <defs><marker id="netarr" viewBox="0 0 10 10" refX="9" refY="5"
+      markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill={MUT} /></marker></defs>
+
+     {/* links behind the zones, so no wire crosses a label */}
+     {NET_LINKS.filter((l) => l.from !== l.to).map((l, i) => {
+      const a = zoneBox(netZone(l.from)), b = zoneBox(netZone(l.to));
+      const fwd = a.x <= b.x;
+      const x1 = fwd ? a.x + ZW : a.x, x2 = fwd ? b.x : b.x + ZW;
+      const y1 = a.y + 34 + (i % 5) * 14, y2 = b.y + 34 + (i % 5) * 14;
+      const k = fwd ? 34 : -34;
+      // The id on the wire is what makes the picture index into the
+      // table. Without it a reader sees six curves and has no way to ask
+      // which one is the puller's session.
+      return (
+       <g key={l.id}>
+        <path d={`M ${x1} ${y1} C ${x1 + k} ${y1} ${x2 - k} ${y2} ${x2} ${y2}`}
+         fill="none" stroke={tone(l.st)} strokeWidth="1.3"
+         strokeDasharray={l.st === "live" ? undefined : "5 3"}
+         opacity="0.75" markerEnd="url(#netarr)" />
+        <text x={x1 + (fwd ? 8 : -8)} y={y1 - 3} fontSize="8.5"
+         fontWeight="700" textAnchor={fwd ? "start" : "end"}
+         fill={tone(l.st)}>{l.id}</text>
+       </g>);
+     })}
+
+     {NET_ZONES.map((z) => {
+      const p = zoneBox(z);
+      const ls = netLinksFor(z.id);
+      const un = ls.filter((l) => l.st !== "live").length;
+      return (
+       <g key={z.id} className="cp-hit" tabIndex={0} role="button"
+        onClick={() => setZone(zone === z.id ? null : z.id)}>
+        <rect className="cp-bx" x={p.x} y={p.y} width={ZW} height={ZH} rx={8}
+         fill={zone === z.id ? "#eef3f8" : "#fff"}
+         stroke={zone === z.id ? ACC : (z.isNew ? OK : "#c3d4e4")}
+         strokeWidth={zone === z.id ? 2.4 : (z.isNew ? 1.9 : 1.3)} />
+        <text x={p.x + 10} y={p.y + 19} fontSize="10.5" fontWeight="700"
+         fill={ACC}>{z.n}</text>
+        <text x={p.x + 10} y={p.y + 32} fontSize="8.5" fill={MUT}>
+         {z.own}{z.unsited ? " - site open, U1" : ""}</text>
+        {z.holds.slice(0, 5).map((h, i) => (
+         <text key={h} x={p.x + 12} y={p.y + 50 + i * 13} fontSize="8.5"
+          fill={INK}>{h.length > 30 ? h.slice(0, 29) + "." : h}</text>))}
+        <text x={p.x + ZW - 10} y={p.y + ZH - 8} textAnchor="end"
+         fontSize="8.5" fontWeight="700" fill={un ? WARN : OK}>
+         {ls.length} links{un ? ` - ${un} unbuilt` : ""}</text>
+        <SvgGo x={p.x + ZW - 8} y={p.y + 18} />
+       </g>);
+     })}
+    </svg>
+    <div style={{ display: "flex", gap: 15, flexWrap: "wrap", marginTop: 9,
+     fontSize: 11, color: SUB }}>
+     {Object.keys(NET_STATE).map((k) => (
+      <span key={k} style={{ display: "inline-flex", alignItems: "center",
+       gap: 6 }}>
+       <span style={{ display: "inline-block", width: 18, height: 0,
+        borderTop: `2px ${k === "live" ? "solid" : "dashed"} ${NET_STATE[k].c}`
+        }} />{NET_STATE[k].n} &mdash; {NET_STATE[k].w}</span>))}
+    </div>
+    <ClickHint>Every zone opens what it holds and every link that touches
+     it.</ClickHint>
+   </div>
+
+   {sel && (
+    <div style={card({ borderLeft: `3px solid ${ACC}` })}>
+     <div style={eyebrow}>{sel.own}</div>
+     <b style={{ fontSize: 14, color: INK }}>{sel.n}</b>
+     <Body><div style={{ marginTop: 6 }}>{sel.w}</div></Body>
+     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 9 }}>
+      {sel.holds.map((h) => (
+       <span key={h} style={{ fontSize: 10.5, fontFamily: MONO,
+        border: `1px solid ${RULE}`, borderRadius: 3, padding: "2px 7px",
+        color: INK }}>{h}</span>))}
+     </div>
+    </div>)}
+
+   <div style={card({ borderLeft: `3px solid ${OK}` })}>
+    <div style={eyebrow}>Settled</div>
+    {NET_SETTLED.map((x, i) => (
+     <div key={x.t} style={{ display: "flex", gap: 14, padding: "7px 0",
+      borderTop: i ? "1px solid #eef3f5" : "none", flexWrap: "wrap" }}>
+      <span style={{ fontSize: 12.5, fontWeight: 500, color: INK,
+       flex: "0 0 215px" }}>{x.t}</span>
+      <span style={{ fontSize: 12.5, color: SUB, lineHeight: 1.6,
+       flex: "1 1 320px" }}>{x.w}</span>
+     </div>))}
+   </div>
+
+   <Head title="Every connection"
+    note="the list a firewall, route table and allow-list are written from" />
+   <div style={card()}>
+    {(sel ? netLinksFor(sel.id) : NET_LINKS).map((l, i) => (
+     <div key={l.id} style={{ padding: "10px 0",
+      borderTop: i ? "1px solid #eef3f5" : "none" }}>
+      <div style={{ display: "flex", gap: 9, alignItems: "baseline",
+       flexWrap: "wrap" }}>
+       <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700,
+        color: INK }}>{l.id}</span>
+       <Chip bg={tone(l.st)} fg="#fff">{NET_STATE[l.st].n}</Chip>
+       <b style={{ fontSize: 12.5, color: INK }}>{l.w}</b>
+       {l.u && <span style={{ fontSize: 10.5, fontFamily: MONO, color: BAD }}>
+        {l.u}</span>}
+      </div>
+      <div style={{ display: "flex", gap: 18, flexWrap: "wrap",
+       marginTop: 6, fontSize: 11.5, color: SUB }}>
+       <span style={{ flex: "1 1 260px" }}>
+        <b style={{ ...eyebrow, display: "block" }}>Mechanism</b>{l.mech}</span>
+       <span style={{ flex: "0 1 170px" }}>
+        <b style={{ ...eyebrow, display: "block" }}>Protocol</b>{l.proto}</span>
+       <span style={{ flex: "0 1 150px" }}>
+        <b style={{ ...eyebrow, display: "block" }}>Direction</b>{l.dir}</span>
+       <span style={{ flex: "0 1 150px" }}>
+        <b style={{ ...eyebrow, display: "block" }}>Rule owner</b>{l.owner}</span>
+      </div>
+      <div style={{ fontSize: 11.5, color: MUT, lineHeight: 1.6,
+       marginTop: 5 }}>{l.note}</div>
+     </div>))}
+   </div>
+
+   <div style={card({ borderLeft: `3px solid ${BAD}` })}>
+    <div style={eyebrow}>The one that fails silently</div>
+    <b style={{ fontSize: 13.5, color: INK }}>{NET_DNS.t}</b>
+    <Body><div style={{ marginTop: 6 }}>{NET_DNS.w}</div></Body>
+    <ul style={{ fontSize: 12.5, color: SUB, lineHeight: 1.7,
+     margin: "9px 0 0", paddingLeft: 17 }}>
+     {NET_DNS.checks.map((c) => <li key={c}>{c}</li>)}</ul>
+   </div>
+
+   <div style={card({ borderLeft: `3px solid ${WARN}` })}>
+    <div style={eyebrow}>{NET_TAG_ROUTE.t}</div>
+    <Body><div style={{ marginTop: 5 }}>{NET_TAG_ROUTE.w}</div>
+     <div style={{ marginTop: 7 }}>{NET_TAG_ROUTE.why}</div></Body>
+    <ul style={{ fontSize: 12.5, color: SUB, lineHeight: 1.7,
+     margin: "9px 0 0", paddingLeft: 17 }}>
+     {NET_TAG_ROUTE.need.map((c) => <li key={c}>{c}</li>)}</ul>
+   </div>
+
+   <Head title="What each team has to do" note="grouped the way it is assigned" />
+   <div style={{ display: "grid", gap: 9,
+    gridTemplateColumns: "repeat(auto-fit,minmax(330px,1fr))" }}>
+    {NET_WORK.map((g) => (
+     <div key={g.team} style={card({ marginBottom: 0 })}>
+      <b style={{ fontSize: 13, color: ACC }}>{g.team}</b>
+      <ul style={{ fontSize: 12, color: SUB, lineHeight: 1.65,
+       margin: "8px 0 0", paddingLeft: 17 }}>
+       {g.items.map((x) => <li key={x} style={{ marginBottom: 3 }}>{x}</li>)}</ul>
+     </div>))}
+   </div>
+
+   <Head title="Still open" note={`${NET_UNKNOWN.length} questions, each blocking something named`} />
+   <div style={{ display: "grid", gap: 8 }}>
+    {NET_UNKNOWN.map((u) => (
+     <div key={u.id} style={card({ marginBottom: 0,
+      borderLeft: `3px solid ${BAD}` })}>
+      <div style={{ display: "flex", gap: 8, alignItems: "baseline",
+       flexWrap: "wrap" }}>
+       <Chip bg={BAD} fg="#fff">{u.id}</Chip>
+       <b style={{ fontSize: 13, color: INK }}>{u.q}</b>
+      </div>
+      <Body><div style={{ marginTop: 6 }}>{u.w}</div></Body>
+      <div style={{ fontSize: 11.5, color: MUT, marginTop: 6 }}>
+       <b style={{ ...eyebrow, display: "inline" }}>Blocks</b> &nbsp;{u.blocks}</div>
+     </div>))}
+   </div>
+
+   <div style={card({ marginTop: 11 })}>
+    <div style={{ fontSize: 10.5, color: MUT }}>{NET_DOC.note}</div>
+   </div>
   </div>);
 }
 

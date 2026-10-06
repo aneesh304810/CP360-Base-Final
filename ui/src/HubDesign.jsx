@@ -24,7 +24,8 @@ import { SEI_ARCH_DOC, ARCH_FEEDS, ARCH_LAYERS, ARCH_ORCHESTRATION,
  ARCH_PRINCIPLES, ARCH_CONFLICTS, OUTBOUND_FLOW, INBOUND_POSTURE,
  conflictsAt } from "./seiArchitecture.js";
 import { NavStyles, Trail, SvgGo } from "./HubNav.jsx";
-import { GatewayView, SdcEndToEnd } from "./HubContext.jsx";
+import { GatewayView, SdcEndToEnd, NetworkView } from "./HubContext.jsx";
+import { NET_COUNTS } from "./hubNetwork.js";
 import { ContextView, GateView, LoaderLoopView, Stage2Model,
  FileIngestionView, Stage1Model, DbModelView, GapSupplementView }
  from "./HubContext.jsx";
@@ -108,6 +109,7 @@ export default function HubDesign({ t }) {
  // that forgets which only leaves them the browser's back button.
  const [gapFrom, setGapFrom] = useState(null);
  const [sdcLegPick, setSdcLegPick] = useState(null);   // SDC end to end: which leg
+ const [netZonePick, setNetZonePick] = useState(null); // network view: which zone
  const [expand, setExpand] = useState(null);    // L3 component detail panel
  const [srcOf, setSrcOf] = useState(null);      // component shown beside its SEI source
  const [seiDoc, setSeiDoc] = useState(null);    // {doc, section} open in the popup
@@ -779,6 +781,17 @@ export default function HubDesign({ t }) {
     filter={gapF} setFilter={setGapF} />
   </div>);
 
+ /* ---------- NET: the whole network, for the infrastructure teams ---------- */
+ if (view === "NET") return (
+  <div>
+   <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+   <NavStyles />
+   <Popup />
+   <Crumb trail={[["containers", () => setView("L2")],
+                  ["the network, end to end", null]]} />
+   <NetworkView t={t} zone={netZonePick} setZone={setNetZonePick} />
+  </div>);
+
  /* ---------- SDC: the event path end to end, with its network ---------- */
  if (view === "SDC") return (
   <div>
@@ -988,6 +1001,11 @@ export default function HubDesign({ t }) {
        borderRadius: 999, cursor: "pointer", background: "#0f4775",
        color: "#fff" }}>
       ⇆ the boundary · 3 transports, 4 channels</span>
+     <span onClick={() => { setView("NET"); setNetZonePick(null); }}
+      style={{ fontSize: 10.5, fontWeight: 800, padding: "6px 14px",
+       borderRadius: 999, cursor: "pointer", background: "#e8f3ec",
+       color: "#15663a", border: "1px solid #b9ddc8" }}>
+      ⇄ the network, end to end · {NET_COUNTS.design + NET_COUNTS.open} links unbuilt</span>
      <span onClick={() => setView("SEIFLOW")} style={{ fontSize: 10.5,
       fontWeight: 800, padding: "6px 14px", borderRadius: 999, cursor: "pointer",
       background: "#eef3f8", color: "#0f4775" }}>

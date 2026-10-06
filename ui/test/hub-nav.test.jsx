@@ -31,8 +31,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { NAV_CSS, NavStyles, OpenCard, ClickHint, SvgGo, Trail }
   from "../src/HubNav.jsx";
 import { ContextView, Stage2Model, DbModelView, Stage2Erd, Stage2Lineage,
-  Stage2Feeds, Stage2Atlas, GatewayView, SdcEndToEnd }
+  Stage2Feeds, Stage2Atlas, GatewayView, SdcEndToEnd, NetworkView }
   from "../src/HubContext.jsx";
+import { NET_ZONES, NET_LINKS, NET_STATE, NET_WORK, NET_UNKNOWN, NET_DNS,
+  NET_SETTLED, NET_COUNTS, netZone } from "../src/hubNetwork.js";
 import { GW_LAYERS, GW_VANTAGE, GW_AD3 } from "../src/hubGatewayLayers.js";
 import { LANES } from "../src/hubGroups.js";
 import { SDC_LEGS, SDC_OPEN, SDC_PATHS, SDC_ENVS, SDC_NET_FACTS,
@@ -366,10 +368,17 @@ ok(!/\\u[0-9a-fA-F]{4}/.test(CTXSRC) && !/\\u[0-9a-fA-F]{4}/.test(NAVSRC),
      "every leg says what it does AND what network it runs on - a leg "
      + "with no network line is the omission this screen exists to fix",
      SDC_LEGS.filter((l) => !l.net).map((l) => l.n).join(","));
-  ok(SDC_LEGS.every((l) => l.st !== "open" || l.ask),
-     "and an open leg names the question, so a dashed red box is never "
+  ok(SDC_LEGS.every((l) => l.st === "settled" || l.ask),
+     "and an unfinished leg names the question, so a dashed box is never "
      + "an alarm with no message",
-     SDC_LEGS.filter((l) => l.st === "open" && !l.ask).map((l) => l.n).join(","));
+     SDC_LEGS.filter((l) => l.st !== "settled" && !l.ask).map((l) => l.n).join(","));
+  // Agreed-and-unbuilt is not the same as nobody-has-said-how, and a
+  // screen that draws them alike makes the network look either finished
+  // or hopeless depending on which colour it picked.
+  ok(new Set(SDC_LEGS.map((l) => l.st)).size >= 2
+     && SDC_LEGS.some((l) => l.st === "design"),
+     "the legs distinguish agreed-but-unbuilt from no-mechanism-agreed",
+     [...new Set(SDC_LEGS.map((l) => l.st))].join(","));
   for (const l of SDC_LEGS.filter((x) => x.ask))
     ok(SDC_OPEN.some((o) => o.id === l.ask),
        `leg ${l.n} points at a question that exists (${l.ask})`, "");
@@ -394,12 +403,14 @@ ok(!/\\u[0-9a-fA-F]{4}/.test(CTXSRC) && !/\\u[0-9a-fA-F]{4}/.test(NAVSRC),
 
   // The whole finding, in one assertion: the legs that cross into SEI's
   // network are the ones with no agreed network.
-  const reaches = SDC_LEGS.filter((l) => l.side === "BBH"
-    && /into SEI's (space|account)/.test(l.net));
-  const inside = SDC_LEGS.filter((l) => l.side === "BBH"
-    && /Inside BBH|BBH-internal/.test(l.net));
-  ok(reaches.length > 0 && reaches.every((l) => l.st === "open"),
-     "every BBH leg that reaches into SEI's network is still open",
+  const reaches = SDC_LEGS.filter((l) => l.side === "BBH" && l.reach === "sei");
+  const inside = SDC_LEGS.filter((l) => l.side === "BBH" && l.reach === "bbh");
+  ok(SDC_LEGS.every((l) => l.reach),
+     "whether a leg crosses into SEI's network is a field, not something "
+     + "inferred from its prose - the prose changes every time a fact "
+     + "lands and a regex over it quietly stops testing anything", "");
+  ok(reaches.length > 0 && reaches.every((l) => l.st !== "settled"),
+     "every BBH leg that reaches into SEI's network is still unfinished",
      reaches.map((x) => `${x.n}:${x.st}`).join(" "));
   ok(inside.length > 0 && inside.every((l) => l.st === "settled"),
      "and every BBH leg that stays inside BBH is settled - the split is "
@@ -437,6 +448,98 @@ ok(!/\\u[0-9a-fA-F]{4}/.test(CTXSRC) && !/\\u[0-9a-fA-F]{4}/.test(NAVSRC),
   ok(/structure and metadata only/i.test(NETSRC)
      && /not committed/i.test(NETSRC),
      "and the file says the slide is SEI's and is not committed", "");
+}
+
+/* --------------- the network view, for the infrastructure teams */
+// This one leaves the programme: it is sent to security, infrastructure
+// and network engineering, who will act on it without being in the room.
+// So it has to be checkable on its own terms - every link a firewall
+// request could be written from, every state distinguishable, and nothing
+// from SEI's documents reproduced that should not be.
+{
+  const h = render(<NetworkView t={t} zone={null} setZone={() => {}} />);
+  ok(count(h, /class="cp-hit"/g) === NET_ZONES.length,
+     "every zone opens", count(h, /class="cp-hit"/g));
+  ok(NET_LINKS.every((l) => netZone(l.from) && netZone(l.to)),
+     "every link joins two zones that exist - a dangling link is a "
+     + "firewall request to nowhere", "");
+  for (const f of ["mech", "proto", "dir", "owner", "note"])
+    ok(NET_LINKS.every((l) => l[f]),
+       `every link states its ${f} - the table is the deliverable, and a `
+       + "blank column is a question the reader has to come back with",
+       NET_LINKS.filter((l) => !l[f]).map((l) => l.id).join(","));
+  ok(NET_LINKS.every((l) => NET_STATE[l.st]),
+     "and a state that is one of the three", "");
+  // An unbuilt link has to be traceable to something: the open question
+  // it waits on, the component that owns it, or the decision that has to
+  // be taken first. "Not built" with no reference is a line item nobody
+  // can pick up.
+  const traced = (l) => l.u
+    || /\b(M\d+|U\d|Q\d|GW-(GAP|RISK)-\d+|DEC-GAP-\d+|SILVER-DEC-\d+)\b/
+         .test(l.note + l.mech);
+  const untraced = NET_LINKS.filter((l) => l.st !== "live" && !traced(l));
+  ok(untraced.length === 0,
+     "every unbuilt link cites the question, component or decision it "
+     + "waits on", untraced.map((l) => l.id).join(","));
+  ok(NET_LINKS.filter((l) => l.u).every((l) => SDC_OPEN.some((o) => o.id === l.u)),
+     "and a link's question id resolves against the event path's list, "
+     + "so the two screens cannot drift apart",
+     NET_LINKS.filter((l) => l.u && !SDC_OPEN.some((o) => o.id === l.u))
+       .map((l) => `${l.id}->${l.u}`).join(","));
+  ok(NET_LINKS.every((l) => h.includes(l.id)),
+     "every link id is on the page, so the picture indexes into the table",
+     "");
+
+  // Three states, because agreed-and-unbuilt and nobody-has-said-how get
+  // escalated to different people.
+  ok(Object.keys(NET_STATE).length === 3
+     && Object.values(NET_STATE).every((x) => x.n && x.w && x.c),
+     "three states, each with a label and an explanation", "");
+
+  // What the user settled this session, held as settled rather than
+  // quietly left in the open list.
+  const settled = NET_SETTLED.map((x) => x.t + " " + x.w).join(" ");
+  for (const [re, what] of [
+    [/Kafka/i, "the Kafka is the event transport"],
+    [/Private Link/i, "Private Link is how BBH reaches it"],
+    [/tag/i, "the tag selects the Snowflake target"],
+    [/three|DEV.*IMPS.*Prod/i, "there are three environments"],
+  ])
+    ok(re.test(settled), `recorded as settled: ${what}`, "");
+  ok(NET_COUNTS.open === 0,
+     "nothing is left in no-mechanism-agreed - the gap is build now",
+     JSON.stringify(NET_COUNTS));
+
+  // The two that are easy to conflate and expensive to.
+  ok(/route/i.test(JSON.stringify(NET_UNKNOWN)) &&
+     /admission|allow-list/i.test(JSON.stringify(NET_UNKNOWN)),
+     "a route and an admission are held apart - Private Link gives the "
+     + "first and the Snowflake network policy decides the second", "");
+  ok(/ADVERTISED|advertised/.test(JSON.stringify(NET_LINKS)),
+     "and the Kafka link says every advertised broker, not the bootstrap "
+     + "address - the rule most often written wrong from a connection string",
+     "");
+  ok(/private DNS/i.test(NET_DNS.t + NET_DNS.w) && NET_DNS.checks.length >= 4,
+     "the private-DNS failure is called out: a private endpoint without "
+     + "its zone is a public route that succeeds", "");
+
+  // Four teams, each with work they can actually start.
+  ok(NET_WORK.length >= 4 && NET_WORK.every((g) => g.team && g.items.length),
+     "every team named has a list", NET_WORK.map((g) => g.team).join(","));
+  ok(NET_UNKNOWN.every((u) => u.blocks),
+     "and every open question says what it blocks", "");
+
+  // Same discipline as the SDC module: this leaves the building.
+  const NETSRC2 = fs.readFileSync(path.join(SRC, "hubNetwork.js"), "utf8");
+  for (const [re, what] of [
+    [/\b\d{1,3}(\.\d{1,3}){3}\b/, "an IP address"],
+    [/\b[a-z0-9-]+\.(snowflakecomputing|azure|windows|core)\.[a-z.]+/i, "a hostname"],
+    [/\/\d{1,2}\b(?!\d)/, "a CIDR mask"],
+  ])
+    ok(!re.test(NETSRC2.replace(/https?:\/\/\S+/g, "")),
+       `no ${what} is recorded`, (NETSRC2.match(re) || [""])[0]);
+  ok(/to confirm/.test(NETSRC2),
+     "ports are flagged as protocol defaults to confirm, not observed", "");
 }
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\nhub-nav assertions pass");

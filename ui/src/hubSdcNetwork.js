@@ -1,5 +1,15 @@
 // The SDC event path, end to end, with the network it actually runs on.
 //
+// WHAT CHANGED, AND WHY THE SHAPE OF THE QUESTION MOVED. The event
+// transport is a Kafka SEI builds for BBH and publishes the topics to;
+// the listener reads the event, and the TAG on it selects which SDC
+// Snowflake the puller then connects to. Access to both is over Private
+// Link, as on SEI's network page. So almost nothing here is unknown any
+// more - it is unbuilt, which is a different thing and a better one. The
+// one genuinely unresolved item is whether the Snowflake account network
+// policy admits what arrives over BBH's Private Link, because a route and
+// an admission are two controls and the first does not imply the second.
+//
 // WHY THE LOGICAL PATH WAS NOT ENOUGH. Every screen before this one draws
 // the event path as actors and messages: SWP commits, SDC publishes, the
 // listener consumes, the collapser folds, the puller re-reads, the gate
@@ -85,60 +95,67 @@ export const SDC_PATHS = [
 // ask: what network does this leg actually run on. `st` is how well that
 // is known - settled, assumed by us, or open.
 export const SDC_LEGS = [
- { n: 1, side: "SEI", a: "SWP", t: "Commits to the intake",
+ { n: 1, side: "SEI", reach: "sei", a: "SWP", t: "Commits to the intake",
    w: "The book of record writes. Golden Gate and the migration scripts "
     + "run on SEI's dedicated VMs inside the paired subscription.",
    short: "Inside SEI's space",
    net: "Entirely inside SEI's space. Nothing of BBH's is involved.",
    st: "settled" },
- { n: 2, side: "SEI", a: "SDC", t: "Publishes on the domain topic",
+ { n: 2, side: "SEI", reach: "sei", a: "SDC", t: "Publishes on the domain topic",
    w: "A data event per changed row - eventid, key, op, view, no payload. "
     + "Markers 1000 and 1001 bracket the commit on every partition of "
     + "every subscribed topic.",
-   short: "The topic transport is not on the network page",
-   net: "SEI's network page covers the Snowflake account - Private Link, "
-      + "storage paths, network policies. Where the event topics live, and "
-      + "how a subscriber outside SEI's subnets reaches them, is not on it.",
-   st: "open", ask: "Q1" },
- { n: 3, side: "BBH", a: "SDC Event Listener", t: "Consumes the topic",
+   short: "Published to a Kafka SEI builds for BBH",
+   net: "SEI provisions a Kafka for BBH and publishes the topics to it. "
+      + "The transport and the access mechanism are both settled - BBH "
+      + "reaches it over Private Link, as on SEI's network page. What is "
+      + "left is provisioning: three environments, and every broker "
+      + "reachable rather than only a bootstrap address.",
+   st: "design", ask: "Q1" },
+ { n: 3, side: "BBH", reach: "sei", a: "SDC Event Listener", t: "Consumes the topic",
    w: "M1. Long-running consumer, at-least-once, offsets owned by the "
     + "consumer group. Markers bracket the micro-batch.",
-   short: "A held connection into SEI's space - not an API call",
-   net: "A subscription is a held connection into SEI's space from a BBH "
-      + "pod, opened once and kept. It is not a request, so it cannot "
-      + "cross Apigee and it inherits none of the gateway's controls.",
-   st: "open", ask: "Q1" },
- { n: 4, side: "BBH", a: "Key-Set Collapser", t: "Folds repeat keys",
+   short: "Kafka consumer over Private Link - held, not a request",
+   net: "A Kafka consumer holds a TCP connection to the broker set from a "
+      + "BBH pod, over Private Link. It is not a request, so it crosses "
+      + "Apigee nowhere and inherits none of the gateway's controls. "
+      + "Reachability must cover every ADVERTISED broker, not just the "
+      + "bootstrap address.",
+   st: "design", ask: "Q1" },
+ { n: 4, side: "BBH", reach: "bbh", a: "Key-Set Collapser", t: "Folds repeat keys",
    w: "M4. Many events on one key over a micro-batch window become one "
     + "key to read. This is what keeps the pull bounded.",
    short: "BBH-internal. No network question.",
    net: "BBH-internal. No network question.", st: "settled" },
- { n: 5, side: "BBH", a: "Set-Based Puller", t: "Re-reads current state",
+ { n: 5, side: "BBH", reach: "sei", a: "Set-Based Puller", t: "Re-reads current state",
    w: "M5. One bound, set-based retrieval per view per micro-batch - not "
-    + "one call per event. The event named what changed; this reads it.",
-   short: "A Snowflake session the network policy refuses - SEI subnets and VPN only",
-   net: "A Snowflake driver session from a BBH pod into SEI's account. "
-      + "This is the leg the network page refuses: the policy admits SEI "
-      + "subnets and VPN only, and a BBH pod is neither. It also needs "
-      + "Private Link path 3, because a whole key set is a large result "
-      + "set and those are served from Snowflake-managed blob.",
-   st: "open", ask: "Q2" },
- { n: 6, side: "BBH", a: "Intraday Stage-1 Loader", t: "Lands it in RAW",
+    + "one call per event. The tag on the event selects which SDC "
+    + "Snowflake to connect to; the event named what changed, this "
+    + "reads it.",
+   short: "Snowflake over Private Link - three environments, and path 3 as well as path 1",
+   net: "A Snowflake driver session from a BBH pod, over Private Link as "
+      + "on SEI's network page. Two things follow and neither is "
+      + "automatic: the account network policy has to admit whatever the "
+      + "BBH end of that Private Link presents, and path 3 has to exist "
+      + "as well as path 1, because a whole key set is a large result "
+      + "set and those come from Snowflake-managed blob.",
+   st: "design", ask: "Q2" },
+ { n: 6, side: "BBH", reach: "bbh", a: "Intraday Stage-1 Loader", t: "Lands it in RAW",
    w: "M6. Writes what the puller read, under a micro-batch identity.",
    short: "BBH Oracle. Inside BBH.",
    net: "BBH Oracle. Inside BBH.", st: "settled" },
- { n: 7, side: "BBH", a: "Micro-Batch Registry", t: "Records the micro-batch LOADED",
+ { n: 7, side: "BBH", reach: "bbh", a: "Micro-Batch Registry", t: "Records the micro-batch LOADED",
    w: "M13. The inbound twin of FILE_REGISTRY, and the thing the gate "
     + "counts. It does not exist yet.",
    short: "BBH Oracle. Inside BBH.",
    net: "BBH Oracle. Inside BBH.", st: "settled" },
- { n: 8, side: "SEI", a: "SDC", t: "Publishes the EOD system event",
+ { n: 8, side: "SEI", reach: "sei", a: "SDC", t: "Publishes the EOD system event",
    w: "Event 2, batch date flip: end-of-day position and accrual "
     + "processing has completed. About once a day.",
-   short: "Same transport as leg 2",
-   net: "Same transport as leg 2, so the same open question.",
-   st: "open", ask: "Q1" },
- { n: 9, side: "BBH", a: "Event Gate Evaluator", t: "Takes the date to TRIGGER",
+   short: "Same Kafka as leg 2",
+   net: "Published to the same Kafka as leg 2, so the same provisioning.",
+   st: "design", ask: "Q1" },
+ { n: 9, side: "BBH", reach: "bbh", a: "Event Gate Evaluator", t: "Takes the date to TRIGGER",
    w: "M8. One guarded UPDATE, and the event arm needs BOTH every "
     + "micro-batch LOADED AND the EOD system event. Either alone "
     + "transforms a short Stage 1 that STG to INT still reconciles "
@@ -149,21 +166,23 @@ export const SDC_LEGS = [
 
 // What the network page leaves open for BBH, and what each one blocks.
 export const SDC_OPEN = [
- { id: "Q1", q: "How does a BBH consumer reach the SDC topic transport?",
-   w: "The network page covers the Snowflake account - Private Link, "
-    + "storage paths, network policies. It does not say where the event "
-    + "topics live or how a subscriber outside SEI's subnets reaches "
-    + "them. A topic subscription is a held connection, not a request, so "
-    + "it cannot cross Apigee and inherits none of the gateway's controls.",
+ { id: "Q1", q: "Is the Kafka provisioned, in all three environments?",
+   w: "Settled: SEI builds a Kafka for BBH, publishes the topics to it, "
+    + "and BBH reaches it over Private Link. What is left is build. A "
+    + "Kafka client needs every ADVERTISED broker reachable, not just the "
+    + "bootstrap address - a firewall rule written from a connection "
+    + "string connects, then fails on the first metadata refresh. Three "
+    + "SDC environments means three broker sets, three private "
+    + "endpoints and three sets of topic ACLs.",
    blocks: "M1, M10, M11, M12, M16 - the entire event listener side",
-   sev: "block" },
- { id: "Q2", q: "On what network does the puller's Snowflake session run?",
-   w: "The policy admits SEI subnets and VPN only. A BBH OpenShift pod is "
-    + "neither. Three ways out, and they are not equivalent: admit BBH "
-    + "egress to the network policy, put BBH on the permitted VPN, or "
-    + "give BBH its own paired subscription with its own private "
-    + "endpoints. The third is the only one that does not depend on "
-    + "BBH egress addressing staying stable.",
+   sev: "warn" },
+ { id: "Q2", q: "Does the network policy admit the BBH Private Link?",
+   w: "A private endpoint gives BBH a route. The account network policy "
+    + "decides whether the connection is accepted once it arrives, and "
+    + "today it admits SEI subnets and VPN only. These are two separate "
+    + "controls and provisioning the first does not satisfy the second: "
+    + "the session is refused before authentication, so no credential or "
+    + "driver setting can work around it.",
    blocks: "M5, and through it every intraday path",
    sev: "block" },
  { id: "Q3", q: "Is Private Link path 3 provisioned, or only path 1?",
@@ -174,18 +193,21 @@ export const SDC_OPEN = [
     + "first real micro-batch.",
    blocks: "M5 at volume - and it will pass UAT before it fails",
    sev: "block" },
- { id: "Q4", q: "Three environments, three paths - who builds each?",
-   w: "DEV, IMPS and Prod are separate accounts on separate subscriptions "
-    + "with no firewall overlap between them. A path proven in DEV proves "
-    + "nothing about Prod, and the environment is part of the connection "
-    + "identity rather than a parameter on one endpoint.",
-   blocks: "Promotion. A DEV-only path makes the pipeline undeployable",
+ { id: "Q4", q: "How many Snowflake targets can a tag select?",
+   w: "The listener routes on the tag, so the number of endpoints, DNS "
+    + "records and policy admissions is the number of distinct targets "
+    + "the tag set can reach, times three for DEV, IMPS and Prod. One "
+    + "endpoint per environment is the answer only if every tag resolves "
+    + "within a single account.",
+   blocks: "Sizing the Private Link build",
    sev: "warn" },
- { id: "Q5", q: "Where do the Snowflake credentials live?",
+ { id: "Q5", q: "Where do the Kafka and Snowflake credentials live?",
    w: "The gateway review requires secrets to resolve from the platform "
-    + "secret service and never from workflow metadata (GW-GAP-02). A "
-    + "driver session that does not cross the gateway still has to meet "
-    + "that standard, and nothing currently says it does.",
+    + "secret service and never from workflow metadata (GW-GAP-02). "
+    + "Neither of these crosses the gateway, and both still have to meet "
+    + "that standard. Three environments means three sets, and the Kafka "
+    + "credential is a second kind - mTLS, SASL or OAuth - that nothing "
+    + "has yet named.",
    blocks: "Nothing yet, but it is the same finding as GW-RISK-02",
    sev: "warn" },
 ];
