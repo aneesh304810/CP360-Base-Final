@@ -53,10 +53,11 @@ export const NET_STATE = {
 // Zones are drawn; the detail lives on the links.
 export const NET_ZONES = [
  { id: "sei", n: "SEI estate", own: "SEI", col: 0, row: 0,
-   w: "SWP, the extract and loader services, and the dedicated VMs that "
-    + "run Golden Gate and the release migration scripts.",
-   holds: ["SWP", "SEI PS loader", "SFTP extract", "Momentum",
-     "Dedicated VMs"] },
+   w: "SWP, the SDC publisher that writes BBH's events onto the Kafka, "
+    + "the extract and loader services, and the dedicated VMs that run "
+    + "Golden Gate and the release migration scripts.",
+   holds: ["SWP", "SDC publisher", "SEI PS loader", "SFTP extract",
+     "Momentum", "Dedicated VMs"] },
  // SEI's own Kafka estate, with a queue dedicated to BBH on it. The
  // distinction from "a Kafka built for BBH" is not pedantry: a shared
  // cluster means the brokers, their capacity and their blast radius are
