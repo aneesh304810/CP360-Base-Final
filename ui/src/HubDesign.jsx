@@ -23,6 +23,7 @@ import { GROUPS, PROC_STAGES, groupOfTracker, stageOfTracker, groupById,
 import { SEI_ARCH_DOC, ARCH_FEEDS, ARCH_LAYERS, ARCH_ORCHESTRATION,
  ARCH_PRINCIPLES, ARCH_CONFLICTS, OUTBOUND_FLOW, INBOUND_POSTURE,
  conflictsAt } from "./seiArchitecture.js";
+import { NavStyles, Trail, SvgGo } from "./HubNav.jsx";
 import { ContextView, GateView, LoaderLoopView, Stage2Model,
  FileIngestionView, Stage1Model, DbModelView, GapSupplementView }
  from "./HubContext.jsx";
@@ -212,20 +213,10 @@ export default function HubDesign({ t }) {
  // C4 breadcrumb. The drill-down is only useful if the way back up is
  // obvious at every level — a reader who has to use the browser's back
  // button has lost the hierarchy the diagram is for.
- const Crumb = ({ trail }) => (
-  <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap",
-   marginBottom: 12, fontSize: 11 }}>
-   {trail.map(([label, go], i) => (
-    <span key={label + i} style={{ display: "inline-flex", alignItems: "center",
-     gap: 7 }}>
-     {i > 0 && <span style={{ color: "#9aa7b2" }}>›</span>}
-     <span onClick={go || undefined}
-      style={{ fontWeight: go ? 700 : 800, cursor: go ? "pointer" : "default",
-       padding: "5px 12px", borderRadius: 999,
-       background: go ? "#eef3f8" : (t.navy || "#10193b"),
-       color: go ? (t.accent || "#0f4775") : "#fff" }}>{label}</span>
-    </span>))}
-  </div>);
+ // One breadcrumb shape for the whole drill, defined in HubNav.jsx beside
+ // the other navigation affordances. It also carries the stylesheet those
+ // affordances need, so every view that has a trail has them.
+ const Crumb = ({ trail }) => <Trail steps={trail} t={t} />;
  const Defs = () => (
   <defs><marker id="hubarr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8"
    markerHeight="8" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#555" /></marker>
@@ -240,6 +231,7 @@ export default function HubDesign({ t }) {
   if (c) return (
    <div>
     <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <NavStyles />
     <Popup />
     <SourceReference t={t} comp={c} finding={FIND[c.id]} coverage={covOf(c)}
      onOpenDoc={openDoc}
@@ -256,6 +248,7 @@ export default function HubDesign({ t }) {
   return (
    <div>
     <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <NavStyles />
     <DocDrill t={t} docKey={doc.key} from={doc.from} onBack={() => setDoc(null)} />
    </div>);
 
@@ -264,6 +257,7 @@ export default function HubDesign({ t }) {
   return (
    <div>
     <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <NavStyles />
     <span onClick={() => setFlat(false)} style={{ fontSize: 11.5, fontWeight: 700,
      padding: "7px 16px", borderRadius: 5, background: t.navy || "#10193b",
      color: "#fff", cursor: "pointer", display: "inline-block", marginBottom: 10 }}>
@@ -279,6 +273,7 @@ export default function HubDesign({ t }) {
   return (
    <div>
     <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <NavStyles />
     <span onClick={() => setView("L2")} style={{ fontSize: 11.5, fontWeight: 700,
      padding: "7px 16px", borderRadius: 5, background: t.navy || "#10193b",
      color: "#fff", cursor: "pointer", display: "inline-block", marginBottom: 12 }}>
@@ -561,6 +556,7 @@ export default function HubDesign({ t }) {
   return (
    <div>
     <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <NavStyles />
     <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap",
      alignItems: "center" }}>
      <span onClick={() => setView("L2")} style={{ fontSize: 11.5, fontWeight: 700,
@@ -717,6 +713,7 @@ export default function HubDesign({ t }) {
  if (view === "CTX") return (
   <div>
    <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+   <NavStyles />
    <Popup />
    <Crumb trail={[["containers", () => setView("L2")],
                   ["the boundary", null]]} />
@@ -727,6 +724,7 @@ export default function HubDesign({ t }) {
  if (view === "GATE") return (
   <div>
    <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+   <NavStyles />
    <Popup />
    <Crumb trail={[["containers", () => setView("L2")],
                   ["Orchestration", () => { setGrp("orchestration"); setView("GRP"); }],
@@ -738,6 +736,7 @@ export default function HubDesign({ t }) {
  if (view === "LOOP") return (
   <div>
    <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+   <NavStyles />
    <Popup />
    <Crumb trail={[["containers", () => setView("L2")],
                   ["Ingress and Egress", () => { setGrp("ingress"); setView("GRP"); }],
@@ -749,6 +748,7 @@ export default function HubDesign({ t }) {
  if (view === "FILE") return (
   <div>
    <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+   <NavStyles />
    <Popup />
    <Crumb trail={[["containers", () => setView("L2")],
                   ["Ingestion", () => { setGrp("ingestion"); setView("GRP"); }],
@@ -761,6 +761,7 @@ export default function HubDesign({ t }) {
  if (view === "GAPS") return (
   <div>
    <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+   <NavStyles />
    <Popup />
    <Crumb trail={[["containers", () => setView("L2")],
                   ["gap supplements", null]]} />
@@ -772,6 +773,7 @@ export default function HubDesign({ t }) {
  if (view === "DBM") return (
   <div>
    <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+   <NavStyles />
    <Popup />
    <Crumb trail={[["containers", () => setView("L2")],
                   ["Processing", () => { setGrp("processing"); setView("GRP"); }],
@@ -786,6 +788,7 @@ export default function HubDesign({ t }) {
  if (view === "S1M") return (
   <div>
    <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+   <NavStyles />
    <Popup />
    <Crumb trail={[["containers", () => setView("L2")],
                   ["Processing", () => { setGrp("processing"); setView("GRP"); }],
@@ -798,6 +801,7 @@ export default function HubDesign({ t }) {
  if (view === "S2M") return (
   <div>
    <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+   <NavStyles />
    <Popup />
    <Crumb trail={[["containers", () => setView("L2")],
     ["Processing", () => { setGrp("processing"); setView("GRP"); }],
@@ -854,9 +858,9 @@ export default function HubDesign({ t }) {
   // container itself so the top level answers what is in there, not
   // just how much.
   const Lane = ({ l, x, y, w, h }) => (
-   <g onClick={(e) => { e.stopPropagation(); setGrp(l.gid); setView("GRP"); }}
-    style={{ cursor: "pointer" }}>
-    <rect x={x} y={y} width={w} height={h} rx="6"
+   <g className="cp-hit" tabIndex={0} role="button"
+    onClick={(e) => { e.stopPropagation(); setGrp(l.gid); setView("GRP"); }}>
+    <rect className="cp-bx" x={x} y={y} width={w} height={h} rx="6"
      fill={l.proposal ? "#fdf1f2" : "#eef3f8"}
      stroke={l.proposal ? "#e0a9b0" : "#c3d4e4"}
      strokeDasharray={l.proposal ? "4 3" : undefined} strokeWidth="1" />
@@ -871,6 +875,8 @@ export default function HubDesign({ t }) {
       {T(x + w - 19, y + 14.5, `⚠${conflictsAt(l.id).length}`,
         { fs: 7.5, fw: 800, anchor: "middle", fill: "#fff" })}
      </g>)}
+    <SvgGo x={x + w - 7} y={y + h - 7}
+     c={l.proposal ? "#cc3344" : "#0f4775"} />
    </g>);
   const LaneRow = ({ id, x, y, w }) => {
    const ls = lanesOf(id);
@@ -886,8 +892,9 @@ export default function HubDesign({ t }) {
    const stack = w < 400;              // the right-hand column is narrow
    const ls = lanesOf(id);
    return (
-    <g onClick={() => { setGrp(id); setView("GRP"); }} style={{ cursor: "pointer" }}>
-     <rect x={x} y={y} width={w} height={h} rx="10" fill="#fff"
+    <g className="cp-hit" tabIndex={0} role="button"
+     onClick={() => { setGrp(id); setView("GRP"); }}>
+     <rect className="cp-bx" x={x} y={y} width={w} height={h} rx="10" fill="#fff"
       stroke="#7fa8c9" strokeWidth="1.4" />
      <rect x={x} y={y} width={w} height={30} rx="10" fill="#0f4775" />
      <rect x={x} y={y + 20} width={w} height={10} fill="#0f4775" />
@@ -905,9 +912,9 @@ export default function HubDesign({ t }) {
     </g>);
   };
   const Stage = ({ st, x, y, w }) => (
-   <g onClick={(e) => { e.stopPropagation(); setGrp("processing"); setView("GRP"); }}
-    style={{ cursor: "pointer" }}>
-    <rect x={x} y={y} width={w} height={62} rx="7"
+   <g className="cp-hit" tabIndex={0} role="button"
+    onClick={(e) => { e.stopPropagation(); setGrp("processing"); setView("GRP"); }}>
+    <rect className="cp-bx" x={x} y={y} width={w} height={62} rx="7"
      fill={st.bbh.length ? "#fff" : "#1168bd"}
      stroke={st.bbh.length ? "#a8560f" : "none"}
      strokeDasharray={st.bbh.length ? "5 3" : undefined}
@@ -932,6 +939,7 @@ export default function HubDesign({ t }) {
   return (
    <div>
     <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <NavStyles />
     <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
      <span onClick={() => setView("L1")} style={{ fontSize: 11.5, fontWeight: 700,
       padding: "7px 16px", borderRadius: 5, background: t.navy || "#10193b",
@@ -1001,10 +1009,10 @@ export default function HubDesign({ t }) {
       {Arrow(462, 544, 462, 566)}
 
       {/* processing, with the stage chain drawn inside it */}
-      <g onClick={() => { setGrp("processing"); setView("GRP"); }}
-       style={{ cursor: "pointer" }}>
-       <rect x={24} y={570} width={876} height={232} rx="10" fill="#fff"
-        stroke="#7fa8c9" strokeWidth="1.4" />
+      <g className="cp-hit" tabIndex={0} role="button"
+       onClick={() => { setGrp("processing"); setView("GRP"); }}>
+       <rect className="cp-bx" x={24} y={570} width={876} height={232} rx="10"
+        fill="#fff" stroke="#7fa8c9" strokeWidth="1.4" />
        <rect x={24} y={570} width={876} height={30} rx="10" fill="#0f4775" />
        <rect x={24} y={590} width={876} height={10} fill="#0f4775" />
        {T(38, 590, "⚙  PROCESSING", { fs: 10, fw: 800, fill: "#fff" })}
@@ -1030,10 +1038,10 @@ export default function HubDesign({ t }) {
       {T(936, 710, "records itself in the other.", { fs: 8, italic: true })}
 
       {/* the proposal, kept apart */}
-      <g onClick={() => { setGrp("events"); setView("GRP"); }}
-       style={{ cursor: "pointer" }}>
-       <rect x={24} y={826} width={1192} height={52} rx="10" fill="#fdf1f2"
-        stroke="#e0a9b0" strokeDasharray="5 4" strokeWidth="1.3" />
+      <g className="cp-hit" tabIndex={0} role="button"
+       onClick={() => { setGrp("events"); setView("GRP"); }}>
+       <rect className="cp-bx" x={24} y={826} width={1192} height={52} rx="10"
+        fill="#fdf1f2" stroke="#e0a9b0" strokeDasharray="5 4" strokeWidth="1.3" />
        {T(40, 848, `▸  EVENT INGESTION — ${evt.length} components`,
          { fs: 10, fw: 800, fill: "#cc3344" })}
        {T(40, 864, "Proposed by this programme's review. Not in SEI's documents and not in the delivery workbook — open it to see what it would add.",
@@ -1078,6 +1086,7 @@ export default function HubDesign({ t }) {
   return (
    <div>
     <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <NavStyles />
     <span onClick={() => setView("L1")} style={{ fontSize: 11.5, fontWeight: 700,
      padding: "7px 16px", borderRadius: 5, background: t.navy || "#10193b",
      color: "#fff", cursor: "pointer", display: "inline-block",
@@ -1259,6 +1268,7 @@ export default function HubDesign({ t }) {
   return (
    <div>
     <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <NavStyles />
     <Crumb trail={[["containers", () => setView("L2")],
                    ["Integration Architecture v5", null]]} />
 
@@ -1448,6 +1458,7 @@ export default function HubDesign({ t }) {
   return (
    <div>
     <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <NavStyles />
     <Crumb trail={[["containers", () => setView("L2")],
                    [evts ? "Event Ingestion" : g.n, null]]} />
     <div style={{ background: evts ? "#5c3030" : "#0f4775", color: "#fff",
@@ -1703,6 +1714,7 @@ export default function HubDesign({ t }) {
   return (
    <div>
     <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <NavStyles />
     <Crumb trail={[
       ["architecture", () => setView("SEIFLOW")],
       [st.n, null]]} />
@@ -1774,6 +1786,7 @@ export default function HubDesign({ t }) {
   return (
    <div>
     <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <NavStyles />
     <Crumb trail={[
       ["architecture", () => setView("SEIFLOW")],
       [st.n, () => { setSeiStage(c.s); setView("SEIL3"); }],
@@ -1899,6 +1912,7 @@ export default function HubDesign({ t }) {
   return (
    <div>
     <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <NavStyles />
     <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
      <span onClick={() => setView("L2")} style={{ fontSize: 11.5, fontWeight: 700,
       padding: "7px 16px", borderRadius: 5, background: t.navy || "#10193b",
@@ -2011,6 +2025,7 @@ export default function HubDesign({ t }) {
   return (
    <div>
     <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <NavStyles />
     <span onClick={() => { setCont("FND"); setView("L3"); }}
      style={{ fontSize: 11.5, fontWeight: 700, padding: "7px 16px", borderRadius: 5,
       background: t.navy || "#10193b", color: "#fff", cursor: "pointer",
@@ -2169,6 +2184,7 @@ export default function HubDesign({ t }) {
   return (
    <div>
     <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+    <NavStyles />
     <span onClick={() => setView("L1")} style={{ fontSize: 11.5, fontWeight: 700,
      padding: "7px 16px", borderRadius: 5, background: t.navy || "#10193b",
      color: "#fff", cursor: "pointer", display: "inline-block", marginBottom: 12 }}>
@@ -2272,6 +2288,7 @@ export default function HubDesign({ t }) {
  return (
   <div>
    <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+   <NavStyles />
    <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center" }}>
     <span onClick={() => { setView("SEIBASE"); setExpand(null); }}
      style={{ fontSize: 10.5, fontWeight: 800, padding: "5px 14px",

@@ -11,6 +11,7 @@
 // Real characters only.
 
 import React from "react";
+import { NavStyles, OpenCard, ClickHint, SvgGo } from "./HubNav.jsx";
 import { CHANNELS, TRANSPORTS, GATEWAY_NOTE, chanById } from "./hubChannels.js";
 import { EV_KINDS, EV_RULES, EV_GATE, CLOCKS } from "./hubEventModel.js";
 import { LOOP_LEGS, SUB_STATES, LOOP_RULES, LOOP_GAP } from "./hubLoaderLoop.js";
@@ -86,8 +87,9 @@ function Lane({ y, dir, label, role, dim, onPick }) {
   <line x1={x1} y1={a} x2={x2} y2={a} stroke={col} strokeWidth="1.6"
    strokeDasharray={dash} markerEnd="url(#ctxarr)" />);
  return (
-  <g onClick={onPick} style={{ cursor: "pointer" }}>
+  <g className="cp-hit" onClick={onPick} tabIndex={0} role="button">
    <rect x="268" y={y - 22} width="424" height="38" fill="transparent" />
+   <SvgGo x={668} y={y - 12} />
    {dir === "in" ? <>{seg(272, 466)}{seg(614, 686)}</>
                  : <>{seg(466, 272)}{seg(686, 614)}</>}
    <text x="276" y={y - 14} fontSize="11.5" fontWeight="500" fill={INK}>
@@ -100,6 +102,7 @@ export function ContextView({ t, chan, setChan }) {
  const c = chan ? chanById(chan) : null;
  return (
   <div>
+   <NavStyles />
    <div style={card()}>
     <svg viewBox="0 0 1200 500" style={{ width: "100%", height: "auto" }}
      role="img" aria-label="SEI and BBH, three transports and four channels">
@@ -192,9 +195,10 @@ export function ContextView({ t, chan, setChan }) {
      <b>Three transports, four channels.</b> Events and files cross on their
      own transports. Everything API-shaped - the data fetch, the loader push,
      the status coming back, and every consumer call - crosses through Apigee
-     and the API Gateway. That band is a wall, not a step in a chain. Click a
-     channel.
+     and the API Gateway. That band is a wall, not a step in a chain.
     </div>
+    <ClickHint>Each of the six numbered channels opens what crosses on it,
+     which transport carries it, and what breaks when it stops.</ClickHint>
    </div>
 
    {c ? (
@@ -273,6 +277,7 @@ export function ContextView({ t, chan, setChan }) {
 export function GateView({ t, onFile }) {
  return (
   <div>
+   <NavStyles />
    <div style={card()}>
     <b style={{ fontSize: 15, color: INK }}>
      Three kinds of event, three different jobs</b>
@@ -354,6 +359,7 @@ export function GateView({ t, onFile }) {
 export function LoaderLoopView({ t }) {
  return (
   <div>
+   <NavStyles />
    <div style={card()}>
     <b style={{ fontSize: 15, color: INK }}>A loop, not an arrow</b>
     <Body><div style={{ marginTop: 6 }}>Legs 2 and 3 cross the gateway; leg 4
@@ -418,8 +424,10 @@ function EdgeRow({ r, i, onPick }) {
  const e = EDGE[r.kind];
  return (
   <div onClick={() => onPick && onPick(r.child)}
+   className={onPick ? "cp-row" : undefined}
    style={{ display: "flex", gap: 10, alignItems: "baseline", padding: "7px 0",
-    borderTop: i ? "1px solid #eef3f5" : "none", cursor: onPick ? "pointer" : "default" }}>
+    borderTop: i ? "1px solid #eef3f5" : "none",
+    cursor: onPick ? "pointer" : "default" }}>
    <span style={{ width: 8, height: 8, borderRadius: "50%", background: e[0],
     flex: "0 0 auto", marginTop: 4 }} />
    <span style={{ fontFamily: MONO, fontSize: 11.5, color: INK, flex: "1 1 40%",
@@ -474,6 +482,7 @@ export function Stage2Model({ t, dom, tbl, setDom, setTbl,
    </div>);
   return (
    <div>
+    <NavStyles />
     <div style={card()}>
      <div style={eyebrow}>{s2DomainName(r[0])}{anchor ? " - anchor entity" : ""}</div>
      <div style={{ fontFamily: MONO, fontSize: 17, fontWeight: 500, color: INK,
@@ -544,9 +553,9 @@ export function Stage2Model({ t, dom, tbl, setDom, setTbl,
    .map((r) => [r.child, r.parent]).flat()
    .filter((n) => s2Table(n) && s2DomainOf(n) !== dom))];
   const Ent = ({ n, sub, anchor, gaps }) => (
-   <div onClick={() => setTbl(n)} style={{ background: "#fff",
+   <OpenCard onClick={() => setTbl(n)} opens="table" style={{ background: "#fff",
     border: `1px solid ${RULE}`, borderLeft: anchor ? `3px solid ${ACC}` : undefined,
-    borderRadius: 6, padding: "9px 11px", cursor: "pointer" }}>
+    borderRadius: 6, padding: "9px 11px" }}>
     <div style={{ fontFamily: MONO, fontSize: 12, fontWeight: 500, color: INK,
      overflowWrap: "anywhere" }}>{n}
      {gaps > 0 && <span style={{ display: "inline-block", width: 7, height: 7,
@@ -554,10 +563,11 @@ export function Stage2Model({ t, dom, tbl, setDom, setTbl,
       background: s2Blocked(n) ? BAD : WARN }} />}</div>
     <div style={{ fontFamily: MONO, fontSize: 10.5, color: MUT, marginTop: 3,
      overflowWrap: "anywhere" }}>{sub}</div>
-   </div>);
+   </OpenCard>);
   const showErd = erd !== false;
   return (
    <div>
+    <NavStyles />
     <div style={card()}>
      <b style={{ fontSize: 15, color: INK }}>{s2DomainName(dom)}</b>
      <div style={{ fontSize: 11, color: MUT, marginTop: 4 }}>
@@ -566,6 +576,9 @@ export function Stage2Model({ t, dom, tbl, setDom, setTbl,
     </div>
     <Persp now={showErd ? "erd" : "list"} set={(k) => setErd && setErd(k === "erd")}
      opts={[["erd", "ERD"], ["list", "Entities and relationships"]]} />
+    {!showErd && <ClickHint>Every entity and every row here opens that
+     table. The ERD tab is the same tables, drawn as spine and
+     leaves.</ClickHint>}
     {showErd && <Stage2Erd t={t} dom={dom} onPick={setTbl} />}
     {showErd ? null : (<>
     <div style={{ display: "grid", gap: 8,
@@ -606,9 +619,10 @@ export function Stage2Model({ t, dom, tbl, setDom, setTbl,
  }
 
  /* ---- the three top-level perspectives ---- */
- const bar = (
+ const bar = (<>
+  <NavStyles />
   <Persp now={P} set={setP} opts={[["domains", "Domains"],
-   ["lineage", "Cross-domain lineage"], ["feeds", "Feeds to Stage 1"]]} />);
+   ["lineage", "Cross-domain lineage"], ["feeds", "Feeds to Stage 1"]]} /></>);
  if (P === "lineage") return (
   <div>{bar}<Stage2Lineage t={t} onPick={setDom} /></div>);
  if (P === "feeds") return (
@@ -616,6 +630,7 @@ export function Stage2Model({ t, dom, tbl, setDom, setTbl,
 
  return (
   <div>
+   <NavStyles />
    {bar}
    <div style={card()}>
     <div style={eyebrow}>Stage 2 - INT - normalised SWP model</div>
@@ -644,8 +659,8 @@ export function Stage2Model({ t, dom, tbl, setDom, setTbl,
      const into = s2RelsInto(d.k).length;
      const nokey = s2TablesIn(d.k).filter((r) => s2Blocked(r[1])).length;
      return (
-      <div key={d.k} onClick={() => setDom(d.k)} style={card({ marginBottom: 0,
-       cursor: "pointer" })}>
+      <OpenCard key={d.k} onClick={() => setDom(d.k)} opens="ERD and tables"
+       style={card({ marginBottom: 0 })}>
        <b style={{ fontSize: 13, color: INK }}>{d.n}</b>
        <div style={{ fontSize: 11, color: MUT, margin: "3px 0 8px" }}>
         {d.c} tables - {own.length} out{into ? ` - ${into} in` : ""}</div>
@@ -655,9 +670,11 @@ export function Stage2Model({ t, dom, tbl, setDom, setTbl,
         {nokey > 0 && <Chip bg={BAD} fg="#fff">
          {nokey} key{nokey > 1 ? "s" : ""} undecided</Chip>}
        </div>
-      </div>);
+      </OpenCard>);
     })}
    </div>
+   <ClickHint>A domain opens its ERD; a box in the ERD opens that table,
+    with its key, its edges and anything unresolved on it.</ClickHint>
 
    <div style={card({ borderLeft: `3px solid ${BAD}`, marginTop: 11 })}>
     <div style={eyebrow}>Built, versus designed</div>
@@ -672,7 +689,7 @@ export function Stage2Model({ t, dom, tbl, setDom, setTbl,
    </div>
    <div style={card({ borderLeft: `3px solid ${WARN}` })}>
     <Body><b style={{ color: INK }}>{S2_INFERRED_COUNT} of {S2_RELS.length}
-     relationships are not declared foreign keys</b>, and {S2_TESTED.size} are
+     {" "}relationships are not declared foreign keys</b>, and {S2_TESTED.size} are
      proposed as dbt tests. Every edge is either declared, tested, or enforced
      nowhere - and the third group is where the build risk sits.</Body>
    </div>
@@ -736,6 +753,7 @@ export function FileIngestionView({ t, onComp }) {
  const SEV = { warn: WARN, bad: BAD };
  return (
   <div>
+   <NavStyles />
    <div style={card()}>
     <b style={{ fontSize: 15, color: INK }}>
      Discover, validate, load, reconcile, archive</b>
@@ -866,6 +884,7 @@ export function Stage1Model({ t }) {
  const both = s1Both(), only = s1ArchOnly();
  return (
   <div>
+   <NavStyles />
    <div style={card()}>
     <div style={eyebrow}>Stage 1 - RAW - bronze</div>
     <b style={{ fontSize: 16, color: INK }}>{S1_SHAPE.n}</b>
@@ -955,11 +974,15 @@ export function DbModelView({ t, pick, setPick, onOpen }) {
  const node = (x, y, w, h, n, sub, o) => {
   const opt = o || {};
   return (
-   <g key={n} onClick={opt.onClick} style={{ cursor: opt.onClick ? "pointer" : "default" }}>
-    <rect x={x - w / 2} y={y} width={w} height={h} rx={6}
+   <g key={n} onClick={opt.onClick} className={opt.onClick ? "cp-hit" : undefined}
+    tabIndex={opt.onClick ? 0 : undefined} role={opt.onClick ? "button" : undefined}
+    style={opt.onClick ? undefined : { cursor: "default" }}>
+    <rect className="cp-bx" x={x - w / 2} y={y} width={w} height={h} rx={6}
      fill={opt.fill || "#fff"} stroke={opt.stroke || RULE}
      strokeWidth={opt.sel ? 2.4 : 1.4}
      strokeDasharray={opt.dash ? "5 4" : undefined} />
+    {opt.onClick && <SvgGo x={x + w / 2 - 8} y={y + 15}
+     c={opt.stroke === BAD ? BAD : ACC} />}
     <text x={x} y={y + 24} textAnchor="middle" fontSize={opt.fs || 12.5}
      fontWeight="500" fill={INK}>{n}</text>
     {sub && <text x={x} y={y + 40} textAnchor="middle" fontSize="10"
@@ -970,6 +993,7 @@ export function DbModelView({ t, pick, setPick, onOpen }) {
  };
  return (
   <div>
+   <NavStyles />
    <div style={card()}>
     <svg viewBox="0 0 1200 560" style={{ width: "100%", height: "auto" }}
      role="img" aria-label="The database: the data path and the control plane">
@@ -1040,9 +1064,10 @@ export function DbModelView({ t, pick, setPick, onOpen }) {
     <div style={{ fontSize: 11.5, color: SUB, lineHeight: 1.6, marginTop: 9,
      maxWidth: "92ch" }}>
      <b>The data path is what a business reader follows; the control plane is
-     what an operator follows at 3am.</b> Click any table. RAW and INT open
-     their own data models.
+     what an operator follows at 3am.</b>
     </div>
+    <ClickHint>Every box opens, including the two dashed ones that do not
+     exist yet. RAW and INT go on to their own data models.</ClickHint>
    </div>
 
    {sel ? (
@@ -1122,8 +1147,9 @@ export function Stage2Erd({ t, dom, onPick }) {
   const anchor = s2IsAnchor(n);
   const r = s2Table(n);
   return (
-   <g onClick={() => onPick && onPick(n)} style={{ cursor: "pointer" }}>
-    <rect x={p[0]} y={p[1]} width={BW} height={BH} rx={5}
+   <g className="cp-hit" onClick={() => onPick && onPick(n)} tabIndex={0}
+    role="button">
+    <rect className="cp-bx" x={p[0]} y={p[1]} width={BW} height={BH} rx={5}
      fill={outside ? "#f4f7f9" : "#fff"}
      stroke={anchor ? ACC : RULE} strokeWidth={anchor ? 2 : 1.3}
      strokeDasharray={outside ? "5 4" : undefined} />
@@ -1132,6 +1158,7 @@ export function Stage2Erd({ t, dom, onPick }) {
     <text x={p[0] + 10} y={p[1] + 29} fontSize="8.5" fill={MUT}>
      {outside ? s2DomainName(s2DomainOf(n)) : (r && r[2] ? r[2].split(", ")[0] : "no key")}
      {s2Blocked(n) ? "  * key undecided" : ""}</text>
+    <SvgGo x={p[0] + BW - 7} y={p[1] + 24} />
    </g>);
  };
  return (
@@ -1171,6 +1198,8 @@ export function Stage2Erd({ t, dom, onPick }) {
     <span style={{ color: MUT }}>dashed box = an entity this domain
      references but does not own &middot; thick border = anchor</span>
    </div>
+   <ClickHint>Every box opens that table, the dashed ones included &mdash;
+    those land you in the domain that owns it.</ClickHint>
   </div>);
 }
 
@@ -1200,10 +1229,12 @@ export function Stage2Lineage({ t, onPick }) {
      const owns = s2RelsOwned(d.k);
      const out = Object.keys(pairs).filter((k) => k.split(">")[0] === d.k).length;
      return (
-      <g key={d.k} onClick={() => onPick && onPick(d.k)}
-       style={{ cursor: "pointer" }}>
-       <rect x="0" y={yOf(d.k) - 15} width={W} height={LANE - 6} rx="5"
-        fill={i % 2 ? "#f4f7f9" : "#fff"} stroke="#eef3f5" />
+      <g key={d.k} className="cp-hit" onClick={() => onPick && onPick(d.k)}
+       tabIndex={0} role="button">
+       <rect className="cp-bx" x="0" y={yOf(d.k) - 15} width={W}
+        height={LANE - 6} rx="5" fill={i % 2 ? "#f4f7f9" : "#fff"}
+        stroke="#eef3f5" />
+       <SvgGo x={W - 12} y={yOf(d.k) + 7} />
        <text x="12" y={yOf(d.k) + 2} fontSize="11.5" fontWeight="500"
         fill={INK}>{d.n}</text>
        <text x="12" y={yOf(d.k) + 15} fontSize="9.5" fill={MUT}>
@@ -1239,6 +1270,7 @@ export function Stage2Lineage({ t, onPick }) {
     domain it points at, and the number on it is how many columns. A domain
     with many arcs out cannot be built, tested or loaded on its own.
    </div>
+   <ClickHint>Every lane opens that domain&apos;s ERD.</ClickHint>
   </div>);
 }
 
@@ -1255,7 +1287,7 @@ export function Stage2Feeds({ t, onPick }) {
    <span style={{ flex: "0 0 90px" }}>{confChip(f.conf)}</span>
    <span style={{ display: "flex", gap: 5, flexWrap: "wrap", flex: "1 1 50%" }}>
     {f.tables.map((n) => (
-     <span key={n} onClick={() => onPick && onPick(n)}
+     <span key={n} className="cp-row" onClick={() => onPick && onPick(n)}
       style={{ fontFamily: MONO, fontSize: 10, border: `1px solid ${RULE}`,
        borderRadius: 3, padding: "1px 6px", cursor: "pointer", color: INK }}>
       {n}</span>))}
@@ -1263,6 +1295,7 @@ export function Stage2Feeds({ t, onPick }) {
   </div>);
  return (
   <div>
+   <NavStyles />
    <div style={card()}>
     <div style={eyebrow}>SWP feed &rarr; Stage 1 RAW &rarr; Stage 2 canonical</div>
     <b style={{ fontSize: 16, color: INK }}>
@@ -1382,11 +1415,12 @@ function Find({ r }) {
 export function GapSupplementView({ t, tab, setTab, filter, setFilter }) {
  const T = tab || "reconcile";
  const F = filter || "all";
- const bar = (
+ const bar = (<>
+  <NavStyles />
   <Persp now={T} set={setTab} opts={[["reconcile", "What it changes"],
    ["register", "Gap register"], ["decisions", "Decisions and risks"],
    ["accept", "Acceptance criteria"], ["gateway", "The gateway review"],
-   ["source", "Source and terminology"]]} />);
+   ["source", "Source and terminology"]]} /></>);
 
  if (T === "register") return (
   <div>{bar}
