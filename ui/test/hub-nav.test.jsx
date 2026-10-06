@@ -31,8 +31,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { NAV_CSS, NavStyles, OpenCard, ClickHint, SvgGo, Trail }
   from "../src/HubNav.jsx";
 import { ContextView, Stage2Model, DbModelView, Stage2Erd, Stage2Lineage,
-  Stage2Feeds } from "../src/HubContext.jsx";
-import { S2_DOMAINS, s2TablesIn } from "../src/hubStage2Model.js";
+  Stage2Feeds, Stage2Atlas } from "../src/HubContext.jsx";
+import { S2_DOMAINS, S2_TABLES, S2_RELS, s2TablesIn, s2DomainOf }
+  from "../src/hubStage2Model.js";
 import { DB_PATH, DB_CONTROL, DB_ABSENT } from "../src/hubDbModel.js";
 import { tLight } from "../src/bbhTheme.js";
 
@@ -214,6 +215,70 @@ ok(/<SectionHeader t=\{t\}>CP Integration Hub<\/SectionHeader>\s*\n\s*<NavStyles
 // The guard that has caught this three times already.
 ok(!/\\u[0-9a-fA-F]{4}/.test(CTXSRC) && !/\\u[0-9a-fA-F]{4}/.test(NAVSRC),
    "no escaped unicode - six literal characters in JSX text", "");
+
+/* ------------------------------------------- the atlas: all 52 at once */
+// The whole claim of this screen is that it shows every table and every
+// relationship. A layout that quietly loses an edge still looks correct -
+// it just draws a model nobody has, which is the exact failure the
+// domain-by-domain views were built to avoid.
+{
+  const h = render(<Stage2Atlas t={t} onPick={() => {}} onDomain={() => {}} />);
+  const refDoms = {};
+  S2_RELS.forEach((r) => {
+    (refDoms[r.parent] = refDoms[r.parent] || new Set()).add(s2DomainOf(r.child));
+  });
+  const spine = Object.keys(refDoms).filter((k) => refDoms[k].size > 1);
+  const rows = S2_TABLES.filter((r) => spine.indexOf(r[1]) < 0).length;
+
+  ok(count(h, /class="cp-hit"/g) === rows + S2_DOMAINS.length + spine.length,
+     `every one of the ${S2_TABLES.length} tables, plus ${S2_DOMAINS.length} `
+     + "domain headers, is its own target", count(h, /class="cp-hit"/g));
+  for (const r of S2_TABLES)
+    if (!h.includes(">" + r[1] + "<") && !h.includes(r[1].slice(0, 39) + "."))
+      ok(false, `${r[1]} is on the page`, "");
+  ok(true, "no table is missing from the atlas", "");
+
+  // The spine is derived, never listed. Hard-code it and the picture stops
+  // agreeing with the model the moment a relationship is added.
+  ok(/function atlasShape/.test(CTXSRC)
+     && /refDoms\[r\.parent\]/.test(CTXSRC),
+     "the shared entities are derived from the edges, not a hand-kept list", "");
+  ok(spine.length === 6 && spine.indexOf("ACCOUNT") >= 0,
+     "which today is six entities, ACCOUNT among them", spine.join(","));
+
+  // Every edge is accounted for: drawn to the spine, drawn inside a panel,
+  // or named in the footnote. The totals have to add up to all of them.
+  const paths = count(h, /<path /g);
+  const named = count(h, /class="cp-row"/g);
+  ok(paths + named === S2_RELS.length,
+     `${S2_RELS.length} relationships, all drawn or all named - nothing is `
+     + "dropped quietly", `${paths} drawn + ${named} named`);
+  ok(named === 3 && /Named, not drawn/i.test(h),
+     "the three that cross a boundary without a shared entity are listed, "
+     + "with the reason they are not wired", named);
+  for (const r of S2_RELS.filter((x) => s2DomainOf(x.child) !== s2DomainOf(x.parent)
+        && spine.indexOf(x.parent) < 0))
+    ok(h.includes(r.parent) && h.includes(r.child),
+       `${r.child} to ${r.parent} is named in full`, "");
+
+  // A self-reference is a point joined to itself; the generic edge path
+  // collapses to a flat stub that reads as an edge to somewhere offscreen.
+  const self = S2_RELS.filter((r) => r.child === r.parent);
+  ok(self.length > 0 && /r\.child === r\.parent/.test(CTXSRC),
+     `the ${self.length} self-reference(s) get a loop, not a collapsed line`,
+     self.map((r) => r.child).join(","));
+  ok(/e\.child === e\.parent/.test(CTXSRC),
+     "and so do they in the per-domain ERD, which had the same collapse", "");
+
+  // Order matters here and is invisible in a static read: an arc drawn in
+  // a panel's own gutter before the panel background is painted over by it.
+  const pi = h.indexOf("the edges a domain owns outright");
+  ok(/then the panel backgrounds[\s\S]{0,400}then the edges a domain owns outright/
+     .test(CTXSRC),
+     "panel backgrounds are painted before the arcs that sit in them", "");
+  ok(/cross-domain lines first[\s\S]{0,300}toSpine\.map/.test(CTXSRC),
+     "and the cross-domain lines before both, so they run behind", "");
+}
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\nhub-nav assertions pass");
 if (bad) process.exit(1);

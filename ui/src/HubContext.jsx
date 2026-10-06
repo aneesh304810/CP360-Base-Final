@@ -622,7 +622,10 @@ export function Stage2Model({ t, dom, tbl, setDom, setTbl,
  const bar = (<>
   <NavStyles />
   <Persp now={P} set={setP} opts={[["domains", "Domains"],
+   ["atlas", "Every table, by domain"],
    ["lineage", "Cross-domain lineage"], ["feeds", "Feeds to Stage 1"]]} /></>);
+ if (P === "atlas") return (
+  <div>{bar}<Stage2Atlas t={t} onPick={setTbl} onDomain={setDom} /></div>);
  if (P === "lineage") return (
   <div>{bar}<Stage2Lineage t={t} onPick={setDom} /></div>);
  if (P === "feeds") return (
@@ -1176,10 +1179,14 @@ export function Stage2Erd({ t, dom, onPick }) {
      // Bulge it out to the right instead.
      if (a[0] === b[0]) {
       const x = a[0] + BW;
+      // A self-reference collapses that bulge to a flat stub, so it gets a
+      // loop of its own.
+      const d = e.child === e.parent
+       ? `M ${x} ${ya - 8} C ${x + 34} ${ya - 14} ${x + 34} ${ya + 14} ${x} ${ya + 8}`
+       : `M ${x} ${ya} C ${x + 42} ${ya} ${x + 42} ${yb} ${x} ${yb}`;
       return (
-       <path key={i} d={`M ${x} ${ya} C ${x + 42} ${ya} ${x + 42} ${yb} ${x} ${yb}`}
-        fill="none" stroke={col} strokeWidth="1.2" strokeDasharray={dash}
-        opacity="0.75" />);
+       <path key={i} d={d} fill="none" stroke={col} strokeWidth="1.2"
+        strokeDasharray={dash} opacity="0.75" />);
      }
      const aRight = a[0] < b[0];
      return (
@@ -1271,6 +1278,263 @@ export function Stage2Lineage({ t, onPick }) {
     with many arcs out cannot be built, tested or loaded on its own.
    </div>
    <ClickHint>Every lane opens that domain&apos;s ERD.</ClickHint>
+  </div>);
+}
+
+/* ---- The atlas: all 52 tables, grouped by domain, with the linkage ---
+   WHY A SPINE AND NOT A GRID. Laid out as a plain graph, 52 tables and 73
+   edges is spaghetti and every reading of it is wrong. The model is not
+   shaped like a graph, though: six entities carry 33 of the 36 edges that
+   cross a domain boundary. So those six come out into the middle, each
+   domain keeps the rest of its tables in a panel of its own, and a line
+   from a panel to the middle means exactly one thing - this domain cannot
+   be built, tested or loaded without that entity.
+
+   THE THREE EDGES NOT DRAWN. Three cross-domain edges do not pass through
+   a shared entity, and wiring them would mean three lines crossing the
+   whole picture to say something about three rows. They are named in full
+   underneath and marked on the row they leave, because a reader who
+   cannot see them must still be told they exist. Nothing is dropped
+   quietly. */
+function atlasShape() {
+ const refDoms = {};
+ S2_RELS.forEach((r) => {
+  (refDoms[r.parent] = refDoms[r.parent] || new Set()).add(s2DomainOf(r.child));
+ });
+ const spineNames = S2_DOMAINS.flatMap((d) => s2TablesIn(d.k).map((r) => r[1]))
+  .filter((n) => refDoms[n] && refDoms[n].size > 1)
+  .sort((a, b) => S2_RELS.filter((r) => r.parent === b).length
+                - S2_RELS.filter((r) => r.parent === a).length);
+ const onSpine = new Set(spineNames);
+ const panels = S2_DOMAINS.map((d) => ({
+  k: d.k, n: d.n,
+  rows: s2TablesIn(d.k).map((r) => r[1]).filter((n) => !onSpine.has(n)),
+  lifted: s2TablesIn(d.k).map((r) => r[1]).filter((n) => onSpine.has(n)),
+ })).sort((a, b) => b.rows.length - a.rows.length);
+ // Greedy, tallest first: the two columns end within a row or two of each
+ // other, which is the difference between one screen and two.
+ const col = [[], []], hgt = [0, 0];
+ panels.forEach((p) => {
+  const i = hgt[0] <= hgt[1] ? 0 : 1;
+  col[i].push(p); hgt[i] += p.rows.length;
+ });
+ return { spineNames, onSpine, col, refDoms };
+}
+
+export function Stage2Atlas({ t, onPick, onDomain }) {
+ const { spineNames, onSpine, col, refDoms } = atlasShape();
+ const W = 1240, PW = 318, LX = 34, RX = W - 34 - PW;
+ const ROW = 20, HDR = 32, PAD = 8, PGAP = 14, IG = 22;
+ const SL = 506, SR = 734;                       // the spine column's sides
+ const colX = [LX, RX];
+
+ // ---- panels, and the y of every row in them
+ const pos = {}, panelAt = {}, panelBox = [];
+ const colH = [0, 0];
+ col.forEach((ps, ci) => {
+  let y = 10;
+  ps.forEach((p) => {
+   const h = HDR + p.rows.length * ROW + PAD;
+   panelBox.push({ ...p, ci, x: colX[ci], y, h });
+   p.rows.forEach((n, i) => {
+    pos[n] = { ci, x: colX[ci], y: y + HDR + i * ROW + ROW / 2 };
+    panelAt[n] = p.k;
+   });
+   y += h + PGAP;
+  });
+  colH[ci] = y;
+ });
+
+ // ---- the spine, each box tall in proportion to what lands on it
+ const inc = (n) => S2_RELS.filter((r) => r.parent === n);
+ // Three lines of text need 50px whatever the entity's weight; MODEL and
+ // FEE_PACKAGE drew their count over their owner before this floor existed.
+ const sH = (n) => 50 + Math.min(40, inc(n).length * 2);
+ const spineTotal = spineNames.reduce((a, n) => a + sH(n), 0) + (spineNames.length - 1) * 16;
+ const H = Math.max(colH[0], colH[1], spineTotal + 20) + 14;
+ const spineY = {};
+ { let y = Math.max(10, (H - 14 - spineTotal) / 2);
+   spineNames.forEach((n) => { spineY[n] = y; y += sH(n) + 16; }); }
+
+ // ---- edges, classified by where their ends actually sit
+ const toSpine = [], inside = [], apart = [];
+ S2_RELS.forEach((r) => {
+  if (onSpine.has(r.parent) && !onSpine.has(r.child)) toSpine.push(r);
+  else if (onSpine.has(r.parent) && onSpine.has(r.child)) toSpine.push(r);
+  else if (panelAt[r.child] && panelAt[r.child] === panelAt[r.parent]) inside.push(r);
+  else apart.push(r);
+ });
+ // Landing points are spread along the side of the box each line arrives
+ // on, so twenty-one edges into ACCOUNT arrive at twenty-one places
+ // rather than one.
+ const land = {};
+ spineNames.forEach((n) => {
+  const h = sH(n), top = spineY[n];
+  [0, 1].forEach((side) => {
+   const es = toSpine.filter((r) => r.parent === n
+     && (onSpine.has(r.child) ? (spineY[r.child] < top ? 0 : 1)
+                              : pos[r.child].ci) === side)
+    .sort((a, b) => (onSpine.has(a.child) ? spineY[a.child] : pos[a.child].y)
+                  - (onSpine.has(b.child) ? spineY[b.child] : pos[b.child].y));
+   es.forEach((r, i) => {
+    land[r.child + ">" + r.parent + (r.col || "")] =
+     { x: side ? SR : SL, y: top + (h * (i + 1)) / (es.length + 1) };
+   });
+  });
+ });
+
+ const colr = (r) => (r.kind === "fk" ? OK : WARN);
+ const dash = (r) => (r.kind === "fk" ? undefined : "4 3");
+
+ const Row = ({ n, p }) => {
+  const q = pos[n], gaps = s2GapsOn(n).length;
+  const odd = apart.filter((r) => r.child === n).length;
+  return (
+   <g className="cp-hit" tabIndex={0} role="button"
+    onClick={() => onPick && onPick(n)}>
+    <rect className="cp-bx" x={p.x + IG} y={q.y - ROW / 2 + 1} width={PW - IG - 4}
+     height={ROW - 2} rx={3} fill="#fff" stroke="#eef3f5" strokeWidth="1" />
+    <text x={p.x + IG + 7} y={q.y + 3.5} fontSize="9.5" fontFamily={MONO}
+     fill={INK}>{n.length > 40 ? n.slice(0, 39) + "." : n}</text>
+    {gaps > 0 && <circle cx={p.x + PW - 14} cy={q.y} r={3}
+     fill={s2Blocked(n) ? BAD : WARN} />}
+    {odd > 0 && <text x={p.x + PW - 24} y={q.y + 3.5} fontSize="9"
+     fontWeight="700" textAnchor="end" fill={MUT}>{"*".repeat(odd)}</text>}
+   </g>);
+ };
+
+ return (
+  <div>
+   <div style={card()}>
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }}
+     role="img" aria-label="All 52 canonical tables grouped by domain, with every relationship">
+
+     {/* cross-domain lines first, so they run behind every panel */}
+     {toSpine.map((r, i) => {
+      const L = land[r.child + ">" + r.parent + (r.col || "")];
+      if (!L) return null;
+      const src = onSpine.has(r.child)
+       ? { x: L.x === SL ? SL : SR, y: spineY[r.child] + sH(r.child) / 2 }
+       : { x: pos[r.child].ci ? pos[r.child].x : pos[r.child].x + PW,
+           y: pos[r.child].y };
+      const k = L.x === SL ? 58 : -58;
+      return (
+       <path key={"s" + i}
+        d={`M ${src.x} ${src.y} C ${src.x + k} ${src.y} ${L.x - k} ${L.y} ${L.x} ${L.y}`}
+        fill="none" stroke={colr(r)} strokeWidth="1.05" strokeDasharray={dash(r)}
+        opacity="0.5" />);
+     })}
+
+     {/* then the panel backgrounds, which hide the lines passing under */}
+     {panelBox.map((p) => (
+      <rect key={"p" + p.k} x={p.x} y={p.y} width={PW} height={p.h} rx={7}
+       fill="#fff" stroke="#d3dde5" strokeWidth="1.2" />))}
+
+     {/* then the edges a domain owns outright, in its own left gutter */}
+     {inside.map((r, i) => {
+      const a = pos[r.child], b = pos[r.parent];
+      const x = a.x + IG;
+      const d = r.child === r.parent
+       ? `M ${x} ${a.y - 5} C ${x - 21} ${a.y - 8} ${x - 21} ${a.y + 8} ${x} ${a.y + 5}`
+       : `M ${x} ${a.y} C ${x - 19} ${a.y} ${x - 19} ${b.y} ${x} ${b.y}`;
+      return (
+       <path key={"i" + i} d={d} fill="none" stroke={colr(r)} strokeWidth="1.2"
+        strokeDasharray={dash(r)} opacity="0.9" />);
+     })}
+
+     {panelBox.map((p) => (
+      <g key={p.k}>
+       <g className="cp-hit" tabIndex={0} role="button"
+        onClick={() => onDomain && onDomain(p.k)}>
+        <rect className="cp-bx" x={p.x} y={p.y} width={PW} height={HDR - 4} rx={7}
+         fill="#eef3f8" stroke="#d3dde5" strokeWidth="1" />
+        <text x={p.x + 10} y={p.y + 18} fontSize="10.5" fontWeight="700"
+         fill={ACC}>{p.n}</text>
+        <text x={p.x + PW - 22} y={p.y + 18} fontSize="8.5" textAnchor="end"
+         fill={MUT}>{p.rows.length + p.lifted.length} tables
+         {p.lifted.length ? ` - ${p.lifted.length} on the spine` : ""}</text>
+        <SvgGo x={p.x + PW - 7} y={p.y + 19} />
+       </g>
+       {p.rows.map((n) => <Row key={n} n={n} p={p} />)}
+      </g>))}
+
+     {/* the shared spine */}
+     {spineNames.map((n) => {
+      const h = sH(n), y = spineY[n], d = s2DomainOf(n);
+      return (
+       <g key={n} className="cp-hit" tabIndex={0} role="button"
+        onClick={() => onPick && onPick(n)}>
+        <rect className="cp-bx" x={SL} y={y} width={SR - SL} height={h} rx={6}
+         fill="#f7fafc" stroke={ACC} strokeWidth="2" />
+        <text x={(SL + SR) / 2} y={y + 19} textAnchor="middle" fontSize="11"
+         fontFamily={MONO} fontWeight="500" fill={INK}>{n}</text>
+        <text x={(SL + SR) / 2} y={y + 32} textAnchor="middle" fontSize="8.5"
+         fill={MUT}>{inc(n).length} point at it, from {refDoms[n].size} domains</text>
+        <text x={(SL + SR) / 2} y={y + h - 6} textAnchor="middle" fontSize="8"
+         fill={ACC}>owned by {s2DomainName(d)}</text>
+        <SvgGo x={SR - 7} y={y + 14} />
+       </g>);
+     })}
+    </svg>
+
+    <div style={{ display: "flex", gap: 15, flexWrap: "wrap", marginTop: 9,
+     fontSize: 11, color: SUB, alignItems: "center" }}>
+     <span><span style={{ display: "inline-block", width: 16, height: 2,
+      background: OK, verticalAlign: "middle" }} /> declared FK</span>
+     <span><span style={{ display: "inline-block", width: 16, height: 2,
+      background: WARN, verticalAlign: "middle" }} /> inferred</span>
+     <span style={{ color: MUT }}>a dot marks an unresolved model gap
+      &middot; a loop is a table that is its own parent &middot; an
+      asterisk means an edge listed below rather than drawn &middot; the
+      middle column is every entity more than one domain depends on</span>
+    </div>
+    <ClickHint>Any table, and any domain header, opens. The header goes to
+     that domain&apos;s own ERD; a table goes to its key, its edges and
+     anything unresolved on it.</ClickHint>
+   </div>
+
+   <div style={card()}>
+    <div style={eyebrow}>How to read it</div>
+    <Body><div style={{ marginTop: 5 }}>
+     <b style={{ color: INK }}>{toSpine.length} of {S2_RELS.length}
+     {" "}relationships end on one of the {spineNames.length} entities in the
+     middle.</b> That is the finding, not the drawing: {spineNames.slice(0, 3)
+      .join(", ")} and three others are what every domain here is actually
+     coupled to. A domain whose panel has many lines leaving it has no
+     independent build, no independent test and no independent load, whatever
+     the domain boundary on the page suggests. The {inside.length} edges
+     drawn inside a panel are the ones a domain owns outright.</div></Body>
+   </div>
+
+   {apart.length > 0 && (
+    <div style={card({ borderLeft: `3px solid ${WARN}` })}>
+     <div style={eyebrow}>Named, not drawn - {apart.length} edges</div>
+     <Body><div style={{ marginTop: 5 }}>These cross a domain boundary
+      without passing through a shared entity. Three wires across the whole
+      picture would say very little and cost a great deal of legibility, so
+      they are listed here instead and marked with an asterisk on the row
+      they leave. They count in every total above.</div></Body>
+     <div style={{ marginTop: 9 }}>
+      {apart.map((r, i) => (
+       <div key={i} className="cp-row" onClick={() => onPick && onPick(r.child)}
+        style={{ display: "flex", gap: 10, alignItems: "baseline",
+         padding: "7px 0", borderTop: i ? "1px solid #eef3f5" : "none" }}>
+        <span style={{ width: 8, height: 8, borderRadius: "50%",
+         background: colr(r), flex: "0 0 auto" }} />
+        <span style={{ fontFamily: MONO, fontSize: 11, color: INK }}>
+         {r.child}</span>
+        <span style={{ fontSize: 10.5, color: MUT }}>
+         {s2DomainName(s2DomainOf(r.child))}</span>
+        <span style={{ fontSize: 11, color: MUT }}>to</span>
+        <span style={{ fontFamily: MONO, fontSize: 11, color: INK }}>
+         {r.parent}</span>
+        <span style={{ fontSize: 10.5, color: MUT }}>
+         {s2DomainName(s2DomainOf(r.parent))}</span>
+        <span style={{ fontSize: 11, color: SUB, marginLeft: "auto" }}>
+         {r.kind === "fk" ? "declared FK" : `inferred - ${r.label}`}</span>
+       </div>))}
+     </div>
+    </div>)}
   </div>);
 }
 
