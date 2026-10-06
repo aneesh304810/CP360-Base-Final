@@ -27,6 +27,8 @@ import discussionApi, { emptyStore } from "./hub_discussion_api.js";
 import { seedRows, materialise, SEED_ANSWERS, CONF, SEI_GAP_NOTE }
   from "./hubAnswers.js";
 import { FIGS } from "./HubAnswerFigs.jsx";
+import { buildExportHtml, exportFilename, figKeysIn, attIdsIn }
+  from "./hubDiscussionExport.js";
 
 const ST = {
   open:       { label: "open",        c: "#6b7884", bg: "#f1f4f7" },
@@ -248,6 +250,7 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
   const [draft, setDraft] = useState({});
   const [editing, setEditing] = useState(null);
   const [text, setText] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     let on = true;
@@ -324,6 +327,86 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
 
   const grouped = TPS.map((tp) => [tp, rows.filter((r) => r.topic === tp.no)])
     .filter(([, r]) => r.length);
+
+  // ---- Export -------------------------------------------------------
+  //
+  // EXPORTS WHAT IS ON SCREEN, AND SAYS SO. Exporting all 108 when the
+  // reader has filtered to one owner surprises them in a meeting; a
+  // 12-question file that reads as the whole review is worse. The filter
+  // is carried into the file's own header.
+  //
+  // THE SERVER RENDERER IS LOADED ON DEMAND. renderToStaticMarkup turns a
+  // figure component into the SVG that goes in the file, and it is about
+  // 40KB nobody needs until they press this. A dynamic import keeps it out
+  // of the main bundle.
+  //
+  // AN ATTACHMENT THAT WILL NOT FETCH DOES NOT FAIL THE EXPORT. It becomes
+  // a visible note in the file saying the image is still on the server.
+  // Half an export is worth having; a silent gap is not.
+  const filterNote = () => {
+    const bits = [];
+    if (ftopic) bits.push(`topic ${ftopic}`);
+    if (fowner) bits.push(`owner ${((OWN[fowner] || {}).name) || fowner}`);
+    if (fstatus) bits.push(`status ${fstatus}`);
+    if (q) bits.push(`matching "${q}"`);
+    return bits.join(", ");
+  };
+
+  const dataUrlFor = async (att) => {
+    try {
+      const r = await fetch(discussionApi.attachmentUrl(att.id));
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const blob = await r.blob();
+      const url = await new Promise((res, rej) => {
+        const fr = new FileReader();
+        fr.onload = () => res(fr.result);
+        fr.onerror = () => rej(new Error("could not be read"));
+        fr.readAsDataURL(blob);
+      });
+      return { ...att, dataUrl: url };
+    } catch (e) {
+      return { ...att, dataUrl: null, error: e.message || "unreachable" };
+    }
+  };
+
+  const runExport = async () => {
+    setExporting(true);
+    try {
+      const answersOf = (n) => answers.filter((a) => a.qid === n);
+      let figs = {};
+      try {
+        const { renderToStaticMarkup } = await import("react-dom/server");
+        figKeysIn(rows, answersOf).forEach((k) => {
+          if (FIGS[k]) figs[k] = renderToStaticMarkup(React.createElement(FIGS[k]));
+        });
+      } catch (e) { figs = {}; }
+
+      const want = attIdsIn(rows, answersOf, store.atts);
+      const got = await Promise.all(want.map(dataUrlFor));
+      const byId = {};
+      got.forEach((x) => { byId[x.id] = x; });
+      const atts = {};
+      Object.entries(store.atts || {}).forEach(([aid, items]) => {
+        atts[aid] = (items || []).map((x) => byId[x.id] || x);
+      });
+
+      const filtered = !!(ftopic || fowner || fstatus || q);
+      const html = buildExportHtml({
+        rows, answersOf, topics: TPS, owners: OWN, figs, atts,
+        meta: { at: now(), by: actor, live, filtered, total: all.length,
+          filterNote: filterNote() },
+      });
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = exportFilename({ at: new Date().toISOString(), filtered });
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    } finally { setExporting(false); }
+  };
 
   const addAnswer = (qid, body) => {
     const id = `a${Date.now()}`;
@@ -419,6 +502,12 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
           {Object.keys(ST).map((s) => <option key={s} value={s}>{ST[s].label}</option>)}
         </select>
         <span style={S.shown}>{rows.length} shown</span>
+        <span onClick={exporting ? undefined : runExport}
+          title={"One self-contained HTML file with every answer, figure and "
+            + "attachment embedded. Open it anywhere, or print it to PDF."}
+          style={{ ...S.ghostSm, opacity: exporting ? 0.5 : 1,
+            cursor: exporting ? "default" : "pointer" }}>
+          {exporting ? "Exporting…" : `Export ${rows.length}`}</span>
         <input value={q} onChange={(e) => setQ(e.target.value)} style={S.srch}
           placeholder="Search question text or number…" />
       </div>
