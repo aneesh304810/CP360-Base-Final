@@ -86,25 +86,28 @@ SEI's own ids, so they can be quoted straight back.
 
 - **D2.** Confirm all missing dimensions resolve inside the seven-day window, and approve the single-table DQ design, the replay policy and the retention-boundary alert.
 
-## Gaps and decisions that land here
+## How this works, from the architecture supplement
 
-From the consolidated gap supplement and the CP-Integration-Gateway
-readiness review. These arrived after the SEI baseline and in several
-places disagree with it; where they do, both readings are given and
-neither is silently adopted.
+### DATE_CONTROL transition ownership
 
-### Gap register
-
-| Gap | What is missing | Required disposition |
+| Transition | Owner | Guard |
 |---|---|---|
-| `GAP-06` | DATE_CONTROL and file lifecycles lack one canonical state view | Add state machines, transition ownership, guards and recovery behaviour |
+| Create PENDING | Transformation completion process | Previous date completed and no conflicting active row |
+| PENDING to TRIGGER | Ingestion completeness task | Missing-interface set is empty AND the atomic update affects one row |
+| TRIGGER to COMPLETE | Transformation DAG | Required models, tests, DQ gates, reconciliation and publish succeed |
+| TRIGGER retry | Authorised recovery procedure | Same business date and replay-safe processing |
 
-### Against what this design already says
+### The two-DAG contract
 
-#### Confirms the baseline — One guarded owner of PENDING to TRIGGER
+- Run separate Ingestion and Transformation DAGs
+- Use DATE_CONTROL as the durable business-date state machine
+- Permit one guarded owner of the PENDING to TRIGGER transition
+- Build dimensions before facts
+- Advance to the next business date only after the complete transformation and publish boundary succeeds
 
-- **The supplement says.** The missing-interface set is empty AND the atomic update affects exactly one row.
-- **This design holds.** The same guard, drawn as the gate.
+## Open against this component
+
+**2 other open items** — `GAP-06`, `R17`. Stated in full, with both readings and the decision each needs, in the gap supplement.
 
 ## Sources
 

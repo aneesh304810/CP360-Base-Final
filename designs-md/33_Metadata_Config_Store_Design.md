@@ -69,76 +69,38 @@ is one a model runs, not a constraint the database enforces.
 | `FILE_REGISTRY` | The lifecycle record per logical interface and business date. It is what makes repeated discovery safe, and ARCHIVED on it is what completeness counts. | ingest Appendix B (p.19) · §6.2 (p.12) |
 | `DATE_CONTROL` | The orchestration ledger, and the one object both documents write to. One row per business date, at most one row not COMPLETE at a time, enforced by a unique index on a CASE expression. | ingest Appendix E.1 (p.24) · §6.3 (p.13) · dbt Appendix A.2 (p.25) |
 
-## Gaps and decisions that land here
+## How this works, from the architecture supplement
 
-From the consolidated gap supplement and the CP-Integration-Gateway
-readiness review. These arrived after the SEI baseline and in several
-places disagree with it; where they do, both readings are given and
-neither is silently adopted.
+### Minimum common fields on every operational event
 
-### Gap register
+- timestamp, environment, component, project_id, business_date
+- correlation_id, load_id, file_id, dag_run_id, workflow_id, step_id
+- event_type, status, error_code, error_category, duration_ms, record_count
+- Restricted business data and secrets are never emitted in operational logs
 
-| Gap | What is missing | Required disposition |
-|---|---|---|
-| `GAP-05` | Foundation services are spread across many documents | Add a canonical control, metadata, evidence, audit, security, observability and lineage model |
-| `GAP-09` | Identifiers are inconsistent across components | Add canonical traceability identifiers and propagation rules |
-| `GAP-11` | Logical relationships among control and processing entities are not consolidated | Add logical ERDs |
+### Required event families
 
-### Against what this design already says
+- file discovered, matched, duplicate skipped, validated, loaded, reconciled, quarantined, archived, archive failed
+- completeness evaluated, missing interfaces identified, SLA breached, SLA recovered, transformation triggered
+- dbt model started, completed, failed, tested
+- DQ failure opened, resolved or closed; reconciliation passed or failed
+- workflow and step state changed
+- API or loader request accepted, rejected, retried, timed out or completed
+- consumer publish started, completed or failed
 
-#### Conflict — Three different counts of reconciliation boundaries
+### Security and access
 
-- **The supplement says.** Seven boundaries, including Stage 2 to Stage 3 and publish to consumer acknowledgement.
-- **This design holds.** The pack specifies three. The architect review recommends twelve under an event-primary posture.
-- **What it costs to leave open.** Nobody can say whether reconciliation is complete, because complete is three, seven or twelve depending on which document is open.
-- **Decision.** `none raised - worth one`
+- Enterprise SSO for authorised user access
+- Role-based access to configuration, control, support and administrative actions
+- Separate runtime service accounts for ingestion, transformation, publishing and operational support
+- Credentials resolved from the approved secret store
+- Encryption in transit and at rest to the hosting platform standard
+- Audit of configuration changes, replay requests, manual state changes and security-sensitive operations
+- Least privilege on Oracle schemas, Landing/Archive/Quarantine paths, OpenShift namespaces, APIs and monitoring data
 
-#### Closes a gap — The outbound submission registry now has a design
+## Open against this component
 
-- **The supplement says.** WORKFLOW_DEFINITION to WORKFLOW_INSTANCE to LOADER_DELIVERY and API_CALL, each reporting STATUS_EVENT.
-- **This design holds.** The loader loop screen says there is no outbound equivalent of FILE_REGISTRY, so a reject count has nothing to reconcile against and a batch that never comes back never ages out.
-- **What it costs to leave open.** Closed, if the ERD is approved. LOADER_DELIVERY plus STATUS_EVENT is the registry that was missing.
-
-#### Closes a gap — Stage 2 to Stage 3 movement has a pattern and a gate
-
-- **The supplement says.** Database-link or direct-path movement preserving LOAD_ID and BUSINESS_DATE, with a reconciliation gate that authorises or holds the publish scope, and a replay boundary scoped by date and load.
-- **This design holds.** The database picture has no movement component at all - Pre-Gold simply follows DIM and FACT with nothing in between.
-- **What it costs to leave open.** Closed in design. Still needs DEC-GAP-04 to pick the mechanism.
-- **Decision.** `DEC-GAP-04`
-
-#### New — LOAD_ID is missing from every model we draw
-
-- **The supplement says.** LOAD_ID is the identifier preserved from RAW through Stage 2, Stage 3, replay and publish evidence, and acceptance criterion 4 depends on it.
-- **This design holds.** Stage 1 adds BUSINESS_DATE, SRC_RECORD_ID, FILE_REGISTRY_ID and LOAD_TS. Stage 2's standard columns add MICRO_BATCH_ID and DBT_INVOCATION_ID. Neither carries LOAD_ID.
-- **What it costs to leave open.** Without it there is no single identifier for one load execution across four tiers, and the Stage 2 to Stage 3 reconciliation gate has nothing to key on. This is a hole in our own model, not in theirs.
-- **Decision.** `SILVER-DEC-04`
-
-#### New — Three foundation entities with no table anywhere
-
-- **The supplement says.** Workflow metadata, API configuration and a schema registry are named as control and metadata entities.
-- **This design holds.** The database model holds five control tables. None of these three is among them, and nothing else in the corpus defines them.
-- **What it costs to leave open.** The outbound path is configuration-driven by design and has no configuration store. Schema registry ownership is DEC-GAP-07 and unassigned.
-- **Decision.** `DEC-GAP-07`
-
-#### New — Graceful degradation has four named behaviours
-
-- **The supplement says.** Oracle unavailable: do not claim or advance durable state. Splunk or Integration360 unavailable: follow the buffering policy, never silently discard required evidence. SEI APIs unavailable: workflow state stays queryable, retry reuses the same correlation and idempotency keys. CP360 UI unavailable: durable state remains in Oracle and Airflow.
-- **This design holds.** Nothing on partial failure of a dependency.
-- **What it costs to leave open.** The third one is the sharp one: evidence silently discarded during a Splunk outage is indistinguishable afterwards from evidence that was never produced.
-- **Decision.** `DEC-GAP-08`
-
-#### Closes a gap — The correlation identifier now has an owner and a rule
-
-- **The supplement says.** The gateway validates a trusted incoming correlation value or generates one, and propagates it to outbound calls, logs, metrics and traces.
-- **This design holds.** Both the loader loop and the boundary screen ask for a correlation id minted at the gateway and carried through, and name it as not yet owned.
-- **What it costs to leave open.** Closed. The gateway owns minting and propagation, which is the answer both screens were asking for.
-
-#### New — Rotate anything that may have been exposed - including ours
-
-- **The supplement says.** GW-RISK-02 requires rotation evidence and clean repository and pipeline scans for any credential that may previously have been exposed.
-- **This design holds.** This repository carried a plaintext Oracle password in local/load-all.ps1 across more than one commit. The working tree no longer has it; the history still does, and nothing has been rotated.
-- **What it costs to leave open.** The gateway review sets the standard and this repository does not meet it. Rotation and a history rewrite are both still open, and this has been flagged more than once.
-- **Decision.** `GW-RISK-02`
+**1 unresolved conflict and 10 other open items** — `GAP-05`, `GAP-09`, `GAP-11`, `R4`, `R6`, `R7`, `R9`, `R11`, `R13`, `R24`, `R25`. Stated in full, with both readings and the decision each needs, in the gap supplement.
 
 ## Sources
 

@@ -55,25 +55,28 @@ Proposed, not approved and not specified. It goes on the
 architecture drawing when SEI's documents cover it or BBH formally
 adopts it. Until then it is in the event container, drawn apart.
 
-## Gaps and decisions that land here
+## How this works, from the architecture supplement
 
-From the consolidated gap supplement and the CP-Integration-Gateway
-readiness review. These arrived after the SEI baseline and in several
-places disagree with it; where they do, both readings are given and
-neither is silently adopted.
+### Consumer rules
 
-### Gap register
+- Treat the event as a notification, not the record of truth
+- Retrieve the current record from the named SDC view using the payload key
+- Process duplicate delivery idempotently
+- Handle insert, update and delete explicitly
+- Do not assume ordering across different event identifiers
+- Use marker events where sequencing or processing gates require them
+- Store the processing outcome by event identifier, key, operation, consumer and correlation scope
 
-| Gap | What is missing | Required disposition |
-|---|---|---|
-| `GAP-07` | SDC event architecture is not integrated into CP360 | Add event taxonomy, payload handling, idempotency, retrieval, replay and marker-event gating |
+### Marker event handling
 
-### Against what this design already says
+- Marker events control processing milestones and dates rather than identifying a business record
+- Marker consumers validate the applicable batch and online dates
+- Correlate the marker to the active business date
+- Record whether the marker advances, releases, or only reports a processing gate
 
-#### Confirms the baseline — An event is a notification, not the record
+## Open against this component
 
-- **The supplement says.** Treat the event as notification; retrieve the current record from the named SDC view by payload key; process duplicates idempotently.
-- **This design holds.** The same, as the three event kinds and the event-then-fetch path.
+**2 other open items** — `GAP-07`, `R19`. Stated in full, with both readings and the decision each needs, in the gap supplement.
 
 ## Sources
 

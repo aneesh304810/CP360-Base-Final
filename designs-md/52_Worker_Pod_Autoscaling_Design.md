@@ -63,41 +63,48 @@ SEI's own ids, so they can be quoted straight back.
 
 - **O2.** Confirm batch SLA, peak timing, representative file sizes and the Oracle connection envelope.
 
-## Gaps and decisions that land here
+## How this works, from the architecture supplement
 
-From the consolidated gap supplement and the CP-Integration-Gateway
-readiness review. These arrived after the SEI baseline and in several
-places disagree with it; where they do, both readings are given and
-neither is silently adopted.
+### Runtime domains
 
-### Gap register
+| Domain | Workloads |
+|---|---|
+| Orchestration | Airflow scheduler, webserver, triggerer and workers |
+| Transformation | dbt task containers launched by Airflow |
+| Integration services | API and workflow services |
+| CP360 services | FastAPI backend and React UI where deployed on the same platform |
+| Platform operations | Logging, metrics, health probes, secret integration and deployment controls |
 
-| Gap | What is missing | Required disposition |
-|---|---|---|
-| `GAP-04` | OpenShift is named but not designed as a platform domain | Add runtime topology, deployment, secret, storage, scaling, CI/CD and operations contracts |
+### Deployment requirements
 
-### Against what this design already says
+- Separate configuration from container images
+- Immutable, versioned images from the approved internal registry
+- Liveness and readiness probes for long-running services
+- Defined CPU and memory requests and limits
+- Horizontal scaling only for stateless or concurrency-safe services
+- Shared storage mounted only where the file-processing contract requires it
+- Database schema migration and application deployment versioned and controlled
+- Airflow and application logs preserved in the approved evidence platform
 
-#### New — Graceful degradation has four named behaviours
+### Graceful degradation
 
-- **The supplement says.** Oracle unavailable: do not claim or advance durable state. Splunk or Integration360 unavailable: follow the buffering policy, never silently discard required evidence. SEI APIs unavailable: workflow state stays queryable, retry reuses the same correlation and idempotency keys. CP360 UI unavailable: durable state remains in Oracle and Airflow.
-- **This design holds.** Nothing on partial failure of a dependency.
-- **What it costs to leave open.** The third one is the sharp one: evidence silently discarded during a Splunk outage is indistinguishable afterwards from evidence that was never produced.
-- **Decision.** `DEC-GAP-08`
+- Oracle unavailable: processing does not claim or advance durable state
+- Splunk or Integration360 unavailable: core transaction behaviour follows the approved buffering or failure policy and never silently discards required evidence
+- SEI APIs unavailable: workflow state remains queryable and safe retry reuses the same correlation and idempotency identifiers
+- CP360 UI unavailable: durable ingestion and orchestration state remains in Oracle and Airflow
 
-#### New — HA and DR establish no numbers at all
+### CI/CD gates
 
-- **The supplement says.** Seven items to finalise, and the supplement states plainly that no numerical RTO or RPO is established and that values require formal BBH approval.
-- **This design holds.** Nothing on availability, failover or recovery objectives.
-- **What it costs to leave open.** Production readiness has a named precondition that is not started. It is honest about being unstarted, which is better than a number nobody agreed.
-- **Decision.** `DEC-GAP-09`
+- Source control to build and unit test
+- Dependency and image scan
+- Schema and contract tests
+- Deploy to OpenShift
+- Smoke and connectivity tests
+- Controlled environment promotion
 
-#### New — Starvation has a second cause: the gateway does not scale yet
+## Open against this component
 
-- **The supplement says.** HorizontalPodAutoscaler comes 'after load behaviour is validated', and PodDisruptionBudget and NetworkPolicy are listed as required but not yet in place (GW-GAP-06, GW-RISK-06).
-- **This design holds.** The shared-quota risk assumes the gateway itself keeps up and only the SEI quota is contended.
-- **What it costs to leave open.** A bursty set-based pull, a loader window and interactive reads share a service with no autoscaling and no disruption budget. The queue forms before the quota is reached.
-- **Decision.** `GW-GAP-06`
+**4 other open items** — `GAP-04`, `R13`, `R15`, `R22`. Stated in full, with both readings and the decision each needs, in the gap supplement.
 
 ## Sources
 

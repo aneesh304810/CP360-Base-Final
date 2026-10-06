@@ -135,6 +135,77 @@ def findings_for(gid):
 def gaps_for_domain(dom):
     return [g for g in M["GAP_REGISTER"] if g["dom"] == dom]
 
+def _design_blocks(gid, name):
+    """The DESIGN the supplement adds - contracts, rules and policies.
+
+    This is not the gap analysis. It is content that belongs inside the
+    component it describes: a reader of the landing-zone design should
+    find the readiness convention under how it works, not in a list of
+    what is missing. The analysis lives in one document, linked from the
+    single line _open_line writes.
+    """
+    L = []
+    A = L.append
+    blocks = list(M["GAP_DESIGN"].get(gid) or [])
+    # The gateway review describes exactly one component.
+    if gid == "ingress" and re.search(r'gateway|apigee', name, re.I):
+        blocks = blocks + [
+            {"h": "Header policy", "cols": ["Header category", "Required behaviour"],
+             "rows": [[h[0], h[1]] for h in M["GW_HEADERS"]]},
+            {"h": "A governed operation declares",
+             "items": ["`%s`" % f for f in M["GW_OPERATION"]]},
+            {"h": "Vendor token cache",
+             "cols": ["State", "Meaning", "Transitions"],
+             "rows": [[x[0], x[1], x[2]] for x in M["GW_TOKEN_STATES"]]},
+            {"h": "Configuration split",
+             "items": ["**ConfigMap, non-secret.** `%s`"
+                       % "`, `".join(M["GW_SECRETS"]["configmap"]),
+                       "**Secret, sensitive.** `%s`"
+                       % "`, `".join(M["GW_SECRETS"]["secret"]),
+                       M["GW_SECRETS"]["startup"]]},
+        ]
+    if not blocks:
+        return []
+    for b in blocks:
+        A("### %s" % b["h"])
+        A("")
+        if b.get("rows"):
+            cols = b.get("cols") or []
+            A("| %s |" % " | ".join(cols))
+            A("|%s" % ("---|" * len(cols)))
+            for r in b["rows"]:
+                A("| %s |" % " | ".join(md_escape(x) for x in r))
+        else:
+            for x in b["items"]:
+                A("- %s" % x)
+        A("")
+    return L
+
+def _open_line(gid, dom, name):
+    """One line, not a chapter.
+
+    The gap analysis used to be pasted into all 91 documents, which put a
+    commentary about which document disagrees with which between the
+    reader and the design. The findings still matter, so the count and
+    the ids stay - as a pointer, in one line.
+    """
+    fs = findings_for(gid)
+    gs = gaps_for_domain(dom) if dom else []
+    if not (fs or gs):
+        return []
+    ids = [g["id"] for g in gs] + [r["id"] for r in fs]
+    conf = len([r for r in fs if r["v"] == "conflict"])
+    bits = []
+    if conf:
+        bits.append("%d unresolved conflict%s" % (conf, "" if conf == 1 else "s"))
+    rest = len(ids) - conf
+    if rest:
+        bits.append("%d other open item%s" % (rest, "" if rest == 1 else "s"))
+    return ["## Open against this component", "",
+            "**%s** \u2014 `%s`. Stated in full, with both readings and the "
+            "decision each needs, in the gap supplement."
+            % (" and ".join(bits), "`, `".join(ids)), ""]
+
 def _supplement_section(gid, dom, sei_ids, tname):
     """Everything the two supplements say about this component."""
     L = []
@@ -323,9 +394,15 @@ def build(tid, name):
                 A("- **%s.** %s" % (o, OPEN[o]["t"]))
         A("")
 
-    # ---- 6b. what the supplements add, change or contradict
+    # ---- 6b. the design the supplement adds, in place; the analysis as
+    #          one line pointing at the one document that carries it
     dom = GROUP_TO_DOMAIN.get(gid)
-    L += _supplement_section(gid, dom, sei_ids, name)
+    blocks = _design_blocks(gid, name)
+    if blocks:
+        A("## How this works, from the architecture supplement")
+        A("")
+        L += blocks
+    L += _open_line(gid, dom, name)
 
     # ---- 7. sources
     A("## Sources")
@@ -1055,7 +1132,10 @@ for f in sorted(glob.glob("designs-md/*.md")):
             r'loader|callback|outbound|submission|gateway|status',
             name, re.I) else "events"
         body = proposal(cid, name)
-        extra = _supplement_section(pg, GROUP_TO_DOMAIN[pg], [], name)
+        blocks = _design_blocks(pg, name)
+        extra = ((["## How this works, from the architecture supplement", ""]
+                  + blocks) if blocks else []) \
+                + _open_line(pg, GROUP_TO_DOMAIN[pg], name)
         fm = _fm(fm, generated="true", sei_status="proposal",
                  architecture_domain=GROUP_TO_DOMAIN[pg],
                  canonical_tier="not on the stage chain",

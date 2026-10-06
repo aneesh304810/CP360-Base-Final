@@ -104,33 +104,29 @@ SEI's own ids, so they can be quoted straight back.
 - **O3.** Confirm the retention period and purge approach for RAW and FILE_REGISTRY.
 - **O6.** Confirm expected-interface criteria and any holiday or month-end rules.
 
-## Gaps and decisions that land here
+## How this works, from the architecture supplement
 
-From the consolidated gap supplement and the CP-Integration-Gateway
-readiness review. These arrived after the SEI baseline and in several
-places disagree with it; where they do, both readings are given and
-neither is silently adopted.
+### What ingestion is responsible for
 
-### Against what this design already says
+- Discover candidate files independently as they arrive
+- Match each file to exactly one active interface configuration
+- Derive BUSINESS_DATE using the configured naming contract
+- Validate readability, structure, header, trailer, zero-row policy and counts
+- Claim one logical file lifecycle record
+- Load the configured Stage 1 RAW table atomically
+- Reconcile counts, archive successful files and quarantine invalid files
+- Evaluate daily completeness and the common file-set SLA after every run
 
-#### Conflict — The file lifecycle has two sets of state names
+### Lifecycle rules
 
-- **The supplement says.** DISCOVERED, PROCESSING, DUPLICATE_SKIPPED, QUARANTINED, FAILED, ARCHIVE_FAILED, ARCHIVED.
-- **This design holds.** RECEIVED, VALIDATED, LOADING, QUARANTINED, FAILED, ARCHIVE_FAILED, ARCHIVED - from the File Ingestion design document.
-- **What it costs to leave open.** Two names for one state machine is two state machines. Operators will see one set in the registry and the other in the runbook, and DUPLICATE_SKIPPED exists in only one of them.
-- **Decision.** `none raised - worth one`
+- ARCHIVED is the successful state completeness evaluation counts
+- FAILED and QUARANTINED reuse the existing lifecycle record during authorised retry
+- ARCHIVE_FAILED retries the archive operation and does not reload committed RAW records
+- Registry uniqueness prevents duplicate successful loading for the configured logical file and business date
 
-#### New — Landing zone failure modes, including ambiguous match
+## Open against this component
 
-- **The supplement says.** Partial file exposure, duplicate physical delivery for the same logical interface and date, no configuration match, MORE THAN ONE configuration match, storage unavailable. A file matching two configurations is a configuration error and is not loaded.
-- **This design holds.** The file screen covers validation thoroughly and says nothing about what happens before a file is matched to an interface.
-- **What it costs to leave open.** Ambiguous match is the one with no safe default: loading against the first match silently routes a file to the wrong RAW table.
-- **Decision.** `DEC-GAP-02, DEC-GAP-03`
-
-#### Confirms the baseline — ARCHIVE_FAILED never reloads RAW
-
-- **The supplement says.** Retries the archive operation and does not reload committed RAW records.
-- **This design holds.** The same rule, in the same words, from the File Ingestion design.
+**1 unresolved conflict and 2 other open items** — `R3`, `R14`, `R16`. Stated in full, with both readings and the decision each needs, in the gap supplement.
 
 ## Sources
 

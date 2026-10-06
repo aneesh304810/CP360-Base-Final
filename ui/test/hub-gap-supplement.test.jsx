@@ -267,10 +267,37 @@ ok(["canonical_tier", "control_entities", "traceability_identifiers",
     "supplement"].every((k) =>
      comps.every((f) => new RegExp(`^${k}:`, "m").test(read(f)))),
    "and the other four keys the supplement asks for in front matter", "");
-ok(comps.every((f) => /## Gaps and decisions that land here/.test(read(f))),
-   "and every one has a section for the gaps and decisions that land on it",
-   comps.filter((f) => !/## Gaps and decisions that land here/.test(read(f)))
-     .slice(0, 3).join(" "));
+// THE ANALYSIS IS NOT IN THE DESIGN DOCUMENTS. Pasting "the supplement
+// says X, this corpus holds Y" into all 91 put a commentary about which
+// document disagrees with which between the reader and the design. The
+// findings still matter, so each component carries the count and the ids
+// in one line, and the full statement lives in one document.
+const analysis = comps.filter((f) =>
+  /The supplement says|Gaps and decisions that land here/.test(read(f)));
+ok(analysis.length === 0,
+   "no component document carries the gap analysis as prose - a design "
+   + "document says what the thing IS",
+   analysis.slice(0, 3).join(" "));
+ok(comps.filter((f) => /## Open against this component/.test(read(f))).length
+     >= 60,
+   "but the ones with open items say so in a single line, with the ids",
+   comps.filter((f) => /## Open against this component/.test(read(f))).length);
+ok(comps.filter((f) =>
+     /## How this works, from the architecture supplement/.test(read(f)))
+     .length >= 60,
+   "and the supplement's actual DESIGN - contracts, rules, policies - is "
+   + "folded into the component it describes",
+   comps.filter((f) =>
+     /## How this works, from the architecture supplement/.test(read(f))).length);
+// The design content has to be real, not a heading over nothing.
+const lz = read(comps.find((f) => /Landing_Zone/.test(f)));
+ok(/Ambiguous files/.test(lz) && /NOT loaded/.test(lz),
+   "the landing-zone design now states the ambiguous-match rule in its own "
+   + "body, which is where somebody building it will look", "");
+const gw = comps.filter((f) => /Gateway|Apigee/i.test(f));
+ok(gw.length > 0 && gw.some((f) => /Header policy/.test(read(f))),
+   "and the gateway component carries the header policy and the token "
+   + "cache, not a pointer to them", gw.join(" "));
 
 // The six new overview documents, and that each carries its own finding.
 [["gap-supplement.md", /25 findings|places the supplements/],
