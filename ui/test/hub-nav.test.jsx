@@ -31,8 +31,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { NAV_CSS, NavStyles, OpenCard, ClickHint, SvgGo, Trail }
   from "../src/HubNav.jsx";
 import { ContextView, Stage2Model, DbModelView, Stage2Erd, Stage2Lineage,
-  Stage2Feeds, Stage2Atlas, GatewayView, SdcEndToEnd, NetworkView }
-  from "../src/HubContext.jsx";
+  Stage2Feeds, Stage2Atlas, GatewayView, SdcEndToEnd, NetworkView,
+  SystemIntegrationView } from "../src/HubContext.jsx";
+import { SI_STEPS, SI_EDGES, SI_ABSENT, SI_NOTES, siStep, siBand }
+  from "../src/hubSystemIntegration.js";
 import { NET_ZONES, NET_LINKS, NET_STATE, NET_WORK, NET_UNKNOWN, NET_DNS,
   NET_SETTLED, NET_COUNTS, NET_FLOWS, netZone } from "../src/hubNetwork.js";
 import { GW_LAYERS, GW_VANTAGE, GW_AD3 } from "../src/hubGatewayLayers.js";
@@ -647,6 +649,85 @@ ok(!/\\u[0-9a-fA-F]{4}/.test(CTXSRC) && !/\\u[0-9a-fA-F]{4}/.test(NAVSRC),
        `no ${what} is recorded`, (NETSRC2.match(re) || [""])[0]);
   ok(/to confirm/.test(NETSRC2),
      "ports are flagged as protocol defaults to confirm, not observed", "");
+}
+
+/* ------------------- SEI's own integration diagram, and what it omits */
+// The picture both organisations point at in a room. Recorded so our
+// model can be held against the thing they already know - and so the
+// omission reads as an omission rather than as something we missed.
+{
+  const h = render(<SystemIntegrationView t={t} pick={null} setPick={() => {}} />);
+  ok(count(h, /class="cp-hit"/g) === SI_STEPS.length,
+     "every numbered step opens", count(h, /class="cp-hit"/g));
+  ok(SI_STEPS.every((x) => siBand(x.band)),
+     "and sits in a band that exists",
+     SI_STEPS.filter((x) => !siBand(x.band)).map((x) => x.n).join(","));
+  ok(SI_STEPS.filter((x) => x.ours).every((x) => legById(x.ours)),
+     "a step mapped to one of our legs names a leg that exists",
+     SI_STEPS.filter((x) => x.ours && !legById(x.ours))
+       .map((x) => `${x.n}->${x.ours}`).join(","));
+  ok(SI_EDGES.every((e) => siStep(e[0]) || siBand(e[0]))
+     && SI_EDGES.every((e) => siStep(e[1]) || siBand(e[1])),
+     "every edge joins two things on the diagram",
+     SI_EDGES.filter((e) => !(siStep(e[0]) || siBand(e[0]))
+       || !(siStep(e[1]) || siBand(e[1]))).map((e) => e.join(">")).join(","));
+
+  // THE FINDING. Their diagram has no event path. If our channel A ever
+  // appears in it, this assertion is the thing that notices.
+  const absent = JSON.stringify(SI_ABSENT);
+  ok(/event path, entirely/i.test(absent) && /channel A/.test(absent),
+     "the absence of the event path is recorded as the headline, not a "
+     + "footnote - it is the route this programme made primary", "");
+  ok(SI_ABSENT.some((a) => /file-based inbound/i.test(a.t)),
+     "and the file inbound path too - the diagram's file is the LOADER "
+     + "file going out, not the daily extract coming in", "");
+  ok(!SI_STEPS.some((x) => /kafka|queue|snowflake|listener/i.test(x.t)),
+     "no step on their diagram is an event step, which is what makes the "
+     + "two entries above true", "");
+  ok(SI_STEPS.filter((x) => x.ours === "A1" || x.ours === "A2").length === 0,
+     "and nothing maps to channel A", "");
+
+  // Two proxies, not one band. Worth a note rather than a silent merge.
+  ok(SI_STEPS.filter((x) => /Apigee/i.test(x.t)).length === 2,
+     "the Apigee proxy appears twice on their diagram",
+     SI_STEPS.filter((x) => /Apigee/i.test(x.t)).map((x) => x.n).join(","));
+  ok(/appears twice/i.test(JSON.stringify(SI_NOTES)),
+     "and that is called out rather than merged into our one gateway band",
+     "");
+
+  // Source discipline: the diagram is SEI Confidential.
+  const SISRC = fs.readFileSync(path.join(SRC, "hubSystemIntegration.js"), "utf8");
+  ok(/not committed/i.test(SISRC) && /Confidential/i.test(SISRC),
+     "the module says the source is confidential and not committed", "");
+  for (const [re, what] of [
+    [/\b\d{1,3}(\.\d{1,3}){3}\b/, "an IP address"],
+    [/https?:\/\/[a-z0-9.-]+\.(com|net|io)/i, "a hostname"],
+  ])
+    ok(!re.test(SISRC), `no ${what} is recorded from it`, "");
+}
+
+// A filtered network view collapses the zones that are not on the flow.
+// Left full height and greyed they took half the picture to say "not on
+// this flow", which made the filtered view harder to read than the
+// unfiltered one - the opposite of the point.
+{
+  const all = render(<NetworkView t={t} zone={null} setZone={() => {}}
+    flow="all" setFlow={() => {}} />);
+  const one = render(<NetworkView t={t} zone={null} setZone={() => {}}
+    flow="file" setFlow={() => {}} />);
+  ok(!/not on this flow/.test(one),
+     "a collapsed zone says nothing rather than saying it is empty", "");
+  const offFlow = NET_ZONES.filter((z) =>
+    !NET_LINKS.some((l) => l.flow === "file" && (l.from === z.id || l.to === z.id)));
+  ok(offFlow.length > 0 && offFlow.every((z) => !one.includes(z.holds[0])),
+     "and drops its contents, so only the zones on the flow carry detail",
+     offFlow.filter((z) => one.includes(z.holds[0])).map((z) => z.id).join(","));
+  ok(NET_ZONES.every((z) => one.includes(z.n)),
+     "every zone keeps its title, so the picture is still the whole map",
+     "");
+  ok(all.length > one.length,
+     "and the filtered view is smaller than the unfiltered one",
+     `${all.length} vs ${one.length}`);
 }
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\nhub-nav assertions pass");

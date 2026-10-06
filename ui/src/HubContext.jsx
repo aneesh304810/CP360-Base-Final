@@ -36,6 +36,8 @@ import { NET_DOC, NET_STATE, NET_ZONES, NET_LINKS, NET_DNS, NET_TAG_ROUTE,
  NET_WORK, NET_UNKNOWN, NET_SETTLED, NET_COUNTS, NET_FLOWS, netZone,
  netLinksFor }
  from "./hubNetwork.js";
+import { SI_DOC, SI_BANDS, SI_STEPS, SI_EDGES, SI_COVERS, SI_ABSENT,
+ SI_NOTES, SI_UNMAPPED, siStep, siBand } from "./hubSystemIntegration.js";
 import { GW_DOC, GW_STRENGTHS, GW_GAPS, GW_RISKS, GW_OPERATION, GW_HEADERS,
  GW_TOKEN_STATES, GW_TOKEN_TESTS, GW_SECRETS, GW_RUNTIME_OBJECTS,
  GW_METRICS, GW_RUNBOOKS, GW_APPROVAL, GW_PLAN, GW_BLOCKING }
@@ -840,8 +842,14 @@ export function NetworkView({ t, zone, setZone, flow, setFlow }) {
  // none of it.
  const F = flow || "all";
  const inF = (l) => F === "all" || l.flow === F;
- const ZW = 206, ZGAP = 42, ZY = 46, ZH = 128, ROWH = 170;
+ const ZW = 206, ZGAP = 42, ZY = 46, ZH = 128, ZHOFF = 34, ROWH = 170;
  const colX = (c) => 24 + c * (ZW + ZGAP);
+ // A zone with nothing on the selected flow collapses to its title. Left
+ // full height and greyed it still took half the picture to say "not on
+ // this flow", which is how a filtered view ended up harder to read than
+ // the unfiltered one.
+ const onFlow = (z) => netLinksFor(z.id).filter(inF).length > 0;
+ const zh = (z) => (onFlow(z) ? ZH : ZHOFF);
  const zoneBox = (z) => ({ x: colX(z.col), y: ZY + (z.row || 0) * ROWH });
  const rows = Math.max(...NET_ZONES.map((z) => (z.row || 0))) + 1;
  const W = colX(Math.max(...NET_ZONES.map((z) => z.col))) + ZW + 24;
@@ -899,7 +907,8 @@ export function NetworkView({ t, zone, setZone, flow, setFlow }) {
       if (a.x === b.x) {
        const dn = a.y < b.y;
        const xv = a.x + ZW / 2 + ((i % 3) - 1) * 26;
-       const ya = dn ? a.y + ZH : a.y, yb = dn ? b.y : b.y + ZH;
+       const ha = zh(netZone(l.from)), hb = zh(netZone(l.to));
+       const ya = dn ? a.y + ha : a.y, yb = dn ? b.y : b.y + hb;
        return (
         <g key={l.id}>
          <line x1={xv} y1={ya} x2={xv} y2={yb} stroke={tone(l.st)}
@@ -932,27 +941,27 @@ export function NetworkView({ t, zone, setZone, flow, setFlow }) {
       const p = zoneBox(z);
       const ls = netLinksFor(z.id).filter(inF);
       const un = ls.filter((l) => l.st !== "live").length;
+      const on = ls.length > 0, h = zh(z);
       return (
        <g key={z.id} className="cp-hit" tabIndex={0} role="button"
         onClick={() => setZone(zone === z.id ? null : z.id)}>
-        <rect className="cp-bx" x={p.x} y={p.y} width={ZW} height={ZH} rx={8}
-         fill={zone === z.id ? "#eef3f8" : "#fff"}
-         stroke={zone === z.id ? ACC : (z.isNew ? OK : "#c3d4e4")}
-         strokeWidth={zone === z.id ? 2.4 : (z.isNew ? 1.9 : 1.3)}
-         opacity={ls.length ? 1 : 0.42} />
+        <rect className="cp-bx" x={p.x} y={p.y} width={ZW} height={h} rx={8}
+         fill={zone === z.id ? "#eef3f8" : (on ? "#fff" : "#f7f9fa")}
+         stroke={zone === z.id ? ACC : (on ? (z.isNew ? OK : "#c3d4e4") : "#e4eaef")}
+         strokeWidth={zone === z.id ? 2.4 : (on && z.isNew ? 1.9 : 1.3)} />
         <text x={p.x + 10} y={p.y + 19} fontSize="10.5" fontWeight="700"
-         fill={ACC}>{z.n}</text>
-        <text x={p.x + 10} y={p.y + 32} fontSize="8.5" fill={MUT}>
-         {z.own}{z.unsited ? " - site open, U1" : ""}</text>
-        {z.holds.slice(0, 5).map((h, i) => (
-         <text key={h} x={p.x + 12} y={p.y + 50 + i * 13} fontSize="8.5"
-          fill={INK}>{h.length > 30 ? h.slice(0, 29) + "." : h}</text>))}
-        <text x={p.x + ZW - 10} y={p.y + ZH - 8} textAnchor="end"
-         fontSize="8.5" fontWeight="700"
-         fill={!ls.length ? MUT : (un ? WARN : OK)}>
-         {ls.length ? `${ls.length} links${un ? ` - ${un} unbuilt` : ""}`
-                    : "not on this flow"}</text>
-        <SvgGo x={p.x + ZW - 8} y={p.y + 18} />
+         fill={on ? ACC : "#9aa7b2"}>{z.n}</text>
+        {on && <>
+         <text x={p.x + 10} y={p.y + 32} fontSize="8.5" fill={MUT}>
+          {z.own}{z.unsited ? " - site open, U1" : ""}</text>
+         {z.holds.slice(0, 5).map((h2, i) => (
+          <text key={h2} x={p.x + 12} y={p.y + 50 + i * 13} fontSize="8.5"
+           fill={INK}>{h2.length > 30 ? h2.slice(0, 29) + "." : h2}</text>))}
+         <text x={p.x + ZW - 10} y={p.y + h - 8} textAnchor="end"
+          fontSize="8.5" fontWeight="700" fill={un ? WARN : OK}>
+          {ls.length} links{un ? ` - ${un} unbuilt` : ""}</text>
+         <SvgGo x={p.x + ZW - 8} y={p.y + 18} />
+        </>}
        </g>);
      })}
     </svg>
@@ -1074,6 +1083,176 @@ export function NetworkView({ t, zone, setZone, flow, setFlow }) {
 
    <div style={card({ marginTop: 11 })}>
     <div style={{ fontSize: 10.5, color: MUT }}>{NET_DOC.note}</div>
+   </div>
+  </div>);
+}
+
+/* ===================================================================
+   SEI's own integration diagram, redrawn, with what it omits.
+
+   WHY REDRAW SOMEONE ELSE'S PICTURE. It is the one both organisations
+   point at in a room. Drawn here, a reader can hold our model against
+   the thing they already know - and the omission then reads as an
+   omission rather than as something we forgot to find.
+
+   LAYOUT. Four bands left to right, steps stacked inside them, numbers
+   as the diagram numbers them. Not a wire map: the previous attempt at
+   one of these put nineteen curves behind seven boxes and nobody could
+   follow a single path. Columns and numbers, then the detail in lists.
+   =================================================================== */
+export function SystemIntegrationView({ t, pick, setPick }) {
+ const BW = 268, BG = 26, RH = 56, TOP = 54;
+ const bx = (i) => 16 + i * (BW + BG);
+ const W = bx(SI_BANDS.length - 1) + BW + 16;
+ const rows = SI_BANDS.map((b) => SI_STEPS.filter((s) => s.band === b.id));
+ const H = TOP + Math.max(...rows.map((r) => r.length)) * RH + 24;
+ const sel = pick ? siStep(pick) : null;
+ const tone = (s) => (s.ours ? ACC : WARN);
+ return (
+  <div>
+   <NavStyles />
+   <div style={card()}>
+    <div style={eyebrow}>{SI_DOC.own} &middot; their diagram, redrawn</div>
+    <b style={{ fontSize: 16, color: INK }}>{SI_DOC.n}</b>
+    <Body><div style={{ marginTop: 6 }}>{SI_DOC.w}</div></Body>
+    <div style={{ display: "flex", gap: 22, flexWrap: "wrap", marginTop: 13 }}>
+     {[[SI_STEPS.length, "numbered steps", INK],
+       [SI_STEPS.length - SI_UNMAPPED.length, "we have", OK],
+       [SI_UNMAPPED.length, "we do not", WARN],
+       [SI_ABSENT.length, "we have and they do not", BAD]].map(([n, l, c]) => (
+        <span key={l} style={{ textAlign: "center" }}>
+         <b style={{ fontSize: 23, color: c, display: "block" }}>{n}</b>
+         <span style={{ fontSize: 10, color: MUT }}>{l}</span></span>))}
+    </div>
+   </div>
+
+   <div style={card()}>
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }}
+     role="img" aria-label="SEI's BBH to SEI system integration diagram, redrawn as four bands">
+     {SI_BANDS.map((b, i) => (
+      <g key={b.id}>
+       <rect x={bx(i)} y={30} width={BW} height={H - 46} rx={9}
+        fill={b.own === "SEI" ? "#fbfaf4" : "#f6f9fb"}
+        stroke={b.own === "SEI" ? "#d8d2b8" : "#c3d4e4"} strokeWidth="1.3" />
+       <text x={bx(i) + 12} y={22} fontSize="11" fontWeight="800"
+        fill={b.own === "SEI" ? "#8a7b3f" : ACC}>{b.n}</text>
+       <text x={bx(i) + BW - 12} y={22} fontSize="9" textAnchor="end"
+        fill={MUT}>{b.own}</text>
+      </g>))}
+
+     {SI_BANDS.map((b, i) =>
+      SI_STEPS.filter((s) => s.band === b.id).map((s, j) => {
+       const x = bx(i) + 12, y = TOP + j * RH;
+       return (
+        <g key={s.n} className="cp-hit" tabIndex={0} role="button"
+         onClick={() => setPick(pick === s.n ? null : s.n)}>
+         <rect className="cp-bx" x={x} y={y} width={BW - 24} height={RH - 12}
+          rx={6} fill={pick === s.n ? "#eef3f8" : "#fff"}
+          stroke={pick === s.n ? ACC : (s.ours ? "#c3d4e4" : WARN)}
+          strokeWidth={pick === s.n ? 2.2 : (s.ours ? 1.2 : 1.6)}
+          strokeDasharray={s.ours ? undefined : "5 3"} />
+         <circle cx={x + 17} cy={y + 20} r={11} fill={tone(s)} />
+         <text x={x + 17} y={y + 24} textAnchor="middle" fontSize="10"
+          fontWeight="800" fill="#fff">{s.n}</text>
+         <text x={x + 35} y={y + 17} fontSize="10.5" fontWeight="600"
+          fill={INK}>{s.t.length > 29 ? s.t.slice(0, 28) + "." : s.t}</text>
+         <text x={x + 35} y={y + 32} fontSize="8.5"
+          fill={s.ours ? ACC : WARN}>
+          {s.ours ? `our leg ${s.ours}` : "nothing in our model"}</text>
+         <SvgGo x={x + BW - 32} y={y + 16} />
+        </g>);
+      }))}
+    </svg>
+    <div style={{ display: "flex", gap: 15, flexWrap: "wrap", marginTop: 9,
+     fontSize: 11, color: SUB }}>
+     <span><span style={{ display: "inline-block", width: 10, height: 10,
+      borderRadius: "50%", background: ACC, verticalAlign: "middle" }} />
+      {" "}a step we have a leg for</span>
+     <span><span style={{ display: "inline-block", width: 10, height: 10,
+      borderRadius: "50%", background: WARN, verticalAlign: "middle" }} />
+      {" "}a step with nothing in our model</span>
+    </div>
+    <ClickHint>Every numbered step opens what it is and which of our legs
+     it corresponds to.</ClickHint>
+   </div>
+
+   {sel && (
+    <div style={card({ borderLeft: `3px solid ${tone(sel)}` })}>
+     <div style={{ display: "flex", gap: 9, alignItems: "baseline",
+      flexWrap: "wrap" }}>
+      <span style={{ width: 24, height: 24, borderRadius: "50%",
+       background: tone(sel), color: "#fff", fontSize: 11, fontWeight: 800,
+       display: "grid", placeItems: "center" }}>{sel.n}</span>
+      <b style={{ fontSize: 14.5, color: INK }}>{sel.t}</b>
+      <span style={{ fontSize: 11, color: MUT }}>
+       {(siBand(sel.band) || {}).n}</span>
+     </div>
+     <Body><div style={{ marginTop: 7 }}>{sel.w}</div></Body>
+     <div style={{ marginTop: 9, fontSize: 12.5,
+      color: sel.ours ? SUB : WARN }}>
+      <b style={{ ...eyebrow, display: "inline" }}>In our model</b> &nbsp;
+      {sel.ours ? `leg ${sel.ours}` : "nothing corresponds to this step"}
+     </div>
+     <div style={{ marginTop: 9, display: "flex", gap: 6, flexWrap: "wrap" }}>
+      {SI_EDGES.filter((e) => e[0] === sel.n || e[1] === sel.n).map((e, i) => (
+       <span key={i} style={{ fontSize: 10.5, border: `1px solid ${RULE}`,
+        borderRadius: 999, padding: "2px 9px", color: SUB }}>
+        {e[0]} &rarr; {e[1]}{e[2] ? ` · ${e[2]}` : ""}</span>))}
+     </div>
+    </div>)}
+
+   <div style={card({ borderLeft: `3px solid ${BAD}` })}>
+    <div style={eyebrow}>What the diagram does not show</div>
+    <Body><div style={{ marginTop: 5 }}>
+     <b style={{ color: INK }}>Every numbered step runs BBH to SEI.</b> The
+     diagram covers data extracts, JSON, loader files and real-time API
+     calls in detail. The two paths that run the other way - events and
+     files inbound - are not on it, which is why their absence is easy to
+     miss in a review of it.</div></Body>
+    <div style={{ marginTop: 11 }}>
+     {SI_ABSENT.map((a, i) => (
+      <div key={a.t} style={{ padding: "10px 0",
+       borderTop: i ? "1px solid #eef3f5" : "none" }}>
+       <div style={{ display: "flex", gap: 8, alignItems: "baseline",
+        flexWrap: "wrap" }}>
+        <Chip bg={a.sev === "block" ? BAD : WARN} fg="#fff">
+         {a.sev === "block" ? "not on it at all" : "no step for it"}</Chip>
+        <b style={{ fontSize: 13, color: INK }}>{a.t}</b>
+        <span style={{ fontSize: 11, color: ACC }}>{a.ours}</span>
+       </div>
+       <div style={{ fontSize: 12.5, color: SUB, lineHeight: 1.6,
+        marginTop: 5 }}>{a.w}</div>
+      </div>))}
+    </div>
+   </div>
+
+   <Head title="What it covers, against our channels" />
+   <div style={card()}>
+    {SI_COVERS.map((c, i) => (
+     <div key={c.t} style={{ display: "flex", gap: 14, padding: "8px 0",
+      borderTop: i ? "1px solid #eef3f5" : "none", alignItems: "baseline" }}>
+      <span style={{ fontSize: 12.5, fontWeight: 500, color: INK,
+       flex: "0 0 190px" }}>{c.t}</span>
+      <Chip bg={c.st === "ok" ? OK : WARN} fg="#fff">
+       {c.st === "ok" ? "we have it" : "we do not"}</Chip>
+      <span style={{ fontSize: 12.5, color: SUB }}>{c.ours}</span>
+     </div>))}
+   </div>
+
+   <Head title="Where the two models disagree"
+    note="not omissions - places the same thing is drawn differently" />
+   <div style={{ display: "grid", gap: 9,
+    gridTemplateColumns: "repeat(auto-fit,minmax(330px,1fr))" }}>
+    {SI_NOTES.map((n) => (
+     <div key={n.t} style={card({ marginBottom: 0,
+      borderLeft: `3px solid ${WARN}` })}>
+      <b style={{ fontSize: 13, color: INK }}>{n.t}</b>
+      <Body><div style={{ marginTop: 6 }}>{n.w}</div></Body>
+     </div>))}
+   </div>
+
+   <div style={card({ marginTop: 11 })}>
+    <div style={{ fontSize: 10.5, color: MUT }}>{SI_DOC.note}</div>
    </div>
   </div>);
 }

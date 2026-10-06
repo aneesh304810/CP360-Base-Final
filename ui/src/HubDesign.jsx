@@ -24,7 +24,9 @@ import { SEI_ARCH_DOC, ARCH_FEEDS, ARCH_LAYERS, ARCH_ORCHESTRATION,
  ARCH_PRINCIPLES, ARCH_CONFLICTS, OUTBOUND_FLOW, INBOUND_POSTURE,
  conflictsAt } from "./seiArchitecture.js";
 import { NavStyles, Trail, SvgGo } from "./HubNav.jsx";
-import { GatewayView, SdcEndToEnd, NetworkView } from "./HubContext.jsx";
+import { GatewayView, SdcEndToEnd, NetworkView, SystemIntegrationView }
+ from "./HubContext.jsx";
+import { SI_ABSENT } from "./hubSystemIntegration.js";
 import { NET_COUNTS } from "./hubNetwork.js";
 import { ContextView, GateView, LoaderLoopView, Stage2Model,
  FileIngestionView, Stage1Model, DbModelView, GapSupplementView }
@@ -111,6 +113,7 @@ export default function HubDesign({ t }) {
  const [sdcLegPick, setSdcLegPick] = useState(null);   // SDC end to end: which leg
  const [netZonePick, setNetZonePick] = useState(null); // network view: which zone
  const [netFlow, setNetFlow] = useState("all");       // network view: which flow
+ const [siPick, setSiPick] = useState(null);          // SEI's diagram: which step
  const [expand, setExpand] = useState(null);    // L3 component detail panel
  const [srcOf, setSrcOf] = useState(null);      // component shown beside its SEI source
  const [seiDoc, setSeiDoc] = useState(null);    // {doc, section} open in the popup
@@ -782,6 +785,17 @@ export default function HubDesign({ t }) {
     filter={gapF} setFilter={setGapF} />
   </div>);
 
+ /* ---------- SI: SEI's own integration diagram, and what it omits ---------- */
+ if (view === "SI") return (
+  <div>
+   <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+   <NavStyles />
+   <Popup />
+   <Crumb trail={[["containers", () => setView("L2")],
+                  ["SEI's integration diagram", null]]} />
+   <SystemIntegrationView t={t} pick={siPick} setPick={setSiPick} />
+  </div>);
+
  /* ---------- NET: the whole network, for the infrastructure teams ---------- */
  if (view === "NET") return (
   <div>
@@ -1003,6 +1017,11 @@ export default function HubDesign({ t }) {
        borderRadius: 999, cursor: "pointer", background: "#0f4775",
        color: "#fff" }}>
       ⇆ the boundary · 3 transports, 4 channels</span>
+     <span onClick={() => { setView("SI"); setSiPick(null); }}
+      style={{ fontSize: 10.5, fontWeight: 800, padding: "6px 14px",
+       borderRadius: 999, cursor: "pointer", background: "#fdf1f2",
+       color: "#cc3344", border: "1px solid #f0c9ce" }}>
+      ▦ SEI&apos;s integration diagram · {SI_ABSENT.length} paths missing from it</span>
      <span onClick={() => { setView("NET"); setNetZonePick(null); }}
       style={{ fontSize: 10.5, fontWeight: 800, padding: "6px 14px",
        borderRadius: 999, cursor: "pointer", background: "#e8f3ec",
