@@ -37,6 +37,7 @@ import { NET_ZONES, NET_LINKS, NET_STATE, NET_WORK, NET_UNKNOWN, NET_DNS,
   NET_SETTLED, NET_COUNTS, NET_FLOWS, netZone } from "../src/hubNetwork.js";
 import { GW_LAYERS, GW_VANTAGE, GW_AD3 } from "../src/hubGatewayLayers.js";
 import { LANES } from "../src/hubGroups.js";
+import { CHANNELS, LEGS, legById } from "../src/hubChannels.js";
 import { SDC_LEGS, SDC_OPEN, SDC_PATHS, SDC_ENVS, SDC_NET_FACTS,
   SDC_TRANSPORT_NOTE } from "../src/hubSdcNetwork.js";
 import { S2_DOMAINS, S2_TABLES, S2_RELS, s2TablesIn, s2DomainOf }
@@ -122,10 +123,11 @@ ok(!/const Crumb = \(\{ trail \}\) => \(\s*<div style=\{\{ display: "flex"/.test
 /* --------------------------------------- every diagram node advertises */
 {
   const h = render(<ContextView t={t} chan={null} setChan={() => {}} />);
-  ok(count(h, /class="cp-hit"/g) === 6,
-     "all six boundary channels are marked, not the two that were obvious",
-     count(h, /class="cp-hit"/g));
-  ok(count(h, /class="cp-go"/g) === 6,
+  const crossing = LEGS.filter((l) => l.crosses).length;
+  ok(count(h, /class="cp-hit"/g) === crossing,
+     "every leg that crosses the boundary is marked, not the two that "
+     + "were obvious", count(h, /class="cp-hit"/g));
+  ok(count(h, /class="cp-go"/g) === crossing,
      "each with a chevron drawn at rest", count(h, /class="cp-go"/g));
   ok(/Clickable/i.test(h), "and the picture says it is one", "");
   ok(h.includes("cp-nav-css"),
@@ -565,16 +567,68 @@ ok(!/\\u[0-9a-fA-F]{4}/.test(CTXSRC) && !/\\u[0-9a-fA-F]{4}/.test(NAVSRC),
      "the loader flow includes the Hub calling the consumer back - the "
      + "direction nobody draws, because consumers are assumed to call in",
      loader.map((l) => l.dir).join(" | "));
-  ok(files.some((l) => /error.detail/i.test(l.w)),
-     "and the error-detail file coming back, which is a file path the "
-     + "loader flow depends on", "");
-  ok(files.some((l) => /must NOT join|never empties/i.test(l.note)),
+  // Purpose and transport are different axes, and this is the link that
+  // proves it: the error-detail file is a LOADER leg that travels on the
+  // FILE transport. Filing it under files is how the old model lost it.
+  const detail = NET_LINKS.find((l) => l.leg === "C3");
+  ok(detail && detail.flow === "loader" && /file/i.test(detail.mech + detail.w),
+     "the error-detail file is in the loader flow and carried on the "
+     + "file transport - purpose and transport are different axes",
+     detail ? `${detail.flow}/${detail.mech}` : "missing");
+  ok(detail && /must NOT join|never empties/i.test(detail.note),
      "with the rule that keeps it out of the expected daily set - in it, "
      + "the inbound business date never transforms", "");
-  ok(loader.filter((l) => /BBH to SEI/i.test(l.dir)).length === 2,
-     "data fetch and loader submit are separate links - they share a "
-     + "quota and compete, which one link hides",
-     loader.filter((l) => /BBH to SEI/i.test(l.dir)).map((l) => l.id).join(","));
+  // Three callers, one gateway, one SEI quota - and the pipeline's own
+  // read is NOT one of them, which is the thing a single "data fetch"
+  // link hid for as long as it existed.
+  const viaGw = NET_LINKS.filter((l) => /Apigee|CP-Integration-Gateway/i.test(l.mech));
+  ok(viaGw.length >= 3,
+     "the loader submit, the on-demand read and the consumer call all "
+     + "cross the gateway, so the quota contest is visible",
+     viaGw.map((l) => l.id).join(","));
+  ok(!viaGw.some((l) => l.leg === "A2"),
+     "and the pipeline's read is not among them - it is a Snowflake "
+     + "session, so it contends for nothing at the gateway and inherits "
+     + "nothing from it either", "");
+  // A link that IS a boundary leg carries that leg's id, so the two
+  // screens cannot be read as two separate lists.
+  ok(NET_LINKS.filter((l) => l.leg).every((l) => l.id.startsWith(l.leg)),
+     "a link that is a leg is named after it",
+     NET_LINKS.filter((l) => l.leg && !l.id.startsWith(l.leg))
+       .map((l) => `${l.id}/${l.leg}`).join(","));
+
+  // ONE TAXONOMY, PROVED. The flows are derived from the channels and a
+  // link that is a boundary leg says which. Without these two the two
+  // screens are just two lists that happen to agree today.
+  ok(NET_FLOWS.filter((f) => f.ch).length === CHANNELS.length
+     && NET_FLOWS.filter((f) => f.ch).every((f) =>
+          CHANNELS.some((c) => c.id === f.ch && c.flow === f.k)),
+     "every channel is a flow and the ids match - the flows are derived, "
+     + "not a second hand-kept list", "");
+  ok(NET_LINKS.filter((l) => l.leg).every((l) => legById(l.leg)),
+     "every link that claims a leg names one that exists",
+     NET_LINKS.filter((l) => l.leg && !legById(l.leg))
+       .map((l) => `${l.id}->${l.leg}`).join(","));
+  ok(NET_LINKS.filter((l) => l.leg)
+       .every((l) => legById(l.leg).ch === (NET_FLOWS.find((f) => f.k === l.flow) || {}).ch),
+     "and a link's flow agrees with its leg's channel - disagree and the "
+     + "same hop is in two places at once",
+     NET_LINKS.filter((l) => l.leg && legById(l.leg).ch
+        !== (NET_FLOWS.find((f) => f.k === l.flow) || {}).ch)
+       .map((l) => l.id).join(","));
+  {
+    const missing = LEGS.filter((l) => l.crosses
+      && !NET_LINKS.some((x) => x.leg === l.id));
+    ok(missing.length === 0,
+       "every boundary leg has a network link - a leg with no link is a "
+       + "crossing nobody has to provision", missing.map((l) => l.id).join(","));
+  }
+  // The misalignment the single taxonomy exposed: the pipeline's read is
+  // a Snowflake session, not an API call, and the network view said API.
+  ok(NET_LINKS.some((l) => l.leg === "A2" && /Snowflake/i.test(l.mech)),
+     "the pipeline's read is a Snowflake session in both views", "");
+  ok(!NET_LINKS.some((l) => l.leg === "A2" && /Apigee|gateway/i.test(l.mech)),
+     "and does not also claim to cross the gateway", "");
 
   // Four teams, each with work they can actually start.
   ok(NET_WORK.length >= 4 && NET_WORK.every((g) => g.team && g.items.length),

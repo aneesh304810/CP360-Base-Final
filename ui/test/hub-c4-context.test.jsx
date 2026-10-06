@@ -29,8 +29,8 @@ import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ContextView, GateView, LoaderLoopView, Stage2Model }
   from "../src/HubContext.jsx";
-import { CHANNELS, TRANSPORTS, GATEWAY_NOTE, chanById }
-  from "../src/hubChannels.js";
+import { CHANNELS, LEGS, TRANSPORTS, HELD_TRANSPORTS, GATEWAY_NOTE,
+  chanById, legById, legsOf, transportOf } from "../src/hubChannels.js";
 import { EV_KINDS, EV_RULES, EV_GATE, CLOCKS } from "../src/hubEventModel.js";
 import { LOOP_LEGS, SUB_STATES, LOOP_RULES, LOOP_GAP }
   from "../src/hubLoaderLoop.js";
@@ -74,22 +74,67 @@ const HUBSRC = fs.readFileSync(path.join(SRC, "HubDesign.jsx"), "utf8");
 const t = tLight;
 
 /* ------------------------------------------------- the boundary model */
-ok(CHANNELS.length === 4, "four channels cross the boundary", CHANNELS.length);
-ok(TRANSPORTS.length === 3, "on three transports, not four", TRANSPORTS.length);
-ok(CHANNELS.filter((c) => c.role === "primary").length === 3
-   && CHANNELS.filter((c) => c.role === "standby").length === 1,
-   "files are the only standby channel; the other three are primary",
-   CHANNELS.map((c) => `${c.id}:${c.role}`).join(" "));
-ok(CHANNELS.every((c) => c.legs.length >= 3 && c.legs.every((l) =>
-     l[0] === "SEI" || l[0] === "BBH")),
-   "every channel names its legs, and each leg says whose it is",
-   CHANNELS.map((c) => `${c.id}:${c.legs.length}`).join(" "));
-// The gateway is a band, not a step. If the loader and the fetch do not
-// both name it, the shared-quota risk has nowhere to be read.
-ok(chanById("C2").transport === "Apigee + API Gateway"
-   && /gateway/i.test(chanById("C4").detail + chanById("C4").transport),
-   "the data fetch and the loader both cross the gateway",
-   chanById("C2").transport + " | " + chanById("C4").transport);
+// ONE TAXONOMY, THREE LEVELS. There were three and they did not line
+// up - four channels, six hand-numbered lanes with one channel owning
+// three of them, and three transports - which is why nobody could say
+// what "channel 4" meant. A channel is a purpose; a leg is one directed
+// hop inside it; a transport is a property of the leg. These assertions
+// hold that apart, because the collapse back into one list is gradual
+// and each step looks harmless.
+ok(CHANNELS.length === 4, "four channels", CHANNELS.length);
+ok(CHANNELS.every((c) => /^[A-D]$/.test(c.id)),
+   "lettered, so a leg id carries its channel and A2 is unambiguous",
+   CHANNELS.map((c) => c.id).join(""));
+ok(LEGS.every((l) => chanById(l.ch)),
+   "every leg belongs to a channel that exists",
+   LEGS.filter((l) => !chanById(l.ch)).map((l) => l.id).join(","));
+ok(LEGS.every((l) => l.id === l.ch + l.no),
+   "and its id IS its channel and number - no second numbering to drift",
+   LEGS.filter((l) => l.id !== l.ch + l.no).map((l) => l.id).join(","));
+ok(CHANNELS.every((c) => legsOf(c.id).length > 0),
+   "no channel is empty", "");
+ok(LEGS.every((l) => l.hops.length >= 2
+     && l.hops.every((h) => h[0] === "SEI" || h[0] === "BBH")),
+   "every leg names its hops, and each hop says whose it is",
+   LEGS.filter((l) => !l.hops || l.hops.length < 2).map((l) => l.id).join(","));
+
+// FOUR TRANSPORTS, AND THE COUNT WAS WRONG IN A WAY THAT MATTERED. The
+// old three predated the Kafka and folded a Snowflake driver session
+// into "the API", which credited the gateway with controls over the
+// primary inbound path that it does not have.
+ok(TRANSPORTS.length === 4, "four transports, not three", TRANSPORTS.length);
+ok(LEGS.every((l) => transportOf(l)),
+   "every leg names a transport that exists",
+   LEGS.filter((l) => !transportOf(l)).map((l) => l.id).join(","));
+ok(HELD_TRANSPORTS.length === 2
+   && HELD_TRANSPORTS.every((x) => /kafka|snowflake/i.test(x.id)),
+   "two are held connections - the Kafka consumer and the Snowflake "
+   + "session - and both are channel A, the primary inbound path",
+   HELD_TRANSPORTS.map((x) => x.id).join(","));
+ok(legsOf("A").every((l) => transportOf(l).held),
+   "so channel A crosses the gateway nowhere", "");
+
+// Only a leg that crosses the boundary gets a lane on a picture whose
+// subject IS the boundary. Drawing the BBH-internal ones there is what
+// made one channel own three lanes.
+ok(LEGS.every((l) => l.crosses === !!l.y),
+   "a leg has a lane position exactly when it crosses the boundary",
+   LEGS.filter((l) => l.crosses !== !!l.y).map((l) => l.id).join(","));
+ok(LEGS.filter((l) => l.crosses).length === 7
+   && LEGS.filter((l) => !l.crosses).length === 2,
+   "seven legs cross; the consumer call and the consumer answer do not",
+   LEGS.filter((l) => !l.crosses).map((l) => l.id).join(","));
+{
+  const ys = LEGS.filter((l) => l.crosses).map((l) => l.y).sort((a, b) => a - b);
+  ok(ys.every((y, i) => i === 0 || y - ys[i - 1] >= 30),
+     "and no two lanes are within 30px - labels collided at 33px pitch "
+     + "and it shipped", ys.join(","));
+}
+// The gateway is a band, not a step. If the loader and the on-demand
+// read do not both name it, the shared-quota risk has nowhere to be read.
+ok(transportOf(legById("C1")).id === "api"
+   && transportOf(legById("D2")).id === "api",
+   "the loader submit and the on-demand read share the gateway", "");
 ok(GATEWAY_NOTE.buys.length >= 4 && /quota/i.test(GATEWAY_NOTE.costs)
    && /reserved floor/i.test(GATEWAY_NOTE.fix),
    "the chokepoint is stated with its cost and its mitigation, not just "
@@ -229,15 +274,31 @@ try { html = render(<ContextView t={t} chan={null} setChan={() => {}} />); }
 catch (e) { ok(false, "ContextView renders", e.message); }
 ok(/BBH boundary/.test(html) && /Apigee/.test(html),
    "the context screen draws the boundary and the gateway", html.length);
-ok(CHANNELS.every(() => true) && /Change events/.test(html)
-   && /File delivery/.test(html),
-   "and all six crossings are on it", "");
+ok(LEGS.filter((l) => l.crosses).every((l) => html.includes(l.id)),
+   "and every crossing leg is labelled on it by id",
+   LEGS.filter((l) => l.crosses && !html.includes(l.id))
+     .map((l) => l.id).join(","));
+ok(/Kafka consumer/.test(html) && /Snowflake session/.test(html),
+   "with a box per transport - the read lands on a driver session, not "
+   + "on Apigee", "");
 
 try {
-  const h = render(<ContextView t={t} chan="C4" setChan={() => {}} />);
-  ok(/Loader round trip/.test(h) && /Integration 360/.test(h),
-     "picking a channel opens its legs", h.length);
-} catch (e) { ok(false, "ContextView with a channel renders", e.message); }
+  // Picking a leg has to answer at both levels: what this hop does, and
+  // which channel it belongs to. One click, two levels - that is the
+  // whole reason the leg is the unit the diagram draws.
+  const h = render(<ContextView t={t} chan="C2" setChan={() => {}} />);
+  ok(/Status back/.test(h) && /Integration 360/.test(h),
+     "picking a leg opens that leg", h.length);
+  ok(/Loader/.test(h) && /leg 2 of channel C/.test(h),
+     "and says which channel it is a leg of", "");
+  ok(/C1/.test(h) && /C3/.test(h) && /C4/.test(h),
+     "and offers the channel's other legs, so the round trip is reachable "
+     + "from any point on it", "");
+  const a = render(<ContextView t={t} chan="A2" setChan={() => {}} />);
+  ok(/held connection/i.test(a),
+     "a leg on a held transport says so - the gateway's controls do not "
+     + "reach it and the old model implied they did", "");
+} catch (e) { ok(false, "ContextView with a leg renders", e.message); }
 
 try {
   const h = render(<GateView t={t} />);
@@ -288,7 +349,7 @@ ok(tblFails.length === 0,
 // Dark theme is a different surface, not an inversion: a screen that reads
 // in light and vanishes in dark has not been tested.
 try {
-  render(<ContextView t={tDark} chan="C1" setChan={() => {}} />);
+  render(<ContextView t={tDark} chan="A1" setChan={() => {}} />);
   render(<GateView t={tDark} />);
   render(<LoaderLoopView t={tDark} />);
   render(<Stage2Model t={tDark} dom="PH" tbl="TAXLOT"

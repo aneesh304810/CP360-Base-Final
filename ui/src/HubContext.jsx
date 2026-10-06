@@ -12,7 +12,8 @@
 
 import React from "react";
 import { NavStyles, OpenCard, ClickHint, SvgGo } from "./HubNav.jsx";
-import { CHANNELS, TRANSPORTS, GATEWAY_NOTE, chanById } from "./hubChannels.js";
+import { CHANNELS, LEGS, TRANSPORTS, GATEWAY_NOTE,
+ chanById, legById, legsOf, transportOf } from "./hubChannels.js";
 import { EV_KINDS, EV_RULES, EV_GATE, CLOCKS } from "./hubEventModel.js";
 import { LOOP_LEGS, SUB_STATES, LOOP_RULES, LOOP_GAP } from "./hubLoaderLoop.js";
 import { FILE_CHAIN, FILE_VALIDATIONS, COUNT_RULE, FAIL_MODES, FILE_POSTURE }
@@ -87,8 +88,8 @@ const Pbox = ({ x, y, w, h, n, s, stroke }) => (
    fontSize="10" fill={MUT}>{s}</text>}
  </g>);
 
-function Lane({ y, dir, label, role, dim, onPick }) {
- const col = dim ? MUT : ACC, a = y + 8;
+function Lane({ y, dir, label, role, dim, onPick, tone }) {
+ const col = dim ? MUT : (tone || ACC), a = y + 8;
  const dash = dim ? "6 4" : undefined;
  const seg = (x1, x2) => (
   <line x1={x1} y1={a} x2={x2} y2={a} stroke={col} strokeWidth="1.6"
@@ -101,18 +102,24 @@ function Lane({ y, dir, label, role, dim, onPick }) {
                  : <>{seg(466, 272)}{seg(686, 614)}</>}
    <text x="276" y={y - 14} fontSize="11.5" fontWeight="500" fill={INK}>
     {label}</text>
-   <text x="276" y={y - 2} fontSize="10" fill={dim ? MUT : ACC}>{role}</text>
+   <text x="276" y={y - 2} fontSize="10" fill={dim ? MUT : (tone || ACC)}>
+    {role}</text>
   </g>);
 }
 
 export function ContextView({ t, chan, setChan }) {
- const c = chan ? chanById(chan) : null;
+ // A selection is a LEG; its channel comes from the leg. One click, two
+ // levels of answer - which is the point of making the leg the unit the
+ // diagram draws and the channel the unit a reader argues about.
+ const leg = chan ? legById(chan) : null;
+ const c = leg ? chanById(leg.ch) : null;
+ const CHC = { A: "#2a78d6", B: "#1baf7a", C: "#eb6834", D: "#6d3ac0" };
  return (
   <div>
    <NavStyles />
    <div style={card()}>
     <svg viewBox="0 0 1200 500" style={{ width: "100%", height: "auto" }}
-     role="img" aria-label="SEI and BBH, three transports and four channels">
+     role="img" aria-label="SEI and BBH, four channels on four transports">
      <defs><marker id="ctxarr" viewBox="0 0 10 10" refX="9" refY="5"
       markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill={SUB} /></marker></defs>
@@ -139,43 +146,45 @@ export function ContextView({ t, chan, setChan }) {
      <text x="640" y="32" textAnchor="middle" fontSize="10" fill={MUT}>
       BBH boundary</text>
 
-     <Pbox x={470} y={98} w={140} h={50} n="SDC consumer"
-      s="topic subscription" stroke="#2a78d6" />
-     {/* Two layers, not one box. The wrapper is the only thing a consumer
-         addresses; the call still leaves through BBH Apigee, which is the
-         identity SEI observes. Drawn as one box there was nowhere to put
-         the trust boundary, which is where the blocking readiness gap is. */}
-     <rect x="470" y="190" width="140" height="130" rx="6" fill="#fff"
+     {/* One box per transport, so a leg lands on the thing that actually
+         carries it. The read used to point at Apigee, which said a
+         Snowflake driver session is an API call. It is not, and that
+         mistake is why the gateway was credited with controls over the
+         primary inbound path. */}
+     <text x="540" y="90" textAnchor="middle" fontSize="8" fontWeight="700"
+      fill={BAD}>HELD CONNECTIONS - no gateway, no gateway controls</text>
+     <Pbox x={470} y={98} w={140} h={46} n="Kafka consumer"
+      s="BBH's dedicated queue" stroke="#2a78d6" />
+     <rect x="470" y="158" width="140" height="46" rx="6" fill="#fff"
+      stroke="#2a78d6" strokeWidth="1.3" strokeDasharray="5 3" />
+     <text x="540" y="178" textAnchor="middle" fontSize="11.5"
+      fontWeight="500" fill={INK}>Snowflake session</text>
+     <text x="540" y="193" textAnchor="middle" fontSize="8.5" fill={MUT}>
+      driver, over Private Link</text>
+
+     <rect x="470" y="216" width="140" height="118" rx="6" fill="#fff"
       stroke={ACC} strokeWidth="1.3" />
-     <line x1="470" y1="255" x2="610" y2="255" stroke={ACC} strokeWidth="1.1"
+     <line x1="470" y1="276" x2="610" y2="276" stroke={ACC} strokeWidth="1.1"
       strokeDasharray="4 3" />
-     <text x="540" y="212" textAnchor="middle" fontSize="11.5"
+     <text x="540" y="236" textAnchor="middle" fontSize="11.5"
       fontWeight="500" fill={INK}>API Gateway</text>
-     <text x="540" y="226" textAnchor="middle" fontSize="8.5" fill={MUT}>
-      the wrapper</text>
-     <text x="540" y="239" textAnchor="middle" fontSize="8.5" fill={MUT}>
+     <text x="540" y="250" textAnchor="middle" fontSize="8.5" fill={MUT}>
       consumers see only this</text>
-     <text x="540" y="276" textAnchor="middle" fontSize="11.5"
+     <text x="540" y="296" textAnchor="middle" fontSize="11.5"
       fontWeight="500" fill={INK}>BBH Apigee</text>
-     <text x="540" y="290" textAnchor="middle" fontSize="8.5" fill={MUT}>
+     <text x="540" y="310" textAnchor="middle" fontSize="8.5" fill={MUT}>
       the identity SEI sees</text>
-     <text x="540" y="308" textAnchor="middle" fontSize="9" fill={ACC}>
+     <text x="540" y="327" textAnchor="middle" fontSize="8.5" fill={ACC}>
       every API, both ways</text>
-     <g opacity="0.62"><Pbox x={470} y={345} w={140} h={75} n="File transport"
+
+     <g opacity="0.62"><Pbox x={470} y={352} w={140} h={72} n="File transport"
       s="SFTP / Momentum" /></g>
 
-     <Lane y={120} dir="in" label="1 - Change events"
-      role="PRIMARY - notification only" onPick={() => setChan("C1")} />
-     <Lane y={205} dir="out" label="2 - Data fetch"
-      role="fetches what the events name" onPick={() => setChan("C2")} />
-     <Lane y={247} dir="out" label="3 - Loader push" role="BBH data to SEI"
-      onPick={() => setChan("C4")} />
-     <Lane y={289} dir="in" label="4 - Status back" role="verdict and counts"
-      onPick={() => setChan("C4")} />
-     <Lane y={360} dir="in" label="5 - File delivery"
-      role="STANDBY - recovery route" dim onPick={() => setChan("C3")} />
-     <Lane y={400} dir="in" label="6 - Error detail"
-      role="which records, and why" dim onPick={() => setChan("C4")} />
+     {LEGS.filter((l) => l.crosses).map((l) => (
+      <Lane key={l.id} y={l.y} dir={l.dir} label={`${l.id} - ${l.name}`}
+       role={l.sub}
+       dim={l.role === "standby"} tone={CHC[l.ch]}
+       onPick={() => setChan(l.id)} />))}
 
      <rect x="706" y="96" width="458" height="196" rx="6" fill="#fff"
       stroke={RULE} />
@@ -219,55 +228,131 @@ export function ContextView({ t, chan, setChan }) {
      network and its security from the consumer, and the call still leaves
      through Apigee, which is why SEI sees requests arriving from it.
     </div>
-    <div style={{ fontSize: 11.5, color: SUB, lineHeight: 1.6, marginTop: 6,
-     maxWidth: "92ch" }}>
-     <b style={{ color: BAD }}>Three transports is the count of what is
-     drawn, not of what the design needs.</b> The event path also runs a
-     topic subscription and a Snowflake driver session - held connections
-     into SEI&apos;s network rather than requests, crossing the gateway
-     nowhere and inheriting none of its controls. They are on the
-     event-ingestion lane, with the network they would need.
+    <div style={{ display: "flex", gap: 13, flexWrap: "wrap", marginTop: 9,
+     fontSize: 11, color: SUB, alignItems: "center" }}>
+     {CHANNELS.map((ch) => (
+      <span key={ch.id} style={{ display: "inline-flex", alignItems: "center",
+       gap: 6 }}>
+       <span style={{ width: 17, height: 17, borderRadius: 4,
+        background: CHC[ch.id], color: "#fff", fontSize: 10,
+        fontWeight: 800, display: "grid", placeItems: "center" }}>
+        {ch.id}</span>
+       {ch.name}
+       <span style={{ color: MUT }}>{legsOf(ch.id).length} legs</span></span>))}
     </div>
-    <ClickHint>Each of the six numbered channels opens what crosses on it,
-     which transport carries it, and what breaks when it stops.</ClickHint>
+    <ClickHint>Four channels, nine legs. A leg is one directed hop and is
+     lettered by its channel, so A2 is the second leg of Events. Open any
+     one for what crosses on it and what breaks when it stops.</ClickHint>
    </div>
 
-   {c ? (
-    <div style={card()}>
-     <div style={eyebrow}>Channel {c.no}</div>
+   {leg && c ? (
+    <div style={card({ borderLeft: `3px solid ${CHC[c.id]}` })}>
      <div style={{ display: "flex", gap: 9, alignItems: "baseline",
-      flexWrap: "wrap", margin: "3px 0 7px" }}>
-      <b style={{ fontSize: 15, color: INK }}>{c.name}</b>
-      {c.role === "primary" ? <Chip bg={ACC} fg="#fff">Primary</Chip>
-                            : <Chip bg="#eef1f4" fg={MUT}>Standby</Chip>}
+      flexWrap: "wrap" }}>
+      <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700,
+       color: "#fff", background: CHC[c.id], borderRadius: 4,
+       padding: "2px 8px" }}>{leg.id}</span>
+      <b style={{ fontSize: 15, color: INK }}>{leg.name}</b>
+      <span style={{ fontSize: 11.5, color: MUT }}>
+       leg {leg.no} of channel {c.id} &mdash; {c.name}</span>
+      {leg.role === "primary" ? <Chip bg={ACC} fg="#fff">Primary</Chip>
+                              : <Chip bg="#eef1f4" fg={MUT}>Standby</Chip>}
      </div>
-     <Body><div style={{ color: INK, marginBottom: 5 }}>{c.one}</div>
-      {c.detail}</Body>
+     <Body><div style={{ color: INK, margin: "7px 0 5px" }}>{leg.one}</div>
+      {leg.detail}</Body>
      <div style={{ ...eyebrow, margin: "13px 0 3px" }}>How it runs</div>
-     {c.legs.map((l, i) => (
+     {leg.hops.map((h, i) => (
       <div key={i} style={{ display: "flex", gap: 11, padding: "9px 0",
-       borderTop: i ? `1px solid #eef3f5` : "none" }}>
+       borderTop: i ? "1px solid #eef3f5" : "none" }}>
        <span style={{ flex: "0 0 22px", height: 22, borderRadius: "50%",
-        background: l[0] === "SEI" ? "#0091bf" : ACC, color: "#fff",
+        background: h[0] === "SEI" ? "#0091bf" : ACC, color: "#fff",
         fontSize: 11, fontWeight: 700, display: "grid",
         placeItems: "center" }}>{i + 1}</span>
        <span><b style={{ fontSize: 9.5, color: MUT, letterSpacing: 0.4 }}>
-        {l[0]}</b>
+        {h[0]}</b>
         <div style={{ fontSize: 12.5, color: SUB, lineHeight: 1.6 }}>
-         {l[1]}</div></span>
+         {h[1]}</div></span>
       </div>))}
-     <div style={{ fontSize: 10.5, color: MUT, marginTop: 10 }}>
-      Transport - {c.transport} &nbsp;-&nbsp; {c.src}</div>
+     {(() => {
+      const tr = transportOf(leg);
+      return (
+       <div style={{ display: "flex", gap: 9, alignItems: "baseline",
+        flexWrap: "wrap", marginTop: 11, fontSize: 11, color: MUT }}>
+        <b style={{ ...eyebrow, display: "inline" }}>Transport</b>
+        <span style={{ color: INK }}>{tr.n}</span>
+        <span>{tr.sub}</span>
+        {tr.held && <Chip bg={BAD} fg="#fff">held connection</Chip>}
+        <span style={{ marginLeft: "auto" }}>{c.src}</span>
+       </div>);
+     })()}
+     <div style={{ ...eyebrow, margin: "13px 0 5px" }}>
+      The other legs of channel {c.id}</div>
+     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+      {legsOf(c.id).filter((x) => x.id !== leg.id).map((x) => (
+       <span key={x.id} className="cp-row" onClick={() => setChan(x.id)}
+        style={{ fontSize: 11, border: `1px solid ${RULE}`,
+         borderRadius: 999, padding: "3px 11px", cursor: "pointer",
+         color: INK }}>
+        <b style={{ fontFamily: MONO, color: CHC[c.id] }}>{x.id}</b>
+        {" "}{x.name}</span>))}
+     </div>
     </div>
    ) : (
-    <div style={card()}>
-     <div style={eyebrow}>The pattern underneath</div>
-     <Body>One idea, applied four times: <b style={{ color: INK }}>a thin
-      signal on one transport, the payload on another.</b> Inbound, the event
-      says a row changed and the API fetches it. Outbound, the status API
-      gives the verdict and a file carries the per-record detail. Learn it
-      once and all four channels read the same way.</Body>
+    <div style={{ display: "grid", gap: 9,
+     gridTemplateColumns: "repeat(auto-fit,minmax(265px,1fr))" }}>
+     {CHANNELS.map((ch) => (
+      <div key={ch.id} style={card({ marginBottom: 0,
+       borderLeft: `3px solid ${CHC[ch.id]}` })}>
+       <div style={{ display: "flex", gap: 8, alignItems: "baseline",
+        flexWrap: "wrap" }}>
+        <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700,
+         color: "#fff", background: CHC[ch.id], borderRadius: 4,
+         padding: "1px 7px" }}>{ch.id}</span>
+        <b style={{ fontSize: 13.5, color: INK }}>{ch.name}</b>
+        {ch.role === "standby" && <Chip bg="#eef1f4" fg={MUT}>Standby</Chip>}
+       </div>
+       <Body><div style={{ marginTop: 6 }}>{ch.one}</div></Body>
+       <div style={{ display: "flex", gap: 5, flexWrap: "wrap",
+        marginTop: 9 }}>
+        {legsOf(ch.id).map((x) => (
+         <span key={x.id} className="cp-row" onClick={() => setChan(x.id)}
+          style={{ fontSize: 10.5, border: `1px solid ${RULE}`,
+           borderRadius: 999, padding: "2px 9px", cursor: "pointer",
+           color: INK }}>
+          <b style={{ fontFamily: MONO, color: CHC[ch.id] }}>{x.id}</b>
+          {" "}{x.name}</span>))}
+       </div>
+      </div>))}
     </div>)}
+
+   <Head title="Four transports, two of which cross the gateway nowhere"
+    note="a transport is a property of a leg, not a list beside it" />
+   <div style={{ display: "grid", gap: 9,
+    gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))" }}>
+    {TRANSPORTS.map((tr) => (
+     <div key={tr.id} style={card({ marginBottom: 0,
+      borderLeft: `3px solid ${tr.held ? BAD : ACC}` })}>
+      <div style={{ display: "flex", gap: 7, alignItems: "baseline",
+       flexWrap: "wrap" }}>
+       <b style={{ fontSize: 13, color: INK }}>{tr.n}</b>
+       {tr.held && <Chip bg={BAD} fg="#fff">held</Chip>}
+      </div>
+      <div style={{ fontSize: 11.5, color: SUB, marginTop: 4 }}>{tr.sub}</div>
+      <div style={{ fontSize: 10.5, color: MUT, marginTop: 7,
+       fontFamily: MONO }}>
+       {LEGS.filter((l) => l.transport === tr.id).map((l) => l.id).join(", ")}</div>
+     </div>))}
+   </div>
+   <div style={card({ borderLeft: `3px solid ${BAD}`, marginTop: 11 })}>
+    <div style={eyebrow}>Why the count used to be three</div>
+    <Body>The old count predated the Kafka and folded the Snowflake
+     session into &quot;the API&quot;. Both are <b style={{ color: INK }}>held
+     connections into SEI&apos;s network rather than requests</b>: they
+     cross the gateway nowhere and inherit none of its mTLS, rate
+     limiting, retry policy or single authoritative log. They are also
+     channel A, the primary inbound path &mdash; so the two transports
+     with the fewest controls carry the most important traffic.</Body>
+   </div>
 
    <Head title="The gateway is a chokepoint, and that cuts both ways"
     note="one managed door - and one shared quota" />

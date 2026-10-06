@@ -29,6 +29,8 @@
 // Ports are the protocol defaults a reviewer would expect, flagged as
 // to-confirm rather than observed.
 
+import { CHANNELS } from "./hubChannels.js";
+
 export const NET_DOC = {
  n: "End-to-end network",
  w: "Every connection between SEI, Snowflake, BBH and the consumers, "
@@ -105,45 +107,51 @@ export const NET_ZONES = [
    holds: ["BBH Apigee", "CRM and other consumers"] },
 ];
 
-export const NET_FLOWS = [
- { k: "event", n: "Events", c: "#2a78d6",
-   w: "Kafka in, Snowflake read on the tag" },
- { k: "file", n: "Files", c: "#1baf7a",
-   w: "SFTP, Momentum, and the shared storage both sides touch" },
- { k: "loader", n: "Loader", c: "#eb6834",
-   w: "Out to SEI, status back by API, detail back by file" },
- { k: "consumer", n: "Consumers", c: "#6d3ac0",
-   w: "In through the gateway, answered by an outbound call" },
- { k: "platform", n: "Platform", c: "#5c6b7a",
-   w: "Inside BBH: the data estate and the evidence path" },
-];
+// THE FLOWS ARE THE CHANNELS. Derived rather than restated, so a link
+// here and a leg on the boundary screen are the same object seen from
+// two sides - one with its purpose, one with its firewall rule. A
+// hand-kept second list is how the two drifted into four names for one
+// thing in the first place.
+//
+// Platform is the one addition and it is explicitly NOT a channel: it
+// never crosses the boundary, and a network engineer still has to
+// provision it.
+const CH_COLOUR = { A: "#2a78d6", B: "#1baf7a", C: "#eb6834", D: "#6d3ac0" };
+
+export const NET_FLOWS = CHANNELS.map((c) => ({
+ k: c.flow, ch: c.id, n: `${c.id} - ${c.name}`, c: CH_COLOUR[c.id],
+ w: c.one,
+})).concat([
+ { k: "platform", ch: null, n: "Platform", c: "#5c6b7a",
+   w: "Inside BBH, crossing nothing: the data estate and the evidence path." },
+]);
 
 // Every connection, in the shape a firewall request is written in.
 export const NET_LINKS = [
  /* ---------------- events ---------------- */
- { id: "E1", flow: "event", from: "sei", to: "snow", st: "live",
+ { id: "N1", flow: "event", from: "sei", to: "snow", st: "live",
    w: "SWP commits to the Snowflake intake",
    mech: "Inside SEI's paired subscription",
    proto: "Snowflake driver", dir: "SEI to Snowflake",
    owner: "SEI", note: "No BBH involvement." },
- { id: "E2", flow: "event", from: "sei", to: "fabric", st: "live",
+ { id: "N2", flow: "event", from: "sei", to: "fabric", st: "live",
    w: "SEI VMs reach the Snowflake SQL service",
    mech: "Azure Private Link, private endpoint in the customer VNet",
    proto: "TLS 443, to confirm", dir: "SEI to Snowflake",
    owner: "SEI network", note: "Path 1 on SEI's diagram." },
- { id: "E3", flow: "event", from: "fabric", to: "snow", st: "live",
+ { id: "N3", flow: "event", from: "fabric", to: "snow", st: "live",
    w: "Internal stage traffic: PUT, GET and large result sets",
    mech: "Second Azure Private Link plus a storage service endpoint, to "
        + "Snowflake-managed blob",
    proto: "TLS 443, to confirm", dir: "both",
    owner: "SEI network",
    note: "Path 3. Separate from the SQL path and separately provisioned." },
- { id: "E4", flow: "event", from: "snow", to: "fabric", st: "live",
+ { id: "N4", flow: "event", from: "snow", to: "fabric", st: "live",
    w: "External stage traffic: COPY and external tables",
    mech: "Cross-tenant VNet rules on the customer's own blob or ADLS gen2",
    proto: "TLS 443, to confirm", dir: "Snowflake to customer storage",
    owner: "SEI network", note: "Path 4. Not used by the event path." },
- { id: "E5", flow: "event", from: "bbh", to: "kafka", st: "design", u: "Q1",
+ { id: "A1", flow: "event", leg: "A1", from: "bbh", to: "kafka", st: "design", u: "Q1",
    w: "The listener consumes BBH's dedicated queue",
    mech: "Kafka consumer, long-lived TCP to the broker set, reached over "
        + "Azure Private Link as on SEI's network page",
@@ -157,7 +165,7 @@ export const NET_LINKS = [
        + "on the first metadata refresh. Three environments, three "
        + "broker sets. Shared cluster, so BBH's isolation rests on "
        + "topic ACLs rather than on the cluster boundary." },
- { id: "E6", flow: "event", from: "bbh", to: "fabric", st: "design", u: "Q2",
+ { id: "A2", flow: "event", leg: "A2", from: "bbh", to: "fabric", st: "design", u: "Q2",
    w: "The puller reads the SDC view the event's tag selects",
    mech: "A Snowflake driver session. Needs a private endpoint reachable "
        + "from the BBH runtime AND admission to the Snowflake network "
@@ -168,7 +176,7 @@ export const NET_LINKS = [
        + "the route; the account network policy decides whether the "
        + "connection is accepted once it arrives. This is the leg the "
        + "whole events-primary posture rests on." },
- { id: "E7", flow: "event", from: "bbh", to: "fabric", st: "design", u: "Q3",
+ { id: "A2-blob", flow: "event", leg: "A2", from: "bbh", to: "fabric", st: "design", u: "Q3",
    w: "The puller's large result sets",
    mech: "A second private endpoint to Snowflake-managed blob, as path 3",
    proto: "TLS 443, to confirm", dir: "both",
@@ -177,14 +185,14 @@ export const NET_LINKS = [
        + "until the first real micro-batch." },
 
  /* ---------------- files ---------------- */
- { id: "F1", flow: "file", from: "sei", to: "sei", st: "live",
+ { id: "N5", flow: "file", from: "sei", to: "sei", st: "live",
    w: "SWP writes the daily extract to SEI SFTP",
    mech: "Inside SEI's estate",
    proto: "SFTP 22, to confirm", dir: "SEI internal",
    owner: "SEI",
    note: "Produced every day whether or not it is loaded - under the "
        + "event-primary posture this set is standby." },
- { id: "F2", flow: "file", from: "sei", to: "store", st: "live",
+ { id: "B1", flow: "file", leg: "B1", from: "sei", to: "store", st: "live",
    w: "Momentum transfers complete files to the Landing Zone",
    mech: "Managed file transfer. Which side initiates, and where Momentum "
        + "itself runs, decides the direction of the firewall rule - and "
@@ -196,7 +204,7 @@ export const NET_LINKS = [
        + "convention. Transfer evidence - names, timestamps, outcome, "
        + "checksum where the contract has one - is required from "
        + "Momentum and is a separate interface from the file itself." },
- { id: "F3", flow: "file", from: "bbh", to: "store", st: "live",
+ { id: "N6", flow: "file", from: "bbh", to: "store", st: "live",
    w: "Worker pods read Landing and write Archive and Quarantine",
    mech: "Shared storage mounted into the pods - the file-processing "
        + "contract requires consistent visibility across every worker",
@@ -205,7 +213,7 @@ export const NET_LINKS = [
    note: "ARCHIVE_FAILED exists because the move can fail after RAW is "
        + "committed. That state is a storage failure mode, not an "
        + "application one, and it must never trigger a reload." },
- { id: "F4", flow: "file", from: "sei", to: "store", st: "design", u: "U5",
+ { id: "C3", flow: "loader", leg: "C3", from: "sei", to: "store", st: "design", u: "U5",
    w: "The loader error-detail file arrives",
    mech: "The same file transport as F2, to confirm - nothing states "
        + "whether outbound error detail returns on the inbound channel "
@@ -218,21 +226,24 @@ export const NET_LINKS = [
        + "empties and the business date never transforms." },
 
  /* ---------------- loader ---------------- */
- { id: "L1", flow: "loader", from: "edge", to: "sei", st: "live",
-   w: "Hub fetches data from the SEI APIs",
+ { id: "D2", flow: "consumer", leg: "D2", from: "edge", to: "sei", st: "live",
+   w: "The Hub reads SEI on demand for a consumer that cannot wait",
    mech: "CP-Integration-Gateway, then BBH Apigee, then out",
    proto: "HTTPS 443, mTLS and OAuth", dir: "BBH to SEI",
    owner: "BBH platform",
-   note: "Bursty and set-based. Shares the gateway and the SEI quota with "
-       + "L2 and C1, which is the starvation risk." },
- { id: "L2", flow: "loader", from: "edge", to: "sei", st: "live",
+   note: "One API, two callers: the same gateway and contract serve this "
+       + "and the pipeline. The pipeline's own read is NOT this - it is "
+       + "a Snowflake session (E6) that crosses the gateway nowhere. "
+       + "Interactive and unbounded in number, so it is the half of the "
+       + "quota contest that can starve the loader window." },
+ { id: "C1", flow: "loader", leg: "C1", from: "edge", to: "sei", st: "live",
    w: "Hub submits the loader to SEI PS",
    mech: "CP-Integration-Gateway, then BBH Apigee, then out",
    proto: "HTTPS 443, mTLS and OAuth", dir: "BBH to SEI",
    owner: "BBH platform",
    note: "The identity SEI observes is Apigee's. Window-bound, so it "
        + "competes with L1's bursts for the same quota." },
- { id: "L3", flow: "loader", from: "sei", to: "edge", st: "design",
+ { id: "C2", flow: "loader", leg: "C2", from: "sei", to: "edge", st: "design",
    w: "SEI PS calls back with status and counts",
    mech: "Inbound through Apigee to the callback receiver",
    proto: "HTTPS 443", dir: "SEI to BBH",
@@ -240,7 +251,7 @@ export const NET_LINKS = [
    note: "M2. Designed; the receiver is not built. This is the only "
        + "SEI-initiated API call inbound to BBH, so it is the only "
        + "inbound rule the loader flow needs." },
- { id: "L4", flow: "loader", from: "bbh", to: "edge", st: "design", u: "U6",
+ { id: "C4", flow: "loader", leg: "C4", from: "bbh", to: "edge", st: "design", u: "U6",
    w: "The Hub answers the originating consumer",
    mech: "An outbound call from the Hub to the consumer's own API",
    proto: "HTTPS 443, to confirm", dir: "BBH to consumer",
@@ -251,7 +262,7 @@ export const NET_LINKS = [
        + "API and the error file agree." },
 
  /* ---------------- consumers ---------------- */
- { id: "C1", flow: "consumer", from: "edge", to: "bbh", st: "live",
+ { id: "D1", flow: "consumer", leg: "D1", from: "edge", to: "bbh", st: "live",
    w: "Consumers call the Hub",
    mech: "CP-Integration-Gateway is the only host a consumer addresses",
    proto: "HTTPS 443", dir: "consumer to BBH",
@@ -260,19 +271,19 @@ export const NET_LINKS = [
        + "as enforced." },
 
  /* ---------------- platform ---------------- */
- { id: "P1", flow: "platform", from: "bbh", to: "bbh", st: "live",
+ { id: "N7", flow: "platform", from: "bbh", to: "bbh", st: "live",
    w: "Runtime to the data estate",
    mech: "In-cluster or in-datacentre, depending on U1",
    proto: "Oracle SQL*Net 1521 or 2484, to confirm", dir: "both",
    owner: "BBH platform", note: "Stage 1 and Stage 2." },
- { id: "P2", flow: "platform", from: "bbh", to: "bbh", st: "design",
+ { id: "N8", flow: "platform", from: "bbh", to: "bbh", st: "design",
    w: "Stage 2 Oracle to Stage 3 Exadata",
    mech: "Database link or approved direct path - DEC-GAP-04 picks which",
    proto: "Oracle SQL*Net, to confirm", dir: "Stage 2 to Stage 3",
    owner: "BBH platform",
    note: "The mechanism is an open decision, so the network rule cannot "
        + "be written yet." },
- { id: "P3", flow: "platform", from: "bbh", to: "bbh", st: "live",
+ { id: "N9", flow: "platform", from: "bbh", to: "bbh", st: "live",
    w: "Evidence to the approved logging platform",
    mech: "Splunk, and Integration 360 for status",
    proto: "HTTPS 443, to confirm", dir: "BBH internal",
