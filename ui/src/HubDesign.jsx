@@ -23,8 +23,8 @@ import { GROUPS, PROC_STAGES, groupOfTracker, stageOfTracker, groupById,
 import { SEI_ARCH_DOC, ARCH_FEEDS, ARCH_LAYERS, ARCH_ORCHESTRATION,
  ARCH_PRINCIPLES, ARCH_CONFLICTS, OUTBOUND_FLOW, INBOUND_POSTURE,
  conflictsAt } from "./seiArchitecture.js";
-import { ContextView, GateView, LoaderLoopView, Stage2Model }
- from "./HubContext.jsx";
+import { ContextView, GateView, LoaderLoopView, Stage2Model,
+ FileIngestionView } from "./HubContext.jsx";
 import { s2DomainName, s2DomainOf, S2_TABLES, S2_RELS, S2_INFERRED_COUNT }
  from "./hubStage2Model.js";
 
@@ -724,7 +724,7 @@ export default function HubDesign({ t }) {
    <Crumb trail={[["containers", () => setView("L2")],
                   ["Orchestration", () => { setGrp("orchestration"); setView("GRP"); }],
                   ["events and the gate", null]]} />
-   <GateView t={t} />
+   <GateView t={t} onFile={() => setView("FILE")} />
   </div>);
 
  /* ---------- LOOP: the outbound round trip ---------- */
@@ -736,6 +736,18 @@ export default function HubDesign({ t }) {
                   ["Ingress and Egress", () => { setGrp("ingress"); setView("GRP"); }],
                   ["the loader loop", null]]} />
    <LoaderLoopView t={t} />
+  </div>);
+
+ /* ---------- FILE: the file path, end to end ---------- */
+ if (view === "FILE") return (
+  <div>
+   <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+   <Popup />
+   <Crumb trail={[["containers", () => setView("L2")],
+                  ["Ingestion", () => { setGrp("ingestion"); setView("GRP"); }],
+                  ["file-based ingestion", null]]} />
+   <FileIngestionView t={t}
+    onComp={(id) => { setSeiComp(id); setView("SEIL4"); }} />
   </div>);
 
  /* ---------- S2M: Stage 2 INT, the canonical model ---------- */
@@ -1398,8 +1410,14 @@ export default function HubDesign({ t }) {
 
     {/* A container that owns a detailed screen offers it here rather than
         leaving the reader to find it from the top. */}
-    {(grp === "orchestration" || grp === "ingress" || grp === "events") && (
+    {(grp === "orchestration" || grp === "ingress" || grp === "events"
+      || grp === "ingestion") && (
      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "10px 0 2px" }}>
+      {grp === "ingestion" && (
+       <span onClick={() => setView("FILE")} style={{ fontSize: 10.5,
+        fontWeight: 800, padding: "6px 14px", borderRadius: 999,
+        cursor: "pointer", background: "#e8f3ec", color: "#1f6b45" }}>
+        ▤ file-based ingestion · discover, validate, load, reconcile, archive</span>)}
       {(grp === "orchestration" || grp === "events") && (
        <span onClick={() => setView("GATE")} style={{ fontSize: 10.5,
         fontWeight: 800, padding: "6px 14px", borderRadius: 999,

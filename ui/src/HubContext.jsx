@@ -14,6 +14,9 @@ import React from "react";
 import { CHANNELS, TRANSPORTS, GATEWAY_NOTE, chanById } from "./hubChannels.js";
 import { EV_KINDS, EV_RULES, EV_GATE, CLOCKS } from "./hubEventModel.js";
 import { LOOP_LEGS, SUB_STATES, LOOP_RULES, LOOP_GAP } from "./hubLoaderLoop.js";
+import { FILE_CHAIN, FILE_VALIDATIONS, COUNT_RULE, FAIL_MODES, FILE_POSTURE }
+ from "./hubFileIngestion.js";
+import { SEI_STATES, SEI_TABLES, SEI_COMPONENTS } from "./seiBaseline.js";
 import { S2_DOMAINS, S2_CONTRACT, S2_STD_COLS, S2_GAPS, S2_INFERRED_COUNT,
  S2_RELS, S2_TESTED, s2Table, s2DomainOf, s2DomainName, s2IsAnchor, s2IntKey,
  s2ShortKey, s2RelsOwned, s2RelsInto, s2GapsOn, s2Blocked, s2TablesIn }
@@ -251,7 +254,7 @@ export function ContextView({ t, chan, setChan }) {
 /* ===================================================================
    Events and the gate.
    =================================================================== */
-export function GateView({ t }) {
+export function GateView({ t, onFile }) {
  return (
   <div>
    <div style={card()}>
@@ -302,6 +305,10 @@ export function GateView({ t }) {
         <li key={x} style={{ fontFamily: MONO, fontSize: 11.5, color: INK,
          lineHeight: 1.7 }}>{x}</li>))}</ul>
       <Body>{a.why}</Body>
+      {!a.live && onFile && (
+       <div onClick={onFile} style={{ fontSize: 11, fontWeight: 700,
+        color: ACC, cursor: "pointer", marginTop: 8 }}>
+        the file path, end to end -&gt;</div>)}
       <div style={{ fontSize: 10.5, color: MUT, marginTop: 7 }}>{a.src}</div>
      </div>))}
    </div>
@@ -644,6 +651,139 @@ export function Stage2Model({ t, dom, tbl, setDom, setTbl }) {
         marginTop: 6 }}>{g.g}</div>
        <div style={{ fontSize: 12.5, color: SUB, lineHeight: 1.6 }}>{g.r}</div>
       </div>))}
+   </div>
+  </div>);
+}
+
+/* ===================================================================
+   File-based ingestion - the path both design documents describe.
+   The states and the control tables are read from the SEI baseline
+   rather than restated, so there is one copy of each.
+   =================================================================== */
+export function FileIngestionView({ t, onComp }) {
+ const reg = SEI_STATES.file_registry;
+ const tbl = (id) => SEI_TABLES.find((x) => x.id === id);
+ const comp = (id) => SEI_COMPONENTS.find((x) => x.id === id);
+ const SEV = { warn: WARN, bad: BAD };
+ return (
+  <div>
+   <div style={card()}>
+    <b style={{ fontSize: 15, color: INK }}>
+     Discover, validate, load, reconcile, archive</b>
+    <Body><div style={{ marginTop: 6 }}>The path both SEI design documents
+     describe, and the best-specified thing in the pack. Every step below is
+     cited; click a component for its record.</div></Body>
+   </div>
+
+   {FILE_CHAIN.map((f, i) => (
+    <div key={f.id} style={card({ borderLeft: `3px solid ${ACC}` })}>
+     <div style={{ display: "flex", gap: 12, alignItems: "baseline",
+      flexWrap: "wrap" }}>
+      <span style={{ flex: "0 0 22px", height: 22, borderRadius: "50%",
+       background: ACC, color: "#fff", fontSize: 11, fontWeight: 700,
+       display: "grid", placeItems: "center" }}>{i + 1}</span>
+      <b style={{ fontSize: 13.5, color: INK }}>{f.n}</b>
+      <span style={{ fontFamily: MONO, fontSize: 10.5, color: MUT }}>
+       {f.tech}</span>
+     </div>
+     <Body><div style={{ marginTop: 7 }}>{f.w}</div></Body>
+     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 9 }}>
+      {f.sei.map((id) => {
+       const c = comp(id);
+       return (
+        <span key={id} onClick={() => onComp && onComp(id)}
+         style={{ fontSize: 10, fontWeight: 700, borderRadius: 3,
+          padding: "2px 8px", background: "#e4f0fb", color: ACC,
+          cursor: onComp ? "pointer" : "default" }}>
+         {c ? c.n : id}</span>);
+      })}
+      {f.tbl.map((id) => {
+       const x = tbl(id);
+       return (
+        <span key={id} style={{ fontFamily: MONO, fontSize: 10,
+         fontWeight: 700, borderRadius: 3, padding: "2px 8px",
+         background: "#eef1f4", color: "#5c6b7a" }}>{x ? x.n : id}</span>);
+      })}
+     </div>
+    </div>))}
+
+   <Head title="What validation means, in order"
+    note="all of it before a single row reaches RAW" />
+   <div style={card()}>
+    {FILE_VALIDATIONS.map((v, i) => (
+     <div key={v[0]} style={{ display: "flex", gap: 14, padding: "8px 0",
+      borderTop: i ? "1px solid #eef3f5" : "none" }}>
+      <span style={{ fontSize: 12.5, fontWeight: 500, color: INK,
+       flex: "0 0 150px" }}>{v[0]}</span>
+      <span style={{ fontSize: 12.5, color: SUB, lineHeight: 1.6 }}>
+       {v[1]}</span>
+     </div>))}
+   </div>
+
+   <Head title="The commit condition" note="checked before the commit, not after" />
+   <div style={card({ borderLeft: `3px solid ${OK}` })}>
+    <div style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700,
+     color: INK }}>{COUNT_RULE.eq}</div>
+    <Body><div style={{ marginTop: 7 }}>{COUNT_RULE.w}</div></Body>
+   </div>
+
+   <Head title="Three ways it fails, three different recoveries"
+    note="collapsing them into one is how a business date gets duplicated" />
+   <div style={{ display: "grid", gap: 9,
+    gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))" }}>
+    {FAIL_MODES.map((f) => (
+     <div key={f.st} style={card({ marginBottom: 0,
+      borderLeft: `3px solid ${SEV[f.sev]}` })}>
+      <Chip bg={SEV[f.sev]} fg="#fff">{f.st}</Chip>
+      <div style={{ fontSize: 12.5, color: INK, lineHeight: 1.6,
+       marginTop: 8 }}>{f.when}</div>
+      <div style={{ fontSize: 12, color: SUB, lineHeight: 1.6,
+       marginTop: 4 }}><b>RAW:</b> {f.raw}</div>
+      <div style={{ fontSize: 12.5, color: SUB, lineHeight: 1.6,
+       marginTop: 6 }}>{f.fix}</div>
+     </div>))}
+   </div>
+
+   <Head title={reg.n} note={`the lifecycle record - ${reg.ev}`} />
+   <div style={card()}>
+    {reg.rows.map((r, i) => (
+     <div key={r[0]} style={{ display: "flex", gap: 14, padding: "8px 0",
+      borderTop: i ? "1px solid #eef3f5" : "none" }}>
+      <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700,
+       color: INK, flex: "0 0 150px" }}>{r[0]}</span>
+      <span style={{ fontSize: 12.5, color: SUB, flex: "1 1 45%",
+       lineHeight: 1.6 }}>{r[1]}</span>
+      <span style={{ fontSize: 12, color: MUT, flex: "1 1 35%",
+       lineHeight: 1.6 }}>{r[2]}</span>
+     </div>))}
+   </div>
+
+   <Head title="The two control tables it runs on"
+    note="what is expected, and what arrived" />
+   <div style={{ display: "grid", gap: 9,
+    gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))" }}>
+    {["T1", "T2"].map((id) => {
+     const x = tbl(id);
+     if (!x) return null;
+     return (
+      <div key={id} style={card({ marginBottom: 0 })}>
+       <div style={{ fontFamily: MONO, fontSize: 13, fontWeight: 500,
+        color: INK }}>{x.n}</div>
+       <Body><div style={{ marginTop: 6 }}>{x.w}</div></Body>
+       <div style={{ fontFamily: MONO, fontSize: 10.5, color: MUT,
+        lineHeight: 1.7, marginTop: 8, overflowWrap: "anywhere" }}>
+        {x.cols}</div>
+       <div style={{ fontSize: 10.5, color: MUT, marginTop: 7 }}>{x.ev}</div>
+      </div>);
+    })}
+   </div>
+
+   <div style={card({ borderLeft: `3px solid ${WARN}`, marginTop: 11 })}>
+    <div style={eyebrow}>{FILE_POSTURE.q}</div>
+    <Body><div style={{ marginTop: 5 }}>{FILE_POSTURE.b}</div></Body>
+    <ul style={{ fontSize: 12.5, color: SUB, lineHeight: 1.65,
+     margin: "9px 0 0", paddingLeft: 17 }}>
+     {FILE_POSTURE.turns.map((x) => <li key={x}>{x}</li>)}</ul>
    </div>
   </div>);
 }

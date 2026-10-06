@@ -38,6 +38,10 @@ import { S2_DOMAINS, S2_TABLES, S2_RELS, S2_TESTED, S2_GAPS, S2_CONTRACT,
   S2_STD_COLS, S2_ANCHORS, S2_INFERRED_COUNT, s2Table, s2DomainOf,
   s2DomainName, s2IntKey, s2ShortKey, s2RelsOwned, s2RelsInto, s2GapsOn,
   s2Blocked, s2TablesIn } from "../src/hubStage2Model.js";
+import { FILE_CHAIN, FILE_VALIDATIONS, COUNT_RULE, FAIL_MODES, FILE_POSTURE }
+  from "../src/hubFileIngestion.js";
+import { SEI_COMPONENTS, SEI_TABLES, SEI_STATES } from "../src/seiBaseline.js";
+import { FileIngestionView } from "../src/HubContext.jsx";
 import { tLight, tDark } from "../src/bbhTheme.js";
 
 let bad = 0;
@@ -312,5 +316,81 @@ ok(["CTX", "GATE", "LOOP", "S2M"].every((v) => {
      return /<Crumb trail=/.test(HUBSRC.slice(i, i + 1400));
    }), "and each one carries a breadcrumb back up the ladder", "");
 
-console.log(bad ? `\n${bad} assertion(s) failed` : "\nhub-c4-context assertions pass");
+
+/* ------------------------------------------- file-based ingestion */
+// This path is the best-specified thing in the pack and the easiest to
+// lose once it is labelled "secondary". These pin the parts that stop
+// being obvious when it is drawn as one dashed box.
+ok(FILE_CHAIN.length === 6
+   && FILE_CHAIN.every((f) => f.w && f.tech && f.sei.length > 0),
+   "the file chain has all six steps, each with its technology and at "
+   + "least one cited component", FILE_CHAIN.length);
+ok(FILE_CHAIN.every((f) => f.sei.every((id) =>
+     SEI_COMPONENTS.some((c) => c.id === id))),
+   "and every component it cites exists in the SEI baseline",
+   FILE_CHAIN.flatMap((f) => f.sei)
+     .filter((id) => !SEI_COMPONENTS.some((c) => c.id === id)).join(" "));
+ok(FILE_CHAIN.every((f) => f.tbl.every((id) =>
+     SEI_TABLES.some((x) => x.id === id))),
+   "and every table it cites exists too",
+   FILE_CHAIN.flatMap((f) => f.tbl)
+     .filter((id) => !SEI_TABLES.some((x) => x.id === id)).join(" "));
+ok(/one transaction/i.test(FILE_CHAIN.find((f) => f.n === "RAW load").w),
+   "the RAW load says one transaction per file - a half-loaded file is the "
+   + "state the design refuses to allow", "");
+ok(FILE_VALIDATIONS.length === 5
+   && FILE_VALIDATIONS.some(([k]) => /zero-row/i.test(k)),
+   "all five validations, zero-row among them", FILE_VALIDATIONS.length);
+ok(/valid delivery, not an error/i.test(
+     FILE_VALIDATIONS.find(([k]) => /zero-row/i.test(k))[1]),
+   "and the zero-row rule says it is a valid delivery - treating it as a "
+   + "failure stalls the gate on a quiet day", "");
+ok(COUNT_RULE.eq === "FILE_ROW_COUNT = TRAILER_ROW_COUNT = RAW_ROW_COUNT",
+   "the commit condition is all three counts, named", COUNT_RULE.eq);
+ok(/before the commit/i.test(COUNT_RULE.w),
+   "and checked before the commit, so a short load cannot reach ARCHIVED",
+   COUNT_RULE.w.slice(0, 60));
+
+// THE ONE THAT MATTERS. Three failures, three recoveries, and only one of
+// them must never be reloaded.
+ok(FAIL_MODES.length === 3
+   && FAIL_MODES.map((f) => f.st).join(",")
+      === "QUARANTINED,FAILED,ARCHIVE_FAILED",
+   "three failure states, named apart", FAIL_MODES.map((f) => f.st).join(","));
+const af = FAIL_MODES.find((f) => f.st === "ARCHIVE_FAILED");
+ok(/never reload raw/i.test(af.fix) && af.sev === "bad",
+   "ARCHIVE_FAILED says never reload RAW, and is marked more severe than "
+   + "the other two - a reload here duplicates a business date and nothing "
+   + "downstream will tell you", af.fix.slice(0, 70));
+ok(FAIL_MODES.filter((f) => /no raw rows|rolled back|unchanged/i.test(f.raw))
+     .length === 2,
+   "and the two recoverable ones say RAW was not written, which is why "
+   + "they are recoverable", FAIL_MODES.map((f) => f.raw).join(" | "));
+ok(/generated and held/i.test(FILE_POSTURE.b) && FILE_POSTURE.turns.length >= 3,
+   "the live-or-recovery question is stated with what turns on it", "");
+
+try {
+  const h = render(<FileIngestionView t={t} onComp={() => {}} />);
+  ok(/ARCHIVE_FAILED/.test(h) && /FILE_ROW_COUNT/.test(h)
+     && /FILE_SCHEMA_CONFIG/.test(h) && /FILE_REGISTRY/.test(h),
+     "the file screen draws the chain, the count rule, both control tables "
+     + "and the failure states", h.length);
+  ok((h.match(/RECEIVED|VALIDATED|LOADING|QUARANTINED|ARCHIVED/g) || []).length >= 5,
+     "and the whole registry lifecycle, read from the baseline rather than "
+     + "restated here", "");
+  render(<FileIngestionView t={tDark} onComp={() => {}} />);
+  ok(true, "and it renders under the dark theme", "");
+} catch (e) { ok(false, "FileIngestionView renders", e.message); }
+
+ok(/view === "FILE"/.test(HUBSRC) && /setView\("FILE"\)/.test(HUBSRC),
+   "HubDesign routes the file path and makes it clickable", "");
+ok(/<Crumb trail=/.test(HUBSRC.slice(HUBSRC.indexOf('view === "FILE"'),
+     HUBSRC.indexOf('view === "FILE"') + 1400)),
+   "and it carries a breadcrumb", "");
+// The gate's file arm is the other place a reader asks "what does that
+// path actually do"; a dead end there sends them back to the top.
+ok(/onFile=\{\(\) => setView\("FILE"\)\}/.test(HUBSRC),
+   "the gate's file arm links straight to it", "");
+
+console.log(bad ? `\n${bad} assertion(s) failed` : "\nhub-c4-context file assertions pass");
 if (bad) process.exit(1);
