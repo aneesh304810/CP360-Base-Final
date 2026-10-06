@@ -44,7 +44,10 @@ import { S1_TABLES, S1_RULES, S1_COLS, S1_CONFLICT, S1_NOT_HERE, s1Both,
   s1ArchOnly } from "../src/hubStage1Model.js";
 import { DB_PATH, DB_CONTROL, DB_ABSENT, DB_LINKS, DB_NOTE, dbNode }
   from "../src/hubDbModel.js";
-import { Stage1Model, DbModelView } from "../src/HubContext.jsx";
+import { FEEDS, RAW_TABLES, RAW_WITHOUT_FEED, FAN_OUT, FEED_SUMMARY }
+  from "../src/hubFeedMap.js";
+import { Stage1Model, DbModelView, Stage2Erd, Stage2Lineage, Stage2Feeds }
+  from "../src/HubContext.jsx";
 import { SEI_COMPONENTS, SEI_TABLES, SEI_STATES } from "../src/seiBaseline.js";
 import { FileIngestionView } from "../src/HubContext.jsx";
 import { tLight, tDark } from "../src/bbhTheme.js";
@@ -496,6 +499,102 @@ ok(/Data models/.test(HUBSRC)
 ok(!/canonical tables, 10 domains →/.test(HUBSRC),
    "and the old link on the Stage 2 INT stage card is gone, so there is "
    + "one way in rather than two", "");
+
+
+/* ------------------------------- the other three Stage 2 perspectives */
+// ONE MODEL, FOUR QUESTIONS. If these ever disagree about the numbers
+// they are four models, which is the thing the perspective bar exists to
+// prevent.
+const cross = S2_RELS.filter((r) => {
+  const a = s2DomainOf(r.child), b = s2DomainOf(r.parent);
+  return a && b && a !== b;
+});
+ok(cross.length === 36,
+   "36 of the 73 relationships cross a domain boundary - the number the "
+   + "lineage view is built to show", cross.length);
+ok(cross.every((r) => S2_DOMAINS.some((d) => d.k === s2DomainOf(r.child))
+     && S2_DOMAINS.some((d) => d.k === s2DomainOf(r.parent))),
+   "and every one of them lands in a lane that exists", "");
+
+/* ---- the feed chain ---- */
+ok(FEEDS.length === 38,
+   "38 SWP feeds, derived from the canonical model's own source-sheet "
+   + "column so the two cannot drift apart", FEEDS.length);
+ok(FEEDS.reduce((a, f) => a + f.tables.length, 0) === S2_TABLES.length,
+   "and between them they account for all 52 canonical tables, once each",
+   FEEDS.reduce((a, f) => a + f.tables.length, 0));
+ok(FEED_SUMMARY.named + FEED_SUMMARY.likely + FEED_SUMMARY.none === 38
+   && FEED_SUMMARY.mapped === FEED_SUMMARY.named + FEED_SUMMARY.likely,
+   "every feed carries exactly one confidence and the totals agree",
+   JSON.stringify(FEED_SUMMARY));
+// THE FINDING, pinned so a later edit cannot quietly soften it.
+ok(FEED_SUMMARY.none === 23,
+   "23 feeds have no Stage 1 landing table named by either document",
+   FEED_SUMMARY.none);
+ok(FEED_SUMMARY.anchorsUnmapped.length === 2
+   && FEED_SUMMARY.anchorsUnmapped.indexOf("ASSET") >= 0,
+   "and two of them are anchors of the Stage 2 model, ASSET among them - "
+   + "a domain with no described inbound path",
+   FEED_SUMMARY.anchorsUnmapped.join(" "));
+ok(FEEDS.every((f) => f.conf === "none" ? !f.raw : !!f.raw),
+   "a feed has a RAW table exactly when its confidence is not none", "");
+ok(FEEDS.every((f) => !f.raw || RAW_TABLES.indexOf(f.raw) >= 0),
+   "and every RAW table a feed names is one the architecture lists",
+   FEEDS.filter((f) => f.raw && RAW_TABLES.indexOf(f.raw) < 0)
+     .map((f) => f.raw).join(" "));
+ok(RAW_WITHOUT_FEED.length === 2
+   && RAW_WITHOUT_FEED.every((n) => !FEEDS.some((f) => f.raw === n)),
+   "the two correction tables have no feed, and nothing claims they do",
+   RAW_WITHOUT_FEED.join(" "));
+ok(FAN_OUT[0].feed === "Account" && FAN_OUT[0].tables.length === 7,
+   "the biggest fan-out is one feed becoming seven canonical tables - the "
+   + "number people get wrong when they size this work",
+   `${FAN_OUT[0].feed}:${FAN_OUT[0].tables.length}`);
+ok(FEEDS.every((f) => f.tables.every((n) => s2Table(n))),
+   "every table a feed claims exists in the model", "");
+
+/* ---- all three render, for every domain ---- */
+try {
+  S2_DOMAINS.forEach((d) => {
+    const h = render(<Stage2Erd t={t} dom={d.k} onPick={() => {}} />);
+    if (!/<svg/.test(h)) ok(false, `ERD for ${d.k} draws`, "");
+  });
+  ok(true, "the ERD draws for all ten domains", "");
+  const h = render(<Stage2Erd t={t} dom="PM" onPick={() => {}} />);
+  ok(/CLIENT/.test(h) && /declared FK/.test(h),
+     "with its entities and a legend for the two edge states", "");
+  render(<Stage2Erd t={tDark} dom="TX" onPick={() => {}} />);
+  ok(true, "and in dark", "");
+} catch (e) { ok(false, "Stage2Erd renders", e.message); }
+
+try {
+  const h = render(<Stage2Lineage t={t} onPick={() => {}} />);
+  ok(/36 of 73/.test(h) && /Party Management/.test(h),
+     "the lineage view draws every lane and states the crossing count",
+     h.length);
+  render(<Stage2Lineage t={tDark} onPick={() => {}} />);
+  ok(true, "and in dark", "");
+} catch (e) { ok(false, "Stage2Lineage renders", e.message); }
+
+try {
+  const h = render(<Stage2Feeds t={t} onPick={() => {}} />);
+  ok(/RAW_ACCOUNT/.test(h) && /No RAW table named/.test(h)
+     && /23 of 38/.test(h),
+     "the feed view draws the mapped groups, the unmapped group and the "
+     + "finding", h.length);
+  ok(/RAW_CORRECTED_TRANSACTION/.test(h),
+     "and the RAW tables that have no feed at all", "");
+  render(<Stage2Feeds t={tDark} onPick={() => {}} />);
+  ok(true, "and in dark", "");
+} catch (e) { ok(false, "Stage2Feeds renders", e.message); }
+
+// The switcher has to be state the page owns, or a reader loses their
+// place every time they open a table.
+ok(/const \[s2p, setS2p\] = useState\("domains"\)/.test(HUBSRC)
+   && /persp=\{s2p\}/.test(HUBSRC),
+   "HubDesign owns which perspective is open", "");
+ok(/erd=\{s2erd\}/.test(HUBSRC),
+   "and whether a domain shows its ERD or its lists", "");
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\nhub-c4-context assertions pass");
 if (bad) process.exit(1);

@@ -20,6 +20,9 @@ import { S1_SHAPE, S1_RULES, S1_COLS, S1_TABLES, S1_CONFLICT, S1_NOT_HERE,
  s1Both, s1ArchOnly } from "./hubStage1Model.js";
 import { DB_PATH, DB_CONTROL, DB_ABSENT, DB_LINKS, DB_NOTE, dbNode }
  from "./hubDbModel.js";
+import { FEEDS, RAW_TABLES, RAW_CONF, RAW_WITHOUT_FEED, FAN_OUT,
+ FEED_SUMMARY, feedsForRaw, feedsUnmapped, feedOfTable, feedsForDomain }
+ from "./hubFeedMap.js";
 import { SEI_STATES, SEI_TABLES, SEI_COMPONENTS } from "./seiBaseline.js";
 import { S2_DOMAINS, S2_CONTRACT, S2_STD_COLS, S2_GAPS, S2_INFERRED_COUNT,
  S2_RELS, S2_TESTED, s2Table, s2DomainOf, s2DomainName, s2IsAnchor, s2IntKey,
@@ -424,7 +427,25 @@ function EdgeRow({ r, i, onPick }) {
   </div>);
 }
 
-export function Stage2Model({ t, dom, tbl, setDom, setTbl }) {
+/* The perspective bar. One model, four questions - keeping them as tabs
+   rather than four screens is what stops them drifting into four models. */
+function Persp({ now, set, opts }) {
+ return (
+  <div style={{ display: "inline-flex", gap: 3, background: "#eef3f5",
+   borderRadius: 999, padding: 3, marginBottom: 11, flexWrap: "wrap" }}>
+   {opts.map(([k, label]) => (
+    <span key={k} onClick={() => set(k)} style={{ fontSize: 11.5,
+     fontWeight: now === k ? 600 : 400, padding: "5px 14px",
+     borderRadius: 999, cursor: "pointer",
+     background: now === k ? ACC : "transparent",
+     color: now === k ? "#fff" : SUB }}>{label}</span>))}
+  </div>);
+}
+
+export function Stage2Model({ t, dom, tbl, setDom, setTbl,
+ persp, setPersp, erd, setErd }) {
+ const P = persp || "domains";
+ const setP = setPersp || (() => {});
  /* ---- one table ---- */
  if (tbl) {
   const r = s2Table(tbl);
@@ -516,6 +537,7 @@ export function Stage2Model({ t, dom, tbl, setDom, setTbl }) {
     <div style={{ fontFamily: MONO, fontSize: 10.5, color: MUT, marginTop: 3,
      overflowWrap: "anywhere" }}>{sub}</div>
    </div>);
+  const showErd = erd !== false;
   return (
    <div>
     <div style={card()}>
@@ -524,6 +546,10 @@ export function Stage2Model({ t, dom, tbl, setDom, setTbl }) {
       {tabs.length} tables - {own.length} relationships out - {into.length} in
       - anchors shown with a left rule - a dot marks an unresolved model gap</div>
     </div>
+    <Persp now={showErd ? "erd" : "list"} set={(k) => setErd && setErd(k === "erd")}
+     opts={[["erd", "ERD"], ["list", "Entities and relationships"]]} />
+    {showErd && <Stage2Erd t={t} dom={dom} onPick={setTbl} />}
+    {showErd ? null : (<>
     <div style={{ display: "grid", gap: 8,
      gridTemplateColumns: "repeat(auto-fit,minmax(205px,1fr))",
      alignItems: "start" }}>
@@ -557,12 +583,22 @@ export function Stage2Model({ t, dom, tbl, setDom, setTbl }) {
          onPick={setTbl} />))}
       </div>
      </>)}
+    </>)}
    </div>);
  }
 
- /* ---- the domain map ---- */
+ /* ---- the three top-level perspectives ---- */
+ const bar = (
+  <Persp now={P} set={setP} opts={[["domains", "Domains"],
+   ["lineage", "Cross-domain lineage"], ["feeds", "Feeds to Stage 1"]]} />);
+ if (P === "lineage") return (
+  <div>{bar}<Stage2Lineage t={t} onPick={setDom} /></div>);
+ if (P === "feeds") return (
+  <div>{bar}<Stage2Feeds t={t} onPick={setTbl} /></div>);
+
  return (
   <div>
+   {bar}
    <div style={card()}>
     <div style={eyebrow}>Stage 2 - INT - normalised SWP model</div>
     <b style={{ fontSize: 16, color: INK }}>52 canonical tables, 10 domains</b>
@@ -1007,5 +1043,270 @@ export function DbModelView({ t, pick, setPick, onOpen }) {
      <div style={eyebrow}>One writer each</div>
      <Body>{DB_NOTE}</Body>
     </div>)}
+  </div>);
+}
+
+/* ===================================================================
+   Stage 2, seen three more ways.
+
+   ONE MODEL, FOUR QUESTIONS. The domain map answers "what is in here".
+   The ERD answers "how does this domain hang together". The lineage view
+   answers "what does this domain depend on that it does not own". The
+   feed view answers "where did any of it come from". They are
+   perspectives on the same 52 tables, not four models.
+   =================================================================== */
+
+/* ---- ERD: hub and spoke, because that is the shape these domains are --
+   Every one of these domains is one or two heavily-referenced entities
+   with a ring of children. Laid out as a generic graph it is spaghetti;
+   laid out as spine and leaves it reads in one pass. */
+export function Stage2Erd({ t, dom, onPick }) {
+ const tabs = s2TablesIn(dom).map((r) => r[1]);
+ const own = s2RelsOwned(dom);
+ const ext = [...new Set(own.map((r) => r.parent)
+  .filter((n) => s2Table(n) && s2DomainOf(n) !== dom))];
+ const all = tabs.concat(ext);
+ const inDeg = {};
+ all.forEach((n) => { inDeg[n] = own.filter((r) => r.parent === n).length; });
+ const spine = all.filter((n) => inDeg[n] >= 2 || ext.indexOf(n) >= 0)
+  .sort((a, b) => inDeg[b] - inDeg[a]);
+ const leaves = all.filter((n) => spine.indexOf(n) < 0);
+ // One column of leaves unless a domain ever grows past twelve. Two
+ // columns looked tidier and was worse: every spine-to-column-two line
+ // crossed a column-one box, and a line that crosses a box reads as
+ // touching it. No domain here has more than eleven tables.
+ const cols = leaves.length > 12 ? 2 : 1;
+ const colOf = (i) => (cols === 1 ? 0 : i % 2);
+ const rowOf = (i) => (cols === 1 ? i : Math.floor(i / 2));
+ const BW = 258, BH = 38, GAP = 11;
+ const LX = 40, RX = [430, 430 + BW + 56];
+ const rows = cols === 1 ? leaves.length : Math.ceil(leaves.length / 2);
+ const H = Math.max(spine.length, rows) * (BH + GAP) + 70;
+ const pos = {};
+ spine.forEach((n, i) => { pos[n] = [LX, 44 + i * (BH + GAP)]; });
+ leaves.forEach((n, i) => { pos[n] = [RX[colOf(i)], 44 + rowOf(i) * (BH + GAP)]; });
+ const W = RX[cols - 1] + BW + 62;
+
+ const Box = ({ n }) => {
+  const p = pos[n];
+  const outside = ext.indexOf(n) >= 0;
+  const anchor = s2IsAnchor(n);
+  const r = s2Table(n);
+  return (
+   <g onClick={() => onPick && onPick(n)} style={{ cursor: "pointer" }}>
+    <rect x={p[0]} y={p[1]} width={BW} height={BH} rx={5}
+     fill={outside ? "#f4f7f9" : "#fff"}
+     stroke={anchor ? ACC : RULE} strokeWidth={anchor ? 2 : 1.3}
+     strokeDasharray={outside ? "5 4" : undefined} />
+    <text x={p[0] + 10} y={p[1] + 16} fontSize="10.5" fontFamily={MONO}
+     fontWeight="500" fill={INK}>{n.length > 27 ? n.slice(0, 26) + "." : n}</text>
+    <text x={p[0] + 10} y={p[1] + 29} fontSize="8.5" fill={MUT}>
+     {outside ? s2DomainName(s2DomainOf(n)) : (r && r[2] ? r[2].split(", ")[0] : "no key")}
+     {s2Blocked(n) ? "  * key undecided" : ""}</text>
+   </g>);
+ };
+ return (
+  <div style={card()}>
+   <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }}
+    role="img" aria-label={`Entity relationships inside ${s2DomainName(dom)}`}>
+    {own.map((e, i) => {
+     const a = pos[e.parent], b = pos[e.child];
+     if (!a || !b) return null;
+     const col = e.kind === "fk" ? OK : WARN;
+     const dash = e.kind === "fk" ? undefined : "4 4";
+     const ya = a[1] + BH / 2, yb = b[1] + BH / 2;
+     // Two leaves pointing at each other sit in the same column, and a
+     // straight line between them runs through every box in between.
+     // Bulge it out to the right instead.
+     if (a[0] === b[0]) {
+      const x = a[0] + BW;
+      return (
+       <path key={i} d={`M ${x} ${ya} C ${x + 42} ${ya} ${x + 42} ${yb} ${x} ${yb}`}
+        fill="none" stroke={col} strokeWidth="1.2" strokeDasharray={dash}
+        opacity="0.75" />);
+     }
+     const aRight = a[0] < b[0];
+     return (
+      <line key={i} x1={aRight ? a[0] + BW : a[0]} y1={ya}
+       x2={aRight ? b[0] : b[0] + BW} y2={yb}
+       stroke={col} strokeWidth="1.2" strokeDasharray={dash} opacity="0.75" />);
+    })}
+    {all.map((n) => <Box key={n} n={n} />)}
+   </svg>
+   <div style={{ display: "flex", gap: 15, flexWrap: "wrap", marginTop: 9,
+    fontSize: 11, color: SUB }}>
+    <span><span style={{ display: "inline-block", width: 16, height: 2,
+     background: OK, verticalAlign: "middle" }} /> declared FK</span>
+    <span><span style={{ display: "inline-block", width: 16, height: 2,
+     background: WARN, verticalAlign: "middle" }} /> inferred</span>
+    <span style={{ color: MUT }}>dashed box = an entity this domain
+     references but does not own &middot; thick border = anchor</span>
+   </div>
+  </div>);
+}
+
+/* ---- Lineage: what each domain owes the others ---------------------- */
+export function Stage2Lineage({ t, onPick }) {
+ const LANE = 44, LX = 236, W = 1180;
+ const order = S2_DOMAINS.map((d) => d.k);
+ const yOf = (k) => 30 + order.indexOf(k) * LANE;
+ const cross = S2_RELS.filter((r) => {
+  const a = s2DomainOf(r.child), b = s2DomainOf(r.parent);
+  return a && b && a !== b;
+ });
+ const pairs = {};
+ cross.forEach((r) => {
+  const key = s2DomainOf(r.child) + ">" + s2DomainOf(r.parent);
+  (pairs[key] = pairs[key] || []).push(r);
+ });
+ const H = order.length * LANE + 46;
+ return (
+  <div style={card()}>
+   <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }}
+    role="img" aria-label="Cross-domain dependencies between the ten domains">
+    <defs><marker id="lnarr" viewBox="0 0 10 10" refX="9" refY="5"
+     markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+     <path d="M 0 0 L 10 5 L 0 10 z" fill={MUT} /></marker></defs>
+    {S2_DOMAINS.map((d, i) => {
+     const owns = s2RelsOwned(d.k);
+     const out = Object.keys(pairs).filter((k) => k.split(">")[0] === d.k).length;
+     return (
+      <g key={d.k} onClick={() => onPick && onPick(d.k)}
+       style={{ cursor: "pointer" }}>
+       <rect x="0" y={yOf(d.k) - 15} width={W} height={LANE - 6} rx="5"
+        fill={i % 2 ? "#f4f7f9" : "#fff"} stroke="#eef3f5" />
+       <text x="12" y={yOf(d.k) + 2} fontSize="11.5" fontWeight="500"
+        fill={INK}>{d.n}</text>
+       <text x="12" y={yOf(d.k) + 15} fontSize="9.5" fill={MUT}>
+        {d.c} tables &middot; {owns.length} out &middot; depends on {out} other
+        {out === 1 ? " domain" : " domains"}</text>
+      </g>);
+    })}
+    {/* Each arc leaves the owner's lane and lands in the lane it depends
+        on. Staggered by index so two arcs between the same pair of lanes
+        do not sit on top of each other. */}
+    {Object.entries(pairs).map(([key, rs], i) => {
+     const [from, to] = key.split(">");
+     const y1 = yOf(from) + 2, y2 = yOf(to) + 2;
+     const x = LX + 26 + (i % 14) * 62;
+     const d = `M ${x} ${y1} C ${x + 34} ${y1} ${x + 34} ${y2} ${x} ${y2}`;
+     return (
+      <g key={key}>
+       {/* Weight by how many columns cross, so the nine-column dependency
+           does not look like the one-column one. */}
+       <path d={d} fill="none" stroke={rs.length >= 4 ? ACC : MUT}
+        strokeWidth={Math.min(3.4, 1 + rs.length * 0.28)}
+        opacity={rs.length >= 4 ? 0.9 : 0.75} markerEnd="url(#lnarr)" />
+       <text x={x + 38} y={(y1 + y2) / 2 + 3} fontSize={rs.length >= 4 ? 11 : 9}
+        fontWeight={rs.length >= 4 ? 700 : 400}
+        fill={rs.length >= 4 ? ACC : MUT}>{rs.length}</text>
+      </g>);
+    })}
+   </svg>
+   <div style={{ fontSize: 11.5, color: SUB, lineHeight: 1.6, marginTop: 9,
+    maxWidth: "92ch" }}>
+    <b>{cross.length} of {S2_RELS.length} relationships cross a domain
+    boundary.</b> Each arc runs from the domain that owns the column to the
+    domain it points at, and the number on it is how many columns. A domain
+    with many arcs out cannot be built, tested or loaded on its own.
+   </div>
+  </div>);
+}
+
+/* ---- Feeds: the chain from a file to a canonical table --------------- */
+export function Stage2Feeds({ t, onPick }) {
+ const S = FEED_SUMMARY;
+ const confChip = (c) => c === "named" ? <Chip bg={OK} fg="#fff">named</Chip>
+  : c === "likely" ? <Chip bg="#eef1f4" fg={MUT}>inferred</Chip>
+  : <Chip bg={BAD} fg="#fff">no RAW table</Chip>;
+ const FeedRow = ({ f }) => (
+  <div style={{ display: "flex", gap: 12, padding: "8px 0",
+   borderTop: "1px solid #eef3f5", alignItems: "baseline", flexWrap: "wrap" }}>
+   <span style={{ fontSize: 12.5, color: INK, flex: "0 0 200px" }}>{f.feed}</span>
+   <span style={{ flex: "0 0 90px" }}>{confChip(f.conf)}</span>
+   <span style={{ display: "flex", gap: 5, flexWrap: "wrap", flex: "1 1 50%" }}>
+    {f.tables.map((n) => (
+     <span key={n} onClick={() => onPick && onPick(n)}
+      style={{ fontFamily: MONO, fontSize: 10, border: `1px solid ${RULE}`,
+       borderRadius: 3, padding: "1px 6px", cursor: "pointer", color: INK }}>
+      {n}</span>))}
+   </span>
+  </div>);
+ return (
+  <div>
+   <div style={card()}>
+    <div style={eyebrow}>SWP feed &rarr; Stage 1 RAW &rarr; Stage 2 canonical</div>
+    <b style={{ fontSize: 16, color: INK }}>
+     {S.feeds} feeds, {S.mapped} with a Stage 1 table named</b>
+    <Body><div style={{ marginTop: 6 }}>Neither document publishes this map.
+     The only real one is FILE_SCHEMA_CONFIG.TARGET_RAW_TABLE, which is
+     configuration rather than a list, so the chain from a file to a
+     canonical table exists nowhere on paper. What follows is matched by
+     name and labelled with how confident that match is.</div></Body>
+    <div style={{ display: "flex", gap: 22, flexWrap: "wrap", marginTop: 13 }}>
+     {[[S.feeds, "feeds", INK], [S.named, "RAW table named", OK],
+       [S.likely, "inferred", MUT], [S.none, "no RAW table", BAD]]
+      .map(([n, l, c]) => (
+       <span key={l} style={{ textAlign: "center" }}>
+        <b style={{ fontSize: 23, color: c, display: "block" }}>{n}</b>
+        <span style={{ fontSize: 10, color: MUT }}>{l}</span></span>))}
+    </div>
+   </div>
+
+   <div style={card({ borderLeft: `3px solid ${BAD}` })}>
+    <div style={eyebrow}>The finding</div>
+    <Body><div style={{ marginTop: 5 }}>
+     <b style={{ color: INK }}>{S.none} of {S.feeds} feeds have no Stage 1
+     landing table named by either document</b> &mdash; and two of them,
+     {" "}{S.anchorsUnmapped.join(" and ")}, are anchors of the Stage 2
+     model. If ASSET has no RAW table, the whole Asset and Security Master
+     domain has no described inbound path, and nothing downstream notices,
+     because nothing downstream asks for a table that was never modelled.
+    </div></Body>
+   </div>
+
+   <Head title="One feed is not one table"
+    note="the fan-out nobody expects when they size this work" />
+   <div style={card()}>
+    {FAN_OUT.map((f, i) => (
+     <div key={f.feed} style={{ display: "flex", gap: 14, padding: "8px 0",
+      borderTop: i ? "1px solid #eef3f5" : "none", alignItems: "baseline" }}>
+      <span style={{ fontSize: 12.5, color: INK, flex: "0 0 190px" }}>
+       {f.feed}</span>
+      <b style={{ fontSize: 15, color: ACC, flex: "0 0 36px" }}>
+       {f.tables.length}</b>
+      <span style={{ fontSize: 12, color: SUB }}>canonical tables, in
+       {" "}{f.domains.map((d) => s2DomainName(d)).join(" and ")}</span>
+     </div>))}
+   </div>
+
+   {RAW_TABLES.map((raw) => (
+    <div key={raw} style={card()}>
+     <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+      <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 500,
+       color: INK }}>{raw}</span>
+      <span style={{ fontSize: 11, color: MUT }}>
+       {feedsForRaw(raw).length} feeds land here</span>
+     </div>
+     {feedsForRaw(raw).map((f) => <FeedRow key={f.feed} f={f} />)}
+    </div>))}
+
+   <div style={card({ borderLeft: `3px solid ${BAD}` })}>
+    <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+     <b style={{ fontSize: 13, color: BAD }}>No RAW table named</b>
+     <span style={{ fontSize: 11, color: MUT }}>
+      {feedsUnmapped().length} feeds</span>
+    </div>
+    {feedsUnmapped().map((f) => <FeedRow key={f.feed} f={f} />)}
+   </div>
+
+   <div style={card()}>
+    <div style={eyebrow}>And two RAW tables with no feed</div>
+    <Body><div style={{ marginTop: 5 }}>
+     {RAW_WITHOUT_FEED.join(" and ")} are named by the architecture but have
+     no source sheet in the canonical model. Corrections arrive as a
+     re-delivery rather than as a feed of their own &mdash; or they do not,
+     and which reading is right is conflict C4.</div></Body>
+   </div>
   </div>);
 }

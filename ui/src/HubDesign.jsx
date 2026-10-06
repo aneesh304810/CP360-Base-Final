@@ -95,6 +95,8 @@ export default function HubDesign({ t }) {
  const [s2dom, setS2dom] = useState(null);         // Stage 2 model: which domain
  const [s2tbl, setS2tbl] = useState(null);         // Stage 2 model: which table
  const [dbPick, setDbPick] = useState(null);       // database model: which table
+ const [s2p, setS2p] = useState("domains");        // Stage 2: which perspective
+ const [s2erd, setS2erd] = useState(true);         // Stage 2 domain: ERD or list
  const [expand, setExpand] = useState(null);    // L3 component detail panel
  const [srcOf, setSrcOf] = useState(null);      // component shown beside its SEI source
  const [seiDoc, setSeiDoc] = useState(null);    // {doc, section} open in the popup
@@ -791,7 +793,9 @@ export default function HubDesign({ t }) {
     ...(s2tbl ? [[s2DomainName(s2dom || ""), () => setS2tbl(null)],
                  [s2tbl, null]] : [])]} />
    <Stage2Model t={t} dom={s2dom} tbl={s2tbl}
-    setDom={(d) => { setS2dom(d); setS2tbl(null); }}
+    persp={s2p} setPersp={(p) => { setS2p(p); setS2dom(null); setS2tbl(null); }}
+    erd={s2erd} setErd={setS2erd}
+    setDom={(d) => { setS2dom(d); setS2tbl(null); setS2p("domains"); }}
     setTbl={(x) => { setS2tbl(x); if (x && !s2dom) setS2dom(s2DomainOf(x)); }} />
   </div>);
 
