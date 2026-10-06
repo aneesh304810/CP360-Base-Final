@@ -31,9 +31,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { NAV_CSS, NavStyles, OpenCard, ClickHint, SvgGo, Trail }
   from "../src/HubNav.jsx";
 import { ContextView, Stage2Model, DbModelView, Stage2Erd, Stage2Lineage,
-  Stage2Feeds, Stage2Atlas, GatewayView } from "../src/HubContext.jsx";
+  Stage2Feeds, Stage2Atlas, GatewayView, SdcEndToEnd }
+  from "../src/HubContext.jsx";
 import { GW_LAYERS, GW_VANTAGE, GW_AD3 } from "../src/hubGatewayLayers.js";
 import { LANES } from "../src/hubGroups.js";
+import { SDC_LEGS, SDC_OPEN, SDC_PATHS, SDC_ENVS, SDC_NET_FACTS,
+  SDC_TRANSPORT_NOTE } from "../src/hubSdcNetwork.js";
 import { S2_DOMAINS, S2_TABLES, S2_RELS, s2TablesIn, s2DomainOf }
   from "../src/hubStage2Model.js";
 import { DB_PATH, DB_CONTROL, DB_ABSENT } from "../src/hubDbModel.js";
@@ -346,6 +349,94 @@ ok(!/\\u[0-9a-fA-F]{4}/.test(CTXSRC) && !/\\u[0-9a-fA-F]{4}/.test(NAVSRC),
     ok(/if \(l\.view\) \{ setView\(l\.view\); return; \}/.test(HUBSRC),
        "and the lane click honours it before falling back to the container", "");
   }
+}
+
+/* ------------------ SDC end to end: the logical path and its network */
+// Every other screen draws the event path as actors and messages, and
+// apart from the network it looks finished. Together with SEI's network
+// page it is not: the primary inbound path depends on a BBH pod opening
+// a session into a Snowflake account whose policy admits SEI subnets and
+// VPN only. That sentence only exists when both are on one page, which
+// is what this screen is for and what these assertions protect.
+{
+  const h = render(<SdcEndToEnd t={t} pick={null} setPick={() => {}}
+    onGate={() => {}} />);
+
+  ok(SDC_LEGS.every((l) => l.short && l.net && l.w),
+     "every leg says what it does AND what network it runs on - a leg "
+     + "with no network line is the omission this screen exists to fix",
+     SDC_LEGS.filter((l) => !l.net).map((l) => l.n).join(","));
+  ok(SDC_LEGS.every((l) => l.st !== "open" || l.ask),
+     "and an open leg names the question, so a dashed red box is never "
+     + "an alarm with no message",
+     SDC_LEGS.filter((l) => l.st === "open" && !l.ask).map((l) => l.n).join(","));
+  for (const l of SDC_LEGS.filter((x) => x.ask))
+    ok(SDC_OPEN.some((o) => o.id === l.ask),
+       `leg ${l.n} points at a question that exists (${l.ask})`, "");
+  ok(count(h, /class="cp-hit"/g) === SDC_LEGS.length,
+     "all nine legs open", count(h, /class="cp-hit"/g));
+  // renderToStaticMarkup escapes the apostrophe in "SEI's".
+  const esc = (x) => x.replace(/&/g, "&amp;").replace(/'/g, "&#x27;")
+    .replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  // The SEI column is 214px and holds three boxes; its legs carry their
+  // network line in the panel rather than on the box. Every BBH leg has
+  // room and must show it on the diagram - clipping leg 5 to fit lost the
+  // clause that names the refusal, which is the finding.
+  const onDiagram = SDC_LEGS.filter((l) => l.side === "BBH");
+  ok(onDiagram.every((l) => h.includes(esc(l.short))),
+     "every BBH leg's network line is on the diagram in full, not clipped",
+     onDiagram.filter((l) => !h.includes(esc(l.short))).map((l) => l.n).join(","));
+  ok(SDC_LEGS.every((l) => {
+       const o = render(<SdcEndToEnd t={t} pick={l.n} setPick={() => {}} />);
+       return o.includes(esc(l.net));
+     }),
+     "and opening any leg, SEI's included, gives the full network text", "");
+
+  // The whole finding, in one assertion: the legs that cross into SEI's
+  // network are the ones with no agreed network.
+  const reaches = SDC_LEGS.filter((l) => l.side === "BBH"
+    && /into SEI's (space|account)/.test(l.net));
+  const inside = SDC_LEGS.filter((l) => l.side === "BBH"
+    && /Inside BBH|BBH-internal/.test(l.net));
+  ok(reaches.length > 0 && reaches.every((l) => l.st === "open"),
+     "every BBH leg that reaches into SEI's network is still open",
+     reaches.map((x) => `${x.n}:${x.st}`).join(" "));
+  ok(inside.length > 0 && inside.every((l) => l.st === "settled"),
+     "and every BBH leg that stays inside BBH is settled - the split is "
+     + "exactly the organisation boundary, which is the finding",
+     inside.map((x) => `${x.n}:${x.st}`).join(" "));
+
+  // Path 3 is the one that passes every test and then fails.
+  const p3 = SDC_PATHS.find((x) => x.n === 3);
+  ok(/large result set/i.test(p3.carries) && /blob/i.test(p3.via + p3.t),
+     "the second Private Link is recorded as serving large result sets "
+     + "from blob, not just PUT and GET", "");
+  ok(/test/i.test(p3.lose),
+     "and says why it is missed: the connectivity tests all pass without it",
+     p3.lose);
+  ok(SDC_OPEN.some((o) => o.id === "Q3" && o.sev === "block"),
+     "it is a blocking question, not a note", "");
+
+  ok(SDC_ENVS.length === 3 && /environment is part of the connection identity/i
+     .test(SDC_NET_FACTS.map((f) => f.m).join(" ")),
+     "three paired accounts, and the screen says environment is part of "
+     + "the connection identity rather than a parameter", "");
+  ok(/fourth/.test(SDC_TRANSPORT_NOTE) && /cross/.test(SDC_TRANSPORT_NOTE),
+     "and the fourth transport is named - the context screen's three "
+     + "transports do not cover a held connection", "");
+
+  // SEI's slide is SEI's property and nothing identifying is recorded.
+  const NETSRC = fs.readFileSync(path.join(SRC, "hubSdcNetwork.js"), "utf8");
+  for (const [re, what] of [
+    [/\b\d{1,3}(\.\d{1,3}){3}\b/, "an IP address"],
+    [/\b[a-z0-9-]+\.(snowflakecomputing|azure|windows|core)\.[a-z.]+/i, "a hostname"],
+    [/\b(privatelink|subscription-id|tenant-id)\s*[:=]/i, "an identifier"],
+  ])
+    ok(!re.test(NETSRC), `no ${what} is recorded from SEI's network page`,
+       (NETSRC.match(re) || [""])[0]);
+  ok(/structure and metadata only/i.test(NETSRC)
+     && /not committed/i.test(NETSRC),
+     "and the file says the slide is SEI's and is not committed", "");
 }
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\nhub-nav assertions pass");

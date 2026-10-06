@@ -24,7 +24,7 @@ import { SEI_ARCH_DOC, ARCH_FEEDS, ARCH_LAYERS, ARCH_ORCHESTRATION,
  ARCH_PRINCIPLES, ARCH_CONFLICTS, OUTBOUND_FLOW, INBOUND_POSTURE,
  conflictsAt } from "./seiArchitecture.js";
 import { NavStyles, Trail, SvgGo } from "./HubNav.jsx";
-import { GatewayView } from "./HubContext.jsx";
+import { GatewayView, SdcEndToEnd } from "./HubContext.jsx";
 import { ContextView, GateView, LoaderLoopView, Stage2Model,
  FileIngestionView, Stage1Model, DbModelView, GapSupplementView }
  from "./HubContext.jsx";
@@ -107,6 +107,7 @@ export default function HubDesign({ t }) {
  // reachable from the gateway as well as from the top level, and a trail
  // that forgets which only leaves them the browser's back button.
  const [gapFrom, setGapFrom] = useState(null);
+ const [sdcLegPick, setSdcLegPick] = useState(null);   // SDC end to end: which leg
  const [expand, setExpand] = useState(null);    // L3 component detail panel
  const [srcOf, setSrcOf] = useState(null);      // component shown beside its SEI source
  const [seiDoc, setSeiDoc] = useState(null);    // {doc, section} open in the popup
@@ -776,6 +777,19 @@ export default function HubDesign({ t }) {
                   ["gap supplements", null]]} />
    <GapSupplementView t={t} tab={gapTab} setTab={setGapTab}
     filter={gapF} setFilter={setGapF} />
+  </div>);
+
+ /* ---------- SDC: the event path end to end, with its network ---------- */
+ if (view === "SDC") return (
+  <div>
+   <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+   <NavStyles />
+   <Popup />
+   <Crumb trail={[["containers", () => setView("L2")],
+                  ["Ingestion", () => { setGrp("ingestion"); setView("GRP"); }],
+                  ["SDC events, end to end", null]]} />
+   <SdcEndToEnd t={t} pick={sdcLegPick} setPick={setSdcLegPick}
+    onGate={() => setView("GATE")} />
   </div>);
 
  /* ---------- GW: the gateway, as two layers ---------- */

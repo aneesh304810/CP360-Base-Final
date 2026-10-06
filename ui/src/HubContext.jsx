@@ -29,6 +29,8 @@ import { GAP_DOC, GAP_SCOPE, GAP_PRECEDENCE, GAP_TIERS, GAP_REGISTER,
  GAP_DECISIONS, GAP_ACCEPTANCE, GAP_CODE_FINDING, GAP_NAMING, GAP_HADR_OPEN,
  BUILD_LABEL, buildStatus, BUILD_SUMMARY } from "./hubGapSupplement.js";
 import { GW_LAYERS, GW_VANTAGE, GW_AD3 } from "./hubGatewayLayers.js";
+import { SDC_NET_DOC, SDC_ENVS, SDC_NET_FACTS, SDC_PATHS, SDC_LEGS,
+ SDC_OPEN, SDC_TRANSPORT_NOTE, SDC_BLOCKING, sdcLeg } from "./hubSdcNetwork.js";
 import { GW_DOC, GW_STRENGTHS, GW_GAPS, GW_RISKS, GW_OPERATION, GW_HEADERS,
  GW_TOKEN_STATES, GW_TOKEN_TESTS, GW_SECRETS, GW_RUNTIME_OBJECTS,
  GW_METRICS, GW_RUNBOOKS, GW_APPROVAL, GW_PLAN, GW_BLOCKING }
@@ -212,6 +214,15 @@ export function ContextView({ t, chan, setChan }) {
      layers: the API Gateway is a wrapper that isolates BBH&apos;s Apigee
      network and its security from the consumer, and the call still leaves
      through Apigee, which is why SEI sees requests arriving from it.
+    </div>
+    <div style={{ fontSize: 11.5, color: SUB, lineHeight: 1.6, marginTop: 6,
+     maxWidth: "92ch" }}>
+     <b style={{ color: BAD }}>Three transports is the count of what is
+     drawn, not of what the design needs.</b> The event path also runs a
+     topic subscription and a Snowflake driver session - held connections
+     into SEI&apos;s network rather than requests, crossing the gateway
+     nowhere and inheriting none of its controls. They are on the
+     event-ingestion lane, with the network they would need.
     </div>
     <ClickHint>Each of the six numbered channels opens what crosses on it,
      which transport carries it, and what breaks when it stops.</ClickHint>
@@ -531,6 +542,178 @@ export function GatewayView({ t, onReview, onComp }) {
        token state machine and the approval checklist</b>
      </OpenCard>)}
    </div>
+  </div>);
+}
+
+/* ===================================================================
+   SDC events end to end, with the network underneath them.
+
+   WHY THIS IS ONE SCREEN AND NOT TWO. The logical path and the network
+   path are drawn apart everywhere else, and apart they both look fine.
+   Together they do not: the primary inbound path depends on a BBH pod
+   opening a session into a Snowflake account whose network policy admits
+   SEI subnets and VPN only. That sentence only exists when the two
+   pictures are on the same page.
+   =================================================================== */
+const ST_TONE = { settled: OK, open: BAD };
+
+export function SdcEndToEnd({ t, pick, setPick, onGate }) {
+ // The SEI column was 102px and truncated every label it held, which on
+ // a screen whose whole point is "three of these legs have no network"
+ // meant the reader could not read three of the legs.
+ const LW = 1200, RH = 58, X0 = 258, SEIW = 214, BW2 = 926;
+ const H = SDC_LEGS.length * RH + 54;
+ const sel = pick ? sdcLeg(pick) : null;
+ const openOf = (id) => SDC_OPEN.find((o) => o.id === id);
+ const clip = (x, n) => (x.length > n ? x.slice(0, n - 1) + "." : x);
+ return (
+  <div>
+   <NavStyles />
+   <div style={card()}>
+    <b style={{ fontSize: 15, color: INK }}>
+     Nine legs, two networks, and three of the legs have no network yet</b>
+    <Body><div style={{ marginTop: 6 }}>{SDC_TRANSPORT_NOTE}</div></Body>
+   </div>
+
+   <div style={card()}>
+    <svg viewBox={`0 0 ${LW} ${H}`} style={{ width: "100%", height: "auto" }}
+     role="img" aria-label="The SDC event path end to end, each leg with the network it runs on">
+     <rect x="8" y="26" width={SEIW} height={H - 40} rx="8" fill="#f4f7f9"
+      stroke="#0091bf" strokeWidth="1.2" />
+     <text x={8 + SEIW / 2} y="20" textAnchor="middle" fontSize="10"
+      fontWeight="800" fill="#0091bf">SEI</text>
+     <rect x={X0 - 14} y="26" width={BW2 + 28} height={H - 40} rx="8"
+      fill="#fbfcfd" stroke={ACC} strokeWidth="1.2" />
+     <text x={X0} y="20" fontSize="10" fontWeight="800" fill={ACC}>BBH</text>
+
+     {SDC_LEGS.map((l, i) => {
+      const y = 40 + i * RH, sei = l.side === "SEI";
+      const x = sei ? 18 : X0;
+      const w = sei ? SEIW - 20 : BW2;
+      const open = l.st === "open";
+      return (
+       <g key={l.n} className="cp-hit" tabIndex={0} role="button"
+        onClick={() => setPick(pick === l.n ? null : l.n)}>
+        <rect className="cp-bx" x={x} y={y} width={w} height={RH - 12} rx={6}
+         fill={pick === l.n ? "#eef3f8" : "#fff"}
+         stroke={pick === l.n ? ACC : (open ? BAD : "#dfe6e9")}
+         strokeWidth={pick === l.n ? 2.2 : (open ? 1.6 : 1.2)}
+         strokeDasharray={open ? "5 3" : undefined} />
+        <text x={x + 9} y={y + 18} fontSize="10.5" fontWeight="600" fill={INK}>
+         {l.n}. {l.a}</text>
+        <text x={x + 9} y={y + 33} fontSize="9" fill={MUT}>
+         {clip(l.t, sei ? 30 : 46)}</text>
+        {/* Every open leg says why on the leg, SEI's included. A dashed
+            red box with no reason on it is an alarm with no message. */}
+        <text x={x + w - 10} y={y + 18} textAnchor="end" fontSize="9"
+         fontWeight="700" fill={open ? BAD : OK}>
+         {open ? `network open - ${l.ask}` : "network settled"}</text>
+        {!sei && <text x={x + w - 10} y={y + 33} textAnchor="end" fontSize="8.5"
+         fill={MUT}>{l.short}</text>}
+        <SvgGo x={x + w - 10} y={y + 45} />
+       </g>);
+     })}
+     {SDC_LEGS.slice(0, -1).map((l, i) => {
+      const y = 40 + i * RH + RH - 12, n = SDC_LEGS[i + 1];
+      const x1 = l.side === "SEI" ? 18 + (SEIW - 20) / 2 : X0 + 30;
+      const x2 = n.side === "SEI" ? 18 + (SEIW - 20) / 2 : X0 + 30;
+      return (
+       <path key={l.n} d={`M ${x1} ${y} C ${x1} ${y + 6} ${x2} ${y + 6} ${x2} ${y + 12}`}
+        fill="none" stroke={MUT} strokeWidth="1.2" />);
+     })}
+    </svg>
+    <ClickHint>Every BBH leg opens what it does and the network it needs.
+     A dashed red leg has no network path agreed yet.</ClickHint>
+   </div>
+
+   {sel && (
+    <div style={card({ borderLeft: `3px solid ${ST_TONE[sel.st]}` })}>
+     <div style={eyebrow}>Leg {sel.n} - {sel.side}</div>
+     <b style={{ fontSize: 14, color: INK }}>{sel.a} - {sel.t}</b>
+     <Body><div style={{ marginTop: 6 }}>{sel.w}</div></Body>
+     <div style={{ marginTop: 10 }}>
+      <div style={eyebrow}>The network it runs on</div>
+      <Body><div style={{ marginTop: 3 }}>{sel.net}</div></Body>
+     </div>
+     {sel.ask && openOf(sel.ask) && (
+      <div style={{ marginTop: 10, padding: "9px 12px", background: "#fdf7f8",
+       border: `1px solid ${BAD}`, borderRadius: 6 }}>
+       <Chip bg={BAD} fg="#fff">{sel.ask}</Chip>
+       <div style={{ fontSize: 12.5, color: INK, marginTop: 5 }}>
+        {openOf(sel.ask).q}</div>
+      </div>)}
+    </div>)}
+
+   <Head title="What SEI's network page establishes"
+    note={SDC_NET_DOC.src} />
+   <div style={card()}>
+    {SDC_NET_FACTS.map((f, i) => (
+     <div key={f.f} style={{ padding: "9px 0",
+      borderTop: i ? "1px solid #eef3f5" : "none" }}>
+      <div style={{ fontSize: 12.5, fontWeight: 500, color: INK }}>{f.f}</div>
+      <div style={{ fontSize: 12.5, color: SUB, lineHeight: 1.6,
+       marginTop: 3 }}>{f.m}</div>
+     </div>))}
+    <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginTop: 11 }}>
+     {SDC_ENVS.map((e) => (
+      <span key={e.k} style={{ fontSize: 11, border: `1px solid ${RULE}`,
+       borderRadius: 999, padding: "3px 12px", color: SUB }}>
+       <b style={{ color: INK }}>{e.n}</b> &middot; {e.w}</span>))}
+    </div>
+    <div style={{ fontSize: 10.5, color: MUT, marginTop: 10 }}>
+     {SDC_NET_DOC.note}</div>
+   </div>
+
+   <Head title="Two Private Links, not one"
+    note="the distinction that passes every test and then fails in production" />
+   <div style={{ display: "grid", gap: 9,
+    gridTemplateColumns: "repeat(auto-fit,minmax(265px,1fr))" }}>
+    {SDC_PATHS.map((p) => {
+     const trap = p.n === 3;
+     return (
+      <div key={p.n} style={card({ marginBottom: 0,
+       borderLeft: `3px solid ${trap ? BAD : ACC}` })}>
+       <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+        <Chip bg={trap ? BAD : "#eef1f4"} fg={trap ? "#fff" : MUT}>
+         path {p.n}</Chip>
+        <b style={{ fontSize: 12.5, color: INK }}>{p.t}</b>
+       </div>
+       <div style={{ fontSize: 11, color: MUT, marginTop: 5 }}>{p.via}</div>
+       <Body><div style={{ marginTop: 6 }}>
+        <b style={{ color: INK }}>Carries.</b> {p.carries}</div>
+        <div style={{ marginTop: 4 }}>
+        <b style={{ color: trap ? BAD : INK }}>Without it.</b> {p.lose}</div>
+       </Body>
+      </div>);
+    })}
+   </div>
+
+   <Head title="What the network page leaves open"
+    note={`${SDC_BLOCKING.length} of ${SDC_OPEN.length} block the event path outright`} />
+   <div style={{ display: "grid", gap: 8 }}>
+    {SDC_OPEN.map((o) => (
+     <div key={o.id} style={card({ marginBottom: 0,
+      borderLeft: `3px solid ${o.sev === "block" ? BAD : WARN}` })}>
+      <div style={{ display: "flex", gap: 8, alignItems: "baseline",
+       flexWrap: "wrap" }}>
+       <Chip bg={o.sev === "block" ? BAD : WARN} fg="#fff">
+        {o.id}{o.sev === "block" ? " - blocks" : ""}</Chip>
+       <b style={{ fontSize: 13, color: INK }}>{o.q}</b>
+      </div>
+      <Body><div style={{ marginTop: 6 }}>{o.w}</div></Body>
+      <div style={{ fontSize: 11.5, color: MUT, marginTop: 6 }}>
+       <b style={{ ...eyebrow, display: "inline" }}>Blocks</b> &nbsp;{o.blocks}</div>
+     </div>))}
+   </div>
+
+   {onGate && (
+    <OpenCard onClick={onGate} opens="the completeness gate"
+     style={card({ marginTop: 11, borderLeft: `3px solid ${ACC}` })}>
+     <div style={eyebrow}>Where this path ends</div>
+     <b style={{ fontSize: 12.5, color: INK }}>
+      Both arms of the gate, and why the event arm needs the micro-batches
+      as well as the EOD event</b>
+    </OpenCard>)}
   </div>);
 }
 

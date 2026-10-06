@@ -170,12 +170,16 @@ export const LANES = {
      + "files it produces touch this design." },
  ],
  ingestion: [
+  // The second lane with a screen of its own: the event path is nine legs
+  // across two organisations, and three of them have no agreed network.
   { id: "eventbased", n: "Event-based ingestion", tech: "PRIMARY \u00b7 SDC events",
-    sei: [], reg: [],
+    sei: [], reg: [], view: "SDC",
     w: "BBH's primary inbound route. Neither SEI design document describes "
      + "it \u2014 both describe the file path and only the file path \u2014 so "
      + "the primary way data arrives has no design document behind it. "
-     + "Its components are in the event container.",
+     + "Nine legs end to end, and on three of them the network a BBH pod "
+     + "would use to reach SEI is still open. Its components are in the "
+     + "event container.",
     primary: true },
   { id: "filebased", n: "File-based ingestion", tech: "SECONDARY \u00b7 Airflow \u00b7 Python",
     sei: ["S5", "S6", "S7", "S8"], reg: ["13", "9", "23"],

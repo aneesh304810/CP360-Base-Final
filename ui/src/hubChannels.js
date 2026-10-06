@@ -55,6 +55,13 @@ export const CHANNELS = [
     src:"PACK v5 + BBH decision" },
 ];
 
+// Three transports is what the boundary picture draws. The event path
+// also needs a topic subscription and a Snowflake driver session, and
+// neither is a request: they are held connections into SEI's network that
+// cross the gateway nowhere. They are modelled on the event-ingestion
+// lane (hubSdcNetwork.js) rather than here, because what is open about
+// them is network rather than contract - but the count below is the
+// count of what crosses the drawn boundary, not of what the design needs.
 export const TRANSPORTS = [
  { id: "ev",   n: "SDC topics", sub: "domain topics, at-least-once",
    dir: "in",  role: "primary" },
