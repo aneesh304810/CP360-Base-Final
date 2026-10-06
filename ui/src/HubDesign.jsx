@@ -24,7 +24,9 @@ import { SEI_ARCH_DOC, ARCH_FEEDS, ARCH_LAYERS, ARCH_ORCHESTRATION,
  ARCH_PRINCIPLES, ARCH_CONFLICTS, OUTBOUND_FLOW, INBOUND_POSTURE,
  conflictsAt } from "./seiArchitecture.js";
 import { ContextView, GateView, LoaderLoopView, Stage2Model,
- FileIngestionView, Stage1Model, DbModelView } from "./HubContext.jsx";
+ FileIngestionView, Stage1Model, DbModelView, GapSupplementView }
+ from "./HubContext.jsx";
+import { RECONCILE, RC_COUNTS } from "./hubGapReconcile.js";
 import { s2DomainName, s2DomainOf, S2_TABLES, S2_RELS, S2_INFERRED_COUNT }
  from "./hubStage2Model.js";
 
@@ -97,6 +99,8 @@ export default function HubDesign({ t }) {
  const [dbPick, setDbPick] = useState(null);       // database model: which table
  const [s2p, setS2p] = useState("domains");        // Stage 2: which perspective
  const [s2erd, setS2erd] = useState(true);         // Stage 2 domain: ERD or list
+ const [gapTab, setGapTab] = useState("reconcile"); // gap supplement: which tab
+ const [gapF, setGapF] = useState("all");           // gap supplement: verdict filter
  const [expand, setExpand] = useState(null);    // L3 component detail panel
  const [srcOf, setSrcOf] = useState(null);      // component shown beside its SEI source
  const [seiDoc, setSeiDoc] = useState(null);    // {doc, section} open in the popup
@@ -753,6 +757,17 @@ export default function HubDesign({ t }) {
     onComp={(id) => { setSeiComp(id); setView("SEIL4"); }} />
   </div>);
 
+ /* ---------- GAPS: the supplements, and what they change ---------- */
+ if (view === "GAPS") return (
+  <div>
+   <SectionHeader t={t}>CP Integration Hub</SectionHeader>
+   <Popup />
+   <Crumb trail={[["containers", () => setView("L2")],
+                  ["gap supplements", null]]} />
+   <GapSupplementView t={t} tab={gapTab} setTab={setGapTab}
+    filter={gapF} setFilter={setGapF} />
+  </div>);
+
  /* ---------- DBM: the database, as one picture, in the flow ---------- */
  if (view === "DBM") return (
   <div>
@@ -944,6 +959,12 @@ export default function HubDesign({ t }) {
       cursor: "pointer", background: "#fdf1f2", color: "#cc3344",
       border: "1px solid #f0c9ce" }}>
       ⚠ architecture v5 · {ARCH_CONFLICTS.length} conflicts with the design documents</span>
+     <span onClick={() => { setGapTab("reconcile"); setGapF("all");
+       setView("GAPS"); }}
+      style={{ fontSize: 10.5, fontWeight: 800, padding: "6px 14px",
+       borderRadius: 999, cursor: "pointer", background: "#fff7ec",
+       color: "#a8560f", border: "1px solid #e8c9a6" }}>
+      ▦ gap supplements · {RECONCILE.length} places they change what we drew</span>
     </div>
     <div style={{ background: "#fff", border: `1px solid ${t.panel2 || "#dfe6e9"}`,
      borderRadius: 10, padding: 16, overflowX: "auto" }}>

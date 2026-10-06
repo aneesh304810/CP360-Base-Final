@@ -23,8 +23,17 @@ import { DB_PATH, DB_CONTROL, DB_ABSENT, DB_LINKS, DB_NOTE, dbNode }
 import { FEEDS, RAW_TABLES, RAW_CONF, RAW_WITHOUT_FEED, FAN_OUT,
  FEED_SUMMARY, feedsForRaw, feedsUnmapped, feedOfTable, feedsForDomain }
  from "./hubFeedMap.js";
+import { GAP_DOC, GAP_SCOPE, GAP_PRECEDENCE, GAP_TIERS, GAP_REGISTER,
+ GAP_IDENTIFIERS, GAP_FOUNDATION, GAP_OUTBOUND_ERD, GAP_RECON, GAP_MOVEMENT,
+ GAP_DECISIONS, GAP_ACCEPTANCE, GAP_CODE_FINDING, GAP_NAMING, GAP_HADR_OPEN,
+ BUILD_LABEL, buildStatus, BUILD_SUMMARY } from "./hubGapSupplement.js";
+import { GW_DOC, GW_STRENGTHS, GW_GAPS, GW_RISKS, GW_OPERATION, GW_HEADERS,
+ GW_TOKEN_STATES, GW_TOKEN_TESTS, GW_SECRETS, GW_RUNTIME_OBJECTS,
+ GW_METRICS, GW_RUNBOOKS, GW_APPROVAL, GW_PLAN, GW_BLOCKING }
+ from "./hubGatewayReview.js";
+import { RECONCILE, RC_VERDICT, RC_COUNTS, rcBy } from "./hubGapReconcile.js";
 import { SEI_STATES, SEI_TABLES, SEI_COMPONENTS } from "./seiBaseline.js";
-import { S2_DOMAINS, S2_CONTRACT, S2_STD_COLS, S2_GAPS, S2_INFERRED_COUNT,
+import { S2_DOMAINS, S2_TABLES, S2_CONTRACT, S2_STD_COLS, S2_GAPS, S2_INFERRED_COUNT,
  S2_RELS, S2_TESTED, s2Table, s2DomainOf, s2DomainName, s2IsAnchor, s2IntKey,
  s2ShortKey, s2RelsOwned, s2RelsInto, s2GapsOn, s2Blocked, s2TablesIn }
  from "./hubStage2Model.js";
@@ -472,6 +481,15 @@ export function Stage2Model({ t, dom, tbl, setDom, setTbl,
      {anchor && inDoms.length > 0 && (
       <Body><div style={{ marginTop: 5 }}>Referenced from {inDoms.length} domains
        - {inDoms.map((d) => s2DomainName(d)).join(", ")}.</div></Body>)}
+     <div style={{ marginTop: 9 }}>
+      {(() => {
+       const b = buildStatus(tbl), L = BUILD_LABEL[b];
+       return (
+        <span title={L[1]}>
+         <Chip bg={b === "target" ? "#eef1f4" : b === "sample" ? OK : WARN}
+          fg={b === "target" ? MUT : "#fff"}>{L[0]}</Chip></span>);
+      })()}
+     </div>
      <div style={{ marginTop: 11 }}>
       <KV k="INT key"><span style={{ fontFamily: MONO, color: INK }}>
        {s2IntKey(r)}</span></KV>
@@ -641,7 +659,18 @@ export function Stage2Model({ t, dom, tbl, setDom, setTbl,
     })}
    </div>
 
-   <div style={card({ borderLeft: `3px solid ${WARN}`, marginTop: 11 })}>
+   <div style={card({ borderLeft: `3px solid ${BAD}`, marginTop: 11 })}>
+    <div style={eyebrow}>Built, versus designed</div>
+    <Body><div style={{ marginTop: 5 }}>
+     <b style={{ color: INK }}>{BUILD_SUMMARY().implemented} of
+     {" "}{S2_TABLES.length} canonical models exist in the code</b>, and
+     {" "}{BUILD_SUMMARY().expand} of those are mapped to fewer attributes
+     than the canonical model defines. The other
+     {" "}{S2_TABLES.length - BUILD_SUMMARY().implemented} are targets. Every
+     table below is drawn alike, so a model and an intention look identical
+     until you open one.</div></Body>
+   </div>
+   <div style={card({ borderLeft: `3px solid ${WARN}` })}>
     <Body><b style={{ color: INK }}>{S2_INFERRED_COUNT} of {S2_RELS.length}
      relationships are not declared foreign keys</b>, and {S2_TESTED.size} are
      proposed as dbt tests. Every edge is either declared, tested, or enforced
@@ -1308,5 +1337,425 @@ export function Stage2Feeds({ t, onPick }) {
      re-delivery rather than as a feed of their own &mdash; or they do not,
      and which reading is right is conflict C4.</div></Body>
    </div>
+  </div>);
+}
+
+/* ===================================================================
+   The gap supplements, and what they do to what we already drew.
+
+   TWO DOCUMENTS ARRIVED OVER THE TOP OF THE BASELINE: a consolidated
+   architecture gap supplement and a production-readiness review of the
+   CP-Integration-Gateway. Holding them beside the baseline is worth
+   nothing unless somebody compares them, so the reconciliation is the
+   default view and the source documents are behind it.
+   =================================================================== */
+const SEV = { block: BAD, open: WARN };
+
+function Find({ r }) {
+ const v = RC_VERDICT[r.v];
+ return (
+  <div style={card({ borderLeft: `3px solid ${v.c}` })}>
+   <div style={{ display: "flex", gap: 9, alignItems: "baseline",
+    flexWrap: "wrap" }}>
+    <Chip bg={v.c} fg="#fff">{v.n}</Chip>
+    <span style={{ fontFamily: MONO, fontSize: 10.5, color: MUT }}>{r.id}</span>
+    <b style={{ fontSize: 13.5, color: INK }}>{r.t}</b>
+   </div>
+   <div style={{ display: "grid", gap: 10, marginTop: 10,
+    gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))" }}>
+    <div><div style={eyebrow}>The supplement says</div>
+     <Body><div style={{ marginTop: 4 }}>{r.sup}</div></Body></div>
+    <div><div style={eyebrow}>The Hub holds</div>
+     <Body><div style={{ marginTop: 4 }}>{r.hub}</div></Body></div>
+   </div>
+   {r.cost && (
+    <div style={{ marginTop: 10, paddingTop: 9,
+     borderTop: "1px solid #eef3f5" }}>
+     <div style={eyebrow}>What it costs to leave open</div>
+     <Body><div style={{ marginTop: 4, color: INK }}>{r.cost}</div></Body></div>)}
+   <div style={{ fontSize: 10.5, color: MUT, marginTop: 9 }}>
+    {r.dec && r.dec !== "none" ? `Decision: ${r.dec}` : "No decision needed"}
+    {r.where ? ` · lands on ${r.where}` : ""}</div>
+  </div>);
+}
+
+export function GapSupplementView({ t, tab, setTab, filter, setFilter }) {
+ const T = tab || "reconcile";
+ const F = filter || "all";
+ const bar = (
+  <Persp now={T} set={setTab} opts={[["reconcile", "What it changes"],
+   ["register", "Gap register"], ["decisions", "Decisions and risks"],
+   ["accept", "Acceptance criteria"], ["gateway", "The gateway review"],
+   ["source", "Source and terminology"]]} />);
+
+ if (T === "register") return (
+  <div>{bar}
+   <div style={card()}>
+    <b style={{ fontSize: 15, color: INK }}>
+     {GAP_REGISTER.length} architecture gaps, {GW_GAPS.length} gateway gaps</b>
+    <Body><div style={{ marginTop: 5 }}>Each with the disposition the
+     supplement requires. Four of the gateway gaps block production
+     approval.</div></Body>
+   </div>
+   <Head title="Architecture" note="the consolidated supplement" />
+   <div style={card()}>
+    {GAP_REGISTER.map((g, i) => (
+     <div key={g.id} style={{ display: "flex", gap: 13, padding: "9px 0",
+      borderTop: i ? "1px solid #eef3f5" : "none", flexWrap: "wrap" }}>
+      <span style={{ fontFamily: MONO, fontSize: 11, color: ACC,
+       flex: "0 0 68px" }}>{g.id}</span>
+      <span style={{ flex: "1 1 340px", minWidth: 0 }}>
+       <div style={{ fontSize: 12.5, color: INK, lineHeight: 1.55 }}>{g.g}</div>
+       <div style={{ fontSize: 12, color: SUB, lineHeight: 1.55,
+        marginTop: 3 }}>{g.d}</div></span>
+      <span style={{ fontSize: 10.5, color: MUT, flex: "0 0 180px" }}>
+       {g.dom}</span>
+     </div>))}
+   </div>
+   <Head title="Gateway" note={`${GW_BLOCKING} of ${GW_GAPS.length} block production approval`} />
+   <div style={card()}>
+    {GW_GAPS.map((g, i) => (
+     <div key={g.id} style={{ display: "flex", gap: 13, padding: "9px 0",
+      borderTop: i ? "1px solid #eef3f5" : "none", flexWrap: "wrap" }}>
+      <span style={{ fontFamily: MONO, fontSize: 11, color: SEV[g.sev],
+       flex: "0 0 86px" }}>{g.id}</span>
+      <span style={{ flex: "1 1 340px", minWidth: 0 }}>
+       <div style={{ fontSize: 12.5, color: INK, lineHeight: 1.55 }}>{g.g}</div>
+       <div style={{ fontSize: 12, color: SUB, lineHeight: 1.55,
+        marginTop: 3 }}>{g.d}</div></span>
+      <span style={{ flex: "0 0 80px" }}>
+       {g.sev === "block" ? <Chip bg={BAD} fg="#fff">blocks</Chip>
+                          : <Chip bg="#eef1f4" fg={MUT}>open</Chip>}</span>
+     </div>))}
+   </div>
+  </div>);
+
+ if (T === "decisions") return (
+  <div>{bar}
+   <div style={card()}>
+    <b style={{ fontSize: 15, color: INK }}>
+     {GAP_DECISIONS.length} decisions must close before build completion</b>
+    <Body><div style={{ marginTop: 5 }}>Ten architecture, eight Stage 2.
+     None is a preference: each one changes what gets built.</div></Body>
+   </div>
+   {[["arch", "Architecture"], ["silver", "Stage 2 Silver"]].map(([k, n]) => (
+    <div key={k}>
+     <Head title={n} note={`${GAP_DECISIONS.filter((d) => d[2] === k).length} decisions`} />
+     <div style={card()}>
+      {GAP_DECISIONS.filter((d) => d[2] === k).map((d, i) => (
+       <div key={d[0]} style={{ display: "flex", gap: 13, padding: "8px 0",
+        borderTop: i ? "1px solid #eef3f5" : "none" }}>
+        <span style={{ fontFamily: MONO, fontSize: 11, color: ACC,
+         flex: "0 0 120px" }}>{d[0]}</span>
+        <span style={{ fontSize: 12.5, color: SUB, lineHeight: 1.6 }}>
+         {d[1]}</span>
+       </div>))}
+     </div>
+    </div>))}
+   <Head title="Gateway risks" note="with the evidence each needs before closure" />
+   <div style={card()}>
+    {GW_RISKS.map((r, i) => (
+     <div key={r[0]} style={{ display: "flex", gap: 13, padding: "9px 0",
+      borderTop: i ? "1px solid #eef3f5" : "none", flexWrap: "wrap" }}>
+      <span style={{ fontFamily: MONO, fontSize: 11, color: BAD,
+       flex: "0 0 96px" }}>{r[0]}</span>
+      <span style={{ fontSize: 12.5, color: INK, flex: "1 1 300px" }}>{r[1]}</span>
+      <span style={{ fontSize: 12, color: SUB, flex: "1 1 280px" }}>{r[2]}</span>
+     </div>))}
+   </div>
+   <div style={card({ borderLeft: `3px solid ${BAD}` })}>
+    <div style={eyebrow}>HA and DR establish no numbers at all</div>
+    <Body><div style={{ marginTop: 5 }}>Seven items to finalise, and the
+     supplement states plainly that no numerical RTO or RPO is established
+     and that values require formal BBH approval.</div></Body>
+    <ul style={{ fontSize: 12.5, color: SUB, lineHeight: 1.65,
+     margin: "9px 0 0", paddingLeft: 17 }}>
+     {GAP_HADR_OPEN.map((x) => <li key={x}>{x}</li>)}</ul>
+   </div>
+  </div>);
+
+ if (T === "accept") return (
+  <div>{bar}
+   <div style={card()}>
+    <b style={{ fontSize: 15, color: INK }}>
+     {GAP_ACCEPTANCE.length + GW_APPROVAL.length} criteria</b>
+    <Body><div style={{ marginTop: 5 }}>The design is complete when these
+     hold. They are measurable, which is what makes them worth holding as
+     data rather than prose.</div></Body>
+   </div>
+   {[["arch", "Architecture"], ["silver", "Stage 2 Silver"]].map(([k, n]) => (
+    <div key={k}>
+     <Head title={n} note={`${GAP_ACCEPTANCE.filter((a) => a[0] === k).length} criteria`} />
+     <div style={card()}>
+      {GAP_ACCEPTANCE.filter((a) => a[0] === k).map((a, i) => (
+       <div key={a[1]} style={{ display: "flex", gap: 11, padding: "7px 0",
+        borderTop: i ? "1px solid #eef3f5" : "none" }}>
+        <span style={{ fontSize: 11, color: MUT, flex: "0 0 22px" }}>
+         {i + 1}</span>
+        <span style={{ fontSize: 12.5, color: SUB, lineHeight: 1.6 }}>
+         {a[1]}</span>
+       </div>))}
+     </div>
+    </div>))}
+   <Head title="Gateway production approval"
+    note="all twelve are required, not a scorecard" />
+   <div style={card()}>
+    {GW_APPROVAL.map((a, i) => (
+     <div key={a} style={{ display: "flex", gap: 11, padding: "7px 0",
+      borderTop: i ? "1px solid #eef3f5" : "none" }}>
+      <span style={{ fontSize: 11, color: MUT, flex: "0 0 22px" }}>{i + 1}</span>
+      <span style={{ fontSize: 12.5, color: SUB, lineHeight: 1.6 }}>{a}</span>
+     </div>))}
+   </div>
+  </div>);
+
+ if (T === "gateway") return (
+  <div>{bar}
+   <div style={card({ borderLeft: `3px solid ${WARN}` })}>
+    <div style={eyebrow}>{GW_DOC.n}</div>
+    <Body><div style={{ marginTop: 5 }}>{GW_DOC.w}</div>
+     <div style={{ marginTop: 9, color: INK }}>{GW_DOC.verdict}</div></Body>
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 11 }}>
+     {GW_DOC.stack.map((x) => (
+      <span key={x} style={{ fontSize: 10.5, border: `1px solid ${RULE}`,
+       borderRadius: 999, padding: "2px 9px", color: SUB }}>{x}</span>))}
+    </div>
+   </div>
+   <div style={{ display: "grid", gap: 9,
+    gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))" }}>
+    <div style={card({ marginBottom: 0, borderLeft: `3px solid ${OK}` })}>
+     <div style={eyebrow}>What is already right</div>
+     <ul style={{ fontSize: 12.5, color: SUB, lineHeight: 1.65,
+      margin: "7px 0 0", paddingLeft: 17 }}>
+      {GW_STRENGTHS.map((x) => <li key={x}>{x}</li>)}</ul>
+    </div>
+    <div style={card({ marginBottom: 0, borderLeft: `3px solid ${BAD}` })}>
+     <div style={eyebrow}>Immediate actions</div>
+     <ul style={{ fontSize: 12.5, color: SUB, lineHeight: 1.65,
+      margin: "7px 0 0", paddingLeft: 17 }}>
+      {GW_PLAN.immediate.map((x) => <li key={x}>{x}</li>)}</ul>
+    </div>
+   </div>
+   <Head title="A governed operation" note="declared before any outbound call is built" />
+   <div style={card()}>
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+     {GW_OPERATION.map((f) => (
+      <span key={f} style={{ fontFamily: MONO, fontSize: 10.5,
+       border: `1px solid ${RULE}`, borderRadius: 3, padding: "2px 7px",
+       color: INK }}>{f}</span>))}
+    </div>
+    <div style={{ marginTop: 11, padding: "9px 13px", background: "#fdf7f0",
+     borderLeft: `3px solid ${WARN}`, borderRadius: "0 5px 5px 0" }}>
+     <Body><b style={{ color: INK }}>There is no quota or rate-limit field
+      on this list</b> &mdash; and the boundary screen names gateway rate
+      limiting as the thing that actually enforces the key-set collapser's
+      restraint. The mitigation we describe has no implementation
+      named.</Body>
+    </div>
+   </div>
+   <Head title="Header policy" note="accepted, generated, suppressed, returned" />
+   <div style={card()}>
+    {GW_HEADERS.map((h, i) => (
+     <div key={h[0]} style={{ display: "flex", gap: 14, padding: "8px 0",
+      borderTop: i ? "1px solid #eef3f5" : "none" }}>
+      <span style={{ fontSize: 12.5, fontWeight: 500, color: INK,
+       flex: "0 0 190px" }}>{h[0]}</span>
+      <span style={{ fontSize: 12.5, color: SUB, lineHeight: 1.6 }}>
+       {h[1]}</span>
+     </div>))}
+   </div>
+   <Head title="The vendor token cache"
+    note="in memory, per pod - so refresh count scales with replicas" />
+   <div style={card()}>
+    {GW_TOKEN_STATES.map((x, i) => (
+     <div key={x[0]} style={{ display: "flex", gap: 14, padding: "8px 0",
+      borderTop: i ? "1px solid #eef3f5" : "none" }}>
+      <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700,
+       color: INK, flex: "0 0 120px" }}>{x[0]}</span>
+      <span style={{ fontSize: 12.5, color: SUB, flex: "1 1 40%" }}>{x[1]}</span>
+      <span style={{ fontSize: 12, color: MUT, flex: "1 1 40%" }}>{x[2]}</span>
+     </div>))}
+    <div style={{ ...eyebrow, marginTop: 12 }}>Required tests</div>
+    <ul style={{ fontSize: 12.5, color: SUB, lineHeight: 1.65,
+     margin: "7px 0 0", paddingLeft: 17 }}>
+     {GW_TOKEN_TESTS.map((x) => <li key={x}>{x}</li>)}</ul>
+   </div>
+   <Head title="OpenShift runtime objects" note="three are not in place yet" />
+   <div style={card()}>
+    {GW_RUNTIME_OBJECTS.map((o, i) => (
+     <div key={o[0]} style={{ display: "flex", gap: 12, padding: "7px 0",
+      borderTop: i ? "1px solid #eef3f5" : "none", alignItems: "baseline" }}>
+      <span style={{ flex: "0 0 74px" }}>
+       {o[1] ? <Chip bg="#eef1f4" fg={MUT}>present</Chip>
+             : <Chip bg={WARN} fg="#fff">not yet</Chip>}</span>
+      <span style={{ fontSize: 12.5, color: SUB }}>{o[0]}</span>
+     </div>))}
+   </div>
+   <div style={{ display: "grid", gap: 9,
+    gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))" }}>
+    <div style={card({ marginBottom: 0 })}>
+     <div style={eyebrow}>Metric families</div>
+     <ul style={{ fontSize: 12.5, color: SUB, lineHeight: 1.65,
+      margin: "7px 0 0", paddingLeft: 17 }}>
+      {GW_METRICS.map((x) => <li key={x}>{x}</li>)}</ul>
+    </div>
+    <div style={card({ marginBottom: 0 })}>
+     <div style={eyebrow}>Runbooks required</div>
+     <ul style={{ fontSize: 12.5, color: SUB, lineHeight: 1.65,
+      margin: "7px 0 0", paddingLeft: 17 }}>
+      {GW_RUNBOOKS.map((x) => <li key={x}>{x}</li>)}</ul>
+    </div>
+   </div>
+   <div style={card({ borderLeft: `3px solid ${BAD}` })}>
+    <div style={eyebrow}>Secret hygiene</div>
+    <Body><div style={{ marginTop: 5 }}>{GW_SECRETS.never}</div>
+     <div style={{ marginTop: 7, color: INK }}>{GW_SECRETS.rotate}{" "}
+      {GW_SECRETS.startup}</div></Body>
+    <div style={{ display: "grid", gap: 10, marginTop: 11,
+     gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))" }}>
+     {[["ConfigMap - non-secret", GW_SECRETS.configmap],
+       ["Secret - sensitive", GW_SECRETS.secret]].map(([n, xs]) => (
+      <div key={n}><div style={eyebrow}>{n}</div>
+       <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 6 }}>
+        {xs.map((x) => (
+         <span key={x} style={{ fontFamily: MONO, fontSize: 10,
+          border: `1px solid ${RULE}`, borderRadius: 3, padding: "1px 6px",
+          color: INK }}>{x}</span>))}</div></div>))}
+    </div>
+   </div>
+  </div>);
+
+ if (T === "source") return (
+  <div>{bar}
+   <div style={card()}>
+    <div style={eyebrow}>{GAP_DOC.n}</div>
+    <Body><div style={{ marginTop: 5 }}>{GAP_DOC.w}</div></Body>
+    <div style={{ ...eyebrow, marginTop: 12 }}>Built from</div>
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+     {GAP_DOC.sources.map((x) => (
+      <span key={x} style={{ fontSize: 10.5, border: `1px solid ${RULE}`,
+       borderRadius: 999, padding: "2px 9px", color: SUB }}>{x}</span>))}
+    </div>
+   </div>
+   <Head title="The four-tier model"
+    note="the single most consequential thing in the supplement" />
+   <div style={card()}>
+    {GAP_TIERS.map((x, i) => (
+     <div key={x.tier} style={{ display: "flex", gap: 14, padding: "9px 0",
+      borderTop: i ? "1px solid #eef3f5" : "none" }}>
+      <span style={{ fontSize: 12.5, fontWeight: 600, color: ACC,
+       flex: "0 0 150px" }}>{x.tier}</span>
+      <span style={{ fontSize: 12.5, fontWeight: 500, color: INK,
+       flex: "0 0 130px" }}>{x.n}</span>
+      <span style={{ fontSize: 12.5, color: SUB, lineHeight: 1.6 }}>{x.w}</span>
+     </div>))}
+   </div>
+   <Head title="Precedence" note="which document wins, asked constantly and guessed at" />
+   <div style={card()}>
+    {GAP_PRECEDENCE.map((p, i) => (
+     <div key={p} style={{ display: "flex", gap: 11, padding: "7px 0",
+      borderTop: i ? "1px solid #eef3f5" : "none" }}>
+      <b style={{ fontSize: 13, color: ACC, flex: "0 0 22px" }}>{i + 1}</b>
+      <span style={{ fontSize: 12.5, color: SUB }}>{p}</span>
+     </div>))}
+   </div>
+   <Head title="Canonical traceability identifiers"
+    note="nine, with the propagation rule that usually gets lost" />
+   <div style={card()}>
+    {GAP_IDENTIFIERS.map((x, i) => (
+     <div key={x[0]} style={{ display: "flex", gap: 13, padding: "8px 0",
+      borderTop: i ? "1px solid #eef3f5" : "none", flexWrap: "wrap" }}>
+      <span style={{ fontFamily: MONO, fontSize: 11.5, color: INK,
+       flex: "0 0 150px" }}>{x[0]}</span>
+      <span style={{ fontSize: 12, color: MUT, flex: "0 0 210px" }}>{x[1]}</span>
+      <span style={{ fontSize: 12.5, color: SUB, flex: "1 1 320px" }}>{x[2]}</span>
+     </div>))}
+   </div>
+   <Head title="Foundation entities" note="five exist, three have no table anywhere" />
+   <div style={card()}>
+    {GAP_FOUNDATION.map((f, i) => (
+     <div key={f[0]} style={{ display: "flex", gap: 12, padding: "8px 0",
+      borderTop: i ? "1px solid #eef3f5" : "none", alignItems: "baseline",
+      flexWrap: "wrap" }}>
+      <span style={{ flex: "0 0 74px" }}>
+       {f[2] ? <Chip bg="#eef1f4" fg={MUT}>exists</Chip>
+             : <Chip bg={WARN} fg="#fff">no table</Chip>}</span>
+      <span style={{ fontFamily: MONO, fontSize: 11.5, color: INK,
+       flex: "0 0 200px" }}>{f[0]}</span>
+      <span style={{ fontSize: 12.5, color: SUB, flex: "1 1 320px" }}>
+       {f[1]}</span>
+     </div>))}
+   </div>
+   <Head title="Stage 2 to Stage 3" note={GAP_MOVEMENT.n} />
+   <div style={card()}>
+    <Body>{GAP_MOVEMENT.w}</Body>
+    <div style={{ marginTop: 9 }}><div style={eyebrow}>The gate</div>
+     <Body><div style={{ marginTop: 4 }}>{GAP_MOVEMENT.gate}</div></Body></div>
+    <div style={{ marginTop: 9 }}><div style={eyebrow}>Replay boundary</div>
+     <Body><div style={{ marginTop: 4 }}>{GAP_MOVEMENT.replay}</div></Body></div>
+   </div>
+   <Head title="Seven reconciliation boundaries" note="the pack specifies three" />
+   <div style={card()}>
+    <ul style={{ fontSize: 12.5, color: SUB, lineHeight: 1.7, margin: 0,
+     paddingLeft: 17 }}>{GAP_RECON.map((x) => <li key={x}>{x}</li>)}</ul>
+   </div>
+   <Head title="Naming standard" note="one pattern per object type" />
+   <div style={card()}>
+    {GAP_NAMING.map((n, i) => (
+     <div key={n[0]} style={{ display: "flex", gap: 13, padding: "7px 0",
+      borderTop: i ? "1px solid #eef3f5" : "none" }}>
+      <span style={{ fontSize: 12.5, color: INK, flex: "0 0 180px" }}>
+       {n[0]}</span>
+      <span style={{ fontFamily: MONO, fontSize: 11, color: SUB,
+       flex: "0 0 240px" }}>{n[1]}</span>
+      <span style={{ fontFamily: MONO, fontSize: 11, color: MUT }}>{n[2]}</span>
+     </div>))}
+   </div>
+   <div style={card({ borderLeft: `3px solid ${WARN}` })}>
+    <div style={eyebrow}>Code finding - {GAP_CODE_FINDING.model}</div>
+    <Body><div style={{ marginTop: 5 }}>{GAP_CODE_FINDING.w}</div>
+     <div style={{ marginTop: 7, color: INK }}>{GAP_CODE_FINDING.why}</div>
+     <div style={{ marginTop: 7 }}>{GAP_CODE_FINDING.fix}</div></Body>
+   </div>
+   <Head title="Scope" note={`${GAP_SCOPE.length} architecture domains`} />
+   <div style={card()}>
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+     {GAP_SCOPE.map((x) => (
+      <span key={x} style={{ fontSize: 11.5, border: `1px solid ${RULE}`,
+       borderRadius: 999, padding: "3px 11px", color: SUB }}>{x}</span>))}
+    </div>
+   </div>
+  </div>);
+
+ /* ---- the default: what the supplements change ---- */
+ const shown = F === "all" ? RECONCILE : rcBy(F);
+ return (
+  <div>{bar}
+   <div style={card()}>
+    <b style={{ fontSize: 16, color: INK }}>
+     {RECONCILE.length} places the supplements touch what we already drew</b>
+    <Body><div style={{ marginTop: 6 }}>Holding a second design document
+     beside the first is worth nothing unless somebody compares them. Nothing
+     below is silently resolved: where the two disagree, both readings are
+     stated and the decision is named.</div></Body>
+    <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginTop: 13 }}>
+     {[["all", "All", INK]].concat(Object.keys(RC_VERDICT)
+       .map((k) => [k, RC_VERDICT[k].n, RC_VERDICT[k].c]))
+      .map(([k, n, c]) => (
+       <span key={k} onClick={() => setFilter && setFilter(k)}
+        style={{ cursor: "pointer", fontSize: 11.5, fontWeight: F === k ? 700 : 400,
+         borderRadius: 999, padding: "4px 13px",
+         border: `1px solid ${F === k ? c : RULE}`,
+         background: F === k ? c : "#fff",
+         color: F === k ? "#fff" : SUB }}>
+        {n}{k === "all" ? ` ${RECONCILE.length}` : ` ${RC_COUNTS[k]}`}</span>))}
+    </div>
+    <div style={{ fontSize: 11.5, color: SUB, marginTop: 10 }}>
+     {F === "all" ? "Conflicts first." : RC_VERDICT[F] && RC_VERDICT[F].w}
+    </div>
+   </div>
+   {["conflict", "closes", "extends", "agrees"]
+    .filter((v) => F === "all" || F === v)
+    .map((v) => shown.filter((r) => r.v === v).map((r) => <Find key={r.id} r={r} />))}
   </div>);
 }
