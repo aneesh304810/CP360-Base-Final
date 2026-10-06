@@ -222,5 +222,76 @@ try {
 ok(/view === "GAPS"/.test(HUBSRC) && /setView\("GAPS"\)/.test(HUBSRC),
    "HubDesign routes the supplements and makes them reachable", "");
 
+
+/* ------------------------------------------- the design documents */
+// The supplement's own required-updates list asks for these, so they are
+// asserted rather than eyeballed after a regeneration.
+const DOCS_DIR = path.join(path.dirname(srcDir()), "..", "designs-md");
+const docs = fs.existsSync(DOCS_DIR)
+  ? fs.readdirSync(DOCS_DIR).filter((f) => f.endsWith(".md")) : [];
+ok(docs.length >= 100, "the design corpus is present", docs.length);
+
+const read = (f) => fs.readFileSync(path.join(DOCS_DIR, f), "utf8");
+const fmOf = (s) => (s.match(/^---\n([\s\S]*?)\n---\n/) || [, ""])[1];
+
+// DUPLICATE FRONT-MATTER KEYS. The generator appended generated: and
+// sei_status: on every run without removing the previous pair, so a
+// document regenerated three times carried three copies of both. The
+// supplement asks for this to be fixed during regeneration.
+const dup = docs.filter((f) => {
+  const keys = fmOf(read(f)).split("\n")
+    .filter((l) => /^[a-z_]+:/.test(l)).map((l) => l.split(":")[0]);
+  return new Set(keys).size !== keys.length;
+});
+ok(dup.length === 0,
+   "no document has a duplicate front-matter key - the generator strips "
+   + "every key it owns before re-adding it", dup.slice(0, 3).join(" "));
+
+const comps = docs.filter((f) => /^component_id:/m.test(read(f)));
+ok(comps.length === 91,
+   "ninety-one component documents - the 65 tracked plus the 26 proposals, "
+   + "which are the components the supplements have most to say about",
+   comps.length);
+ok(comps.every((f) => /^architecture_domain:/m.test(read(f))),
+   "every one carries an architecture_domain - matching a component to a "
+   + "container only by its explicit lane left 23 with none, and those "
+   + "silently received none of their domain's gaps",
+   comps.filter((f) => !/^architecture_domain:/m.test(read(f))).slice(0, 3).join(" "));
+["canonical_tier", "control_entities", "traceability_identifiers",
+ "supplement"].forEach((k) => {
+  const miss = comps.filter((f) => !new RegExp(`^${k}:`, "m").test(read(f)));
+  if (miss.length) ok(false, `every component document carries ${k}`,
+                      miss.slice(0, 3).join(" "));
+});
+ok(["canonical_tier", "control_entities", "traceability_identifiers",
+    "supplement"].every((k) =>
+     comps.every((f) => new RegExp(`^${k}:`, "m").test(read(f)))),
+   "and the other four keys the supplement asks for in front matter", "");
+ok(comps.every((f) => /## Gaps and decisions that land here/.test(read(f))),
+   "and every one has a section for the gaps and decisions that land on it",
+   comps.filter((f) => !/## Gaps and decisions that land here/.test(read(f)))
+     .slice(0, 3).join(" "));
+
+// The six new overview documents, and that each carries its own finding.
+[["gap-supplement.md", /25 findings|places the supplements/],
+ ["gateway-review.md", /no quota or rate-limit field/],
+ ["stage1-raw-model.md", /LOAD_ID` is \*\*not\*\* among them|See R9/],
+ ["stage2-canonical-model.md", /exist in code/],
+ ["feed-to-stage1-map.md", /no Stage 1 landing table named/],
+ ["database-model.md", /control plane/]].forEach(([f, re_]) => {
+  if (!docs.includes(f)) { ok(false, `${f} exists`, ""); return; }
+  if (!re_.test(read(f))) ok(false, `${f} carries its finding`, "");
+});
+ok(["gap-supplement.md", "gateway-review.md", "stage1-raw-model.md",
+    "stage2-canonical-model.md", "feed-to-stage1-map.md", "database-model.md"]
+     .every((f) => docs.includes(f)),
+   "the six new overview documents are generated", "");
+// A document that quotes the supplement without saying what this corpus
+// holds is a quotation, not a reconciliation - the same rule as the data.
+const gapDoc = read("gap-supplement.md");
+ok(/This corpus holds/.test(gapDoc) && /What it costs to leave open/.test(gapDoc),
+   "and the gap document states both readings and the cost, not just the "
+   + "supplement's side", "");
+
 console.log(bad ? `\n${bad} assertion(s) failed` : "\nhub-gap-supplement assertions pass");
 if (bad) process.exit(1);

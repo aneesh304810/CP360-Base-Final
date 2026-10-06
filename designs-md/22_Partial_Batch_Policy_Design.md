@@ -20,10 +20,11 @@ gap_owner: Joint
 in_scope: true
 generated: true
 sei_status: absent
-generated: true
-sei_status: absent
-generated: true
-sei_status: absent
+architecture_domain: Orchestration
+canonical_tier: not on the stage chain
+control_entities: [DATE_CONTROL, FILE_REGISTRY]
+traceability_identifiers: [BUSINESS_DATE, DAG_RUN_ID]
+supplement: CP360-GAP-DESIGN-SUPPLEMENT
 ---
 
 # Partial-Batch Policy
@@ -43,6 +44,26 @@ SEI has no partial-set path: the transition fires only on an empty missing set. 
 That is not a judgement on whether it is needed. It means no
 design exists to build from, and writing one is BBH's to do and
 SEI's to confirm.
+
+## Gaps and decisions that land here
+
+From the consolidated gap supplement and the CP-Integration-Gateway
+readiness review. These arrived after the SEI baseline and in several
+places disagree with it; where they do, both readings are given and
+neither is silently adopted.
+
+### Gap register
+
+| Gap | What is missing | Required disposition |
+|---|---|---|
+| `GAP-06` | DATE_CONTROL and file lifecycles lack one canonical state view | Add state machines, transition ownership, guards and recovery behaviour |
+
+### Against what this design already says
+
+#### Confirms the baseline — One guarded owner of PENDING to TRIGGER
+
+- **The supplement says.** The missing-interface set is empty AND the atomic update affects exactly one row.
+- **This design holds.** The same guard, drawn as the gate.
 
 ## Sources
 

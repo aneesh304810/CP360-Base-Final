@@ -20,10 +20,11 @@ gap_owner: Joint
 in_scope: true
 generated: true
 sei_status: absent
-generated: true
-sei_status: absent
-generated: true
-sei_status: absent
+architecture_domain: Orchestration
+canonical_tier: not on the stage chain
+control_entities: [DATE_CONTROL, FILE_REGISTRY]
+traceability_identifiers: [BUSINESS_DATE, DAG_RUN_ID]
+supplement: CP360-GAP-DESIGN-SUPPLEMENT
 ---
 
 # Intraday Cadence Control
@@ -53,6 +54,26 @@ Each one is a decision to take before a model is written.
 - **The architecture says.** Five STG2_* tables, materialised as tables, full refresh daily or incremental.
 - **The design documents say.** A STG view that stores nothing, plus an INT table kept seven days and partitioned.
 - **Why it matters.** Not a naming difference. One stores Stage 2 and one does not, and the retention, the replay window and the reconciliation boundaries all follow from which it is.
+
+## Gaps and decisions that land here
+
+From the consolidated gap supplement and the CP-Integration-Gateway
+readiness review. These arrived after the SEI baseline and in several
+places disagree with it; where they do, both readings are given and
+neither is silently adopted.
+
+### Gap register
+
+| Gap | What is missing | Required disposition |
+|---|---|---|
+| `GAP-06` | DATE_CONTROL and file lifecycles lack one canonical state view | Add state machines, transition ownership, guards and recovery behaviour |
+
+### Against what this design already says
+
+#### Confirms the baseline — One guarded owner of PENDING to TRIGGER
+
+- **The supplement says.** The missing-interface set is empty AND the atomic update affects exactly one row.
+- **This design holds.** The same guard, drawn as the gate.
 
 ## Sources
 

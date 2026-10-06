@@ -3242,5 +3242,3792 @@
    "target": "",
    "notes": ""
   }
- ]
+ ],
+ "GAP_DOC": {
+  "n": "CP360 Final Consolidated Gap and Missing Design Specification",
+  "w": "The authoritative cross-component design supplement, merged from the Markdown corpus, the architecture PDFs, the two technical designs, the canonical-model references and the sample implementation code.",
+  "sources": [
+   "all_markdown.md",
+   "CP360_Architecture_Gap_Design_Supplement.md",
+   "CP360_Stage2_Silver_Intermediate_Canonical_Model.md",
+   "SEI-BBH Integration Architecture v5",
+   "BBH File Ingestion Framework TDD v2.0",
+   "BBH dbt Transformation TDD v2",
+   "SEI Data Cloud Event Specification",
+   "SWP_BBH Canonical Model with ERD Draft",
+   "SWP_BBH Normalized Canonical Data Model v1 Draft",
+   "all_code.txt"
+  ]
+ },
+ "GAP_SCOPE": [
+  "Ingress and Egress",
+  "Ingestion",
+  "Orchestration",
+  "Processing",
+  "Stage 2 Silver Intermediate Canonical Model",
+  "Stage 3 Pre-Gold Boundary",
+  "Foundation",
+  "OpenShift Platform",
+  "SEI Data Cloud Events",
+  "Data Quality and Reconciliation",
+  "Security, Audit, Lineage, HA and DR"
+ ],
+ "GAP_TIERS": [
+  {
+   "tier": "Stage 1",
+   "n": "RAW",
+   "w": "Source-faithful Oracle persistence with ingestion lineage."
+  },
+  {
+   "tier": "Stage 2",
+   "n": "Enriched",
+   "w": "dbt standardization, DQ, conforming, enrichment and intermediate persistence."
+  },
+  {
+   "tier": "Stage 3",
+   "n": "Pre-Gold",
+   "w": "Oracle Exadata consumer-oriented transformations, dimensions, facts and control-total preparation."
+  },
+  {
+   "tier": "Consumer Movement",
+   "n": "Publish and delivery",
+   "w": "Extract, transport, load and verify, with no transformation in flight."
+  }
+ ],
+ "GAP_REGISTER": [
+  {
+   "id": "GAP-01",
+   "g": "No single master view joins inbound, outbound, foundation and platform architecture",
+   "d": "Add consolidated architecture and responsibility boundaries",
+   "dom": "Processing"
+  },
+  {
+   "id": "GAP-02",
+   "g": "Business capability view is incomplete",
+   "d": "Add a capability model across ingress, ingestion, orchestration, processing, foundation and runtime",
+   "dom": "Processing"
+  },
+  {
+   "id": "GAP-03",
+   "g": "Ingress and egress component responsibilities are fragmented",
+   "d": "Add Landing, Momentum/SFTP, API Gateway, Apigee, Loader Framework, callbacks and source boundaries",
+   "dom": "Ingress and Egress"
+  },
+  {
+   "id": "GAP-04",
+   "g": "OpenShift is named but not designed as a platform domain",
+   "d": "Add runtime topology, deployment, secret, storage, scaling, CI/CD and operations contracts",
+   "dom": "OpenShift Platform"
+  },
+  {
+   "id": "GAP-05",
+   "g": "Foundation services are spread across many documents",
+   "d": "Add a canonical control, metadata, evidence, audit, security, observability and lineage model",
+   "dom": "Foundation"
+  },
+  {
+   "id": "GAP-06",
+   "g": "DATE_CONTROL and file lifecycles lack one canonical state view",
+   "d": "Add state machines, transition ownership, guards and recovery behaviour",
+   "dom": "Orchestration"
+  },
+  {
+   "id": "GAP-07",
+   "g": "SDC event architecture is not integrated into CP360",
+   "d": "Add event taxonomy, payload handling, idempotency, retrieval, replay and marker-event gating",
+   "dom": "SEI Data Cloud Events"
+  },
+  {
+   "id": "GAP-08",
+   "g": "Stage 2 to Stage 3 cross-database movement is under-specified",
+   "d": "Add movement pattern, controls, replay boundary and reconciliation",
+   "dom": "Stage 3 Pre-Gold Boundary"
+  },
+  {
+   "id": "GAP-09",
+   "g": "Identifiers are inconsistent across components",
+   "d": "Add canonical traceability identifiers and propagation rules",
+   "dom": "Foundation"
+  },
+  {
+   "id": "GAP-10",
+   "g": "HA/DR and graceful degradation are proposal-level",
+   "d": "Add requirements, recovery scope and validation expectations",
+   "dom": "Security, Audit, Lineage, HA and DR"
+  },
+  {
+   "id": "GAP-11",
+   "g": "Logical relationships among control and processing entities are not consolidated",
+   "d": "Add logical ERDs",
+   "dom": "Foundation"
+  },
+  {
+   "id": "GAP-12",
+   "g": "Architecture-level acceptance criteria are missing",
+   "d": "Add measurable design completion criteria",
+   "dom": "Processing"
+  }
+ ],
+ "GAP_IDENTIFIERS": [
+  [
+   "PROJECT_ID",
+   "CP360 project or catalog scope",
+   "Applied to metadata and catalog entities where multiple projects coexist"
+  ],
+  [
+   "FILE_ID",
+   "Physical or logical file lifecycle",
+   "Created in FILE_REGISTRY and referenced by loaded RAW rows"
+  ],
+  [
+   "LOAD_ID",
+   "One ingestion or load execution",
+   "Preserved from RAW through Stage 2, Stage 3, replay and publish evidence"
+  ],
+  [
+   "SRC_RECORD_ID",
+   "Source record within a delivery",
+   "Preserved on record-level lineage where available"
+  ],
+  [
+   "BUSINESS_DATE",
+   "Processing and partition date",
+   "Present in RAW, INT, control, DQ, reconciliation and publish evidence"
+  ],
+  [
+   "DAG_RUN_ID",
+   "Airflow execution",
+   "Recorded in control and operational evidence"
+  ],
+  [
+   "CORRELATION_ID",
+   "Cross-component request or workflow",
+   "Propagated through Hub, orchestration, API and loader execution, callback and monitoring"
+  ],
+  [
+   "IDEMPOTENCY_KEY",
+   "Duplicate prevention for requests",
+   "Stable across retries of the same business operation"
+  ],
+  [
+   "EVENT_ID",
+   "SEI Data Cloud event definition",
+   "Retained with event-processing evidence and consumer outcome"
+  ]
+ ],
+ "GAP_FOUNDATION": [
+  [
+   "FILE_SCHEMA_CONFIG",
+   "Active interface definition, filename matching, parsing, validation, RAW target",
+   true
+  ],
+  [
+   "FILE_REGISTRY",
+   "File lifecycle, counts, status, timestamps, business date, lineage",
+   true
+  ],
+  [
+   "DATE_CONTROL",
+   "Durable business-date state machine, SLA cutoff, DAG run traceability",
+   true
+  ],
+  [
+   "DQ_VALIDATION_FAILURE",
+   "Source and Transformation DQ failures and resolution state",
+   true
+  ],
+  [
+   "RECON_RESULT",
+   "Immutable reconciliation result per date, model and control",
+   true
+  ],
+  [
+   "Workflow metadata",
+   "Workflow definitions, step ordering, routing, dependencies, retry policy",
+   false
+  ],
+  [
+   "API configuration",
+   "Endpoint, authentication reference, timeout, retry, response mapping",
+   false
+  ],
+  [
+   "Schema registry",
+   "Versioned file and API contracts and compatibility metadata",
+   false
+  ]
+ ],
+ "GAP_OUTBOUND_ERD": [
+  [
+   "WORKFLOW_DEFINITION",
+   "contains",
+   "WORKFLOW_STEP_DEFINITION"
+  ],
+  [
+   "WORKFLOW_DEFINITION",
+   "instantiates",
+   "WORKFLOW_INSTANCE"
+  ],
+  [
+   "WORKFLOW_INSTANCE",
+   "executes",
+   "WORKFLOW_STEP_INSTANCE"
+  ],
+  [
+   "WORKFLOW_INSTANCE",
+   "invokes",
+   "API_CALL"
+  ],
+  [
+   "WORKFLOW_INSTANCE",
+   "submits",
+   "LOADER_DELIVERY"
+  ],
+  [
+   "API_CALL",
+   "reports",
+   "STATUS_EVENT"
+  ],
+  [
+   "LOADER_DELIVERY",
+   "reports",
+   "STATUS_EVENT"
+  ]
+ ],
+ "GAP_RECON": [
+  "physical file rows versus parsed rows",
+  "header and trailer count versus parsed rows",
+  "parsed rows versus committed RAW rows",
+  "RAW PASS plus DQ failures versus applicable source scope",
+  "Stage 2 source versus Stage 3 inserted and rejected scope",
+  "dimension and fact load counts and business control totals",
+  "Pre-Gold publish scope versus consumer delivery and acknowledgement"
+ ],
+ "GAP_MOVEMENT": {
+  "n": "Stage 2 to Stage 3, across databases",
+  "w": "Database-link or approved direct-path movement from Stage 2 Oracle to Stage 3 Exadata, preserving LOAD_ID, BUSINESS_DATE, source keys and reconciliation attributes. Full reload may use the approved bulk mechanism. CDC or GoldenGate only for an approved intraday requirement.",
+  "gate": "Reconciliation PASS authorises the publish scope. FAIL holds the publish and preserves the replay scope.",
+  "replay": "Scoped by approved business date and load lineage. Replay must not create duplicate active dimension rows or duplicate fact rows."
+ },
+ "GAP_DECISIONS": [
+  [
+   "DEC-GAP-01",
+   "Approve canonical Stage 1, Stage 2, Stage 3 and Consumer Movement terminology",
+   "arch"
+  ],
+  [
+   "DEC-GAP-02",
+   "Confirm the Landing file-readiness convention",
+   "arch"
+  ],
+  [
+   "DEC-GAP-03",
+   "Confirm unknown-file and ambiguous-match exception locations",
+   "arch"
+  ],
+  [
+   "DEC-GAP-04",
+   "Confirm the Stage 2 to Stage 3 default transfer mechanism and fallback bulk load",
+   "arch"
+  ],
+  [
+   "DEC-GAP-05",
+   "Confirm event consumer persistence and duplicate-detection key",
+   "arch"
+  ],
+  [
+   "DEC-GAP-06",
+   "Confirm OpenShift namespace, tenancy, scaling and shared-storage model",
+   "arch"
+  ],
+  [
+   "DEC-GAP-07",
+   "Confirm schema registry ownership and compatibility policy",
+   "arch"
+  ],
+  [
+   "DEC-GAP-08",
+   "Confirm Integration360 versus Splunk evidence ownership by event family",
+   "arch"
+  ],
+  [
+   "DEC-GAP-09",
+   "Approve HA topology and component-level RTO and RPO",
+   "arch"
+  ],
+  [
+   "DEC-GAP-10",
+   "Confirm correction and historical replay rules for each consumer",
+   "arch"
+  ],
+  [
+   "SILVER-DEC-01",
+   "Confirm the canonical entity inventory and ownership by domain",
+   "silver"
+  ],
+  [
+   "SILVER-DEC-02",
+   "Confirm the canonical business key for each entity",
+   "silver"
+  ],
+  [
+   "SILVER-DEC-03",
+   "Confirm whether Stage 2 stores daily snapshots, effective-dated history, or a combination by entity",
+   "silver"
+  ],
+  [
+   "SILVER-DEC-04",
+   "Confirm the standard lineage columns available in every RAW source",
+   "silver"
+  ],
+  [
+   "SILVER-DEC-05",
+   "Confirm Oracle schemas for STG, INT, DQ and reconciliation objects",
+   "silver"
+  ],
+  [
+   "SILVER-DEC-06",
+   "Confirm retention and partition-management rules by Stage 2 entity",
+   "silver"
+  ],
+  [
+   "SILVER-DEC-07",
+   "Confirm the location and naming of Stage 3 and publish models",
+   "silver"
+  ],
+  [
+   "SILVER-DEC-08",
+   "Confirm whether generic INT_REFERENCE stays generic or is decomposed into typed models",
+   "silver"
+  ]
+ ],
+ "GAP_ACCEPTANCE": [
+  [
+   "arch",
+   "Every architecture component is assigned to one canonical domain and tier"
+  ],
+  [
+   "arch",
+   "Every business-date transition has one owner, guard and persisted evidence record"
+  ],
+  [
+   "arch",
+   "Every file lifecycle state has an entry rule, exit rule, retry rule and operational event"
+  ],
+  [
+   "arch",
+   "Stage 2 to Stage 3 movement preserves LOAD_ID and BUSINESS_DATE and has a reconciliation gate"
+  ],
+  [
+   "arch",
+   "No Source or Transformation DQ failure progresses without approved resolution"
+  ],
+  [
+   "arch",
+   "Dimension processing completes and passes its tests before dependent facts are built"
+  ],
+  [
+   "arch",
+   "Every API, loader, workflow and SDC event is traceable by correlation or event identifier"
+  ],
+  [
+   "arch",
+   "Gateway, orchestration, ingestion, transformation and publishing failures are distinguishable in evidence"
+  ],
+  [
+   "arch",
+   "OpenShift deployments use versioned images, external config, secrets, health checks and controlled promotion"
+  ],
+  [
+   "arch",
+   "Security-sensitive changes, replay actions and manual state interventions are audited"
+  ],
+  [
+   "arch",
+   "HA/DR requirements and runbooks are approved and tested before production readiness"
+  ],
+  [
+   "arch",
+   "Component Markdown links to this supplement rather than defining conflicting alternatives"
+  ],
+  [
+   "silver",
+   "Every source interface maps to one or more STG views"
+  ],
+  [
+   "silver",
+   "Every STG PASS record maps to a canonical model or a documented non-persisted disposition"
+  ],
+  [
+   "silver",
+   "Every canonical entity has an approved grain and business key"
+  ],
+  [
+   "silver",
+   "Every incremental model has a deterministic unique key including BUSINESS_DATE"
+  ],
+  [
+   "silver",
+   "Every canonical relationship has a defined DQ rule"
+  ],
+  [
+   "silver",
+   "Every model preserves available load and file lineage"
+  ],
+  [
+   "silver",
+   "Every model has not-null, uniqueness and applicable relationship tests"
+  ],
+  [
+   "silver",
+   "Stage 2 reconciliation is recorded for every business date"
+  ],
+  [
+   "silver",
+   "Consumer-specific models are outside the Stage 2 folder"
+  ],
+  [
+   "silver",
+   "A failed Stage 2 test or reconciliation prevents Stage 3 publication"
+  ]
+ ],
+ "GAP_CODE_FINDING": {
+  "model": "int_bbh_open_trade_star",
+  "w": "Joins Account, Asset, Reference, Tax Lot, Transaction Header and Transaction Detail into a denormalised, target-oriented layout, and sits in the Stage 2 intermediate folder.",
+  "why": "Consumer-oriented denormalisation in Stage 2 is what stops Stage 2 being reusable: the next consumer needs a different shape and gets a second star beside the first.",
+  "fix": "Relocate to models/pre_gold/trades/pg_bbh_open_trade.sql, or to models/publish/imds/pub_bbh_open_trade_star.sql."
+ },
+ "GAP_NAMING": [
+  [
+   "RAW table",
+   "RAW_<SOURCE_ENTITY>",
+   "RAW_TRANSACTION_HEADER"
+  ],
+  [
+   "STG view",
+   "STG_<SOURCE_ENTITY>",
+   "STG_TRANSACTION_HEADER"
+  ],
+  [
+   "Canonical INT model",
+   "INT_<CANONICAL_ENTITY>",
+   "INT_TRANSACTION_HEADER"
+  ],
+  [
+   "Pre-Gold model",
+   "PG_<BUSINESS_OUTPUT>",
+   "PG_BBH_OPEN_TRADE"
+  ],
+  [
+   "Publish model",
+   "PUB_<CONSUMER>_<OUTPUT>",
+   "PUB_IMDS_BBH_OPEN_TRADE"
+  ],
+  [
+   "DQ model",
+   "DQ_<ENTITY>_<RULE_GROUP>",
+   "DQ_TRANSACTION_RELATIONSHIP"
+  ],
+  [
+   "Reconciliation model",
+   "RECON_<LAYER>_<ENTITY>",
+   "RECON_INT_TRANSACTION_HEADER"
+  ]
+ ],
+ "GAP_HADR_OPEN": [
+  "availability-zone and site topology for the Integration Hub and OpenShift runtime",
+  "Oracle and Exadata replication and failover approach",
+  "Airflow metadata database protection",
+  "persistent storage backup and restore",
+  "RTO and RPO per platform component",
+  "failover ownership and operational communication",
+  "periodic restore tests and DR game-day evidence"
+ ],
+ "GAP_PRECEDENCE": [
+  "Approved architecture decision records in the CP360 design corpus",
+  "This gap supplement, for the subjects it explicitly covers",
+  "The current File Ingestion and dbt Transformation technical designs",
+  "Integration architecture material",
+  "Older component summaries, drafts and proposal-only artifacts"
+ ],
+ "GAP_BUILD_STATUS": {
+  "ACCOUNT": "sample-expand",
+  "ACCOUNT_OPTIONAL_FIELDS": "sample",
+  "ASSET": "sample-expand",
+  "TAXLOT": "sample",
+  "TRANSACTION_HEADER": "sample-expand",
+  "TRANSACTION_DETAIL": "sample-expand",
+  "REFERENCE": "sample"
+ },
+ "GW_DOC": {
+  "n": "CP-Integration-Gateway",
+  "w": "Spring Boot WebFlux vendor gateway: forwards approved inbound calls to configured vendor endpoints, obtains and caches the vendor OAuth token, adds outbound Authorization and AppKey headers, maps the vendor response, and exposes health, metrics and tracing.",
+  "stack": [
+   "Java 21",
+   "Spring Boot WebFlux, Actuator, Validation, Security",
+   "Spring Cloud Circuit Breaker with Resilience4j",
+   "Micrometer, Prometheus, OpenTelemetry OTLP",
+   "OpenShift Route, probes, ServiceMonitor",
+   "Jenkins CI/CD"
+  ],
+  "verdict": "Moderate maturity. Pre-production hardening is required. Production approval remains conditional on closing the security-boundary, secret-management, deployment-governance, testing, observability and operational-readiness gaps."
+ },
+ "GW_STRENGTHS": [
+  "Clear separation among controller, forwarding service, token service, configuration and exception handling",
+  "Reactive non-blocking HTTP model, aligned with gateway I/O workloads",
+  "Circuit-breaker integration is present",
+  "OpenShift deployment artifacts include probes and resource controls",
+  "Actuator, metrics and tracing dependencies are represented"
+ ],
+ "GW_GAPS": [
+  {
+   "id": "GW-GAP-01",
+   "g": "Inbound trust boundary is not yet demonstrated as fully enforced",
+   "d": "Require authenticated identity and authorization in production through an approved API-management boundary, Spring Security, or both",
+   "sev": "block"
+  },
+  {
+   "id": "GW-GAP-02",
+   "g": "Forwarding-path governance needs an explicit contract",
+   "d": "Maintain an allowlist of approved paths, methods, request schemas and vendor targets; reject arbitrary proxy paths",
+   "sev": "block"
+  },
+  {
+   "id": "GW-GAP-03",
+   "g": "Header propagation requires strict governance",
+   "d": "Define accepted, generated, propagated, suppressed and returned headers",
+   "sev": "block"
+  },
+  {
+   "id": "GW-GAP-04",
+   "g": "Configuration patterns need convergence",
+   "d": "ConfigMap for non-secret settings, Secret for sensitive settings, profiles for behaviour only",
+   "sev": "open"
+  },
+  {
+   "id": "GW-GAP-05",
+   "g": "Truststore behaviour needs standardization",
+   "d": "Mount the binary truststore securely, inject the password separately, prevent production TLS bypass",
+   "sev": "block"
+  },
+  {
+   "id": "GW-GAP-06",
+   "g": "Deployment safeguards require standardization",
+   "d": "Add rollout verification, autoscaling policy, disruption budget, resource limits and policy controls",
+   "sev": "open"
+  },
+  {
+   "id": "GW-GAP-07",
+   "g": "Test depth is below behaviour complexity",
+   "d": "Add focused unit, integration, contract, resilience and security tests",
+   "sev": "open"
+  },
+  {
+   "id": "GW-GAP-08",
+   "g": "CI/CD controls are not yet fully mandatory",
+   "d": "Enforce compilation, tests, scans, image checks, manifest checks, rollout checks and retained evidence",
+   "sev": "open"
+  },
+  {
+   "id": "GW-GAP-09",
+   "g": "Operational contracts require formalization",
+   "d": "Define SLOs, dashboards, alerts, support queries, rollback procedures and vendor-outage runbooks",
+   "sev": "open"
+  }
+ ],
+ "GW_RISKS": [
+  [
+   "GW-RISK-01",
+   "Inbound authentication or authorization is incomplete",
+   "Approved boundary design and passing tests"
+  ],
+  [
+   "GW-RISK-02",
+   "Historical or accidental secret exposure",
+   "Rotation evidence and clean repository and pipeline scans"
+  ],
+  [
+   "GW-RISK-03",
+   "Arbitrary path forwarding",
+   "Governed allowlist and negative tests"
+  ],
+  [
+   "GW-RISK-04",
+   "Unsafe header propagation",
+   "Approved header contract and tests"
+  ],
+  [
+   "GW-RISK-05",
+   "Incomplete CI/CD gates",
+   "Mandatory pipeline gates and retained results"
+  ],
+  [
+   "GW-RISK-06",
+   "Missing rollout and availability controls",
+   "Validated rollout, resources, scaling and disruption configuration"
+  ],
+  [
+   "GW-RISK-07",
+   "Insufficient operational readiness",
+   "Approved dashboards, alerts, support queries and runbooks"
+  ]
+ ],
+ "GW_OPERATION": [
+  "operation_id",
+  "allowed_method",
+  "allowed_path_pattern",
+  "vendor_target_path",
+  "request_schema_version",
+  "required_request_headers",
+  "allowed_request_headers",
+  "allowed_response_headers",
+  "timeout_policy",
+  "retry_policy",
+  "circuit_breaker_policy"
+ ],
+ "GW_HEADERS": [
+  [
+   "Caller identity",
+   "Trust only values asserted by the approved upstream boundary; prevent spoofing"
+  ],
+  [
+   "Vendor Authorization",
+   "Generate from the vendor token; do not blindly forward caller authorization"
+  ],
+  [
+   "AppKey",
+   "Resolve using the approved precedence and fallback policy"
+  ],
+  [
+   "Correlation identifier",
+   "Validate a trusted incoming value or generate one; propagate to outbound calls, logs, metrics and traces"
+  ],
+  [
+   "Hop-by-hop headers",
+   "Suppress"
+  ],
+  [
+   "Host and forwarding headers",
+   "Generate or normalize under gateway control"
+  ],
+  [
+   "Vendor response headers",
+   "Return only an explicit allowlist"
+  ]
+ ],
+ "GW_TOKEN_STATES": [
+  [
+   "EMPTY",
+   "No token held",
+   "to REFRESHING when a token is requested"
+  ],
+  [
+   "REFRESHING",
+   "Token request in flight",
+   "to VALID on receipt, to FAILED on error"
+  ],
+  [
+   "VALID",
+   "Cached and inside the safe expiry boundary",
+   "cache hit, or to REFRESHING at safe expiry, or to EMPTY on invalidation"
+  ],
+  [
+   "FAILED",
+   "Token request failed",
+   "to REFRESHING on approved retry"
+  ]
+ ],
+ "GW_TOKEN_TESTS": [
+  "First request obtains and caches a token",
+  "A later request uses the valid cached token",
+  "Refresh occurs at the configured safe-expiry boundary",
+  "Concurrent requests do not create a token-refresh storm",
+  "Failed refresh does not leave an invalid token usable",
+  "Vendor authorization failure follows the approved eviction and replay policy",
+  "Token and credential values never appear in logs or exceptions"
+ ],
+ "GW_SECRETS": {
+  "never": "AppKeys, Basic authorization values, truststore passwords, tokens and private certificates are never committed, and never appear in logs, traces, error responses, build output or image layers.",
+  "rotate": "Rotate any value that may previously have been exposed.",
+  "startup": "Production startup fails when a mandatory secret is absent.",
+  "configmap": [
+   "VENDOR_CLIENT_HOST",
+   "VENDOR_TOKEN_HOST",
+   "CONNECT_TIMEOUT",
+   "RESPONSE_TIMEOUT",
+   "TOKEN_EXPIRY_SKEW",
+   "ALLOWED_OPERATION_CONFIGURATION",
+   "LOG_LEVEL_DEFAULTS",
+   "OTEL_EXPORT_CONFIGURATION"
+  ],
+  "secret": [
+   "VENDOR_APP_KEY",
+   "VENDOR_BASIC_AUTHORIZATION",
+   "TRUSTSTORE_PASSWORD",
+   "TRUSTSTORE_FILE"
+  ]
+ },
+ "GW_RUNTIME_OBJECTS": [
+  [
+   "Deployment or approved workload object",
+   true
+  ],
+  [
+   "Service",
+   true
+  ],
+  [
+   "Route with approved TLS policy",
+   true
+  ],
+  [
+   "ConfigMap",
+   true
+  ],
+  [
+   "Secret bindings and truststore volume",
+   true
+  ],
+  [
+   "Least-privilege ServiceAccount",
+   true
+  ],
+  [
+   "ServiceMonitor, where Prometheus Operator discovery is used",
+   true
+  ],
+  [
+   "HorizontalPodAutoscaler, after load behaviour is validated",
+   false
+  ],
+  [
+   "PodDisruptionBudget, aligned with the approved availability model",
+   false
+  ],
+  [
+   "NetworkPolicy, where the platform standard requires it",
+   false
+  ]
+ ],
+ "GW_METRICS": [
+  "Inbound request count and latency by governed operation",
+  "Vendor response status class and latency",
+  "Token cache hit, miss, refresh and failure",
+  "Circuit-breaker state and rejected calls",
+  "Retry and timeout counts",
+  "Rejection by validation, authentication, authorization, path, method and schema",
+  "Pod availability and rollout health"
+ ],
+ "GW_RUNBOOKS": [
+  "Vendor business endpoint unavailable",
+  "Vendor token endpoint unavailable",
+  "Certificate or truststore failure",
+  "Secret missing or expired",
+  "Circuit breaker open",
+  "Elevated latency or error rate",
+  "Failed deployment or rollback",
+  "Route, Service, DNS or NetworkPolicy failure",
+  "Unexpected authentication or authorization rejection",
+  "Suspected secret exposure"
+ ],
+ "GW_APPROVAL": [
+  "Approved and tested inbound authentication and authorization",
+  "Explicit operation allowlisting that prevents arbitrary proxying",
+  "Documented and tested request and response header contracts",
+  "No production secrets in source, image layers, ConfigMaps, logs, traces or pipeline output",
+  "External truststore and password configuration with no production TLS bypass",
+  "Passing token cache, expiry, refresh, concurrency, eviction and failure tests",
+  "Retry limited to approved replay-safe scenarios",
+  "Tested circuit-breaker, timeout, token-error and vendor-error mapping",
+  "Passing mandatory CI/CD quality, security, image and manifest gates",
+  "Validated OpenShift probes, resources, rollout, disruption, scaling, Secret mount and monitoring",
+  "Approved dashboards, alerts, support queries and runbooks",
+  "Documented rollback and credential-rotation evidence"
+ ],
+ "GW_PLAN": {
+  "immediate": [
+   "Rotate and clean any credential that may previously have been exposed",
+   "Lock production TLS and logging behaviour",
+   "Finalize and test AppKey precedence and fallback",
+   "Define and enforce the inbound identity and authorization boundary",
+   "Add explicit operation, path, method, schema and header allowlists"
+  ],
+  "short": [
+   "Complete ConfigMap, Secret and truststore mounting",
+   "Make test and security gates mandatory in Jenkins",
+   "Add token, forwarding, security, resilience, error-mapping and contract tests",
+   "Parameterize and validate OpenShift deployment assets",
+   "Add rollout verification, rollback identification, autoscaling, disruption and policy controls"
+  ],
+  "later": [
+   "Add policy-as-code validation for OpenShift assets",
+   "Establish approved SLOs, dashboards, alert thresholds and ownership",
+   "Complete the gateway threat model",
+   "Approve and exercise incident, rollback, downstream-outage and credential-compromise runbooks"
+  ]
+ },
+ "RECONCILE": [
+  {
+   "id": "R1",
+   "v": "conflict",
+   "t": "Stage 3 names two different things",
+   "sup": "Stage 3 IS Pre-Gold, on Oracle Exadata, and a fourth tier - Consumer Movement - carries publish and delivery with no transformation in flight.",
+   "hub": "The data path draws Stage 3 as the warehouse itself, with Pre-Gold as a separate layer before it and no publish tier at all.",
+   "cost": "Every document that says 'Stage 3' means one of two different databases. The acceptance criterion 'every component is assigned to one canonical domain and tier' cannot be evaluated until this is picked.",
+   "dec": "DEC-GAP-01",
+   "where": "the database model, and PROC_STAGES"
+  },
+  {
+   "id": "R2",
+   "v": "conflict",
+   "t": "DIM and FACT are in the wrong tier",
+   "sup": "Dimensions, facts, aggregates and control-total preparation are Stage 3 Pre-Gold, on Exadata. Stage 2 is normalised canonical entities and stops there.",
+   "hub": "Stage 2 INT is drawn as INT, DIM and FACT together, on the same Oracle estate - which is how both SEI design documents describe it.",
+   "cost": "This is not a folder move. If the supplement holds, DIM and FACT change database, the dbt chain splits across two estates, and the STG-to-INT reconciliation boundary stops being the last one that matters.",
+   "dec": "DEC-GAP-01",
+   "where": "PROC_STAGES, the stage chain, the database model"
+  },
+  {
+   "id": "R3",
+   "v": "conflict",
+   "t": "The file lifecycle has two sets of state names",
+   "sup": "DISCOVERED, PROCESSING, DUPLICATE_SKIPPED, QUARANTINED, FAILED, ARCHIVE_FAILED, ARCHIVED.",
+   "hub": "RECEIVED, VALIDATED, LOADING, QUARANTINED, FAILED, ARCHIVE_FAILED, ARCHIVED - from the File Ingestion design document.",
+   "cost": "Two names for one state machine is two state machines. Operators will see one set in the registry and the other in the runbook, and DUPLICATE_SKIPPED exists in only one of them.",
+   "dec": "none raised - worth one",
+   "where": "SEI_STATES, the file ingestion screen"
+  },
+  {
+   "id": "R4",
+   "v": "conflict",
+   "t": "Three different counts of reconciliation boundaries",
+   "sup": "Seven boundaries, including Stage 2 to Stage 3 and publish to consumer acknowledgement.",
+   "hub": "The pack specifies three. The architect review recommends twelve under an event-primary posture.",
+   "cost": "Nobody can say whether reconciliation is complete, because complete is three, seven or twelve depending on which document is open.",
+   "dec": "none raised - worth one",
+   "where": "RECON_RESULT, the DQ lane"
+  },
+  {
+   "id": "R5",
+   "v": "conflict",
+   "t": "Stage 2 retention is settled here and open there",
+   "sup": "Seven-day retention WHERE DEFINED, and SILVER-DEC-06 leaves retention and partition management open per entity.",
+   "hub": "Seven days, partition drop, stated flatly on every one of the 52 tables.",
+   "cost": "The replay window follows from retention. Stating it as settled when it is a per-entity decision makes every replay answer provisional without saying so.",
+   "dec": "SILVER-DEC-06",
+   "where": "the INT contract, every table record"
+  },
+  {
+   "id": "R6",
+   "v": "closes",
+   "t": "The outbound submission registry now has a design",
+   "sup": "WORKFLOW_DEFINITION to WORKFLOW_INSTANCE to LOADER_DELIVERY and API_CALL, each reporting STATUS_EVENT.",
+   "hub": "The loader loop screen says there is no outbound equivalent of FILE_REGISTRY, so a reject count has nothing to reconcile against and a batch that never comes back never ages out.",
+   "cost": "Closed, if the ERD is approved. LOADER_DELIVERY plus STATUS_EVENT is the registry that was missing.",
+   "dec": "none",
+   "where": "the loader loop, the database model"
+  },
+  {
+   "id": "R7",
+   "v": "closes",
+   "t": "Stage 2 to Stage 3 movement has a pattern and a gate",
+   "sup": "Database-link or direct-path movement preserving LOAD_ID and BUSINESS_DATE, with a reconciliation gate that authorises or holds the publish scope, and a replay boundary scoped by date and load.",
+   "hub": "The database picture has no movement component at all - Pre-Gold simply follows DIM and FACT with nothing in between.",
+   "cost": "Closed in design. Still needs DEC-GAP-04 to pick the mechanism.",
+   "dec": "DEC-GAP-04",
+   "where": "the database model, the data path"
+  },
+  {
+   "id": "R8",
+   "v": "closes",
+   "t": "Correlation across the loader round trip",
+   "sup": "CORRELATION_ID propagated through Hub, orchestration, API and loader execution, callback and monitoring; IDEMPOTENCY_KEY stable across retries of the same business operation.",
+   "hub": "The loader screen asks for one submission id threading all four legs, and names it as missing.",
+   "cost": "Closed. The identifiers exist and have propagation rules.",
+   "dec": "none",
+   "where": "the loader loop"
+  },
+  {
+   "id": "R9",
+   "v": "extends",
+   "t": "LOAD_ID is missing from every model we draw",
+   "sup": "LOAD_ID is the identifier preserved from RAW through Stage 2, Stage 3, replay and publish evidence, and acceptance criterion 4 depends on it.",
+   "hub": "Stage 1 adds BUSINESS_DATE, SRC_RECORD_ID, FILE_REGISTRY_ID and LOAD_TS. Stage 2's standard columns add MICRO_BATCH_ID and DBT_INVOCATION_ID. Neither carries LOAD_ID.",
+   "cost": "Without it there is no single identifier for one load execution across four tiers, and the Stage 2 to Stage 3 reconciliation gate has nothing to key on. This is a hole in our own model, not in theirs.",
+   "dec": "SILVER-DEC-04",
+   "where": "S1_COLS and S2_STD_COLS"
+  },
+  {
+   "id": "R10",
+   "v": "extends",
+   "t": "Seven of 52 canonical models exist",
+   "sup": "The code sample implements Account, Account Optional Field, Asset, Reference, Tax Lot, Transaction Header and Transaction Detail. Four of those seven are mapped to fewer attributes than the canonical model defines. The other 45 are targets.",
+   "hub": "All 52 canonical tables are drawn alike, with no build status at all - a model and an intention look identical.",
+   "cost": "Anyone sizing the work from our screens sees 52 designed tables and no indication that 45 of them do not exist.",
+   "dec": "SILVER-DEC-01",
+   "where": "the Stage 2 canonical model"
+  },
+  {
+   "id": "R11",
+   "v": "extends",
+   "t": "Three foundation entities with no table anywhere",
+   "sup": "Workflow metadata, API configuration and a schema registry are named as control and metadata entities.",
+   "hub": "The database model holds five control tables. None of these three is among them, and nothing else in the corpus defines them.",
+   "cost": "The outbound path is configuration-driven by design and has no configuration store. Schema registry ownership is DEC-GAP-07 and unassigned.",
+   "dec": "DEC-GAP-07",
+   "where": "the control plane"
+  },
+  {
+   "id": "R12",
+   "v": "extends",
+   "t": "A consumer-oriented model is sitting in Stage 2",
+   "sup": "int_bbh_open_trade_star joins six INT models into a denormalised target layout and belongs in Pre-Gold or Publish.",
+   "hub": "Nothing. The app models the canonical layer and has no view of what is actually in the dbt project.",
+   "cost": "Consumer denormalisation inside Stage 2 is what stops Stage 2 being reusable: the next consumer needs a different shape and gets a second star beside the first.",
+   "dec": "SILVER-DEC-07",
+   "where": "nothing yet"
+  },
+  {
+   "id": "R13",
+   "v": "extends",
+   "t": "Graceful degradation has four named behaviours",
+   "sup": "Oracle unavailable: do not claim or advance durable state. Splunk or Integration360 unavailable: follow the buffering policy, never silently discard required evidence. SEI APIs unavailable: workflow state stays queryable, retry reuses the same correlation and idempotency keys. CP360 UI unavailable: durable state remains in Oracle and Airflow.",
+   "hub": "Nothing on partial failure of a dependency.",
+   "cost": "The third one is the sharp one: evidence silently discarded during a Splunk outage is indistinguishable afterwards from evidence that was never produced.",
+   "dec": "DEC-GAP-08",
+   "where": "nothing yet"
+  },
+  {
+   "id": "R14",
+   "v": "extends",
+   "t": "Landing zone failure modes, including ambiguous match",
+   "sup": "Partial file exposure, duplicate physical delivery for the same logical interface and date, no configuration match, MORE THAN ONE configuration match, storage unavailable. A file matching two configurations is a configuration error and is not loaded.",
+   "hub": "The file screen covers validation thoroughly and says nothing about what happens before a file is matched to an interface.",
+   "cost": "Ambiguous match is the one with no safe default: loading against the first match silently routes a file to the wrong RAW table.",
+   "dec": "DEC-GAP-02, DEC-GAP-03",
+   "where": "the file ingestion screen"
+  },
+  {
+   "id": "R15",
+   "v": "extends",
+   "t": "HA and DR establish no numbers at all",
+   "sup": "Seven items to finalise, and the supplement states plainly that no numerical RTO or RPO is established and that values require formal BBH approval.",
+   "hub": "Nothing on availability, failover or recovery objectives.",
+   "cost": "Production readiness has a named precondition that is not started. It is honest about being unstarted, which is better than a number nobody agreed.",
+   "dec": "DEC-GAP-09",
+   "where": "nothing yet"
+  },
+  {
+   "id": "R20",
+   "v": "conflict",
+   "t": "The context screen credits the gateway with controls it does not yet enforce",
+   "sup": "GW-GAP-01: the inbound trust boundary is NOT yet demonstrated as fully enforced. GW-RISK-03: arbitrary path forwarding is a live risk until a governed allowlist exists.",
+   "hub": "The boundary screen lists what the single managed door buys - mTLS and OAuth to SEI, rotation in one place, retry and circuit-breaker policy, one authoritative log - in the present tense, as though all of it were in force.",
+   "cost": "A diagram that credits a component with controls it does not have is worse than one that omits the component: it stops anybody asking. Those claims need a 'designed, not yet enforced' state.",
+   "dec": "GW-GAP-01, GW-GAP-02",
+   "where": "the boundary screen, the gateway band"
+  },
+  {
+   "id": "R21",
+   "v": "extends",
+   "t": "The rate limit our design depends on is not in the operation contract",
+   "sup": "A governed operation declares method, path pattern, vendor target, schema version, header allowlists, timeout, retry and circuit-breaker policy. There is no quota or rate-limit field.",
+   "hub": "The boundary screen says rate limiting at the gateway is 'where the key-set collapser's restraint is actually enforced', and the mitigation for a consumer read-storm starving ingestion is 'separate API products with their own quota tiers'.",
+   "cost": "Our stated mitigation has no implementation named anywhere. The collapser proposes and nothing disposes.",
+   "dec": "none raised - worth one",
+   "where": "the boundary screen, GATEWAY_NOTE"
+  },
+  {
+   "id": "R22",
+   "v": "extends",
+   "t": "Starvation has a second cause: the gateway does not scale yet",
+   "sup": "HorizontalPodAutoscaler comes 'after load behaviour is validated', and PodDisruptionBudget and NetworkPolicy are listed as required but not yet in place (GW-GAP-06, GW-RISK-06).",
+   "hub": "The shared-quota risk assumes the gateway itself keeps up and only the SEI quota is contended.",
+   "cost": "A bursty set-based pull, a loader window and interactive reads share a service with no autoscaling and no disruption budget. The queue forms before the quota is reached.",
+   "dec": "GW-GAP-06",
+   "where": "the boundary screen"
+  },
+  {
+   "id": "R23",
+   "v": "extends",
+   "t": "The vendor token cache is per-pod, and the storm is a named test",
+   "sup": "The token is cached in memory until a safe expiry boundary, and 'concurrent requests do not create a token-refresh storm' is a required test.",
+   "hub": "Nothing. The gateway is drawn as one band with no internal state.",
+   "cost": "In-memory means per-pod: every replica refreshes on its own clock, and the refresh count scales with replicas rather than with work. The puller's burst is exactly the shape that triggers it.",
+   "dec": "GW-GAP-07",
+   "where": "nothing yet"
+  },
+  {
+   "id": "R24",
+   "v": "closes",
+   "t": "The correlation identifier now has an owner and a rule",
+   "sup": "The gateway validates a trusted incoming correlation value or generates one, and propagates it to outbound calls, logs, metrics and traces.",
+   "hub": "Both the loader loop and the boundary screen ask for a correlation id minted at the gateway and carried through, and name it as not yet owned.",
+   "cost": "Closed. The gateway owns minting and propagation, which is the answer both screens were asking for.",
+   "dec": "none",
+   "where": "the boundary screen, the loader loop"
+  },
+  {
+   "id": "R25",
+   "v": "extends",
+   "t": "Rotate anything that may have been exposed - including ours",
+   "sup": "GW-RISK-02 requires rotation evidence and clean repository and pipeline scans for any credential that may previously have been exposed.",
+   "hub": "This repository carried a plaintext Oracle password in local/load-all.ps1 across more than one commit. The working tree no longer has it; the history still does, and nothing has been rotated.",
+   "cost": "The gateway review sets the standard and this repository does not meet it. Rotation and a history rewrite are both still open, and this has been flagged more than once.",
+   "dec": "GW-RISK-02",
+   "where": "the repository, not a screen"
+  },
+  {
+   "id": "R16",
+   "v": "agrees",
+   "t": "ARCHIVE_FAILED never reloads RAW",
+   "sup": "Retries the archive operation and does not reload committed RAW records.",
+   "hub": "The same rule, in the same words, from the File Ingestion design.",
+   "cost": "",
+   "dec": "",
+   "where": "the file ingestion screen"
+  },
+  {
+   "id": "R17",
+   "v": "agrees",
+   "t": "One guarded owner of PENDING to TRIGGER",
+   "sup": "The missing-interface set is empty AND the atomic update affects exactly one row.",
+   "hub": "The same guard, drawn as the gate.",
+   "cost": "",
+   "dec": "",
+   "where": "the gate"
+  },
+  {
+   "id": "R18",
+   "v": "agrees",
+   "t": "Dimensions before facts, and no placeholder keys",
+   "sup": "Build dimensions before facts; late-arriving dimensions are held rather than replaced with placeholder keys.",
+   "hub": "The same, on the transformation chain and the Gold layer.",
+   "cost": "",
+   "dec": "",
+   "where": "the stage chain"
+  },
+  {
+   "id": "R19",
+   "v": "agrees",
+   "t": "An event is a notification, not the record",
+   "sup": "Treat the event as notification; retrieve the current record from the named SDC view by payload key; process duplicates idempotently.",
+   "hub": "The same, as the three event kinds and the event-then-fetch path.",
+   "cost": "",
+   "dec": "",
+   "where": "events and the gate"
+  }
+ ],
+ "RC_VERDICT": {
+  "conflict": {
+   "n": "Conflict",
+   "w": "the two disagree and somebody has to choose",
+   "c": "#c1113a"
+  },
+  "closes": {
+   "n": "Closes a gap",
+   "w": "answers something the Hub flagged as missing",
+   "c": "#159943"
+  },
+  "extends": {
+   "n": "New",
+   "w": "material the Hub has nothing for yet",
+   "c": "#e67e22"
+  },
+  "agrees": {
+   "n": "Confirms",
+   "w": "independently states what the baseline already says",
+   "c": "#3a6f9e"
+  }
+ },
+ "S1_SHAPE": {
+  "n": "One table per inbound interface",
+  "w": "The DDL is per interface, declared alongside the interface rather than in a central model. FILE_SCHEMA_CONFIG.TARGET_RAW_TABLE is what routes a file to its table, which is why there is deliberately no column-mapping table: the RAW table's own DDL is the schema contract.",
+  "ev": "ingest Glossary (p.25) - dbt section 4.1 (p.10)"
+ },
+ "S1_RULES": [
+  [
+   "Append-only",
+   "Rows are added, never updated in place. A corrected delivery is a new row set for the same business date, not an edit."
+  ],
+  [
+   "No keys declared",
+   "No primary key, no foreign key, no uniqueness. Identity is asserted first in STG, and enforced first in INT."
+  ],
+  [
+   "Nothing cleaned",
+   "No trimming, no casting beyond what the load needs, no code translation. The first thing that reads a row's content is the STG view."
+  ],
+  [
+   "Nothing rejected",
+   "A row that will fail DQ still lands. Rejection is a Stage 2 decision, so the evidence of what arrived survives it."
+  ],
+  [
+   "One transaction per file",
+   "A file loads whole or not at all, and the three counts must agree before the commit."
+  ]
+ ],
+ "S1_COLS": [
+  [
+   "BUSINESS_DATE",
+   "date",
+   "which day this row belongs to - set from the file, not from the clock"
+  ],
+  [
+   "SRC_RECORD_ID",
+   "number",
+   "the row's identity within its delivery, so a DQ failure in Stage 2 can name the line it came from"
+  ],
+  [
+   "FILE_REGISTRY_ID",
+   "number",
+   "which delivery it arrived in - the join back to the file, its counts and its archive path"
+  ],
+  [
+   "LOAD_TS",
+   "timestamp",
+   "when it landed"
+  ]
+ ],
+ "S1_TABLES": [
+  {
+   "n": "RAW_ACCOUNT",
+   "arch": true,
+   "doc": true
+  },
+  {
+   "n": "RAW_CLIENT",
+   "arch": true,
+   "doc": true
+  },
+  {
+   "n": "RAW_TRANSACTION",
+   "arch": true,
+   "doc": true
+  },
+  {
+   "n": "RAW_TAXLOT",
+   "arch": true,
+   "doc": false
+  },
+  {
+   "n": "RAW_POSITION",
+   "arch": true,
+   "doc": false
+  },
+  {
+   "n": "RAW_CORRECTED_TRANSACTION",
+   "arch": true,
+   "doc": false
+  },
+  {
+   "n": "RAW_CORRECTED_POSITION",
+   "arch": true,
+   "doc": false
+  }
+ ],
+ "S1_CONFLICT": {
+  "id": "C1",
+  "t": "Three RAW tables, or seven",
+  "w": "The architecture names seven. The dbt design document names three - account, client and transaction. Position, tax lot and the two correction tables do not appear in it at all.",
+  "why": "Four of the seven feeds have no transformation designed for them. If the architecture is right, the design document covers under half the inbound surface, and the gap is invisible from Stage 2 because nothing downstream asks for a table that was never modelled."
+ },
+ "S1_NOT_HERE": [
+  "No entities and no relationships - the first normalised model is Stage 2 INT.",
+  "No reference-code translation - codes land as delivered.",
+  "No deduplication - a duplicate delivery is two row sets, told apart by FILE_REGISTRY_ID.",
+  "No retention rule is stated in either document for RAW, unlike INT's seven days."
+ ],
+ "S2_DOMAINS": [
+  {
+   "k": "PM",
+   "n": "Party Management",
+   "c": 11
+  },
+  {
+   "k": "AP",
+   "n": "Account & Portfolio",
+   "c": 10
+  },
+  {
+   "k": "AS",
+   "n": "Asset & Security Master",
+   "c": 3
+  },
+  {
+   "k": "PH",
+   "n": "Positions & Holdings",
+   "c": 6
+  },
+  {
+   "k": "TX",
+   "n": "Transactions & Cash Activity",
+   "c": 7
+  },
+  {
+   "k": "FB",
+   "n": "Fees & Billing",
+   "c": 4
+  },
+  {
+   "k": "SC",
+   "n": "Statements & Communications",
+   "c": 3
+  },
+  {
+   "k": "IP",
+   "n": "Investment Product",
+   "c": 2
+  },
+  {
+   "k": "OS",
+   "n": "Organization & Security",
+   "c": 3
+  },
+  {
+   "k": "RC",
+   "n": "Reference & Configuration",
+   "c": 3
+  }
+ ],
+ "S2_TABLES": [
+  [
+   "PM",
+   "CLIENT",
+   "CLIENT_ID",
+   [],
+   "Client"
+  ],
+  [
+   "PM",
+   "CLIENT_ACCOUNT_LINKAGE",
+   "CLIENT_ID, ACCOUNT_ID, RELATIONSHIP",
+   [
+    [
+     "CLIENT_ID",
+     "CLIENT"
+    ],
+    [
+     "ACCOUNT_ID",
+     "ACCOUNT"
+    ]
+   ],
+   "Client Account Linkage"
+  ],
+  [
+   "PM",
+   "CLIENT_INVESTMENT_MANAGER",
+   null,
+   [
+    [
+     "CLIENT_ID",
+     "CLIENT"
+    ]
+   ],
+   "Client"
+  ],
+  [
+   "PM",
+   "CLIENT_RELATED_THIRD_PARTY",
+   null,
+   [
+    [
+     "CLIENT_ID",
+     "CLIENT"
+    ]
+   ],
+   "Client"
+  ],
+  [
+   "PM",
+   "CLIENT_SOLUTION",
+   null,
+   [
+    [
+     "CLIENT_ID",
+     "CLIENT"
+    ]
+   ],
+   "Client"
+  ],
+  [
+   "PM",
+   "CLIENT_TAX_PROFILE",
+   null,
+   [
+    [
+     "CLIENT_ID",
+     "CLIENT"
+    ]
+   ],
+   "Client"
+  ],
+  [
+   "PM",
+   "CLIENT_W8_PROFILE",
+   null,
+   [
+    [
+     "CLIENT_ID",
+     "CLIENT"
+    ]
+   ],
+   "Client"
+  ],
+  [
+   "PM",
+   "PARTY_CONTACT",
+   "CONTACT_IDENTIFIER, CONTACT_TYPE, ENTITY_IDENTIFIER",
+   [
+    [
+     "ENTITY_IDENTIFIER",
+     "CLIENT"
+    ]
+   ],
+   "Contact Details"
+  ],
+  [
+   "PM",
+   "PARTY_OPTIONAL_FIELDS",
+   "PARTY_ID",
+   [
+    [
+     "PARTY_ID",
+     "CLIENT"
+    ]
+   ],
+   "Party Optional Fields"
+  ],
+  [
+   "PM",
+   "PARTY_RELATIONSHIPS",
+   "RELATIONSHIP_IDENTIFIER, RELATIONSHIP_ROLE",
+   [],
+   "Relationships"
+  ],
+  [
+   "PM",
+   "PAY_TO_RECIPIENTS",
+   "ACCOUNT_NUMBER, ENTITY_ID, PAY_TO_METHOD, PROFILE_ID",
+   [
+    [
+     "ACCOUNT_NUMBER",
+     "ACCOUNT"
+    ]
+   ],
+   "Pay To Recipients"
+  ],
+  [
+   "AP",
+   "ACCOUNT",
+   "ACCOUNT_ID",
+   [],
+   "Account"
+  ],
+  [
+   "AP",
+   "ACCOUNT_FEE_PACKAGE_ASSOCIATION",
+   "ACCOUNT_ID, FEE_PACKAGE_ID",
+   [
+    [
+     "ACCOUNT_ID",
+     "ACCOUNT"
+    ],
+    [
+     "FEE_PACKAGE_ID",
+     "FEE_PACKAGE"
+    ]
+   ],
+   "Account"
+  ],
+  [
+   "AP",
+   "ACCOUNT_INVESTMENT_GUIDELINES",
+   "ACCOUNT_ID, INVESTMENT_GUIDELINE_ID",
+   [
+    [
+     "ACCOUNT_ID",
+     "ACCOUNT"
+    ]
+   ],
+   "Account"
+  ],
+  [
+   "AP",
+   "ACCOUNT_INVESTMENT_MANAGER",
+   "ACCOUNT_ID, INVESTMENT_MANAGER",
+   [
+    [
+     "ACCOUNT_ID",
+     "ACCOUNT"
+    ]
+   ],
+   "Account"
+  ],
+  [
+   "AP",
+   "ACCOUNT_INVESTMENT_RESTRICTIONS",
+   "ACCOUNT_ID, INVESTMENT_RESTRICTIONS",
+   [
+    [
+     "ACCOUNT_ID",
+     "ACCOUNT"
+    ]
+   ],
+   "Account"
+  ],
+  [
+   "AP",
+   "ACCOUNT_OPTIONAL_FIELDS",
+   "ACCOUNT_ID, ACCOUNT_NUMBER, ACCOUNT_OPTIONAL_FIELD_ID, ACCOUNT_OPTIONAL_FIELD_VALUE",
+   [
+    [
+     "ACCOUNT_ID",
+     "ACCOUNT"
+    ]
+   ],
+   "Account Optional Fields"
+  ],
+  [
+   "AP",
+   "ACCOUNT_SOLUTION",
+   "ACCOUNT_ID, SOLUTION",
+   [
+    [
+     "ACCOUNT_ID",
+     "ACCOUNT"
+    ]
+   ],
+   "Account"
+  ],
+  [
+   "AP",
+   "ACCOUNT_SPECIFIC_FEE",
+   "ACCOUNT_ID, ACCOUNT_SPECIFIC_FEE_TYPE",
+   [
+    [
+     "ACCOUNT_ID",
+     "ACCOUNT"
+    ]
+   ],
+   "Account"
+  ],
+  [
+   "AP",
+   "PORTFOLIO",
+   "PORTFOLIO_ID",
+   [
+    [
+     "ACCOUNT_ID",
+     "ACCOUNT"
+    ]
+   ],
+   "Portfolio"
+  ],
+  [
+   "AP",
+   "PORTFOLIO_GROUPS",
+   "GROUP_ID, GROUP_TYPE_ID",
+   [
+    [
+     "ACCOUNT_ID",
+     "ACCOUNT"
+    ]
+   ],
+   "Portfolio Groups"
+  ],
+  [
+   "AS",
+   "ASSET",
+   "FIRM_ID, INSTRUMENT_ID",
+   [],
+   "Asset"
+  ],
+  [
+   "AS",
+   "ASSET_INVESTMENT_CLASS",
+   "SCHEMA_ID, TRD_INSTRUMENT_ID",
+   [
+    [
+     "TRD_INSTRUMENT_ID",
+     "ASSET"
+    ]
+   ],
+   "Asset Investment Class"
+  ],
+  [
+   "AS",
+   "ASSET_OPTIONAL_FIELDS",
+   "ASSET_OPTIONAL_FIELD_DATA_ID",
+   [
+    [
+     "INSTRUMENT_ID",
+     "ASSET"
+    ]
+   ],
+   "Asset Optional Fields"
+  ],
+  [
+   "PH",
+   "ACTIVE_COMMITS_AND_BLOCKS",
+   "ACCOUNT_NUMBER, FIRM_ID, PORTFOLIO_ID, TRD_INSTRUMENT_ID",
+   [
+    [
+     "ACCOUNT_NUMBER",
+     "ACCOUNT"
+    ],
+    [
+     "PORTFOLIO_ID",
+     "PORTFOLIO"
+    ],
+    [
+     "TRD_INSTRUMENT_ID",
+     "ASSET"
+    ]
+   ],
+   "Active Commits and Blocks"
+  ],
+  [
+   "PH",
+   "CUSTODY_AND_NOSTRO_POS",
+   "ACCOUNT_NUMBER, INSTRUMENT_ID, ISO_3_CHARACTER_CCY, PORTFOLIO_ID, POSITION_TYPE, POSK_ID, TRADING_PARTNER_ACCOUNT_NAME, TRADING_PARTNER_ACCOUNT_NUMBER",
+   [
+    [
+     "ACCOUNT_NUMBER",
+     "ACCOUNT"
+    ],
+    [
+     "INSTRUMENT_ID",
+     "ASSET"
+    ],
+    [
+     "PORTFOLIO_ID",
+     "PORTFOLIO"
+    ]
+   ],
+   "Custody And Nostro Pos"
+  ],
+  [
+   "PH",
+   "END_OF_DAY_POSITIONS",
+   "AS_OF_DATE, TAXLOT_PORTFOLIO_ID, TRD_INSTRUMENT_ID",
+   [
+    [
+     "TAXLOT_PORTFOLIO_ID",
+     "PORTFOLIO"
+    ],
+    [
+     "TRD_INSTRUMENT_ID",
+     "ASSET"
+    ]
+   ],
+   "End of Day Positions"
+  ],
+  [
+   "PH",
+   "END_OF_PERIOD_VALUE_AGG",
+   "ACCOUNT_NUMBER, FIRM_ID",
+   [
+    [
+     "ACCOUNT_NUMBER",
+     "ACCOUNT"
+    ]
+   ],
+   "End of Period Value Agg"
+  ],
+  [
+   "PH",
+   "FX_FORWARD_POSITION",
+   "COUNTER_CURR, PORTFOLIO_ID, PROCESSING_DATE, REFERENCE_CURR",
+   [
+    [
+     "ACCOUNT_ID",
+     "ACCOUNT"
+    ],
+    [
+     "PORTFOLIO_ID",
+     "PORTFOLIO"
+    ]
+   ],
+   "FX Forward Position"
+  ],
+  [
+   "PH",
+   "TAXLOT",
+   "TAXLOT_ID",
+   [
+    [
+     "INSTRUMENT_ID",
+     "ASSET"
+    ],
+    [
+     "PORTFOLIO_ID",
+     "PORTFOLIO"
+    ]
+   ],
+   "Taxlot"
+  ],
+  [
+   "TX",
+   "RECURRING_CASH_ACTIVITY",
+   "ACCOUNT_NUMBER, NEXT_ACTIVITY_ID, PORTFOLIO_ID, PROCESSING_SCHEDULE_ID",
+   [
+    [
+     "ACCOUNT_NUMBER",
+     "ACCOUNT"
+    ],
+    [
+     "PORTFOLIO_ID",
+     "PORTFOLIO"
+    ]
+   ],
+   "Recurring Cash Activities"
+  ],
+  [
+   "TX",
+   "TRANSACTION_DETAIL",
+   "TRANSACTION_DETAIL_ID",
+   [
+    [
+     "TRANSACTION_ID",
+     "TRANSACTION_HEADER"
+    ]
+   ],
+   "Transaction Detail"
+  ],
+  [
+   "TX",
+   "TRANSACTION_DETAIL_ADJUSTMENT_TYPE",
+   "ADJUSTMENT_TYPE, TRANSACTION_DETAIL_ID",
+   [
+    [
+     "TRANSACTION_DETAIL_ID",
+     "TRANSACTION_DETAIL"
+    ]
+   ],
+   "Transaction Detail"
+  ],
+  [
+   "TX",
+   "TRANSACTION_HEADER",
+   "TRANSACTION_ID",
+   [],
+   "Transaction Header"
+  ],
+  [
+   "TX",
+   "TRANSACTION_HEADER_ADJUSTMENT_TYPE",
+   "ADJUSTMENT_TYPE, TRANSACTION_ID",
+   [
+    [
+     "TRANSACTION_ID",
+     "TRANSACTION_HEADER"
+    ]
+   ],
+   "Transaction Header"
+  ],
+  [
+   "TX",
+   "TRANSACTION_HEADER_RELATED_TRANSACTION",
+   "TRANSACTION_ID, RELATED_TRANSACTION_ID",
+   [
+    [
+     "RELATED_TRANSACTION_ID",
+     "TRANSACTION_HEADER"
+    ]
+   ],
+   "Transaction Header"
+  ],
+  [
+   "TX",
+   "UPCOMING_CASH_ACTIVITIES",
+   "ACCOUNT_NUMBER, ACTIVITY_REF, ACTIVITY_TYPE, PORTFOLIO_ID",
+   [
+    [
+     "ACCOUNT_NUMBER",
+     "ACCOUNT"
+    ],
+    [
+     "PORTFOLIO_ID",
+     "PORTFOLIO"
+    ]
+   ],
+   "Curr Upcoming Activities"
+  ],
+  [
+   "FB",
+   "FEE_COMPUTATION",
+   "COMPUTATION_ACTIVITY_ID, FEE_BASIS, RULE_DESCRIPTION",
+   [],
+   "Fee Computation"
+  ],
+  [
+   "FB",
+   "FEE_GROUP",
+   "FEE_GROUP_MEMBER_ACCOUNT, FEE_GROUP_MEMBER_ACCOUNT_PORTFOLIO",
+   [
+    [
+     "FEE_GROUP_MEMBER_ACCOUNT",
+     "ACCOUNT"
+    ],
+    [
+     "FEE_GROUP_MEMBER_ACCOUNT_PORTFOLIO",
+     "PORTFOLIO"
+    ]
+   ],
+   "Fee Group"
+  ],
+  [
+   "FB",
+   "FEE_PACKAGE",
+   "FEE_PACKAGE_PROFILE_ID, FEE_RULE_ID",
+   [],
+   "Fee Package"
+  ],
+  [
+   "FB",
+   "FEE_PACKAGE_USAGE",
+   "FEE_PACKAGE_USAGE_ID",
+   [],
+   "Fee Package Usage"
+  ],
+  [
+   "SC",
+   "STATEMENT_EVENT",
+   "STATEMENT_EVENT_ID",
+   [],
+   "Statement Event"
+  ],
+  [
+   "SC",
+   "STATEMENT_EVENT_INSTANCE",
+   "STATEMENT_EVENT_INSTANCE_ID",
+   [
+    [
+     "STATEMENT_EVENT_ID",
+     "STATEMENT_EVENT"
+    ]
+   ],
+   "Statement Event Instance"
+  ],
+  [
+   "SC",
+   "STATEMENT_PACKAGE",
+   "STATEMENT_PACKAGE_ID",
+   [],
+   "Statement Package"
+  ],
+  [
+   "IP",
+   "MODEL",
+   "MODEL_ID",
+   [],
+   "Model"
+  ],
+  [
+   "IP",
+   "MODEL_ALLOCATION",
+   "ALLOCATION_ID",
+   [
+    [
+     "MODEL_ID",
+     "MODEL"
+    ]
+   ],
+   "Model Allocation"
+  ],
+  [
+   "OS",
+   "ROLE_DETAILS",
+   "ACCESS_TYPE, FUNCTION, ROLE_ID, TARGET_TYPE",
+   [],
+   "Role Details"
+  ],
+  [
+   "OS",
+   "USER_DETAIL",
+   "ENTITY_ID",
+   [],
+   "User Detail"
+  ],
+  [
+   "OS",
+   "USER_TEAM_AND_ROLE",
+   "EMPLOYEE_ROLE_ID, EMPLOYEE_TEAM_ID, ENTITY_ID",
+   [],
+   "User Team and Role"
+  ],
+  [
+   "RC",
+   "FUND_CUTOFF_TIMES",
+   null,
+   [],
+   "Fund Cutoff Times"
+  ],
+  [
+   "RC",
+   "INTEREST_RATES",
+   null,
+   [],
+   "Interest Rates"
+  ],
+  [
+   "RC",
+   "REFERENCE",
+   null,
+   [],
+   "Reference"
+  ]
+ ],
+ "S2_RELS": [
+  {
+   "child": "CLIENT_ACCOUNT_LINKAGE",
+   "col": "CLIENT_ID",
+   "parent": "CLIENT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": true
+  },
+  {
+   "child": "CLIENT_ACCOUNT_LINKAGE",
+   "col": "ACCOUNT_ID",
+   "parent": "ACCOUNT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": true
+  },
+  {
+   "child": "CLIENT_INVESTMENT_MANAGER",
+   "col": "CLIENT_ID",
+   "parent": "CLIENT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "CLIENT_RELATED_THIRD_PARTY",
+   "col": "CLIENT_ID",
+   "parent": "CLIENT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "CLIENT_SOLUTION",
+   "col": "CLIENT_ID",
+   "parent": "CLIENT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "CLIENT_TAX_PROFILE",
+   "col": "CLIENT_ID",
+   "parent": "CLIENT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "CLIENT_W8_PROFILE",
+   "col": "CLIENT_ID",
+   "parent": "CLIENT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "PARTY_CONTACT",
+   "col": "ENTITY_IDENTIFIER",
+   "parent": "CLIENT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "PARTY_OPTIONAL_FIELDS",
+   "col": "PARTY_ID",
+   "parent": "CLIENT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "PAY_TO_RECIPIENTS",
+   "col": "ACCOUNT_NUMBER",
+   "parent": "ACCOUNT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "ACCOUNT_FEE_PACKAGE_ASSOCIATION",
+   "col": "ACCOUNT_ID",
+   "parent": "ACCOUNT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "ACCOUNT_FEE_PACKAGE_ASSOCIATION",
+   "col": "FEE_PACKAGE_ID",
+   "parent": "FEE_PACKAGE",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": true
+  },
+  {
+   "child": "ACCOUNT_INVESTMENT_GUIDELINES",
+   "col": "ACCOUNT_ID",
+   "parent": "ACCOUNT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "ACCOUNT_INVESTMENT_MANAGER",
+   "col": "ACCOUNT_ID",
+   "parent": "ACCOUNT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "ACCOUNT_INVESTMENT_RESTRICTIONS",
+   "col": "ACCOUNT_ID",
+   "parent": "ACCOUNT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "ACCOUNT_OPTIONAL_FIELDS",
+   "col": "ACCOUNT_ID",
+   "parent": "ACCOUNT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "ACCOUNT_SOLUTION",
+   "col": "ACCOUNT_ID",
+   "parent": "ACCOUNT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "ACCOUNT_SPECIFIC_FEE",
+   "col": "ACCOUNT_ID",
+   "parent": "ACCOUNT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "PORTFOLIO",
+   "col": "ACCOUNT_ID",
+   "parent": "ACCOUNT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": true
+  },
+  {
+   "child": "PORTFOLIO_GROUPS",
+   "col": "ACCOUNT_ID",
+   "parent": "ACCOUNT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "ASSET_INVESTMENT_CLASS",
+   "col": "TRD_INSTRUMENT_ID",
+   "parent": "ASSET",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "ASSET_OPTIONAL_FIELDS",
+   "col": "INSTRUMENT_ID",
+   "parent": "ASSET",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "ACTIVE_COMMITS_AND_BLOCKS",
+   "col": "ACCOUNT_NUMBER",
+   "parent": "ACCOUNT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "ACTIVE_COMMITS_AND_BLOCKS",
+   "col": "PORTFOLIO_ID",
+   "parent": "PORTFOLIO",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "ACTIVE_COMMITS_AND_BLOCKS",
+   "col": "TRD_INSTRUMENT_ID",
+   "parent": "ASSET",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "CUSTODY_AND_NOSTRO_POS",
+   "col": "ACCOUNT_NUMBER",
+   "parent": "ACCOUNT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "CUSTODY_AND_NOSTRO_POS",
+   "col": "INSTRUMENT_ID",
+   "parent": "ASSET",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "CUSTODY_AND_NOSTRO_POS",
+   "col": "PORTFOLIO_ID",
+   "parent": "PORTFOLIO",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "END_OF_DAY_POSITIONS",
+   "col": "TAXLOT_PORTFOLIO_ID",
+   "parent": "PORTFOLIO",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": true
+  },
+  {
+   "child": "END_OF_DAY_POSITIONS",
+   "col": "TRD_INSTRUMENT_ID",
+   "parent": "ASSET",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": true
+  },
+  {
+   "child": "END_OF_PERIOD_VALUE_AGG",
+   "col": "ACCOUNT_NUMBER",
+   "parent": "ACCOUNT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "FX_FORWARD_POSITION",
+   "col": "ACCOUNT_ID",
+   "parent": "ACCOUNT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "FX_FORWARD_POSITION",
+   "col": "PORTFOLIO_ID",
+   "parent": "PORTFOLIO",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "TAXLOT",
+   "col": "INSTRUMENT_ID",
+   "parent": "ASSET",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": true
+  },
+  {
+   "child": "TAXLOT",
+   "col": "PORTFOLIO_ID",
+   "parent": "PORTFOLIO",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": true
+  },
+  {
+   "child": "RECURRING_CASH_ACTIVITY",
+   "col": "ACCOUNT_NUMBER",
+   "parent": "ACCOUNT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "RECURRING_CASH_ACTIVITY",
+   "col": "PORTFOLIO_ID",
+   "parent": "PORTFOLIO",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "TRANSACTION_DETAIL",
+   "col": "TRANSACTION_ID",
+   "parent": "TRANSACTION_HEADER",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": true
+  },
+  {
+   "child": "TRANSACTION_DETAIL_ADJUSTMENT_TYPE",
+   "col": "TRANSACTION_DETAIL_ID",
+   "parent": "TRANSACTION_DETAIL",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "TRANSACTION_HEADER_ADJUSTMENT_TYPE",
+   "col": "TRANSACTION_ID",
+   "parent": "TRANSACTION_HEADER",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "TRANSACTION_HEADER_RELATED_TRANSACTION",
+   "col": "RELATED_TRANSACTION_ID",
+   "parent": "TRANSACTION_HEADER",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "UPCOMING_CASH_ACTIVITIES",
+   "col": "ACCOUNT_NUMBER",
+   "parent": "ACCOUNT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "UPCOMING_CASH_ACTIVITIES",
+   "col": "PORTFOLIO_ID",
+   "parent": "PORTFOLIO",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "FEE_GROUP",
+   "col": "FEE_GROUP_MEMBER_ACCOUNT",
+   "parent": "ACCOUNT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "FEE_GROUP",
+   "col": "FEE_GROUP_MEMBER_ACCOUNT_PORTFOLIO",
+   "parent": "PORTFOLIO",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": false
+  },
+  {
+   "child": "STATEMENT_EVENT_INSTANCE",
+   "col": "STATEMENT_EVENT_ID",
+   "parent": "STATEMENT_EVENT",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": true
+  },
+  {
+   "child": "MODEL_ALLOCATION",
+   "col": "MODEL_ID",
+   "parent": "MODEL",
+   "label": "declared FK",
+   "kind": "fk",
+   "tested": true
+  },
+  {
+   "child": "TRANSACTION_HEADER",
+   "parent": "ACCOUNT",
+   "col": null,
+   "label": "transacts",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "TRANSACTION_HEADER",
+   "parent": "ASSET",
+   "col": null,
+   "label": "traded",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "TRANSACTION_HEADER",
+   "parent": "PAY_TO_RECIPIENTS",
+   "col": null,
+   "label": "paid to",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "TRANSACTION_HEADER",
+   "parent": "TAXLOT",
+   "col": null,
+   "label": "creates lot",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "TRANSACTION_DETAIL",
+   "parent": "PORTFOLIO",
+   "col": null,
+   "label": "impacts",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "STATEMENT_EVENT",
+   "parent": "ACCOUNT",
+   "col": null,
+   "label": "receives",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "STATEMENT_EVENT",
+   "parent": "STATEMENT_PACKAGE",
+   "col": null,
+   "label": "defines",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "STATEMENT_EVENT",
+   "parent": "PORTFOLIO_GROUPS",
+   "col": null,
+   "label": "group receives",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "STATEMENT_EVENT_INSTANCE",
+   "parent": "CLIENT",
+   "col": null,
+   "label": "tax reporting",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "FEE_PACKAGE_USAGE",
+   "parent": "FEE_PACKAGE",
+   "col": null,
+   "label": "used by",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "FEE_PACKAGE_USAGE",
+   "parent": "ACCOUNT",
+   "col": null,
+   "label": "uses package",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "FEE_PACKAGE_USAGE",
+   "parent": "FEE_GROUP",
+   "col": null,
+   "label": "uses package",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "FEE_COMPUTATION",
+   "parent": "FEE_PACKAGE_USAGE",
+   "col": null,
+   "label": "computed from",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "USER_TEAM_AND_ROLE",
+   "parent": "USER_DETAIL",
+   "col": null,
+   "label": "assigned",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "USER_TEAM_AND_ROLE",
+   "parent": "ROLE_DETAILS",
+   "col": null,
+   "label": "EMPLOYEE_ROLE_ID = ROLE_ID",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "ACCOUNT",
+   "parent": "MODEL",
+   "col": null,
+   "label": "assigned to",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "PORTFOLIO",
+   "parent": "MODEL",
+   "col": null,
+   "label": "assigned to",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "PORTFOLIO_GROUPS",
+   "parent": "PORTFOLIO",
+   "col": null,
+   "label": "grouped in",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "MODEL_ALLOCATION",
+   "parent": "ASSET",
+   "col": null,
+   "label": "allocated to",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "MODEL_ALLOCATION",
+   "parent": "MODEL_ALLOCATION",
+   "col": null,
+   "label": "parent of",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "ASSET",
+   "parent": "ASSET",
+   "col": null,
+   "label": "RELATED_INSTRUMENT_ID (underlying)",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "CLIENT_RELATED_THIRD_PARTY",
+   "parent": "CLIENT",
+   "col": null,
+   "label": "related to",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "PARTY_RELATIONSHIPS",
+   "parent": "CLIENT",
+   "col": null,
+   "label": "primary entity",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "TAXLOT",
+   "parent": "END_OF_DAY_POSITIONS",
+   "col": null,
+   "label": "detailed by",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "INTEREST_RATES",
+   "parent": "ASSET",
+   "col": null,
+   "label": "rated",
+   "kind": "inf",
+   "tested": false
+  },
+  {
+   "child": "FUND_CUTOFF_TIMES",
+   "parent": "ASSET",
+   "col": null,
+   "label": "cutoff for",
+   "kind": "inf",
+   "tested": false
+  }
+ ],
+ "S2_GAPS": [
+  {
+   "n": 1,
+   "block": true,
+   "on": [
+    "ACCOUNT"
+   ],
+   "g": "ACCOUNT primary key differs between the dictionary sheet (ACCOUNT_NUMBER) and the domain sheet (ACCOUNT_ID). Children join on either.",
+   "r": "Keep ACCOUNT_ID as PK, declare ACCOUNT_NUMBER a unique alternate key."
+  },
+  {
+   "n": 2,
+   "block": true,
+   "on": [
+    "ASSET"
+   ],
+   "g": "ASSET PK is FIRM_ID + INSTRUMENT_ID, but positions and classifications reference TRD_INSTRUMENT_ID, and FIRM_ID is nullable.",
+   "r": "Decide the asset grain — global or trading-level. Declare TRD_INSTRUMENT_ID a UK and make PK columns NOT NULL."
+  },
+  {
+   "n": 3,
+   "block": false,
+   "on": [
+    "PARTY_CONTACT"
+   ],
+   "g": "Called PARTY_ADDRESS in the dictionary sheet and PARTY_CONTACT in the domain sheet and ERD.",
+   "r": "Standardise on PARTY_CONTACT."
+  },
+  {
+   "n": 4,
+   "block": false,
+   "on": [
+    "ACCOUNT_INVESTMENT_GUIDELINES",
+    "ACCOUNT_INVESTMENT_MANAGER"
+   ],
+   "g": "In the Account domain sheet these rows are labelled ACCOUNT_FEE_PACKAGE_ASSOCIATION.",
+   "r": "Correct the table labels."
+  },
+  {
+   "n": 5,
+   "block": true,
+   "on": [
+    "CLIENT_INVESTMENT_MANAGER",
+    "CLIENT_RELATED_THIRD_PARTY",
+    "CLIENT_SOLUTION",
+    "CLIENT_TAX_PROFILE",
+    "CLIENT_W8_PROFILE",
+    "FUND_CUTOFF_TIMES",
+    "INTEREST_RATES",
+    "REFERENCE"
+   ],
+   "g": "No primary key defined for 8 tables — 5 Party children and all 3 Reference tables.",
+   "r": "Define composite keys. Without one there is no INT merge key and no partition identity."
+  },
+  {
+   "n": 6,
+   "block": true,
+   "on": [
+    "PARTY_CONTACT",
+    "CLIENT_ACCOUNT_LINKAGE",
+    "TAXLOT",
+    "MODEL_ALLOCATION",
+    "USER_DETAIL",
+    "FEE_PACKAGE_USAGE",
+    "ROLE_DETAILS"
+   ],
+   "g": "PK columns marked nullable.",
+   "r": "Make NOT NULL or replace with a stable key."
+  },
+  {
+   "n": 7,
+   "block": false,
+   "on": [
+    "ACCOUNT_FEE_PACKAGE_ASSOCIATION",
+    "FEE_PACKAGE"
+   ],
+   "g": "The FK points at FEE_PACKAGE, whose PK is FEE_PACKAGE_PROFILE_ID + FEE_RULE_ID — so the FK is to half a key.",
+   "r": "Align to FEE_PACKAGE_PROFILE_ID, or split a package header from its rules."
+  },
+  {
+   "n": 8,
+   "block": false,
+   "on": [
+    "FEE_GROUP",
+    "FEE_COMPUTATION",
+    "FEE_PACKAGE_USAGE"
+   ],
+   "g": "Fee Group is referenced by FEE_GROUP_NAME, which is not a key.",
+   "r": "Introduce FEE_GROUP_ID."
+  },
+  {
+   "n": 9,
+   "block": false,
+   "on": [],
+   "g": "Many logical relationships are not declared foreign keys.",
+   "r": "Declare them, or confirm they are intentionally loose. Shown as inferred edges throughout."
+  },
+  {
+   "n": 10,
+   "block": false,
+   "on": [
+    "FEE_COMPUTATION",
+    "FEE_GROUP"
+   ],
+   "g": "The ERD coverage page lists FEE_COMPUTATION twice and omits FEE_GROUP.",
+   "r": "Correct the coverage slide and recheck per-domain attribute counts."
+  },
+  {
+   "n": 11,
+   "block": false,
+   "on": [
+    "ACCOUNT_OPTIONAL_FIELDS",
+    "FEE_COMPUTATION",
+    "CUSTODY_AND_NOSTRO_POS"
+   ],
+   "g": "Composite primary keys with free-text members.",
+   "r": "Replace text members with identifiers where available."
+  },
+  {
+   "n": 12,
+   "block": true,
+   "on": [],
+   "g": "BUSINESS_DATE and the lineage columns are not in the canonical dictionary but are required by the INT contract — so every dictionary key is short by one column.",
+   "r": "Add the standard INT columns to all 52 tables. This mockup already renders the effective INT key, not the dictionary key."
+  }
+ ],
+ "S2_CONTRACT": [
+  [
+   "Input",
+   "STG view rows where DQ_STATUS_CD = PASS, plus approved mapping tables"
+  ],
+  [
+   "Materialization",
+   "dbt incremental table, partitioned by BUSINESS_DATE"
+  ],
+  [
+   "Primary key",
+   "Natural key from the dictionary PLUS BUSINESS_DATE"
+  ],
+  [
+   "Surrogate keys",
+   "Not generated here. Gold sequences such as ACCOUNT_KEY are never used in INT"
+  ],
+  [
+   "Retention",
+   "7 days, by partition drop"
+  ],
+  [
+   "Transformation DQ",
+   "Unmapped codes, ambiguous mappings and unresolved relationships raise DQ_VALIDATION_FAILURE"
+  ],
+  [
+   "Replay",
+   "OPEN, reprocess-eligible rows are re-selected by key plus BUSINESS_DATE"
+  ],
+  [
+   "Reconciliation",
+   "STG PASS count = INT count, per table per BUSINESS_DATE, boundary STG_TO_INT"
+  ]
+ ],
+ "S2_STD_COLS": [
+  [
+   "BUSINESS_DATE",
+   "date",
+   "partition and key part"
+  ],
+  [
+   "SRC_RECORD_ID",
+   "number",
+   "RAW lineage"
+  ],
+  [
+   "FILE_REGISTRY_ID",
+   "number",
+   "file lineage"
+  ],
+  [
+   "MICRO_BATCH_ID",
+   "number",
+   "event lineage — the event path's equivalent"
+  ],
+  [
+   "LOAD_TS",
+   "timestamp",
+   "load time"
+  ],
+  [
+   "DBT_INVOCATION_ID",
+   "varchar",
+   "run audit"
+  ]
+ ],
+ "S2_ANCHORS": [
+  "ACCOUNT",
+  "PORTFOLIO",
+  "ASSET",
+  "CLIENT"
+ ],
+ "FEEDS": [
+  {
+   "feed": "Account",
+   "raw": "RAW_ACCOUNT",
+   "conf": "named",
+   "tables": [
+    "ACCOUNT",
+    "ACCOUNT_FEE_PACKAGE_ASSOCIATION",
+    "ACCOUNT_INVESTMENT_GUIDELINES",
+    "ACCOUNT_INVESTMENT_MANAGER",
+    "ACCOUNT_INVESTMENT_RESTRICTIONS",
+    "ACCOUNT_SOLUTION",
+    "ACCOUNT_SPECIFIC_FEE"
+   ],
+   "domains": [
+    "AP"
+   ]
+  },
+  {
+   "feed": "Account Optional Fields",
+   "raw": "RAW_ACCOUNT",
+   "conf": "likely",
+   "tables": [
+    "ACCOUNT_OPTIONAL_FIELDS"
+   ],
+   "domains": [
+    "AP"
+   ]
+  },
+  {
+   "feed": "Active Commits and Blocks",
+   "raw": "RAW_POSITION",
+   "conf": "likely",
+   "tables": [
+    "ACTIVE_COMMITS_AND_BLOCKS"
+   ],
+   "domains": [
+    "PH"
+   ]
+  },
+  {
+   "feed": "Asset",
+   "raw": null,
+   "conf": "none",
+   "tables": [
+    "ASSET"
+   ],
+   "domains": [
+    "AS"
+   ]
+  },
+  {
+   "feed": "Asset Investment Class",
+   "raw": null,
+   "conf": "none",
+   "tables": [
+    "ASSET_INVESTMENT_CLASS"
+   ],
+   "domains": [
+    "AS"
+   ]
+  },
+  {
+   "feed": "Asset Optional Fields",
+   "raw": null,
+   "conf": "none",
+   "tables": [
+    "ASSET_OPTIONAL_FIELDS"
+   ],
+   "domains": [
+    "AS"
+   ]
+  },
+  {
+   "feed": "Client",
+   "raw": "RAW_CLIENT",
+   "conf": "named",
+   "tables": [
+    "CLIENT",
+    "CLIENT_INVESTMENT_MANAGER",
+    "CLIENT_RELATED_THIRD_PARTY",
+    "CLIENT_SOLUTION",
+    "CLIENT_TAX_PROFILE",
+    "CLIENT_W8_PROFILE"
+   ],
+   "domains": [
+    "PM"
+   ]
+  },
+  {
+   "feed": "Client Account Linkage",
+   "raw": "RAW_CLIENT",
+   "conf": "likely",
+   "tables": [
+    "CLIENT_ACCOUNT_LINKAGE"
+   ],
+   "domains": [
+    "PM"
+   ]
+  },
+  {
+   "feed": "Contact Details",
+   "raw": "RAW_CLIENT",
+   "conf": "likely",
+   "tables": [
+    "PARTY_CONTACT"
+   ],
+   "domains": [
+    "PM"
+   ]
+  },
+  {
+   "feed": "Curr Upcoming Activities",
+   "raw": null,
+   "conf": "none",
+   "tables": [
+    "UPCOMING_CASH_ACTIVITIES"
+   ],
+   "domains": [
+    "TX"
+   ]
+  },
+  {
+   "feed": "Custody And Nostro Pos",
+   "raw": "RAW_POSITION",
+   "conf": "likely",
+   "tables": [
+    "CUSTODY_AND_NOSTRO_POS"
+   ],
+   "domains": [
+    "PH"
+   ]
+  },
+  {
+   "feed": "End of Day Positions",
+   "raw": "RAW_POSITION",
+   "conf": "named",
+   "tables": [
+    "END_OF_DAY_POSITIONS"
+   ],
+   "domains": [
+    "PH"
+   ]
+  },
+  {
+   "feed": "End of Period Value Agg",
+   "raw": "RAW_POSITION",
+   "conf": "likely",
+   "tables": [
+    "END_OF_PERIOD_VALUE_AGG"
+   ],
+   "domains": [
+    "PH"
+   ]
+  },
+  {
+   "feed": "Fee Computation",
+   "raw": null,
+   "conf": "none",
+   "tables": [
+    "FEE_COMPUTATION"
+   ],
+   "domains": [
+    "FB"
+   ]
+  },
+  {
+   "feed": "Fee Group",
+   "raw": null,
+   "conf": "none",
+   "tables": [
+    "FEE_GROUP"
+   ],
+   "domains": [
+    "FB"
+   ]
+  },
+  {
+   "feed": "Fee Package",
+   "raw": null,
+   "conf": "none",
+   "tables": [
+    "FEE_PACKAGE"
+   ],
+   "domains": [
+    "FB"
+   ]
+  },
+  {
+   "feed": "Fee Package Usage",
+   "raw": null,
+   "conf": "none",
+   "tables": [
+    "FEE_PACKAGE_USAGE"
+   ],
+   "domains": [
+    "FB"
+   ]
+  },
+  {
+   "feed": "Fund Cutoff Times",
+   "raw": null,
+   "conf": "none",
+   "tables": [
+    "FUND_CUTOFF_TIMES"
+   ],
+   "domains": [
+    "RC"
+   ]
+  },
+  {
+   "feed": "FX Forward Position",
+   "raw": "RAW_POSITION",
+   "conf": "likely",
+   "tables": [
+    "FX_FORWARD_POSITION"
+   ],
+   "domains": [
+    "PH"
+   ]
+  },
+  {
+   "feed": "Interest Rates",
+   "raw": null,
+   "conf": "none",
+   "tables": [
+    "INTEREST_RATES"
+   ],
+   "domains": [
+    "RC"
+   ]
+  },
+  {
+   "feed": "Model",
+   "raw": null,
+   "conf": "none",
+   "tables": [
+    "MODEL"
+   ],
+   "domains": [
+    "IP"
+   ]
+  },
+  {
+   "feed": "Model Allocation",
+   "raw": null,
+   "conf": "none",
+   "tables": [
+    "MODEL_ALLOCATION"
+   ],
+   "domains": [
+    "IP"
+   ]
+  },
+  {
+   "feed": "Party Optional Fields",
+   "raw": "RAW_CLIENT",
+   "conf": "likely",
+   "tables": [
+    "PARTY_OPTIONAL_FIELDS"
+   ],
+   "domains": [
+    "PM"
+   ]
+  },
+  {
+   "feed": "Pay To Recipients",
+   "raw": null,
+   "conf": "none",
+   "tables": [
+    "PAY_TO_RECIPIENTS"
+   ],
+   "domains": [
+    "PM"
+   ]
+  },
+  {
+   "feed": "Portfolio",
+   "raw": null,
+   "conf": "none",
+   "tables": [
+    "PORTFOLIO"
+   ],
+   "domains": [
+    "AP"
+   ]
+  },
+  {
+   "feed": "Portfolio Groups",
+   "raw": null,
+   "conf": "none",
+   "tables": [
+    "PORTFOLIO_GROUPS"
+   ],
+   "domains": [
+    "AP"
+   ]
+  },
+  {
+   "feed": "Recurring Cash Activities",
+   "raw": null,
+   "conf": "none",
+   "tables": [
+    "RECURRING_CASH_ACTIVITY"
+   ],
+   "domains": [
+    "TX"
+   ]
+  },
+  {
+   "feed": "Reference",
+   "raw": null,
+   "conf": "none",
+   "tables": [
+    "REFERENCE"
+   ],
+   "domains": [
+    "RC"
+   ]
+  },
+  {
+   "feed": "Relationships",
+   "raw": "RAW_CLIENT",
+   "conf": "likely",
+   "tables": [
+    "PARTY_RELATIONSHIPS"
+   ],
+   "domains": [
+    "PM"
+   ]
+  },
+  {
+   "feed": "Role Details",
+   "raw": null,
+   "conf": "none",
+   "tables": [
+    "ROLE_DETAILS"
+   ],
+   "domains": [
+    "OS"
+   ]
+  },
+  {
+   "feed": "Statement Event",
+   "raw": null,
+   "conf": "none",
+   "tables": [
+    "STATEMENT_EVENT"
+   ],
+   "domains": [
+    "SC"
+   ]
+  },
+  {
+   "feed": "Statement Event Instance",
+   "raw": null,
+   "conf": "none",
+   "tables": [
+    "STATEMENT_EVENT_INSTANCE"
+   ],
+   "domains": [
+    "SC"
+   ]
+  },
+  {
+   "feed": "Statement Package",
+   "raw": null,
+   "conf": "none",
+   "tables": [
+    "STATEMENT_PACKAGE"
+   ],
+   "domains": [
+    "SC"
+   ]
+  },
+  {
+   "feed": "Taxlot",
+   "raw": "RAW_TAXLOT",
+   "conf": "named",
+   "tables": [
+    "TAXLOT"
+   ],
+   "domains": [
+    "PH"
+   ]
+  },
+  {
+   "feed": "Transaction Detail",
+   "raw": "RAW_TRANSACTION",
+   "conf": "named",
+   "tables": [
+    "TRANSACTION_DETAIL",
+    "TRANSACTION_DETAIL_ADJUSTMENT_TYPE"
+   ],
+   "domains": [
+    "TX"
+   ]
+  },
+  {
+   "feed": "Transaction Header",
+   "raw": "RAW_TRANSACTION",
+   "conf": "named",
+   "tables": [
+    "TRANSACTION_HEADER",
+    "TRANSACTION_HEADER_ADJUSTMENT_TYPE",
+    "TRANSACTION_HEADER_RELATED_TRANSACTION"
+   ],
+   "domains": [
+    "TX"
+   ]
+  },
+  {
+   "feed": "User Detail",
+   "raw": null,
+   "conf": "none",
+   "tables": [
+    "USER_DETAIL"
+   ],
+   "domains": [
+    "OS"
+   ]
+  },
+  {
+   "feed": "User Team and Role",
+   "raw": null,
+   "conf": "none",
+   "tables": [
+    "USER_TEAM_AND_ROLE"
+   ],
+   "domains": [
+    "OS"
+   ]
+  }
+ ],
+ "RAW_TABLES": [
+  "RAW_ACCOUNT",
+  "RAW_CLIENT",
+  "RAW_POSITION",
+  "RAW_TAXLOT",
+  "RAW_TRANSACTION"
+ ],
+ "RAW_WITHOUT_FEED": [
+  "RAW_CORRECTED_TRANSACTION",
+  "RAW_CORRECTED_POSITION"
+ ],
+ "FAN_OUT": [
+  {
+   "feed": "Account",
+   "raw": "RAW_ACCOUNT",
+   "conf": "named",
+   "tables": [
+    "ACCOUNT",
+    "ACCOUNT_FEE_PACKAGE_ASSOCIATION",
+    "ACCOUNT_INVESTMENT_GUIDELINES",
+    "ACCOUNT_INVESTMENT_MANAGER",
+    "ACCOUNT_INVESTMENT_RESTRICTIONS",
+    "ACCOUNT_SOLUTION",
+    "ACCOUNT_SPECIFIC_FEE"
+   ],
+   "domains": [
+    "AP"
+   ]
+  },
+  {
+   "feed": "Client",
+   "raw": "RAW_CLIENT",
+   "conf": "named",
+   "tables": [
+    "CLIENT",
+    "CLIENT_INVESTMENT_MANAGER",
+    "CLIENT_RELATED_THIRD_PARTY",
+    "CLIENT_SOLUTION",
+    "CLIENT_TAX_PROFILE",
+    "CLIENT_W8_PROFILE"
+   ],
+   "domains": [
+    "PM"
+   ]
+  },
+  {
+   "feed": "Transaction Header",
+   "raw": "RAW_TRANSACTION",
+   "conf": "named",
+   "tables": [
+    "TRANSACTION_HEADER",
+    "TRANSACTION_HEADER_ADJUSTMENT_TYPE",
+    "TRANSACTION_HEADER_RELATED_TRANSACTION"
+   ],
+   "domains": [
+    "TX"
+   ]
+  },
+  {
+   "feed": "Transaction Detail",
+   "raw": "RAW_TRANSACTION",
+   "conf": "named",
+   "tables": [
+    "TRANSACTION_DETAIL",
+    "TRANSACTION_DETAIL_ADJUSTMENT_TYPE"
+   ],
+   "domains": [
+    "TX"
+   ]
+  }
+ ],
+ "FEED_SUMMARY": {
+  "feeds": 38,
+  "mapped": 15,
+  "named": 6,
+  "likely": 9,
+  "none": 23,
+  "anchorsUnmapped": [
+   "ASSET",
+   "PORTFOLIO"
+  ]
+ },
+ "DB_PATH": [
+  {
+   "id": "raw",
+   "n": "RAW",
+   "tbl": "T4",
+   "layer": "Stage 1",
+   "kind": "table",
+   "open": "s1",
+   "w": "One table per inbound interface, append-only, as delivered.",
+   "writes": "Python loader",
+   "reads": "the STG view"
+  },
+  {
+   "id": "stg",
+   "n": "STG",
+   "tbl": null,
+   "layer": "Stage 2",
+   "kind": "view",
+   "open": null,
+   "w": "A view. Stores nothing, recomputed on read, and its job is the source DQ check.",
+   "writes": "nobody - it is a view",
+   "reads": "the INT models"
+  },
+  {
+   "id": "int",
+   "n": "INT",
+   "tbl": "T5",
+   "layer": "Stage 2 INT",
+   "kind": "table",
+   "open": "s2",
+   "w": "52 canonical tables. The normalised SWP model, PASS rows only, partitioned by BUSINESS_DATE and kept seven days.",
+   "writes": "dbt",
+   "reads": "DIM and FACT, and replay"
+  },
+  {
+   "id": "gold",
+   "n": "DIM / FACT",
+   "tbl": "T6",
+   "layer": "Gold",
+   "kind": "table",
+   "open": null,
+   "w": "SCD2 dimensions built first, dimension-resolved facts built second.",
+   "writes": "dbt",
+   "reads": "Pre-Gold and consumers"
+  },
+  {
+   "id": "pre",
+   "n": "Pre-Gold",
+   "tbl": null,
+   "layer": "Pre-Gold",
+   "kind": "table",
+   "open": null,
+   "w": "A mirror of IMDS and PBDW, so the last step is movement rather than transformation.",
+   "writes": "dbt",
+   "reads": "the warehouse load"
+  },
+  {
+   "id": "wh",
+   "n": "Warehouse",
+   "tbl": null,
+   "layer": "Stage 3",
+   "kind": "table",
+   "open": null,
+   "w": "The warehouse itself. No reshaping at this boundary.",
+   "writes": "movement",
+   "reads": "the estate"
+  }
+ ],
+ "DB_CONTROL": [
+  {
+   "id": "cfg",
+   "n": "FILE_SCHEMA_CONFIG",
+   "tbl": "T1",
+   "role": "configuration",
+   "w": "What is expected: the interfaces, their patterns, their target RAW table and whether a zero-row file is allowed.",
+   "writes": "nobody at run time",
+   "reads": "discovery, the loader, the gate"
+  },
+  {
+   "id": "reg",
+   "n": "FILE_REGISTRY",
+   "tbl": "T2",
+   "role": "what arrived",
+   "w": "One row per interface per business date, with its counts and its lifecycle. ARCHIVED on it is what completeness counts.",
+   "writes": "the Python loader",
+   "reads": "the gate, recovery, evidence"
+  },
+  {
+   "id": "date",
+   "n": "DATE_CONTROL",
+   "tbl": "T3",
+   "role": "the business date",
+   "w": "One row per business date. PENDING to TRIGGER to COMPLETE, at most one date open at a time.",
+   "writes": "both DAGs, by guarded update",
+   "reads": "every run"
+  },
+  {
+   "id": "dq",
+   "n": "DQ_VALIDATION_FAILURE",
+   "tbl": "T7",
+   "role": "what failed",
+   "w": "A row per failing record per rule, with resolution_status and whether it is reprocess-eligible.",
+   "writes": "dbt",
+   "reads": "replay, evidence, the DQ screens"
+  },
+  {
+   "id": "recon",
+   "n": "RECON_RESULT",
+   "tbl": "T8",
+   "role": "what agrees",
+   "w": "Counts across each boundary per business date. Three boundaries are specified; the event path needs more.",
+   "writes": "dbt",
+   "reads": "evidence and sign-off"
+  }
+ ],
+ "DB_ABSENT": [
+  {
+   "id": "mb",
+   "n": "MICRO_BATCH_REGISTRY",
+   "route": "the event path",
+   "w": "The event path's equivalent of FILE_REGISTRY: one row per micro-batch with a state and a count. Without it the gate cannot ask whether every micro-batch LOADED, which is half of its condition."
+  },
+  {
+   "id": "sub",
+   "n": "LOADER_SUBMISSION",
+   "route": "the outbound loader",
+   "w": "One row per submission threading all four legs, with counts from the status API and the id of the error-detail file. Without it a reject count has nothing to reconcile against and a batch that never comes back never ages out."
+  }
+ ],
+ "DB_LINKS": [
+  {
+   "from": "raw",
+   "to": "stg",
+   "kind": "flow",
+   "w": "read by"
+  },
+  {
+   "from": "stg",
+   "to": "int",
+   "kind": "flow",
+   "w": "PASS rows only"
+  },
+  {
+   "from": "int",
+   "to": "gold",
+   "kind": "flow",
+   "w": "dimensions first"
+  },
+  {
+   "from": "gold",
+   "to": "pre",
+   "kind": "flow",
+   "w": "mirrored"
+  },
+  {
+   "from": "pre",
+   "to": "wh",
+   "kind": "flow",
+   "w": "moved"
+  },
+  {
+   "from": "cfg",
+   "to": "reg",
+   "kind": "governs",
+   "w": "expected set"
+  },
+  {
+   "from": "reg",
+   "to": "raw",
+   "kind": "writes",
+   "w": "FILE_REGISTRY_ID on every row"
+  },
+  {
+   "from": "date",
+   "to": "int",
+   "kind": "governs",
+   "w": "TRIGGER starts the run"
+  },
+  {
+   "from": "stg",
+   "to": "dq",
+   "kind": "writes",
+   "w": "fail reasons"
+  },
+  {
+   "from": "int",
+   "to": "recon",
+   "kind": "writes",
+   "w": "STG_TO_INT counts"
+  }
+ ],
+ "DB_NOTE": "Every control table has exactly one writer. That is the property worth keeping: two writers on DATE_CONTROL is how two runs both believe they own the business date, and the guarded update exists precisely because the design refuses to rely on there being only one.",
+ "FILE_CHAIN": [
+  {
+   "id": "F1",
+   "n": "Discovery",
+   "tech": "Airflow - scheduled",
+   "w": "A scheduled scan of the Landing Zone, every five minutes. Repeated discovery of the same file is safe because the registry claim on (interface, business date) is what makes it idempotent, not the scan.",
+   "sei": [
+    "S6"
+   ],
+   "tbl": [
+    "T1",
+    "T2"
+   ]
+  },
+  {
+   "id": "F2",
+   "n": "One task per file",
+   "tech": "Dynamic Task Mapping",
+   "w": "Each discovered file is expanded into its own mapped task, so one bad file fails one task rather than the run. The DAG itself is metadata-driven: the interfaces it expects come from configuration, not from code.",
+   "sei": [
+    "S5",
+    "S7"
+   ],
+   "tbl": [
+    "T1"
+   ]
+  },
+  {
+   "id": "F3",
+   "n": "Validation",
+   "tech": "Python - worker pod",
+   "w": "Before a single row is loaded: readable, header, trailer, zero-row policy and business date. Anything that fails here has touched no RAW table, which is what makes QUARANTINED recoverable by simply revalidating a corrected file.",
+   "sei": [
+    "S8"
+   ],
+   "tbl": [
+    "T2"
+   ]
+  },
+  {
+   "id": "F4",
+   "n": "RAW load",
+   "tech": "one Oracle transaction",
+   "w": "The detail rows go into the configured RAW table in ONE transaction. Not one per batch of rows, not one per chunk - one per file. A half-loaded file is the state the design refuses to allow.",
+   "sei": [
+    "S8"
+   ],
+   "tbl": [
+    "T4"
+   ]
+  },
+  {
+   "id": "F5",
+   "n": "Three counts agree",
+   "tech": "the commit condition",
+   "w": "Parsed rows, the trailer's declared count and the rows actually inserted must all be equal. They are checked before the commit, not after, so a disagreement rolls back rather than needing a repair.",
+   "sei": [
+    "S8"
+   ],
+   "tbl": [
+    "T2"
+   ]
+  },
+  {
+   "id": "F6",
+   "n": "Archive",
+   "tech": "file move",
+   "w": "The file moves to Archive and the outcome is recorded. ARCHIVED is the only terminal success, and it is what the completeness gate counts - not RECEIVED, not LOADING.",
+   "sei": [
+    "S4",
+    "S8"
+   ],
+   "tbl": [
+    "T2"
+   ]
+  }
+ ],
+ "FILE_VALIDATIONS": [
+  [
+   "Readable",
+   "The file opens and parses as the configured format."
+  ],
+  [
+   "Header",
+   "Present and matching the configured schema for the interface."
+  ],
+  [
+   "Trailer",
+   "Present, and its declared row count is readable."
+  ],
+  [
+   "Zero-row policy",
+   "A zero-row file is a valid delivery, not an error - it is how an interface says it had nothing today. Treating it as a failure stalls the completeness gate on a quiet day."
+  ],
+  [
+   "Business date",
+   "The date in the file matches the date being ingested."
+  ]
+ ],
+ "COUNT_RULE": {
+  "eq": "FILE_ROW_COUNT = TRAILER_ROW_COUNT = RAW_ROW_COUNT",
+  "w": "Parsed, declared and inserted. All three are held on the registry row, so a disagreement is readable afterwards rather than only in a log. They are compared before the commit, not after it, so a disagreement rolls the transaction back - which is why a short load can never reach ARCHIVED and never counts towards completeness."
+ },
+ "FAIL_MODES": [
+  {
+   "st": "QUARANTINED",
+   "when": "Pre-load validation failed.",
+   "raw": "No RAW rows were written.",
+   "fix": "Correct the file and revalidate. The registry record is reused rather than duplicated.",
+   "sev": "warn"
+  },
+  {
+   "st": "FAILED",
+   "when": "A technical failure, or the RAW load itself failed.",
+   "raw": "The transaction rolled back, so RAW is unchanged.",
+   "fix": "Rerun after verifying RAW state. The registry record is reused.",
+   "sev": "warn"
+  },
+  {
+   "st": "ARCHIVE_FAILED",
+   "when": "RAW committed, then the file move failed.",
+   "raw": "RAW ALREADY HOLDS THE ROWS.",
+   "fix": "Retry the move ONLY. Never reload RAW - a reload here duplicates a business date, and nothing downstream will tell you.",
+   "sev": "bad"
+  }
+ ],
+ "FILE_POSTURE": {
+  "q": "Live route, or recovery route?",
+  "b": "Under the events-primary posture the file set is described as generated and held rather than loaded. That makes the file arm of the completeness gate a recovery path rather than the daily one - and a cold standby and a running second pipeline look very different on a page and cost very different amounts to keep working.",
+  "turns": [
+   "Whether the file arm of the gate is exercised every day or only in recovery",
+   "Whether a file-path defect is found by the next run or by the first incident that needs it",
+   "Whether the two routes must agree on a business date, and what happens when they do not"
+  ]
+ },
+ "CHANNELS": [
+  {
+   "id": "C1",
+   "no": 1,
+   "name": "Change events",
+   "dir": "in",
+   "transport": "SDC topics",
+   "role": "primary",
+   "y": 130,
+   "port": "A",
+   "one": "SEI tells BBH that a row changed. The event carries no data.",
+   "detail": "Four envelope fields — eventid (a type code, not a message id), key, op (I/U/D) and view. The event names what changed and where to read it; it never carries the change itself. Published on domain topics, at-least-once, ordered within topic and partition only.",
+   "legs": [
+    [
+     "SEI",
+     "SWP writes to the Snowflake intake; SDC publishes on the domain topic"
+    ],
+    [
+     "BBH",
+     "Event listener consumes; markers 1000/1001 bracket each commit"
+    ],
+    [
+     "BBH",
+     "Key-set collapser folds repeat keys over the micro-batch window"
+    ]
+   ],
+   "src": "E360 · Payload_Structure, Consumption_Guidance"
+  },
+  {
+   "id": "C2",
+   "no": 2,
+   "name": "Data fetch API",
+   "dir": "out",
+   "transport": "Apigee + API Gateway",
+   "role": "primary",
+   "y": 215,
+   "port": "B",
+   "one": "BBH reads the current state of the keys the events named.",
+   "detail": "One bound, set-based retrieval per view per micro-batch — not per event. The same gateway and the same contract also serve an on-demand real-time read for consumers that cannot wait for the pipeline: one API, two callers.",
+   "legs": [
+    [
+     "BBH",
+     "Set-based puller builds the key set for the view"
+    ],
+    [
+     "BBH",
+     "Call leaves through Apigee and the API Gateway"
+    ],
+    [
+     "SEI",
+     "SEI view API returns current state for the set"
+    ]
+   ],
+   "src": "REVIEW · M5 Set-Based Puller"
+  },
+  {
+   "id": "C3",
+   "no": 3,
+   "name": "File delivery",
+   "dir": "in",
+   "transport": "SFTP / Momentum",
+   "role": "standby",
+   "y": 360,
+   "port": "C",
+   "one": "The daily file set. Generated and held as a recovery route.",
+   "detail": "SWP writes to SFTP, Momentum copies complete files to the Landing Zone, discovery runs every five minutes and maps one task per file. Validate, load RAW in one transaction, three counts must agree, archive. Under the event-primary posture this is produced each day but not loaded in the ordinary course.",
+   "legs": [
+    [
+     "SEI",
+     "SWP extract to SFTP"
+    ],
+    [
+     "SEI",
+     "Momentum copies complete files to the Landing Zone"
+    ],
+    [
+     "BBH",
+     "Scheduled discovery, one mapped task per file, validate, load, archive"
+    ]
+   ],
+   "src": "PACK · File Ingestion Framework"
+  },
+  {
+   "id": "C4",
+   "no": 4,
+   "name": "Loader round trip",
+   "dir": "loop",
+   "transport": "Gateway + file",
+   "role": "primary",
+   "y": 285,
+   "port": "B",
+   "one": "BBH data to SEI, and the outcome back — status by API, detail by file.",
+   "detail": "Four legs and two transports. The status API carries the verdict and the counts; the error file carries the per-record detail. The response to the originating consumer cannot be sent until both are in and agree.",
+   "legs": [
+    [
+     "BBH",
+     "Consumer calls the Hub API with loader details and data"
+    ],
+    [
+     "BBH",
+     "Validate, map to SWP loader format, call the loader API out through the gateway"
+    ],
+    [
+     "SEI",
+     "SEI PS processes; calls Integration 360 with status and counts"
+    ],
+    [
+     "SEI",
+     "Status and error detail arrive as a file on the file transport"
+    ]
+   ],
+   "src": "PACK v5 + BBH decision"
+  }
+ ],
+ "TRANSPORTS": [
+  {
+   "id": "ev",
+   "n": "SDC topics",
+   "sub": "domain topics, at-least-once",
+   "dir": "in",
+   "role": "primary"
+  },
+  {
+   "id": "api",
+   "n": "Apigee + API Gateway",
+   "sub": "every API, both directions",
+   "dir": "both",
+   "role": "primary"
+  },
+  {
+   "id": "file",
+   "n": "SFTP / Momentum",
+   "sub": "the daily file set",
+   "dir": "in",
+   "role": "standby"
+  }
+ ],
+ "GATEWAY_NOTE": {
+  "buys": [
+   "mTLS and OAuth to SEI in one place",
+   "certificate and secret rotation in one place",
+   "retry, circuit-breaker and payload masking policy",
+   "rate limiting - where the key-set collapser's restraint is actually enforced",
+   "one authoritative log for every integration call, in or out"
+  ],
+  "costs": "Shared door, shared quota. The puller is bursty and must not starve; the loader has a window; interactive consumers are latency-sensitive and unbounded in number. A consumer read-storm can eat the SEI quota, ingestion stalls, and the completeness gate never fires.",
+  "fix": "Separate API products with their own quota tiers per caller class, sharing the gateway but not the budget, with a reserved floor for the ingestion puller that it cannot be squeezed below."
+ },
+ "EV_KINDS": [
+  {
+   "k": "Data",
+   "cls": "data",
+   "var": "--ev-data",
+   "cadence": "continuous",
+   "tells": "A row changed on a named SDC view.",
+   "carries": "eventid, key, op (I/U/D), view. No payload.",
+   "note": "The event is a notification. Nothing moves until the puller re-reads current state from the view the event names."
+  },
+  {
+   "k": "Marker",
+   "cls": "marker",
+   "var": "--ev-marker",
+   "cadence": "~288 / day",
+   "tells": "A commit boundary on a topic — you have the whole commit, not part of one.",
+   "carries": "eventId, batchDt, onlineDt. Three fields, no counts.",
+   "note": "1000 opens and 1001 closes, on every partition of every subscribed topic. The batch is consistent only when the LAST topic closes. A consumer that declares itself done at its own end marker has read part of a transaction. Ids 1000/1001 sit clear of the catalogue's 1–105 and are not catalogue events."
+  },
+  {
+   "k": "System",
+   "cls": "system",
+   "var": "--ev-system",
+   "cadence": "~once / day",
+   "tells": "A business process in SWP has finished.",
+   "carries": "eventId, batchDt, onlineDt.",
+   "note": "Event 2 — batch date flip, EDB: end-of-day position and accrual processing has completed, and this is the gate for retrieving EOD data. Event 5 — pricing complete, price date flip. A missing system event raises the System Event SLA alert."
+  }
+ ],
+ "EV_RULES": [
+  "Marker events carry no record counts, so they cannot be used for record-count completeness.",
+  "There is no required processing order between event types. If ordering matters downstream, the listener imposes it.",
+  "The stream is at-least-once. Consumers must handle duplicates; the key field is the deduplication identifier.",
+  "Events stay on the topic 7 days by default, 90 days maximum by configuration. Recovery is by moving the consumer group offset back.",
+  "Published events are immutable. An event at an offset cannot be updated, replaced, corrected or removed.",
+  "An MB Start on one domain topic guarantees the same MB Start on every other domain topic."
+ ],
+ "EV_GATE": {
+  "what": "One guarded UPDATE on DATE_CONTROL takes the business date from PENDING to TRIGGER. Only the run whose UPDATE changes exactly one row may invoke the transformation.",
+  "arms": [
+   {
+    "id": "A",
+    "live": true,
+    "name": "Event arm",
+    "sub": "both conditions, not either",
+    "cond": [
+     "Every micro-batch up to the boundary is LOADED",
+     "The EOD system event has been received"
+    ],
+    "why": "The system event says SEI finished producing. It says nothing about whether BBH finished consuming. Gating on the event alone lets the transformation run on short Stage 1 — and STG to INT still reconciles, because it ties against a Stage 1 that is itself short.",
+    "src": "REVIEW · M8 Event Gate Evaluator"
+   },
+   {
+    "id": "B",
+    "live": false,
+    "name": "File arm",
+    "sub": "recovery route",
+    "cond": [
+     "Expected active DAILY interfaces in FILE_SCHEMA_CONFIG",
+     "MINUS distinct ARCHIVED interfaces in FILE_REGISTRY = empty"
+    ],
+    "why": "Runs after every ingestion run including zero-file runs, with trigger_rule all_done. Under the event-primary posture this arm is the recovery path rather than the daily one.",
+    "src": "PACK · File Ingestion Framework E.2"
+   }
+  ],
+  "sla": "If the cutoff passes and neither arm is satisfied: the date stays PENDING, nothing is triggered, a correlated breach alert is published. On later completion a recovery alert is published and the trigger fires. One SLA model, two triggers.",
+  "nonGating": "The loader error-detail file must not join the expected set. A clean outbound day produces no file; if that file is an expected daily interface, the set never empties and the inbound day never transforms. Outbound status and inbound completeness are two different clocks."
+ },
+ "CLOCKS": [
+  {
+   "id": "intraday",
+   "n": "Intraday",
+   "cadence": "continuous, about 288 micro-batches a day",
+   "owns": "The event path: listen, box, collapse, pull, land, register."
+  },
+  {
+   "id": "eod",
+   "n": "End of day",
+   "cadence": "once, when the gate opens",
+   "owns": "The transformation chain and the business date."
+  }
+ ],
+ "LOOP_LEGS": [
+  [
+   "1",
+   "Consumer submits",
+   "loader details and the data, to the Hub API"
+  ],
+  [
+   "2",
+   "Loader push",
+   "validated, mapped to SWP format, out through the gateway"
+  ],
+  [
+   "3",
+   "Status back",
+   "verdict and counts, into Integration 360"
+  ],
+  [
+   "4",
+   "Error detail",
+   "per-record outcomes, as a file on the file transport"
+  ],
+  [
+   "5",
+   "Callback",
+   "the consumer is answered, once 3 and 4 agree"
+  ]
+ ],
+ "SUB_STATES": [
+  [
+   "SUBMITTED",
+   "Loader API accepted the push. Nothing known about the outcome."
+  ],
+  [
+   "ACCEPTED",
+   "SEI acknowledged the batch for processing."
+  ],
+  [
+   "PROCESSED",
+   "All records landed. No error file expected."
+  ],
+  [
+   "PARTIALLY_PROCESSED",
+   "Some rejected. The response to the consumer waits on the detail file."
+  ],
+  [
+   "REJECTED",
+   "Batch refused whole."
+  ],
+  [
+   "STATUS_UNRESOLVED",
+   "Past max age with no terminal status. Not left sitting at SUBMITTED for ever."
+  ],
+  [
+   "RESPONDED",
+   "The originating consumer has been called back. Terminal."
+  ]
+ ],
+ "LOOP_RULES": [
+  [
+   "Correlation",
+   "One submission id threads all four legs, so a batch has one timeline rather than four logs."
+  ],
+  [
+   "Reconciliation",
+   "The reject count SEI reported by API must equal the row count in the detail file. Disagreement means the picture is incomplete and the consumer is not told it is done."
+  ],
+  [
+   "Idempotency",
+   "SEI will resend status. The same status twice lands once."
+  ],
+  [
+   "Push and poll",
+   "A poller covers non-terminal submissions on a tiered cadence. When push and poll disagree, the poll wins and terminal never regresses."
+  ],
+  [
+   "Asynchronous by necessity",
+   "The API status can say 60 rejected; only the file says which 60. So the consumer contract is acknowledge on submission, respond on completion — never request/response."
+  ],
+  [
+   "Error file handling",
+   "Registry row, header and trailer counts, quarantine on malformed, archive on success — the existing file framework, with the gating flag off."
+  ]
+ ],
+ "LOOP_GAP": {
+  "t": "No submission registry",
+  "b": "Inbound, FILE_REGISTRY gives every file a row and a state. Outbound, a submission has nowhere to live. Without one there is no correlation id threading the four legs, no reconciliation of the API reject count against the detail file, and no age-out for a batch that never comes back.",
+  "needs": [
+   "submission id, originating consumer, business date",
+   "state: SUBMITTED to ACCEPTED to PROCESSED / PARTIALLY_PROCESSED / REJECTED to RESPONDED",
+   "counts sent, processed and rejected, from the status leg",
+   "the error-detail file's registry id, from the file leg",
+   "the consumer callback outcome"
+  ]
+ }
 }
