@@ -25,6 +25,7 @@ import HubDesign from "./HubDesign.jsx";
 import Integration360Design from "./Integration360Design.jsx";
 import SecurityAdmin from "./SecurityAdmin.jsx";
 import Compare from "./Compare.jsx";
+import ReleaseDelivery from "./ReleaseDelivery.jsx";
 import Login from "./Login.jsx";
 import { securityApi, allowed } from "./securityApi.js";
 
@@ -76,6 +77,7 @@ export default function App() {
  pii: <PiiExplorer t={t} selection={route === "pii" ? selection : null} />,
  guardrails: <Guardrails t={t} selection={route === "guardrails" ? selection : null} />,
  devops360: <DevOps360 t={t} />,
+ release: <ReleaseDelivery t={t} />,
  variance: <Variance360 t={t} />,
  datasources: <AdminDatasources t={t} />,
  recon: <Recon360 t={t} />,

@@ -1361,8 +1361,20 @@ export default function DevOps360({ t }) {
       <Detail t={t} open={open} envs={envs} hist={hist}
         onClose={() => setOpen(null)} />
 
-      <Dashboard t={t} live={live} envs={envs} hist={hist} rels={rels}
-        onPick={setOpen} />
+      {/* The dashboard moved to Governance -> Release Delivery. This page
+          is the DESIGN of the delivery system; "what is live where" is an
+          operational question asked by people who never open an
+          architecture page. Two audiences, two screens. */}
+      <div style={{ background: t.panel, border: `1px solid ${t.border}`,
+        borderLeft: `3px solid ${t.accent}`, borderRadius: 8,
+        padding: "13px 17px", margin: "22px 0 0", fontSize: 12.5,
+        color: t.sub, lineHeight: 1.6, maxWidth: "80ch" }}>
+        <b style={{ color: t.text }}>The release delivery dashboard has
+        moved.</b> What is deployed where, with the CSV export, now lives
+        under <b style={{ color: t.text }}>Governance &rarr; Release
+        Delivery</b>. This page keeps the delivery system itself: the maps,
+        the pipelines, what a version is and how promotion works.
+      </div>
 
       <div style={{ fontSize: 15, fontWeight: 700, color: t.text,
         margin: "26px 0 4px" }}>Reference</div>

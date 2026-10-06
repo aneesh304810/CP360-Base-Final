@@ -132,6 +132,7 @@ MERGE INTO sec_module t USING (SELECT 'home' k, 'Home' n, NULL g,
   UNION ALL SELECT 'variance','Variance 360','Governance','Value differences between stages','N',53 FROM dual
   UNION ALL SELECT 'recon','Recon 360','Governance','Reconciliation across systems','N',54 FROM dual
   UNION ALL SELECT 'apiconsole','API Console','Governance','Run and inspect API calls','N',55 FROM dual
+  UNION ALL SELECT 'release','Release Delivery','Governance','What is deployed where, from guardrail_deployment','N',56 FROM dual
   UNION ALL SELECT 'datasources','Data Sources','Admin','Connections the catalog harvests from','N',60 FROM dual
   UNION ALL SELECT 'apicatalog','API Catalog Admin','Admin','Maintain the API catalogue','N',61 FROM dual
   UNION ALL SELECT 'hub','CP Integration Hub','Admin','Integration hub model and flows','N',62 FROM dual
@@ -140,6 +141,10 @@ MERGE INTO sec_module t USING (SELECT 'home' k, 'Home' n, NULL g,
   UNION ALL SELECT 'security','Security Entitlement','Admin','Who may see which module. Admin only.','N',65 FROM dual
   UNION ALL SELECT 'system','System Design','Architecture','Design documents and diagrams','N',70 FROM dual
   UNION ALL SELECT 'designstatus','Design Status','Architecture','Set and track hub component design status. The only screen that WRITES.','N',71 FROM dual
+  -- devops360 was never seeded. Under enforcement that makes the screen
+  -- unreachable rather than merely ungranted, which is not what anybody
+  -- decided; it is registered here so a grant becomes possible.
+  UNION ALL SELECT 'devops360','DevOps 360','Architecture','The delivery system: pipelines, versions and promotion','N',72 FROM dual
 ) s ON (t.module_key = s.k)
 WHEN MATCHED THEN UPDATE SET module_name = s.n, nav_group = s.g,
   description = s.d, open_to_all = s.o, sort_order = s.s

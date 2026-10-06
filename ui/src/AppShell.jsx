@@ -33,6 +33,7 @@ const NAV_GROUPS = [
  ['impact', 'Impact Analysis', '⚡'],
  ['variance', 'Variance 360', '≍'],
  ['recon', 'Recon 360', '⇄'],
+ ['release', 'Release Delivery', '\u25B3'],
  ['apiconsole', 'API Console', '\u2318'],
  ]
 },
