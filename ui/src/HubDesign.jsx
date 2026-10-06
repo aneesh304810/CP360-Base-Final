@@ -110,6 +110,7 @@ export default function HubDesign({ t }) {
  const [gapFrom, setGapFrom] = useState(null);
  const [sdcLegPick, setSdcLegPick] = useState(null);   // SDC end to end: which leg
  const [netZonePick, setNetZonePick] = useState(null); // network view: which zone
+ const [netFlow, setNetFlow] = useState("all");       // network view: which flow
  const [expand, setExpand] = useState(null);    // L3 component detail panel
  const [srcOf, setSrcOf] = useState(null);      // component shown beside its SEI source
  const [seiDoc, setSeiDoc] = useState(null);    // {doc, section} open in the popup
@@ -789,7 +790,8 @@ export default function HubDesign({ t }) {
    <Popup />
    <Crumb trail={[["containers", () => setView("L2")],
                   ["the network, end to end", null]]} />
-   <NetworkView t={t} zone={netZonePick} setZone={setNetZonePick} />
+   <NetworkView t={t} zone={netZonePick} setZone={setNetZonePick}
+    flow={netFlow} setFlow={setNetFlow} />
   </div>);
 
  /* ---------- SDC: the event path end to end, with its network ---------- */

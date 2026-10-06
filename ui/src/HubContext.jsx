@@ -32,7 +32,8 @@ import { GW_LAYERS, GW_VANTAGE, GW_AD3 } from "./hubGatewayLayers.js";
 import { SDC_NET_DOC, SDC_ENVS, SDC_NET_FACTS, SDC_PATHS, SDC_LEGS,
  SDC_OPEN, SDC_TRANSPORT_NOTE, SDC_BLOCKING, sdcLeg } from "./hubSdcNetwork.js";
 import { NET_DOC, NET_STATE, NET_ZONES, NET_LINKS, NET_DNS, NET_TAG_ROUTE,
- NET_WORK, NET_UNKNOWN, NET_SETTLED, NET_COUNTS, netZone, netLinksFor }
+ NET_WORK, NET_UNKNOWN, NET_SETTLED, NET_COUNTS, NET_FLOWS, netZone,
+ netLinksFor }
  from "./hubNetwork.js";
 import { GW_DOC, GW_STRENGTHS, GW_GAPS, GW_RISKS, GW_OPERATION, GW_HEADERS,
  GW_TOKEN_STATES, GW_TOKEN_TESTS, GW_SECRETS, GW_RUNTIME_OBJECTS,
@@ -748,7 +749,12 @@ export function SdcEndToEnd({ t, pick, setPick, onGate }) {
    nobody-has-said-how, and a review that cannot tell them apart
    escalates the wrong one.
    =================================================================== */
-export function NetworkView({ t, zone, setZone }) {
+export function NetworkView({ t, zone, setZone, flow, setFlow }) {
+ // "Show me only the file paths" is the first thing anyone asks of a
+ // nineteen-link table, and without it they read the whole thing or
+ // none of it.
+ const F = flow || "all";
+ const inF = (l) => F === "all" || l.flow === F;
  const ZW = 206, ZGAP = 42, ZY = 46, ZH = 128, ROWH = 170;
  const colX = (c) => 24 + c * (ZW + ZGAP);
  const zoneBox = (z) => ({ x: colX(z.col), y: ZY + (z.row || 0) * ROWH });
@@ -775,6 +781,22 @@ export function NetworkView({ t, zone, setZone }) {
     </div>
    </div>
 
+   <div style={{ display: "inline-flex", gap: 3, background: "#eef3f5",
+    borderRadius: 999, padding: 3, marginBottom: 11, flexWrap: "wrap" }}>
+    {[["all", "All flows", INK]].concat(NET_FLOWS.map((f) => [f.k, f.n, f.c]))
+     .map(([k, n, c]) => (
+      <span key={k} onClick={() => setFlow && setFlow(k)}
+       style={{ fontSize: 11.5, fontWeight: F === k ? 600 : 400,
+        padding: "5px 14px", borderRadius: 999, cursor: "pointer",
+        background: F === k ? c : "transparent",
+        color: F === k ? "#fff" : SUB }}>
+       {n} {k === "all" ? NET_LINKS.length
+                        : NET_LINKS.filter((l) => l.flow === k).length}</span>))}
+   </div>
+   {F !== "all" && (
+    <div style={{ fontSize: 11.5, color: SUB, marginBottom: 9 }}>
+     {(NET_FLOWS.find((f) => f.k === F) || {}).w}</div>)}
+
    <div style={card()}>
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }}
      role="img" aria-label="Network zones from SEI through Snowflake and the Private Link fabric to BBH">
@@ -783,9 +805,26 @@ export function NetworkView({ t, zone, setZone }) {
       <path d="M 0 0 L 10 5 L 0 10 z" fill={MUT} /></marker></defs>
 
      {/* links behind the zones, so no wire crosses a label */}
-     {NET_LINKS.filter((l) => l.from !== l.to).map((l, i) => {
+     {NET_LINKS.filter((l) => l.from !== l.to && inF(l)).map((l, i) => {
       const a = zoneBox(netZone(l.from)), b = zoneBox(netZone(l.to));
-      const fwd = a.x <= b.x;
+      // Two zones in the same column are stacked, not side by side, and
+      // the horizontal routing below sends such a link out of one box's
+      // right edge and back into the same x - a wire that reads as
+      // leaving the picture. Those go vertically instead.
+      if (a.x === b.x) {
+       const dn = a.y < b.y;
+       const xv = a.x + ZW / 2 + ((i % 3) - 1) * 26;
+       const ya = dn ? a.y + ZH : a.y, yb = dn ? b.y : b.y + ZH;
+       return (
+        <g key={l.id}>
+         <line x1={xv} y1={ya} x2={xv} y2={yb} stroke={tone(l.st)}
+          strokeWidth="1.3" strokeDasharray={l.st === "live" ? undefined : "5 3"}
+          opacity="0.75" markerEnd="url(#netarr)" />
+         <text x={xv + 5} y={(ya + yb) / 2} fontSize="8.5" fontWeight="700"
+          fill={tone(l.st)}>{l.id}</text>
+        </g>);
+      }
+      const fwd = a.x < b.x;
       const x1 = fwd ? a.x + ZW : a.x, x2 = fwd ? b.x : b.x + ZW;
       const y1 = a.y + 34 + (i % 5) * 14, y2 = b.y + 34 + (i % 5) * 14;
       const k = fwd ? 34 : -34;
@@ -806,7 +845,7 @@ export function NetworkView({ t, zone, setZone }) {
 
      {NET_ZONES.map((z) => {
       const p = zoneBox(z);
-      const ls = netLinksFor(z.id);
+      const ls = netLinksFor(z.id).filter(inF);
       const un = ls.filter((l) => l.st !== "live").length;
       return (
        <g key={z.id} className="cp-hit" tabIndex={0} role="button"
@@ -814,7 +853,8 @@ export function NetworkView({ t, zone, setZone }) {
         <rect className="cp-bx" x={p.x} y={p.y} width={ZW} height={ZH} rx={8}
          fill={zone === z.id ? "#eef3f8" : "#fff"}
          stroke={zone === z.id ? ACC : (z.isNew ? OK : "#c3d4e4")}
-         strokeWidth={zone === z.id ? 2.4 : (z.isNew ? 1.9 : 1.3)} />
+         strokeWidth={zone === z.id ? 2.4 : (z.isNew ? 1.9 : 1.3)}
+         opacity={ls.length ? 1 : 0.42} />
         <text x={p.x + 10} y={p.y + 19} fontSize="10.5" fontWeight="700"
          fill={ACC}>{z.n}</text>
         <text x={p.x + 10} y={p.y + 32} fontSize="8.5" fill={MUT}>
@@ -823,8 +863,10 @@ export function NetworkView({ t, zone, setZone }) {
          <text key={h} x={p.x + 12} y={p.y + 50 + i * 13} fontSize="8.5"
           fill={INK}>{h.length > 30 ? h.slice(0, 29) + "." : h}</text>))}
         <text x={p.x + ZW - 10} y={p.y + ZH - 8} textAnchor="end"
-         fontSize="8.5" fontWeight="700" fill={un ? WARN : OK}>
-         {ls.length} links{un ? ` - ${un} unbuilt` : ""}</text>
+         fontSize="8.5" fontWeight="700"
+         fill={!ls.length ? MUT : (un ? WARN : OK)}>
+         {ls.length ? `${ls.length} links${un ? ` - ${un} unbuilt` : ""}`
+                    : "not on this flow"}</text>
         <SvgGo x={p.x + ZW - 8} y={p.y + 18} />
        </g>);
      })}
@@ -870,13 +912,14 @@ export function NetworkView({ t, zone, setZone }) {
    <Head title="Every connection"
     note="the list a firewall, route table and allow-list are written from" />
    <div style={card()}>
-    {(sel ? netLinksFor(sel.id) : NET_LINKS).map((l, i) => (
+    {(sel ? netLinksFor(sel.id) : NET_LINKS).filter(inF).map((l, i) => (
      <div key={l.id} style={{ padding: "10px 0",
       borderTop: i ? "1px solid #eef3f5" : "none" }}>
       <div style={{ display: "flex", gap: 9, alignItems: "baseline",
        flexWrap: "wrap" }}>
        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700,
-        color: INK }}>{l.id}</span>
+        color: (NET_FLOWS.find((f) => f.k === l.flow) || {}).c || INK }}>
+        {l.id}</span>
        <Chip bg={tone(l.st)} fg="#fff">{NET_STATE[l.st].n}</Chip>
        <b style={{ fontSize: 12.5, color: INK }}>{l.w}</b>
        {l.u && <span style={{ fontSize: 10.5, fontFamily: MONO, color: BAD }}>

@@ -1,7 +1,9 @@
 // The SDC event path, end to end, with the network it actually runs on.
 //
 // WHAT CHANGED, AND WHY THE SHAPE OF THE QUESTION MOVED. The event
-// transport is a Kafka SEI builds for BBH and publishes the topics to;
+// transport is SEI's Kafka infrastructure, carrying a queue dedicated to
+// BBH - a shared cluster with dedicated topics, not a cluster built for
+// BBH. BBH consumes from that queue;
 // the listener reads the event, and the TAG on it selects which SDC
 // Snowflake the puller then connects to. Access to both is over Private
 // Link, as on SEI's network page. So almost nothing here is unknown any
@@ -105,17 +107,18 @@ export const SDC_LEGS = [
    w: "A data event per changed row - eventid, key, op, view, no payload. "
     + "Markers 1000 and 1001 bracket the commit on every partition of "
     + "every subscribed topic.",
-   short: "Published to a Kafka SEI builds for BBH",
-   net: "SEI provisions a Kafka for BBH and publishes the topics to it. "
-      + "The transport and the access mechanism are both settled - BBH "
+   short: "Published to BBH's dedicated queue on SEI's Kafka",
+   net: "SEI publishes to a queue dedicated to BBH on its own Kafka "
+      + "infrastructure. Transport and access are both settled - BBH "
       + "reaches it over Private Link, as on SEI's network page. What is "
-      + "left is provisioning: three environments, and every broker "
-      + "reachable rather than only a bootstrap address.",
+      + "left is provisioning: three environments, every broker "
+      + "reachable rather than only a bootstrap address, and the ACLs "
+      + "that scope BBH to its own queue on a cluster it shares.",
    st: "design", ask: "Q1" },
  { n: 3, side: "BBH", reach: "sei", a: "SDC Event Listener", t: "Consumes the topic",
    w: "M1. Long-running consumer, at-least-once, offsets owned by the "
     + "consumer group. Markers bracket the micro-batch.",
-   short: "Kafka consumer over Private Link - held, not a request",
+   short: "Kafka consumer on a shared cluster, over Private Link",
    net: "A Kafka consumer holds a TCP connection to the broker set from a "
       + "BBH pod, over Private Link. It is not a request, so it crosses "
       + "Apigee nowhere and inherits none of the gateway's controls. "
@@ -152,8 +155,9 @@ export const SDC_LEGS = [
  { n: 8, side: "SEI", reach: "sei", a: "SDC", t: "Publishes the EOD system event",
    w: "Event 2, batch date flip: end-of-day position and accrual "
     + "processing has completed. About once a day.",
-   short: "Same Kafka as leg 2",
-   net: "Published to the same Kafka as leg 2, so the same provisioning.",
+   short: "Same queue as leg 2",
+   net: "Published to the same dedicated queue as leg 2, so the same "
+      + "provisioning and the same ACLs.",
    st: "design", ask: "Q1" },
  { n: 9, side: "BBH", reach: "bbh", a: "Event Gate Evaluator", t: "Takes the date to TRIGGER",
    w: "M8. One guarded UPDATE, and the event arm needs BOTH every "
@@ -166,9 +170,12 @@ export const SDC_LEGS = [
 
 // What the network page leaves open for BBH, and what each one blocks.
 export const SDC_OPEN = [
- { id: "Q1", q: "Is the Kafka provisioned, in all three environments?",
-   w: "Settled: SEI builds a Kafka for BBH, publishes the topics to it, "
-    + "and BBH reaches it over Private Link. What is left is build. A "
+ { id: "Q1", q: "Is BBH's queue provisioned and scoped, in all three environments?",
+   w: "Settled: SEI carries a queue dedicated to BBH on its own Kafka "
+    + "infrastructure, and BBH reaches it over Private Link. What is "
+    + "left is build, and one thing a dedicated cluster would not need: "
+    + "the topic ACLs that keep BBH to its own queue, because the "
+    + "cluster boundary is not BBH's boundary. A "
     + "Kafka client needs every ADVERTISED broker reachable, not just the "
     + "bootstrap address - a firewall rule written from a connection "
     + "string connects, then fails on the first metadata refresh. Three "

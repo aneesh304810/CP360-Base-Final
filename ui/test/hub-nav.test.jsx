@@ -34,7 +34,7 @@ import { ContextView, Stage2Model, DbModelView, Stage2Erd, Stage2Lineage,
   Stage2Feeds, Stage2Atlas, GatewayView, SdcEndToEnd, NetworkView }
   from "../src/HubContext.jsx";
 import { NET_ZONES, NET_LINKS, NET_STATE, NET_WORK, NET_UNKNOWN, NET_DNS,
-  NET_SETTLED, NET_COUNTS, netZone } from "../src/hubNetwork.js";
+  NET_SETTLED, NET_COUNTS, NET_FLOWS, netZone } from "../src/hubNetwork.js";
 import { GW_LAYERS, GW_VANTAGE, GW_AD3 } from "../src/hubGatewayLayers.js";
 import { LANES } from "../src/hubGroups.js";
 import { SDC_LEGS, SDC_OPEN, SDC_PATHS, SDC_ENVS, SDC_NET_FACTS,
@@ -481,10 +481,15 @@ ok(!/\\u[0-9a-fA-F]{4}/.test(CTXSRC) && !/\\u[0-9a-fA-F]{4}/.test(NAVSRC),
   ok(untraced.length === 0,
      "every unbuilt link cites the question, component or decision it "
      + "waits on", untraced.map((l) => l.id).join(","));
-  ok(NET_LINKS.filter((l) => l.u).every((l) => SDC_OPEN.some((o) => o.id === l.u)),
-     "and a link's question id resolves against the event path's list, "
-     + "so the two screens cannot drift apart",
-     NET_LINKS.filter((l) => l.u && !SDC_OPEN.some((o) => o.id === l.u))
+  // A question id resolves against one of the two lists: the event
+  // path's Qs or this screen's Us. An id that resolves against neither
+  // is a reference to a question nobody is tracking.
+  const resolves = (id) => SDC_OPEN.some((o) => o.id === id)
+    || NET_UNKNOWN.some((u) => u.id === id);
+  ok(NET_LINKS.filter((l) => l.u).every((l) => resolves(l.u)),
+     "a link's question id resolves against the event path's list or "
+     + "this screen's, so the two cannot drift apart",
+     NET_LINKS.filter((l) => l.u && !resolves(l.u))
        .map((l) => `${l.id}->${l.u}`).join(","));
   ok(NET_LINKS.every((l) => h.includes(l.id)),
      "every link id is on the page, so the picture indexes into the table",
@@ -501,6 +506,8 @@ ok(!/\\u[0-9a-fA-F]{4}/.test(CTXSRC) && !/\\u[0-9a-fA-F]{4}/.test(NAVSRC),
   const settled = NET_SETTLED.map((x) => x.t + " " + x.w).join(" ");
   for (const [re, what] of [
     [/Kafka/i, "the Kafka is the event transport"],
+    [/dedicated|shared cluster/i,
+     "it is a dedicated queue on SEI's shared cluster, not a BBH build"],
     [/Private Link/i, "Private Link is how BBH reaches it"],
     [/tag/i, "the tag selects the Snowflake target"],
     [/three|DEV.*IMPS.*Prod/i, "there are three environments"],
@@ -522,6 +529,52 @@ ok(!/\\u[0-9a-fA-F]{4}/.test(CTXSRC) && !/\\u[0-9a-fA-F]{4}/.test(NAVSRC),
   ok(/private DNS/i.test(NET_DNS.t + NET_DNS.w) && NET_DNS.checks.length >= 4,
      "the private-DNS failure is called out: a private endpoint without "
      + "its zone is a public route that succeeds", "");
+
+  // Flows, so a team can isolate the path it owns. Nineteen links read
+  // as one wall of text otherwise.
+  ok(NET_LINKS.every((l) => NET_FLOWS.some((f) => f.k === l.flow)),
+     "every link belongs to a flow that exists",
+     NET_LINKS.filter((l) => !NET_FLOWS.some((f) => f.k === l.flow))
+       .map((l) => l.id).join(","));
+  ok(NET_FLOWS.every((f) => NET_LINKS.some((l) => l.flow === f.k)),
+     "and every flow has links - an empty filter pill is a dead control",
+     "");
+
+  // The file path was one link and is now the four things infrastructure
+  // actually has to provision.
+  const files = NET_LINKS.filter((l) => l.flow === "file");
+  const fileText = JSON.stringify(files);
+  for (const [re, what] of [
+    [/SFTP/i, "SFTP"], [/Momentum/i, "Momentum"],
+    [/mounted|mount/i, "the mount into the worker pods"],
+    [/Archive|Quarantine/i, "Archive and Quarantine"],
+  ])
+    ok(re.test(fileText), `the file flow names ${what}`, "");
+  ok(NET_ZONES.some((z) => z.id === "store"),
+     "shared storage is its own zone - an external writer and internal "
+     + "readers both touch it, which makes its protocol and mount an "
+     + "infrastructure question", "");
+  ok(/which side initiates|which side opens/i.test(fileText),
+     "and the Momentum link flags which side opens the connection as "
+     + "unstated, because that decides the direction of the rule", "");
+
+  // The loader round trip is five legs and two of them were missing from
+  // every network picture.
+  const loader = NET_LINKS.filter((l) => l.flow === "loader");
+  ok(loader.some((l) => /BBH to consumer/i.test(l.dir)),
+     "the loader flow includes the Hub calling the consumer back - the "
+     + "direction nobody draws, because consumers are assumed to call in",
+     loader.map((l) => l.dir).join(" | "));
+  ok(files.some((l) => /error.detail/i.test(l.w)),
+     "and the error-detail file coming back, which is a file path the "
+     + "loader flow depends on", "");
+  ok(files.some((l) => /must NOT join|never empties/i.test(l.note)),
+     "with the rule that keeps it out of the expected daily set - in it, "
+     + "the inbound business date never transforms", "");
+  ok(loader.filter((l) => /BBH to SEI/i.test(l.dir)).length === 2,
+     "data fetch and loader submit are separate links - they share a "
+     + "quota and compete, which one link hides",
+     loader.filter((l) => /BBH to SEI/i.test(l.dir)).map((l) => l.id).join(","));
 
   // Four teams, each with work they can actually start.
   ok(NET_WORK.length >= 4 && NET_WORK.every((g) => g.team && g.items.length),

@@ -55,15 +55,20 @@ export const NET_ZONES = [
     + "run Golden Gate and the release migration scripts.",
    holds: ["SWP", "SEI PS loader", "SFTP extract", "Momentum",
      "Dedicated VMs"] },
- // Dedicated, not shared. SEI stands this up for BBH, which makes topic
- // naming, ACLs and consumer-group ownership a joint design rather than
- // something BBH inherits from an existing estate.
- { id: "kafka", n: "SEI Kafka, built for BBH", own: "SEI", col: 1, row: 0,
-   w: "The event transport. SEI provisions a Kafka for BBH; the listener "
-    + "consumes from it. This is what Q1 was asking about and it is now "
-    + "answered in mechanism - what remains open is the network path to "
-    + "it and how a consumer authenticates.",
-   holds: ["Domain topics", "Markers 1000 and 1001", "Consumer group offsets"],
+ // SEI's own Kafka estate, with a queue dedicated to BBH on it. The
+ // distinction from "a Kafka built for BBH" is not pedantry: a shared
+ // cluster means the brokers, their capacity and their blast radius are
+ // SEI platform concerns BBH shares with other consumers, and that
+ // BBH's isolation is enforced by topic ACLs rather than by the cluster
+ // boundary. Those are different questions to ask and different things
+ // to test.
+ { id: "kafka", n: "SEI Kafka infrastructure", own: "SEI platform",
+   col: 1, row: 0,
+   w: "SEI's existing Kafka, carrying a queue dedicated to BBH. BBH "
+    + "consumes from that queue; it does not own the cluster. Shared "
+    + "infrastructure, dedicated topics.",
+   holds: ["BBH's dedicated queue", "Domain topics",
+     "Markers 1000 and 1001", "Consumer group offsets"],
    isNew: true },
  { id: "snow", n: "Snowflake tenant - SDC", own: "Snowflake, under SEI",
    col: 1, row: 1,
@@ -84,51 +89,75 @@ export const NET_ZONES = [
     + "them. Where this sits is U1.",
    holds: ["OpenShift", "Airflow and dbt", "CP-Integration-Gateway",
      "Oracle Stage 1 and 2", "Exadata Stage 3"], unsited: true },
+ // Called out as its own zone because an EXTERNAL writer (Momentum) and
+ // internal readers (the worker pods) both touch it. That makes its
+ // protocol, its mount and its firewall rule an infrastructure question
+ // rather than an application detail, and it was invisible while the
+ // file path was one link.
+ { id: "store", n: "BBH shared storage", own: "BBH", col: 3, row: 1,
+   w: "Landing, Archive and Quarantine, visible consistently to every "
+    + "worker pod. Momentum writes into it from outside; the pods read "
+    + "and move within it.",
+   holds: ["Landing Zone", "Archive", "Quarantine"] },
  { id: "edge", n: "BBH edge and consumers", own: "BBH", col: 4, row: 0,
    w: "BBH Apigee, and the consumers that address the gateway in front "
     + "of it.",
    holds: ["BBH Apigee", "CRM and other consumers"] },
 ];
 
+export const NET_FLOWS = [
+ { k: "event", n: "Events", c: "#2a78d6",
+   w: "Kafka in, Snowflake read on the tag" },
+ { k: "file", n: "Files", c: "#1baf7a",
+   w: "SFTP, Momentum, and the shared storage both sides touch" },
+ { k: "loader", n: "Loader", c: "#eb6834",
+   w: "Out to SEI, status back by API, detail back by file" },
+ { k: "consumer", n: "Consumers", c: "#6d3ac0",
+   w: "In through the gateway, answered by an outbound call" },
+ { k: "platform", n: "Platform", c: "#5c6b7a",
+   w: "Inside BBH: the data estate and the evidence path" },
+];
+
 // Every connection, in the shape a firewall request is written in.
 export const NET_LINKS = [
- { id: "N1", from: "sei", to: "snow", st: "live",
+ /* ---------------- events ---------------- */
+ { id: "E1", flow: "event", from: "sei", to: "snow", st: "live",
    w: "SWP commits to the Snowflake intake",
    mech: "Inside SEI's paired subscription",
    proto: "Snowflake driver", dir: "SEI to Snowflake",
    owner: "SEI", note: "No BBH involvement." },
- { id: "N2", from: "sei", to: "fabric", st: "live",
+ { id: "E2", flow: "event", from: "sei", to: "fabric", st: "live",
    w: "SEI VMs reach the Snowflake SQL service",
    mech: "Azure Private Link, private endpoint in the customer VNet",
    proto: "TLS 443, to confirm", dir: "SEI to Snowflake",
    owner: "SEI network", note: "Path 1 on SEI's diagram." },
- { id: "N3", from: "fabric", to: "snow", st: "live",
+ { id: "E3", flow: "event", from: "fabric", to: "snow", st: "live",
    w: "Internal stage traffic: PUT, GET and large result sets",
    mech: "Second Azure Private Link plus a storage service endpoint, to "
        + "Snowflake-managed blob",
    proto: "TLS 443, to confirm", dir: "both",
    owner: "SEI network",
    note: "Path 3. Separate from the SQL path and separately provisioned." },
- { id: "N4", from: "snow", to: "fabric", st: "live",
+ { id: "E4", flow: "event", from: "snow", to: "fabric", st: "live",
    w: "External stage traffic: COPY and external tables",
    mech: "Cross-tenant VNet rules on the customer's own blob or ADLS gen2",
    proto: "TLS 443, to confirm", dir: "Snowflake to customer storage",
    owner: "SEI network", note: "Path 4. Not used by the event path." },
-
- { id: "N5", from: "bbh", to: "kafka", st: "design", u: "Q1",
-   w: "The event listener consumes the published topics",
+ { id: "E5", flow: "event", from: "bbh", to: "kafka", st: "design", u: "Q1",
+   w: "The listener consumes BBH's dedicated queue",
    mech: "Kafka consumer, long-lived TCP to the broker set, reached over "
        + "Azure Private Link as on SEI's network page",
    proto: "Kafka over TLS, 9093 or equivalent, to confirm",
    dir: "BBH to SEI, inbound data",
-   owner: "SEI provisions, BBH consumes",
+   owner: "SEI platform runs it, BBH consumes",
    note: "A held connection to a broker set, not a request: it crosses no "
        + "gateway and inherits none of its controls. Reachability is to "
        + "every ADVERTISED broker, not just the bootstrap address - a "
        + "rule written from a connection string connects and then fails "
        + "on the first metadata refresh. Three environments, three "
-       + "broker sets." },
- { id: "N6", from: "bbh", to: "fabric", st: "design", u: "Q2",
+       + "broker sets. Shared cluster, so BBH's isolation rests on "
+       + "topic ACLs rather than on the cluster boundary." },
+ { id: "E6", flow: "event", from: "bbh", to: "fabric", st: "design", u: "Q2",
    w: "The puller reads the SDC view the event's tag selects",
    mech: "A Snowflake driver session. Needs a private endpoint reachable "
        + "from the BBH runtime AND admission to the Snowflake network "
@@ -137,10 +166,9 @@ export const NET_LINKS = [
    owner: "BBH network, SEI admits",
    note: "A route and an admission are two controls. Private Link gives "
        + "the route; the account network policy decides whether the "
-       + "connection is accepted once it arrives, and today it admits "
-       + "SEI subnets and VPN only. This is the leg the whole "
-       + "events-primary posture rests on." },
- { id: "N7", from: "bbh", to: "fabric", st: "design", u: "Q3",
+       + "connection is accepted once it arrives. This is the leg the "
+       + "whole events-primary posture rests on." },
+ { id: "E7", flow: "event", from: "bbh", to: "fabric", st: "design", u: "Q3",
    w: "The puller's large result sets",
    mech: "A second private endpoint to Snowflake-managed blob, as path 3",
    proto: "TLS 443, to confirm", dir: "both",
@@ -148,43 +176,111 @@ export const NET_LINKS = [
    note: "Provision only the SQL path and every connectivity test passes "
        + "until the first real micro-batch." },
 
- { id: "N8", from: "edge", to: "sei", st: "live",
-   w: "Hub calls out to the SEI APIs - data fetch and loader submit",
+ /* ---------------- files ---------------- */
+ { id: "F1", flow: "file", from: "sei", to: "sei", st: "live",
+   w: "SWP writes the daily extract to SEI SFTP",
+   mech: "Inside SEI's estate",
+   proto: "SFTP 22, to confirm", dir: "SEI internal",
+   owner: "SEI",
+   note: "Produced every day whether or not it is loaded - under the "
+       + "event-primary posture this set is standby." },
+ { id: "F2", flow: "file", from: "sei", to: "store", st: "live",
+   w: "Momentum transfers complete files to the Landing Zone",
+   mech: "Managed file transfer. Which side initiates, and where Momentum "
+       + "itself runs, decides the direction of the firewall rule - and "
+       + "no document here states either.",
+   proto: "SFTP 22 or the Momentum transport, to confirm",
+   dir: "SEI to BBH, to confirm which side opens it",
+   owner: "Joint",
+   note: "Only complete files become visible, by final rename or marker "
+       + "convention. Transfer evidence - names, timestamps, outcome, "
+       + "checksum where the contract has one - is required from "
+       + "Momentum and is a separate interface from the file itself." },
+ { id: "F3", flow: "file", from: "bbh", to: "store", st: "live",
+   w: "Worker pods read Landing and write Archive and Quarantine",
+   mech: "Shared storage mounted into the pods - the file-processing "
+       + "contract requires consistent visibility across every worker",
+   proto: "The storage protocol, to confirm - NFS, SMB or a CSI driver",
+   dir: "both", owner: "BBH platform",
+   note: "ARCHIVE_FAILED exists because the move can fail after RAW is "
+       + "committed. That state is a storage failure mode, not an "
+       + "application one, and it must never trigger a reload." },
+ { id: "F4", flow: "file", from: "sei", to: "store", st: "design", u: "U5",
+   w: "The loader error-detail file arrives",
+   mech: "The same file transport as F2, to confirm - nothing states "
+       + "whether outbound error detail returns on the inbound channel "
+       + "or a separate one",
+   proto: "As F2, to confirm", dir: "SEI to BBH",
+   owner: "Joint",
+   note: "Leg 4 of the loader round trip. It must NOT join the expected "
+       + "daily set: a clean outbound day produces no file, and if it is "
+       + "an expected daily interface the inbound completeness set never "
+       + "empties and the business date never transforms." },
+
+ /* ---------------- loader ---------------- */
+ { id: "L1", flow: "loader", from: "edge", to: "sei", st: "live",
+   w: "Hub fetches data from the SEI APIs",
    mech: "CP-Integration-Gateway, then BBH Apigee, then out",
    proto: "HTTPS 443, mTLS and OAuth", dir: "BBH to SEI",
    owner: "BBH platform",
-   note: "The identity SEI observes is Apigee's." },
- { id: "N9", from: "sei", to: "edge", st: "design",
-   w: "SEI PS calls back with loader status and counts",
+   note: "Bursty and set-based. Shares the gateway and the SEI quota with "
+       + "L2 and C1, which is the starvation risk." },
+ { id: "L2", flow: "loader", from: "edge", to: "sei", st: "live",
+   w: "Hub submits the loader to SEI PS",
+   mech: "CP-Integration-Gateway, then BBH Apigee, then out",
+   proto: "HTTPS 443, mTLS and OAuth", dir: "BBH to SEI",
+   owner: "BBH platform",
+   note: "The identity SEI observes is Apigee's. Window-bound, so it "
+       + "competes with L1's bursts for the same quota." },
+ { id: "L3", flow: "loader", from: "sei", to: "edge", st: "design",
+   w: "SEI PS calls back with status and counts",
    mech: "Inbound through Apigee to the callback receiver",
    proto: "HTTPS 443", dir: "SEI to BBH",
    owner: "BBH platform",
-   note: "M2. Designed; the receiver is not built." },
- { id: "N10", from: "sei", to: "bbh", st: "live",
-   w: "The daily file set",
-   mech: "SFTP, then Momentum copies complete files to the Landing Zone",
-   proto: "SFTP 22, to confirm", dir: "SEI to BBH",
+   note: "M2. Designed; the receiver is not built. This is the only "
+       + "SEI-initiated API call inbound to BBH, so it is the only "
+       + "inbound rule the loader flow needs." },
+ { id: "L4", flow: "loader", from: "bbh", to: "edge", st: "design", u: "U6",
+   w: "The Hub answers the originating consumer",
+   mech: "An outbound call from the Hub to the consumer's own API",
+   proto: "HTTPS 443, to confirm", dir: "BBH to consumer",
    owner: "BBH platform",
-   note: "Standby under the event-primary posture, produced daily either way." },
- { id: "N11", from: "edge", to: "bbh", st: "live",
+   note: "Leg 5, and the direction nobody draws: the Hub calls the "
+       + "consumer, not the other way round. Egress to every consumer "
+       + "that submits a loader, and it cannot be sent until the status "
+       + "API and the error file agree." },
+
+ /* ---------------- consumers ---------------- */
+ { id: "C1", flow: "consumer", from: "edge", to: "bbh", st: "live",
    w: "Consumers call the Hub",
    mech: "CP-Integration-Gateway is the only host a consumer addresses",
    proto: "HTTPS 443", dir: "consumer to BBH",
    owner: "BBH platform",
    note: "GW-GAP-01: the inbound trust boundary is not yet demonstrated "
        + "as enforced." },
- { id: "N12", from: "bbh", to: "bbh", st: "live",
+
+ /* ---------------- platform ---------------- */
+ { id: "P1", flow: "platform", from: "bbh", to: "bbh", st: "live",
    w: "Runtime to the data estate",
    mech: "In-cluster or in-datacentre, depending on U1",
    proto: "Oracle SQL*Net 1521 or 2484, to confirm", dir: "both",
    owner: "BBH platform", note: "Stage 1 and Stage 2." },
- { id: "N13", from: "bbh", to: "bbh", st: "design",
+ { id: "P2", flow: "platform", from: "bbh", to: "bbh", st: "design",
    w: "Stage 2 Oracle to Stage 3 Exadata",
    mech: "Database link or approved direct path - DEC-GAP-04 picks which",
    proto: "Oracle SQL*Net, to confirm", dir: "Stage 2 to Stage 3",
    owner: "BBH platform",
    note: "The mechanism is an open decision, so the network rule cannot "
        + "be written yet." },
+ { id: "P3", flow: "platform", from: "bbh", to: "bbh", st: "live",
+   w: "Evidence to the approved logging platform",
+   mech: "Splunk, and Integration 360 for status",
+   proto: "HTTPS 443, to confirm", dir: "BBH internal",
+   owner: "BBH platform",
+   note: "On the degradation path: if this is unavailable, buffering "
+       + "policy applies and required evidence is never silently "
+       + "discarded. A dropped evidence write is indistinguishable "
+       + "afterwards from evidence never produced." },
 ];
 
 // The routing rule, and the network question hiding inside it.
@@ -250,9 +346,10 @@ export const NET_WORK = [
     "Connectivity smoke tests in the CI/CD gate that assert the private path, not just a 200"] },
  { team: "SEI",
    items: [
-    "Where the Kafka brokers built for BBH sit, and how BBH reaches every broker rather than only a bootstrap address",
+    "Where the Kafka brokers sit, and how BBH reaches every broker rather than only a bootstrap address",
     "The authentication the Kafka expects - mTLS, SASL or OAuth - and who issues the credential",
-    "Topic naming, ACLs, and whether BBH owns its consumer group offsets",
+    "Topic ACLs scoping BBH to its own queue, on a cluster it shares - and whether BBH owns its consumer group offsets",
+    "Whether the cluster is capacity-managed per consumer, or a noisy neighbour can affect BBH's lag",
     "The closed set of tag values and the Snowflake target each one resolves to - U4",
     "Confirm whether path 3 is provisioned for the BBH-facing account, or only path 1",
     "Confirm which of the three admission routes for BBH is acceptable"] },
@@ -262,8 +359,9 @@ export const NET_WORK = [
 // settled: a reviewer who sees three open questions where there are two
 // escalates the wrong one.
 export const NET_SETTLED = [
- { t: "The event transport", w: "A Kafka SEI builds for BBH, with the "
-   + "topics published to it. Not a shared estate BBH joins." },
+ { t: "The event transport", w: "SEI's own Kafka infrastructure, with a "
+   + "queue dedicated to BBH to consume from. Shared cluster, dedicated "
+   + "topics - BBH does not own the brokers." },
  { t: "How BBH reaches it", w: "Azure Private Link, the same mechanism as "
    + "SEI's own page shows for the Snowflake account." },
  { t: "How the Snowflake target is chosen", w: "The tag on the event. "
@@ -302,10 +400,30 @@ export const NET_UNKNOWN = [
     + "set can reach, times three environments. One per environment is "
     + "right only if every tag resolves within a single account.",
    blocks: "Sizing the Private Link build" },
+ { id: "U5", q: "Which channel carries the loader error-detail file back?",
+   w: "Leg 4 of the loader round trip returns per-record detail as a "
+    + "file. Nothing states whether it arrives on the same inbound "
+    + "transport as the daily extract or a separate one, and the answer "
+    + "decides whether it is one firewall rule or two. It must also "
+    + "stay OUT of the expected daily set: a clean outbound day produces "
+    + "no file, and if it is an expected daily interface the inbound "
+    + "completeness set never empties and the business date never "
+    + "transforms.",
+   blocks: "F4, and the loader round trip cannot close without it" },
+ { id: "U6", q: "What egress does the Hub need to reach every consumer's API?",
+   w: "Leg 5 is the Hub calling the consumer back, which is the only "
+    + "direction nobody draws - consumers are assumed to call in. Every "
+    + "consumer that submits a loader is an egress destination, and "
+    + "nothing names who maintains that list, what authenticates the "
+    + "Hub to a consumer, or what happens when one is unreachable while "
+    + "a submission is outstanding.",
+   blocks: "L4 - the consumer is never answered" },
  { id: "U4", q: "What authenticates the Kafka consumer, and who issues it?",
-   w: "Private Link carries the connection; it does not authenticate it. "
-    + "mTLS, SASL or OAuth is a separate choice with a separate "
-    + "credential lifecycle, three times over, and nothing has named it.",
+   w: "Private Link carries the connection; it does not authenticate it, "
+    + "and on a shared cluster it does not scope it either. mTLS, SASL "
+    + "or OAuth is a separate choice with its own credential lifecycle, "
+    + "three times over, and the ACLs that keep BBH to its own queue are "
+    + "a third thing again. Nothing has named any of them.",
    blocks: "N5 - and it is a second credential class the secret service "
          + "has to hold" },
 ];
