@@ -366,6 +366,8 @@ function LegacyDatapoints({ t, onOpen }) {
   // Browse by category: the dictionary's group, with every UD field under
   // one category. Client-side over the list already loaded; null = all.
   const [cat, setCat] = useState(null);
+  // all | category. "all" is the plain list; "category" adds the rail.
+  const [view, setView] = useState("all");
   const cats = categorize(defs);
   const shown = inCategory(defs, cat);
   // The code values a UD field carries (sql/75). Fetched per selection and
@@ -425,6 +427,7 @@ function LegacyDatapoints({ t, onOpen }) {
     const list = inCategory(defs, c);
     setSel((prev) => (prev && list.find((x) => x.field_code_norm === prev.field_code_norm)) || list[0] || null);
   };
+  const pickView = (v) => { setView(v); if (v === "all") pickCat(null); };
   const col = LEGACY_SYS[curSys] || { c: t.accent, bg: t.infoBg, label: curSys };
   const clsPill = (v) => {
     const map = {
@@ -468,6 +471,17 @@ function LegacyDatapoints({ t, onOpen }) {
       </div>
 
       {/* search */}
+      {/* tabs: All Data Points / Browse by Category, same control as the SEI side */}
+      <div style={{ display: "flex", gap: 2, borderBottom: `1px solid ${t.border}`, margin: "0 0 18px" }}>
+        {[["all", "All Data Points"], ["category", "Browse by Category"]].map(([k, label]) => (
+          <button key={k} onClick={() => pickView(k)} style={{
+            background: "none", border: "none", fontSize: 13, fontWeight: 500,
+            padding: "10px 18px", cursor: "pointer", fontFamily: t.font,
+            color: view === k ? t.accent : (t.sub || t.textMuted),
+            borderBottom: `2px solid ${view === k ? t.accent : "transparent"}`,
+            marginBottom: -1 }}>{label}</button>))}
+      </div>
+
       {curSys === "ADDVANTAGE" && (!cat || cat === UD_CATEGORY) &&
         <UdStrip t={t} ov={udOv} shape={udShape} tv={udTv} sv={udSv} />}
       <div style={{ display: "flex", gap: 10, marginBottom: 14, alignItems: "center" }}>
@@ -480,8 +494,8 @@ function LegacyDatapoints({ t, onOpen }) {
       </div>
 
       {/* list + detail */}
-      <div style={{ display: "grid", gridTemplateColumns: "230px 320px 1fr", gap: 18 }}>
-        <div style={{ maxHeight: 520, overflowY: "auto" }}>
+      <div style={{ display: "grid", gridTemplateColumns: view === "category" ? "230px 320px 1fr" : "320px 1fr", gap: 18 }}>
+        {view === "category" && <div style={{ maxHeight: 520, overflowY: "auto" }}>
           <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase",
             color: t.muted || t.textMuted, marginBottom: 8 }}>Browse by category ({cats.length})</div>
           {[{ category: null, count: defs.length, label: "All data points" }, ...cats].map((c) => {
@@ -504,7 +518,7 @@ function LegacyDatapoints({ t, onOpen }) {
                     {c.pii > 0 ? `${c.pii} PII` : ""}</div>)}
               </div>);
           })}
-        </div>
+        </div>}
         <div style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: 8,
           overflow: "hidden", maxHeight: 520, overflowY: "auto" }}>
           {shown.map((d) => (

@@ -66,7 +66,11 @@ ok(/import \{ categorize, inCategory, UD_CATEGORY \} from "\.\/legacyCategories\
 ok(/\(!cat \|\| cat === UD_CATEGORY\) &&\s*<UdStrip/.test(D), "the UD 360 strip hides while another category is open");
 ok(/const shown = inCategory\(defs, cat\);/.test(D) && /\{shown\.map\(\(d\) => \(/.test(D), "the list renders the filtered set, not the full one");
 ok(/Browse by category \(\{cats\.length\}\)/.test(D), "the rail is labelled with its count");
-ok(/gridTemplateColumns: "230px 320px 1fr"/.test(D), "three columns: rail, list, detail");
+ok(/const \[view, setView\] = useState\("all"\);/.test(D), "the default view is All, the plain list");
+ok(/\[\["all", "All Data Points"\], \["category", "Browse by Category"\]\]/.test(D), "two tabs, the same control as the SEI side");
+ok(/\{view === "category" && <div style=\{\{ maxHeight: 520/.test(D), "the rail exists only on the category tab");
+ok(/gridTemplateColumns: view === "category" \? "230px 320px 1fr" : "320px 1fr"/.test(D), "the list keeps its full width on All");
+ok(/const pickView = \(v\) => \{ setView\(v\); if \(v === "all"\) pickCat\(null\); \};/.test(D), "going back to All clears the category");
 ok(/useEffect\(\(\) => \{ setCat\(null\); \}, \[curSys\]\);/.test(D), "switching legacy system clears the category");
 ok(/Nothing in this category\./.test(D), "an empty category says so rather than 'No definitions'");
 
