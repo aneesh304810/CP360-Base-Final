@@ -482,7 +482,10 @@ function LegacyDatapoints({ t, onOpen }) {
             marginBottom: -1 }}>{label}</button>))}
       </div>
 
-      {curSys === "ADDVANTAGE" && (!cat || cat === UD_CATEGORY) &&
+      {/* The UD 360 strip belongs to the UD fields: it shows while the UD
+          category is being browsed or a UD field is the selected one, and
+          never above a Basic Information listing. */}
+      {curSys === "ADDVANTAGE" && (cat === UD_CATEGORY || isUdAttribute(sel?.field_code_norm)) &&
         <UdStrip t={t} ov={udOv} shape={udShape} tv={udTv} sv={udSv} />}
       <div style={{ display: "flex", gap: 10, marginBottom: 14, alignItems: "center" }}>
         <input value={q} onChange={(e) => setQ(e.target.value)}

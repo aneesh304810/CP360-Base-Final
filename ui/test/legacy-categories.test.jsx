@@ -63,7 +63,7 @@ ok(inCategory(defs, "Tax (TX)").length === 1, "a group filters to its fields");
 
 console.log("-- the pane composes category with the loaded list");
 ok(/import \{ categorize, inCategory, UD_CATEGORY \} from "\.\/legacyCategories\.js"/.test(D), "Datapoint360 imports the helper");
-ok(/\(!cat \|\| cat === UD_CATEGORY\) &&\s*<UdStrip/.test(D), "the UD 360 strip hides while another category is open");
+ok(/\(cat === UD_CATEGORY \|\| isUdAttribute\(sel\?\.field_code_norm\)\) &&\s*<UdStrip/.test(D), "the UD 360 strip appears only for UD fields, browsed or selected");
 ok(/const shown = inCategory\(defs, cat\);/.test(D) && /\{shown\.map\(\(d\) => \(/.test(D), "the list renders the filtered set, not the full one");
 ok(/Browse by category \(\{cats\.length\}\)/.test(D), "the rail is labelled with its count");
 ok(/const \[view, setView\] = useState\("all"\);/.test(D), "the default view is All, the plain list");
