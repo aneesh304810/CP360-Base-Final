@@ -1,0 +1,42 @@
+# AddVantage UD classification rules. Evidence precedence, highest first:
+#   1. the AddVantage UD workbook (field type, lookup table)   -> DICTIONARY
+#   2. the TRP multiline samples (business usage)              -> SAMPLES
+#   3. these rules, written from the brief                      -> RULE
+#   4. profiling (dominant type)                                -> INFERRED
+# A rule here is a hypothesis with a name on it. It is overwritten the moment
+# the workbook says otherwise, and the registry records which source won.
+
+# Multipart parents whose lines are narrative. "=" inside them is prose.
+free_text_parents: [UD_32, UD_514]
+
+# What a multipart parent IS, by structure.
+structures:
+  UD_23:  { role: HOUSEHOLD,            domain: HOUSEHOLD, silver: ACCOUNT_HOUSEHOLD,
+            lines: [household_id, household_name, household_code, display_name] }
+  UD_32:  { role: BILLING_INSTRUCTION,  domain: BILLING,   silver: ACCOUNT_BILLING,
+            lines: [instruction_text] }
+  UD_506: { role: AUTHORITY,            domain: AUTHORITY, silver: ACCOUNT_AUTHORITY,
+            lines: [authority_role_text] }
+  UD_514: { role: TEXT_BLOCK,           domain: UNKNOWN,   silver: null,
+            lines: [text] }
+
+# Single attributes with a domain hypothesis from the brief.
+attributes:
+  UD_1:   { domain: ACCOUNT_CLASSIFICATION, silver: ACCOUNT_CLASSIFICATION, class: CODE_DESCRIPTION }
+  UD_2:   { domain: ACCOUNT_CLASSIFICATION, silver: ACCOUNT_CLASSIFICATION }
+  UD_7:   { domain: ACCOUNT_CLASSIFICATION, silver: ACCOUNT_CLASSIFICATION }
+  UD_14:  { domain: TAX,                    silver: ACCOUNT_TAX_STATUS,     class: CODE_DESCRIPTION, table_hint: 714 }
+  UD_51:  { domain: IPS,                    silver: ACCOUNT_IPS }
+  UD_52:  { domain: IPS,                    silver: ACCOUNT_IPS }
+  UD_503: { domain: AUTHORITY,              silver: ACCOUNT_AUTHORITY,      class: CODE_DESCRIPTION }
+
+# The thirteen the brief asks to evaluate for Gold.
+gold_candidates: [UD_1, UD_2, UD_7, UD_14, UD_26, UD_31, UD_46, UD_51, UD_52, UD_80, UD_503, UD_507, UD_534]
+
+# Attributes the profiler reads as TIMESTAMP that are account numbers
+# (10 digits, no separator). Reclassified to IDENTIFIER before any type is
+# declared stable.
+identifier_parents: [UD_527, UD_540]
+
+domains: [ACCOUNT_CLASSIFICATION, HOUSEHOLD, BILLING, FIDUCIARY, AUTHORITY, IPS, COMPLIANCE,
+          TAX, ACCOUNT_STATUS, CLIENT_SEGMENT, PRODUCT_RESTRICTION, ORGANIZATION, UNKNOWN]

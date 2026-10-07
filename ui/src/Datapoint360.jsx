@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { SectionHeader } from "./AppShell.jsx";
 import { api } from "./api.js";
 import { advantageUdApi, isUdAttribute, codedSummary } from "./advantageUd.js";
+import { UdOverview, udDetailRows } from "./AdvantageUd360.jsx";
 
 // =====================================================================
 // Datapoint 360 — browse by Inbound / Outbound (parent groups, SEI),
@@ -365,13 +366,28 @@ function LegacyDatapoints({ t, onOpen }) {
   // only for a UD code on AddVantage; every other field has none and the
   // pane must not spend a round trip finding that out.
   const [codes, setCodes] = useState([]);
+  // The UD 360 (sql/76): the envelope's overview once per system, and the
+  // registry row for the selected key. Both say loaded:false until the
+  // profile step has run, and the pane then shows exactly what it did.
+  const [udOv, setUdOv] = useState(null);
+  const [udShape, setUdShape] = useState(null);
+  const [udAttr, setUdAttr] = useState(null);
+
+  useEffect(() => {
+    if (curSys !== "ADDVANTAGE") { setUdOv(null); setUdShape(null); return; }
+    let live = true;
+    advantageUdApi.overview().then((r) => { if (live) setUdOv(r); });
+    advantageUdApi.clobShape().then((r) => { if (live) setUdShape(r); });
+    return () => { live = false; };
+  }, [curSys]);
 
   useEffect(() => {
     if (!sel || curSys !== "ADDVANTAGE" || !isUdAttribute(sel.field_code_norm)) {
-      setCodes([]); return;
+      setCodes([]); setUdAttr(null); return;
     }
     let live = true;
     advantageUdApi.codes(sel.field_code_norm).then((r) => { if (live) setCodes(r.codes || []); });
+    advantageUdApi.attribute(sel.field_code_norm).then((r) => { if (live) setUdAttr(r); });
     return () => { live = false; };
   }, [sel, curSys]);
 
@@ -435,6 +451,7 @@ function LegacyDatapoints({ t, onOpen }) {
       </div>
 
       {/* search */}
+      {curSys === "ADDVANTAGE" && <UdOverview t={t} ov={udOv} shape={udShape} />}
       <div style={{ display: "flex", gap: 10, marginBottom: 14, alignItems: "center" }}>
         <input value={q} onChange={(e) => setQ(e.target.value)}
           placeholder="Search attribute / field code…"
@@ -513,6 +530,7 @@ function LegacyDatapoints({ t, onOpen }) {
                       </td>
                     </tr>))}
                 </tbody></table>],
+                ...udDetailRows(t, udAttr),
                 ["PB field mapping", sel.pb_field_mapping && <span key="pb"
                   style={{ fontFamily: "monospace" }}>{sel.pb_field_mapping}</span>],
                 ["Classifications", (sel.privacy_class || sel.regulatory_class || sel.operational_class)

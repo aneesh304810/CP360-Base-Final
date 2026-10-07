@@ -47,3 +47,56 @@ export function codedSummary(codes) {
   return `Coded field · ${n} value${n === 1 ? "" : "s"} ${where}` +
     (verified ? " · verified" : "");
 }
+
+/* The 360 view (sql/76). Each call falls back to {loaded:false} so the
+   pane can say "not loaded yet" instead of drawing empty charts. */
+advantageUdApi.overview = () =>
+  _get("/advantage-ud/overview", () => ({ loaded: false, attributes: 0, parents: [], families: [] }));
+advantageUdApi.attribute = (name) =>
+  _get(`/advantage-ud/attribute?name=${encodeURIComponent(name)}`,
+    () => ({ attribute: name, loaded: false, registry: null, codes: [], siblings: [], conflicts: [] }));
+advantageUdApi.clobShape = () =>
+  _get("/advantage-ud/clob-shape", () => ({ loaded: false, example: {}, key_count_buckets: {} }));
+advantageUdApi.registry = (q) => {
+  const s = new URLSearchParams();
+  Object.entries(q || {}).forEach(([k, v]) => { if (v) s.set(k, v); });
+  const qs = s.toString();
+  return _get(`/advantage-ud/registry${qs ? "?" + qs : ""}`, () => ({ attributes: [] }));
+};
+
+/* Plain-language readings of the registry numbers, so the pane says what
+   a figure MEANS rather than printing it. Pure, tested. */
+export const pct = (v) => (v == null ? null : `${Math.round(Number(v) * 10) / 10}%`);
+
+export function presenceReading(r) {
+  const p = Number(r?.record_presence_pct);
+  if (!r || Number.isNaN(p)) return null;
+  if (p >= 99) return "on every account";
+  if (p >= 50) return "on most accounts";
+  if (p >= 5) return "on some accounts";
+  return "rare";
+}
+
+export function typeReading(r) {
+  if (!r) return null;
+  const parts = [];
+  if (r.type_reclassified === "Y") parts.push(`profiled as ${r.dominant_type}, read as ${r.value_class} (10-digit account reference)`);
+  else parts.push(`${r.value_class}${r.dominant_type && r.dominant_type !== r.value_class ? ` (profiled ${r.dominant_type})` : ""}`);
+  if (r.dominant_type_pct != null && Number(r.dominant_type_pct) < 100) parts.push(`${pct(r.dominant_type_pct)} of values`);
+  if (r.type_variance_ind === "Y") parts.push(r.variance_class ? r.variance_class.toLowerCase().replace(/_/g, " ") : "mixed representations");
+  if (Number(r.leading_zero_count) > 0) parts.push("leading zeros, kept as text");
+  return parts.join(" · ");
+}
+
+export function parseDistribution(s) {
+  try { const o = typeof s === "string" ? JSON.parse(s) : (s || {});
+    return Object.entries(o).map(([k, v]) => [k, Number(v)]).sort((a, b) => b[1] - a[1]); }
+  catch { return []; }
+}
+
+export const SOURCE_LABEL = {
+  DICTIONARY: "from the AddVantage UD workbook",
+  SAMPLES: "from the TRP business samples",
+  RULE: "hypothesis from the brief, not yet confirmed",
+  INFERRED: "inferred from the values only",
+};

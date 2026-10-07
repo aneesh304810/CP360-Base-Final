@@ -83,6 +83,45 @@ The profiler's outputs (`attribute_detail.csv` at 343 MB, `record_schemas.csv`,
 Only `code_dictionary.csv` is read by the loader above. `attribute_detail.csv`
 is per account and must be streamed, never loaded whole, and never committed.
 
+## 1b. The UD 360 on Datapoint 360: built, waiting for the drop
+
+Everything below runs today against a synthetic drop shaped exactly like
+the profiler's files (`api/test/_advantage_ud_fixture.py`). The real
+files replace it without a code change.
+
+| Piece | Where |
+|---|---|
+| Registry, parent, family, schema, conflict and run tables | `sql/76_advantage_ud_profile.sql` |
+| Loader for `attribute_profile`, `type_variance`, `parent_structures`, `schema_variants`, `code_conflicts`, `run_summary` | `ingestion/advantage_ud_profile_conn.py`, step `advantage_ud_profile` |
+| Classification rules, as data with a source on every decision | `ingestion/advantage_ud_rules.yaml`, `advantage_ud_rules.py` |
+| `/advantage-ud/overview`, `/attribute`, `/clob-shape`, `/registry` | `api/app/routers_advantage_ud.py` |
+| Overview strip (tiles, how the CLOB looks, domains, classes, families) and the detail rows (key structure, presence, values, type and variance, shape, domain and Silver with its source, block lines, conflicts) | `ui/src/AdvantageUd360.jsx`, spliced into `Datapoint360.jsx` |
+
+What the loader decides, and records as such:
+
+- **Family** = the set of multipart blocks a row carries, named by role
+  ("household + billing instruction + authority"). Exact key sets stay in
+  the schema table under their family. In the synthetic drop eight key
+  sets fold into five families; the real figure is what the 12,951 become.
+- **Identifier reclassification**: a key profiled `TIMESTAMP`, 10 characters
+  wide, under `UD_527` or `UD_540`, is read as `IDENTIFIER`. The profile is
+  kept beside the decision (`dominant_type` vs `value_class`).
+- **Conflicts** inside a free-text block are `PARAMETERIZED_VALUE`,
+  `FORMATTING_VARIATION` or `FREE_TEXT_FALSE_POSITIVE`; outside one,
+  `TRUE_CONFLICT`.
+- **Domain and Silver entity** come from the rules file and are marked
+  `RULE` ("hypothesis from the brief, not yet confirmed") until the
+  workbook's field type or a sample overrides them. The pane prints the
+  source next to the pill.
+- **Never loaded**: `sample_values`, `attribute_detail.csv`,
+  `record_schemas.csv`. The pane's "how the CLOB looks" is drawn from
+  shapes (class, length, mask, first code), so no value is ever shown.
+
+Two profiler details the loader allows for: counts are written as floats
+(`19.0`), and `parent_attribute` is filled for single keys as well as
+lines (the loader derives the parent from the key, so a single stays a
+single).
+
 ## 2. What the profiling figures already tell us
 
 The brief quotes a profiling run. Read as evidence, before any code:
@@ -294,7 +333,39 @@ Kept short on purpose, since the build waits on the analysis:
    populated?
 6. Who owns each of the 13 gold candidates.
 
-## 11. What to run first
+## 11. What I need from you, in order of value
+
+1. **The profiler outputs**, into `local-data/advantage-ud/profile/`. The
+   six the loader reads are small: `attribute_profile.csv`,
+   `type_variance.csv`, `parent_structures.csv`, `schema_variants.csv`,
+   `code_conflicts.csv`, `run_summary.csv`. `attribute_detail.csv` and
+   `record_schemas.csv` are not needed. If pasting into chat is the only
+   route, drop the `sample_values` column first: it carries names.
+2. **The UD workbook's sheet list** and, if one exists, the sheet that maps
+   a UD number to a lookup table. This alone decides whether every coded
+   field is `VERIFIED` or `STRONGLY_INFERRED`. Then the `Tables` and `List`
+   sheets as CSV.
+3. **`profile_ud_clob.py` itself**, into `tools/`, so the run is
+   reproducible from the repository. The copy pasted into chat lost its
+   indentation.
+4. **One redacted CLOB**, if you want the example on the pane to be a real
+   shape rather than a synthetic one: any row with every value replaced by
+   its length or a mask. Not required.
+5. **Answers to section 10**, especially `LOAD_TYPE` semantics and who owns
+   the thirteen gold candidates.
+6. **Not `dataVar.csv`.** The profile is enough for the catalogue; the
+   extract is 21,672 accounts and does not belong in a chat or a repo.
+
+## 12. What to run once the files are in
+
+1. Drop the files as above.
+2. `sql/75` and `sql/76` once.
+3. `python -m ingestion.run advantage_ud_profile advantage_ud_dictionary`.
+4. Open Datapoint 360 → Non-SEI → AddVantage. The strip appears above the
+   list; a UD field's pane carries the extra rows.
+5. Discovery of the two workbooks into `docs/advantage_ud/source_inventory.md`
+   is the step after that, and it answers item 2 if the sheet exists.
+
 
 1. Drop the three files in `local-data/advantage-ud/` (gitignored; see its
    README). They carry account numbers, household names and employee names
