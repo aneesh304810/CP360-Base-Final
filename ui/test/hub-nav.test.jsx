@@ -638,8 +638,15 @@ ok(!/\\u[0-9a-fA-F]{4}/.test(CTXSRC) && !/\\u[0-9a-fA-F]{4}/.test(NAVSRC),
   ok(NET_UNKNOWN.every((u) => u.blocks),
      "and every open question says what it blocks", "");
 
-  // Same discipline as the SDC module: this leaves the building.
-  const NETSRC2 = fs.readFileSync(path.join(SRC, "hubNetwork.js"), "utf8");
+  // Same discipline as the SDC module: this leaves the building. The two
+  // STANDARD private-DNS zone suffixes are stripped before the check -
+  // they are Microsoft's and Snowflake's names for the Private Link zones,
+  // not the name of any BBH or SEI system, and a DNS checklist that could
+  // not name them would be useless. Anything else that looks like a host
+  // still fails.
+  const STD_ZONES = /privatelink\.(snowflakecomputing\.com|blob\.core\.windows\.net)/g;
+  const NETSRC2 = fs.readFileSync(path.join(SRC, "hubNetwork.js"), "utf8")
+    .replace(STD_ZONES, "");
   for (const [re, what] of [
     [/\b\d{1,3}(\.\d{1,3}){3}\b/, "an IP address"],
     [/\b[a-z0-9-]+\.(snowflakecomputing|azure|windows|core)\.[a-z.]+/i, "a hostname"],

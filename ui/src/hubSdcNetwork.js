@@ -74,7 +74,9 @@ export const SDC_NET_FACTS = [
 export const SDC_PATHS = [
  { n: 1, t: "Azure Private Link to the Snowflake SQL service",
    via: "Private endpoint in the customer VNet, into the Private Link Service",
-   carries: "Every SQL session: authentication, queries, small result sets",
+   carries: "Every SQL session: authentication, queries, small result sets - "
+          + "and the OCSP certificate-revocation URL, which rides the same "
+          + "private zone and is the piece most often left unresolvable",
    lose: "No connectivity at all." },
  { n: 2, t: "The second private endpoint on the same service",
    via: "Private endpoint in the customer VNet",

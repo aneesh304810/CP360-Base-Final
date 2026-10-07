@@ -324,7 +324,11 @@ export const NET_DNS = {
   + "resolves the public name, opens a public route, and succeeds - so "
   + "nothing fails and nothing alerts. The traffic simply is not on the "
   + "private path anyone believes it is on.",
- checks: ["A private DNS zone exists for each private-endpoint service",
+ checks: ["A private DNS zone exists for each private-endpoint service - "
+   + "privatelink.snowflakecomputing.com AND privatelink.blob.core.windows.net",
+  "The OCSP name resolves privately too - an unresolvable OCSP URL fails "
+   + "TLS in a way that looks random, because the driver checks "
+   + "certificate revocation before it checks anything else",
   "It is linked to every VNet whose workloads resolve that name",
   "Conditional forwarders on any on-premises resolver point at it",
   "Resolution is tested FROM the workload, not from a jump host",
@@ -382,6 +386,11 @@ export const NET_SETTLED = [
  { t: "How many environments", w: "Three - DEV, IMPS and Prod - each a "
    + "separate account on a separate subscription with no firewall "
    + "overlap between them." },
+ { t: "What BBH connects to", w: "A Snowflake READER account SEI provisions "
+   + "for the client, named by SEI's pattern, not SEI's own account. "
+   + "BBH plays the 'SEI client Azure VNet' role on SEI's architecture "
+   + "page: its own VNet, private endpoint, DNS servers and a "
+   + "peering/gateway back to its sites." },
 ];
 
 // Private Link as on SEI's page means BBH plays the "Customer Tenant and
