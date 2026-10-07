@@ -123,7 +123,7 @@ ok(/over the 32-char line/.test(renderToStaticMarkup(<div>{wide[2][1]}</div>)), 
 
 console.log("-- the pane is wired for the 360");
 ok(/import \{ UdStrip, udDetailRows \} from "\.\/AdvantageUd360\.jsx"/.test(D), "Datapoint360 imports the 360");
-ok(/curSys === "ADDVANTAGE" && <UdStrip t=\{t\} ov=\{udOv\}/.test(D), "the strip is AddVantage only");
+ok(/curSys === "ADDVANTAGE" && \(!cat \|\| cat === UD_CATEGORY\) &&\s*<UdStrip t=\{t\} ov=\{udOv\}/.test(D), "the strip is AddVantage only, and only for All or the UD category");
 ok(/advantageUdApi\.attribute\(sel\.field_code_norm\)/.test(D) && /\.\.\.udDetailRows\(t, udAttr\)/.test(D), "the detail rows are spliced for the selected key");
 ok(/advantageUdApi\.overview\(\)/.test(D) && /advantageUdApi\.clobShape\(\)/.test(D), "overview and shape are fetched once per system");
 

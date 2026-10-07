@@ -3,6 +3,7 @@ import { SectionHeader } from "./AppShell.jsx";
 import { api } from "./api.js";
 import { advantageUdApi, isUdAttribute, codedSummary } from "./advantageUd.js";
 import { UdStrip, udDetailRows } from "./AdvantageUd360.jsx";
+import { categorize, inCategory, UD_CATEGORY } from "./legacyCategories.js";
 
 // =====================================================================
 // Datapoint 360 — browse by Inbound / Outbound (parent groups, SEI),
@@ -362,6 +363,11 @@ function LegacyDatapoints({ t, onOpen }) {
   const [defs, setDefs] = useState([]);
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(null);
+  // Browse by category: the dictionary's group, with every UD field under
+  // one category. Client-side over the list already loaded; null = all.
+  const [cat, setCat] = useState(null);
+  const cats = categorize(defs);
+  const shown = inCategory(defs, cat);
   // The code values a UD field carries (sql/75). Fetched per selection and
   // only for a UD code on AddVantage; every other field has none and the
   // pane must not spend a round trip finding that out.
@@ -408,10 +414,17 @@ function LegacyDatapoints({ t, onOpen }) {
     api.legacyDictionary(curSys, q || undefined).then((r) => {
       const d = r.definitions || [];
       setDefs(d);
+      setCat((c) => (c && d.some((x) => categorize([x])[0].category === c)) ? c : null);
       setSel((prev) => (prev && d.find((x) => x.field_code_norm === prev.field_code_norm)) || d[0] || null);
     });
   }, [curSys, q]);
 
+  useEffect(() => { setCat(null); }, [curSys]);
+  const pickCat = (c) => {
+    setCat(c);
+    const list = inCategory(defs, c);
+    setSel((prev) => (prev && list.find((x) => x.field_code_norm === prev.field_code_norm)) || list[0] || null);
+  };
   const col = LEGACY_SYS[curSys] || { c: t.accent, bg: t.infoBg, label: curSys };
   const clsPill = (v) => {
     const map = {
@@ -455,21 +468,46 @@ function LegacyDatapoints({ t, onOpen }) {
       </div>
 
       {/* search */}
-      {curSys === "ADDVANTAGE" && <UdStrip t={t} ov={udOv} shape={udShape} tv={udTv} sv={udSv} />}
+      {curSys === "ADDVANTAGE" && (!cat || cat === UD_CATEGORY) &&
+        <UdStrip t={t} ov={udOv} shape={udShape} tv={udTv} sv={udSv} />}
       <div style={{ display: "flex", gap: 10, marginBottom: 14, alignItems: "center" }}>
         <input value={q} onChange={(e) => setQ(e.target.value)}
           placeholder="Search attribute / field code…"
           style={{ flex: "0 1 300px", padding: "8px 12px", fontSize: 13, fontFamily: t.font,
             border: `1px solid ${t.border}`, borderRadius: 6 }} />
         <span style={{ fontSize: 12, color: t.muted || t.textMuted, marginLeft: "auto" }}>
-          {legacyLabel(curSys)} · {defs.length} data points</span>
+          {legacyLabel(curSys)} · {cat ? `${shown.length} of ${defs.length} · ${cat}` : `${defs.length} data points`}</span>
       </div>
 
       {/* list + detail */}
-      <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 18 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "230px 320px 1fr", gap: 18 }}>
+        <div style={{ maxHeight: 520, overflowY: "auto" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase",
+            color: t.muted || t.textMuted, marginBottom: 8 }}>Browse by category ({cats.length})</div>
+          {[{ category: null, count: defs.length, label: "All data points" }, ...cats].map((c) => {
+            const on = cat === c.category;
+            return (
+              <div key={c.category || "(all)"} onClick={() => pickCat(c.category)} role="button" tabIndex={0}
+                onKeyDown={(e) => { if (e.key === "Enter") pickCat(c.category); }}
+                style={{ padding: "8px 11px", marginBottom: 5, cursor: "pointer", borderRadius: 6,
+                  border: `1px solid ${on ? col.c : t.border}`, background: on ? col.bg : t.panel,
+                  borderLeft: `3px solid ${on ? col.c : (c.ud ? col.c : "transparent")}` }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: on || c.ud ? 700 : 500, color: t.navy,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                    {c.label || c.category}</span>
+                  <span style={{ fontSize: 10.5, color: t.muted || t.textMuted }}>{c.count}</span>
+                </div>
+                {(c.pii > 0 || c.mapped > 0) && (
+                  <div style={{ fontSize: 9.5, color: t.muted || t.textMuted, marginTop: 2 }}>
+                    {c.mapped > 0 ? `${c.mapped} in lineage` : ""}{c.mapped > 0 && c.pii > 0 ? " · " : ""}
+                    {c.pii > 0 ? `${c.pii} PII` : ""}</div>)}
+              </div>);
+          })}
+        </div>
         <div style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: 8,
           overflow: "hidden", maxHeight: 520, overflowY: "auto" }}>
-          {defs.map((d) => (
+          {shown.map((d) => (
             <div key={d.field_code_norm} onClick={() => setSel(d)}
               style={{ padding: "10px 14px", borderBottom: `1px solid ${t.bg}`, cursor: "pointer",
                 background: sel?.field_code_norm === d.field_code_norm ? (t.infoBg || "#e0f5fd") : t.panel,
@@ -487,8 +525,8 @@ function LegacyDatapoints({ t, onOpen }) {
                   borderRadius: 3 }}>DEPR</span>}
               </div>
             </div>))}
-          {defs.length === 0 && <div style={{ padding: 16, color: t.muted || t.textMuted,
-            fontSize: 12 }}>No definitions.</div>}
+          {shown.length === 0 && <div style={{ padding: 16, color: t.muted || t.textMuted,
+            fontSize: 12 }}>{defs.length ? "Nothing in this category." : "No definitions."}</div>}
         </div>
 
         <div>
