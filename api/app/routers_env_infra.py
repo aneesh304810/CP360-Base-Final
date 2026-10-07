@@ -27,6 +27,9 @@ SEL = ("SELECT env, layer, system_name, hosts, sizing_ram, sizing_cpu, "
 KEYS = ["env", "layer", "system_name", "hosts", "sizing_ram", "sizing_cpu",
         "sizing_storage", "growth", "hosting", "direction", "protocol_port",
         "notes", "row_hash"]
+WL_KEYS = ["env", "system_name", "workload_key", "namespace", "workload_name",
+           "workload_type", "host", "endpoint_url", "hc_type", "hc_target",
+           "ssl_target", "collection_instruction"]
 
 
 def _norm(rows, keys):
@@ -93,21 +96,24 @@ def _exec_many(sql, seq):
                            f"({e}) · earlier: " + "; ".join(attempts))
 
 def _attach_workloads(rows):
+    # Same rule as _rows(): db.query returns dicts with lowercased keys on
+    # the house helper and tuples elsewhere, so go through _norm rather
+    # than index positions. Indexing w[0] on a dict raised KeyError: 0 -
+    # outside the try below, so GET /env-infra 500'd the moment
+    # env_workload had its first row, while /topology (which never
+    # attaches workloads) kept answering 200.
     try:
-        wl = query("SELECT env, system_name, workload_key, namespace, "
-                   "workload_name, workload_type, host, endpoint_url, hc_type, "
-                   "hc_target, ssl_target, collection_instruction "
-                   "FROM env_workload ORDER BY workload_key")
+        wl = _norm(query("SELECT env, system_name, workload_key, namespace, "
+                         "workload_name, workload_type, host, endpoint_url, "
+                         "hc_type, hc_target, ssl_target, "
+                         "collection_instruction "
+                         "FROM env_workload ORDER BY workload_key"), WL_KEYS)
     except Exception:
         return rows
     m = {}
     for w in wl:
-        m.setdefault((w[0], w[1]), []).append({
-            "workload_key": w[2], "namespace": w[3] or "",
-            "workload_name": w[4] or "", "workload_type": w[5] or "",
-            "host": w[6] or "", "endpoint_url": w[7] or "",
-            "hc_type": w[8] or "", "hc_target": w[9] or "",
-            "ssl_target": w[10] or "", "collection_instruction": w[11] or ""})
+        m.setdefault((w["env"], w["system_name"]), []).append(
+            {k: w[k] for k in WL_KEYS[2:]})
     for r in rows:
         r["workloads"] = m.get((r["env"], r["system_name"]), [])
     return rows
