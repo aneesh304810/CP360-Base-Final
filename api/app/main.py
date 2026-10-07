@@ -70,6 +70,7 @@ for _mod in (
         "routers_legacy_profile",
         "routers_legacy_matrix",
         "routers_reference_legacy",
+        "routers_advantage_ud",
 
         # Additional routers
         "routers_recon360",

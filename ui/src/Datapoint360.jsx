@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { SectionHeader } from "./AppShell.jsx";
 import { api } from "./api.js";
+import { advantageUdApi, isUdAttribute, codedSummary } from "./advantageUd.js";
 
 // =====================================================================
 // Datapoint 360 — browse by Inbound / Outbound (parent groups, SEI),
@@ -360,6 +361,19 @@ function LegacyDatapoints({ t, onOpen }) {
   const [defs, setDefs] = useState([]);
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(null);
+  // The code values a UD field carries (sql/75). Fetched per selection and
+  // only for a UD code on AddVantage; every other field has none and the
+  // pane must not spend a round trip finding that out.
+  const [codes, setCodes] = useState([]);
+
+  useEffect(() => {
+    if (!sel || curSys !== "ADDVANTAGE" || !isUdAttribute(sel.field_code_norm)) {
+      setCodes([]); return;
+    }
+    let live = true;
+    advantageUdApi.codes(sel.field_code_norm).then((r) => { if (live) setCodes(r.codes || []); });
+    return () => { live = false; };
+  }, [sel, curSys]);
 
   useEffect(() => {
     api.legacySystems().then((r) => {
@@ -482,7 +496,23 @@ function LegacyDatapoints({ t, onOpen }) {
                 ["Constraints", (sel.is_required === "Y" || sel.is_unique === "Y") && <span key="rq">
                   {sel.is_required === "Y" && clsPill("Required")}
                   {sel.is_unique === "Y" && clsPill("Unique")}</span>],
-                ["Description", sel.short_desc],
+                ["Description", (sel.short_desc || codes.length > 0) && <span key="ds">
+                  {sel.short_desc}
+                  {codes.length > 0 && <div style={{ marginTop: 4, fontWeight: 600,
+                    color: t.accent }}>{codedSummary(codes)}</div>}</span>],
+                ["Code values", codes.length > 0 && <table key="cv" style={{ borderCollapse: "collapse",
+                    fontSize: 12 }}><tbody>
+                  {codes.map((c) => (
+                    <tr key={c.source + ":" + c.code_value}>
+                      <td style={{ fontFamily: "monospace", fontWeight: 700, padding: "2px 14px 2px 0",
+                        whiteSpace: "nowrap" }}>{c.code_value}</td>
+                      <td style={{ padding: "2px 14px 2px 0" }}>{c.description_value}</td>
+                      <td style={{ padding: "2px 0", color: t.muted || t.textMuted, whiteSpace: "nowrap" }}>
+                        {c.occurrence_count != null ? `${c.occurrence_count} accounts` : ""}
+                        {c.source === "TABLES" ? (c.table_number ? ` · table ${c.table_number}` : " · table") : ""}
+                      </td>
+                    </tr>))}
+                </tbody></table>],
                 ["PB field mapping", sel.pb_field_mapping && <span key="pb"
                   style={{ fontFamily: "monospace" }}>{sel.pb_field_mapping}</span>],
                 ["Classifications", (sel.privacy_class || sel.regulatory_class || sel.operational_class)

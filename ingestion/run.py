@@ -36,6 +36,7 @@ STEPS = [
     "legacy_lineage",    # legacy DWH end-to-end lineage (SRC->STG1->STG2->DWH) + proof
     "legacy_dictionary", # legacy business definitions (AddVantage/CRD/STAR) keyed by field code
     "legacy_source_file",# CP_SOURCE_FILE: the business name of each AddVantage EOD feed
+    "advantage_ud_dictionary", # the code values each AddVantage UD field carries (sql/75)
     "sei_crosswalk",     # IMDS/STAR/UAF/SEI crosswalk workbook — lanes, mapping, verdicts
     "event360",          # Event 360: the SEI event specification workbook
     "sdc_compute",       # SDC client compute sizing: the read-back bill, per view
@@ -257,6 +258,12 @@ def _run_step(step, conn, loader, resolver) -> None:
         c = LegacySourceFileConnector.from_env()
         n = c.load(loader, c.parse())
         log.info("legacy_source_file: merged %s feeds", n)
+        return
+    if step == "advantage_ud_dictionary":
+        from .advantage_ud_dictionary_conn import AdvantageUdDictionaryConnector
+        c = AdvantageUdDictionaryConnector.from_env()
+        n = c.load(loader, c.parse())
+        log.info("advantage_ud_dictionary: merged %s code values", n)
         return
     if step == "legacy_dictionary":
         from .legacy_dictionary_conn import LegacyDictionaryConnector
