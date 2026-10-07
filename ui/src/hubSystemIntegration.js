@@ -16,10 +16,11 @@
 // everything on the diagram is BBH pushing to SEI, and the event path is
 // the one direction that runs the other way.
 //
-// THE OTHER THING IT SHOWS. The Apigee proxy appears TWICE - node 3 on
-// the way in, node 12 on the status return. Our own model drew the
-// gateway as one band. Two proxies is either two deployments or one
-// drawn twice, and nobody has said which.
+// THE OTHER THING IT SHOWS. "BBH API Apigee proxy" appears twice - node 3
+// on the way in, node 12 on the status return - and it IS the
+// CP-Integration-Gateway: BBH's wrapper around the BBH Apigee proxy,
+// drawn at the two points of the flow it sits on. One component, two
+// positions. The earlier reading of this as "two proxies" was wrong.
 
 export const SI_DOC = {
  n: "BBH to SEI : System Integration",
@@ -51,7 +52,9 @@ export const SI_STEPS = [
    ours: null },
  { n: "2c", band: "hub",  t: "Loader file", w: "Into the Integration Hub.",
    ours: "C1" },
- { n: "3",  band: "hub",  t: "BBH API Apigee proxy", w: "Inbound leg.",
+ { n: "3",  band: "hub",  t: "CP-Integration-Gateway",
+   w: "SEI's label is \"BBH API Apigee proxy\"; it is the BBH Apigee proxy "
+    + "with BBH's wrapper around it. Inbound leg, and the real-time calls.",
    ours: "C1" },
  { n: "4",  band: "orch", t: "Orchestration API",
    w: "SEI's entry point for everything BBH sends.", ours: "C1" },
@@ -69,8 +72,9 @@ export const SI_STEPS = [
    w: "Submit loader into the SWP platform.", ours: "C1" },
  { n: "11", band: "orch", t: "Status monitoring dashboard",
    w: "SEI-side view of workflow status.", ours: null },
- { n: "12", band: "hub",  t: "BBH API Apigee proxy",
-   w: "The SECOND proxy on the diagram - the status-return leg.",
+ { n: "12", band: "hub",  t: "CP-Integration-Gateway",
+   w: "The same component as node 3 - the BBH Apigee proxy with BBH's "
+    + "wrapper - drawn where the status return passes through it.",
    ours: "C2" },
  { n: "13", band: "hub",  t: "Integration360",
    w: "Status monitoring, exception management, process tracking, "
@@ -122,11 +126,12 @@ export const SI_ABSENT = [
 
 // What our model has that theirs numbers differently, and vice versa.
 export const SI_NOTES = [
- { t: "The Apigee proxy appears twice",
-   w: "Node 3 inbound and node 12 on the status return. Our model draws "
-    + "one gateway band. Two proxies is either two deployments or one "
-    + "component drawn twice, and the answer changes the rule count, the "
-    + "certificate inventory and who owns the error envelope." },
+ { t: "Nodes 3 and 12 are one component",
+   w: "SEI labels both \"BBH API Apigee proxy\". That is the "
+    + "CP-Integration-Gateway - BBH's wrapper around the BBH Apigee proxy - "
+    + "drawn at the two points of the flow it sits on, inbound and status "
+    + "return. One deployment, one rule set, one certificate inventory; "
+    + "our one gateway band and their two boxes agree." },
  { t: "Everything on the diagram runs BBH to SEI",
    w: "Every numbered step is BBH pushing or SEI processing what BBH "
     + "pushed. The two inbound paths - events and files - are the "

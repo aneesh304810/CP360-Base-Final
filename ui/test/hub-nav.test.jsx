@@ -687,13 +687,20 @@ ok(!/\\u[0-9a-fA-F]{4}/.test(CTXSRC) && !/\\u[0-9a-fA-F]{4}/.test(NAVSRC),
   ok(SI_STEPS.filter((x) => x.ours === "A1" || x.ours === "A2").length === 0,
      "and nothing maps to channel A", "");
 
-  // Two proxies, not one band. Worth a note rather than a silent merge.
-  ok(SI_STEPS.filter((x) => /Apigee/i.test(x.t)).length === 2,
-     "the Apigee proxy appears twice on their diagram",
-     SI_STEPS.filter((x) => /Apigee/i.test(x.t)).map((x) => x.n).join(","));
-  ok(/appears twice/i.test(JSON.stringify(SI_NOTES)),
-     "and that is called out rather than merged into our one gateway band",
+  // Nodes 3 and 12 are one component: the CP-Integration-Gateway, which
+  // is BBH's wrapper around the BBH Apigee proxy, drawn at the two points
+  // of the flow it sits on. An earlier reading had them as two proxies.
+  const gw = SI_STEPS.filter((x) => /CP-Integration-Gateway/.test(x.t));
+  ok(gw.length === 2 && gw.map((x) => x.n).join() === "3,12",
+     "nodes 3 and 12 are both the CP-Integration-Gateway",
+     gw.map((x) => x.n).join(","));
+  ok(gw.every((x) => /Apigee proxy/i.test(x.w)),
+     "and each says it is the BBH Apigee proxy with the wrapper, so SEI's "
+     + "label and ours are reconciled rather than one replacing the other",
      "");
+  ok(/one component/i.test(JSON.stringify(SI_NOTES))
+     && !/two deployments/i.test(JSON.stringify(SI_NOTES)),
+     "the note says one component, two positions - not two proxies", "");
 
   // Source discipline: the diagram is SEI Confidential.
   const SISRC = fs.readFileSync(path.join(SRC, "hubSystemIntegration.js"), "utf8");
