@@ -154,75 +154,6 @@ var W=190,H=52;
 var ZONES=[["EXTERNAL · SEI / VENDOR",20,210],["DMZ · MFT / EGRESS",270,220],["CORP · USERS / MGMT",530,190],
  ["CP INTEGRATION HUB · OPENSHIFT",760,250],["DATA ZONE",1050,210],["CONSUMERS",1300,240]];
 var FWS=[["FW-EDGE",250],["FW-DMZ",510],["FW-APP",740],["FW-DATA",1030],["FW-CONS",1280]];
-/* ---- Azure band, drawn LEFT of the on-prem board without moving it ----
-   SEI's SDC Technical Architecture puts a client in its own Azure VNet with
-   a private endpoint, DNS servers and a peering/gateway back to its sites.
-   BBH is that client. Everything here is DESIGN STATE - none of it is
-   provisioned - so every lane is amber-dashed and says so. URL shapes are
-   SEI's placeholder patterns, never real names. The board to the right is
-   untouched: it is wrapped in a translate() so no coordinate moved.      */
-var AZW=560,AZSEL=null;
-var AZENV={DEV:"SEI DEV",SIT:"SEI IMPS",TRIAL_UAT:"SEI IMPS",PROD:"SEI Prod"};
-var AZZONES=[["SEI AZURE · SDC",20,250],["BBH AZURE · VNET",290,250]];
-var AZNODES=[
- {id:"az.kafka",x:40,y:90,ic:"📨",t:"SEI Kafka · BBH queue",sub:"dedicated topics · ACL-scoped"},
- {id:"az.rdr",x:40,y:190,ic:"❄",t:"Snowflake reader account",sub:"{SEI_org}-{client}_rdr_acc"},
- {id:"az.ocsp",x:40,y:290,ic:"🔏",t:"OCSP · cert revocation",sub:"ocsp.{account}.privatelink…"},
- {id:"az.stage",x:40,y:390,ic:"🪣",t:"Internal stage · storage acct",sub:"{storage_acct}.privatelink.blob…"},
- {id:"az.seivnet",x:40,y:560,ic:"🏢",t:"SEI VNet · PE · DNS · peering",sub:"SEI side → SEI sites"},
- {id:"az.pekafka",x:310,y:90,ic:"🔗",t:"Private endpoint · Kafka",sub:"every advertised broker"},
- {id:"az.pesql",x:310,y:190,ic:"🔗",t:"Private endpoint · SQL + OCSP",sub:"path 1 · account + OCSP URLs"},
- {id:"az.peblob",x:310,y:390,ic:"🔗",t:"Private endpoint · stage blob",sub:"path 3 · PUT GET · large results"},
- {id:"az.dns",x:310,y:470,ic:"🧭",t:"Private DNS zones ×2",sub:"snowflakecomputing · blob.core.windows"},
- {id:"az.gw",x:310,y:560,ic:"🛣",t:"Peering / Gateway → BBH sites",sub:"ExpressRoute or VPN · U1 open"}
-];
-var AZL=[
- {id:"az-kafka",pts:[[310,116],[230,116]],chip:[270,102,"Kafka 9093"],
-  rows:[["PATH","listener → BBH queue on SEI Kafka"],["MECH","Private Link · held connection"],["DNS","broker names must resolve private"],["ACL","BBH scoped to its own topics"],["STATUS","DESIGNED · not provisioned · Q1"]]},
- {id:"az-sql",pts:[[310,216],[230,216]],chip:[270,202,"443 · path 1"],
-  rows:[["PATH","puller → reader account"],["URL","{SEI_org}-{client}_rdr_acc.privatelink…"],["ADMIT","account network policy must allow PE"],["TAG","event tag selects the target"],["STATUS","DESIGNED · not provisioned · Q2"]]},
- {id:"az-ocsp",pts:[[310,226],[262,226],[262,316],[230,316]],chip:[262,270,"OCSP 80/443"],
-  rows:[["PATH","driver cert-revocation check"],["URL","ocsp.{account}.privatelink…"],["WHY","unresolvable OCSP = TLS fails, looks random"],["DNS","same private zone as the account"],["STATUS","DESIGNED · not provisioned"]]},
- {id:"az-blob",pts:[[310,416],[230,416]],chip:[270,402,"443 · path 3"],
-  rows:[["PATH","large result sets · PUT · GET"],["URL","{storage_acct}.privatelink.blob.core…"],["WHY","path 1 alone passes tests, fails on batch"],["DNS","privatelink.blob.core.windows.net zone"],["STATUS","DESIGNED · not provisioned · Q3"]]},
- {id:"az-dns",pts:[[405,470],[405,446]],chip:[405,458,"resolve"],
-  rows:[["ZONES","privatelink.snowflakecomputing.com"],["","privatelink.blob.core.windows.net"],["LINK","to every resolving VNet"],["ONPREM","conditional forwarders if hub is on-prem"],["TEST","from the workload, assert a private IP"]]},
- {id:"az-gw",pts:[[500,586],[548,586]],chip:[524,572,"→ hub pods"],
-  rows:[["PATH","BBH VNet ⇄ BBH sites ⇄ OpenShift"],["MECH","ExpressRoute or VPN - U1 undecided"],["CARRIES","Kafka + Snowflake sessions to hub pods"],["ENVS","DEV · IMPS · Prod · no overlap"],["STATUS","OPEN · site topology not established"]]}
-];
-function azBoard(){
- var o='';
- AZZONES.forEach(function(z,i){o+='<rect x="'+z[1]+'" y="34" width="'+z[2]+'" height="770" rx="12" fill="'+(i%2?'#f3f7fa':'#eef4fb')+'" stroke="#c9d9ea"/>'
-  +'<text x="'+(z[1]+10)+'" y="52" font-size="9.6" font-weight="800" fill="#2e5f8a" letter-spacing="1.8">'+z[0]+'</text>';});
- o+='<text x="30" y="70" font-size="8.6" font-weight="800" fill="#2a78d6">'+esc(AZENV[cur]||"SEI env")+' · mapping to confirm</text>'
-  +'<text x="300" y="70" font-size="8.6" font-weight="800" fill="#c98d1a">DESIGN STATE · nothing provisioned</text>';
- o+='<line x1="275" y1="38" x2="275" y2="800" stroke="#2a78d6" stroke-width="3" stroke-dasharray="4,7"/><rect x="235" y="806" width="80" height="15" rx="7" fill="#2a78d6"/><text x="275" y="817" font-size="8.6" font-weight="800" fill="#fff" text-anchor="middle">PRIVATE LINK</text>';
- o+='<line x1="550" y1="38" x2="550" y2="800" stroke="#c96a76" stroke-width="3" stroke-dasharray="4,7"/><rect x="520" y="806" width="60" height="15" rx="7" fill="#8a1f2d"/><text x="550" y="817" font-size="8.6" font-weight="800" fill="#fff" text-anchor="middle">FW-CLOUD</text>';
- AZL.forEach(function(L,i){
-  o+='<path d="M '+L.pts.map(function(p){return p[0]+" "+p[1];}).join(" L ")+'" fill="none" stroke="#c98d1a" stroke-width="1.5" stroke-dasharray="2,4" marker-end="url(#a)"/>';
-  var c=L.chip,w=c[2].length*5.4+14;
-  o+='<g data-act="az:'+i+'" style="cursor:pointer"><rect x="'+(c[0]-w/2)+'" y="'+(c[1]-8)+'" width="'+w+'" height="16" rx="8" fill="#fdf3d7" stroke="#c98d1a"/>'
-   +'<text x="'+c[0]+'" y="'+(c[1]+3.5)+'" font-size="8.4" font-weight="800" fill="#8a5a00" text-anchor="middle">'+esc(c[2])+'</text></g>';
- });
- AZNODES.forEach(function(n){
-  o+='<g><rect x="'+n.x+'" y="'+n.y+'" width="'+W+'" height="'+H+'" rx="10" fill="#fff" stroke="#9ec0de" stroke-dasharray="5,4" stroke-width="1.4" filter="drop-shadow(0 1px 3px rgba(16,40,60,.14))"/>'
-   +'<text x="'+(n.x+10)+'" y="'+(n.y+21)+'" font-size="11" font-weight="800" fill="#10193b">'+n.ic+' '+esc(n.t)+'</text>'
-   +'<text x="'+(n.x+10)+'" y="'+(n.y+38)+'" font-size="9.2" fill="#4a5d6e" font-family="Consolas,monospace">'+esc(n.sub)+'</text></g>';
- });
- o+='<text x="30" y="672" font-size="8.4" fill="#56718a">SEI "SDC Technical Architecture": BBH is the client VNet.</text>'
-  +'<text x="30" y="686" font-size="8.4" fill="#56718a">PE + DNS + peering on BBH\'s side · reader account on SEI\'s.</text>'
-  +'<text x="30" y="700" font-size="8.4" fill="#56718a">URL shapes are SEI\'s placeholders, not names.</text>';
- if(AZSEL!==null&&AZL[AZSEL]){
-  var L=AZL[AZSEL],px=Math.min(L.chip[0]+18,300),py=Math.min(L.chip[1],640),ph=34+L.rows.length*17;
-  o+='<g><rect x="'+px+'" y="'+py+'" width="252" height="'+ph+'" rx="10" fill="#10193b" filter="drop-shadow(0 3px 8px rgba(16,25,59,.35))"/>'
-   +'<text x="'+(px+12)+'" y="'+(py+19)+'" font-size="9.6" font-weight="800" fill="#7cc0ff" letter-spacing="1">'+esc(L.id.toUpperCase())+'</text>'
-   +'<g data-act="close" style="cursor:pointer"><text x="'+(px+238)+'" y="'+(py+19)+'" font-size="11" font-weight="800" fill="#8fa3b5" text-anchor="middle">✕</text></g>';
-  L.rows.forEach(function(r,k){o+='<text x="'+(px+12)+'" y="'+(py+38+k*17)+'" font-size="7.8" font-weight="800" fill="#5f7a94">'+r[0]+'</text>'
-   +'<text x="'+(px+72)+'" y="'+(py+38+k*17)+'" font-size="9" fill="#e6eef6" font-family="Consolas,monospace">'+esc(r[1])+'</text>';});
-  o+='</g>';
- }
- return o;
-}
 function esc(t){return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;");}
 function stCol(s){return s==="ok"?"#2fb344":s==="warn"?"#e8a013":s==="wait"?"#9aa7b2":"#d43a3a";}
 function nodes(e){return [
@@ -372,7 +303,7 @@ function render(){
     +'<text x="'+(px+72)+'" y="'+(py+38+k*17)+'" font-size="9" fill="#e6eef6" font-family="Consolas,monospace">'+esc(r[1])+'</text>';});
   s+='</g>';
  }
- return {svg:'<g transform="translate('+AZW+',0)">'+s+'</g>'+azBoard()};
+ return {svg:s};
 }
 function clock(){var m=(17*60+21+Math.floor(tick*0.72))%1440;var s2=(tick*26)%60;
  return ('0'+Math.floor(m/60)).slice(-2)+':'+('0'+m%60).slice(-2)+':'+('0'+s2).slice(-2);}
@@ -485,9 +416,8 @@ export default function EnvTopology({ t }) {
  const onBoardClick = (e) => {
   const g = e.target.closest("[data-act]"); if (!g) return;
   const act = g.getAttribute("data-act");
-  if (act === "close") { SEL = null; AZSEL = null; }
-  else if (act.startsWith("lane:")) { const i = +act.slice(5); SEL = (SEL === i ? null : i); AZSEL = null; }
-  else if (act.startsWith("az:")) { const i = +act.slice(3); AZSEL = (AZSEL === i ? null : i); SEL = null; }
+  if (act === "close") SEL = null;
+  else if (act.startsWith("lane:")) { const i = +act.slice(5); SEL = (SEL === i ? null : i); }
   bump();
  };
 
@@ -531,11 +461,11 @@ export default function EnvTopology({ t }) {
     </div>)}
    <div style={{ background: "#fff", border: "1px solid #dfe6ec", borderRadius: 12, padding: 8, overflowX: "auto" }}
         onClick={onBoardClick}>
-    <svg viewBox={"0 0 " + (1560 + AZW) + " 830"} style={{ minWidth: 1560 + AZW, display: "block" }}
+    <svg viewBox="0 0 1560 830" style={{ minWidth: 1560, display: "block" }}
          dangerouslySetInnerHTML={{ __html: board.svg }} />
    </div>
    <div style={{ marginTop: 8, fontSize: 9.4, color: "#7d93a8" }}>
-    click ⓘ/?/! badges for path detail · the Azure band at left is design state, amber until provisioned · {mode === "LIVE"
+    click ⓘ/?/! badges for path detail · {mode === "LIVE"
      ? "statuses from env_probe_result via /env-infra/probes/live (5s)"
      : "upload works locally in DEMO; deploy the API for real probes"} · rev {rev}
    </div>

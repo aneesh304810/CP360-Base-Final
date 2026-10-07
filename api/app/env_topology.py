@@ -19,6 +19,45 @@ NODE_MAP = [   # (layer, system-substring) -> node id, zone, icon
     (("External API", "SEI SWP Platform"), ("ext.sei", "EXTERNAL", "☁")),
     (("External API", "SEI SaaS"), ("ext.saas", "EXTERNAL", "☁")),
     (("External API", "Proxy Egress"), ("egr.allowlist", "EXTERNAL", "🌐")),
+    # The Azure band. A workbook row with layer "Azure" lands here and
+    # REPLACES the planned placeholder of the same id below, so the board
+    # moves from design state to inventory one row at a time.
+    (("Azure", "Kafka"),              ("az.kafka",   "SEI AZURE · SDC",  "📨")),
+    (("Azure", "reader account"),     ("az.rdr",     "SEI AZURE · SDC",  "❄")),
+    (("Azure", "OCSP"),               ("az.ocsp",    "SEI AZURE · SDC",  "🔏")),
+    (("Azure", "internal stage"),     ("az.stage",   "SEI AZURE · SDC",  "🪣")),
+    (("Azure", "endpoint · Kafka"),   ("az.pekafka", "BBH AZURE · VNET", "🔗")),
+    (("Azure", "endpoint · SQL"),     ("az.pesql",   "BBH AZURE · VNET", "🔗")),
+    (("Azure", "endpoint · stage"),   ("az.peblob",  "BBH AZURE · VNET", "🔗")),
+    (("Azure", "DNS"),                ("az.dns",     "BBH AZURE · VNET", "🧭")),
+    (("Azure", "Gateway"),            ("az.gw",      "BBH AZURE · VNET", "🛣")),
+]
+
+# DESIGN STATE, emitted for every env until a row replaces it. From SEI's
+# "SDC Technical Architecture": the client sits in its own Azure VNet with a
+# private endpoint, DNS servers and a peering/gateway back to its sites,
+# reaching a Snowflake READER account over Private Link, the internal stage
+# on a second private endpoint, and OCSP on the same private zone. Nothing
+# here is provisioned, so every node and lane is planned+tbd and the board
+# draws it amber and dashed. URL shapes are SEI's placeholders, never names.
+PLANNED_NODES = [   # titles fit beside the PLANNED tag; PE = private endpoint
+    ("az.kafka",   "SEI AZURE · SDC",  "📨", "Kafka · BBH queue",     "SEI Kafka infra · dedicated topics · ACL"),
+    ("az.rdr",     "SEI AZURE · SDC",  "❄",  "Snowflake reader acct", "{SEI_org}-{client}_rdr_acc"),
+    ("az.ocsp",    "SEI AZURE · SDC",  "🔏", "OCSP responder",        "ocsp.{account}.privatelink… · TLS"),
+    ("az.stage",   "SEI AZURE · SDC",  "🪣", "Internal stage · blob", "{storage_acct}.privatelink.blob…"),
+    ("az.pekafka", "BBH AZURE · VNET", "🔗", "PE · Kafka brokers",    "private endpoint · every advertised broker"),
+    ("az.pesql",   "BBH AZURE · VNET", "🔗", "PE · SQL + OCSP",       "private endpoint · path 1 · account URLs"),
+    ("az.peblob",  "BBH AZURE · VNET", "🔗", "PE · stage blob",       "private endpoint · path 3 · PUT GET"),
+    ("az.dns",     "BBH AZURE · VNET", "🧭", "Private DNS zones ×2",  "snowflakecomputing · blob.core.windows"),
+    ("az.gw",      "BBH AZURE · VNET", "🛣", "Gateway → BBH sites",   "ExpressRoute or VPN · U1 open"),
+]
+PLANNED_LANES = [   # id, from, to, rule, why it is open
+    ("az-kafka", "az.pekafka", "az.kafka", "Kafka 9093",   "held connection · every advertised broker · Q1"),
+    ("az-sql",   "az.pesql",   "az.rdr",   "443 · path 1", "account network policy must admit the PE · Q2"),
+    ("az-ocsp",  "az.pesql",   "az.ocsp",  "OCSP 80/443",  "unresolvable OCSP = TLS fails, looks random"),
+    ("az-blob",  "az.peblob",  "az.stage", "443 · path 3", "path 1 alone passes tests, fails on first batch · Q3"),
+    ("az-dns",   "az.dns",     "az.pesql", "resolve",      "two private zones, linked to every resolving VNet"),
+    ("az-hub",   "az.gw",      "app.hub",  "ExpressRoute / VPN", "site topology not established · U1"),
 ]
 LANES = [   # from, to, rule-source: which row's protocol_port governs the crossing
     ("sei-mft",     "ext.sei",   "dmz.mft",    "dmz.mft"),
@@ -106,6 +145,19 @@ def build_topology(rows, env):
         lanes.append({"id": f"{_slug(r['system_name'])}-auto", "from": src, "to": nid,
                       "rule": port or "TBD", "tbd": tbd, "auto": True,
                       "probe": f"path.{_slug(r['system_name'])}-auto"})
+    # ---- the Azure band: planned placeholders for anything no row has replaced ----
+    have = {n["id"] for n in nodes}
+    for nid, zone, icon, title, sub in PLANNED_NODES:
+        if nid in have:
+            continue
+        nodes.append({"id": nid, "zone": zone, "icon": icon, "title": title, "sub": sub,
+                      "sizing": "", "hosting": "Azure", "probe": None,
+                      "tbd": True, "planned": True})
+    have = {n["id"] for n in nodes}
+    for lid, a, b, rule, why in PLANNED_LANES:
+        if a in have and b in have:
+            lanes.append({"id": lid, "from": a, "to": b, "rule": rule, "tbd": True,
+                          "planned": True, "why": why, "probe": None})
     asks = [{"where": r["layer"] + " · " + r["system_name"], "what": r["protocol_port"] or "port TBD",
              "note": r["notes"]} for r in ers
             if "TBD" in (r.get("protocol_port") or "TBD").upper()]

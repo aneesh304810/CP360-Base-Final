@@ -401,21 +401,30 @@ export function SslSummaryCards({ t, onDrill, env = null }) {
 // presentation-only and lives here; data never does.
 
 const NB = { W: 190, H: 52 };
-const NBV_ZONES = [["EXTERNAL · SEI / VENDOR", 24], ["DMZ · MFT / EGRESS", 258],
- ["CORP · USERS / IDENTITY", 503], ["OPENSHIFT · OCPQ", 738],
- ["DATA ZONE", 1008], ["CONSUMERS", 1238]];
+// Two Azure zones sit LEFT of the on-prem board. Everything that was on the
+// board keeps its layout, shifted right by AZ; the server emits the Azure
+// nodes as planned placeholders until a workbook row replaces each one.
+const AZ = 468;
+const NBV_ZONES = [["SEI AZURE · SDC", 24], ["BBH AZURE · VNET", 258],
+ ["EXTERNAL · SEI / VENDOR", 24 + AZ], ["DMZ · MFT / EGRESS", 258 + AZ],
+ ["CORP · USERS / IDENTITY", 503 + AZ], ["OPENSHIFT · OCPQ", 738 + AZ],
+ ["DATA ZONE", 1008 + AZ], ["CONSUMERS", 1238 + AZ]];
 const NBV_POS = {                      // node id -> [x,y] (v2 vertical, airy)
- "ext.sei": [36, 90], "ext.saas": [36, 170], "ext.seiapi": [36, 470],
- "egr.allowlist": [36, 470],
- "dmz.mft": [270, 90], "dmz.momentum": [270, 170], "dmz.cifs": [270, 250],
- "dmz.apigee": [270, 470],
- "corp.users": [515, 90], "corp.ping": [515, 170], "mgmt.stack": [515, 470],
- "app.ingress": [750, 90], "app.hub": [750, 170],
- "data.imds": [1020, 90], "data.pbdw": [1020, 210],
- "cons.piv": [1250, 90], "cons.portal": [1250, 190], "cons.vendor": [1250, 270] };
-const NBV_AUTO = { "DATA ZONE": [1020, 330], "CONSUMERS": [1250, 350],
- "DMZ · MFT / EGRESS": [270, 330], "EXTERNAL": [36, 250],
- "CP INTEGRATION HUB · OPENSHIFT": [750, 330] };
+ "az.kafka": [36, 90], "az.rdr": [36, 170], "az.ocsp": [36, 250], "az.stage": [36, 330],
+ "az.pekafka": [270, 90], "az.pesql": [270, 170], "az.peblob": [270, 330],
+ "az.dns": [270, 410], "az.gw": [270, 490],
+ "ext.sei": [36 + AZ, 90], "ext.saas": [36 + AZ, 170], "ext.seiapi": [36 + AZ, 470],
+ "egr.allowlist": [36 + AZ, 470],
+ "dmz.mft": [270 + AZ, 90], "dmz.momentum": [270 + AZ, 170], "dmz.cifs": [270 + AZ, 250],
+ "dmz.apigee": [270 + AZ, 470],
+ "corp.users": [515 + AZ, 90], "corp.ping": [515 + AZ, 170], "mgmt.stack": [515 + AZ, 470],
+ "app.ingress": [750 + AZ, 90], "app.hub": [750 + AZ, 170],
+ "data.imds": [1020 + AZ, 90], "data.pbdw": [1020 + AZ, 210],
+ "cons.piv": [1250 + AZ, 90], "cons.portal": [1250 + AZ, 190], "cons.vendor": [1250 + AZ, 270] };
+const NBV_AUTO = { "DATA ZONE": [1020 + AZ, 330], "CONSUMERS": [1250 + AZ, 350],
+ "DMZ · MFT / EGRESS": [270 + AZ, 330], "EXTERNAL": [36 + AZ, 250],
+ "CP INTEGRATION HUB · OPENSHIFT": [750 + AZ, 330],
+ "SEI AZURE · SDC": [36, 410], "BBH AZURE · VNET": [270, 570] };
 const NBV_STATIC = [
  { id: "ext.sei", title: "☁ SEI SWP", sub: "batch + api endpoints" },
  { id: "ext.saas", title: "☁ SEI SaaS · SWP Desktop", sub: "user UI · SSO BBH ↔ SEI" },
@@ -433,7 +442,8 @@ const NBV_CTX = [
  { id: "hub-mgm", from: "app.hub", to: "mgmt.stack", rule: "8088" }];
 const NBV_DOT = { OK: "#2fb344", WARN: "#e8a013", DOWN: "#d43a3a", WAIT: "#9aa7b2" };
 const NBV_W = 190;
-const NBV_COLS = [36, 270, 515, 750, 1020, 1250];
+const NBV_COLS = [36, 270, 36 + AZ, 270 + AZ, 515 + AZ, 750 + AZ, 1020 + AZ, 1250 + AZ];
+const NBV_VW = 1460 + AZ;
 const nbvCorR = (x) => { for (let i = 0; i < NBV_COLS.length; i++)
  if (Math.abs(NBV_COLS[i] - x) < 5) return i < NBV_COLS.length - 1
   ? (NBV_COLS[i] + NBV_W + NBV_COLS[i + 1]) / 2 : NBV_COLS[i] + NBV_W + 22;
@@ -516,7 +526,7 @@ export function NetworkBoard({ t, env = "DEV" }) {
  const scrollRef = React.useRef(null);
  const zClamp = (z) => Math.min(3, Math.max(0.4, z));
  const zFit = () => setZoom(zClamp(
-  ((scrollRef.current && scrollRef.current.clientWidth) || 1200) / 1460));
+  ((scrollRef.current && scrollRef.current.clientWidth) || 1200) / NBV_VW));
  useEffect(() => {
   if (!fs) return;
   const onKey = (e) => { if (e.key === "Escape") setFs(false); };
@@ -633,8 +643,8 @@ export function NetworkBoard({ t, env = "DEV" }) {
      Ctrl+wheel zoom · Esc exits · click clusters to expand · i/? badges</span>
    </div>
    <div ref={scrollRef} style={{ overflow: "auto", flex: fs ? 1 : "none" }}>
-    <svg viewBox="0 0 1460 640"
-     style={{ width: Math.round(1460 * zoom), display: "block" }}>
+    <svg viewBox={`0 0 ${NBV_VW} 640`}
+     style={{ width: Math.round(NBV_VW * zoom), display: "block" }}>
      <style>{"@keyframes nbFlow{to{stroke-dashoffset:-20}}"}</style>
      {NBV_ZONES.map((z) => (
       <g key={z[0]}>
@@ -677,15 +687,15 @@ export function NetworkBoard({ t, env = "DEV" }) {
        <g key={n.id} onClick={() => clu && setOpen({ ...open, [n.id]: !open[n.id] })}
         style={{ cursor: clu ? "pointer" : "default" }}>
         <rect x={n.x} y={n.y} width={NBV_W} height={H} rx={9} fill="#fff"
-         stroke={n.auto ? "#7b4dbb" : w === "DOWN" ? "#e4a09a" : "#e3eaef"}
-         strokeWidth={1.3} strokeDasharray={n.auto ? "5,4" : "none"} />
+         stroke={n.planned ? "#c98d1a" : n.auto ? "#7b4dbb" : w === "DOWN" ? "#e4a09a" : "#e3eaef"}
+         strokeWidth={1.3} strokeDasharray={(n.auto || n.planned) ? "5,4" : "none"} />
         <text x={n.x + 10} y={n.y + 17} fontSize={9.6} fontWeight={700} fill="#1c2a3a">
          {n.title}{clu ? " " : ""}
          {clu && <tspan fontSize={7.2} fill="#1168bd">
           [{m.length}]{open[n.id] ? " ▾" : " ▸"}</tspan>}</text>
         <text x={n.x + 10} y={n.y + 31} fontSize={7.4} fill="#93a5b5" style={mono}>
          {(n.sub || "").slice(0, 34)}</text>
-        {w && !n.bare && <circle cx={n.x + NBV_W - 11} cy={n.y + 11} r={4.2}
+        {w && !n.bare && !n.planned && <circle cx={n.x + NBV_W - 11} cy={n.y + 11} r={4.2}
          fill={w === "WAIT" ? "#fff" : NBV_DOT[w] || "#9aa7b2"}
          stroke={w === "WAIT" ? "#9aa7b2" : "none"} strokeWidth={1.4}
          strokeDasharray={w === "WAIT" ? "2.2,1.8" : "none"} />}
@@ -716,12 +726,16 @@ export function NetworkBoard({ t, env = "DEV" }) {
           height={11} rx={5.5} fill="#7b4dbb" />
          <text x={n.x + NBV_W - 29} y={n.y + H - 5.5} fontSize={7} fontWeight={800}
           fill="#fff" textAnchor="middle">AUTO</text></>}
+        {n.planned && <><rect x={n.x + NBV_W - 58} y={n.y + 6} width={50}
+          height={11} rx={5.5} fill="#c98d1a" />
+         <text x={n.x + NBV_W - 33} y={n.y + 14.5} fontSize={7} fontWeight={800}
+          fill="#fff" textAnchor="middle">PLANNED</text></>}
        </g>);
      })}
      {sel && (() => {
       const l = lanes.find((x) => x.id === sel); if (!l) return null;
       const a = byId[l.from], b = byId[l.to]; if (!a || !b) return null;
-      const px = Math.min(Math.max((a.x + b.x) / 2 - 110, 30), 1190);
+      const px = Math.min(Math.max((a.x + b.x) / 2 - 110, 30), NBV_VW - 270);
       const py = Math.min(Math.max((a.y + b.y) / 2 + 16, 50), 550);
       const st = (live["path." + l.id] || {}).st;
       return (
@@ -732,7 +746,8 @@ export function NetworkBoard({ t, env = "DEV" }) {
         <text x={px + 12} y={py + 36} fontSize={9} fill="#e6eef6" style={mono}>
          {l.from} → {l.to}  ·  {l.rule || "internal"}</text>
         <text x={px + 12} y={py + 54} fontSize={8.4} fill="#b9c9d8">
-         {l.tbd ? "◌ awaiting firewall decision"
+         {l.planned ? "◌ design state · " + (l.why || "not provisioned")
+          : l.tbd ? "◌ awaiting firewall decision"
           : l.probe ? "path " + (st || "no result yet") + " · " + l.probe
           : "context lane"}</text>
        </g>);
@@ -740,8 +755,9 @@ export function NetworkBoard({ t, env = "DEV" }) {
     </svg>
    </div>
    <div style={{ padding: "7px 13px", fontSize: 10.5, color: t.sub }}>
-    nodes/lanes from env_infra (AUTO dashed purple) · clusters collapsed — click to
-    expand · rollup strip = member health · statuses via /env-infra/probes/live</div>
+    nodes/lanes from env_infra (AUTO dashed purple · PLANNED dashed amber = Azure
+    design state, no row yet) · clusters collapsed — click to expand · rollup strip =
+    member health · statuses via /env-infra/probes/live</div>
   </div>);
 }
 
