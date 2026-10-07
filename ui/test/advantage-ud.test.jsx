@@ -132,7 +132,7 @@ if (bad) process.exit(1);
 
 // ---- type variance and schema variants, each its own reading --------------
 import { TypeVarianceView, SchemaVarianceView, UdStrip } from "../src/AdvantageUd360.jsx";
-import { schemaReading } from "../src/advantageUd.js";
+import { schemaReading, sourcesLine } from "../src/advantageUd.js";
 
 console.log("-- the schema reading in words");
 ok(schemaReading(null) === null && schemaReading({ loaded: false }) === null, "no reading until loaded");
@@ -168,7 +168,15 @@ ok(/Type variance · 2/.test(strip) && /Schema variants · 12,951/.test(strip), 
 ok(/shapes, never values/.test(strip), "the overview is the default tab");
 ok(/not loaded yet/.test(renderToStaticMarkup(<UdStrip t={tLight} ov={{ loaded: false }} />)) , "an unloaded warehouse gets the instruction without tabs");
 const D2 = fs.readFileSync(path.join(SRC, "Datapoint360.jsx"), "utf8");
-ok(/<UdStrip t=\{t\} ov=\{udOv\} shape=\{udShape\} tv=\{udTv\} sv=\{udSv\} \/>/.test(D2), "Datapoint360 mounts the strip with both analyses");
+ok(/<UdStrip t=\{t\} ov=\{udOv\} shape=\{udShape\} tv=\{udTv\} sv=\{udSv\} st=\{udSt\} \/>/.test(D2), "Datapoint360 mounts the strip with both analyses and the sources line");
+{
+  ok(sourcesLine(null) === null, "no status, no line");
+  const line = sourcesLine({ profile: { loaded: true, attributes: 284 }, extract: { loaded: true, rows: 21672, quarantined: 2, batch_id: "20261007032517992253" },
+    workbook: { loaded: true, tables: 41, links: { STRONGLY_INFERRED: 12, WEAK: 3 } }, trp: { loaded: false } });
+  ok(/profile 284 keys · extract 21,672 rows, 2 quarantined · batch 20261007032517992253 · workbook 41 tables · links 12 strongly inferred, 3 weak · TRP not loaded/.test(line), "the sources line names every source and its state", line);
+  const html = renderToStaticMarkup(<UdOverview t={tLight} ov={ov} shape={shape} st={{ profile: { loaded: true, attributes: 284 }, extract: { loaded: false }, workbook: { loaded: false }, trp: { loaded: false } }} />);
+  ok(/Sources/.test(html) && /extract not loaded/.test(html), "the overview prints the line");
+}
 ok(/advantageUdApi\.typeVariance\(\)/.test(D2) && /advantageUdApi\.schemaVariance\(\)/.test(D2), "and fetches both once per system");
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\nadvantage-ud variance assertions pass");

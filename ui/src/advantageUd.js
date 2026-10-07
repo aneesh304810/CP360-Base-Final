@@ -121,3 +121,25 @@ export function schemaReading(sv) {
   if (sv.typed_drift_sets) parts.push(`${sv.typed_drift_sets} sets keep the same keys with different value types`);
   return parts.map((x) => x[0].toUpperCase() + x.slice(1)).join(". ") + ".";
 }
+
+advantageUdApi.ingestStatus = () =>
+  _get("/advantage-ud/ingest-status", () => null);
+
+/* One line saying which sources the picture rests on. */
+export function sourcesLine(st) {
+  if (!st) return null;
+  const p = [];
+  p.push(st.profile?.loaded ? `profile ${st.profile.attributes} keys` : "profile not loaded");
+  p.push(st.extract?.loaded
+    ? `extract ${Number(st.extract.rows).toLocaleString()} rows${st.extract.quarantined ? `, ${st.extract.quarantined} quarantined` : ""}${st.extract.batch_id ? ` · batch ${st.extract.batch_id}` : ""}`
+    : "extract not loaded");
+  if (st.workbook?.loaded) {
+    const l = st.workbook.links || {};
+    const lk = Object.entries(l).map(([k, v]) => `${v} ${k.toLowerCase().replace(/_/g, " ")}`).join(", ");
+    p.push(`workbook ${st.workbook.tables} tables${lk ? ` · links ${lk}` : " · no links yet"}`);
+  } else p.push("workbook not loaded");
+  p.push(st.trp?.loaded
+    ? `TRP ${st.trp.attributes} attributes reconciled${st.trp.missing_in_extract ? `, ${st.trp.missing_in_extract} sample values with no key in the extract` : ""}`
+    : "TRP not loaded");
+  return p.join(" · ");
+}

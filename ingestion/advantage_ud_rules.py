@@ -68,7 +68,10 @@ def reclassify_type(attr, dominant_type, max_len, rules=None):
     references, is an IDENTIFIER. Returns (type, changed)."""
     r = rules or RULES
     _, parent, _, _ = split_key(attr)
-    if dominant_type == "TIMESTAMP" and max_len and int(max_len) == 10 \
+    # The brief says the profiler reads them as TIMESTAMP; a value such as
+    # 1010000017 the parser here reads as INTEGER. Either way, ten digits
+    # under an account-reference parent is an identifier, never a number.
+    if dominant_type in ("TIMESTAMP", "INTEGER") and max_len and int(max_len) == 10 \
             and (parent in set(r.get("identifier_parents") or []) or attr in set(r.get("identifier_parents") or [])):
         return "IDENTIFIER", True
     return dominant_type, False

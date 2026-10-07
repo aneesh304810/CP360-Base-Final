@@ -380,3 +380,34 @@ def schema_variance():
             "tiers": {k: len(v) for k, v in tiers.items()}, "core_keys": tiers.get("core", []),
             "optional_keys": optional, "optional_count": len(optional),
             "top": top, "families_list": list(fams.values())[:40]}
+
+
+@router.get("/ingest-status")
+def ingest_status():
+    """What has been loaded, from every source, as counts. The overview
+    strip prints this as one line so a reader knows which of the five
+    sources the picture rests on."""
+    def one(sql):
+        r = _safe(sql)
+        return r[0] if r else {}
+    raw = one("SELECT COUNT(*) AS n, SUM(CASE WHEN parse_status = 'OK' THEN 1 ELSE 0 END) AS ok_n, "
+              "MAX(batch_id) AS batch_id, MAX(as_of_date) AS as_of_date FROM cp_advantage_ud_raw")
+    attr = one("SELECT COUNT(*) AS n, COUNT(DISTINCT attribute_name) AS keys FROM cp_advantage_ud_attribute")
+    quar = one("SELECT COUNT(*) AS n FROM cp_advantage_ud_quarantine")
+    reg = one("SELECT COUNT(*) AS n FROM cp_advantage_ud_registry")
+    tab = one("SELECT COUNT(*) AS n, SUM(code_count) AS codes FROM cp_advantage_ud_table")
+    links = _safe("SELECT link_status, COUNT(*) AS n FROM cp_advantage_ud_link GROUP BY link_status")
+    recon = one("SELECT COUNT(*) AS n, SUM(trp_rows) AS trp_rows, SUM(missing_in_extract) AS missing, "
+                "SUM(value_differs) AS differs FROM cp_advantage_ud_recon")
+    codes = _safe("SELECT source, COUNT(*) AS n FROM cp_advantage_ud_dictionary GROUP BY source")
+    return {
+        "profile":   {"loaded": bool(reg.get("n")), "attributes": reg.get("n") or 0},
+        "extract":   {"loaded": bool(raw.get("n")), "rows": raw.get("n") or 0, "ok": raw.get("ok_n") or 0,
+                      "quarantined": quar.get("n") or 0, "attribute_rows": attr.get("n") or 0,
+                      "keys": attr.get("keys") or 0, "batch_id": raw.get("batch_id"), "as_of_date": raw.get("as_of_date")},
+        "workbook":  {"loaded": bool(tab.get("n")), "tables": tab.get("n") or 0, "table_codes": tab.get("codes") or 0,
+                      "links": {l["link_status"]: l["n"] for l in links}},
+        "codes":     {c["source"]: c["n"] for c in codes},
+        "trp":       {"loaded": bool(recon.get("n")), "attributes": recon.get("n") or 0, "rows": recon.get("trp_rows") or 0,
+                      "missing_in_extract": recon.get("missing") or 0, "differs": recon.get("differs") or 0},
+    }

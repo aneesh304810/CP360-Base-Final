@@ -38,6 +38,9 @@ STEPS = [
     "legacy_source_file",# CP_SOURCE_FILE: the business name of each AddVantage EOD feed
     "advantage_ud_dictionary", # the code values each AddVantage UD field carries (sql/75)
     "advantage_ud_profile",    # the UD registry, parents, families, conflicts (sql/76)
+    "advantage_ud_extract",    # dataVar.csv -> raw, attribute, quarantine (sql/77)
+    "advantage_ud_workbook",   # the UD metadata workbook: tables, field types, links (sql/77)
+    "advantage_ud_trp",        # TRP samples vs the extract, counts only (sql/77)
     "sei_crosswalk",     # IMDS/STAR/UAF/SEI crosswalk workbook — lanes, mapping, verdicts
     "event360",          # Event 360: the SEI event specification workbook
     "sdc_compute",       # SDC client compute sizing: the read-back bill, per view
@@ -259,6 +262,56 @@ def _run_step(step, conn, loader, resolver) -> None:
         c = LegacySourceFileConnector.from_env()
         n = c.load(loader, c.parse())
         log.info("legacy_source_file: merged %s feeds", n)
+        return
+    if step == "advantage_ud_extract":
+        from .advantage_ud_extract_conn import AdvantageUdExtractConnector
+        c = AdvantageUdExtractConnector.from_env()
+        cur = conn.cursor()
+        try:
+            cur.execute("SELECT attribute_name FROM cp_advantage_ud_registry")
+            c.known_attributes = {r[0] for r in cur.fetchall()}
+            cur.execute("SELECT schema_signature FROM cp_advantage_ud_schema")
+            c.known_schemas = {r[0] for r in cur.fetchall()}
+        except Exception as e:                       # noqa: BLE001 - tables not there yet
+            log.warning("advantage_ud_extract: registry not readable (%s); everything will count as new", e)
+        finally:
+            cur.close()
+        log.info("advantage_ud_extract: %s", c.load(loader))
+        return
+    if step == "advantage_ud_workbook":
+        from .advantage_ud_workbook_conn import AdvantageUdWorkbookConnector
+        c = AdvantageUdWorkbookConnector.from_env()
+        cur = conn.cursor()
+        try:
+            cur.execute("SELECT attribute_name, code_value FROM cp_advantage_ud_dictionary WHERE source = 'OBSERVED'")
+            obs = {}
+            for a, code in cur.fetchall():
+                obs.setdefault(a, set()).add(code)
+            c.observed = obs
+        except Exception as e:                       # noqa: BLE001
+            log.warning("advantage_ud_workbook: no observed codes (%s); links cannot be inferred", e)
+        finally:
+            cur.close()
+        n = c.load(loader, c.parse())
+        log.info("advantage_ud_workbook: merged %s rows", n)
+        return
+    if step == "advantage_ud_trp":
+        from .advantage_ud_trp_conn import AdvantageUdTrpConnector
+        cur = conn.cursor()
+        def lookup(acct, _cur=cur):
+            _cur.execute("SELECT attribute_name, raw_value FROM cp_advantage_ud_attribute "
+                         "WHERE account_number = :a", {"a": acct})
+            rows = _cur.fetchall()
+            return {a: v for a, v in rows} if rows else None
+        try:
+            cur.execute("SELECT attribute_name FROM cp_advantage_ud_registry")
+            keys = {r[0] for r in cur.fetchall()}
+        except Exception:                            # noqa: BLE001
+            keys = set()
+        c = AdvantageUdTrpConnector.from_env(lookup, keys)
+        n = c.load(loader, c.parse())
+        cur.close()
+        log.info("advantage_ud_trp: %s attributes reconciled", n)
         return
     if step == "advantage_ud_profile":
         from .advantage_ud_profile_conn import AdvantageUdProfileConnector

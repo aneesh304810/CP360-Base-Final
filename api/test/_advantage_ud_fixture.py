@@ -133,6 +133,8 @@ class FakeDb:
         m = re.search(r"from (cp_advantage_ud_\w+)", s)
         if not m:
             return []
+        if m.group(1) not in self.TABLES:          # sql/77 tables: not in the drop
+            return []
         rows = [dict(r) for r in self.data.get(self.TABLES[m.group(1)], [])]
         p = params or {}
         if "attribute_name = :a" in s:
@@ -145,6 +147,8 @@ class FakeDb:
             rows = [r for r in rows if r.get("type_variance_ind") == "Y"]
         if "gold_candidate = 'y'" in s:
             rows = [r for r in rows if r.get("gold_candidate") == "Y"]
+        if "count(*) as n" in s and "group by" not in s:
+            return [{"n": len(rows)}]
         if "count(distinct attribute_name) as n" in s:
             return [{"n": len({r["attribute_name"] for r in rows})}]
         if "group by conflict_class" in s:
@@ -157,6 +161,11 @@ class FakeDb:
             for r in rows:
                 c[r["attribute_count"]] = c.get(r["attribute_count"], 0) + (r.get("record_count") or 0)
             return [{"attribute_count": k, "records": v} for k, v in sorted(c.items())]
+        if "group by source" in s:
+            c = {}
+            for r in rows:
+                c[r["source"]] = c.get(r["source"], 0) + 1
+            return [{"source": k, "n": v} for k, v in c.items()]
         if "group by attribute_name" in s:
             c = {}
             for r in rows:

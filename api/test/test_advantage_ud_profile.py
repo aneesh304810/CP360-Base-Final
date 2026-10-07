@@ -157,6 +157,13 @@ ok(sv["singletons"] == 0, "no one-row sets in the fixture, reported as zero not 
 ok(sv["top"][0]["record_count"] == 6000 and sv["top"][0]["blocks"] == ["UD_23"] and sv["top"][0]["family_label"] == "household" and sv["top"][0]["singles"] == 5,
    "the most common set is described by blocks and singles, never by values", sv["top"][0])
 
+print("-- ingest status")
+st = R.ingest_status()
+ok(st["profile"]["loaded"] and st["profile"]["attributes"] == 16, "the profile is reported loaded with its key count", st["profile"])
+ok(st["extract"]["loaded"] is False and st["workbook"]["loaded"] is False and st["trp"]["loaded"] is False,
+   "sources without rows are reported not loaded, not as zeros that look like data", st)
+ok(st["codes"] == {"OBSERVED": 11}, "code sources counted", st["codes"])
+
 R.query = lambda sql, p=None: []
 ok(R.type_variance()["loaded"] is False and R.schema_variance()["loaded"] is False, "both say not loaded on an empty warehouse")
 ok(R.overview()["loaded"] is False and R.attribute("UD_1")["loaded"] is False and R.clob_shape()["loaded"] is False,

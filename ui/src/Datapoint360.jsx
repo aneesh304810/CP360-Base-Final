@@ -382,6 +382,7 @@ function LegacyDatapoints({ t, onOpen }) {
   const [udAttr, setUdAttr] = useState(null);
   const [udTv, setUdTv] = useState(null);
   const [udSv, setUdSv] = useState(null);
+  const [udSt, setUdSt] = useState(null);
 
   useEffect(() => {
     if (curSys !== "ADDVANTAGE") { setUdOv(null); setUdShape(null); setUdTv(null); setUdSv(null); return; }
@@ -390,6 +391,7 @@ function LegacyDatapoints({ t, onOpen }) {
     advantageUdApi.clobShape().then((r) => { if (live) setUdShape(r); });
     advantageUdApi.typeVariance().then((r) => { if (live) setUdTv(r); });
     advantageUdApi.schemaVariance().then((r) => { if (live) setUdSv(r); });
+    advantageUdApi.ingestStatus().then((r) => { if (live) setUdSt(r); });
     return () => { live = false; };
   }, [curSys]);
 
@@ -486,7 +488,7 @@ function LegacyDatapoints({ t, onOpen }) {
           category is being browsed or a UD field is the selected one, and
           never above a Basic Information listing. */}
       {curSys === "ADDVANTAGE" && (cat === UD_CATEGORY || isUdAttribute(sel?.field_code_norm)) &&
-        <UdStrip t={t} ov={udOv} shape={udShape} tv={udTv} sv={udSv} />}
+        <UdStrip t={t} ov={udOv} shape={udShape} tv={udTv} sv={udSv} st={udSt} />}
       <div style={{ display: "flex", gap: 10, marginBottom: 14, alignItems: "center" }}>
         <input value={q} onChange={(e) => setQ(e.target.value)}
           placeholder="Search attribute / field code…"

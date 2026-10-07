@@ -12,7 +12,7 @@
 // or a person ever leaving the database.
 
 import React from "react";
-import { presenceReading, typeReading, parseDistribution, pct, SOURCE_LABEL, SEVERITY, schemaReading } from "./advantageUd.js";
+import { presenceReading, typeReading, parseDistribution, pct, SOURCE_LABEL, SEVERITY, schemaReading, sourcesLine } from "./advantageUd.js";
 
 const mono = { fontFamily: "Roboto Mono, monospace" };
 
@@ -55,7 +55,7 @@ export function ClobExample({ t, example }) {
     </pre>);
 }
 
-export function UdOverview({ t, ov, shape }) {
+export function UdOverview({ t, ov, shape, st }) {
   if (!ov) return null;
   if (!ov.loaded) {
     return (
@@ -75,6 +75,8 @@ export function UdOverview({ t, ov, shape }) {
   const bTotal = buckets.reduce((s, [, v]) => s + v, 0);
   return (
     <div style={{ marginBottom: 16 }}>
+      {sourcesLine(st) && <div style={{ fontSize: 10.5, color: t.sub || "#4a5a68", marginBottom: 8 }}>
+        <b style={{ color: t.muted || "#7b8894", textTransform: "uppercase", letterSpacing: ".4px", fontSize: 9.5 }}>Sources · </b>{sourcesLine(st)}</div>}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
         <Tile t={t} n={rows != null ? Number(rows).toLocaleString() : null} label="account rows"
           sub={run.parse_success_pct != null ? `${pct(run.parse_success_pct)} parse as JSON` : "in the extract"} />
@@ -316,7 +318,7 @@ export function SchemaVarianceView({ t, sv }) {
 }
 
 /* The strip with its three readings. */
-export function UdStrip({ t, ov, shape, tv, sv }) {
+export function UdStrip({ t, ov, shape, tv, sv, st }) {
   const [tab, setTab] = React.useState("overview");
   if (!ov) return null;
   if (!ov.loaded) return <UdOverview t={t} ov={ov} shape={shape} />;
@@ -330,7 +332,7 @@ export function UdStrip({ t, ov, shape, tv, sv }) {
               border: `1px solid ${tab === k ? (t.accent || "#0f4775") : (t.border || "#c9d4dc")}`,
               background: tab === k ? (t.accent || "#0f4775") : "#fff", color: tab === k ? "#fff" : (t.accent || "#0f4775") }}>{l}</span>))}
       </div>
-      {tab === "overview" && <UdOverview t={t} ov={ov} shape={shape} />}
+      {tab === "overview" && <UdOverview t={t} ov={ov} shape={shape} st={st} />}
       {tab === "type" && <TypeVarianceView t={t} tv={tv} />}
       {tab === "schema" && <SchemaVarianceView t={t} sv={sv} />}
     </div>);
