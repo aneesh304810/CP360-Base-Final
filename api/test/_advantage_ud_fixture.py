@@ -141,6 +141,8 @@ class FakeDb:
             rows = [r for r in rows if r.get("parent_attribute") == p.get("p")]
         if "domain = :d" in s:
             rows = [r for r in rows if r.get("domain") == p.get("d")]
+        if "type_variance_ind = 'y'" in s:
+            rows = [r for r in rows if r.get("type_variance_ind") == "Y"]
         if "gold_candidate = 'y'" in s:
             rows = [r for r in rows if r.get("gold_candidate") == "Y"]
         if "count(distinct attribute_name) as n" in s:

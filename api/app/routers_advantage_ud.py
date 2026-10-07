@@ -236,3 +236,147 @@ def registry(domain: str | None = None, parent: str | None = None, gold: bool = 
         r["shape"] = _shape(r)
         r["term"] = terms.get(r["attribute_name"])
     return {"attributes": rows}
+
+
+# ---------------------------------------------------------------------------
+# type_variance.csv and schema_variants.csv, each read as its own analysis.
+# ---------------------------------------------------------------------------
+
+# What each variance class means for the load, from the brief's rules:
+# leading zeros stay VARCHAR, free text is preserved, dates are never
+# auto-converted, a split happens only where the field is coded.
+VARIANCE_READING = {
+    "NUMERIC_REPRESENTATION_VARIANCE": ("same number, written two ways (12 vs 12.0)",
+                                        "keep the string; parse a decimal beside it"),
+    "DATE_FORMAT_OR_TEXT_VARIANCE":    ("dates in more than one mask, or text where a date is expected",
+                                        "keep the string and its mask; never auto-convert; text rows are a quality finding"),
+    "IDENTIFIER_NUMERIC_COLLISION":    ("an identifier that sometimes has leading zeros and sometimes not",
+                                        "VARCHAR for ever; a zero-stripped id is a different id"),
+    "CODE_VS_FREE_TEXT_VARIANCE":      ("free text that sometimes contains '='",
+                                        "it is text; do not split; the code pairs are false positives"),
+    "FLAG_REPRESENTATION_VARIANCE":    ("a flag written Y/N and also as something else",
+                                        "map the other spellings to Y/N; anything unmapped is a finding"),
+    "COMPLEX_STRUCTURE_VARIANCE":      ("a nested object or array beside plain values",
+                                        "register the structure; do not flatten"),
+    "MIXED_SEMANTIC_TYPES":            ("values of unrelated kinds under one key",
+                                        "review by hand before any type is declared"),
+}
+
+
+def _dist(s):
+    try:
+        import json
+        o = json.loads(s) if isinstance(s, str) else (s or {})
+        return sorted(((k, int(v)) for k, v in o.items()), key=lambda kv: -kv[1])
+    except Exception:                                        # noqa: BLE001
+        return []
+
+
+@router.get("/type-variance")
+def type_variance():
+    """Every key whose values are not all one type: what kind of variance,
+    how much of the column it affects, and what the load should do."""
+    reg = _safe(f"SELECT {_REG_COLS} FROM cp_advantage_ud_registry WHERE type_variance_ind = 'Y' "
+                "ORDER BY dominant_type_pct NULLS LAST, attribute_number, sequence_number")
+    terms = {}
+    for d in _safe("""SELECT field_code_norm, MAX(business_term) AS business_term FROM legacy_dictionary
+                      WHERE source_system = 'ADDVANTAGE' AND field_code_norm LIKE 'UD\\_%' ESCAPE '\\\\'
+                      GROUP BY field_code_norm"""):
+        terms[d["field_code_norm"]] = d["business_term"]
+    rows, by_class = [], {}
+    for r in reg:
+        cls = r.get("variance_class") or "UNCLASSIFIED"
+        dist = _dist(r.get("type_distribution"))
+        minority = [(k, v) for k, v in dist if k != r.get("dominant_type")]
+        occ = r.get("occurrence_count") or sum(v for _, v in dist) or 0
+        minority_n = sum(v for _, v in minority)
+        minority_pct = round(100.0 * minority_n / occ, 2) if occ else None
+        what, do = VARIANCE_READING.get(cls, ("not classified", "review"))
+        if r.get("type_reclassified") == "Y":
+            what, do = ("10-digit account references the profiler read as timestamps",
+                        "IDENTIFIER, VARCHAR; the variance is the profiler's, not the data's")
+        elif r.get("is_free_text") == "Y":
+            do = "it is narrative; preserve the lines"
+        rows.append({
+            "attribute_name": r["attribute_name"], "term": terms.get(r["attribute_name"]),
+            "parent_attribute": r.get("parent_attribute"), "variance_class": cls,
+            "dominant_type": r.get("dominant_type"), "dominant_type_pct": r.get("dominant_type_pct"),
+            "value_class": r.get("value_class"), "type_reclassified": r.get("type_reclassified"),
+            "is_free_text": r.get("is_free_text"), "occurrence_count": occ,
+            "minority": minority, "minority_count": minority_n, "minority_pct": minority_pct,
+            "severity": ("high" if (minority_pct or 0) >= 10 else "medium" if (minority_pct or 0) >= 1 else "low"),
+            "what": what, "do": do, "domain": r.get("domain"), "gold_candidate": r.get("gold_candidate"),
+        })
+        c = by_class.setdefault(cls, {"variance_class": cls, "attributes": 0, "values_affected": 0,
+                                     "what": what if r.get("type_reclassified") != "Y" else VARIANCE_READING.get(cls, ("", ""))[0],
+                                     "do": VARIANCE_READING.get(cls, ("", "review"))[1]})
+        c["attributes"] += 1
+        c["values_affected"] += minority_n
+    classes = sorted(by_class.values(), key=lambda c: -c["attributes"])
+    return {"loaded": bool(reg), "attributes": len(rows),
+            "high": sum(1 for r in rows if r["severity"] == "high"),
+            "reclassified": sum(1 for r in rows if r["type_reclassified"] == "Y"),
+            "free_text": sum(1 for r in rows if r["is_free_text"] == "Y"),
+            "classes": classes, "rows": rows}
+
+
+def _tier(p):
+    p = p or 0
+    return "core" if p >= 99 else "common" if p >= 50 else "occasional" if p >= 5 else "rare"
+
+
+@router.get("/schema-variance")
+def schema_variance():
+    """Why there are 12,951 key sets for 21,672 rows, and what they fold to:
+    the optional keys that multiply key sets, the sizes, the long tail of
+    one-row sets, the sets whose keys agree but whose types do not, and
+    the families."""
+    sch = _safe("SELECT schema_signature, attribute_count, attribute_list, record_count, "
+                "typed_variant_count, record_pct, family_id FROM cp_advantage_ud_schema "
+                "ORDER BY record_count DESC")
+    fams = {f["family_id"]: f for f in _safe(
+        "SELECT family_id, family_label, parents_present, parent_count, record_count, variant_count, "
+        "min_attribute_count, max_attribute_count FROM cp_advantage_ud_family ORDER BY record_count DESC")}
+    reg = _safe(f"SELECT {_REG_COLS} FROM cp_advantage_ud_registry ORDER BY record_presence_pct DESC NULLS LAST")
+    run = {r["metric"]: r["value_num"] for r in _safe("SELECT metric, value_num FROM cp_advantage_ud_run")}
+    rows_total = sum(s.get("record_count") or 0 for s in sch)
+    sizes = {}
+    for s in sch:
+        n = s.get("attribute_count") or 0
+        b = "1-5" if n <= 5 else "6-20" if n <= 20 else "21-50" if n <= 50 else "51-100" if n <= 100 else "100+"
+        d = sizes.setdefault(b, {"bucket": b, "key_sets": 0, "rows": 0})
+        d["key_sets"] += 1
+        d["rows"] += s.get("record_count") or 0
+    order = ["1-5", "6-20", "21-50", "51-100", "100+"]
+    sizes = [sizes[b] for b in order if b in sizes]
+    singletons = [s for s in sch if (s.get("record_count") or 0) == 1]
+    typed_drift = [s for s in sch if (s.get("typed_variant_count") or 1) > 1]
+    tiers = {}
+    for r in reg:
+        t = _tier(r.get("record_presence_pct"))
+        tiers.setdefault(t, []).append(r["attribute_name"])
+    # the keys that multiply key sets: present on some rows and absent on
+    # others. Every one of them can double the number of exact key sets.
+    optional = [{"attribute_name": r["attribute_name"], "record_presence_pct": r.get("record_presence_pct"),
+                 "parent_attribute": r.get("parent_attribute"), "domain": r.get("domain")}
+                for r in reg if 1 <= (r.get("record_presence_pct") or 0) < 99]
+    top = []
+    for s in sch[:15]:
+        keys = [k.strip() for k in (s.get("attribute_list") or "").split(",") if k.strip()]
+        parents = sorted({k.rsplit("_", 1)[0] for k in keys if k.count("_") == 2}, key=lambda p: int(p.split("_")[1]))
+        singles = [k for k in keys if k.count("_") == 1]
+        f = fams.get(s.get("family_id")) or {}
+        top.append({"schema_signature": s["schema_signature"], "attribute_count": s.get("attribute_count"),
+                    "record_count": s.get("record_count"), "record_pct": s.get("record_pct"),
+                    "typed_variant_count": s.get("typed_variant_count"),
+                    "blocks": parents, "singles": len(singles), "singles_sample": singles[:8],
+                    "family_label": f.get("family_label")})
+    return {"loaded": bool(sch),
+            "key_sets": len(sch), "rows": rows_total, "families": len(fams),
+            "declared_key_sets": run.get("schema_variants"), "declared_typed": run.get("typed_schema_variants"),
+            "singletons": len(singletons), "singleton_rows": len(singletons),
+            "typed_drift_sets": len(typed_drift), "typed_drift_rows": sum(s.get("record_count") or 0 for s in typed_drift),
+            "sizes": sizes,
+            "tiers": {k: len(v) for k, v in tiers.items()}, "core_keys": tiers.get("core", []),
+            "optional_keys": optional, "optional_count": len(optional),
+            "top": top, "families_list": list(fams.values())[:40]}

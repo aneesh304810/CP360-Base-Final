@@ -100,3 +100,24 @@ export const SOURCE_LABEL = {
   RULE: "hypothesis from the brief, not yet confirmed",
   INFERRED: "inferred from the values only",
 };
+
+advantageUdApi.typeVariance = () =>
+  _get("/advantage-ud/type-variance", () => ({ loaded: false, attributes: 0, classes: [], rows: [] }));
+advantageUdApi.schemaVariance = () =>
+  _get("/advantage-ud/schema-variance", () => ({ loaded: false, key_sets: 0, sizes: [], top: [], optional_keys: [] }));
+
+export const SEVERITY = { high: ["#f3d2d7", "#c1113a"], medium: ["#fae5d3", "#e67e22"], low: ["#eef2f5", "#4a5a68"] };
+
+/* Why N key sets exist: in words a reader can check. */
+export function schemaReading(sv) {
+  if (!sv || !sv.loaded) return null;
+  const parts = [];
+  if (sv.rows && sv.key_sets) {
+    const r = Math.round((100 * sv.key_sets) / sv.rows);
+    parts.push(`${sv.key_sets.toLocaleString()} exact key sets for ${sv.rows.toLocaleString()} rows, so ${r}% of rows have a key set of their own`);
+  }
+  if (sv.optional_count != null) parts.push(`${sv.optional_count} keys are optional (on 1% to 99% of rows), and each can double the number of sets`);
+  if (sv.families) parts.push(`by blocks present they fold into ${sv.families} families`);
+  if (sv.typed_drift_sets) parts.push(`${sv.typed_drift_sets} sets keep the same keys with different value types`);
+  return parts.map((x) => x[0].toUpperCase() + x.slice(1)).join(". ") + ".";
+}

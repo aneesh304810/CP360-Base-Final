@@ -130,7 +130,35 @@ rg = R.registry(domain="billing")
 ok([r["attribute_name"] for r in rg["attributes"]] == ["UD_32_1", "UD_32_2", "UD_32_19"], "registry filtered by domain, in key order",
    [r["attribute_name"] for r in rg["attributes"]])
 ok(len(R.registry(gold=True)["attributes"]) == 5, "registry filtered to gold candidates")
+print("-- type_variance.csv as its own analysis")
+tv = R.type_variance()
+ok(tv["loaded"] and tv["attributes"] == 5, "only keys with variance are listed", tv["attributes"])
+tvr = {r["attribute_name"]: r for r in tv["rows"]}
+ok(tvr["UD_80"]["minority_pct"] == 6.0 and tvr["UD_80"]["severity"] == "medium" and tvr["UD_80"]["minority"] == [["TEXT", 264]] or tvr["UD_80"]["minority"] == [("TEXT", 264)],
+   "minority share and types come from the distribution, not the dominant pct", tvr["UD_80"])
+ok(tvr["UD_527_1"]["type_reclassified"] == "Y" and "profiler" in tvr["UD_527_1"]["what"],
+   "a reclassified key is called the profiler's variance", tvr["UD_527_1"]["what"])
+ok(tvr["UD_32_19"]["is_free_text"] == "Y" and "narrative" in tvr["UD_32_19"]["do"], "a narrative line is told to stay narrative")
+ok(tvr["UD_51"]["variance_class"] == "DATE_FORMAT_OR_TEXT_VARIANCE" and "never auto-convert" in tvr["UD_51"]["do"], "a date gets the date rule")
+ok({c["variance_class"] for c in tv["classes"]} == {"DATE_FORMAT_OR_TEXT_VARIANCE", "CODE_VS_FREE_TEXT_VARIANCE",
+    "IDENTIFIER_NUMERIC_COLLISION", "FLAG_REPRESENTATION_VARIANCE"}, "classes summarised", [c["variance_class"] for c in tv["classes"]])
+ok(tv["reclassified"] == 1 and tv["free_text"] == 2 and tv["high"] == 0, "the headline counts", (tv["reclassified"], tv["free_text"], tv["high"]))
+
+print("-- schema_variants.csv as its own analysis")
+sv = R.schema_variance()
+ok(sv["loaded"] and sv["key_sets"] == 8 and sv["rows"] == 19690 and sv["families"] == 5, "sets, rows and families", (sv["key_sets"], sv["rows"], sv["families"]))
+ok(sv["declared_key_sets"] == 12951, "the profiler's own count is carried for comparison")
+ok([b["bucket"] for b in sv["sizes"]] == ["1-5", "6-20", "21-50", "51-100", "100+"] and sv["sizes"][1]["rows"] == 12600 and sv["sizes"][1]["key_sets"] == 3,
+   "sizes bucketed with both sets and rows", sv["sizes"])
+ok(sv["tiers"] == {"core": 2, "common": 4, "occasional": 8, "rare": 2} and sv["core_keys"] == ["UD_613", "UD_1"], "presence tiers and the core keys", (sv["tiers"], sv["core_keys"]))
+ok(sv["optional_count"] == 14 and all(1 <= (k["record_presence_pct"] or 0) < 99 for k in sv["optional_keys"]), "optional keys are those on 1% to 99% of rows", sv["optional_count"])
+ok(sv["typed_drift_sets"] == 5, "sets whose keys agree but types do not are counted", sv["typed_drift_sets"])
+ok(sv["singletons"] == 0, "no one-row sets in the fixture, reported as zero not omitted")
+ok(sv["top"][0]["record_count"] == 6000 and sv["top"][0]["blocks"] == ["UD_23"] and sv["top"][0]["family_label"] == "household" and sv["top"][0]["singles"] == 5,
+   "the most common set is described by blocks and singles, never by values", sv["top"][0])
+
 R.query = lambda sql, p=None: []
+ok(R.type_variance()["loaded"] is False and R.schema_variance()["loaded"] is False, "both say not loaded on an empty warehouse")
 ok(R.overview()["loaded"] is False and R.attribute("UD_1")["loaded"] is False and R.clob_shape()["loaded"] is False,
    "an unloaded warehouse says so instead of drawing nothing")
 

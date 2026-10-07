@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { SectionHeader } from "./AppShell.jsx";
 import { api } from "./api.js";
 import { advantageUdApi, isUdAttribute, codedSummary } from "./advantageUd.js";
-import { UdOverview, udDetailRows } from "./AdvantageUd360.jsx";
+import { UdStrip, udDetailRows } from "./AdvantageUd360.jsx";
 
 // =====================================================================
 // Datapoint 360 — browse by Inbound / Outbound (parent groups, SEI),
@@ -372,12 +372,16 @@ function LegacyDatapoints({ t, onOpen }) {
   const [udOv, setUdOv] = useState(null);
   const [udShape, setUdShape] = useState(null);
   const [udAttr, setUdAttr] = useState(null);
+  const [udTv, setUdTv] = useState(null);
+  const [udSv, setUdSv] = useState(null);
 
   useEffect(() => {
-    if (curSys !== "ADDVANTAGE") { setUdOv(null); setUdShape(null); return; }
+    if (curSys !== "ADDVANTAGE") { setUdOv(null); setUdShape(null); setUdTv(null); setUdSv(null); return; }
     let live = true;
     advantageUdApi.overview().then((r) => { if (live) setUdOv(r); });
     advantageUdApi.clobShape().then((r) => { if (live) setUdShape(r); });
+    advantageUdApi.typeVariance().then((r) => { if (live) setUdTv(r); });
+    advantageUdApi.schemaVariance().then((r) => { if (live) setUdSv(r); });
     return () => { live = false; };
   }, [curSys]);
 
@@ -451,7 +455,7 @@ function LegacyDatapoints({ t, onOpen }) {
       </div>
 
       {/* search */}
-      {curSys === "ADDVANTAGE" && <UdOverview t={t} ov={udOv} shape={udShape} />}
+      {curSys === "ADDVANTAGE" && <UdStrip t={t} ov={udOv} shape={udShape} tv={udTv} sv={udSv} />}
       <div style={{ display: "flex", gap: 10, marginBottom: 14, alignItems: "center" }}>
         <input value={q} onChange={(e) => setQ(e.target.value)}
           placeholder="Search attribute / field code…"

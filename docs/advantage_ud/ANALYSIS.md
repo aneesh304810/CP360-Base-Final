@@ -176,6 +176,57 @@ Two things in the brief do not reconcile and need the data:
    attribute. Any attribute over 32 is not a type-3 field, which is a free
    datatype check against the dictionary.
 
+## 2a. type_variance.csv, read on its own
+
+One row per key whose values are not all one type: 90 of 284. The
+variance class says what kind of disagreement it is, and the brief's
+rules say what the load does about each. The pane's "Type variance" tab
+shows the classes with their counts and the keys worst first, where
+worst = the share of values that are NOT the dominant type.
+
+| Class | What it is | What the load does |
+|---|---|---|
+| NUMERIC_REPRESENTATION_VARIANCE | same number written two ways | keep the string, parse a decimal beside it |
+| DATE_FORMAT_OR_TEXT_VARIANCE | more than one mask, or text where a date is expected | keep string and mask, never auto-convert, text rows are a finding |
+| IDENTIFIER_NUMERIC_COLLISION | an id with and without leading zeros | VARCHAR for ever |
+| CODE_VS_FREE_TEXT_VARIANCE | prose that sometimes contains `=` | it is text, no split |
+| FLAG_REPRESENTATION_VARIANCE | Y/N and other spellings | map to Y/N, unmapped is a finding |
+| COMPLEX_STRUCTURE_VARIANCE | nested object or array | register, do not flatten |
+| MIXED_SEMANTIC_TYPES | unrelated kinds under one key | hand review before any type |
+
+Two readings sit on top of the classes. A key under `UD_527` or `UD_540`
+profiled `TIMESTAMP` and 10 wide is the profiler's variance, not the
+data's: the pane marks it "read as IDENTIFIER". A key inside a narrative
+block is never a candidate for a split, whatever its minority types say.
+
+Severity is a share, not a count: a key with 3% minority values on
+20,000 rows is a cleaner problem than one with 30% on 200. The pane
+uses high (10% or more), medium (1% to 10%), low.
+
+## 2b. schema_variants.csv, read on its own
+
+One row per distinct key set: 12,951 for 21,672 rows. The pane's "Schema
+variants" tab answers four questions the file alone does not:
+
+1. **Why so many?** Count the OPTIONAL keys, present on between 1% and 99%
+   of rows. Every one of them can double the number of exact key sets.
+   With a few dozen optional keys, twelve thousand sets is what
+   arithmetic predicts, not a sign of drift.
+2. **How big is a payload?** Key sets and rows bucketed by key count
+   (1 to 5, 6 to 20, 21 to 50, 51 to 100, over 100).
+3. **What is stable?** Keys by presence tier: core (99% or more), common,
+   occasional, rare. The core keys are the base account record.
+4. **What folds to what?** Families by blocks present, and the most
+   common key sets with their blocks and family. A set whose
+   `typed_schema_variant_count` is above 1 keeps the same keys with
+   different value types across rows: that is the drift worth a look,
+   and the pane counts those sets and their rows separately.
+
+The long tail is reported as it is: the number of key sets seen on
+exactly one row. Those rows are not errors. They are accounts with an
+unusual combination of optional keys, and the family view is where they
+become readable.
+
 ## 3. The parse model
 
 One key, one row, five derived columns. No value is altered.

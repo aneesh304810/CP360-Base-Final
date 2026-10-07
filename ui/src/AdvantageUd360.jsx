@@ -12,7 +12,7 @@
 // or a person ever leaving the database.
 
 import React from "react";
-import { presenceReading, typeReading, parseDistribution, pct, SOURCE_LABEL } from "./advantageUd.js";
+import { presenceReading, typeReading, parseDistribution, pct, SOURCE_LABEL, SEVERITY, schemaReading } from "./advantageUd.js";
 
 const mono = { fontFamily: "Roboto Mono, monospace" };
 
@@ -186,4 +186,152 @@ export function udDetailRows(t, a) {
     </span>]);
   }
   return rows;
+}
+
+/* ---- type_variance.csv, read as its own analysis ---------------------- */
+
+const Sec = ({ t, title, children, style }) => (
+  <div style={{ background: "#fff", border: `1px solid ${t.border || "#dfe6e9"}`, borderRadius: 3, padding: "10px 14px", ...style }}>
+    <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".4px",
+      color: t.muted || "#7b8894", marginBottom: 6 }}>{title}</div>
+    {children}
+  </div>);
+
+export function TypeVarianceView({ t, tv }) {
+  if (!tv || !tv.loaded) return <div style={{ fontSize: 12, color: t.muted || "#7b8894" }}>type_variance.csv not loaded yet.</div>;
+  const total = tv.attributes || 1;
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+        <Tile t={t} n={tv.attributes} label="keys with type variance" sub="values not all one type" />
+        <Tile t={t} n={tv.high} label="high" sub="10% or more of values are the minority type" />
+        <Tile t={t} n={tv.reclassified} label="profiler's, not the data's" sub="10-digit ids read as timestamps" />
+        <Tile t={t} n={tv.free_text} label="in narrative blocks" sub="'=' inside prose, no split" />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: 14 }}>
+        <Sec t={t} title="By variance class · what it is, what the load does">
+          {tv.classes.map((c) => (
+            <div key={c.variance_class} style={{ padding: "5px 0", borderTop: "1px solid #f0f3f6", fontSize: 11 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 40px", gap: 8 }}>
+                <span style={{ ...mono, fontWeight: 700 }}>{c.variance_class.toLowerCase().replace(/_/g, " ")}</span>
+                <span style={{ textAlign: "right", color: t.muted || "#7b8894" }}>{c.attributes}</span>
+              </div>
+              <div style={{ height: 6, background: "#eef2f5", borderRadius: 3, margin: "3px 0" }}>
+                <div style={{ width: `${Math.max(2, (100 * c.attributes) / total)}%`, height: 6, background: "#eb6834", borderRadius: 3 }} />
+              </div>
+              <div style={{ color: t.sub || "#4a5a68" }}>{c.what}</div>
+              <div style={{ color: t.accent || "#0f4775", fontWeight: 600 }}>→ {c.do}</div>
+            </div>))}
+        </Sec>
+        <Sec t={t} title="Every key, worst first">
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+            <thead><tr style={{ color: t.muted || "#7b8894", textAlign: "left" }}>
+              <th style={{ padding: "2px 6px" }}>Key</th><th style={{ padding: "2px 6px" }}>Dominant</th>
+              <th style={{ padding: "2px 6px" }}>Minority types</th><th style={{ padding: "2px 6px" }}>Class</th><th style={{ padding: "2px 6px" }}>Do</th></tr></thead>
+            <tbody>
+              {[...tv.rows].sort((a, b) => (b.minority_pct || 0) - (a.minority_pct || 0)).map((r) => {
+                const [bg, c] = SEVERITY[r.severity] || SEVERITY.low;
+                return (
+                  <tr key={r.attribute_name} style={{ borderTop: "1px solid #f0f3f6" }}>
+                    <td style={{ ...mono, padding: "3px 6px", whiteSpace: "nowrap" }}>{r.attribute_name}
+                      {r.term && <div style={{ fontFamily: "inherit", fontSize: 10, color: t.muted || "#7b8894" }}>{r.term}</div>}</td>
+                    <td style={{ padding: "3px 6px", whiteSpace: "nowrap" }}>{r.dominant_type} <span style={{ color: t.muted || "#7b8894" }}>{pct(r.dominant_type_pct)}</span>
+                      {r.type_reclassified === "Y" && <div style={{ fontSize: 10, color: "#b26b00" }}>read as {r.value_class}</div>}</td>
+                    <td style={{ padding: "3px 6px" }}>
+                      <span style={pill(bg, c)}>{r.minority_pct != null ? `${r.minority_pct}%` : "?"}</span>
+                      {(r.minority || []).map(([k, v]) => <span key={k} style={pill("#eef2f5", "#4a5a68")}>{k} {v}</span>)}</td>
+                    <td style={{ padding: "3px 6px", fontSize: 10, color: t.sub || "#4a5a68" }}>{r.variance_class.toLowerCase().replace(/_/g, " ")}</td>
+                    <td style={{ padding: "3px 6px", fontSize: 10, color: t.accent || "#0f4775" }}>{r.do}</td>
+                  </tr>);
+              })}
+            </tbody>
+          </table>
+        </Sec>
+      </div>
+    </div>);
+}
+
+/* ---- schema_variants.csv, read as its own analysis -------------------- */
+export function SchemaVarianceView({ t, sv }) {
+  if (!sv || !sv.loaded) return <div style={{ fontSize: 12, color: t.muted || "#7b8894" }}>schema_variants.csv not loaded yet.</div>;
+  const rowsTotal = sv.rows || 1;
+  const tiers = sv.tiers || {};
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+        <Tile t={t} n={Number(sv.key_sets).toLocaleString()} label="exact key sets" sub={`for ${Number(sv.rows).toLocaleString()} rows`} />
+        <Tile t={t} n={sv.optional_count} label="optional keys" sub="on 1% to 99% of rows · each can double the sets" />
+        <Tile t={t} n={sv.families} label="families" sub="by blocks present" />
+        <Tile t={t} n={Number(sv.singletons).toLocaleString()} label="one-row key sets" sub="the long tail" />
+        <Tile t={t} n={sv.typed_drift_sets} label="typed drift" sub={`same keys, other types · ${Number(sv.typed_drift_rows || 0).toLocaleString()} rows`} />
+      </div>
+      <div style={{ fontSize: 12, color: t.text || "#333", marginBottom: 10, lineHeight: 1.5 }}>{schemaReading(sv)}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1.4fr", gap: 14 }}>
+        <Sec t={t} title="Keys per payload · key sets and rows">
+          {(sv.sizes || []).map((b) => (
+            <div key={b.bucket} style={{ display: "grid", gridTemplateColumns: "48px 1fr 110px", gap: 8, alignItems: "center", fontSize: 11, padding: "2px 0" }}>
+              <span style={mono}>{b.bucket}</span>
+              <div style={{ height: 8, background: "#eef2f5", borderRadius: 4 }}>
+                <div style={{ width: `${Math.max(2, (100 * b.rows) / rowsTotal)}%`, height: 8, background: "#6d3ac0", borderRadius: 4 }} /></div>
+              <span style={{ textAlign: "right", color: t.muted || "#7b8894" }}>{b.key_sets} sets · {Number(b.rows).toLocaleString()}</span>
+            </div>))}
+          <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".4px", color: t.muted || "#7b8894", margin: "10px 0 4px" }}>Key presence tiers</div>
+          {[["core", "≥99% of rows"], ["common", "50–99%"], ["occasional", "5–50%"], ["rare", "<5%"]].map(([k, d]) => (
+            <div key={k} style={{ display: "grid", gridTemplateColumns: "80px 1fr 36px", gap: 8, fontSize: 11, padding: "1px 0" }}>
+              <span><b>{k}</b> <span style={{ color: t.muted || "#7b8894" }}>{d}</span></span>
+              <div style={{ height: 6, background: "#eef2f5", borderRadius: 3, marginTop: 5 }}>
+                <div style={{ width: `${Math.max(1, (100 * (tiers[k] || 0)) / Math.max(1, Object.values(tiers).reduce((a, b) => a + b, 0)))}%`, height: 6, background: "#1baf7a", borderRadius: 3 }} /></div>
+              <span style={{ textAlign: "right", color: t.muted || "#7b8894" }}>{tiers[k] || 0}</span>
+            </div>))}
+          {sv.core_keys?.length > 0 && <div style={{ ...mono, fontSize: 10, color: t.sub || "#4a5a68", marginTop: 4 }}>core: {sv.core_keys.join(", ")}</div>}
+        </Sec>
+        <Sec t={t} title="The optional keys · what multiplies the sets">
+          {(sv.optional_keys || []).slice(0, 30).map((k) => (
+            <div key={k.attribute_name} style={{ display: "grid", gridTemplateColumns: "90px 1fr 50px", gap: 8, alignItems: "center", fontSize: 11, padding: "1px 0" }}>
+              <span style={mono}>{k.attribute_name}</span>
+              <div style={{ height: 6, background: "#eef2f5", borderRadius: 3 }}>
+                <div style={{ width: `${Math.max(1, k.record_presence_pct || 0)}%`, height: 6, background: "#0f4775", borderRadius: 3 }} /></div>
+              <span style={{ textAlign: "right", color: t.muted || "#7b8894" }}>{pct(k.record_presence_pct)}</span>
+            </div>))}
+          {(sv.optional_keys || []).length > 30 && <div style={{ fontSize: 10, color: t.muted || "#7b8894" }}>… {sv.optional_keys.length - 30} more</div>}
+        </Sec>
+        <Sec t={t} title="The most common key sets">
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+            <thead><tr style={{ color: t.muted || "#7b8894", textAlign: "left" }}>
+              <th style={{ padding: "2px 6px" }}>Rows</th><th style={{ padding: "2px 6px" }}>Keys</th><th style={{ padding: "2px 6px" }}>Blocks</th><th style={{ padding: "2px 6px" }}>Family</th><th style={{ padding: "2px 6px" }}>Typed</th></tr></thead>
+            <tbody>
+              {(sv.top || []).map((s) => (
+                <tr key={s.schema_signature} style={{ borderTop: "1px solid #f0f3f6" }}>
+                  <td style={{ padding: "3px 6px", whiteSpace: "nowrap" }}>{Number(s.record_count).toLocaleString()} <span style={{ color: t.muted || "#7b8894" }}>{pct(s.record_pct)}</span></td>
+                  <td style={{ padding: "3px 6px" }}>{s.attribute_count}</td>
+                  <td style={{ ...mono, padding: "3px 6px", fontSize: 10 }}>{s.blocks.length ? s.blocks.join(" ") : "—"}</td>
+                  <td style={{ padding: "3px 6px", fontSize: 10 }}>{s.family_label}</td>
+                  <td style={{ padding: "3px 6px" }}>{s.typed_variant_count > 1 ? <span style={pill("#fae5d3", "#e67e22")}>{s.typed_variant_count} typed</span> : <span style={{ color: t.muted || "#7b8894" }}>1</span>}</td>
+                </tr>))}
+            </tbody>
+          </table>
+        </Sec>
+      </div>
+    </div>);
+}
+
+/* The strip with its three readings. */
+export function UdStrip({ t, ov, shape, tv, sv }) {
+  const [tab, setTab] = React.useState("overview");
+  if (!ov) return null;
+  if (!ov.loaded) return <UdOverview t={t} ov={ov} shape={shape} />;
+  const tabs = [["overview", "Overview"], ["type", `Type variance · ${tv?.attributes ?? "…"}`], ["schema", `Schema variants · ${sv?.key_sets != null ? Number(sv.key_sets).toLocaleString() : "…"}`]];
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+        {tabs.map(([k, l]) => (
+          <span key={k} onClick={() => setTab(k)} role="button" tabIndex={0}
+            style={{ fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 3, cursor: "pointer",
+              border: `1px solid ${tab === k ? (t.accent || "#0f4775") : (t.border || "#c9d4dc")}`,
+              background: tab === k ? (t.accent || "#0f4775") : "#fff", color: tab === k ? "#fff" : (t.accent || "#0f4775") }}>{l}</span>))}
+      </div>
+      {tab === "overview" && <UdOverview t={t} ov={ov} shape={shape} />}
+      {tab === "type" && <TypeVarianceView t={t} tv={tv} />}
+      {tab === "schema" && <SchemaVarianceView t={t} sv={sv} />}
+    </div>);
 }

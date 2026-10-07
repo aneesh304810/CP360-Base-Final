@@ -122,10 +122,54 @@ const wide = udDetailRows(tLight, { ...a, registry: { ...a.registry, max_value_l
 ok(/over the 32-char line/.test(renderToStaticMarkup(<div>{wide[2][1]}</div>)), "a value over 32 chars is flagged as not type-3 text");
 
 console.log("-- the pane is wired for the 360");
-ok(/import \{ UdOverview, udDetailRows \} from "\.\/AdvantageUd360\.jsx"/.test(D), "Datapoint360 imports the 360");
-ok(/curSys === "ADDVANTAGE" && <UdOverview t=\{t\} ov=\{udOv\} shape=\{udShape\} \/>/.test(D), "the overview strip is AddVantage only");
+ok(/import \{ UdStrip, udDetailRows \} from "\.\/AdvantageUd360\.jsx"/.test(D), "Datapoint360 imports the 360");
+ok(/curSys === "ADDVANTAGE" && <UdStrip t=\{t\} ov=\{udOv\}/.test(D), "the strip is AddVantage only");
 ok(/advantageUdApi\.attribute\(sel\.field_code_norm\)/.test(D) && /\.\.\.udDetailRows\(t, udAttr\)/.test(D), "the detail rows are spliced for the selected key");
 ok(/advantageUdApi\.overview\(\)/.test(D) && /advantageUdApi\.clobShape\(\)/.test(D), "overview and shape are fetched once per system");
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\nadvantage-ud 360 assertions pass");
+if (bad) process.exit(1);
+
+// ---- type variance and schema variants, each its own reading --------------
+import { TypeVarianceView, SchemaVarianceView, UdStrip } from "../src/AdvantageUd360.jsx";
+import { schemaReading } from "../src/advantageUd.js";
+
+console.log("-- the schema reading in words");
+ok(schemaReading(null) === null && schemaReading({ loaded: false }) === null, "no reading until loaded");
+const svx = { loaded: true, key_sets: 12951, rows: 21672, optional_count: 38, families: 24, typed_drift_sets: 410 };
+const sr = schemaReading(svx);
+ok(/12,951 exact key sets for 21,672 rows, so 60% of rows have a key set of their own/.test(sr), "the ratio is said as a share of rows", sr);
+ok(/38 keys are optional/.test(sr) && /each can double/.test(sr) && /fold into 24 families/.test(sr) && /410 sets keep the same keys/.test(sr), "optional keys, families and typed drift are all said");
+
+console.log("-- the views render and say not-loaded");
+ok(/not loaded yet/.test(renderToStaticMarkup(<TypeVarianceView t={tLight} tv={{ loaded: false }} />)), "type variance says not loaded");
+ok(/not loaded yet/.test(renderToStaticMarkup(<SchemaVarianceView t={tLight} sv={{ loaded: false }} />)), "schema variants says not loaded");
+const tv = { loaded: true, attributes: 2, high: 1, reclassified: 1, free_text: 0,
+  classes: [{ variance_class: "FLAG_REPRESENTATION_VARIANCE", attributes: 1, what: "a flag written Y/N and also as something else", do: "map the other spellings to Y/N; anything unmapped is a finding" }],
+  rows: [{ attribute_name: "UD_80", term: "RULE 11A", variance_class: "FLAG_REPRESENTATION_VARIANCE", dominant_type: "BOOLEAN_FLAG", dominant_type_pct: 94, minority: [["TEXT", 264]], minority_pct: 6, severity: "medium", do: "map the other spellings to Y/N" },
+         { attribute_name: "UD_527_1", variance_class: "IDENTIFIER_NUMERIC_COLLISION", dominant_type: "TIMESTAMP", dominant_type_pct: 100, value_class: "IDENTIFIER", type_reclassified: "Y", minority: [], minority_pct: 0.8, severity: "low", do: "IDENTIFIER, VARCHAR" }] };
+const th = renderToStaticMarkup(<TypeVarianceView t={tLight} tv={tv} />);
+ok(/flag representation variance/.test(th) && /map the other spellings/.test(th), "classes are read in words with the rule");
+ok(/RULE 11A/.test(th) && /TEXT 264/.test(th) && /6%/.test(th), "a key shows its name, minority types and share");
+ok(/read as IDENTIFIER/.test(th), "a reclassified key says what it is read as");
+ok(th.indexOf("UD_80") < th.indexOf("UD_527_1"), "worst first: the larger minority share is listed before the smaller");
+const sh = renderToStaticMarkup(<SchemaVarianceView t={tLight} sv={{ ...svx, singletons: 7000, typed_drift_rows: 900,
+  sizes: [{ bucket: "1-5", key_sets: 2, rows: 5500 }], tiers: { core: 2, common: 4, occasional: 8, rare: 2 }, core_keys: ["UD_613", "UD_1"],
+  optional_keys: [{ attribute_name: "UD_51", record_presence_pct: 14.3 }],
+  top: [{ schema_signature: "x", attribute_count: 8, record_count: 6000, record_pct: 27.7, typed_variant_count: 3, blocks: ["UD_23"], singles: 5, family_label: "household" }] }} />);
+ok(/12,951/.test(sh) && /7,000/.test(sh) && /core: UD_613, UD_1/.test(sh), "tiles, long tail and core keys");
+ok(/UD_51/.test(sh) && /14\.3%/.test(sh), "optional keys with their presence");
+ok(/3 typed/.test(sh) && /household/.test(sh) && !/[0-9]{10}/.test(sh.replace(/style="[^"]*"/g, "")), "typed drift is flagged per set and no value appears in the text");
+ok(/By blocks present they fold/.test(schemaReading(svx)), "each clause of the reading starts with a capital");
+
+console.log("-- the strip tabs");
+const strip = renderToStaticMarkup(<UdStrip t={tLight} ov={ov} shape={shape} tv={tv} sv={svx} />);
+ok(/Type variance · 2/.test(strip) && /Schema variants · 12,951/.test(strip), "tabs carry their counts");
+ok(/shapes, never values/.test(strip), "the overview is the default tab");
+ok(/not loaded yet/.test(renderToStaticMarkup(<UdStrip t={tLight} ov={{ loaded: false }} />)) , "an unloaded warehouse gets the instruction without tabs");
+const D2 = fs.readFileSync(path.join(SRC, "Datapoint360.jsx"), "utf8");
+ok(/<UdStrip t=\{t\} ov=\{udOv\} shape=\{udShape\} tv=\{udTv\} sv=\{udSv\} \/>/.test(D2), "Datapoint360 mounts the strip with both analyses");
+ok(/advantageUdApi\.typeVariance\(\)/.test(D2) && /advantageUdApi\.schemaVariance\(\)/.test(D2), "and fetches both once per system");
+
+console.log(bad ? `\n${bad} assertion(s) failed` : "\nadvantage-ud variance assertions pass");
 if (bad) process.exit(1);
