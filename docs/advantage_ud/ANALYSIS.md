@@ -122,6 +122,35 @@ Two profiler details the loader allows for: counts are written as floats
 lines (the loader derives the parent from the key, so a single stays a
 single).
 
+## 1c. The envelope on the lineage screen, and what the STG2 chain says
+
+The Legacy Lineage screen for `DIM_ACCOUNT_UD` showed the CLOB's primary
+chain as SRC n/a → STG1 n/a → STG2 `STG2_ACCOUNT_UD_INTRADAY.UD_FLD_NUMBER`
+(VARCHAR2(10)) → DWH `USER_DEFINED_ATTRIBUTE_CLOB`, and under it the
+stage-by-stage proof as the whole JSON per stage: a wall of a hundred keys,
+with client values in it.
+
+Two things follow:
+
+1. **The real lineage is per key, and it is a pivot.** At STG2 the UD data
+   is a tall table: one row per account per UD field number (and, for a
+   type-3 text field, per line). The warehouse pivots those rows into one
+   JSON object per account. So the chain for key `UD_23_2` is
+   `STG2_ACCOUNT_UD_INTRADAY` where `UD_FLD_NUMBER = 23` and line 2 → JSON
+   key `UD_23_2`. That is the chain the registry should carry per key, and
+   it is the chain the exploded `is_ud` lineage rows currently lack. I need
+   the column list of `STG2_ACCOUNT_UD_INTRADAY` (and STG1, if the UD rows
+   land there under another name) to write it down exactly: which column
+   holds the line number, which holds the value, and whether the 32-char
+   line is already a row there.
+2. **The proof is now read as structure.** `ui/src/UdEnvelopePanel.jsx`
+   replaces the raw block for this column only: the JSON is parsed per
+   stage, keys are grouped into blocks and singles with their dictionary
+   name, domain and value class from the registry, each key gets a verdict
+   (same / differs / missing across stages), and every value is masked to
+   its shape unless the reader reveals it. The raw JSON sits behind a
+   toggle. Every other field's proof is unchanged.
+
 ## 2. What the profiling figures already tell us
 
 The brief quotes a profiling run. Read as evidence, before any code:
@@ -351,9 +380,11 @@ Kept short on purpose, since the build waits on the analysis:
 4. **One redacted CLOB**, if you want the example on the pane to be a real
    shape rather than a synthetic one: any row with every value replaced by
    its length or a mask. Not required.
-5. **Answers to section 10**, especially `LOAD_TYPE` semantics and who owns
+5. **The column list of `STG2_ACCOUNT_UD_INTRADAY`** (and the STG1 table
+   that feeds it), so the per-key chain can be written exactly.
+6. **Answers to section 10**, especially `LOAD_TYPE` semantics and who owns
    the thirteen gold candidates.
-6. **Not `dataVar.csv`.** The profile is enough for the catalogue; the
+7. **Not `dataVar.csv`.** The profile is enough for the catalogue; the
    extract is 21,672 accounts and does not belong in a chat or a repo.
 
 ## 12. What to run once the files are in

@@ -223,6 +223,16 @@ def registry(domain: str | None = None, parent: str | None = None, gold: bool = 
           (" WHERE " + " AND ".join(where) if where else "") + \
           " ORDER BY attribute_number, sequence_number NULLS FIRST"
     rows = _safe(sql, p)
+    # The dictionary's name for each key (UD/1 "OWNED BY CODE"), joined in
+    # Python: a LEFT JOIN would make the whole statement fail on a warehouse
+    # without sql/27, and the registry must answer without it.
+    terms = {}
+    for d in _safe("""SELECT field_code_norm, MAX(business_term) AS business_term
+                      FROM legacy_dictionary
+                      WHERE source_system = 'ADDVANTAGE' AND field_code_norm LIKE 'UD\_%' ESCAPE '\\'
+                      GROUP BY field_code_norm"""):
+        terms[d["field_code_norm"]] = d["business_term"]
     for r in rows:
         r["shape"] = _shape(r)
+        r["term"] = terms.get(r["attribute_name"])
     return {"attributes": rows}

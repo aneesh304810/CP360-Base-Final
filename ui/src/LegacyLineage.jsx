@@ -4,6 +4,7 @@ import LineageGraph from "./LineageGraph.jsx";
 import DependencyMatrix from "./DependencyMatrix.jsx";
 import TableExplorer from "./TableExplorer.jsx";
 import { crosswalkApi } from "./seiCrosswalkApi.js";
+import UdEnvelopePanel, { isUdClob } from "./UdEnvelopePanel.jsx";
 
 // =====================================================================
 // LegacyLineage v5 — the Non-SEI lineage engine.
@@ -507,7 +508,11 @@ function InlineDef({ t, system, dataSource, code, ctx, row, tableName, onDataSou
  ? (tb, col) => onJump({ dwh_target_table: tb, dwh_target_column: col })
  : undefined} />
  )}
- {proof.length > 0 && (
+ {proof.length > 0 && isUdClob(row) && (
+ <div style={{ paddingTop: 12, borderTop: `1px solid ${t.panel2 || "#dfe6e9"}` }}>
+ <UdEnvelopePanel t={t} field={row} proof={proof}
+ table={row.dwh_target_table || tableName} /></div>)}
+ {proof.length > 0 && !isUdClob(row) && (
  <>
  <div style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase",
  letterSpacing: 0.4, color: t.sub || "#666", margin: "4px 0 6px",
@@ -1145,7 +1150,10 @@ const xfArrow = (xf) => (
  {" "}→ canon {canon(a.src_source_column)}</span>
  </div>))}
  </div>)}
- {(f.proof || []).length > 0 && (
+ {(f.proof || []).length > 0 && isUdClob(f) && (
+ <UdEnvelopePanel t={t} field={f} proof={f.proof}
+ table={f.dwh_target_table} />)}
+ {(f.proof || []).length > 0 && !isUdClob(f) && (
  <div style={{ marginTop: 8 }}>
  <div style={{ fontSize: 9, fontWeight: 700,
  textTransform: "uppercase", color: t.sub || "#666",
