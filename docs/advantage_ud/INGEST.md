@@ -15,6 +15,33 @@ with `local\load.ps1`. Nothing new to install: `oracledb`, `openpyxl` and
 The order matters: 3 needs 1 to know which keys are new, 4 needs 2 to
 infer links from observed codes, 5 needs 3 to compare values.
 
+## The short version
+
+```powershell
+. .\local\set-env.ps1                      # sets CP_ADDV_UD_DIR = <repo>\local-data\advantage-ud (and the DSN)
+sqlplus -S $env:CP_CATALOG_DB_DSN "@sql\75_advantage_ud_dictionary.sql"   # once
+sqlplus -S $env:CP_CATALOG_DB_DSN "@sql\76_advantage_ud_profile.sql"      # once
+sqlplus -S $env:CP_CATALOG_DB_DSN "@sql\77_advantage_ud_ingest.sql"       # once
+.\local\load.ps1 advantage_ud               # everything in the folder, in order
+```
+
+Put every file you have in `local-data\advantage-ud\`: the extract csv, the
+UD workbook, the TRP workbook, and the profiler's csvs (loose, or in a
+`profile\` sub-folder). Names may vary: each file is recognised by what it
+is (the csv whose header has `USER_DEFINED_ATTRIBUTE_CLOB` is the extract,
+the xlsx with sheets `List` and `Tables` is the workbook, the xlsx whose
+first sheet has `Account Number` and `Ud n seq` headers is the samples).
+A different folder for one run: `.\local\load.ps1 advantage_ud -File D:\drops\addv-ud`.
+
+The step prints what it found, writes `docs\advantage_ud\source_inventory.md`,
+then runs the five sub-steps below in order, skipping any whose source is
+not in the folder and stopping at the first failure. Each sub-step can also
+be run on its own (`.\local\load.ps1 advantage_ud_extract`).
+
+One variable: `CP_ADDV_UD_DIR`. The per-file variables (`CP_ADDV_UD_EXTRACT`,
+`CP_ADDV_UD_WORKBOOK`, `CP_ADDV_UD_TRP`, `CP_ADDV_UD_PROFILE_DIR`,
+`CP_ADDV_UD_CODES`) exist only to point at a file somewhere else.
+
 ## 0. Before you start
 
 - Pull `claude/column-lineage-graph` at the latest commit.
@@ -37,9 +64,8 @@ local-data\advantage-ud\
 ```
 
 Do not copy `attribute_detail.csv` or `record_schemas.csv`; nothing reads
-them. The folder is gitignored. Other locations work through
-`CP_ADDV_UD_PROFILE_DIR`, `CP_ADDV_UD_CODES`, `CP_ADDV_UD_EXTRACT`,
-`CP_ADDV_UD_WORKBOOK`, `CP_ADDV_UD_TRP`.
+them. The folder is gitignored. The profiler csvs may sit loose in the
+folder instead of under `profile\`.
 
 ## 2. Discovery first, once
 

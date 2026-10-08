@@ -41,6 +41,7 @@ STEPS = [
     "advantage_ud_extract",    # dataVar.csv -> raw, attribute, quarantine (sql/77)
     "advantage_ud_workbook",   # the UD metadata workbook: tables, field types, links (sql/77)
     "advantage_ud_trp",        # TRP samples vs the extract, counts only (sql/77)
+    "advantage_ud",            # all of the above from one folder (CP_ADDV_UD_DIR), in order
     "sei_crosswalk",     # IMDS/STAR/UAF/SEI crosswalk workbook — lanes, mapping, verdicts
     "event360",          # Event 360: the SEI event specification workbook
     "sdc_compute",       # SDC client compute sizing: the read-back bill, per view
@@ -262,6 +263,35 @@ def _run_step(step, conn, loader, resolver) -> None:
         c = LegacySourceFileConnector.from_env()
         n = c.load(loader, c.parse())
         log.info("legacy_source_file: merged %s feeds", n)
+        return
+    if step == "advantage_ud":
+        # One folder, every source, in dependency order. Discovery first,
+        # so the inventory says what was found before anything is written;
+        # then each sub-step, stopping at the first failure, because a
+        # half-run that reports success is how a screen under-reports.
+        from .advantage_ud_paths import resolve, describe
+        r = resolve()
+        log.info("advantage_ud: sources\n%s", describe(r))
+        if not any((r["extract"], r["workbook"], r["trp"], r["profile"])):
+            raise FileNotFoundError(f"advantage_ud: nothing recognised in {r['dir']} (set CP_ADDV_UD_DIR)")
+        try:
+            from tools.advantage_ud_discovery import inventory
+            out = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                               "docs", "advantage_ud", "source_inventory.md")
+            with open(out, "w", encoding="utf-8") as fh:
+                fh.write(inventory(r["dir"]))
+            log.info("advantage_ud: inventory written to %s", out)
+        except Exception as e:                       # noqa: BLE001 - discovery is help, not a gate
+            log.warning("advantage_ud: inventory not written (%s)", e)
+        order = [("advantage_ud_profile", bool(r["profile_dir"])), ("advantage_ud_dictionary", bool(r["codes"])),
+                 ("advantage_ud_extract", bool(r["extract"])), ("advantage_ud_workbook", bool(r["workbook"])),
+                 ("advantage_ud_trp", bool(r["trp"]))]
+        for sub, have in order:
+            if not have:
+                log.warning("advantage_ud: %s skipped, its source is not in the folder", sub)
+                continue
+            log.info("advantage_ud: >>> %s", sub)
+            _run_step(sub, conn, loader, resolver)
         return
     if step == "advantage_ud_extract":
         from .advantage_ud_extract_conn import AdvantageUdExtractConnector

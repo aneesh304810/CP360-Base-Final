@@ -38,6 +38,13 @@ if (-not $env:CP_SDC_COMPUTE_XLSX) { $env:CP_SDC_COMPUTE_XLSX = Join-Path $Artif
 # env_infra, for the same reason
 if (-not $env:CP_SAMPLE_ARTIFACTS) { $env:CP_SAMPLE_ARTIFACTS = $Artifacts }
 
+# AddVantage UD - one folder holds every source (the extract csv, the UD
+# workbook, the TRP samples, the profiler's csvs or a profile\ sub-folder);
+# each file is recognised by its content, so names may vary between drops.
+#   .\load.ps1 advantage_ud                         # the folder below
+#   .\load.ps1 advantage_ud -File D:\drops\addv-ud   # another folder, this run only
+if (-not $env:CP_ADDV_UD_DIR) { $env:CP_ADDV_UD_DIR = Join-Path $Root "local-data\advantage-ud" }
+
 # Gates are hard by default and that is the point: a load four rows short looks
 # right on screen and quietly under-reports. 0/false/no downgrades a failure to
 # a logged ERROR and writes the rows ANYWAY - for inspecting a workbook you know
@@ -49,6 +56,7 @@ if (-not $env:CP_SAMPLE_ARTIFACTS) { $env:CP_SAMPLE_ARTIFACTS = $Artifacts }
 if (-not $Step) {
   Write-Host "Usage: .\load.ps1 <step> [-File <path>]" -ForegroundColor Yellow
   Write-Host "  Event 360 steps: event360 | sdc_compute | event_subscription | event360_all"
+  Write-Host "  AddVantage UD:   advantage_ud [-File <folder>]   (or one of: advantage_ud_profile | advantage_ud_dictionary | advantage_ud_extract | advantage_ud_workbook | advantage_ud_trp)"
   exit 1
 }
 Write-Host ("  root      {0}" -f $Root) -ForegroundColor DarkGray
@@ -56,6 +64,16 @@ if ($Step -like "event360*" -or $Step -eq "sdc_compute" -or $Step -eq "event_sub
   Write-Host ("  event360  {0}" -f $env:CP_EVENT360_XLSX)    -ForegroundColor DarkGray
   Write-Host ("  sdc       {0}" -f $env:CP_SDC_COMPUTE_XLSX) -ForegroundColor DarkGray
   Write-Host ("  subs      {0}" -f $env:CP_EVENT_SUB_DIR)    -ForegroundColor DarkGray
+}
+if ($Step -like "advantage_ud*") {
+  if ($File) {
+    if (-not (Test-Path $File -PathType Container)) {
+      Write-Error "advantage_ud takes a FOLDER holding every source, not a file: $File"
+      exit 1
+    }
+    $env:CP_ADDV_UD_DIR = (Resolve-Path $File).Path
+  }
+  Write-Host ("  addv-ud   {0}" -f $env:CP_ADDV_UD_DIR) -ForegroundColor DarkGray
 }
 
 switch ($Step) {

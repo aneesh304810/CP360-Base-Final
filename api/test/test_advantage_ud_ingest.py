@@ -203,9 +203,50 @@ ok(all(k in ("attribute_name", "trp_rows", "matched_accounts", "value_equal", "v
              "account_not_in_extract", "null_tokens", "junk_markers", "in_registry") for r in bt["recon"] for k in r), "nothing but counts is stored")
 LT = Store(); ok(ct.load(LT, bt) == 4 and LT.commits == 1, "four attributes reconciled, one commit")
 
+print("-- one folder, every source recognised by content")
+from ingestion.advantage_ud_paths import resolve, describe
+import shutil
+f = tempfile.mkdtemp()
+shutil.copy(csvp, os.path.join(f, "DIM_ACCOUNT_UD extract oct.csv"))          # not called dataVar
+shutil.copy(wbp, os.path.join(f, "metadata_v2.xlsx"))                        # no "user defined" in the name
+shutil.copy(trp, os.path.join(f, "samples.xlsx"))                            # no "trp" in the name
+with open(os.path.join(f, "attribute_profile.csv"), "w") as fh: fh.write("attribute_name\n")   # loose, not in profile/
+with open(os.path.join(f, "code_dictionary.csv"), "w") as fh: fh.write("attribute_name,code_value,description_value\n")
+with open(os.path.join(f, "notes.txt"), "w") as fh: fh.write("x")
+with open(os.path.join(f, "other.csv"), "w") as fh: fh.write("a,b\n")
+for v in ("CP_ADDV_UD_EXTRACT", "CP_ADDV_UD_WORKBOOK", "CP_ADDV_UD_TRP", "CP_ADDV_UD_PROFILE_DIR", "CP_ADDV_UD_CODES"):
+    os.environ.pop(v, None)
+r = resolve(f)
+ok(r["extract"].endswith("DIM_ACCOUNT_UD extract oct.csv"), "the extract is the csv with the CLOB header, whatever its name", r["extract"])
+ok(r["workbook"].endswith("metadata_v2.xlsx"), "the workbook is the xlsx with List and Tables sheets", r["workbook"])
+ok(r["trp"].endswith("samples.xlsx"), "the samples are the xlsx with Account Number and Ud n seq headers", r["trp"])
+ok(r["profile_dir"] == f and r["codes"].endswith("code_dictionary.csv") and set(r["profile"]) == {"attribute_profile.csv", "code_dictionary.csv"},
+   "profiler csvs are found loose in the folder", (r["profile_dir"], list(r["profile"])))
+ok(sorted(r["unrecognised"]) == ["notes.txt", "other.csv"], "anything else is listed as ignored, not guessed", r["unrecognised"])
+os.environ["CP_ADDV_UD_EXTRACT"] = "/elsewhere/x.csv"
+ok(resolve(f)["extract"] == "/elsewhere/x.csv", "a specific variable still wins over the scan")
+os.environ.pop("CP_ADDV_UD_EXTRACT")
+os.environ["CP_ADDV_UD_DIR"] = f
+ok(resolve()["dir"] == f and AdvantageUdExtractConnector.from_env().path == r["extract"]
+   and AdvantageUdWorkbookConnector.from_env().path == r["workbook"] and AdvantageUdTrpConnector.from_env().path == r["trp"],
+   "CP_ADDV_UD_DIR drives every connector's default")
+os.environ.pop("CP_ADDV_UD_DIR")
+ok(resolve(os.path.join(f, "missing"))["extract"] is None, "a missing folder resolves to nothing, without raising")
+ok("ignored   notes.txt, other.csv" in describe(r) and "extract   " in describe(r), "describe() prints what the step will log", describe(r))
+sub = tempfile.mkdtemp(); os.makedirs(os.path.join(sub, "profile")); shutil.copy(os.path.join(f, "attribute_profile.csv"), os.path.join(sub, "profile", "attribute_profile.csv"))
+ok(resolve(sub)["profile_dir"] == os.path.join(sub, "profile"), "a profile/ sub-folder is preferred when present")
+
 print("-- run.py")
 src = open(os.path.join(os.path.dirname(__file__), "..", "..", "ingestion", "run.py")).read()
-ok(all(f'"{s}"' in src for s in ("advantage_ud_extract", "advantage_ud_workbook", "advantage_ud_trp")), "the three steps are listed and dispatched")
+ok(all(f'"{s}"' in src for s in ("advantage_ud_extract", "advantage_ud_workbook", "advantage_ud_trp", "advantage_ud")), "the steps are listed and dispatched")
+i = src.index('if step == "advantage_ud":')
+body = src[i:i + 3000]
+ok(body.index("advantage_ud_profile") < body.index("advantage_ud_dictionary") < body.index("advantage_ud_extract") < body.index("advantage_ud_workbook") < body.index("advantage_ud_trp"),
+   "the one step runs the five in dependency order")
+ok("skipped, its source is not in the folder" in body and "inventory" in body, "it skips what is absent and writes the inventory first")
+ps = open(os.path.join(os.path.dirname(__file__), "..", "..", "local", "load.ps1")).read()
+ok('CP_ADDV_UD_DIR' in ps and '$Step -like "advantage_ud*"' in ps and 'takes a FOLDER' in ps, "load.ps1 knows the step, the variable and that -File is a folder")
+ok("CP_ADDV_UD_DIR" in open(os.path.join(os.path.dirname(__file__), "..", "..", "local", "set-env.ps1")).read(), "set-env.ps1 sets the variable")
 
 print()
 print("advantage_ud_ingest assertions " + ("FAIL" if bad else "pass"))

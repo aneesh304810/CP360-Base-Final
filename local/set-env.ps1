@@ -34,6 +34,14 @@ $env:BUSINESS_FLOWS_XLSX          = Join-Path $env:CP_CATALOG_ROOT "BUSINESS-FLO
 # Ingested by the reference_data step (after datapoint_index).
 $env:REFERENCE_DATA_XLSX          = Join-Path $env:CP_CATALOG_ROOT "REFERENCE\SWP_EOD_Data_Feeds_Reference_List.xlsx"
 
+# --- AddVantage UD fields ----------------------------------------------------
+# One folder with every source: the DIM_ACCOUNT_UD extract csv, the UD
+# metadata workbook, the TRP samples workbook, and the profiler's csvs (or a
+# profile\ sub-folder). Files are recognised by content, names may vary.
+# Loaded by:  .\local\load.ps1 advantage_ud      (sql/75, 76, 77 first, once)
+# Never under sample-artifacts: these carry account numbers and names.
+$env:CP_ADDV_UD_DIR               = Join-Path $Root "local-data\advantage-ud"
+
 # --- Event 360 -------------------------------------------------------------
 # Three steps, three sources, kept apart on purpose:
 #   event360           the CONTRACT       -- what SEI says an event is

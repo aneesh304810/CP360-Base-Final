@@ -48,14 +48,8 @@ class AdvantageUdTrpConnector(BaseConnector):
 
     @classmethod
     def from_env(cls, lookup=None, registry_keys=None):
-        p = os.environ.get("CP_ADDV_UD_TRP")
-        if not p:
-            base = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "local-data", "advantage-ud")
-            if os.path.isdir(base):
-                for n in sorted(os.listdir(base)):
-                    if n.lower().endswith(".xlsx") and "trp" in n.lower():
-                        p = os.path.join(base, n); break
-        return cls(p, lookup or (lambda a: None), registry_keys)
+        from .advantage_ud_paths import resolve
+        return cls(resolve()["trp"], lookup or (lambda a: None), registry_keys)
 
     def parse(self):
         if not self.path or not os.path.exists(self.path):

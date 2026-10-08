@@ -76,10 +76,9 @@ class AdvantageUdDictionaryConnector(BaseConnector):
 
     @classmethod
     def from_env(cls):
-        p = os.environ.get("CP_ADDV_UD_CODES") or os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "local-data", "advantage-ud", "profile", "code_dictionary.csv")
-        return cls(p)
+        from .advantage_ud_paths import resolve
+        r = resolve()
+        return cls(r["codes"] or os.path.join(r["dir"], "profile", "code_dictionary.csv"))
 
     def parse(self):
         if not os.path.exists(self.path):

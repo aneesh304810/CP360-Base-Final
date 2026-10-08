@@ -61,9 +61,10 @@ class AdvantageUdExtractConnector(BaseConnector):
 
     @classmethod
     def from_env(cls):
-        p = os.environ.get("CP_ADDV_UD_EXTRACT") or os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "local-data", "advantage-ud", "dataVar.csv")
-        return cls(p, chunk=int(os.environ.get("CP_ADDV_UD_CHUNK") or 2000))
+        from .advantage_ud_paths import resolve
+        r = resolve()
+        return cls(r["extract"] or os.path.join(r["dir"], "dataVar.csv"),
+                   chunk=int(os.environ.get("CP_ADDV_UD_CHUNK") or 2000))
 
     # ------------------------------------------------------------ stream
     def rows(self):

@@ -98,10 +98,9 @@ class AdvantageUdProfileConnector(BaseConnector):
 
     @classmethod
     def from_env(cls):
-        d = os.environ.get("CP_ADDV_UD_PROFILE_DIR") or os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "local-data", "advantage-ud", "profile")
-        return cls(d)
+        from .advantage_ud_paths import resolve
+        r = resolve()
+        return cls(r["profile_dir"] or os.path.join(r["dir"], "profile"))
 
     def _path(self, k):
         return os.path.join(self.folder, FILES[k])

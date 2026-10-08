@@ -101,14 +101,8 @@ class AdvantageUdWorkbookConnector(BaseConnector):
 
     @classmethod
     def from_env(cls):
-        p = os.environ.get("CP_ADDV_UD_WORKBOOK")
-        if not p:
-            base = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "local-data", "advantage-ud")
-            if os.path.isdir(base):
-                for n in sorted(os.listdir(base)):
-                    if n.lower().endswith(".xlsx") and "user defined" in n.lower():
-                        p = os.path.join(base, n); break
-        return cls(p)
+        from .advantage_ud_paths import resolve
+        return cls(resolve()["workbook"])
 
     # ------------------------------------------------------------- parse
     def parse(self):

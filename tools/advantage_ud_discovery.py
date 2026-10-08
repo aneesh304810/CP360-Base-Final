@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 from ingestion.advantage_ud_workbook_conn import (find_header_row, DOCUMENTED_LIST,   # noqa: E402
                                                   DOCUMENTED_TABLES, is_trp_header)
+from ingestion.advantage_ud_paths import _xlsx_kind, _csv_header, CLOB                 # noqa: E402
 
 EXTRACT_COLS = ["ACCOUNT_NUMBER", "AS_OF_DATE", "USER_DEFINED_ATTRIBUTE_CLOB", "LOAD_DATE", "BATCH_ID",
                 "LOAD_TYPE", "FIS_LOAD_DATE", "ACTIVE_IND", "ACCOUNT_UD_KEY", "ACCOUNT_KEY",
@@ -32,7 +33,7 @@ def inventory(folder):
     for name in sorted(os.listdir(folder)):
         p = os.path.join(folder, name)
         low = name.lower()
-        if low.endswith(".csv") and "datavar" in low:
+        if low.endswith(".csv") and CLOB in _csv_header(p):
             found = True
             with open(p, newline="", encoding="utf-8-sig") as fh:
                 rd = csv.reader(fh)
@@ -49,7 +50,8 @@ def inventory(folder):
             found = True
             from openpyxl import load_workbook
             wb = load_workbook(p, read_only=True, data_only=True)
-            kind = "TRP samples" if "trp" in low else "UD workbook" if "user defined" in low or "addv" in low else "workbook"
+            k = _xlsx_kind(p) or ("workbook" if "user defined" in low else "trp" if "trp" in low else None)
+            kind = "TRP samples" if k == "trp" else "UD workbook" if k == "workbook" else "workbook (not recognised)"
             lines += [f"## `{name}` ({kind})", ""]
             for ws in wb.worksheets:
                 hr, hdr = find_header_row(ws)
