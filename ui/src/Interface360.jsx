@@ -5,6 +5,7 @@ import { interface360Filters } from './filterConfigs.js';
 import ProjectBadge from './ProjectBadge.jsx';
 import PiiBadge from './PiiBadge.jsx';
 import { api } from './api.js';
+import EcosystemView from './InterfaceEcosystem.jsx';
 
 export default function Interface360({ t, selection }) {
   const [stats, setStats] = useState(null);
@@ -15,16 +16,58 @@ export default function Interface360({ t, selection }) {
   const [tableQ, setTableQ] = useState('');
   const [sel, setSel] = useState(null);
 
-  useEffect(() => { api.interfaceStats().then(setStats); api.interfaceFacets().then(setFacets); }, []);
+  // Fetch ONCE, unfiltered — all 800+ interfaces live in the client; every
+  // filter and the table search then operate over the full set.
   useEffect(() => {
-    const opts = {};
-    if (values.source_project_id?.length) opts.source_project_id = values.source_project_id[0];
-    if (values.target_project_id?.length) opts.target_project_id = values.target_project_id[0];
-    if (values.feed_type?.length) opts.feed_type = values.feed_type[0];
-    api.interfaces(opts).then(d => setRows(d.interfaces || []));
-  }, [values]);
+    api.interfaceStats().then(setStats);
+    api.interfaceFacets().then(setFacets);
+    api.interfaces().then(d => setRows(d.interfaces || []));
+  }, []);
 
-  const cfg = useMemo(() => interface360Filters(facets), [facets]);
+  // Generic client-side filtering: EVERY facet key the filter bar collects is
+  // applied (multi-select = OR within a facet, AND across facets). Previously
+  // only source_project_id / target_project_id / feed_type reached the API,
+  // and only their first value — every other selection was silently ignored.
+  const filtered = useMemo(() => rows.filter(r =>
+    Object.entries(values).every(([k, selVals]) =>
+      !selVals || selVals.length === 0 ||
+      selVals.includes(r[k]) ||
+      selVals.includes(String(r[k] ?? '')))
+  ), [rows, values]);
+
+  // Cascading facets: each dropdown only offers values that co-occur with the
+  // OTHER facets' current selections (classic faceted search — a facet never
+  // narrows itself, so multi-select within it stays possible). Options that
+  // would yield zero rows disappear; currently-selected values always remain
+  // so they can be unselected. Entry shape ({value}/{name}/{label}/string) and
+  // counts are preserved; facet keys that aren't row fields pass through.
+  const facetValue = (e) => (e && typeof e === 'object') ? (e.value ?? e.name ?? e.label) : e;
+  const dynamicFacets = useMemo(() => {
+    if (!rows.length) return facets;
+    const anySelected = Object.values(values).some(v => v && v.length);
+    if (!anySelected) return facets;
+    const out = { ...facets };
+    for (const [k, list] of Object.entries(facets)) {
+      if (!Array.isArray(list)) continue;
+      if (!rows.some(r => k in r)) continue;
+      const others = Object.entries(values)
+        .filter(([vk, selVals]) => vk !== k && selVals && selVals.length);
+      const base = rows.filter(r => others.every(([vk, selVals]) =>
+        selVals.includes(r[vk]) || selVals.includes(String(r[vk] ?? ''))));
+      const allowed = new Set();
+      base.forEach(r => { allowed.add(r[k]); allowed.add(String(r[k] ?? '')); });
+      (values[k] || []).forEach(v => allowed.add(v));
+      const counts = {};
+      base.forEach(r => { counts[r[k]] = (counts[r[k]] || 0) + 1; });
+      out[k] = list
+        .filter(e => allowed.has(facetValue(e)))
+        .map(e => (e && typeof e === 'object' && 'count' in e)
+          ? { ...e, count: counts[facetValue(e)] || 0 } : e);
+    }
+    return out;
+  }, [facets, rows, values]);
+
+  const cfg = useMemo(() => interface360Filters(dynamicFacets), [dynamicFacets]);
   const kpi = (n, l, tone) => (
     <div style={{ background: t.panel, border: `1px solid ${t.disabled}`, borderRadius: t.radius.md,
       padding: '15px 20px', minWidth: 120 }}>
@@ -47,7 +90,7 @@ export default function Interface360({ t, selection }) {
       </div>
 
       <div style={{ display: 'flex', gap: 2, marginBottom: 20, borderBottom: `1px solid ${t.disabled}` }}>
-        {['Table', 'Matrix', 'Routing Paths', 'Explorer'].map(v => (
+        {['Table', 'Matrix', 'Routing Paths', 'Explorer', 'Ecosystem'].map(v => (
           <button key={v} onClick={() => setView(v)} style={{
             background: 'none', border: 'none', fontFamily: t.font, fontSize: 13, fontWeight: 500,
             padding: '10px 18px', cursor: 'pointer', marginBottom: -1,
@@ -58,7 +101,7 @@ export default function Interface360({ t, selection }) {
 
       <GraphFilterBar moduleKey="interface360" required={cfg.required} optional={cfg.optional}
         values={values} onChange={setValues} onClear={() => setValues({})}
-        resultCount={rows.length} totalCount={stats?.interfaces || 0}
+        resultCount={filtered.length} totalCount={stats?.interfaces || rows.length}
         nodeCount={stats?.systems || 0} densityThreshold={cfg.densityThreshold}
         alternativeView={cfg.alternativeView} onSwitchView={setView} t={t} />
 
@@ -75,7 +118,7 @@ export default function Interface360({ t, selection }) {
             'Frequency', 'Migration', 'PII', 'Owner'].map((h, i) => (
             <th key={i} style={thStyle(t)}>{h}</th>))}</tr></thead>
           <tbody>
-            {rows.filter(r => {
+            {filtered.filter(r => {
               if (!tableQ.trim()) return true;
               const s = tableQ.toLowerCase();
               return [r.source_system, r.target_system, r.integration_name, r.update_owner,
@@ -102,9 +145,10 @@ export default function Interface360({ t, selection }) {
         </>
       )}
 
-      {view === 'Matrix' && <MatrixView t={t} rows={rows} />}
-      {view === 'Routing Paths' && <RoutingView t={t} rows={rows} />}
-      {view === 'Explorer' && <ExplorerView t={t} rows={rows} />}
+      {view === 'Matrix' && <MatrixView t={t} rows={filtered} />}
+      {view === 'Routing Paths' && <RoutingView t={t} rows={filtered} />}
+      {view === 'Explorer' && <ExplorerView t={t} rows={filtered} />}
+      {view === 'Ecosystem' && <EcosystemView t={t} rows={filtered} onSelect={setSel} />}
 
       {sel && <Drawer t={t} r={sel} onClose={() => setSel(null)} />}
     </div>
