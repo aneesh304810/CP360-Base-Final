@@ -171,6 +171,20 @@ ok(dl.lines.length >= 40 && dl.lines.every((l) => l.d && typeof l.lx === "number
 const sameGutter = dl.lines.filter((l) => l.pts.length >= 3);
 ok(sameGutter.length > 0 && new Set(sameGutter.map((l) => l.pts[1].y.toFixed(1) + "/" + l.pts[1].x.toFixed(1))).size === sameGutter.length, "lines sharing a gutter take distinct lanes");
 
+console.log("-- the map shapes itself to the space it is given");
+const wide = layout(bagg, { perZone: 8, floor: 2, expanded: null, width: 3200, height: 700 });
+const tall = layout(bagg, { perZone: 8, floor: 2, expanded: null, width: 1100, height: 1400 });
+const free = layout(bagg, { perZone: 8, floor: 2, expanded: null });
+const ratio = (l) => l.width / l.height;
+const closer = (l, w, h) => Math.abs(Math.log(ratio(l) / (w / h))) < Math.abs(Math.log(ratio(free) / (w / h)));
+ok(closer(wide, 3200, 700) && closer(tall, 1100, 1400) && ratio(tall) < ratio(wide), "each picture moves towards its panel's aspect: the tall panel gets a taller picture", [ratio(wide), ratio(free), ratio(tall)].map((x) => x.toFixed(2)));
+ok(Math.abs(Math.log(ratio(wide) / (3200 / 700))) < Math.abs(Math.log(ratio(free) / (3200 / 700))), "the wide picture is closer to the panel's aspect than the free one");
+ok(tall.zones.filter((z) => z.open).some((z) => z.cols < free.zones.find((f) => f.name === z.name).cols) || tall.vy > 1, "a tall panel uses fewer columns or spreads the rows apart", [tall.zones.map((z) => z.cols), tall.vy]);
+ok(wide.vx >= 1 && wide.vy >= 1 && wide.gapY >= 48 && wide.gapX >= 46, "gaps only ever grow, never shrink below their base", [wide.gapX, wide.gapY]);
+ok(audit(wide).length === 0 && audit(tall).length === 0, "routed lines still cross no box after reshaping", [...audit(wide), ...audit(tall)].slice(0, 4));
+const tiny = layout(aggregate(rows), { perZone: 8, floor: 1, expanded: null, width: 1800, height: 900 });
+ok(tiny.vy > 1 && tiny.height > free.rowH * 0 && audit(tiny).length === 0, "a small estate on a big panel spreads out rather than huddling in a corner", [tiny.vx, tiny.vy, tiny.width, tiny.height]);
+
 console.log("-- the landing renders with counted flows and an invitation");
 const lhtml = renderToStaticMarkup(<EcosystemView t={tLight} rows={rows} />);
 ok(/zone-to-zone flows/.test(lhtml) && /click a zone to open it/.test(lhtml), "the header says it is the landing");

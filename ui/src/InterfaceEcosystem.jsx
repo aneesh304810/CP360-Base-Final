@@ -25,10 +25,10 @@
 // else is a box in a grid. Width is the interface count, dashed means
 // every interface on the line is marked Replace, red means PII rides it.
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { projColor, projLabel } from "./bbhTheme.js";
 
-const BOX_W = 150, BOX_H = 40, GAP_X = 46, GAP_Y = 48, ZONE_PAD = 24, ZONE_HEAD = 34, ZONE_GAP = 76;
+const BOX_W = 150, BOX_H = 40, GAP_X = 46, GAP_Y = 48, ZONE_PAD = 24, ZONE_HEAD = 48, ZONE_GAP = 76;
 const BUS = 44;                     // a routing bus under the zones for links between non-adjacent zones
 const LANE = 6;                     // spacing between parallel lines in one gutter
 const MIN_ROW_H = 290;
@@ -89,7 +89,7 @@ export function autoFloor(links, want = 40) {
 }
 
 /* systems + links -> zones with positions, folded where asked. */
-export function layout(agg, { perZone = 8, floor = 1, unfolded = new Set(), expanded = null, width = 1400 } = {}) {
+export function layout(agg, { perZone = 8, floor = 1, unfolded = new Set(), expanded = null, width = 1400, height = null } = {}) {
   const byZone = new Map();
   agg.systems.forEach((s) => { (byZone.get(s.zone) || byZone.set(s.zone, []).get(s.zone)).push(s); });
   // expanded = null means every zone is open (the system map); a Set means
@@ -128,54 +128,92 @@ export function layout(agg, { perZone = 8, floor = 1, unfolded = new Set(), expa
   const shown = allLines.filter((l) => l.n >= floor);
 
   // geometry: every zone in one row across the width; closed zones are
-  // cards as tall as the row, open zones a grid of boxes
-  const nodes = new Map();
+  // cards as tall as the row, open zones a grid of boxes. The grid shapes
+  // itself to the space it is given: columns per zone and the gaps are
+  // chosen so the picture's aspect ratio comes close to the panel's.
   const opens = zones.filter((z) => z.open);
-  opens.forEach((z) => {
+  const colsFor = (z) => {
     const apps = z.kept.filter((s) => !s.store), stores = z.kept.filter((s) => s.store);
-    const items = apps.length + (z.folded.length ? 1 : 0);
-    z.cols = Math.max(1, Math.min(4, Math.ceil(Math.sqrt(Math.max(items, stores.length)))));
-    z.appRows = Math.ceil(items / z.cols); z.storeRows = Math.ceil(stores.length / z.cols);
-    z.w = ZONE_PAD * 2 + z.cols * BOX_W + (z.cols - 1) * GAP_X;
-    z.h = ZONE_HEAD + ZONE_PAD + (z.appRows + z.storeRows) * (BOX_H + GAP_Y) + (z.storeRows ? 12 : 0) + ZONE_PAD;
-  });
-  const rowH = Math.max(MIN_ROW_H, ...opens.map((z) => z.h));
-  let x = 0;
-  zones.forEach((z, zi) => {
-    z.zi = zi; z.x = x; z.y = 0;
-    if (!z.open) {
-      z.w = ZBOX_W; z.h = rowH;
-      nodes.set(ZONE(z.name), { key: ZONE(z.name), id: z.name, zoneBox: true, zone: z.name, zoneName: z.name, zi,
-        proj: z.folded[0]?.proj || "other", n: z.total, in: 0, out: 0, pii: z.pii, mig: z.mig,
-        systems: z.systems, stores: z.stores, internal: internal[ZONE(z.name)] || 0, top: z.folded.slice(0, 5),
-        x: z.x, y: z.y, w: z.w, h: z.h });
-      x += z.w + ZONE_GAP;
-      return;
-    }
-    z.h = rowH;
-    const apps = z.kept.filter((s) => !s.store), stores = z.kept.filter((s) => s.store);
-    z.colsX = Array.from({ length: z.cols }, (_, c) => z.x + ZONE_PAD + c * (BOX_W + GAP_X));
-    z.rowsY = Array.from({ length: z.appRows + z.storeRows }, (_, r) => z.y + ZONE_HEAD + ZONE_PAD + r * (BOX_H + GAP_Y) + (r >= z.appRows && z.storeRows ? 12 : 0));
-    const place = (list, startRow) => list.forEach((s, i) => {
-      s.col = i % z.cols; s.row = startRow + Math.floor(i / z.cols); s.zi = zi;
-      s.x = z.colsX[s.col]; s.y = z.rowsY[s.row]; s.w = BOX_W; s.h = BOX_H;
-      s.zoneName = z.name;
-      nodes.set(s.key, s);
+    z.items = apps.length + (z.folded.length ? 1 : 0); z.storeN = stores.length;
+    return Math.max(1, Math.min(4, Math.ceil(Math.sqrt(Math.max(z.items, z.storeN)))));
+  };
+  opens.forEach((z) => { z.cols = colsFor(z); });
+  const build = (vx, vy) => {
+    const gapX = GAP_X * vx, gapY = GAP_Y * vy, zoneGap = ZONE_GAP * vx, busH = BUS * vy;
+    const nodes = new Map();
+    opens.forEach((z) => {
+      z.appRows = Math.ceil(z.items / z.cols); z.storeRows = Math.ceil(z.storeN / z.cols);
+      z.w = ZONE_PAD * 2 + z.cols * BOX_W + (z.cols - 1) * gapX;
+      z.h = ZONE_HEAD + ZONE_PAD + (z.appRows + z.storeRows) * (BOX_H + gapY) + (z.storeRows ? 12 : 0) + ZONE_PAD;
     });
-    const appList = [...apps];
-    if (z.folded.length) {
-      appList.push({ key: FOLD(z.name), id: `+${z.folded.length} other systems`, fold: true, zone: z.name,
-        proj: z.folded[0].proj, n: z.folded.reduce((a, s) => a + s.n, 0), in: 0, out: 0,
-        pii: z.folded.reduce((a, s) => a + s.pii, 0), mig: 0, folded: z.folded });
+    const rowH = Math.max(MIN_ROW_H, ...opens.map((z) => z.h));
+    let x = 0;
+    zones.forEach((z, zi) => {
+      z.zi = zi; z.x = x; z.y = 0; z.h = rowH;
+      if (!z.open) {
+        z.w = ZBOX_W;
+        nodes.set(ZONE(z.name), { key: ZONE(z.name), id: z.name, zoneBox: true, zone: z.name, zoneName: z.name, zi,
+          proj: z.folded[0]?.proj || "other", n: z.total, in: 0, out: 0, pii: z.pii, mig: z.mig,
+          systems: z.systems, stores: z.stores, internal: internal[ZONE(z.name)] || 0, top: z.folded.slice(0, 5),
+          x: z.x, y: z.y, w: z.w, h: z.h });
+        x += z.w + zoneGap;
+        return;
+      }
+      const apps = z.kept.filter((s) => !s.store), stores = z.kept.filter((s) => s.store);
+      z.colsX = Array.from({ length: z.cols }, (_, c) => z.x + ZONE_PAD + c * (BOX_W + gapX));
+      z.rowsY = Array.from({ length: z.appRows + z.storeRows }, (_, r) => z.y + ZONE_HEAD + ZONE_PAD + r * (BOX_H + gapY) + (r >= z.appRows && z.storeRows ? 12 : 0));
+      const place = (list, startRow) => list.forEach((s, i) => {   // placed copies: the systems themselves stay untouched
+        const col = i % z.cols, row = startRow + Math.floor(i / z.cols);
+        nodes.set(s.key, { ...s, col, row, zi, x: z.colsX[col], y: z.rowsY[row], w: BOX_W, h: BOX_H, zoneName: z.name });
+      });
+      const appList = [...apps];
+      if (z.folded.length) {
+        appList.push({ key: FOLD(z.name), id: `+${z.folded.length} other systems`, fold: true, zone: z.name,
+          proj: z.folded[0].proj, n: z.folded.reduce((a, s) => a + s.n, 0), in: 0, out: 0,
+          pii: z.folded.reduce((a, s) => a + s.pii, 0), mig: 0, folded: z.folded });
+      }
+      place(appList, 0);
+      place(stores, z.appRows);
+      x += z.w + zoneGap;
+    });
+    return { zones, nodes, lines: shown, allLines, internal, width: Math.max(x - zoneGap, 320), height: rowH + busH + 6,
+             rowH, busY: rowH + busH / 2, gapX, gapY, zoneGap, busH, vx, vy,
+             shownCount: shown.length, lineCount: allLines.length, hidden: allLines.length - shown.length,
+             landing: expanded !== null && expanded.size === 0 };
+  };
+  let lay = build(1, 1);
+  if (height && width && opens.length) {
+    // Fill the panel: first spread the rows apart (more lane room, airier
+    // picture); only if the picture is still much wider than the panel,
+    // take a column off the widest zone, never below two. If instead the
+    // picture is taller than the panel, widen the gaps and add columns.
+    const aspect = width / height, ratio = (l) => l.width / l.height;
+    const stretch = () => {
+      let vx = 1, vy = 1;
+      for (let i = 0; i < 40; i++) {
+        const r = ratio(lay);
+        if (r > aspect * 1.03 && vy < 2.4) vy += 0.08;
+        else if (r < aspect / 1.03 && vx < 1.5) vx += 0.08;
+        else break;
+        lay = build(vx, vy);
+      }
+    };
+    for (let attempt = 0; attempt < 6; attempt++) {
+      stretch();
+      const r = ratio(lay);
+      if (r > aspect * 1.15) {
+        const z = opens.filter((o) => o.cols > 2).sort((a, b) => b.w - a.w)[0];
+        if (!z) break; z.cols -= 1;
+      } else if (r < aspect / 1.15) {
+        const z = opens.filter((o) => o.cols < Math.min(4, Math.max(o.items, o.storeN))).sort((a, b) => (b.appRows + b.storeRows) - (a.appRows + a.storeRows))[0];
+        if (!z) break; z.cols += 1;
+      } else break;
+      lay = build(1, 1);
     }
-    place(appList, 0);
-    place(stores, z.appRows);
-    x += z.w + ZONE_GAP;
-  });
-  const lay = { zones, nodes, lines: shown, allLines, internal, width: Math.max(x - ZONE_GAP, 320), height: rowH + BUS + 6,
-                rowH, busY: rowH + BUS / 2,
-                shownCount: shown.length, lineCount: allLines.length, hidden: allLines.length - shown.length,
-                landing: expanded !== null && expanded.size === 0 };
+  }
+  // a tall closed card has room for more of its busiest systems
+  const topN = Math.max(5, Math.min(12, Math.floor((lay.rowH - 210) / 20)));
+  lay.nodes.forEach((n) => { if (n.zoneBox) n.top = lay.zones[n.zi].folded.slice(0, topN); });
   routeLines(lay);
   return lay;
 }
@@ -210,16 +248,16 @@ export function routeLines(lay) {
   const G = (id, base, cap) => { if (!gutters.has(id)) gutters.set(id, { base, cap, users: [] }); return id; };
   const hg = (z, r) => {                               // the gap below row r (-1: above row 0)
     const ys = z.rowsY, last = ys.length - 1;
-    const y = r < 0 ? ys[0] - GAP_Y / 2 : r >= last ? ys[last] + BOX_H + GAP_Y / 2 : (ys[r] + BOX_H + ys[r + 1]) / 2;
-    return G(`h:${z.zi}:${r}`, y, GAP_Y);
+    const y = r < 0 ? ys[0] - lay.gapY / 2 : r >= last ? ys[last] + BOX_H + lay.gapY / 2 : (ys[r] + BOX_H + ys[r + 1]) / 2;
+    return G(`h:${z.zi}:${r}`, y, lay.gapY);
   };
   const vg = (z, c) => {                               // the gap right of column c (-1: left of column 0)
     const xs = z.colsX;
-    const xx = c < 0 ? xs[0] - GAP_X / 2 : xs[c] + BOX_W + GAP_X / 2;
-    return G(`v:${z.zi}:${c}`, xx, GAP_X);
+    const xx = c < 0 ? xs[0] - lay.gapX / 2 : xs[c] + BOX_W + lay.gapX / 2;
+    return G(`v:${z.zi}:${c}`, xx, lay.gapX);
   };
-  const zg = (i) => G(`z:${i}`, zones[i].x + zones[i].w + ZONE_GAP / 2, ZONE_GAP);   // between zone i and i+1
-  const bus = () => G("bus", lay.busY, BUS);
+  const zg = (i) => G(`z:${i}`, zones[i].x + zones[i].w + lay.zoneGap / 2, lay.zoneGap);   // between zone i and i+1
+  const bus = () => G("bus", lay.busY, lay.busH);
   const edge = (n, side) => {
     const along = side === "top" || side === "bottom";
     return G(`e:${n.key}:${side}`, along ? n.x + n.w / 2 : n.y + n.h / 2, along ? n.w : n.h);
@@ -306,7 +344,7 @@ export function routeLines(lay) {
       const len = Math.abs(pts[i].x - pts[i - 1].x) + Math.abs(pts[i].y - pts[i - 1].y);
       if (len > best) { best = len; bi = i; }
     }
-    r.l.lx = (pts[bi].x + pts[bi - 1].x) / 2; r.l.ly = (pts[bi].y + pts[bi - 1].y) / 2;
+    r.l.lx = (pts[bi].x + pts[bi - 1].x) / 2; r.l.ly = (pts[bi].y + pts[bi - 1].y) / 2; r.l.run = best;
     r.l.vertical = Math.abs(pts[bi].x - pts[bi - 1].x) < 0.01;
   });
   return lay;
@@ -456,6 +494,9 @@ function Landing({ t, lay, edge, setEdge, openZone, setExpanded }) {
     </div>);
 }
 
+const zoneCount = (agg) => new Set(agg.systems.map((x) => x.zone)).size;
+const landingKey = (agg, expanded, n) => (n <= 1 ? "all" : expanded === null ? "all" : [...expanded].sort().join("|"));
+
 // defaultOpen: start with every zone open (the system map) instead of the landing.
 export default function EcosystemView({ t, rows, onSelect, defaultOpen = false }) {
   const agg = useMemo(() => aggregate(rows), [rows]);
@@ -467,16 +508,43 @@ export default function EcosystemView({ t, rows, onSelect, defaultOpen = false }
   const [expanded, setExpanded] = useState(() => (defaultOpen ? null : new Set()));
   const [focus, setFocus] = useState(null);
   const [edge, setEdge] = useState(null);
-  const zoneCount = useMemo(() => new Set(agg.systems.map((x) => x.zone)).size, [agg]);
+  const [full, setFull] = useState(false);
+  // the map shapes itself to the space it is given: measure the panel
+  const panelRef = useRef(null);
+  const [space, setSpace] = useState({ w: 0, h: 0 });
+  useLayoutEffect(() => {
+    const el = panelRef.current;
+    if (!el || typeof window === "undefined") return undefined;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      const h = full ? window.innerHeight - r.top - 16 : Math.max(480, window.innerHeight - r.top - 28);
+      const w = Math.max(320, r.width);
+      setSpace((s) => (Math.abs(s.w - w) < 2 && Math.abs(s.h - h) < 2 ? s : { w, h }));
+    };
+    measure();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    if (ro) ro.observe(el);
+    window.addEventListener("resize", measure);
+    return () => { if (ro) ro.disconnect(); window.removeEventListener("resize", measure); };
+  }, [full, landingKey(agg, expanded, zoneCount(agg))]);
+  useEffect(() => {
+    if (!full || typeof window === "undefined") return undefined;
+    const onKey = (e) => { if (e.key === "Escape") setFull(false); };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow; document.body.style.overflow = "hidden";
+    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
+  }, [full]);
+  const zoneCountN = useMemo(() => zoneCount(agg), [agg]);
   // one zone only: there is nothing to land on, go straight to the systems
-  const exp = zoneCount <= 1 ? null : expanded;
+  const exp = zoneCountN <= 1 ? null : expanded;
   const landing = exp !== null && exp.size === 0;
   // the floor picks itself from the lines this zone state can draw, not from raw system pairs
-  const base = useMemo(() => layout(agg, { perZone, floor: 1, unfolded, expanded: exp }), [agg, perZone, unfolded, exp]);
+  const sizing = { width: space.w || 1400, height: landing ? null : (space.h || null) };
+  const base = useMemo(() => layout(agg, { perZone, floor: 1, unfolded, expanded: exp, ...sizing }), [agg, perZone, unfolded, exp, sizing.width, sizing.height]);
   const auto = landing ? 1 : autoFloor(base.allLines);
   const floor = floorPick ?? auto;
-  const lay = useMemo(() => (floor === 1 ? base : layout(agg, { perZone, floor, unfolded, expanded: exp })),
-    [agg, base, perZone, floor, unfolded, exp]);
+  const lay = useMemo(() => (floor === 1 ? base : layout(agg, { perZone, floor, unfolded, expanded: exp, ...sizing })),
+    [agg, base, perZone, floor, unfolded, exp, sizing.width, sizing.height]);
   const openZone = (name) => { const e = new Set(expanded); e.add(name); setExpanded(e); setFocus(null); setEdge(null); };
   const closeZone = (name) => { const e = new Set(expanded); e.delete(name); setExpanded(e); setFocus(null); setEdge(null); };
   const showLabels = lay.lines.length <= 40;
@@ -491,7 +559,7 @@ export default function EcosystemView({ t, rows, onSelect, defaultOpen = false }
     return <div style={{ padding: 24, color: t.textMuted, fontSize: 13 }}>No interfaces match the current filters.</div>;
   }
   return (
-    <div>
+    <div style={full ? { position: "fixed", inset: 0, zIndex: 1000, background: t.bg, padding: "14px 18px", overflow: "auto", fontFamily: t.font } : undefined}>
       <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", fontSize: 11.5, color: t.sub, marginBottom: 10 }}>
         <span><b style={{ color: t.navy }}>{agg.systems.length}</b> systems in <b style={{ color: t.navy }}>{lay.zones.length}</b> zones ·{" "}
           {landing ? <><b style={{ color: t.navy }}>{lay.lineCount}</b> zone-to-zone flows</>
@@ -521,12 +589,16 @@ export default function EcosystemView({ t, rows, onSelect, defaultOpen = false }
           : "cylinder = data store · line width = interfaces · dashed = all Replace · red = carries PII"}</span>
         {(focus || edge) && <span onClick={() => { setFocus(null); setEdge(null); }} role="button" tabIndex={0}
           style={{ cursor: "pointer", color: t.accent, fontWeight: 700 }}>clear ✕</span>}
+        {!landing && <span onClick={() => setFull(!full)} role="button" tabIndex={0} title={full ? "exit full screen (Esc)" : "full screen"}
+          style={{ cursor: "pointer", color: t.accent, fontWeight: 700, border: `1px solid ${t.disabled}`, borderRadius: 4, padding: "3px 10px", background: "#fff" }}>
+          {full ? "exit full screen ✕" : "full screen ⛶"}</span>}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: sel || focus ? "1fr 320px" : "1fr", gap: 14 }}>
         {landing ? <Landing t={t} lay={lay} edge={edge} setEdge={setEdge} openZone={openZone}
                      setExpanded={(e) => { setExpanded(e); setFocus(null); setEdge(null); }} />
-        : <div style={{ background: t.panel, border: `1px solid ${t.disabled}`, borderRadius: t.radius.md, overflow: "auto" }}>
-          <svg viewBox={`0 0 ${lay.width} ${lay.height}`} width="100%" style={{ minWidth: 900, display: "block", maxHeight: "82vh" }} fontFamily={t.font}>
+        : <div ref={panelRef} style={{ background: t.panel, border: `1px solid ${t.disabled}`, borderRadius: t.radius.md, overflow: "hidden" }}>
+          <svg viewBox={`0 0 ${lay.width} ${lay.height}`} width="100%" height={space.h || undefined} preserveAspectRatio="xMidYMin meet"
+            style={{ display: "block" }} fontFamily={t.font}>
             <defs>
               <marker id="eco-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9"
                 markerUnits="userSpaceOnUse" orient="auto-start-reverse">
@@ -537,7 +609,7 @@ export default function EcosystemView({ t, rows, onSelect, defaultOpen = false }
                 <rect x={z.x} y={z.y} width={z.w} height={z.h} rx={8} fill="#f6f8fa" stroke="#d6dee6" />
                 <text x={z.x + ZONE_PAD} y={z.y + 22} fontSize="13" fontWeight="800" fill={t.navy} letterSpacing=".3">
                   {z.name}</text>
-                <text x={z.x + z.w - ZONE_PAD} y={z.y + 22} fontSize="10" fill={t.textMuted} textAnchor="end">
+                <text x={z.w < 520 ? z.x + ZONE_PAD : z.x + z.w - ZONE_PAD} y={z.w < 520 ? z.y + 38 : z.y + 22} fontSize="10" fill={t.textMuted} textAnchor={z.w < 520 ? "start" : "end"}>
                   {z.kept.length + z.folded.length} systems · {z.total} interface ends
                   {exp !== null && <tspan fill={t.accent} fontWeight="700" onClick={() => closeZone(z.name)} style={{ cursor: "pointer" }}>  · close ✕</tspan>}</text>
               </g>))}
@@ -555,11 +627,13 @@ export default function EcosystemView({ t, rows, onSelect, defaultOpen = false }
                     strokeDasharray={l.mig === l.n ? "6,4" : "none"} markerEnd="url(#eco-arrow)">
                     <title>{`${nameOf(l.from)} → ${nameOf(l.to)}: ${l.n} interface${l.n === 1 ? "" : "s"}${l.pairs > 1 ? ` across ${l.pairs} pairs` : ""}${l.pii ? ` · ${l.pii} PII` : ""}${l.mig ? ` · ${l.mig} Replace` : ""}`}</title>
                   </path>
-                  {showLabels && on && (
+                  {showLabels && on && (l.run >= lw + 12 ? (
                     <g>
                       <rect x={l.lx - lw / 2} y={l.ly - 7.5} width={lw} height={15} rx={7} fill="#fff" stroke={c} strokeWidth={0.8} strokeOpacity={0.7} />
                       <text x={l.lx} y={l.ly + 3.5} fontSize="9.5" fontWeight="700" fill={t.navy} textAnchor="middle">{label}</text>
-                    </g>)}
+                    </g>) : (
+                    <text x={l.lx} y={l.ly + 3.5} fontSize="9" fontWeight="700" fill={t.navy} textAnchor="middle"
+                      stroke="#fff" strokeWidth={3} paintOrder="stroke" strokeLinejoin="round">{label}</text>))}
                 </g>);
             })}
             {[...lay.nodes.values()].filter((n) => n.zoneBox).map((n) => {
