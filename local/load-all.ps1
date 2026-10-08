@@ -106,6 +106,17 @@ $env:CP_SEI_LINEAGE_MODE = "load"
 # ---- ENVIRONMENT 360 -------------------------------------------------
 $env:CP_ENV_WORKBOOK = "$Artifacts\INFRAINVENTORY\cp_env_infrastructure_v3.csv"
 
+# ---- ADDVANTAGE UD FIELDS --------------------------------------------
+# One folder holds every source: the DIM_ACCOUNT_UD extract csv, the UD
+# metadata workbook, the TRP samples workbook, and the profiler's csvs
+# (loose or in a profile\ sub-folder). Files are recognised by content, so
+# names may vary between drops. NOT under sample-artifacts: these carry
+# account numbers and names, and local-data\ is in .gitignore.
+# Step `advantage_ud` (in the full run) loads them in dependency order and
+# skips quietly when the folder is empty. Tables: sql\75, 76, 77.
+$env:CP_ADDV_UD_DIR = Join-Path $Root "local-data\advantage-ud"
+# $env:CP_ADDV_UD_CHUNK = "2000"   # extract rows per batch
+
 # ---- EVENT 360 -------------------------------------------------------
 # Three steps, three sources, kept apart on purpose:
 #   event360           the CONTRACT      -- what SEI says an event is

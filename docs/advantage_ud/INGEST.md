@@ -38,6 +38,10 @@ then runs the five sub-steps below in order, skipping any whose source is
 not in the folder and stopping at the first failure. Each sub-step can also
 be run on its own (`.\local\load.ps1 advantage_ud_extract`).
 
+`local\load-all.ps1` sets the same variable and its full run includes the
+`advantage_ud` step, which skips quietly when the folder is empty, so the
+nightly full load picks the drop up with no further change.
+
 One variable: `CP_ADDV_UD_DIR`. The per-file variables (`CP_ADDV_UD_EXTRACT`,
 `CP_ADDV_UD_WORKBOOK`, `CP_ADDV_UD_TRP`, `CP_ADDV_UD_PROFILE_DIR`,
 `CP_ADDV_UD_CODES`) exist only to point at a file somewhere else.

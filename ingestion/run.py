@@ -36,12 +36,9 @@ STEPS = [
     "legacy_lineage",    # legacy DWH end-to-end lineage (SRC->STG1->STG2->DWH) + proof
     "legacy_dictionary", # legacy business definitions (AddVantage/CRD/STAR) keyed by field code
     "legacy_source_file",# CP_SOURCE_FILE: the business name of each AddVantage EOD feed
-    "advantage_ud_dictionary", # the code values each AddVantage UD field carries (sql/75)
-    "advantage_ud_profile",    # the UD registry, parents, families, conflicts (sql/76)
-    "advantage_ud_extract",    # dataVar.csv -> raw, attribute, quarantine (sql/77)
-    "advantage_ud_workbook",   # the UD metadata workbook: tables, field types, links (sql/77)
-    "advantage_ud_trp",        # TRP samples vs the extract, counts only (sql/77)
-    "advantage_ud",            # all of the above from one folder (CP_ADDV_UD_DIR), in order
+    "advantage_ud",            # AddVantage UD: every source in CP_ADDV_UD_DIR, in order (sql/75-77).
+                               # The sub-steps advantage_ud_profile / _dictionary / _extract /
+                               # _workbook / _trp run by name only, so a full run loads each once.
     "sei_crosswalk",     # IMDS/STAR/UAF/SEI crosswalk workbook — lanes, mapping, verdicts
     "event360",          # Event 360: the SEI event specification workbook
     "sdc_compute",       # SDC client compute sizing: the read-back bill, per view
@@ -273,7 +270,10 @@ def _run_step(step, conn, loader, resolver) -> None:
         r = resolve()
         log.info("advantage_ud: sources\n%s", describe(r))
         if not any((r["extract"], r["workbook"], r["trp"], r["profile"])):
-            raise FileNotFoundError(f"advantage_ud: nothing recognised in {r['dir']} (set CP_ADDV_UD_DIR)")
+            # A machine without the drop is the normal case for a full run;
+            # a warning says so, a failure would read as a broken step.
+            log.warning("advantage_ud: nothing recognised in %s (set CP_ADDV_UD_DIR); skipped", r["dir"])
+            return
         try:
             from tools.advantage_ud_discovery import inventory
             out = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
