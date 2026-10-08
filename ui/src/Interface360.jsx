@@ -12,7 +12,7 @@ export default function Interface360({ t, selection }) {
   const [rows, setRows] = useState([]);
   const [facets, setFacets] = useState({});
   const [values, setValues] = useState({});
-  const [view, setView] = useState('Table');
+  const [view, setView] = useState('Overview');
   const [tableQ, setTableQ] = useState('');
   const [sel, setSel] = useState(null);
 
@@ -90,7 +90,7 @@ export default function Interface360({ t, selection }) {
       </div>
 
       <div style={{ display: 'flex', gap: 2, marginBottom: 20, borderBottom: `1px solid ${t.disabled}` }}>
-        {['Table', 'Matrix', 'Routing Paths', 'Explorer', 'Ecosystem'].map(v => (
+        {['Overview', 'Table', 'Matrix', 'Routing Paths', 'Explorer'].map(v => (
           <button key={v} onClick={() => setView(v)} style={{
             background: 'none', border: 'none', fontFamily: t.font, fontSize: 13, fontWeight: 500,
             padding: '10px 18px', cursor: 'pointer', marginBottom: -1,
@@ -148,7 +148,7 @@ export default function Interface360({ t, selection }) {
       {view === 'Matrix' && <MatrixView t={t} rows={filtered} />}
       {view === 'Routing Paths' && <RoutingView t={t} rows={filtered} />}
       {view === 'Explorer' && <ExplorerView t={t} rows={filtered} />}
-      {view === 'Ecosystem' && <EcosystemView t={t} rows={filtered} onSelect={setSel} />}
+      {view === 'Overview' && <EcosystemView t={t} rows={filtered} onSelect={setSel} />}
 
       {sel && <Drawer t={t} r={sel} onClose={() => setSel(null)} />}
     </div>

@@ -31,6 +31,8 @@ import { projColor, projLabel } from "./bbhTheme.js";
 const BOX_W = 150, BOX_H = 40, GAP_X = 26, GAP_Y = 30, ZONE_PAD = 18, ZONE_HEAD = 30, ZONE_GAP = 28;
 const STORE_RE = /warehouse|data\s*mart|datamart|\bdwh?\b|\bdm\b|database|\bdb\b|\blake\b|\bmart\b|\bods\b/i;
 const FOLD = (zone) => `__fold__${zone}`;
+const ZONE = (zone) => `__zone__${zone}`;
+const ZBOX_W = 230, ZBOX_H = 72;
 
 export const canonName = (s) => String(s || "Unknown").trim().replace(/\s+/g, " ").toLowerCase();
 export const isStore = (name) => STORE_RE.test(name || "");
@@ -84,24 +86,34 @@ export function autoFloor(links, want = 60) {
 }
 
 /* systems + links -> zones with positions, folded where asked. */
-export function layout(agg, { perZone = 8, floor = 1, unfolded = new Set(), width = 1400 } = {}) {
+export function layout(agg, { perZone = 8, floor = 1, unfolded = new Set(), expanded = null, width = 1400 } = {}) {
   const byZone = new Map();
   agg.systems.forEach((s) => { (byZone.get(s.zone) || byZone.set(s.zone, []).get(s.zone)).push(s); });
+  // expanded = null means every zone is open (the system map); a Set means
+  // only those zones are open and every other zone is one box (the landing).
   const zones = [...byZone.entries()].map(([name, list]) => {
     list.sort((a, b) => b.n - a.n || a.id.localeCompare(b.id));
+    const open = expanded === null || expanded.has(name);
     const keepAll = unfolded.has(name) || list.length <= perZone + 1;
-    const kept = keepAll ? list : list.slice(0, perZone);
-    const folded = keepAll ? [] : list.slice(perZone);
-    return { name, kept, folded, total: list.reduce((s, x) => s + x.n, 0) };
+    const kept = !open ? [] : keepAll ? list : list.slice(0, perZone);
+    const folded = !open ? list : keepAll ? [] : list.slice(perZone);
+    return { name, open, kept, folded, systems: list.length,
+             total: list.reduce((s, x) => s + x.n, 0),
+             pii: list.reduce((s, x) => s + x.pii, 0), mig: list.reduce((s, x) => s + x.mig, 0),
+             stores: list.filter((x) => x.store).length };
   }).sort((a, b) => b.total - a.total);
 
-  // re-point links at fold nodes
+  // re-point links at fold nodes (a closed zone folds everything into its own box)
   const foldOf = new Map();
-  zones.forEach((z) => z.folded.forEach((s) => foldOf.set(s.key, FOLD(z.name))));
+  zones.forEach((z) => z.folded.forEach((s) => foldOf.set(s.key, z.open ? FOLD(z.name) : ZONE(z.name))));
   const lines = new Map();
+  const internal = {};                                 // interfaces that stay inside a closed zone
   agg.links.forEach((l) => {
     const f = foldOf.get(l.from) || l.from, t = foldOf.get(l.to) || l.to;
-    if (f === t) return;                               // inside one fold: nothing to draw
+    if (f === t) {                                     // inside one fold: counted, not drawn
+      internal[f] = (internal[f] || 0) + l.n;
+      return;
+    }
     const k = `${f}|${t}`;
     const e = lines.get(k) || { key: k, from: f, to: t, n: 0, pii: 0, mig: 0, types: {}, rows: [], pairs: 0 };
     e.n += l.n; e.pii += l.pii; e.mig += l.mig; e.pairs += 1;
@@ -116,6 +128,17 @@ export function layout(agg, { perZone = 8, floor = 1, unfolded = new Set(), widt
   const nodes = new Map();
   let x = 0, y = 0, rowH = 0;
   zones.forEach((z) => {
+    if (!z.open) {                                      // the zone is one box
+      const w = ZBOX_W + ZONE_PAD * 2, h = ZBOX_H + ZONE_PAD * 2;
+      if (x + w > width && x > 0) { x = 0; y += rowH + ZONE_GAP; rowH = 0; }
+      z.x = x; z.y = y; z.w = w; z.h = h;
+      nodes.set(ZONE(z.name), { key: ZONE(z.name), id: z.name, zoneBox: true, zone: z.name, zoneName: z.name,
+        proj: z.folded[0]?.proj || "other", n: z.total, in: 0, out: 0, pii: z.pii, mig: z.mig,
+        systems: z.systems, stores: z.stores, internal: internal[ZONE(z.name)] || 0,
+        x: z.x + ZONE_PAD, y: z.y + ZONE_PAD, w: ZBOX_W, h: ZBOX_H });
+      x += w + ZONE_GAP; rowH = Math.max(rowH, h);
+      return;
+    }
     const apps = z.kept.filter((s) => !s.store), stores = z.kept.filter((s) => s.store);
     const items = apps.length + (z.folded.length ? 1 : 0);
     const cols = Math.max(1, Math.min(4, Math.ceil(Math.sqrt(Math.max(items, stores.length)))));
@@ -141,22 +164,39 @@ export function layout(agg, { perZone = 8, floor = 1, unfolded = new Set(), widt
     place(stores, appRows);
     x += w + ZONE_GAP; rowH = Math.max(rowH, h);
   });
-  return { zones, nodes, lines: shown, allLines, width: Math.max(width, 320), height: y + rowH + 10,
-           shownCount: shown.length, lineCount: allLines.length, hidden: allLines.length - shown.length };
+  return { zones, nodes, lines: shown, allLines, internal, width: Math.max(width, 320), height: y + rowH + 10,
+           shownCount: shown.length, lineCount: allLines.length, hidden: allLines.length - shown.length,
+           landing: expanded !== null && expanded.size === 0 };
 }
 
+const dims = (n) => ({ w: n.w || BOX_W, h: n.h || BOX_H });
+const bez = (p0, p1, p2, p3, t) => ({
+  x: (1 - t) ** 3 * p0.x + 3 * (1 - t) ** 2 * t * p1.x + 3 * (1 - t) * t ** 2 * p2.x + t ** 3 * p3.x,
+  y: (1 - t) ** 3 * p0.y + 3 * (1 - t) ** 2 * t * p1.y + 3 * (1 - t) * t ** 2 * p2.y + t ** 3 * p3.y,
+});
+/* a curve from the side of a that faces b to the side of b that faces a,
+   and its midpoint for a label */
 const anchor = (a, b) => {
-  // leave from the side that faces the other box
-  const ax = a.x + BOX_W / 2, ay = a.y + BOX_H / 2, bx = b.x + BOX_W / 2, by = b.y + BOX_H / 2;
+  const da = dims(a), db = dims(b);
+  const ax = a.x + da.w / 2, ay = a.y + da.h / 2, bx = b.x + db.w / 2, by = b.y + db.h / 2;
   const dx = bx - ax, dy = by - ay;
+  let p0, p1, p2, p3;
   if (Math.abs(dx) > Math.abs(dy)) {
-    const p1 = { x: dx > 0 ? a.x + BOX_W : a.x, y: ay }, p2 = { x: dx > 0 ? b.x : b.x + BOX_W, y: by };
-    const mx = (p1.x + p2.x) / 2;
-    return `M ${p1.x} ${p1.y} C ${mx} ${p1.y}, ${mx} ${p2.y}, ${p2.x} ${p2.y}`;
+    p0 = { x: dx > 0 ? a.x + da.w : a.x, y: ay }; p3 = { x: dx > 0 ? b.x : b.x + db.w, y: by };
+    const mx = (p0.x + p3.x) / 2;
+    p1 = { x: mx, y: p0.y }; p2 = { x: mx, y: p3.y };
+  } else {
+    p0 = { x: ax, y: dy > 0 ? a.y + da.h : a.y }; p3 = { x: bx, y: dy > 0 ? b.y : b.y + db.h };
+    const my = (p0.y + p3.y) / 2;
+    p1 = { x: p0.x, y: my }; p2 = { x: p3.x, y: my };
   }
-  const p1 = { x: ax, y: dy > 0 ? a.y + BOX_H : a.y }, p2 = { x: bx, y: dy > 0 ? b.y : b.y + BOX_H };
-  const my = (p1.y + p2.y) / 2;
-  return `M ${p1.x} ${p1.y} C ${p1.x} ${my}, ${p2.x} ${my}, ${p2.x} ${p2.y}`;
+  // two boxes linked both ways share a track; offset each direction a little
+  const side = (a.key < b.key ? 1 : -1) * 7;
+  const off = Math.abs(dx) > Math.abs(dy) ? { x: 0, y: side } : { x: side, y: 0 };
+  const sh = (p) => ({ x: p.x + off.x, y: p.y + off.y });
+  [p0, p1, p2, p3] = [sh(p0), sh(p1), sh(p2), sh(p3)];
+  const m = bez(p0, p1, p2, p3, 0.5);
+  return { d: `M ${p0.x} ${p0.y} C ${p1.x} ${p1.y}, ${p2.x} ${p2.y}, ${p3.x} ${p3.y}`, mx: m.x, my: m.y };
 };
 
 function Store({ x, y, w, h, fill, stroke, sw }) {
@@ -168,16 +208,28 @@ function Store({ x, y, w, h, fill, stroke, sw }) {
     </g>);
 }
 
-export default function EcosystemView({ t, rows, onSelect }) {
+// defaultOpen: start with every zone open (the system map) instead of the landing.
+export default function EcosystemView({ t, rows, onSelect, defaultOpen = false }) {
   const agg = useMemo(() => aggregate(rows), [rows]);
   const [perZone, setPerZone] = useState(8);
   const [floorPick, setFloorPick] = useState(null);     // null = automatic
   const [unfolded, setUnfolded] = useState(() => new Set());
+  // The landing: every zone closed. Click a zone to open it in place; the
+  // other zones stay as single boxes so cross-zone links still land.
+  const [expanded, setExpanded] = useState(() => (defaultOpen ? null : new Set()));
   const [focus, setFocus] = useState(null);
   const [edge, setEdge] = useState(null);
   const auto = useMemo(() => autoFloor(agg.links), [agg]);
   const floor = floorPick ?? auto;
-  const lay = useMemo(() => layout(agg, { perZone, floor, unfolded }), [agg, perZone, floor, unfolded]);
+  const zoneCount = useMemo(() => new Set(agg.systems.map((x) => x.zone)).size, [agg]);
+  // one zone only: there is nothing to land on, go straight to the systems
+  const exp = zoneCount <= 1 ? null : expanded;
+  const landing = exp !== null && exp.size === 0;
+  const lay = useMemo(() => layout(agg, { perZone, floor: landing ? 1 : floor, unfolded, expanded: exp }),
+    [agg, perZone, floor, unfolded, exp, landing]);
+  const openZone = (name) => { const e = new Set(expanded); e.add(name); setExpanded(e); setFocus(null); setEdge(null); };
+  const closeZone = (name) => { const e = new Set(expanded); e.delete(name); setExpanded(e); setFocus(null); setEdge(null); };
+  const showLabels = lay.lines.length <= 40;
   const sel = edge ? lay.allLines.find((l) => l.key === edge) : null;
   const touches = (l) => !focus || l.from === focus || l.to === focus;
   const focusNode = focus ? lay.nodes.get(focus) : null;
@@ -192,16 +244,28 @@ export default function EcosystemView({ t, rows, onSelect }) {
     <div>
       <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", fontSize: 11.5, color: t.sub, marginBottom: 10 }}>
         <span><b style={{ color: t.navy }}>{agg.systems.length}</b> systems in <b style={{ color: t.navy }}>{lay.zones.length}</b> zones ·{" "}
-          <b style={{ color: t.navy }}>{lay.shownCount}</b> of {lay.lineCount} links drawn · <b style={{ color: t.navy }}>{(rows || []).length}</b> interfaces
+          {landing ? <><b style={{ color: t.navy }}>{lay.lineCount}</b> zone-to-zone flows</>
+            : <><b style={{ color: t.navy }}>{lay.shownCount}</b> of {lay.lineCount} links drawn</>} · <b style={{ color: t.navy }}>{(rows || []).length}</b> interfaces
           {agg.merged > 0 && <span style={{ color: "#b26b00" }}> · {agg.merged} name variants merged (case and spacing only)</span>}</span>
-        <label>systems per zone{" "}
+        {exp !== null && (
+          <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+            <span onClick={() => { setExpanded(new Set()); setFocus(null); setEdge(null); }} role="button" tabIndex={0}
+              style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 4, cursor: "pointer",
+                border: `1px solid ${landing ? t.accent : t.disabled}`, background: landing ? t.accent : "#fff", color: landing ? "#fff" : t.accent }}>all zones</span>
+            {[...(expanded || [])].map((z) => (
+              <span key={z} onClick={() => closeZone(z)} role="button" tabIndex={0} title="close this zone"
+                style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 4, cursor: "pointer",
+                  border: `1px solid ${t.accent}`, background: t.accent, color: "#fff" }}>{z} ✕</span>))}
+            {landing && <span style={{ color: t.textMuted }}>click a zone to open it</span>}
+          </span>)}
+        {!landing && <label>systems per zone{" "}
           <select value={perZone} onChange={(e) => { setPerZone(Number(e.target.value)); setUnfolded(new Set()); }} style={sw}>
-            {[4, 6, 8, 12, 999].map((n) => <option key={n} value={n}>{n === 999 ? "all" : `top ${n}`}</option>)}</select></label>
-        <label>draw links with ≥{" "}
+            {[4, 6, 8, 12, 999].map((n) => <option key={n} value={n}>{n === 999 ? "all" : `top ${n}`}</option>)}</select></label>}
+        {!landing && <label>draw links with ≥{" "}
           <select value={floor} onChange={(e) => setFloorPick(Number(e.target.value))} style={sw}>
             {[1, 2, 3, 5, 10, 20].map((n) => <option key={n} value={n}>{n}</option>)}</select>{" "}
           interface{floor === 1 ? "" : "s"}{floorPick == null ? " (auto)" : ""}
-          {floorPick != null && <span onClick={() => setFloorPick(null)} role="button" tabIndex={0} style={{ marginLeft: 6, color: t.accent, cursor: "pointer" }}>auto</span>}</label>
+          {floorPick != null && <span onClick={() => setFloorPick(null)} role="button" tabIndex={0} style={{ marginLeft: 6, color: t.accent, cursor: "pointer" }}>auto</span>}</label>}
         <span style={{ marginLeft: "auto", color: t.textMuted }}>cylinder = data store · width = interfaces · dashed = all Replace · red = carries PII</span>
         {(focus || edge) && <span onClick={() => { setFocus(null); setEdge(null); }} role="button" tabIndex={0}
           style={{ cursor: "pointer", color: t.accent, fontWeight: 700 }}>clear ✕</span>}
@@ -214,13 +278,14 @@ export default function EcosystemView({ t, rows, onSelect }) {
                 markerUnits="userSpaceOnUse" orient="auto-start-reverse">
                 <path d="M 0 0 L 10 5 L 0 10 z" fill="#8a97a6" /></marker>
             </defs>
-            {lay.zones.map((z) => (
+            {lay.zones.filter((z) => z.open).map((z) => (
               <g key={z.name}>
                 <rect x={z.x} y={z.y} width={z.w} height={z.h} rx={10} fill="#f3f6f9" stroke="#d6dee6" />
                 <text x={z.x + ZONE_PAD} y={z.y + 20} fontSize="12" fontWeight="800" fill={t.navy} letterSpacing=".3">
                   {z.name}</text>
                 <text x={z.x + z.w - ZONE_PAD} y={z.y + 20} fontSize="10" fill={t.textMuted} textAnchor="end">
-                  {z.kept.length + z.folded.length} systems · {z.total} interface ends</text>
+                  {z.kept.length + z.folded.length} systems · {z.total} interface ends
+                  {exp !== null && <tspan fill={t.accent} fontWeight="700" onClick={() => closeZone(z.name)} style={{ cursor: "pointer" }}>  · close ✕</tspan>}</text>
               </g>))}
             {lay.lines.map((l) => {
               const a = lay.nodes.get(l.from), b = lay.nodes.get(l.to);
@@ -228,15 +293,38 @@ export default function EcosystemView({ t, rows, onSelect }) {
               const on = touches(l), picked = edge === l.key;
               const w = 1 + Math.log2(l.n + 1) * 1.1;
               const c = l.pii ? "#c1113a" : projColor(t, a.proj);
+              const g = anchor(a, b);
               return (
-                <path key={l.key} d={anchor(a, b)} fill="none" stroke={c}
-                  strokeWidth={picked ? w + 2 : w} strokeOpacity={on ? (picked ? 1 : 0.42) : 0.05}
-                  strokeDasharray={l.mig === l.n ? "6,4" : "none"} markerEnd="url(#eco-arrow)"
-                  style={{ cursor: "pointer" }} onClick={() => setEdge(picked ? null : l.key)}>
-                  <title>{`${nameOf(l.from)} → ${nameOf(l.to)}: ${l.n} interface${l.n === 1 ? "" : "s"}${l.pairs > 1 ? ` across ${l.pairs} pairs` : ""}${l.pii ? ` · ${l.pii} PII` : ""}${l.mig ? ` · ${l.mig} Replace` : ""}`}</title>
-                </path>);
+                <g key={l.key} style={{ cursor: "pointer" }} onClick={() => setEdge(picked ? null : l.key)}>
+                  <path d={g.d} fill="none" stroke={c}
+                    strokeWidth={picked ? w + 2 : w} strokeOpacity={on ? (picked ? 1 : 0.42) : 0.05}
+                    strokeDasharray={l.mig === l.n ? "6,4" : "none"} markerEnd="url(#eco-arrow)">
+                    <title>{`${nameOf(l.from)} → ${nameOf(l.to)}: ${l.n} interface${l.n === 1 ? "" : "s"}${l.pairs > 1 ? ` across ${l.pairs} pairs` : ""}${l.pii ? ` · ${l.pii} PII` : ""}${l.mig ? ` · ${l.mig} Replace` : ""}`}</title>
+                  </path>
+                  {showLabels && on && (
+                    <g>
+                      <rect x={g.mx - 14} y={g.my - 8} width={28 + (l.pii ? 18 : 0)} height={15} rx={7} fill="#fff" stroke={c} strokeWidth={0.8} strokeOpacity={0.7} />
+                      <text x={g.mx + (l.pii ? 9 : 0)} y={g.my + 3.5} fontSize="9.5" fontWeight="700" fill={t.navy} textAnchor="middle">
+                        {l.n}{l.pii ? ` · ${l.pii}P` : ""}</text>
+                    </g>)}
+                </g>);
             })}
-            {[...lay.nodes.values()].map((n) => {
+            {[...lay.nodes.values()].filter((n) => n.zoneBox).map((n) => {
+              const dim = focus && focus !== n.key && !lay.lines.some((l) => touches(l) && (l.from === n.key || l.to === n.key));
+              const isF = focus === n.key;
+              return (
+                <g key={n.key} opacity={dim ? 0.3 : 1} style={{ cursor: "pointer" }}
+                  onClick={() => openZone(n.zone)}>
+                  <rect x={n.x} y={n.y} width={n.w} height={n.h} rx={10} fill={isF ? "#eaf1f8" : "#f3f6f9"} stroke={isF ? t.accent : "#9fb0c0"} strokeWidth={isF ? 2 : 1.4} />
+                  <text x={n.x + 14} y={n.y + 22} fontSize="13" fontWeight="800" fill={t.navy}>{n.id}</text>
+                  <text x={n.x + 14} y={n.y + 40} fontSize="10" fill={t.sub}>
+                    {n.systems} systems{n.stores ? ` · ${n.stores} stores` : ""} · {n.internal} internal interface{n.internal === 1 ? "" : "s"}</text>
+                  <text x={n.x + 14} y={n.y + 56} fontSize="10" fill={t.textMuted}>
+                    {n.mig ? `${n.mig} replace` : "no replace"}{n.pii ? ` · ${n.pii} PII ends` : ""} · <tspan fill={t.accent} fontWeight="700">open ▸</tspan></text>
+                  {n.pii > 0 && <circle cx={n.x + n.w - 12} cy={n.y + 12} r={4.5} fill="#c1113a" />}
+                </g>);
+            })}
+            {[...lay.nodes.values()].filter((n) => !n.zoneBox).map((n) => {
               const c = n.fold ? "#8a97a6" : projColor(t, n.proj);
               const dim = focus && focus !== n.key && !lay.lines.some((l) => touches(l) && (l.from === n.key || l.to === n.key));
               const isF = focus === n.key;

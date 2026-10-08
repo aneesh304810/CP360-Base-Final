@@ -84,21 +84,50 @@ const floored = layout(agg, { perZone: 3, floor: 2 });
 ok(floored.shownCount < lay.shownCount && floored.hidden === lay.lineCount - floored.shownCount, "the floor hides thin links and says how many");
 
 console.log("-- the picture");
-const html = renderToStaticMarkup(<EcosystemView t={tLight} rows={rows} />);
+const html = renderToStaticMarkup(<EcosystemView t={tLight} rows={rows} defaultOpen />);
 ok(/13<\/b> systems in <b[^>]*>2<\/b> zones/.test(html) && /12<\/b> interfaces/.test(html), "the header counts systems, zones and interfaces", html.slice(0, 400));
 ok(/1 name variants merged/.test(html), "the merge is said on screen");
 ok(/Private Banking<\/text>/.test(html) && /Investment Management<\/text>/.test(html), "zones are drawn as labelled panels");
 ok(/<ellipse /.test(html), "a store is drawn as a cylinder");
 ok(!/other systems/.test(html), "nine systems in a zone with a limit of eight are all shown: folding one system would hide nothing");
-const dense = renderToStaticMarkup(<EcosystemView t={tLight} rows={[...rows, ...Array.from({ length: 6 }, (_, i) => row(100 + i, `Extra ${i}`, "internal", "PB Data Warehouse", "internal", "Private Banking"))]} />);
+const dense = renderToStaticMarkup(<EcosystemView t={tLight} defaultOpen rows={[...rows, ...Array.from({ length: 6 }, (_, i) => row(100 + i, `Extra ${i}`, "internal", "PB Data Warehouse", "internal", "Private Banking"))]} />);
 ok(/\+\d+ other systems/.test(dense) && /click to unfold/.test(dense), "with more systems than the limit, a fold node is drawn and says what to do");
 ok(/stroke-dasharray="6,4"/.test(html) && /stroke="#c1113a"/.test(html), "an all-Replace link is dashed and a PII link is red");
 ok(/systems per zone/.test(html) && /draw links with ≥/.test(html) && /\(auto\)/.test(html), "the two reductions are controls, the floor says it is automatic");
 ok(/No interfaces match/.test(renderToStaticMarkup(<EcosystemView t={tLight} rows={[]} />)), "an empty filter result says so");
 
 console.log("-- wired into Interface 360");
-ok(/import EcosystemView from '\.\/InterfaceEcosystem\.jsx'/.test(I) && /\['Table', 'Matrix', 'Routing Paths', 'Explorer', 'Ecosystem'\]/.test(I), "imported, fifth tab");
-ok(/view === 'Ecosystem' && <EcosystemView t=\{t\} rows=\{filtered\} onSelect=\{setSel\} \/>/.test(I), "draws the filtered rows and opens the drawer");
+ok(/import EcosystemView from '\.\/InterfaceEcosystem\.jsx'/.test(I) && /\['Overview', 'Table', 'Matrix', 'Routing Paths', 'Explorer'\]/.test(I) && /useState\('Overview'\)/.test(I), "imported, the Overview tab comes first and is the default");
+ok(/view === 'Overview' && <EcosystemView t=\{t\} rows=\{filtered\} onSelect=\{setSel\} \/>/.test(I), "draws the filtered rows and opens the drawer");
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\ninterface-ecosystem assertions pass");
+if (bad) process.exit(1);
+
+// ---- the zone-level landing ---------------------------------------------
+console.log("-- landing: every zone one box, one flow per zone pair");
+const land = layout(agg, { perZone: 8, floor: 1, expanded: new Set() });
+ok(land.landing === true && land.zones.every((z) => !z.open), "with nothing expanded, the layout is the landing and every zone is closed");
+ok([...land.nodes.keys()].sort().join("|") === "__zone__Investment Management|__zone__Private Banking", "one node per zone, nothing else", [...land.nodes.keys()]);
+const zpb = land.nodes.get("__zone__Private Banking");
+ok(zpb.zoneBox && zpb.systems === 9 && zpb.stores === 1 && zpb.pii === 2, "a zone box carries its system, store and PII counts", zpb);
+ok(zpb.internal === 8, "interfaces that stay inside the zone are counted on the box, not drawn", zpb.internal);
+ok(land.lineCount === 1 && land.lines[0].from === "__zone__Private Banking" && land.lines[0].to === "__zone__Investment Management" && land.lines[0].n === 1,
+   "one flow between the zones, carrying the one cross-zone interface", land.lines);
+const one = layout(agg, { perZone: 8, floor: 1, expanded: new Set(["Private Banking"]) });
+ok(one.zones.find((z) => z.name === "Private Banking").open && !one.zones.find((z) => z.name === "Investment Management").open, "expanding one zone opens it and leaves the other closed");
+ok(one.nodes.has("pb data warehouse") && one.nodes.has("__zone__Investment Management") && !one.nodes.has("__zone__Private Banking"),
+   "the open zone shows its systems; the closed one is still a box");
+ok(one.lines.some((l) => l.from === "pb data warehouse" && l.to === "__zone__Investment Management"), "a cross-zone link now runs from the system to the closed zone's box");
+ok(layout(agg, { perZone: 8, floor: 1, expanded: null }).zones.every((z) => z.open), "expanded = null is the full system map");
+
+console.log("-- the landing renders with counted flows and an invitation");
+const lhtml = renderToStaticMarkup(<EcosystemView t={tLight} rows={rows} />);
+ok(/zone-to-zone flows/.test(lhtml) && /click a zone to open it/.test(lhtml), "the header says it is the landing");
+ok(/open ▸/.test(lhtml) && /9 systems · 1 stores · 8 internal interfaces/.test(lhtml), "zone boxes carry counts and an open affordance", lhtml.match(/\d+ systems · [^<]*/)?.[0]);
+ok(!/systems per zone/.test(lhtml) && !/draw links with/.test(lhtml), "the system-level controls are hidden on the landing");
+ok(/<rect x="[\d.]+" y="[\d.]+" width="28" height="15"/.test(lhtml) || /<rect x="[\d.]+" y="[\d.]+" width="46" height="15"/.test(lhtml), "flows carry a count label");
+const single = renderToStaticMarkup(<EcosystemView t={tLight} rows={rows.filter((r) => r.domain === "Private Banking")} />);
+ok(!/zone-to-zone flows/.test(single) && /systems per zone/.test(single), "with one zone there is nothing to land on: straight to the system map");
+
+console.log(bad ? `\n${bad} assertion(s) failed (landing)` : "\ninterface-ecosystem landing assertions pass");
 if (bad) process.exit(1);
