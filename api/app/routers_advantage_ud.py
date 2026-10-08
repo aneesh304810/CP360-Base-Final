@@ -336,7 +336,11 @@ def schema_variance():
     the optional keys that multiply key sets, the sizes, the long tail of
     one-row sets, the sets whose keys agree but whose types do not, and
     the families."""
-    sch = _safe("SELECT schema_signature, attribute_count, attribute_list, record_count, "
+    # DBMS_LOB.SUBSTR, not the CLOB itself: a CLOB in a sorted, 12,951-row
+    # select is the kind of statement that fails quietly inside _safe and
+    # reads on the screen as "Schema variants · 0".
+    sch = _safe("SELECT schema_signature, attribute_count, "
+                "DBMS_LOB.SUBSTR(attribute_list, 4000, 1) AS attribute_list, record_count, "
                 "typed_variant_count, record_pct, family_id FROM cp_advantage_ud_schema "
                 "ORDER BY record_count DESC")
     fams = {f["family_id"]: f for f in _safe(

@@ -94,10 +94,16 @@ const ov = { loaded: true, attributes: 284, run: { source_rows: 21672, parse_suc
 const shape = { example: { UD_1: "2=CLIENT ACCOUNT", UD_23_1: "000000000  (leading zeros kept)" }, key_count_buckets: { "1-5": 5500, "6-20": 9000 } };
 const html = renderToStaticMarkup(<UdOverview t={tLight} ov={ov} shape={shape} />);
 ok(/21,672/.test(html) && /284/.test(html) && /12,951 exact key sets/.test(html), "tiles carry the run figures", html.slice(0, 200));
-ok(/household \+ billing instruction/.test(html), "families are listed by label");
-ok(/&quot;UD_23_1&quot;/.test(html) && /leading zeros kept/.test(html), "the CLOB example is drawn from shapes");
-ok(/shapes, never values/.test(html), "and says so");
-ok(/5 parameterized value/.test(html), "conflicts are summarised by class");
+console.log("-- the three sections fold closed by default, each with a one-line summary");
+ok(!/&quot;UD_23_1&quot;/.test(html) && !/5 parameterized value/.test(html), "closed: no example JSON, no conflict detail");
+ok(/How the CLOB looks/.test(html) && /example drawn from shapes, never values/.test(html) && /most payloads carry 6-20 keys \(9,000 rows\)/.test(html), "the CLOB fold summarises core keys and the commonest payload size", html.match(/How the CLOB looks.{0,300}/)?.[0]);
+ok(/Keys by domain and value class/.test(html) && /2 domains · 250 of 284 keys UNKNOWN/.test(html), "the domain fold summarises the unknown share");
+ok(/Schema families/.test(html) && /12 families · largest: household \+ billing instruction \(9,000 rows, 40 key sets\) · 5 code conflicts/.test(html), "the families fold summarises the largest family and the conflicts");
+ok((html.match(/aria-expanded="false"/g) || []).length === 3 && (html.match(/>open</g) || []).length === 3, "three closed folds, each inviting a click");
+const openHtml = renderToStaticMarkup(<UdOverview t={tLight} ov={ov} shape={shape} foldsOpen />);
+ok(/household \+ billing instruction/.test(openHtml) && /&quot;UD_23_1&quot;/.test(openHtml) && /leading zeros kept/.test(openHtml) && /5 parameterized value/.test(openHtml),
+   "open: families, the CLOB example and the conflicts are all there");
+ok((openHtml.match(/aria-expanded="true"/g) || []).length === 3, "all three report open");
 
 console.log("-- the detail rows");
 ok(udDetailRows(tLight, null).length === 0 && udDetailRows(tLight, { loaded: false }).length === 0, "no registry, no rows: the pane is unchanged");

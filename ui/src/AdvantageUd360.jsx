@@ -39,6 +39,24 @@ const Bar = ({ t, rows, total, color }) => (
       </div>))}
   </div>);
 
+/* A section closed to one line until the reader opens it. The summary
+   says what the section would show, so a closed fold still informs. */
+export function Fold({ t, title, summary, children, open: openProp = false }) {
+  const [open, setOpen] = React.useState(openProp);
+  return (
+    <div style={{ background: "#fff", border: `1px solid ${t.border || "#dfe6e9"}`, borderRadius: 3, marginBottom: 8 }}>
+      <div onClick={() => setOpen(!open)} role="button" tabIndex={0} aria-expanded={open}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(!open); } }}
+        style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "9px 14px", cursor: "pointer", userSelect: "none" }}>
+        <span style={{ fontSize: 11, color: t.accent || "#0f4775", width: 10, display: "inline-block" }}>{open ? "▾" : "▸"}</span>
+        <span style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".4px", color: t.muted || "#7b8894", whiteSpace: "nowrap" }}>{title}</span>
+        <span style={{ fontSize: 11.5, color: t.sub || "#4a5a68", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{summary}</span>
+        {!open && <span style={{ fontSize: 10, color: t.accent || "#0f4775", whiteSpace: "nowrap" }}>open</span>}
+      </div>
+      {open && <div style={{ padding: "0 14px 12px" }}>{children}</div>}
+    </div>);
+}
+
 /* The JSON drawn as the profiler saw it, with shapes for values. */
 export function ClobExample({ t, example }) {
   const keys = Object.keys(example || {});
@@ -55,7 +73,7 @@ export function ClobExample({ t, example }) {
     </pre>);
 }
 
-export function UdOverview({ t, ov, shape, st }) {
+export function UdOverview({ t, ov, shape, st, foldsOpen = false }) {
   if (!ov) return null;
   if (!ov.loaded) {
     return (
@@ -89,42 +107,58 @@ export function UdOverview({ t, ov, shape, st }) {
           sub={run.schema_variants != null ? `from ${Number(run.schema_variants).toLocaleString()} exact key sets` : "by blocks present"} />
         <Tile t={t} n={ov.gold_candidates} label="gold candidates" sub="none promoted yet" />
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr", gap: 14 }}>
-        <div style={{ background: "#fff", border: `1px solid ${t.border || "#dfe6e9"}`, borderRadius: 3, padding: "10px 14px" }}>
-          <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".4px",
-            color: t.muted || "#7b8894", marginBottom: 6 }}>How the CLOB looks · shapes, never values</div>
-          <ClobExample t={t} example={shape?.example} />
-          {buckets.length > 0 && (
-            <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 10, color: t.muted || "#7b8894", marginBottom: 3 }}>keys per payload · account rows</div>
-              <Bar t={t} rows={buckets} total={bTotal} color="#6d3ac0" />
-            </div>)}
-        </div>
-        <div style={{ background: "#fff", border: `1px solid ${t.border || "#dfe6e9"}`, borderRadius: 3, padding: "10px 14px" }}>
-          <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".4px",
-            color: t.muted || "#7b8894", marginBottom: 6 }}>Keys by domain · hypothesis until the workbook confirms</div>
-          <Bar t={t} rows={dom} total={ov.attributes} />
-          <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".4px",
-            color: t.muted || "#7b8894", margin: "10px 0 6px" }}>Keys by value class</div>
-          <Bar t={t} rows={cls} total={ov.attributes} color="#1baf7a" />
-        </div>
-        <div style={{ background: "#fff", border: `1px solid ${t.border || "#dfe6e9"}`, borderRadius: 3, padding: "10px 14px" }}>
-          <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".4px",
-            color: t.muted || "#7b8894", marginBottom: 6 }}>Schema families · which blocks an account carries</div>
-          {(ov.families || []).slice(0, 8).map((f) => (
-            <div key={f.family_id} style={{ display: "grid", gridTemplateColumns: "1fr 70px", gap: 8,
-              fontSize: 11, padding: "3px 0", borderTop: "1px solid #f0f3f6" }}>
-              <span style={{ color: t.text || "#333" }}>{f.family_label}
-                <span style={{ color: t.muted || "#7b8894" }}> · {f.variant_count} key sets</span></span>
-              <span style={{ textAlign: "right", color: t.muted || "#7b8894" }}>
-                {Number(f.record_count).toLocaleString()}</span>
-            </div>))}
-          {ov.conflicts && Object.keys(ov.conflicts).length > 0 && (
-            <div style={{ marginTop: 10, fontSize: 10.5, color: t.sub || "#4a5a68" }}>
-              Code conflicts: {Object.entries(ov.conflicts).map(([k, v]) => `${v} ${k.toLowerCase().replace(/_/g, " ")}`).join(" · ")}
-            </div>)}
-        </div>
-      </div>
+      {(() => {
+        const topB = buckets.length ? buckets.reduce((a, b) => (b[1] > a[1] ? b : a)) : null;
+        const topF = (ov.families || [])[0];
+        const unk = ov.by_domain?.UNKNOWN || 0;
+        const clobSum = `${(shape?.core_keys || []).length} core keys` +
+          (topB ? ` · most payloads carry ${topB[0]} keys (${Number(topB[1]).toLocaleString()} rows)` : "") +
+          ` · example drawn from shapes, never values`;
+        const domSum = `${dom.length} domains · ${unk} of ${ov.attributes} keys UNKNOWN until the workbook confirms · ${cls.length} value classes`;
+        const famSum = `${ov.family_count} families` +
+          (topF ? ` · largest: ${topF.family_label} (${Number(topF.record_count).toLocaleString()} rows, ${topF.variant_count} key sets)` : "") +
+          (ov.conflicts && Object.keys(ov.conflicts).length ? ` · ${Object.values(ov.conflicts).reduce((a, b) => a + b, 0)} code conflicts` : "");
+        return (
+          <>
+            <Fold t={t} title="How the CLOB looks" summary={clobSum} open={foldsOpen}>
+              <ClobExample t={t} example={shape?.example} />
+              {buckets.length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 10, color: t.muted || "#7b8894", marginBottom: 3 }}>keys per payload · account rows</div>
+                  <Bar t={t} rows={buckets} total={bTotal} color="#6d3ac0" />
+                </div>)}
+            </Fold>
+            <Fold t={t} title="Keys by domain and value class" summary={domSum} open={foldsOpen}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".4px",
+                    color: t.muted || "#7b8894", margin: "6px 0" }}>By domain · hypothesis until the workbook confirms</div>
+                  <Bar t={t} rows={dom} total={ov.attributes} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".4px",
+                    color: t.muted || "#7b8894", margin: "6px 0" }}>By value class</div>
+                  <Bar t={t} rows={cls} total={ov.attributes} color="#1baf7a" />
+                </div>
+              </div>
+            </Fold>
+            <Fold t={t} title="Schema families" summary={famSum} open={foldsOpen}>
+              <div style={{ fontSize: 10.5, color: t.muted || "#7b8894", margin: "4px 0 6px" }}>which blocks an account carries · rows</div>
+              {(ov.families || []).slice(0, 12).map((f) => (
+                <div key={f.family_id} style={{ display: "grid", gridTemplateColumns: "1fr 90px", gap: 8,
+                  fontSize: 11, padding: "3px 0", borderTop: "1px solid #f0f3f6" }}>
+                  <span style={{ color: t.text || "#333" }}>{f.family_label}
+                    <span style={{ color: t.muted || "#7b8894" }}> · {f.variant_count} key sets</span></span>
+                  <span style={{ textAlign: "right", color: t.muted || "#7b8894" }}>
+                    {Number(f.record_count).toLocaleString()}</span>
+                </div>))}
+              {ov.conflicts && Object.keys(ov.conflicts).length > 0 && (
+                <div style={{ marginTop: 10, fontSize: 10.5, color: t.sub || "#4a5a68" }}>
+                  Code conflicts: {Object.entries(ov.conflicts).map(([k, v]) => `${v} ${k.toLowerCase().replace(/_/g, " ")}`).join(" · ")}
+                </div>)}
+            </Fold>
+          </>);
+      })()}
     </div>);
 }
 
