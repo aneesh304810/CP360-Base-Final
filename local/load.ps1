@@ -44,6 +44,11 @@ if (-not $env:CP_SAMPLE_ARTIFACTS) { $env:CP_SAMPLE_ARTIFACTS = $Artifacts }
 #   .\load.ps1 advantage_ud                         # the folder below
 #   .\load.ps1 advantage_ud -File D:\drops\addv-ud   # another folder, this run only
 if (-not $env:CP_ADDV_UD_DIR) { $env:CP_ADDV_UD_DIR = Join-Path $Root "local-data\advantage-ud" }
+# Data Analysis: SEI's merged source-file catalog. One folder, every workbook
+# or csv in it whose sheets carry Catalog_ID and Source_Attribute (sql/78).
+#   .\load.ps1 sei_migration                          # the folder below
+#   .\load.ps1 sei_migration -File D:\drops\sei-cat    # another folder, this run only
+if (-not $env:CP_SEI_MIGRATION_DIR) { $env:CP_SEI_MIGRATION_DIR = Join-Path $Root "local-data\sei-migration" }
 
 # Gates are hard by default and that is the point: a load four rows short looks
 # right on screen and quietly under-reports. 0/false/no downgrades a failure to
@@ -57,6 +62,7 @@ if (-not $Step) {
   Write-Host "Usage: .\load.ps1 <step> [-File <path>]" -ForegroundColor Yellow
   Write-Host "  Event 360 steps: event360 | sdc_compute | event_subscription | event360_all"
   Write-Host "  AddVantage UD:   advantage_ud [-File <folder>]   (or one of: advantage_ud_profile | advantage_ud_dictionary | advantage_ud_extract | advantage_ud_workbook | advantage_ud_trp)"
+  Write-Host "  Data Analysis:   sei_migration [-File <folder>]  (SEI merged source-file catalog, sql/78)"
   exit 1
 }
 Write-Host ("  root      {0}" -f $Root) -ForegroundColor DarkGray
@@ -74,6 +80,17 @@ if ($Step -like "advantage_ud*") {
     $env:CP_ADDV_UD_DIR = (Resolve-Path $File).Path
   }
   Write-Host ("  addv-ud   {0}" -f $env:CP_ADDV_UD_DIR) -ForegroundColor DarkGray
+}
+
+if ($Step -eq "sei_migration") {
+  if ($File) {
+    if (-not (Test-Path $File -PathType Container)) {
+      Write-Error "sei_migration takes a FOLDER holding the catalog workbook(s), not a file: $File"
+      exit 1
+    }
+    $env:CP_SEI_MIGRATION_DIR = (Resolve-Path $File).Path
+  }
+  Write-Host ("  sei-cat   {0}" -f $env:CP_SEI_MIGRATION_DIR) -ForegroundColor DarkGray
 }
 
 switch ($Step) {

@@ -25,6 +25,7 @@ import HubDesign from "./HubDesign.jsx";
 import Integration360Design from "./Integration360Design.jsx";
 import SecurityAdmin from "./SecurityAdmin.jsx";
 import Compare from "./Compare.jsx";
+import DataAnalysis from "./DataAnalysis.jsx";
 import ReleaseDelivery from "./ReleaseDelivery.jsx";
 import Login from "./Login.jsx";
 import { securityApi, allowed } from "./securityApi.js";
@@ -92,6 +93,7 @@ export default function App() {
  integration360: <Integration360Design t={t} />,
  security: <SecurityAdmin t={t} />,
  compare: <Compare t={t} />,
+ dataanalysis: <DataAnalysis t={t} />,
  };
 
  const signOut = async () => {

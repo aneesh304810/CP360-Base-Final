@@ -41,6 +41,8 @@ $env:REFERENCE_DATA_XLSX          = Join-Path $env:CP_CATALOG_ROOT "REFERENCE\SW
 # Loaded by:  .\local\load.ps1 advantage_ud      (sql/75, 76, 77 first, once)
 # Never under sample-artifacts: these carry account numbers and names.
 $env:CP_ADDV_UD_DIR               = Join-Path $Root "local-data\advantage-ud"
+# Data Analysis: the folder holding SEI's merged source-file catalog (sql/78).
+$env:CP_SEI_MIGRATION_DIR         = Join-Path $Root "local-data\sei-migration"
 
 # --- Event 360 -------------------------------------------------------------
 # Three steps, three sources, kept apart on purpose:

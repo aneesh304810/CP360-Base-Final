@@ -115,6 +115,12 @@ $env:CP_ENV_WORKBOOK = "$Artifacts\INFRAINVENTORY\cp_env_infrastructure_v3.csv"
 # Step `advantage_ud` (in the full run) loads them in dependency order and
 # skips quietly when the folder is empty. Tables: sql\75, 76, 77.
 $env:CP_ADDV_UD_DIR = Join-Path $Root "local-data\advantage-ud"
+
+# --- Data Analysis: SEI merged source-file catalog ------------------------
+# One folder; every workbook or csv in it whose sheets carry Catalog_ID and
+# Source_Attribute is read (sql/78). Step `sei_migration` in the full run.
+# Never under sample-artifacts: the catalog is SEI contract material.
+$env:CP_SEI_MIGRATION_DIR = Join-Path $Root "local-data\sei-migration"
 # $env:CP_ADDV_UD_CHUNK = "2000"   # extract rows per batch
 
 # ---- EVENT 360 -------------------------------------------------------
@@ -279,6 +285,7 @@ $inputs = [ordered]@{
   "Legacy lineage"           = $env:CP_LEGACY_LINEAGE_XLSX
   "Legacy dictionary"        = $env:CP_LEGACY_DICT_XLSX
   "SEI crosswalk"            = $env:CP_SEI_XLSX
+  "SEI migration catalog"    = $env:CP_SEI_MIGRATION_DIR
   "Event 360 catalog"        = $env:CP_EVENT360_XLSX
   "Event consumers.csv"      = (Join-Path $env:CP_EVENT_SUB_DIR "consumers.csv")
   "Event subscriptions.csv"  = (Join-Path $env:CP_EVENT_SUB_DIR "subscriptions.csv")

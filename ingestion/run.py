@@ -40,6 +40,7 @@ STEPS = [
                                # The sub-steps advantage_ud_profile / _dictionary / _extract /
                                # _workbook / _trp run by name only, so a full run loads each once.
     "sei_crosswalk",     # IMDS/STAR/UAF/SEI crosswalk workbook — lanes, mapping, verdicts
+    "sei_migration",     # Data Analysis: SEI's merged source-file catalog in CP_SEI_MIGRATION_DIR (sql/78)
     "event360",          # Event 360: the SEI event specification workbook
     "sdc_compute",       # SDC client compute sizing: the read-back bill, per view
     "event_subscription",# who consumes which event, from CSV — BBH's own decision
@@ -254,6 +255,18 @@ def _run_step(step, conn, loader, resolver) -> None:
         c = SeiCrosswalkConnector.from_env()
         n = c.load(loader, c.parse())
         log.info("sei_crosswalk: merged %s rows", n)
+        return
+    if step == "sei_migration":
+        from .sei_migration_conn import SeiMigrationConnector
+        c = SeiMigrationConnector.from_env()
+        b = c.parse()
+        if not b["fields"]:
+            log.warning("sei_migration: nothing to load from %s (set CP_SEI_MIGRATION_DIR); skipped", c.folder)
+            return
+        for sh in b["sheets"]:
+            log.info("sei_migration: %s / %s: %s rows", sh["workbook"], sh["sheet"], sh["rows"])
+        n = c.load(loader, b)
+        log.info("sei_migration: merged %s fields", n)
         return
     if step == "legacy_source_file":
         from .legacy_source_file_conn import LegacySourceFileConnector
