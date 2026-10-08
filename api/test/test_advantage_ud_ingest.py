@@ -252,3 +252,35 @@ print()
 print("advantage_ud_ingest assertions " + ("FAIL" if bad else "pass"))
 if bad:
     sys.exit(1)
+
+print("-- per-key lineage from the registry")
+from ingestion.advantage_ud_lineage_conn import AdvantageUdLineageConnector, dictionary_code
+ok(dictionary_code("UD_2") == "UD/2" and dictionary_code("UD_23_1") == "UD/23-1", "the source column is spelled the workbook's way, so the canonical join finds it")
+reg = [{"attribute_name": "UD_2", "key_structure": "SINGLE"}, {"attribute_name": "UD_23_1", "key_structure": "MULTIPART", "sequence_number": 1},
+       {"attribute_name": "ACCOUNT", "key_structure": "NON_STANDARD"}]
+existing = {("DIM_ACCOUNT_UD", "UD_2"): "PBDW:DIM_ACCOUNT_UD:UD_2:da39a3ee5e"}      # the proof-exploded row
+cl = AdvantageUdLineageConnector(reg, existing, {"functional_group": "Account Master & Reference Data"})
+rows = cl.parse()
+by = {r["dwh_target_column"]: r for r in rows}
+ok(set(by) == {"UD_2", "UD_23_1"}, "one row per UD key, non-UD keys skipped", list(by))
+ok(by["UD_2"]["lineage_id"] == "PBDW:DIM_ACCOUNT_UD:UD_2:da39a3ee5e", "an exploded row's id is reused, so it is updated, not doubled")
+ok(by["UD_23_1"]["lineage_id"].startswith("PBDW:DIM_ACCOUNT_UD:UD_23_1:") and by["UD_23_1"]["lineage_id"] != by["UD_2"]["lineage_id"], "a new key gets the house id shape")
+ok(by["UD_2"]["src_source_column"] == "UD/2" and by["UD_23_1"]["src_source_column"] == "UD/23-1" and by["UD_2"]["src_source_table"] == "ACCOUNTMASTER", "source: the AddVantage field")
+ok(by["UD_2"]["stg2_source_table"] == "STG2_ACCOUNT_UD_INTRADAY" and "UD_FLD_NUMBER = 2" in by["UD_2"]["stg2_to_dwh_transform"]
+   and "line 1" in by["UD_23_1"]["stg2_to_dwh_transform"], "stg2: the tall table, pivoted by field number and line")
+ok(by["UD_2"]["is_ud"] == "Y" and by["UD_2"]["ud_key"] == "UD_2" and by["UD_2"]["dwh_target_table"] == "DIM_ACCOUNT_UD" and by["UD_2"]["functional_group"] == "Account Master & Reference Data",
+   "dwh: the virtual column inside the envelope, in the CLOB's own group")
+ok("Synthesised from the UD registry" in by["UD_2"]["lineage_status_detail"], "the row says where it came from")
+LL = Store(); ok(cl.load(LL, rows) == 2 and len(LL.rows("legacy_lineage")) == 2 and LL.commits == 1, "merged into legacy_lineage by id")
+src = open(os.path.join(os.path.dirname(__file__), "..", "..", "ingestion", "run.py")).read()
+i = src.index('if step == "advantage_ud":'); body = src[i:i + 3500]
+ok(body.index("advantage_ud_profile") < body.index("advantage_ud_lineage") < body.index("advantage_ud_dictionary"), "the lineage step runs right after the profile in the one step")
+ok('if step == "advantage_ud_lineage":' in src and "WHERE is_ud = 'Y'" in src, "and reads the registry and the exploded rows from the database")
+D = open(os.path.join(os.path.dirname(__file__), "..", "..", "ui", "src", "Datapoint360.jsx")).read()
+ok("lands in <span" in D and "DIM_ACCOUNT_UD.USER_DEFINED_ATTRIBUTE_CLOB" in D and "advantage_ud_lineage" in D,
+   "until the step runs, the pane says the key lands in the envelope instead of 'not mapped'")
+
+print()
+print("advantage_ud_ingest (lineage) assertions " + ("FAIL" if bad else "pass"))
+if bad:
+    sys.exit(1)

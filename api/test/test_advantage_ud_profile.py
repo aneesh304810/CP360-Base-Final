@@ -157,6 +157,20 @@ ok(sv["singletons"] == 0, "no one-row sets in the fixture, reported as zero not 
 ok(sv["top"][0]["record_count"] == 6000 and sv["top"][0]["blocks"] == ["UD_23"] and sv["top"][0]["family_label"] == "household" and sv["top"][0]["singles"] == 5,
    "the most common set is described by blocks and singles, never by values", sv["top"][0])
 
+print("-- the dictionary name reaches every list")
+R.query = db
+_q = R.query
+def _with_terms(sql, p=None):
+    if "legacy_dictionary" in sql:
+        assert "ESCAPE" not in sql, "no escape character: one copy sent Oracle a two-character escape"
+        return [{"field_code_norm": "UD_51", "business_term": "IPS DATE"}, {"field_code_norm": "UD_1", "business_term": "OWNED BY CODE"}]
+    return _q(sql, p)
+R.query = _with_terms
+ok(next(r for r in R.type_variance()["rows"] if r["attribute_name"] == "UD_51")["term"] == "IPS DATE", "type variance rows carry the UD name")
+ok(next(k for k in R.schema_variance()["optional_keys"] if k["attribute_name"] == "UD_51")["term"] == "IPS DATE", "optional keys carry the UD name")
+ok(next(a for a in R.registry()["attributes"] if a["attribute_name"] == "UD_1")["term"] == "OWNED BY CODE", "the registry carries the UD name")
+R.query = db
+
 print("-- ingest status")
 st = R.ingest_status()
 ok(st["profile"]["loaded"] and st["profile"]["attributes"] == 16, "the profile is reported loaded with its key count", st["profile"])

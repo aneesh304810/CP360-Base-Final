@@ -88,6 +88,20 @@ _REG_COLS = """attribute_name, attribute_number, parent_attribute, sequence_numb
     type_reclassified, domain, silver_entity, class_source, gold_candidate, is_free_text"""
 
 
+def _ud_terms():
+    """The dictionary's name for each UD key (UD/1 "OWNED BY CODE"), keyed
+    by canonical code. SUBSTR instead of LIKE: an escaped underscore is
+    easy to get wrong between Python and Oracle, and one copy of this
+    query did, which read as "no names" on the screen."""
+    out = {}
+    for d in _safe("""SELECT field_code_norm, MAX(business_term) AS business_term
+                      FROM legacy_dictionary
+                      WHERE source_system = 'ADDVANTAGE' AND SUBSTR(field_code_norm, 1, 3) = 'UD_'
+                      GROUP BY field_code_norm"""):
+        out[d["field_code_norm"]] = d["business_term"]
+    return out
+
+
 def _shape(r, codes=None):
     return shape_example(r.get("value_class"), r.get("min_value_length"),
                          r.get("max_value_length"), (r.get("leading_zero_count") or 0) > 0,
@@ -226,12 +240,7 @@ def registry(domain: str | None = None, parent: str | None = None, gold: bool = 
     # The dictionary's name for each key (UD/1 "OWNED BY CODE"), joined in
     # Python: a LEFT JOIN would make the whole statement fail on a warehouse
     # without sql/27, and the registry must answer without it.
-    terms = {}
-    for d in _safe("""SELECT field_code_norm, MAX(business_term) AS business_term
-                      FROM legacy_dictionary
-                      WHERE source_system = 'ADDVANTAGE' AND field_code_norm LIKE 'UD\_%' ESCAPE '\\'
-                      GROUP BY field_code_norm"""):
-        terms[d["field_code_norm"]] = d["business_term"]
+    terms = _ud_terms()
     for r in rows:
         r["shape"] = _shape(r)
         r["term"] = terms.get(r["attribute_name"])
@@ -278,11 +287,7 @@ def type_variance():
     how much of the column it affects, and what the load should do."""
     reg = _safe(f"SELECT {_REG_COLS} FROM cp_advantage_ud_registry WHERE type_variance_ind = 'Y' "
                 "ORDER BY dominant_type_pct NULLS LAST, attribute_number, sequence_number")
-    terms = {}
-    for d in _safe("""SELECT field_code_norm, MAX(business_term) AS business_term FROM legacy_dictionary
-                      WHERE source_system = 'ADDVANTAGE' AND field_code_norm LIKE 'UD\\_%' ESCAPE '\\\\'
-                      GROUP BY field_code_norm"""):
-        terms[d["field_code_norm"]] = d["business_term"]
+    terms = _ud_terms()
     rows, by_class = [], {}
     for r in reg:
         cls = r.get("variance_class") or "UNCLASSIFIED"
@@ -357,8 +362,10 @@ def schema_variance():
         tiers.setdefault(t, []).append(r["attribute_name"])
     # the keys that multiply key sets: present on some rows and absent on
     # others. Every one of them can double the number of exact key sets.
+    terms = _ud_terms()
     optional = [{"attribute_name": r["attribute_name"], "record_presence_pct": r.get("record_presence_pct"),
-                 "parent_attribute": r.get("parent_attribute"), "domain": r.get("domain")}
+                 "parent_attribute": r.get("parent_attribute"), "domain": r.get("domain"),
+                 "term": terms.get(r["attribute_name"])}
                 for r in reg if 1 <= (r.get("record_presence_pct") or 0) < 99]
     top = []
     for s in sch[:15]:

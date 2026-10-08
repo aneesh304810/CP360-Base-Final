@@ -283,7 +283,8 @@ def _run_step(step, conn, loader, resolver) -> None:
             log.info("advantage_ud: inventory written to %s", out)
         except Exception as e:                       # noqa: BLE001 - discovery is help, not a gate
             log.warning("advantage_ud: inventory not written (%s)", e)
-        order = [("advantage_ud_profile", bool(r["profile_dir"])), ("advantage_ud_dictionary", bool(r["codes"])),
+        order = [("advantage_ud_profile", bool(r["profile_dir"])), ("advantage_ud_lineage", bool(r["profile_dir"])),
+                 ("advantage_ud_dictionary", bool(r["codes"])),
                  ("advantage_ud_extract", bool(r["extract"])), ("advantage_ud_workbook", bool(r["workbook"])),
                  ("advantage_ud_trp", bool(r["trp"]))]
         for sub, have in order:
@@ -292,6 +293,25 @@ def _run_step(step, conn, loader, resolver) -> None:
                 continue
             log.info("advantage_ud: >>> %s", sub)
             _run_step(sub, conn, loader, resolver)
+        return
+    if step == "advantage_ud_lineage":
+        from .advantage_ud_lineage_conn import AdvantageUdLineageConnector, DWH_TABLE, CLOB
+        cur = conn.cursor()
+        try:
+            cur.execute("SELECT attribute_name, key_structure, sequence_number FROM cp_advantage_ud_registry")
+            reg = [{"attribute_name": a, "key_structure": k, "sequence_number": q} for a, k, q in cur.fetchall()]
+            cur.execute("SELECT dwh_target_table, dwh_target_column, lineage_id FROM legacy_lineage "
+                        "WHERE is_ud = 'Y' AND dwh_target_table = :t", {"t": DWH_TABLE})
+            existing = {(t, c): i for t, c, i in cur.fetchall()}
+            cur.execute("SELECT functional_group FROM legacy_lineage WHERE dwh_target_table = :t "
+                        "AND dwh_target_column = :c AND ROWNUM = 1", {"t": DWH_TABLE, "c": CLOB})
+            row = cur.fetchone()
+            template = {"functional_group": row[0]} if row else {}
+        finally:
+            cur.close()
+        c = AdvantageUdLineageConnector(reg, existing, template)
+        n = c.load(loader, c.parse())
+        log.info("advantage_ud_lineage: merged %s per-key lineage rows", n)
         return
     if step == "advantage_ud_extract":
         from .advantage_ud_extract_conn import AdvantageUdExtractConnector

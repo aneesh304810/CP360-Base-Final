@@ -151,6 +151,8 @@ const tv = { loaded: true, attributes: 2, high: 1, reclassified: 1, free_text: 0
 const th = renderToStaticMarkup(<TypeVarianceView t={tLight} tv={tv} />);
 ok(/flag representation variance/.test(th) && /map the other spellings/.test(th), "classes are read in words with the rule");
 ok(/RULE 11A/.test(th) && /TEXT 264/.test(th) && /6%/.test(th), "a key shows its name, minority types and share");
+ok(/<th[^>]*>Key<\/th><th[^>]*>UD name<\/th><th[^>]*>Dominant<\/th>/.test(th), "the UD name is its own column, after the key");
+ok(/no dictionary entry/.test(th), "a key without a dictionary entry says so in that column");
 ok(/read as IDENTIFIER/.test(th), "a reclassified key says what it is read as");
 ok(th.indexOf("UD_80") < th.indexOf("UD_527_1"), "worst first: the larger minority share is listed before the smaller");
 const sh = renderToStaticMarkup(<SchemaVarianceView t={tLight} sv={{ ...svx, singletons: 7000, typed_drift_rows: 900,

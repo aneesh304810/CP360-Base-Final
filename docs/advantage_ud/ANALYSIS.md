@@ -359,12 +359,16 @@ The six tables in the brief, plus the one the brief's `List` sheet needs:
 | cp_advantage_ud_schema | one row per source row | exact, typed and family signatures |
 | cp_advantage_ud_quarantine | one row per rejected source row | headers always written |
 
-The registry is the lineage join. Once it exists, `legacy_lineage` rows with
-`is_ud='Y'` can be synthesised from the REGISTRY instead of from the proof
-sample, one per attribute, with the dictionary code as the source column.
-That is the single change that turns "all UD fields land on one table" into a
-navigable per-field lineage, and it is a loader change on the catalogue side,
-not a change to `legacy_lineage_conn.py`.
+The registry is the lineage join. Step `advantage_ud_lineage`
+(`ingestion/advantage_ud_lineage_conn.py`) now synthesises one
+`legacy_lineage` row per registry attribute: source `ACCOUNTMASTER.UD/n`
+(the workbook's spelling, so the canonical join key matches), STG2
+`STG2_ACCOUNT_UD_INTRADAY.UD_FLD_NUMBER` with the pivot stated, DWH
+`DIM_ACCOUNT_UD.UD_n` as a virtual column inside the CLOB, `is_ud='Y'`.
+A row the proof explosion already made for the same key is updated in
+place. That is what turns "all UD fields land on one table" into a
+navigable per-field lineage; Datapoint 360's "View in Lineage" works for
+every UD key, and `legacy_lineage_conn.py` is untouched.
 
 ## 8. Gold candidates: nothing promotes yet
 

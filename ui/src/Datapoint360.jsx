@@ -624,7 +624,13 @@ function LegacyDatapoints({ t, onOpen }) {
                     </>
                   ) : (
                     <>
-                      <span style={{ color: t.muted || t.textMuted }}>— not mapped to a DWH column —</span>
+                      {isUdAttribute(sel.field_code_norm) ? (
+                        <span style={{ color: t.sub || t.textMuted }}>
+                          lands in <span style={{ fontFamily: "monospace" }}>DIM_ACCOUNT_UD.USER_DEFINED_ATTRIBUTE_CLOB</span> as
+                          key <span style={{ fontFamily: "monospace" }}>{sel.field_code_norm}</span> · per-key lineage
+                          not loaded yet (step <span style={{ fontFamily: "monospace" }}>advantage_ud_lineage</span>)</span>
+                      ) : (
+                        <span style={{ color: t.muted || t.textMuted }}>— not mapped to a DWH column —</span>)}
                       <div style={{ marginTop: 9 }}>
                         <span title="This data point has no DWH lineage target"
                           style={{ display: "inline-block", fontSize: 10.5, fontWeight: 700,

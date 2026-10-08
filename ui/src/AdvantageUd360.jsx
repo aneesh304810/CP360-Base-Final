@@ -228,15 +228,16 @@ export function TypeVarianceView({ t, tv }) {
         <Sec t={t} title="Every key, worst first">
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
             <thead><tr style={{ color: t.muted || "#7b8894", textAlign: "left" }}>
-              <th style={{ padding: "2px 6px" }}>Key</th><th style={{ padding: "2px 6px" }}>Dominant</th>
+              <th style={{ padding: "2px 6px" }}>Key</th><th style={{ padding: "2px 6px" }}>UD name</th><th style={{ padding: "2px 6px" }}>Dominant</th>
               <th style={{ padding: "2px 6px" }}>Minority types</th><th style={{ padding: "2px 6px" }}>Class</th><th style={{ padding: "2px 6px" }}>Do</th></tr></thead>
             <tbody>
               {[...tv.rows].sort((a, b) => (b.minority_pct || 0) - (a.minority_pct || 0)).map((r) => {
                 const [bg, c] = SEVERITY[r.severity] || SEVERITY.low;
                 return (
                   <tr key={r.attribute_name} style={{ borderTop: "1px solid #f0f3f6" }}>
-                    <td style={{ ...mono, padding: "3px 6px", whiteSpace: "nowrap" }}>{r.attribute_name}
-                      {r.term && <div style={{ fontFamily: "inherit", fontSize: 10, color: t.muted || "#7b8894" }}>{r.term}</div>}</td>
+                    <td style={{ ...mono, padding: "3px 6px", whiteSpace: "nowrap" }}>{r.attribute_name}</td>
+                    <td style={{ padding: "3px 6px", fontWeight: 600, color: t.navy || "#10193b" }}>
+                      {r.term || <span style={{ fontWeight: 400, color: t.muted || "#7b8894" }}>{r.parent_attribute ? `line of ${r.parent_attribute}` : "no dictionary entry"}</span>}</td>
                     <td style={{ padding: "3px 6px", whiteSpace: "nowrap" }}>{r.dominant_type} <span style={{ color: t.muted || "#7b8894" }}>{pct(r.dominant_type_pct)}</span>
                       {r.type_reclassified === "Y" && <div style={{ fontSize: 10, color: "#b26b00" }}>read as {r.value_class}</div>}</td>
                     <td style={{ padding: "3px 6px" }}>
@@ -289,8 +290,9 @@ export function SchemaVarianceView({ t, sv }) {
         </Sec>
         <Sec t={t} title="The optional keys · what multiplies the sets">
           {(sv.optional_keys || []).slice(0, 30).map((k) => (
-            <div key={k.attribute_name} style={{ display: "grid", gridTemplateColumns: "90px 1fr 50px", gap: 8, alignItems: "center", fontSize: 11, padding: "1px 0" }}>
+            <div key={k.attribute_name} style={{ display: "grid", gridTemplateColumns: "80px 1fr 1fr 50px", gap: 8, alignItems: "center", fontSize: 11, padding: "1px 0" }}>
               <span style={mono}>{k.attribute_name}</span>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: t.text || "#333" }}>{k.term || ""}</span>
               <div style={{ height: 6, background: "#eef2f5", borderRadius: 3 }}>
                 <div style={{ width: `${Math.max(1, k.record_presence_pct || 0)}%`, height: 6, background: "#0f4775", borderRadius: 3 }} /></div>
               <span style={{ textAlign: "right", color: t.muted || "#7b8894" }}>{pct(k.record_presence_pct)}</span>

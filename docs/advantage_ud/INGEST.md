@@ -7,6 +7,7 @@ with `local\load.ps1`. Nothing new to install: `oracledb`, `openpyxl` and
 | # | Source | Step | Tables |
 |---|---|---|---|
 | 1 | profiler outputs (6 small csv) | `advantage_ud_profile` | registry, parent, family, schema, conflict, run |
+| 1b | the registry (no file) | `advantage_ud_lineage` | one `legacy_lineage` row per UD key: ACCOUNTMASTER.UD/n → STG2_ACCOUNT_UD_INTRADAY pivot → DIM_ACCOUNT_UD key |
 | 2 | `code_dictionary.csv` | `advantage_ud_dictionary` | dictionary (OBSERVED) |
 | 3 | `dataVar.csv`, the extract | `advantage_ud_extract` | raw, attribute, quarantine (+ registry, schema for drift) |
 | 4 | `AddV User Defined Fields … .xlsx` | `advantage_ud_workbook` | table, field_type, dictionary (TABLES), link |
@@ -34,7 +35,8 @@ first sheet has `Account Number` and `Ud n seq` headers is the samples).
 A different folder for one run: `.\local\load.ps1 advantage_ud -File D:\drops\addv-ud`.
 
 The step prints what it found, writes `docs\advantage_ud\source_inventory.md`,
-then runs the five sub-steps below in order, skipping any whose source is
+then runs the sub-steps below in order (profile, lineage, dictionary,
+extract, workbook, TRP), skipping any whose source is
 not in the folder and stopping at the first failure. Each sub-step can also
 be run on its own (`.\local\load.ps1 advantage_ud_extract`).
 
