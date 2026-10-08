@@ -14,7 +14,7 @@
 //             into one "+N other systems" node; click it to unfold the zone
 //   links     one line per (source, target) pair, and a floor on how many
 //             interfaces a line must carry to be drawn; the floor picks
-//             itself so that about sixty lines show, and the reader can
+//             itself so that about forty lines show, and the reader can
 //             lower it
 //
 // Names that differ only in case or spacing ("AUM", "AUm") are one system;
@@ -28,11 +28,14 @@
 import React, { useMemo, useState } from "react";
 import { projColor, projLabel } from "./bbhTheme.js";
 
-const BOX_W = 150, BOX_H = 40, GAP_X = 26, GAP_Y = 30, ZONE_PAD = 18, ZONE_HEAD = 30, ZONE_GAP = 28;
+const BOX_W = 150, BOX_H = 40, GAP_X = 46, GAP_Y = 48, ZONE_PAD = 24, ZONE_HEAD = 34, ZONE_GAP = 76;
+const BUS = 44;                     // a routing bus under the zones for links between non-adjacent zones
+const LANE = 6;                     // spacing between parallel lines in one gutter
+const MIN_ROW_H = 290;
 const STORE_RE = /warehouse|data\s*mart|datamart|\bdwh?\b|\bdm\b|database|\bdb\b|\blake\b|\bmart\b|\bods\b/i;
 const FOLD = (zone) => `__fold__${zone}`;
 const ZONE = (zone) => `__zone__${zone}`;
-const ZBOX_W = 230, ZBOX_H = 72;
+const ZBOX_W = 232;              // a closed zone is a card as tall as the row
 
 export const canonName = (s) => String(s || "Unknown").trim().replace(/\s+/g, " ").toLowerCase();
 export const isStore = (name) => STORE_RE.test(name || "");
@@ -79,7 +82,7 @@ export function aggregate(rows) {
 }
 
 /* The floor on interfaces per line that leaves about `want` lines. */
-export function autoFloor(links, want = 60) {
+export function autoFloor(links, want = 40) {
   const counts = links.map((l) => l.n).sort((a, b) => b - a);
   if (counts.length <= want) return 1;
   return Math.max(1, counts[want - 1]);
@@ -124,33 +127,38 @@ export function layout(agg, { perZone = 8, floor = 1, unfolded = new Set(), expa
   const allLines = [...lines.values()].sort((a, b) => b.n - a.n);
   const shown = allLines.filter((l) => l.n >= floor);
 
-  // geometry: zones flow left to right and wrap
+  // geometry: every zone in one row across the width; closed zones are
+  // cards as tall as the row, open zones a grid of boxes
   const nodes = new Map();
-  let x = 0, y = 0, rowH = 0;
-  zones.forEach((z) => {
-    if (!z.open) {                                      // the zone is one box
-      const w = ZBOX_W + ZONE_PAD * 2, h = ZBOX_H + ZONE_PAD * 2;
-      if (x + w > width && x > 0) { x = 0; y += rowH + ZONE_GAP; rowH = 0; }
-      z.x = x; z.y = y; z.w = w; z.h = h;
-      nodes.set(ZONE(z.name), { key: ZONE(z.name), id: z.name, zoneBox: true, zone: z.name, zoneName: z.name,
-        proj: z.folded[0]?.proj || "other", n: z.total, in: 0, out: 0, pii: z.pii, mig: z.mig,
-        systems: z.systems, stores: z.stores, internal: internal[ZONE(z.name)] || 0,
-        x: z.x + ZONE_PAD, y: z.y + ZONE_PAD, w: ZBOX_W, h: ZBOX_H });
-      x += w + ZONE_GAP; rowH = Math.max(rowH, h);
-      return;
-    }
+  const opens = zones.filter((z) => z.open);
+  opens.forEach((z) => {
     const apps = z.kept.filter((s) => !s.store), stores = z.kept.filter((s) => s.store);
     const items = apps.length + (z.folded.length ? 1 : 0);
-    const cols = Math.max(1, Math.min(4, Math.ceil(Math.sqrt(Math.max(items, stores.length)))));
-    const appRows = Math.ceil(items / cols), storeRows = Math.ceil(stores.length / cols);
-    const w = ZONE_PAD * 2 + cols * BOX_W + (cols - 1) * GAP_X;
-    const h = ZONE_HEAD + ZONE_PAD + (appRows + storeRows) * (BOX_H + GAP_Y) + (storeRows ? 10 : 0) + ZONE_PAD;
-    if (x + w > width && x > 0) { x = 0; y += rowH + ZONE_GAP; rowH = 0; }
-    z.x = x; z.y = y; z.w = w; z.h = h;
+    z.cols = Math.max(1, Math.min(4, Math.ceil(Math.sqrt(Math.max(items, stores.length)))));
+    z.appRows = Math.ceil(items / z.cols); z.storeRows = Math.ceil(stores.length / z.cols);
+    z.w = ZONE_PAD * 2 + z.cols * BOX_W + (z.cols - 1) * GAP_X;
+    z.h = ZONE_HEAD + ZONE_PAD + (z.appRows + z.storeRows) * (BOX_H + GAP_Y) + (z.storeRows ? 12 : 0) + ZONE_PAD;
+  });
+  const rowH = Math.max(MIN_ROW_H, ...opens.map((z) => z.h));
+  let x = 0;
+  zones.forEach((z, zi) => {
+    z.zi = zi; z.x = x; z.y = 0;
+    if (!z.open) {
+      z.w = ZBOX_W; z.h = rowH;
+      nodes.set(ZONE(z.name), { key: ZONE(z.name), id: z.name, zoneBox: true, zone: z.name, zoneName: z.name, zi,
+        proj: z.folded[0]?.proj || "other", n: z.total, in: 0, out: 0, pii: z.pii, mig: z.mig,
+        systems: z.systems, stores: z.stores, internal: internal[ZONE(z.name)] || 0, top: z.folded.slice(0, 5),
+        x: z.x, y: z.y, w: z.w, h: z.h });
+      x += z.w + ZONE_GAP;
+      return;
+    }
+    z.h = rowH;
+    const apps = z.kept.filter((s) => !s.store), stores = z.kept.filter((s) => s.store);
+    z.colsX = Array.from({ length: z.cols }, (_, c) => z.x + ZONE_PAD + c * (BOX_W + GAP_X));
+    z.rowsY = Array.from({ length: z.appRows + z.storeRows }, (_, r) => z.y + ZONE_HEAD + ZONE_PAD + r * (BOX_H + GAP_Y) + (r >= z.appRows && z.storeRows ? 12 : 0));
     const place = (list, startRow) => list.forEach((s, i) => {
-      const c = i % cols, r = startRow + Math.floor(i / cols);
-      s.x = z.x + ZONE_PAD + c * (BOX_W + GAP_X);
-      s.y = z.y + ZONE_HEAD + ZONE_PAD + r * (BOX_H + GAP_Y) + (r >= appRows && storeRows ? 10 : 0);
+      s.col = i % z.cols; s.row = startRow + Math.floor(i / z.cols); s.zi = zi;
+      s.x = z.colsX[s.col]; s.y = z.rowsY[s.row]; s.w = BOX_W; s.h = BOX_H;
       s.zoneName = z.name;
       nodes.set(s.key, s);
     });
@@ -161,43 +169,148 @@ export function layout(agg, { perZone = 8, floor = 1, unfolded = new Set(), expa
         pii: z.folded.reduce((a, s) => a + s.pii, 0), mig: 0, folded: z.folded });
     }
     place(appList, 0);
-    place(stores, appRows);
-    x += w + ZONE_GAP; rowH = Math.max(rowH, h);
+    place(stores, z.appRows);
+    x += z.w + ZONE_GAP;
   });
-  return { zones, nodes, lines: shown, allLines, internal, width: Math.max(width, 320), height: y + rowH + 10,
-           shownCount: shown.length, lineCount: allLines.length, hidden: allLines.length - shown.length,
-           landing: expanded !== null && expanded.size === 0 };
+  const lay = { zones, nodes, lines: shown, allLines, internal, width: Math.max(x - ZONE_GAP, 320), height: rowH + BUS + 6,
+                rowH, busY: rowH + BUS / 2,
+                shownCount: shown.length, lineCount: allLines.length, hidden: allLines.length - shown.length,
+                landing: expanded !== null && expanded.size === 0 };
+  routeLines(lay);
+  return lay;
 }
 
-const dims = (n) => ({ w: n.w || BOX_W, h: n.h || BOX_H });
-const bez = (p0, p1, p2, p3, t) => ({
-  x: (1 - t) ** 3 * p0.x + 3 * (1 - t) ** 2 * t * p1.x + 3 * (1 - t) * t ** 2 * p2.x + t ** 3 * p3.x,
-  y: (1 - t) ** 3 * p0.y + 3 * (1 - t) ** 2 * t * p1.y + 3 * (1 - t) * t ** 2 * p2.y + t ** 3 * p3.y,
-});
-/* a curve from the side of a that faces b to the side of b that faces a,
-   and its midpoint for a label */
-const anchor = (a, b) => {
-  const da = dims(a), db = dims(b);
-  const ax = a.x + da.w / 2, ay = a.y + da.h / 2, bx = b.x + db.w / 2, by = b.y + db.h / 2;
-  const dx = bx - ax, dy = by - ay;
-  let p0, p1, p2, p3;
-  if (Math.abs(dx) > Math.abs(dy)) {
-    p0 = { x: dx > 0 ? a.x + da.w : a.x, y: ay }; p3 = { x: dx > 0 ? b.x : b.x + db.w, y: by };
-    const mx = (p0.x + p3.x) / 2;
-    p1 = { x: mx, y: p0.y }; p2 = { x: mx, y: p3.y };
-  } else {
-    p0 = { x: ax, y: dy > 0 ? a.y + da.h : a.y }; p3 = { x: bx, y: dy > 0 ? b.y : b.y + db.h };
-    const my = (p0.y + p3.y) / 2;
-    p1 = { x: p0.x, y: my }; p2 = { x: p3.x, y: my };
+/* ORTHOGONAL ROUTING. Every line runs in the gutters: the gaps between
+   rows and columns of a zone, the gap between zones, and a bus under the
+   zones for links between zones that are not neighbours. A line leaves
+   its box from the side that faces its gutter and enters the target the
+   same way, so no line crosses a box. Lines that share a gutter are
+   spread into lanes.
+
+   A route is a list of points whose coordinates are numbers or gutter
+   ids; the ids are resolved to a base coordinate plus a lane offset once
+   every line has claimed its gutters. */
+/* an orthogonal polyline with its corners rounded */
+const roundedPath = (pts, r) => {
+  if (pts.length < 3) return pts.map((p, i) => `${i ? "L" : "M"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
+  let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const p = pts[i - 1], c = pts[i], n = pts[i + 1];
+    const rr = Math.min(r, Math.hypot(c.x - p.x, c.y - p.y) / 2, Math.hypot(n.x - c.x, n.y - c.y) / 2);
+    const ux = Math.sign(c.x - p.x), uy = Math.sign(c.y - p.y), vx = Math.sign(n.x - c.x), vy = Math.sign(n.y - c.y);
+    d += ` L ${(c.x - ux * rr).toFixed(1)} ${(c.y - uy * rr).toFixed(1)} Q ${c.x.toFixed(1)} ${c.y.toFixed(1)} ${(c.x + vx * rr).toFixed(1)} ${(c.y + vy * rr).toFixed(1)}`;
   }
-  // two boxes linked both ways share a track; offset each direction a little
-  const side = (a.key < b.key ? 1 : -1) * 7;
-  const off = Math.abs(dx) > Math.abs(dy) ? { x: 0, y: side } : { x: side, y: 0 };
-  const sh = (p) => ({ x: p.x + off.x, y: p.y + off.y });
-  [p0, p1, p2, p3] = [sh(p0), sh(p1), sh(p2), sh(p3)];
-  const m = bez(p0, p1, p2, p3, 0.5);
-  return { d: `M ${p0.x} ${p0.y} C ${p1.x} ${p1.y}, ${p2.x} ${p2.y}, ${p3.x} ${p3.y}`, mx: m.x, my: m.y };
+  const e = pts[pts.length - 1];
+  return d + ` L ${e.x.toFixed(1)} ${e.y.toFixed(1)}`;
 };
+
+export function routeLines(lay) {
+  const { zones, nodes } = lay;
+  const gutters = new Map();                           // id -> { base, cap, users: [] }
+  const G = (id, base, cap) => { if (!gutters.has(id)) gutters.set(id, { base, cap, users: [] }); return id; };
+  const hg = (z, r) => {                               // the gap below row r (-1: above row 0)
+    const ys = z.rowsY, last = ys.length - 1;
+    const y = r < 0 ? ys[0] - GAP_Y / 2 : r >= last ? ys[last] + BOX_H + GAP_Y / 2 : (ys[r] + BOX_H + ys[r + 1]) / 2;
+    return G(`h:${z.zi}:${r}`, y, GAP_Y);
+  };
+  const vg = (z, c) => {                               // the gap right of column c (-1: left of column 0)
+    const xs = z.colsX;
+    const xx = c < 0 ? xs[0] - GAP_X / 2 : xs[c] + BOX_W + GAP_X / 2;
+    return G(`v:${z.zi}:${c}`, xx, GAP_X);
+  };
+  const zg = (i) => G(`z:${i}`, zones[i].x + zones[i].w + ZONE_GAP / 2, ZONE_GAP);   // between zone i and i+1
+  const bus = () => G("bus", lay.busY, BUS);
+  const edge = (n, side) => {
+    const along = side === "top" || side === "bottom";
+    return G(`e:${n.key}:${side}`, along ? n.x + n.w / 2 : n.y + n.h / 2, along ? n.w : n.h);
+  };
+  const direct = (a, b, axis) => G(`d:${axis}:${[a.key, b.key].sort().join("|")}`, axis === "y" ? a.y + a.h / 2 : a.x + a.w / 2, axis === "y" ? a.h : a.w);
+
+  // leave a box in zone z towards the zone gap on its right (toRight) or left
+  const leave = (a, z, toRight) => {
+    if (a.zoneBox) { const side = toRight ? "right" : "left"; return [{ x: toRight ? a.x + a.w : a.x, y: edge(a, side) }]; }
+    if ((toRight && a.col === z.cols - 1) || (!toRight && a.col === 0)) {
+      const side = toRight ? "right" : "left";
+      return [{ x: toRight ? a.x + a.w : a.x, y: edge(a, side) }];
+    }
+    const e = edge(a, "bottom"), g = hg(z, a.row);
+    return [{ x: e, y: a.y + a.h }, { x: e, y: g }, { x: toRight ? z.x + z.w : z.x, y: g }];
+  };
+  const route = (l) => {
+    const a = nodes.get(l.from), b = nodes.get(l.to);
+    if (!a || !b) return null;
+    const za = zones[a.zi], zb = zones[b.zi];
+    if (a.zi === b.zi) {                               // inside one open zone
+      if (a.row === b.row && Math.abs(a.col - b.col) === 1) {
+        const right = b.col > a.col, y = direct(a, b, "y");
+        return [{ x: right ? a.x + a.w : a.x, y }, { x: right ? b.x : b.x + b.w, y }];
+      }
+      if (a.col === b.col && Math.abs(a.row - b.row) === 1) {
+        const down = b.row > a.row, xx = direct(a, b, "x");
+        return [{ x: xx, y: down ? a.y + a.h : a.y }, { x: xx, y: down ? b.y : b.y + b.h }];
+      }
+      const down = b.row >= a.row, gr = down ? a.row : a.row - 1, g = hg(za, gr);
+      const ea = edge(a, down ? "bottom" : "top");
+      const pts = [{ x: ea, y: down ? a.y + a.h : a.y }, { x: ea, y: g }];
+      if (b.row === (down ? gr + 1 : gr)) {            // the gutter touches b: enter from above or below
+        const eb = edge(b, down ? "top" : "bottom");
+        pts.push({ x: eb, y: g }, { x: eb, y: down ? b.y : b.y + b.h });
+        return pts;
+      }
+      const side = b.col > a.col ? "left" : "right";   // the column gap on the side of b that faces a
+      const v = side === "left" ? vg(za, b.col - 1) : vg(za, b.col), eb = edge(b, side);
+      pts.push({ x: v, y: g }, { x: v, y: eb }, { x: side === "left" ? b.x : b.x + b.w, y: eb });
+      return pts;
+    }
+    // across zones: out to the zone gap, along it (or down to the bus), in again
+    const toRight = b.zi > a.zi;
+    const ga = toRight ? zg(a.zi) : zg(a.zi - 1), gb = toRight ? zg(b.zi - 1) : zg(b.zi);
+    const out = leave(a, za, toRight);
+    const pts = [...out, { x: ga, y: out[out.length - 1].y }];
+    if (ga !== gb) { const y = bus(); pts.push({ x: ga, y }, { x: gb, y }); }
+    const side = toRight ? "left" : "right";
+    if (b.zoneBox || (toRight ? b.col === 0 : b.col === zb.cols - 1)) {
+      const eb = edge(b, side);
+      pts.push({ x: gb, y: eb }, { x: toRight ? b.x : b.x + b.w, y: eb });
+      return pts;
+    }
+    const g = hg(zb, b.row), v = side === "left" ? vg(zb, b.col - 1) : vg(zb, b.col), eb = edge(b, side);
+    pts.push({ x: gb, y: g }, { x: v, y: g }, { x: v, y: eb }, { x: side === "left" ? b.x : b.x + b.w, y: eb });
+    return pts;
+  };
+  const routed = lay.lines.map((l) => ({ l, pts: route(l) })).filter((r) => r.pts);
+  // claim lanes: every gutter a line touches, once per line
+  routed.forEach((r) => {
+    const seen = new Set();
+    r.pts.forEach((p) => [p.x, p.y].forEach((c) => {
+      if (typeof c === "string" && !seen.has(c)) { seen.add(c); gutters.get(c).users.push(r); }
+    }));
+  });
+  // lanes are LANE apart, squeezed so the spread never leaves the gutter
+  const offset = (id, r) => {
+    const g = gutters.get(id), n = g.users.length, k = g.users.indexOf(r);
+    const lane = Math.min(LANE, (g.cap - 10) / Math.max(1, n - 1));
+    return (k - (n - 1) / 2) * lane;
+  };
+  routed.forEach((r) => {
+    const res = r.pts.map((p) => ({
+      x: typeof p.x === "string" ? gutters.get(p.x).base + offset(p.x, r) : p.x,
+      y: typeof p.y === "string" ? gutters.get(p.y).base + offset(p.y, r) : p.y }));
+    // drop zero-length steps
+    const pts = res.filter((p, i) => i === 0 || Math.abs(p.x - res[i - 1].x) > 0.01 || Math.abs(p.y - res[i - 1].y) > 0.01);
+    r.l.pts = pts;
+    r.l.d = roundedPath(pts, 7);
+    // the label sits on the longest run
+    let best = 0, bi = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const len = Math.abs(pts[i].x - pts[i - 1].x) + Math.abs(pts[i].y - pts[i - 1].y);
+      if (len > best) { best = len; bi = i; }
+    }
+    r.l.lx = (pts[bi].x + pts[bi - 1].x) / 2; r.l.ly = (pts[bi].y + pts[bi - 1].y) / 2;
+    r.l.vertical = Math.abs(pts[bi].x - pts[bi - 1].x) < 0.01;
+  });
+  return lay;
+}
 
 function Store({ x, y, w, h, fill, stroke, sw }) {
   const ry = 6;
@@ -354,14 +467,16 @@ export default function EcosystemView({ t, rows, onSelect, defaultOpen = false }
   const [expanded, setExpanded] = useState(() => (defaultOpen ? null : new Set()));
   const [focus, setFocus] = useState(null);
   const [edge, setEdge] = useState(null);
-  const auto = useMemo(() => autoFloor(agg.links), [agg]);
-  const floor = floorPick ?? auto;
   const zoneCount = useMemo(() => new Set(agg.systems.map((x) => x.zone)).size, [agg]);
   // one zone only: there is nothing to land on, go straight to the systems
   const exp = zoneCount <= 1 ? null : expanded;
   const landing = exp !== null && exp.size === 0;
-  const lay = useMemo(() => layout(agg, { perZone, floor: landing ? 1 : floor, unfolded, expanded: exp }),
-    [agg, perZone, floor, unfolded, exp, landing]);
+  // the floor picks itself from the lines this zone state can draw, not from raw system pairs
+  const base = useMemo(() => layout(agg, { perZone, floor: 1, unfolded, expanded: exp }), [agg, perZone, unfolded, exp]);
+  const auto = landing ? 1 : autoFloor(base.allLines);
+  const floor = floorPick ?? auto;
+  const lay = useMemo(() => (floor === 1 ? base : layout(agg, { perZone, floor, unfolded, expanded: exp })),
+    [agg, base, perZone, floor, unfolded, exp]);
   const openZone = (name) => { const e = new Set(expanded); e.add(name); setExpanded(e); setFocus(null); setEdge(null); };
   const closeZone = (name) => { const e = new Set(expanded); e.delete(name); setExpanded(e); setFocus(null); setEdge(null); };
   const showLabels = lay.lines.length <= 40;
@@ -398,12 +513,12 @@ export default function EcosystemView({ t, rows, onSelect, defaultOpen = false }
             {[4, 6, 8, 12, 999].map((n) => <option key={n} value={n}>{n === 999 ? "all" : `top ${n}`}</option>)}</select></label>}
         {!landing && <label>draw links with ≥{" "}
           <select value={floor} onChange={(e) => setFloorPick(Number(e.target.value))} style={sw}>
-            {[1, 2, 3, 5, 10, 20].map((n) => <option key={n} value={n}>{n}</option>)}</select>{" "}
+            {[...new Set([1, 2, 3, 5, 10, 20, floor])].sort((a, b) => a - b).map((n) => <option key={n} value={n}>{n}</option>)}</select>{" "}
           interface{floor === 1 ? "" : "s"}{floorPick == null ? " (auto)" : ""}
           {floorPick != null && <span onClick={() => setFloorPick(null)} role="button" tabIndex={0} style={{ marginLeft: 6, color: t.accent, cursor: "pointer" }}>auto</span>}</label>}
         <span style={{ marginLeft: "auto", color: t.textMuted }}>{landing
           ? "arc width = interfaces · red = carries PII · dashed = all Replace · click a flow for its interfaces"
-          : "cylinder = data store · width = interfaces · dashed = all Replace · red = carries PII"}</span>
+          : "cylinder = data store · line width = interfaces · dashed = all Replace · red = carries PII"}</span>
         {(focus || edge) && <span onClick={() => { setFocus(null); setEdge(null); }} role="button" tabIndex={0}
           style={{ cursor: "pointer", color: t.accent, fontWeight: 700 }}>clear ✕</span>}
       </div>
@@ -411,7 +526,7 @@ export default function EcosystemView({ t, rows, onSelect, defaultOpen = false }
         {landing ? <Landing t={t} lay={lay} edge={edge} setEdge={setEdge} openZone={openZone}
                      setExpanded={(e) => { setExpanded(e); setFocus(null); setEdge(null); }} />
         : <div style={{ background: t.panel, border: `1px solid ${t.disabled}`, borderRadius: t.radius.md, overflow: "auto" }}>
-          <svg viewBox={`0 0 ${lay.width} ${lay.height}`} width="100%" style={{ minWidth: 900, display: "block" }} fontFamily={t.font}>
+          <svg viewBox={`0 0 ${lay.width} ${lay.height}`} width="100%" style={{ minWidth: 900, display: "block", maxHeight: "82vh" }} fontFamily={t.font}>
             <defs>
               <marker id="eco-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9"
                 markerUnits="userSpaceOnUse" orient="auto-start-reverse">
@@ -419,48 +534,60 @@ export default function EcosystemView({ t, rows, onSelect, defaultOpen = false }
             </defs>
             {lay.zones.filter((z) => z.open).map((z) => (
               <g key={z.name}>
-                <rect x={z.x} y={z.y} width={z.w} height={z.h} rx={10} fill="#f3f6f9" stroke="#d6dee6" />
-                <text x={z.x + ZONE_PAD} y={z.y + 20} fontSize="12" fontWeight="800" fill={t.navy} letterSpacing=".3">
+                <rect x={z.x} y={z.y} width={z.w} height={z.h} rx={8} fill="#f6f8fa" stroke="#d6dee6" />
+                <text x={z.x + ZONE_PAD} y={z.y + 22} fontSize="13" fontWeight="800" fill={t.navy} letterSpacing=".3">
                   {z.name}</text>
-                <text x={z.x + z.w - ZONE_PAD} y={z.y + 20} fontSize="10" fill={t.textMuted} textAnchor="end">
+                <text x={z.x + z.w - ZONE_PAD} y={z.y + 22} fontSize="10" fill={t.textMuted} textAnchor="end">
                   {z.kept.length + z.folded.length} systems · {z.total} interface ends
                   {exp !== null && <tspan fill={t.accent} fontWeight="700" onClick={() => closeZone(z.name)} style={{ cursor: "pointer" }}>  · close ✕</tspan>}</text>
               </g>))}
             {lay.lines.map((l) => {
               const a = lay.nodes.get(l.from), b = lay.nodes.get(l.to);
-              if (!a || !b) return null;
+              if (!a || !b || !l.d) return null;
               const on = touches(l), picked = edge === l.key;
-              const w = 1 + Math.log2(l.n + 1) * 1.1;
-              const c = l.pii ? "#c1113a" : projColor(t, a.proj);
-              const g = anchor(a, b);
+              const w = 1 + Math.log2(l.n + 1) * 0.8;
+              const c = l.pii ? "#c1113a" : "#6f7f90";
+              const label = `${l.n}${l.pii ? ` · ${l.pii}P` : ""}`, lw = label.length * 6 + 10;
               return (
                 <g key={l.key} style={{ cursor: "pointer" }} onClick={() => setEdge(picked ? null : l.key)}>
-                  <path d={g.d} fill="none" stroke={c}
-                    strokeWidth={picked ? w + 2 : w} strokeOpacity={on ? (picked ? 1 : 0.42) : 0.05}
+                  <path d={l.d} fill="none" stroke={c} strokeLinejoin="round"
+                    strokeWidth={picked ? w + 2 : w} strokeOpacity={on ? (picked ? 1 : 0.4) : 0.06}
                     strokeDasharray={l.mig === l.n ? "6,4" : "none"} markerEnd="url(#eco-arrow)">
                     <title>{`${nameOf(l.from)} → ${nameOf(l.to)}: ${l.n} interface${l.n === 1 ? "" : "s"}${l.pairs > 1 ? ` across ${l.pairs} pairs` : ""}${l.pii ? ` · ${l.pii} PII` : ""}${l.mig ? ` · ${l.mig} Replace` : ""}`}</title>
                   </path>
                   {showLabels && on && (
                     <g>
-                      <rect x={g.mx - 14} y={g.my - 8} width={28 + (l.pii ? 18 : 0)} height={15} rx={7} fill="#fff" stroke={c} strokeWidth={0.8} strokeOpacity={0.7} />
-                      <text x={g.mx + (l.pii ? 9 : 0)} y={g.my + 3.5} fontSize="9.5" fontWeight="700" fill={t.navy} textAnchor="middle">
-                        {l.n}{l.pii ? ` · ${l.pii}P` : ""}</text>
+                      <rect x={l.lx - lw / 2} y={l.ly - 7.5} width={lw} height={15} rx={7} fill="#fff" stroke={c} strokeWidth={0.8} strokeOpacity={0.7} />
+                      <text x={l.lx} y={l.ly + 3.5} fontSize="9.5" fontWeight="700" fill={t.navy} textAnchor="middle">{label}</text>
                     </g>)}
                 </g>);
             })}
             {[...lay.nodes.values()].filter((n) => n.zoneBox).map((n) => {
               const dim = focus && focus !== n.key && !lay.lines.some((l) => touches(l) && (l.from === n.key || l.to === n.key));
-              const isF = focus === n.key;
+              const c = projColor(t, n.proj), topMax = n.top[0]?.n || 1, px = n.x + 16, bw = n.w - 32 - 30;
               return (
-                <g key={n.key} opacity={dim ? 0.3 : 1} style={{ cursor: "pointer" }}
-                  onClick={() => openZone(n.zone)}>
-                  <rect x={n.x} y={n.y} width={n.w} height={n.h} rx={10} fill={isF ? "#eaf1f8" : "#f3f6f9"} stroke={isF ? t.accent : "#9fb0c0"} strokeWidth={isF ? 2 : 1.4} />
-                  <text x={n.x + 14} y={n.y + 22} fontSize="13" fontWeight="800" fill={t.navy}>{n.id}</text>
-                  <text x={n.x + 14} y={n.y + 40} fontSize="10" fill={t.sub}>
-                    {n.systems} systems{n.stores ? ` · ${n.stores} stores` : ""} · {n.internal} internal interface{n.internal === 1 ? "" : "s"}</text>
-                  <text x={n.x + 14} y={n.y + 56} fontSize="10" fill={t.textMuted}>
-                    {n.mig ? `${n.mig} replace` : "no replace"}{n.pii ? ` · ${n.pii} PII ends` : ""} · <tspan fill={t.accent} fontWeight="700">open ▸</tspan></text>
-                  {n.pii > 0 && <circle cx={n.x + n.w - 12} cy={n.y + 12} r={4.5} fill="#c1113a" />}
+                <g key={n.key} opacity={dim ? 0.3 : 1} style={{ cursor: "pointer" }} onClick={() => openZone(n.zone)}>
+                  <rect x={n.x} y={n.y} width={n.w} height={n.h} rx={8} fill="#fff" stroke="#9fb0c0" strokeWidth={1.2} />
+                  <path d={`M ${n.x + 8} ${n.y} h ${n.w - 16} a 8 8 0 0 1 8 8 v 1 h ${-n.w} v -1 a 8 8 0 0 1 8 -8 z`} fill={c} />
+                  <text x={px} y={n.y + 30} fontSize="14" fontWeight="800" fill={t.navy}>{n.id.length > 26 ? n.id.slice(0, 25) + "…" : n.id}</text>
+                  <text x={px} y={n.y + 44} fontSize="8.5" fill={t.textMuted} letterSpacing=".6">{projLabel(n.proj).toUpperCase()} · CLOSED</text>
+                  <text x={px} y={n.y + 78} fontSize="26" fontWeight="800" fill={t.navy}>{n.internal}</text>
+                  <text x={px} y={n.y + 92} fontSize="8.5" fill={t.textMuted} letterSpacing=".5">INTERNAL INTERFACES</text>
+                  <text x={px + 118} y={n.y + 78} fontSize="15" fontWeight="800" fill={t.navy}>{n.systems}</text>
+                  <text x={px + 118} y={n.y + 92} fontSize="8.5" fill={t.textMuted} letterSpacing=".5">SYSTEMS</text>
+                  <text x={px} y={n.y + 112} fontSize="10" fill={t.sub}>
+                    {n.stores ? `${n.stores} store${n.stores === 1 ? "" : "s"} · ` : ""}{n.mig ? `${n.mig} replace` : "no replace"}
+                    {n.pii ? <tspan fill="#c1113a"> · {n.pii} PII ends</tspan> : null}</text>
+                  <text x={px} y={n.y + 136} fontSize="8.5" fill={t.textMuted} letterSpacing=".5">BUSIEST SYSTEMS</text>
+                  {n.top.map((s, i) => (
+                    <g key={s.key}>
+                      <text x={px} y={n.y + 152 + i * 20} fontSize="10.5" fill={t.text}>{s.id.length > 24 ? s.id.slice(0, 23) + "…" : s.id}</text>
+                      <text x={n.x + n.w - 16} y={n.y + 152 + i * 20} fontSize="10" fill={t.sub} textAnchor="end">{s.n}</text>
+                      <rect x={px} y={n.y + 156 + i * 20} width={bw} height={3} rx={1.5} fill={t.panel2} />
+                      <rect x={px} y={n.y + 156 + i * 20} width={Math.max(3, bw * s.n / topMax)} height={3} rx={1.5} fill={s.store ? t.muted : c} />
+                    </g>))}
+                  <text x={n.x + n.w - 16} y={n.y + n.h - 14} fontSize="11" fontWeight="700" fill={t.accent} textAnchor="end">Open zone ▸</text>
+                  {n.systems > n.top.length && <text x={px} y={n.y + n.h - 14} fontSize="10" fill={t.textMuted}>+{n.systems - n.top.length} more</text>}
                 </g>);
             })}
             {[...lay.nodes.values()].filter((n) => !n.zoneBox).map((n) => {

@@ -3,7 +3,7 @@
 // WHAT THIS LOCKS DOWN. Three reductions make the estate readable and each
 // must be exact: names merged by case and spacing only; a zone keeps its
 // busiest systems and folds the rest into one node whose links aggregate;
-// a floor on interfaces per link that picks itself to leave about sixty
+// a floor on interfaces per link that picks itself to leave about forty
 // lines. Stores are told apart by name and drawn as cylinders. And the tab
 // stays wired into the client-side-filtering Interface 360.
 
@@ -11,7 +11,7 @@ import React from "react";
 import fs from "node:fs";
 import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import EcosystemView, { aggregate, layout, autoFloor, canonName, isStore } from "../src/InterfaceEcosystem.jsx";
+import EcosystemView, { aggregate, layout, autoFloor, canonName, isStore, routeLines } from "../src/InterfaceEcosystem.jsx";
 import { tLight } from "../src/bbhTheme.js";
 
 let bad = 0;
@@ -59,10 +59,10 @@ const link = Object.fromEntries(agg.links.map((l) => [l.key, l]));
 ok(link["addvantage|pb data warehouse"].n === 2 && link["addvantage|pb data warehouse"].pii === 1, "one link per pair, with counts");
 
 console.log("-- the floor picks itself");
-ok(autoFloor(agg.links, 60) === 1, "few links: everything drawn");
+ok(autoFloor(agg.links) === 1, "few links: everything drawn");
 const many = Array.from({ length: 200 }, (_, i) => ({ n: (i % 7) + 1 }));
-const f = autoFloor(many, 60);
-ok(f >= 2 && many.filter((l) => l.n >= f).length <= 60 + 29, "many links: the floor rises so that about sixty remain", [f, many.filter((l) => l.n >= f).length]);
+const f = autoFloor(many, 40);
+ok(f >= 2 && many.filter((l) => l.n >= f).length <= 40 + 29, "many links: the floor rises so that about forty remain", [f, many.filter((l) => l.n >= f).length]);
 
 console.log("-- layout, folding and zones");
 const lay = layout(agg, { perZone: 3, floor: 1 });
@@ -119,6 +119,57 @@ ok(one.nodes.has("pb data warehouse") && one.nodes.has("__zone__Investment Manag
    "the open zone shows its systems; the closed one is still a box");
 ok(one.lines.some((l) => l.from === "pb data warehouse" && l.to === "__zone__Investment Management"), "a cross-zone link now runs from the system to the closed zone's box");
 ok(layout(agg, { perZone: 8, floor: 1, expanded: null }).zones.every((z) => z.open), "expanded = null is the full system map");
+
+console.log("-- orthogonal routing: lines live in the gutters and never cross a box");
+// an axis-aligned segment that passes through the inside of a box it does not start or end on
+const crosses = (p, q, n) => {
+  const x0 = n.x + 1, y0 = n.y + 1, x1 = n.x + n.w - 1, y1 = n.y + n.h - 1;
+  if (Math.abs(p.y - q.y) < 0.01) { const y = p.y; return y > y0 && y < y1 && Math.max(p.x, q.x) > x0 && Math.min(p.x, q.x) < x1; }
+  const x = p.x; return x > x0 && x < x1 && Math.max(p.y, q.y) > y0 && Math.min(p.y, q.y) < y1;
+};
+const audit = (lay) => {
+  const boxes = [...lay.nodes.values()], bad = [];
+  lay.lines.forEach((l) => {
+    if (!l.pts) { bad.push(`${l.key}: not routed`); return; }
+    for (let i = 1; i < l.pts.length; i++) {
+      const p = l.pts[i - 1], q = l.pts[i];
+      if (Math.abs(p.x - q.x) > 0.01 && Math.abs(p.y - q.y) > 0.01) bad.push(`${l.key}: diagonal step`);
+      boxes.forEach((n) => { if (n.key !== l.from && n.key !== l.to && crosses(p, q, n)) bad.push(`${l.key} through ${n.key}`); });
+      // open zones are boxes too: a line may only cross a zone's edge, not run along the inside of another zone it has no end in
+    }
+    const first = l.pts[0], last = l.pts[l.pts.length - 1], a = lay.nodes.get(l.from), b = lay.nodes.get(l.to);
+    const onEdge = (pt, n) => Math.abs(pt.x - n.x) < 0.01 || Math.abs(pt.x - n.x - n.w) < 0.01 || Math.abs(pt.y - n.y) < 0.01 || Math.abs(pt.y - n.y - n.h) < 0.01;
+    if (!onEdge(first, a) || !onEdge(last, b)) bad.push(`${l.key}: does not start and end on the box edges`);
+  });
+  return bad;
+};
+const open2 = layout(agg, { perZone: 3, floor: 1, expanded: null });
+ok(open2.zones.every((z) => z.y === 0) && open2.zones[1].x >= open2.zones[0].x + open2.zones[0].w, "zones sit in one row across the width, never wrapped", open2.zones.map((z) => [z.x, z.y]));
+ok(audit(open2).length === 0, "fixture, all open: every line is orthogonal, starts and ends on a box edge, crosses no box", audit(open2).slice(0, 5));
+const half = layout(agg, { perZone: 3, floor: 1, expanded: new Set(["Private Banking"]) });
+const zi = half.nodes.get("__zone__Investment Management");
+ok(zi.h === half.rowH && zi.w > 200 && Array.isArray(zi.top) && zi.top[0].id === "IM Datamart", "a closed zone is a card as tall as the row, carrying its busiest systems", [zi.h, half.rowH, zi.top?.[0]?.id]);
+ok(audit(half).length === 0, "fixture, one zone open: lines into the closed zone's card cross nothing", audit(half).slice(0, 5));
+// a dense synthetic estate: four zones, 90 names, 600 interfaces, every combination of open and closed
+let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const DOMS = ["Private Banking", "PB Data Platform", "Investment Management", "Shared Services"];
+const names = Array.from({ length: 90 }, (_, i) => [i % 9 === 0 ? `Mart ${i}` : `App ${i}`, DOMS[i % 4]]);
+const big = [];
+for (let i = 0; i < 600; i++) {
+  const dom = DOMS[Math.floor(rnd() * 4)], pool = names.filter((x) => x[1] === dom);
+  const a = pool[Math.floor(rnd() * pool.length)];
+  const cross = rnd() < 0.3, pool2 = cross ? names.filter((x) => x[1] !== dom) : pool;
+  let b = pool2[Math.floor(rnd() * pool2.length)]; if (b[0] === a[0]) b = pool2[(pool2.indexOf(b) + 1) % pool2.length];
+  big.push(row(1000 + i, a[0], "internal", b[0], "internal", dom, { carries_pii: rnd() < 0.2 ? "Y" : "N", migration_flag: rnd() < 0.3 ? "Y" : "N" }));
+}
+const bagg = aggregate(big);
+const combos = [null, new Set(), new Set([DOMS[0]]), new Set([DOMS[0], DOMS[2]]), new Set([DOMS[1], DOMS[3]]), new Set(DOMS)];
+const problems = combos.map((e) => audit(layout(bagg, { perZone: 8, floor: autoFloor(bagg.links), expanded: e }))).flat();
+ok(problems.length === 0, "dense estate, six open/closed combinations: no line crosses a box", problems.slice(0, 6));
+const dl = layout(bagg, { perZone: 8, floor: autoFloor(bagg.links), expanded: null });
+ok(dl.lines.length >= 40 && dl.lines.every((l) => l.d && typeof l.lx === "number"), "every drawn line has a path and a label point", dl.lines.length);
+const sameGutter = dl.lines.filter((l) => l.pts.length >= 3);
+ok(sameGutter.length > 0 && new Set(sameGutter.map((l) => l.pts[1].y.toFixed(1) + "/" + l.pts[1].x.toFixed(1))).size === sameGutter.length, "lines sharing a gutter take distinct lanes");
 
 console.log("-- the landing renders with counted flows and an invitation");
 const lhtml = renderToStaticMarkup(<EcosystemView t={tLight} rows={rows} />);
