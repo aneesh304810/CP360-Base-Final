@@ -123,9 +123,12 @@ ok(layout(agg, { perZone: 8, floor: 1, expanded: null }).zones.every((z) => z.op
 console.log("-- the landing renders with counted flows and an invitation");
 const lhtml = renderToStaticMarkup(<EcosystemView t={tLight} rows={rows} />);
 ok(/zone-to-zone flows/.test(lhtml) && /click a zone to open it/.test(lhtml), "the header says it is the landing");
-ok(/open ▸/.test(lhtml) && /9 systems · 1 stores · 8 internal interfaces/.test(lhtml), "zone boxes carry counts and an open affordance", lhtml.match(/\d+ systems · [^<]*/)?.[0]);
+ok(/Open zone ▸/.test(lhtml) && /Busiest systems/.test(lhtml) && />8<\/div><div[^>]*>internal interfaces</.test(lhtml) && />9<\/div><div[^>]*>systems</.test(lhtml),
+   "zone cards carry the hero count, a busiest-systems preview and an open affordance");
+ok(/PB Data Warehouse/.test(lhtml) && /<ellipse /.test(lhtml) && !/>Tiny E</.test(lhtml.split("Busiest systems")[1] || ""), "the preview lists the busiest five, a store with its cylinder glyph", lhtml.match(/Busiest systems[\s\S]{0,400}/)?.[0]);
+ok(/Zone-to-zone flow/.test(lhtml) && /open both ▸/.test(lhtml) && /Private Banking <span[^>]*>→<\/span> Investment Management/.test(lhtml), "the ledger lists each flow with a way to open both ends");
 ok(!/systems per zone/.test(lhtml) && !/draw links with/.test(lhtml), "the system-level controls are hidden on the landing");
-ok(/<rect x="[\d.]+" y="[\d.]+" width="28" height="15"/.test(lhtml) || /<rect x="[\d.]+" y="[\d.]+" width="46" height="15"/.test(lhtml), "flows carry a count label");
+ok(/<path d="M [\d.]+ 0 C [\d.]+ [\d.]+, [\d.]+ [\d.]+, [\d.]+ 0" fill="none"/.test(lhtml) && /<rect x="[\d.]+" y="[\d.]+" width="[\d.]+" height="18" rx="9"/.test(lhtml), "flows are arcs between the cards with a count label");
 const single = renderToStaticMarkup(<EcosystemView t={tLight} rows={rows.filter((r) => r.domain === "Private Banking")} />);
 ok(!/zone-to-zone flows/.test(single) && /systems per zone/.test(single), "with one zone there is nothing to land on: straight to the system map");
 

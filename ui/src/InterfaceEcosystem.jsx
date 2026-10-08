@@ -209,6 +209,141 @@ function Store({ x, y, w, h, fill, stroke, sw }) {
 }
 
 // defaultOpen: start with every zone open (the system map) instead of the landing.
+/* A small cylinder glyph for a data store. */
+const Cyl = ({ c }) => (
+  <svg width="11" height="11" viewBox="0 0 11 11" style={{ verticalAlign: "-1px", marginRight: 4 }}>
+    <ellipse cx="5.5" cy="2.6" rx="4.6" ry="2" fill="none" stroke={c} strokeWidth="1.2" />
+    <path d="M.9 2.6v5.4a4.6 2 0 0 0 9.2 0V2.6" fill="none" stroke={c} strokeWidth="1.2" />
+  </svg>);
+
+const Stat = ({ t, n, label, big, color }) => (
+  <div>
+    <div style={{ fontSize: big ? 28 : 17, fontWeight: 800, color: color || t.navy, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{n}</div>
+    <div style={{ fontSize: 9.5, color: t.textMuted, textTransform: "uppercase", letterSpacing: ".6px", marginTop: 4, whiteSpace: "nowrap" }}>{label}</div>
+  </div>);
+
+/* THE LANDING. One card per zone across the full width, the flows between
+   zones as arcs beneath the cards, and a ledger of those flows. The card
+   previews the zone's busiest systems so the reader knows what opening it
+   will show. */
+const LAND_W = 1200;
+function Landing({ t, lay, edge, setEdge, openZone, setExpanded }) {
+  const zones = lay.zones;                                      // busiest first
+  const N = zones.length, colW = LAND_W / N;
+  const cx = (i) => colW * (i + 0.5);
+  const idx = Object.fromEntries(zones.map((z, i) => [ZONE(z.name), i]));
+  const flows = lay.allLines;                                   // no floor on the landing
+  const maxN = Math.max(1, ...flows.map((l) => l.n));
+  const cross = {};
+  flows.forEach((l) => {
+    cross[l.from] = cross[l.from] || { out: 0, in: 0 }; cross[l.to] = cross[l.to] || { out: 0, in: 0 };
+    cross[l.from].out += l.n; cross[l.to].in += l.n;
+  });
+  const nameOf = (k) => lay.nodes.get(k)?.id || k;
+  const ARC_MIN = 54, ARC_MAX = 160;
+  const arcs = flows.map((l) => {
+    const a = idx[l.from], b = idx[l.to], fwd = a < b, span = Math.abs(a - b);
+    const h = ARC_MIN + (ARC_MAX - ARC_MIN) * ((span - 1) / Math.max(1, N - 2)) + (fwd ? 0 : 26);
+    const x0 = cx(a) + (fwd ? 12 : -12), x1 = cx(b) + (fwd ? -12 : 12);
+    const label = `${l.n}${l.pii ? ` · ${l.pii} PII` : ""}`;
+    return { l, h, d: `M ${x0} 0 C ${x0} ${h}, ${x1} ${h}, ${x1} 0`, mx: (x0 + x1) / 2, my: h * 0.75, label,
+             lw: label.length * 6.4 + 16, w: 2 + 9 * (l.n / maxN),
+             c: l.pii ? t.piiClientLevel : t.accent, dashed: l.mig === l.n };
+  });
+  const H = flows.length ? Math.max(...arcs.map((a) => a.my)) + 22 : 40;
+  const topTypes = (types) => Object.entries(types).sort((x, y) => y[1] - x[1]).slice(0, 3).map(([k, v]) => `${k} ${v}`).join(" · ");
+  const th = { textAlign: "left", fontSize: 9.5, color: t.textMuted, textTransform: "uppercase", letterSpacing: ".6px", padding: "6px 10px", borderBottom: `1px solid ${t.disabled}`, fontWeight: 700 };
+  const td = { padding: "8px 10px", borderBottom: `1px solid ${t.panel2}`, fontSize: 12, color: t.text, whiteSpace: "nowrap" };
+  const num = { ...td, textAlign: "right", fontVariantNumeric: "tabular-nums" };
+  return (
+    <div data-landing="1">
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${N}, minmax(0, 1fr))`, gap: 18 }}>
+        {zones.map((z) => {
+          const node = lay.nodes.get(ZONE(z.name)); const c = projColor(t, node.proj);
+          const top = z.folded.slice(0, 5), topMax = top[0]?.n || 1;
+          const xz = cross[ZONE(z.name)] || { in: 0, out: 0 };
+          return (
+            <div key={z.name} onClick={() => openZone(z.name)} role="button" tabIndex={0} title={`open ${z.name}`}
+              style={{ background: t.panel, border: `1px solid ${t.disabled}`, borderTop: `4px solid ${c}`, borderRadius: 6,
+                padding: "14px 16px 12px", cursor: "pointer", minWidth: 0, boxShadow: "0 1px 2px rgba(16,25,59,.06)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: t.navy, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{z.name}</div>
+                <div style={{ fontSize: 9.5, color: t.textMuted, textTransform: "uppercase", letterSpacing: ".6px", whiteSpace: "nowrap" }}>{projLabel(node.proj)}</div>
+              </div>
+              <div style={{ display: "flex", gap: 22, margin: "12px 0 12px", alignItems: "flex-end" }}>
+                <Stat t={t} n={node.internal} label={`internal interface${node.internal === 1 ? "" : "s"}`} big />
+                <Stat t={t} n={z.systems} label="systems" />
+                <Stat t={t} n={z.stores} label="stores" />
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+                {[[`${xz.out} out`, t.sub, t.panel2], [`${xz.in} in`, t.sub, t.panel2],
+                  z.mig ? [`${z.mig} replace`, t.warning, t.warningBg] : null,
+                  z.pii ? [`${z.pii} PII ends`, t.danger, t.dangerBg] : null].filter(Boolean).map(([txt, fg, bg]) => (
+                  <span key={txt} style={{ fontSize: 10.5, fontWeight: 700, color: fg, background: bg, padding: "2px 8px", borderRadius: 999 }}>{txt}</span>))}
+              </div>
+              <div style={{ fontSize: 9.5, color: t.textMuted, textTransform: "uppercase", letterSpacing: ".6px", marginBottom: 6 }}>Busiest systems</div>
+              {top.map((s) => (
+                <div key={s.key} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 10, alignItems: "center", padding: "3px 0" }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 11.5, color: t.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {s.store && <Cyl c={t.muted} />}{s.id}</div>
+                    <div style={{ height: 4, background: t.panel2, borderRadius: 2, marginTop: 3 }}>
+                      <div style={{ width: `${Math.max(3, 100 * s.n / topMax)}%`, height: 4, background: s.store ? t.muted : c, borderRadius: 2 }} /></div>
+                  </div>
+                  <div style={{ fontSize: 11, color: t.sub, fontVariantNumeric: "tabular-nums" }}>{s.n}</div>
+                </div>))}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
+                <span style={{ fontSize: 10.5, color: t.textMuted }}>{z.systems > top.length ? `+${z.systems - top.length} more systems` : ""}</span>
+                <span style={{ fontSize: 11.5, fontWeight: 700, color: t.accent }}>Open zone ▸</span>
+              </div>
+            </div>);
+        })}
+      </div>
+      <svg viewBox={`0 0 ${LAND_W} ${H}`} width="100%" style={{ display: "block", marginTop: 2 }} fontFamily={t.font}>
+        <defs>
+          <marker id="eco-arrow-land" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#8a97a6" /></marker>
+        </defs>
+        {zones.map((z, i) => <line key={z.name} x1={cx(i) - 40} y1={0} x2={cx(i) + 40} y2={0} stroke={t.disabled} />)}
+        {!flows.length && <text x={LAND_W / 2} y={26} fontSize="12" fill={t.textMuted} textAnchor="middle">no interfaces cross zones in the current filter</text>}
+        {arcs.map((a) => {
+          const picked = edge === a.l.key, dim = edge && !picked;
+          return (
+            <g key={a.l.key} style={{ cursor: "pointer" }} opacity={dim ? 0.35 : 1} onClick={() => setEdge(picked ? null : a.l.key)}>
+              <path d={a.d} fill="none" stroke={a.c} strokeWidth={picked ? a.w + 2 : a.w} strokeOpacity={picked ? 0.95 : 0.55}
+                strokeDasharray={a.dashed ? "7,5" : "none"} strokeLinecap="round" markerEnd="url(#eco-arrow-land)">
+                <title>{`${nameOf(a.l.from)} → ${nameOf(a.l.to)}: ${a.l.n} interface${a.l.n === 1 ? "" : "s"}${a.l.pii ? ` · ${a.l.pii} PII` : ""}${a.l.mig ? ` · ${a.l.mig} Replace` : ""}`}</title>
+              </path>
+              <rect x={a.mx - a.lw / 2} y={a.my - 9} width={a.lw} height={18} rx={9} fill="#fff" stroke={a.c} strokeWidth={1} />
+              <text x={a.mx} y={a.my + 4} fontSize="10.5" fontWeight="700" fill={t.navy} textAnchor="middle">{a.label}</text>
+            </g>);
+        })}
+      </svg>
+      {flows.length > 0 && (
+        <div style={{ background: t.panel, border: `1px solid ${t.disabled}`, borderRadius: 6, marginTop: 14, overflow: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr>
+              <th style={th}>Zone-to-zone flow</th><th style={{ ...th, textAlign: "right" }}>Interfaces</th><th style={{ ...th, textAlign: "right" }}>System pairs</th>
+              <th style={{ ...th, textAlign: "right" }}>PII</th><th style={{ ...th, textAlign: "right" }}>Replace</th><th style={th}>Feed types</th><th style={th}></th></tr></thead>
+            <tbody>
+              {flows.map((l) => (
+                <tr key={l.key} onClick={() => setEdge(edge === l.key ? null : l.key)} style={{ cursor: "pointer", background: edge === l.key ? t.infoBg : "transparent" }}>
+                  <td style={{ ...td, fontWeight: 700, color: t.navy }}>{nameOf(l.from)} <span style={{ color: t.textMuted }}>→</span> {nameOf(l.to)}</td>
+                  <td style={num}>{l.n}</td><td style={num}>{l.pairs}</td>
+                  <td style={{ ...num, color: l.pii ? t.danger : t.textMuted, fontWeight: l.pii ? 700 : 400 }}>{l.pii || "—"}</td>
+                  <td style={{ ...num, color: l.mig ? t.warning : t.textMuted, fontWeight: l.mig ? 700 : 400 }}>{l.mig || "—"}</td>
+                  <td style={{ ...td, color: t.sub }}>{topTypes(l.types)}</td>
+                  <td style={{ ...td, textAlign: "right" }}>
+                    <span role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); setExpanded(new Set([nameOf(l.from), nameOf(l.to)])); }}
+                      style={{ color: t.accent, fontWeight: 700, fontSize: 11 }}>open both ▸</span></td>
+                </tr>))}
+            </tbody>
+          </table>
+        </div>)}
+    </div>);
+}
+
+// defaultOpen: start with every zone open (the system map) instead of the landing.
 export default function EcosystemView({ t, rows, onSelect, defaultOpen = false }) {
   const agg = useMemo(() => aggregate(rows), [rows]);
   const [perZone, setPerZone] = useState(8);
@@ -266,12 +401,16 @@ export default function EcosystemView({ t, rows, onSelect, defaultOpen = false }
             {[1, 2, 3, 5, 10, 20].map((n) => <option key={n} value={n}>{n}</option>)}</select>{" "}
           interface{floor === 1 ? "" : "s"}{floorPick == null ? " (auto)" : ""}
           {floorPick != null && <span onClick={() => setFloorPick(null)} role="button" tabIndex={0} style={{ marginLeft: 6, color: t.accent, cursor: "pointer" }}>auto</span>}</label>}
-        <span style={{ marginLeft: "auto", color: t.textMuted }}>cylinder = data store · width = interfaces · dashed = all Replace · red = carries PII</span>
+        <span style={{ marginLeft: "auto", color: t.textMuted }}>{landing
+          ? "arc width = interfaces · red = carries PII · dashed = all Replace · click a flow for its interfaces"
+          : "cylinder = data store · width = interfaces · dashed = all Replace · red = carries PII"}</span>
         {(focus || edge) && <span onClick={() => { setFocus(null); setEdge(null); }} role="button" tabIndex={0}
           style={{ cursor: "pointer", color: t.accent, fontWeight: 700 }}>clear ✕</span>}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: sel || focus ? "1fr 320px" : "1fr", gap: 14 }}>
-        <div style={{ background: t.panel, border: `1px solid ${t.disabled}`, borderRadius: t.radius.md, overflow: "auto" }}>
+        {landing ? <Landing t={t} lay={lay} edge={edge} setEdge={setEdge} openZone={openZone}
+                     setExpanded={(e) => { setExpanded(e); setFocus(null); setEdge(null); }} />
+        : <div style={{ background: t.panel, border: `1px solid ${t.disabled}`, borderRadius: t.radius.md, overflow: "auto" }}>
           <svg viewBox={`0 0 ${lay.width} ${lay.height}`} width="100%" style={{ minWidth: 900, display: "block" }} fontFamily={t.font}>
             <defs>
               <marker id="eco-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9"
@@ -347,9 +486,9 @@ export default function EcosystemView({ t, rows, onSelect, defaultOpen = false }
                 </g>);
             })}
           </svg>
-        </div>
+        </div>}
         {(sel || focusNode) && (
-          <div style={{ background: t.panel, border: `1px solid ${t.disabled}`, borderRadius: t.radius.md, padding: 14, fontSize: 12, alignSelf: "start" }}>
+          <div style={{ background: t.panel, border: `1px solid ${t.disabled}`, borderRadius: t.radius.md, padding: 14, fontSize: 12, alignSelf: "start", maxHeight: "78vh", overflow: "auto" }}>
             {sel ? (
               <>
                 <div style={{ fontWeight: 700, color: t.navy, marginBottom: 2 }}>{nameOf(sel.from)} → {nameOf(sel.to)}</div>
