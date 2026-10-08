@@ -529,10 +529,17 @@ export default function EcosystemView({ t, rows, onSelect, defaultOpen = false }
   }, [full, landingKey(agg, expanded, zoneCount(agg))]);
   useEffect(() => {
     if (!full || typeof window === "undefined") return undefined;
+    // Esc, the browser's back button or a route change all leave full screen
     const onKey = (e) => { if (e.key === "Escape") setFull(false); };
+    const leave = () => setFull(false);
     window.addEventListener("keydown", onKey);
+    window.addEventListener("popstate", leave);
+    window.addEventListener("hashchange", leave);
     const prev = document.body.style.overflow; document.body.style.overflow = "hidden";
-    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
+    return () => {
+      window.removeEventListener("keydown", onKey); window.removeEventListener("popstate", leave); window.removeEventListener("hashchange", leave);
+      document.body.style.overflow = prev;
+    };
   }, [full]);
   const zoneCountN = useMemo(() => zoneCount(agg), [agg]);
   // one zone only: there is nothing to land on, go straight to the systems
@@ -589,9 +596,10 @@ export default function EcosystemView({ t, rows, onSelect, defaultOpen = false }
           : "cylinder = data store · line width = interfaces · dashed = all Replace · red = carries PII"}</span>
         {(focus || edge) && <span onClick={() => { setFocus(null); setEdge(null); }} role="button" tabIndex={0}
           style={{ cursor: "pointer", color: t.accent, fontWeight: 700 }}>clear ✕</span>}
-        {!landing && <span onClick={() => setFull(!full)} role="button" tabIndex={0} title={full ? "exit full screen (Esc)" : "full screen"}
-          style={{ cursor: "pointer", color: t.accent, fontWeight: 700, border: `1px solid ${t.disabled}`, borderRadius: 4, padding: "3px 10px", background: "#fff" }}>
-          {full ? "exit full screen ✕" : "full screen ⛶"}</span>}
+        <span onClick={() => setFull(!full)} role="button" tabIndex={0} title={full ? "exit full screen (Esc)" : "full screen"}
+          style={{ cursor: "pointer", color: full ? "#fff" : t.accent, fontWeight: 700, border: `1px solid ${full ? t.accent : t.disabled}`,
+            borderRadius: 4, padding: "3px 10px", background: full ? t.accent : "#fff" }}>
+          {full ? "exit full screen ✕" : "full screen ⛶"}</span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: sel || focus ? "1fr 320px" : "1fr", gap: 14 }}>
         {landing ? <Landing t={t} lay={lay} edge={edge} setEdge={setEdge} openZone={openZone}

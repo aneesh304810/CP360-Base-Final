@@ -193,6 +193,7 @@ ok(/Open zone ▸/.test(lhtml) && /Busiest systems/.test(lhtml) && />8<\/div><di
 ok(/PB Data Warehouse/.test(lhtml) && /<ellipse /.test(lhtml) && !/>Tiny E</.test(lhtml.split("Busiest systems")[1] || ""), "the preview lists the busiest five, a store with its cylinder glyph", lhtml.match(/Busiest systems[\s\S]{0,400}/)?.[0]);
 ok(/Zone-to-zone flow/.test(lhtml) && /open both ▸/.test(lhtml) && /Private Banking <span[^>]*>→<\/span> Investment Management/.test(lhtml), "the ledger lists each flow with a way to open both ends");
 ok(!/systems per zone/.test(lhtml) && !/draw links with/.test(lhtml), "the system-level controls are hidden on the landing");
+ok(/full screen ⛶/.test(lhtml) && /full screen ⛶/.test(renderToStaticMarkup(<EcosystemView t={tLight} rows={rows} defaultOpen />)), "the full-screen control is on the landing and on the map, so there is always a way out");
 ok(/<path d="M [\d.]+ 0 C [\d.]+ [\d.]+, [\d.]+ [\d.]+, [\d.]+ 0" fill="none"/.test(lhtml) && /<rect x="[\d.]+" y="[\d.]+" width="[\d.]+" height="18" rx="9"/.test(lhtml), "flows are arcs between the cards with a count label");
 const single = renderToStaticMarkup(<EcosystemView t={tLight} rows={rows.filter((r) => r.domain === "Private Banking")} />);
 ok(!/zone-to-zone flows/.test(single) && /systems per zone/.test(single), "with one zone there is nothing to land on: straight to the system map");
