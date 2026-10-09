@@ -2889,3 +2889,34 @@ def usage_exceptions(data_source: str | None = None, result: str | None = None, 
             "by_feed": sorted(by_feed.values(), key=lambda x: -x["n"]),
             "note": ("Used in the matrix with no SEI source is work; unused in the matrix but mapped in a document "
                      "is a scope question (the matrix may be stale, or the document maps more than anybody reads).")}
+
+
+@router.get("/flow-candidates")
+def flow_candidates(data_source: str | None = None):
+    """The mapping documents' candidate paths in the shape the ribbon draws:
+    SEI object -> STAR feed -> IMDS table, left links grouped by link class
+    the way the proposal flow groups them by verdict. A path with no STAR
+    field between (DIRECT_SEI_TO_IMDS) comes back as a bypass, which is
+    what the ribbon draws as a dashed arc over the middle, and is what it
+    is. Weight is COUNT(DISTINCT imds column), as the proposal flow counts
+    columns, so the two pictures are comparable band for band."""
+    ds = _ds(data_source)
+    rows = _safe("""SELECT sei_object, sei_source, feed_family, star_field, imds_table, imds_column, link_class
+                    FROM sei_e2e_xwalk WHERE data_source = :ds""", {"ds": ds})
+    left, right, bypass = {}, {}, {}
+    for r in rows:
+        cls = r.get("link_class") or "NO_SEI_SOURCE"
+        src = (r.get("sei_object") or r.get("sei_source") or "").strip() if cls != "NO_SEI_SOURCE" else ""
+        src = src or "no SEI source"
+        tgt = r.get("imds_table") or "(no target)"
+        col = f"{tgt}.{r.get('imds_column') or '?'}"
+        if cls == "SEI_DIRECT" and not r.get("star_field"):
+            bypass.setdefault((src, tgt), set()).add(col)
+            continue
+        mid = r.get("feed_family") or "unmapped"
+        left.setdefault((src, mid, cls), set()).add(col)
+        right.setdefault((mid, tgt), set()).add(col)
+    return {"data_source": ds, "total": len(rows),
+            "left": [{"src": k[0], "mid": k[1], "verdict": k[2], "n": len(v)} for k, v in sorted(left.items())],
+            "right": [{"mid": k[0], "tgt": k[1], "n": len(v)} for k, v in sorted(right.items())],
+            "bypass": [{"src": k[0], "tgt": k[1], "n": len(v)} for k, v in sorted(bypass.items())]}

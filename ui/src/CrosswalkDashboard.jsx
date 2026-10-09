@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { columnsXlsxUrl, crosswalkApi, VERDICT, VERDICT_ORDER, LANE_C } from "./seiCrosswalkApi.js";
+import { columnsXlsxUrl, crosswalkApi, VERDICT, VERDICT_ORDER, LANE_C, mappingDocs, CANDIDATE_VOCAB } from "./seiCrosswalkApi.js";
 import { GLOSSARY_SECTIONS, VERDICT_INFO, SHAPE_INFO, verdictShort }
   from "./crosswalkGlossary.js";
 import { FlowDiagram, EvidencePanel, Waffle, TransformationPanel, LogicCompare }
@@ -149,6 +149,17 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
   const [ev, setEv] = useState(null);
   const [waf, setWaf] = useState(null);
   const [xf, setXf] = useState(null);
+  // The mapping documents' candidate paths, for the ribbon's second
+  // vocabulary. Fetched apart from the proposal flow so a warehouse without
+  // sql/79 draws the ribbon exactly as before: no candidates, no toggle.
+  const [flowCand, setFlowCand] = useState(null);
+  const [flowMode, setFlowMode] = useState("proposed");
+  useEffect(() => {
+    let on = true;
+    mappingDocs.flowCandidates(ds).then((f) => { if (on) setFlowCand(f); });
+    return () => { on = false; };
+  }, [ds]);
+  const hasCand = !!(flowCand && ((flowCand.left || []).length || (flowCand.bypass || []).length));
   const feedMap = useFeedNames(ds);
   // Stable across renders so the diagram's useMemo does not rebuild its
   // whole layout on every parent render.
@@ -667,9 +678,32 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
       {/* Where every column comes from. "no SEI source" is a node here, not
           an omission — it is usually the widest ribbon on the diagram, and
           leaving it out would answer a question nobody asked. */}
-      {flow && ((flow.left || []).length > 0 || (flow.right || []).length > 0) && (
+      {((flow && ((flow.left || []).length > 0 || (flow.right || []).length > 0)) || hasCand) && (
         <Panel t={t} title="Where every column comes from"
-          note="ribbon width is columns · a ribbon that starts at “no SEI source” has nothing behind it">
+          note={flowMode === "candidates"
+            ? "the mapping documents' candidate paths · SEI object → STAR feed → IMDS table · ribbon width is paths · every one a draft, no verdict changes"
+            : "ribbon width is columns · a ribbon that starts at “no SEI source” has nothing behind it"}>
+          {/* Two vocabularies, one drawing. "Proposed" is the crosswalk's own
+              SEI_TO_STAR and VERIFY sheets with their verdicts; "candidates"
+              is what the seven mapping documents say, which nobody has
+              promoted yet. Side by side on the same ribbon, never merged. */}
+          {hasCand && (
+            <div style={{ display: "inline-flex", gap: 2, borderRadius: 999, padding: 3,
+              background: "#e9eef3", marginBottom: 10 }}>
+              {[["proposed", "Proposed · with verdicts"], ["candidates", "Mapping documents · candidates (draft)"]].map(([k, label]) => (
+                <button key={k} type="button" onClick={() => setFlowMode(k)} aria-pressed={flowMode === k}
+                  style={{ font: "inherit", fontSize: 11, padding: "3px 11px", borderRadius: 999, border: 0,
+                    cursor: "pointer", background: flowMode === k ? "#fff" : "transparent",
+                    fontWeight: flowMode === k ? 600 : 400, color: k === "candidates" && flowMode === k ? "#b45309" : t.text }}>
+                  {label}</button>))}
+            </div>)}
+          {flowMode === "candidates" && hasCand ? (
+            <FlowDiagram t={t} flow={flowCand} vocab={CANDIDATE_VOCAB}
+              onOpenTable={onOpenTechnical
+                ? (tbl) => onOpenTechnical({ table: tbl, column: null })
+                : undefined}
+              nameOf={nameOf} />
+          ) : (
           <FlowDiagram t={t} flow={flow}
             onPickVerdict={(x) => drill({ verdict: x },
               `${VERDICT[x]?.t || x} columns`)}
@@ -681,7 +715,11 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
             onOpenTable={onOpenTechnical
               ? (tbl) => onOpenTechnical({ table: tbl, column: null })
               : undefined}
-            nameOf={nameOf} />
+            nameOf={nameOf} />)}
+          {flowMode === "candidates" && hasCand && (
+            <div style={{ fontSize: 11, color: t.sub, marginTop: 8 }}>
+              The rows behind each ribbon are in <b>The SEI mapping documents</b> below: pick the IMDS table on its Coverage view.
+            </div>)}
         </Panel>)}
 
       {/* The ceiling, taken apart. One number made this look like one task;

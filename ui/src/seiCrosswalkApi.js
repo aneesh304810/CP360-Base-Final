@@ -261,6 +261,11 @@ export const mappingDocs = {
   usageExceptions: (data_source, result, feed) =>
     _get(`/sei-crosswalk/usage-exceptions${_qs({ data_source, result, feed })}`,
       () => ({ rows: [], total: 0, by_result: [], by_feed: [], note: "" })),
+  // The candidate paths in the ribbon's own shape: SEI object -> STAR feed
+  // -> IMDS table, left links grouped by link class, SEI-direct as bypass.
+  flowCandidates: (data_source) =>
+    _get(`/sei-crosswalk/flow-candidates${_qs({ data_source })}`,
+      () => ({ left: [], right: [], bypass: [], total: 0 })),
 };
 export const LINK_INFO = {
   E2E:                  { t: "linked end to end",      c: "#159943", bg: "#d0ebd9" },
@@ -270,6 +275,20 @@ export const LINK_INFO = {
   STAR_ONLY:            { t: "no IMDS target",         c: "#6b7c8a", bg: "#eef2f5" },
 };
 export const LINK_ORDER = ["E2E", "SEI_DIRECT", "STAR_NOT_IN_FILE_MAP", "NO_SEI_SOURCE", "STAR_ONLY"];
+// The ribbon's vocabulary when it draws the mapping documents' candidate
+// paths instead of the proposals: link classes, in paths, every one a draft.
+export const CANDIDATE_VOCAB = {
+  info: LINK_INFO, order: LINK_ORDER, unit: "paths", noSource: "NO_SEI_SOURCE",
+  short: (k) => ({
+    E2E: "The document maps a SEI source onto a STAR field, and that STAR field feeds the IMDS column.",
+    SEI_DIRECT: "The document maps the SEI source straight onto the IMDS column, with no STAR field between.",
+    STAR_NOT_IN_FILE_MAP: "The IMDS column is fed by a STAR field the file map does not have.",
+    NO_SEI_SOURCE: "No SEI source is named for this path. The gap.",
+    STAR_ONLY: "A STAR field with no IMDS target on this row.",
+  }[k] || k),
+  bypass: "SEI straight to IMDS, no STAR field (dashed)",
+  bypassShort: "DIRECT_SEI_TO_IMDS: the document maps the SEI source onto the IMDS column without a STAR field between.",
+};
 export const COMPLETENESS_INFO = {
   BOTH_LOGICS_DOCUMENTED:             { t: "both logics",          c: "#159943" },
   IM_LOGIC_AND_SEI_SOURCE_DOCUMENTED: { t: "IM logic + SEI source", c: "#0091bf" },

@@ -16,6 +16,19 @@ import { verdictShort, VERDICT_INFO } from "./crosswalkGlossary.js";
 const MONO = "'Roboto Mono', ui-monospace, Menlo, monospace";
 const vc = (v) => (VERDICT[v] || VERDICT.UNKNOWN).c;
 
+// THE VOCABULARY THE RIBBON SPEAKS. By default the nine verdicts, in
+// columns. The mapping-documents overlay hands in the link classes, in
+// paths, and nothing else about the drawing changes: same layout, same
+// selection, same legend, different words and colours. Kept as a value
+// rather than a mode flag so a third vocabulary costs nothing.
+export const DEFAULT_VOCAB = {
+  info: VERDICT, order: VERDICT_ORDER, short: verdictShort, unit: "columns",
+  noSource: "NO_SOURCE", bypass: "bypasses the contract (dashed)",
+  bypassShort: VERDICT_INFO.NO_BASELINE?.short,
+};
+const vcol = (vocab, v) => ((vocab.info || {})[v] || VERDICT.UNKNOWN).c;
+const vlab = (vocab, v) => ((vocab.info || {})[v] || {}).t || v;
+
 // ====================================================================== flow
 // Three columns — SEI datapoint source, contract feed, warehouse table — with
 // ribbon width in columns.
@@ -31,7 +44,7 @@ const vc = (v) => (VERDICT[v] || VERDICT.UNKNOWN).c;
 // splits into bands. Colour by node and the diagram says mappings exist;
 // colour by verdict and it says how many of them are worth anything.
 export function FlowDiagram({ t, flow, onPickVerdict, onDrill, onOpenTable,
-                              nameOf }) {
+                              nameOf, vocab = DEFAULT_VOCAB }) {
   const [sel, setSel] = useState(null);
   const [full, setFull] = useState(false);
   const box = useRef(null);
@@ -74,8 +87,8 @@ export function FlowDiagram({ t, flow, onPickVerdict, onDrill, onOpenTable,
     // selection bar. Inline it keeps sizing itself from the data, because a
     // panel that grows to 900px tall pushes everything below it off-screen.
     height: full ? Math.max(360, vh - 190) : undefined,
-    nameOf,
-  }), [flow, wide, full, vh, nameOf]);
+    nameOf, vocab,
+  }), [flow, wide, full, vh, nameOf, vocab]);
   const focus = useMemo(() => resolveFocus(model, sel), [model, sel]);
   const muted = t.muted || "#999";
   if (!model) return <div ref={box} />;
@@ -166,24 +179,24 @@ export function FlowDiagram({ t, flow, onPickVerdict, onDrill, onOpenTable,
 
       {focus
         ? <SelectionBar t={t} focus={focus} onClear={() => setSel(null)}
-            onDrill={onDrill} onOpenTable={onOpenTable} />
+            onDrill={onDrill} onOpenTable={onOpenTable} vocab={vocab} />
         : (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 13, marginTop: 11,
             alignItems: "center" }}>
             {verdicts.map((v) => (
-              <span key={v.k} title={verdictShort(v.k)}
+              <span key={v.k} title={vocab.short(v.k)}
                 onClick={onPickVerdict ? () => onPickVerdict(v.k) : undefined}
                 style={{ display: "flex", alignItems: "center", gap: 6,
                   fontSize: 10.5, color: t.sub || "#666",
                   cursor: onPickVerdict ? "pointer" : "default" }}>
-                <i style={{ width: 11, height: 11, borderRadius: 2, background: vc(v.k) }} />
-                {(VERDICT[v.k] || {}).t || v.k} — {v.n} of {v.of}</span>))}
+                <i style={{ width: 11, height: 11, borderRadius: 2, background: vcol(vocab, v.k) }} />
+                {vlab(vocab, v.k)} — {v.n} of {v.of}</span>))}
             {model.bypassN > 0 && (
-              <span title={VERDICT_INFO.NO_BASELINE?.short}
+              <span title={vocab.bypassShort}
                 style={{ display: "flex", alignItems: "center", gap: 6,
                   fontSize: 10.5, color: t.sub || "#666" }}>
                 <i style={{ width: 11, height: 3, background: "#b45309" }} />
-                bypasses the contract (dashed) — {model.bypassN}</span>)}
+                {vocab.bypass} — {model.bypassN}</span>)}
             <span style={{ marginLeft: "auto", fontSize: 10.5, color: muted }}>
               click any box or ribbon to trace its path</span>
           </div>)}
@@ -203,7 +216,7 @@ export function FlowDiagram({ t, flow, onPickVerdict, onDrill, onOpenTable,
         <b style={{ fontSize: 14.5, color: t.navy || "#10193b" }}>
           Where every column comes from</b>
         <span style={{ fontSize: 10.5, color: muted }}>
-          ribbon width is columns · click any box or ribbon to trace its path</span>
+          ribbon width is {vocab.unit} · click any box or ribbon to trace its path</span>
         <button type="button" onClick={() => setFull(false)} style={{
           marginLeft: "auto", background: "none",
           border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderRadius: 3,
@@ -319,7 +332,7 @@ export function resolveFocus(model, sel) {
 
 // The bar under the diagram when something is selected: the path in words,
 // what it is made of, and the two things you would want to do next.
-function SelectionBar({ t, focus, onClear, onDrill, onOpenTable }) {
+function SelectionBar({ t, focus, onClear, onDrill, onOpenTable, vocab = DEFAULT_VOCAB }) {
   const { path, total, verdicts } = focus;
   const label = (path.steps || []).join("  →  ")
     + (path.kind === "bypass" ? "   (bypasses the contract)" : "");
@@ -341,16 +354,16 @@ function SelectionBar({ t, focus, onClear, onDrill, onOpenTable }) {
       {verdicts.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 11, marginTop: 7 }}>
           {verdicts.map((v) => (
-            <span key={v.k} title={verdictShort(v.k)}
+            <span key={v.k} title={vocab.short(v.k)}
               style={{ display: "flex", alignItems: "center", gap: 5,
                 fontSize: 10.5, color: t.sub || "#666" }}>
-              <i style={{ width: 10, height: 10, borderRadius: 2, background: vc(v.k) }} />
-              {(VERDICT[v.k] || {}).t || v.k} <b>{v.n}</b></span>))}
+              <i style={{ width: 10, height: 10, borderRadius: 2, background: vcol(vocab, v.k) }} />
+              {vlab(vocab, v.k)} <b>{v.n}</b></span>))}
         </div>)}
       <div style={{ display: "flex", gap: 14, marginTop: 9, flexWrap: "wrap" }}>
         {onDrill && (
           <button type="button" onClick={() => onDrill(path.filter, title)}
-            style={linkBtn(t)}>open these columns →</button>)}
+            style={linkBtn(t)}>open these {vocab.unit} →</button>)}
         {onOpenTable && path.table && (
           <button type="button" onClick={() => onOpenTable(path.table)}
             style={linkBtn(t)}>open {path.table} in lineage →</button>)}
@@ -368,6 +381,7 @@ const linkBtn = (t) => ({ background: "none", border: "none", padding: 0,
 // Exported for the render harness: both are pure, and the selection
 // traversal is much easier to assert on directly than through a click.
 export function buildFlowModel(flow, opt = {}) {
+  const vocab = opt.vocab || DEFAULT_VOCAB;
   const left = (flow && flow.left) || [];
   const right = (flow && flow.right) || [];
   const bypass = (flow && flow.bypass) || [];
@@ -479,8 +493,8 @@ export function buildFlowModel(flow, opt = {}) {
       out.set(id, { id, x, y, h, n, col, code: bn ? id : null,
         short: trunc(bn || id, chars),
         label: (bn ? `${bn} · ${id}` : id)
-               + (mismatch ? ` — ${inN} columns arrive, ${outN} leave` : ""),
-        c: id === "no SEI source" ? vc("NO_SOURCE") : "#5f87a7" });
+               + (mismatch ? ` — ${inN} ${vocab.unit} arrive, ${outN} leave` : ""),
+        c: id === "no SEI source" ? vcol(vocab, vocab.noSource) : "#5f87a7" });
       y += h + gap;
     });
     return out;
@@ -496,7 +510,7 @@ export function buildFlowModel(flow, opt = {}) {
   const ribbons = [];
 
   // left links, verdict-ordered so the bands stack identically everywhere
-  const ord = (v) => { const i = VERDICT_ORDER.indexOf(v); return i < 0 ? 99 : i; };
+  const ord = (v) => { const i = vocab.order.indexOf(v); return i < 0 ? 99 : i; };
   [...left].sort((a, b) => ord(G(a, "verdict")) - ord(G(b, "verdict")))
     .forEach((r) => {
       const a = pl.get(G(r, "src") || "no SEI source");
@@ -506,10 +520,10 @@ export function buildFlowModel(flow, opt = {}) {
       const ay = a.y + (offA[a.id] = offA[a.id] || 0) + w / 2; offA[a.id] += w;
       const by = b.y + (offB[b.id] = offB[b.id] || 0) + w / 2; offB[b.id] += w;
       const v = G(r, "verdict") || "UNKNOWN";
-      ribbons.push({ side: "left", c: vc(v), w, n, verdict: v,
+      ribbons.push({ side: "left", c: vcol(vocab, v), w, n, verdict: v,
         from: a.id, to: b.id, src: a.id, mid: b.id,
         d: curve(a.x + CW, ay, b.x, by),
-        title: `${a.label} → ${b.label} · ${(VERDICT[v] || {}).t || v} · ${n} columns` });
+        title: `${a.label} → ${b.label} · ${vlab(vocab, v)} · ${n} ${vocab.unit}` });
     });
 
   right.forEach((r) => {
@@ -522,7 +536,7 @@ export function buildFlowModel(flow, opt = {}) {
     ribbons.push({ side: "right", c: "#5f87a7", w, n,
       from: a.id, to: b.id, mid: a.id, tgt: b.id,
       d: curve(a.x + CW, ay, b.x, by),
-      title: `${a.label} → ${b.label} · ${n} columns` });
+      title: `${a.label} → ${b.label} · ${n} ${vocab.unit}` });
   });
 
   // The bypass arcs, over the middle column rather than through it.
@@ -537,7 +551,7 @@ export function buildFlowModel(flow, opt = {}) {
     const ay = a.y + a.h / 2, by = b.y + b.h / 2;
     arcs.push({ c: "#b45309", w, n, from: a.id, to: b.id, src: a.id, tgt: b.id,
       d: `M ${a.x + CW} ${ay} C ${x1} ${ay - 40}, ${x2 - 40} ${by - 16}, ${x2} ${by}`,
-      title: `${a.label} → ${b.label} · bypasses the contract · ${n} columns` });
+      title: `${a.label} → ${b.label} · ${vocab.bypass.replace(" (dashed)", "")} · ${n} ${vocab.unit}` });
   });
 
   const byV = new Map();

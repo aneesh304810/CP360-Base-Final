@@ -45,8 +45,8 @@ STG = [
     {"feed_key": "ODDDIFI1", "imds_table": "HOLDINGDBO.BBH_OPEN_DIVIDENDS", "evidence_completeness": "IM_ONLY_DOCUMENTED", "business_decision": "Y"},
 ]
 E2E = [
-    {"xwalk_row_id": "1", "feed_key": "PEDDIFI1", "feed_family": "PEDDIFI1", "imds_table": "HOLDINGDBO.POSITION", "imds_column": "QUANTITY", "link_class": "E2E", "link_status": "E2E_LINKED", "crosswalk_status": "CANDIDATE", "approval_status": "DRAFT_REVIEW_REQUIRED", "star_field": "Lot Quantity", "sei_source": "Taxlot.QUANTITY"},
-    {"xwalk_row_id": "2", "feed_key": "PEDDIFI1", "feed_family": "PEDDIFI1", "imds_table": "HOLDINGDBO.POSITION", "imds_column": "ENTITY_ID", "link_class": "SEI_DIRECT", "link_status": "DIRECT_SEI_TO_IMDS", "crosswalk_status": "CANDIDATE", "approval_status": "DRAFT_REVIEW_REQUIRED", "star_field": None, "sei_source": "Account.SWP"},
+    {"xwalk_row_id": "1", "feed_key": "PEDDIFI1", "feed_family": "PEDDIFI1", "imds_table": "HOLDINGDBO.POSITION", "imds_column": "QUANTITY", "link_class": "E2E", "link_status": "E2E_LINKED", "crosswalk_status": "CANDIDATE", "approval_status": "DRAFT_REVIEW_REQUIRED", "star_field": "Lot Quantity", "sei_source": "Taxlot.QUANTITY", "sei_object": "Taxlot"},
+    {"xwalk_row_id": "2", "feed_key": "PEDDIFI1", "feed_family": "PEDDIFI1", "imds_table": "HOLDINGDBO.POSITION", "imds_column": "ENTITY_ID", "link_class": "SEI_DIRECT", "link_status": "DIRECT_SEI_TO_IMDS", "crosswalk_status": "CANDIDATE", "approval_status": "DRAFT_REVIEW_REQUIRED", "star_field": None, "sei_source": "Account.SWP", "sei_object": "Account"},
     {"xwalk_row_id": "3", "feed_key": "PEDDIFI1", "feed_family": "PEDDIFI1", "imds_table": "HOLDINGDBO.POSITION", "imds_column": "COST_BASIS", "link_class": "STAR_NOT_IN_FILE_MAP", "link_status": "STAR_FIELD_NOT_IN_FILE_MAP", "crosswalk_status": "GAP", "approval_status": "DRAFT_REVIEW_REQUIRED", "star_field": "Phantom", "sei_source": None},
     {"xwalk_row_id": "4", "feed_key": "PEDDIFI1", "feed_family": "PEDDIFI1", "imds_table": "HOLDINGDBO.POSITION", "imds_column": "PRICE", "link_class": "NO_SEI_SOURCE", "link_status": "NO_SEI_SOURCE", "crosswalk_status": "GAP", "approval_status": "DRAFT_REVIEW_REQUIRED", "star_field": "Price", "sei_source": None},
     {"xwalk_row_id": "5", "feed_key": "ODDDIFI1", "feed_family": "ODDDIFI1", "imds_table": "HOLDINGDBO.BBH_OPEN_DIVIDENDS", "imds_column": "ENTITY_ID", "link_class": "NO_SEI_SOURCE", "link_status": "NO_SEI_SOURCE", "crosswalk_status": "GAP", "approval_status": "DRAFT_REVIEW_REQUIRED", "star_field": "Entity Number", "sei_source": None},
@@ -144,6 +144,17 @@ ok(ent["total"] == 2 and ent["feeds"][0]["feed_family"] == "ODDDIFI1" and [s["se
 ex = R.usage_exceptions()
 ok(ex["total"] == 2 and [r["key"] for r in ex["by_result"]] == ["USED_BUT_UNMAPPED", "UNUSED_BUT_MAPPED"], "exceptions by result, in order", ex["by_result"])
 ok(R.usage_exceptions(result="used_but_unmapped")["total"] == 1, "filter by result")
+
+print("-- the candidate flow, in the ribbon's shape")
+fc = R.flow_candidates()
+ok(fc["total"] == 5 and len(fc["bypass"]) == 1 and fc["bypass"][0] == {"src": "Account", "tgt": "HOLDINGDBO.POSITION", "n": 1},
+   "SEI straight to IMDS with no STAR field is a bypass arc", fc["bypass"])
+lefts = {(l["src"], l["mid"], l["verdict"]): l["n"] for l in fc["left"]}
+ok(lefts.get(("Taxlot", "PEDDIFI1", "E2E")) == 1 and lefts.get(("no SEI source", "PEDDIFI1", "NO_SEI_SOURCE")) == 1
+   and lefts.get(("no SEI source", "PEDDIFI1", "STAR_NOT_IN_FILE_MAP")) == 1 and lefts.get(("no SEI source", "ODDDIFI1", "NO_SEI_SOURCE")) == 1,
+   "left links: SEI object -> STAR feed, grouped by link class; no SEI source is a node", lefts)
+rights = {(r["mid"], r["tgt"]): r["n"] for r in fc["right"]}
+ok(rights == {("PEDDIFI1", "HOLDINGDBO.POSITION"): 3, ("ODDDIFI1", "HOLDINGDBO.BBH_OPEN_DIVIDENDS"): 1}, "right links: STAR feed -> IMDS table, distinct columns", rights)
 
 print("-- an empty warehouse")
 R._safe = lambda sql, params=None: []
