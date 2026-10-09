@@ -289,6 +289,19 @@ class SeiCrosswalkConnector:
         "usage":      ("STAR_FIELD_USAGE_MATRIX",),
         "usagesum":   ("STAR_FIELD_USAGE_SUMMARY",),
         "usagerecon": ("STAR_FIELD_USAGE_RECON",),
+        # The seven sheets the mapping documents added (sql/79). Three lanes
+        # of field maps, a register of the documents they came from, the
+        # code crosswalk, the Entity ID derivation, and the disagreements
+        # between the usage matrix and the documents. Everything in them is
+        # DRAFT_REVIEW_REQUIRED until an approved crosswalk says otherwise,
+        # and the status column is stored as given so that stays visible.
+        "mapsrc":    ("MAPPING_SOURCE_REGISTER", "MAPPING_SOURCES"),
+        "seistar":   ("SEI_TO_STAR_FIELD_MAP", "SEI_TO_STAR_MAP"),
+        "starstage": ("STAR_TO_IMDS_STAGE_MAP", "STAR_TO_IMDS_MAP"),
+        "e2e":       ("SEI_STAR_IMDS_E2E_XWALK", "E2E_XWALK", "SEI_STAR_IMDS_XWALK"),
+        "refcode":   ("REFERENCE_CODE_XWALK", "REFERENCE_CODES", "CODE_XWALK"),
+        "entityid":  ("ENTITY_ID_DERIVATION", "ENTITY_ID"),
+        "usageexc":  ("USAGE_RECON_EXCEPTIONS", "USAGE_EXCEPTIONS"),
     }
 
     # Three sheets share one shape — (name, value, explanation) with a
@@ -368,8 +381,19 @@ class SeiCrosswalkConnector:
             "usage":      self._usage(sheets.get("usage")),
             "usagesum":   self._usagesum(sheets.get("usagesum")),
             "usagerecon": self._usagerecon(sheets.get("usagerecon")),
+            "mapsrc":     self._mapsrc(sheets.get("mapsrc")),
+            "seistar":    [],
+            "starstage":  self._starstage(sheets.get("starstage")),
+            "refcode":    self._refcode(sheets.get("refcode")),
+            "entityid":   self._entityid(sheets.get("entityid")),
+            "usageexc":   self._usageexc(sheets.get("usageexc")),
             "control":  [],
         }
+        # the end-to-end crosswalk checks its STAR fields against the layout
+        # the same workbook publishes, so it is read after STAR_LAYOUT_DETAIL
+        out["e2e"] = self._e2e(sheets.get("e2e"), out["starfld"])
+        out["seistar"] = self._seistar(sheets.get("seistar"), out["starfld"])
+        self._formula_check(wb, by_key, ("STAR_FIELD_USAGE_SUMMARY", "TRANSFORMATION_SUMMARY"))
         # the three summary sheets, into one table, tagged by origin
         for want, label in self.CONTROL_SHEETS:
             real = by_key.get(_hkey(want))
@@ -396,7 +420,10 @@ class SeiCrosswalkConnector:
                        "code": "code", "disp": "disp", "xwalk": "xwalk",
                        "exc": "exc", "lane": "lane",
                        "usage": "usage", "usagesum": "usagesum",
-                       "usagerecon": "usagerecon"}
+                       "usagerecon": "usagerecon",
+                       "mapsrc": "mapsrc", "seistar": "seistar", "starstage": "starstage",
+                       "e2e": "e2e", "refcode": "refcode", "entityid": "entityid",
+                       "usageexc": "usageexc"}
         for key, role in role_of_key.items():
             sheet = sheets.get(role)
             if sheet is not None and not out.get(key):
@@ -1333,7 +1360,13 @@ class SeiCrosswalkConnector:
                 "MATRIX_VALUE", "VALUE", "SOURCE_SHEET", "SHEET",
                 "SOURCE_ROW", "ROW", "ROW_NUMBER",
                 "SOURCE_DOCUMENT", "SOURCE_DOC", "DOCUMENT",
-                "NORMALIZED_KEY", "NORMALISED_KEY", "NOTES", "NOTE")
+                "NORMALIZED_KEY", "NORMALISED_KEY", "NOTES", "NOTE",
+                # the four columns the mapping documents added
+                "MAPPING_DOC_USAGE", "DOC_USAGE", "DOCUMENT_USAGE", "MAPPING_USAGE",
+                "DOC_USAGE_STATUS", "USAGE_IN_MAPPING_DOC", "MAPPING_DOCUMENT_USAGE",
+                "SEI_SOURCE_MAPPED", "SEI_MAPPED", "HAS_SEI_SOURCE", "SEI_SOURCE", "SEI_MAPPING",
+                "USAGE_RECON_RESULT", "CHECK_RESULT", "USAGE_CHECK", "CHECK", "RECON_RESULT", "RESULT",
+                "MAPPING_DOCUMENT", "MAPPING_SOURCE_DOCUMENT", "MAPPING_DOC", "SOURCE_MAPPING_DOCUMENT")
         self._unconsumed(sh, "star_field_usage", *cols)
         out, seen = [], set()
         for i, row in enumerate(sh.rows(), 1):
@@ -1379,8 +1412,32 @@ class SeiCrosswalkConnector:
                                           "NORMALISED_KEY")
                                    or _usage_key(fam, fld)),
                 "notes": sh.get(row, "NOTES", "NOTE"),
+                # What the mapping documents say about the same field, kept
+                # beside the matrix's own word rather than merged into it:
+                # the two disagreeing is the finding USAGE_RECON_EXCEPTIONS
+                # lists, and a merged column could not show it.
+                "doc_usage_status": _nz(sh.get(row, "MAPPING_DOC_USAGE", "DOC_USAGE", "DOCUMENT_USAGE",
+                                               "MAPPING_USAGE", "DOC_USAGE_STATUS", "USAGE_IN_MAPPING_DOC",
+                                               "MAPPING_DOCUMENT_USAGE")),
+                "sei_mapped": self._yn(sh.get(row, "SEI_SOURCE_MAPPED", "SEI_MAPPED", "HAS_SEI_SOURCE",
+                                              "SEI_SOURCE", "SEI_MAPPING")),
+                "usage_check": _nz(sh.get(row, "USAGE_RECON_RESULT", "CHECK_RESULT", "USAGE_CHECK", "CHECK", "RECON_RESULT", "RESULT")),
+                "mapping_document": sh.get(row, "MAPPING_DOCUMENT", "MAPPING_SOURCE_DOCUMENT", "MAPPING_DOC",
+                                           "SOURCE_MAPPING_DOCUMENT"),
             })
         return out
+
+    @staticmethod
+    def _yn(v):
+        """Y / N / None for a yes-no column that may hold the thing itself:
+        a SEI_SOURCE cell reading SEI_POSITION.QTY means mapped."""
+        t = (v or "").strip()
+        if not t:
+            return None
+        low = t.lower()
+        if low in ("n", "no", "false", "0", "not mapped", "unmapped", "none", "n/a", "na", "-"):
+            return "N"
+        return "Y"
 
     @staticmethod
     def _used_pct(declared, used, total, fam=""):
@@ -1425,12 +1482,21 @@ class SeiCrosswalkConnector:
                 "STAR_LAYOUT_FIELDS", "PUBLISHED_FIELDS",
                 "MATRIX_MATCHED_LAYOUT_FIELDS", "MATCHED_FIELDS",
                 "MATRIX_UNMATCHED_LAYOUT_FIELDS", "UNMATCHED_FIELDS",
-                "NOTES", "NOTE")
+                "NOTES", "NOTE",
+                "SEI_MAPPED_FIELDS", "SEI_MAPPED", "MAPPED_FIELDS_SEI", "FIELDS_WITH_SEI_SOURCE",
+                "SEI_MAPPED_PERCENT", "SEI_MAPPED_PCT", "SEI_MAPPED_SHARE", "SEI_SHARE",
+                "USED_NO_SEI_SOURCE", "USED_WITHOUT_SEI_SOURCE", "USED_NO_SEI", "USED_UNMAPPED",
+                "USED_BUT_NO_SEI_SOURCE", "USED_BUT_UNMAPPED", "USAGE_CONFLICTS", "ADDED_FROM_MAPPING_DOC",
+                "MAPPING_DOC", "MAPPING_DOCUMENT")
         self._unconsumed(sh, "star_field_usage_summary", *cols)
         out = []
         for row in sh.rows():
             fam = sh.get(row, "FEED_FAMILY", "FEED_NAME", "FEED")
             if not fam:
+                continue
+            if self._is_total(fam):
+                # the sheet's TOTAL row: the screen adds the families up
+                # itself, and a family called TOTAL would be a tenth feed
                 continue
             out.append({
                 "summary_id": f"{self.data_source}:{_file_key(fam)}",
@@ -1453,6 +1519,20 @@ class SeiCrosswalkConnector:
                 "matrix_unmatched_layout_fields": _num(sh.get(
                     row, "MATRIX_UNMATCHED_LAYOUT_FIELDS", "UNMATCHED_FIELDS")),
                 "notes": sh.get(row, "NOTES", "NOTE"),
+                # the SEI side of usage: how many published fields have a SEI
+                # source in the mapping documents, and how many are read by
+                # something but have none -- the number to chase
+                "sei_mapped_fields": _num(sh.get(row, "SEI_MAPPED_FIELDS", "SEI_MAPPED", "MAPPED_FIELDS_SEI",
+                                                 "FIELDS_WITH_SEI_SOURCE")),
+                "sei_mapped_percent": self._used_pct(
+                    sh.get(row, "SEI_MAPPED_PERCENT", "SEI_MAPPED_PCT", "SEI_MAPPED_SHARE", "SEI_SHARE"),
+                    _num(sh.get(row, "SEI_MAPPED_FIELDS", "SEI_MAPPED", "MAPPED_FIELDS_SEI", "FIELDS_WITH_SEI_SOURCE")),
+                    _num(sh.get(row, "TOTAL_FIELDS", "TOTAL")), fam),
+                "used_no_sei_source": _num(sh.get(row, "USED_BUT_UNMAPPED", "USED_NO_SEI_SOURCE", "USED_WITHOUT_SEI_SOURCE",
+                                                  "USED_NO_SEI", "USED_UNMAPPED", "USED_BUT_NO_SEI_SOURCE")),
+                "usage_conflicts": _num(sh.get(row, "USAGE_CONFLICTS")),
+                "added_from_mapping_doc": _num(sh.get(row, "ADDED_FROM_MAPPING_DOC")),
+                "mapping_document": sh.get(row, "MAPPING_DOC", "MAPPING_DOCUMENT"),
             })
         return out
 
@@ -1509,6 +1589,32 @@ class SeiCrosswalkConnector:
         if not sh:
             return []
         out = []
+        # TRANSFORMATION_SUMMARY became one row per target table, counted by
+        # formula. It is still the workbook's own account, so it still lands
+        # here: the table is the control, the comparison count its result,
+        # and every other column goes into the detail by name, so a column
+        # added later is carried rather than dropped.
+        per_table = not any(_hkey(k) in sh.idx for k in ("CONTROL", "ITEM", "METRIC")) and any(
+            _hkey(k) in sh.idx for k in ("TARGET_TABLE", "TARGET_OBJECT", "IMDS_TARGET", "IMDS_TABLE", "DWH_TARGET_TABLE"))
+        if per_table:
+            for i, row in enumerate(sh.rows(), 1):
+                tbl = sh.get(row, "TARGET_TABLE", "TARGET_OBJECT", "IMDS_TARGET", "IMDS_TABLE", "DWH_TARGET_TABLE")
+                if not tbl:
+                    continue
+                result = sh.get(row, "TARGET_ROWS", "COMPARISON_ROWS", "COMPARISONS", "COMPARED", "COMPARISON_COUNT", "ROWS", "TOTAL")
+                detail = "; ".join(f"{k}={_s(row[ix])}" for k, ix in sorted(sh.idx.items(), key=lambda kv: kv[1])
+                                   if ix < len(row) and _s(row[ix]) and k not in ("TARGETTABLE", "TARGETOBJECT", "STATUS"))
+                out.append({
+                    "control_id": f"{self.data_source}:{sheet_label}:{i}",
+                    "data_source": self.data_source,
+                    "source_sheet": sheet_label,
+                    "control_name": str(tbl)[:400],
+                    "result": result if result is not None else "(no cached value: open and save the workbook in Excel once)",
+                    "status": _nz(sh.get(row, "APPROVAL_STATE", "STATUS", "APPROVAL_STATUS", "COVERAGE_STATUS")),
+                    "detail": detail[:4000] if detail else None,
+                    "seq": i,
+                })
+            return out
         for i, row in enumerate(sh.rows(), 1):
             name = sh.get(row, "CONTROL", "ITEM", "METRIC")
             if not name:
@@ -1524,6 +1630,409 @@ class SeiCrosswalkConnector:
                 "seq": i,
             })
         return out
+
+    # --------------------------------------- the mapping documents (sql/79) ----
+    # Seven sheets built from the SEI mapping documents, read by the columns
+    # the workbook publishes (the inventory is in docs/sei-crosswalk/
+    # MAPPING-DOCS.md). The three field maps are three lanes of one
+    # crosswalk: SEI -> STAR, STAR -> IMDS, and the two joined end to end.
+    # Every row keeps the document it came from and its status as written;
+    # nothing here is approved until APPROVAL_STATUS says so, and nothing
+    # here changes a verdict in SEI_VERIFY.
+
+    _DOC = ("SOURCE_DOCUMENT", "SOURCE_DOC", "MAPPING_DOCUMENT", "MAPPING_DOC", "DOCUMENT")
+    _WHERE = ("SOURCE_SHEET", "SOURCE_ROW", "ROW_NUMBER")
+
+    @staticmethod
+    def _val(v):
+        """A cell, with the documents' placeholders read as empty: a dash,
+        an em dash, n/a. "—" in SEI_SOURCE_FIELD is no field, not a field
+        called —."""
+        t = (v or "").strip()
+        return None if t in ("", "-", "—", "–", "n/a", "N/A", "NA", "none", "None") else t
+
+    def _where(self, sh, row):
+        return {"source_document": sh.get(row, *self._DOC),
+                "source_sheet": sh.get(row, "SOURCE_SHEET"),
+                "source_row": _num(sh.get(row, "SOURCE_ROW", "ROW_NUMBER"))}
+
+    @staticmethod
+    def _is_total(v):
+        return (v or "").strip().upper() in ("TOTAL", "TOTALS", "GRAND TOTAL", "ALL")
+
+    def _mapsrc(self, sh):
+        """MAPPING_SOURCE_REGISTER -- one row per mapping document, keyed by the
+        STAR feed it maps, with what was loaded from it and what was skipped."""
+        if not sh:
+            return []
+        cols = ("FEED_FAMILY", "FEED", "SEI_TO_STAR_ROWS", "SEI_TO_STAR_MAPPED", "MAPPED", "OPEN_DEPENDENCIES", "OPEN_DEP",
+                "IMDS_TARGET_OBJECTS", "IMDS_TARGETS", "IMDS_STAGE_ROWS", "STAGE_ROWS", "NEW_COMPARISON_ROWS", "NEW_CMP",
+                "ALREADY_IN_CATALOG", "NOTES", "NOTE") + self._DOC
+        self._unconsumed(sh, "sei_mapping_source", *cols)
+        out, seen = [], set()
+        for i, row in enumerate(sh.rows(), 1):
+            fam = sh.get(row, "FEED_FAMILY", "FEED")
+            doc = sh.get(row, *self._DOC)
+            if not fam and not doc:
+                continue
+            if self._is_total(fam):
+                continue
+            fam = fam or "NA"
+            sid = f"{self.data_source}:{_file_key(fam)}"
+            if sid in seen:
+                sid = f"{sid}:{i}"
+            seen.add(sid)
+            out.append({
+                "source_id": sid[:400],
+                "data_source": self.data_source,
+                "feed_family": fam,
+                "feed_key": _file_key(fam),
+                "source_document": doc,
+                "document_key": _file_key(doc)[:200] if doc else None,
+                "sei_star_rows": _num(sh.get(row, "SEI_TO_STAR_ROWS")),
+                "sei_star_mapped": _num(sh.get(row, "SEI_TO_STAR_MAPPED", "MAPPED")),
+                "open_dependencies": _num(sh.get(row, "OPEN_DEPENDENCIES", "OPEN_DEP")),
+                "imds_targets": sh.get(row, "IMDS_TARGET_OBJECTS", "IMDS_TARGETS"),
+                "imds_stage_rows": _num(sh.get(row, "IMDS_STAGE_ROWS", "STAGE_ROWS")),
+                "new_comparison_rows": _num(sh.get(row, "NEW_COMPARISON_ROWS", "NEW_CMP")),
+                "already_in_catalog": _num(sh.get(row, "ALREADY_IN_CATALOG")),
+                "notes": sh.get(row, "NOTES", "NOTE"),
+            })
+        return out
+
+    def _seistar(self, sh, starfld=None):
+        """SEI_TO_STAR_FIELD_MAP -- one STAR file field and its SEI source.
+
+        STAR_IN_LAYOUT is checked here against STAR_LAYOUT_DETAIL from the
+        same workbook: a mapping onto a field the layout does not publish is
+        the finding the E2E sheet calls STAR_FIELD_NOT_IN_FILE_MAP."""
+        if not sh:
+            return []
+        cols = ("MAP_ID", "LANE_ID", "LAYER", "FEED_FAMILY", "FEED", "STAR_FIELD", "FIELD_NAME",
+                "BUSINESS_DESCRIPTION", "DESCRIPTION", "DOC_USAGE_STATUS", "USAGE_STATUS",
+                "SEI_SOURCE_OBJECT", "SEI_OBJECT", "SEI_SOURCE_FIELD", "SEI_FIELD", "SEI_TYPE", "SEI_NULLABLE",
+                "JOIN_TRANSFORMATION_LOGIC", "JOIN_LOGIC", "TRANSFORMATION", "MAP_KIND", "MAPPING_TYPE",
+                "OPEN_DEPENDENCY", "NOTES", "NOTE", "MAPPING_STATUS", "APPROVAL_STATUS", "STATUS"
+                ) + self._DOC + self._WHERE
+        self._unconsumed(sh, "sei_star_field_map", *cols)
+        layout = {(_file_key(r["feed_family"] or ""), r.get("field_norm")) for r in (starfld or [])}
+        out, seen = [], set()
+        for i, row in enumerate(sh.rows(), 1):
+            sfld = sh.get(row, "STAR_FIELD", "FIELD_NAME")
+            if not sfld:
+                continue
+            fam = sh.get(row, "FEED_FAMILY", "FEED") or "NA"
+            eobj = self._val(sh.get(row, "SEI_SOURCE_OBJECT", "SEI_OBJECT"))
+            efld = self._val(sh.get(row, "SEI_SOURCE_FIELD", "SEI_FIELD"))
+            rid = sh.get(row, "MAP_ID") or f"{self.data_source}:{_file_key(fam)}:{_norm_code(sfld)}:{_norm_code(eobj or 'NA')}.{_norm_code(efld or 'NA')}"
+            rid = f"{self.data_source}:{rid}" if not rid.startswith(self.data_source + ":") else rid
+            if rid in seen:
+                rid = f"{rid}:{i}"
+            seen.add(rid)
+            out.append({
+                "map_row_id": rid[:600],
+                "data_source": self.data_source,
+                "lane_id": _nz(sh.get(row, "LANE_ID")),
+                "layer": _nz(sh.get(row, "LAYER")),
+                "feed_family": fam if fam != "NA" else None,
+                "feed_key": _file_key(fam) if fam != "NA" else None,
+                "star_field": sfld,
+                "star_field_norm": _norm_code(sfld),
+                "star_in_layout": ("Y" if (_file_key(fam), _norm_code(sfld)) in layout else "N") if layout else None,
+                "business_description": sh.get(row, "BUSINESS_DESCRIPTION", "DESCRIPTION"),
+                "doc_usage_status": _nz(sh.get(row, "DOC_USAGE_STATUS", "USAGE_STATUS")),
+                "sei_object": eobj,
+                "sei_field": efld,
+                "sei_field_norm": _norm_code(efld) if efld else None,
+                "sei_type": _nz(sh.get(row, "SEI_TYPE")),
+                "sei_nullable": _nz(sh.get(row, "SEI_NULLABLE")),
+                "join_logic": self._val(sh.get(row, "JOIN_TRANSFORMATION_LOGIC", "JOIN_LOGIC", "TRANSFORMATION")),
+                "map_kind": _nz(sh.get(row, "MAP_KIND", "MAPPING_TYPE")),
+                "open_dependency": self._yn(sh.get(row, "OPEN_DEPENDENCY")),
+                "mapping_status": _nz(sh.get(row, "MAPPING_STATUS")),
+                "approval_status": _nz(sh.get(row, "APPROVAL_STATUS", "STATUS")),
+                "notes": sh.get(row, "NOTES", "NOTE"),
+                **self._where(sh, row),
+            })
+        return out
+
+    def _starstage(self, sh):
+        """STAR_TO_IMDS_STAGE_MAP -- one IMDS column, the STAR field that feeds
+        it, the legacy logic, and the SEI equivalent beside it. COMPARISON_ID
+        joins TRANSFORMATION_COMPARISON, so the verdict panel and this lane
+        describe the same row."""
+        if not sh:
+            return []
+        cols = ("FEED_FAMILY", "FEED", "TARGET_OBJECT", "IMDS_TARGET_OBJECT", "TARGET_ATTRIBUTE", "IMDS_TARGET_ATTRIBUTE",
+                "TARGET_TYPE", "TARGET_NULLABLE", "STAR_FIELD", "UPLOADER_COLUMN", "IM_LOGIC", "IMDS_TRANSFORMATION_LOGIC",
+                "SEI_EQUIV_LOGIC", "EQUIVALENT_SEI_TRANSFORMATION_LOGIC", "SEI_SOURCE_OBJECT", "SEI_SOURCE_FIELD",
+                "SEI_JOIN_LOGIC", "REMARKS", "NOTES", "COMPARISON_ID", "EVIDENCE_COMPLETENESS",
+                "BUSINESS_DECISION_FLAG", "APPROVAL_STATUS", "STATUS") + self._DOC + self._WHERE
+        self._unconsumed(sh, "star_imds_stage_map", *cols)
+        out, seen = [], set()
+        for i, row in enumerate(sh.rows(), 1):
+            itbl = sh.get(row, "TARGET_OBJECT", "IMDS_TARGET_OBJECT")
+            icol = sh.get(row, "TARGET_ATTRIBUTE", "IMDS_TARGET_ATTRIBUTE")
+            if not icol:
+                continue
+            fam = sh.get(row, "FEED_FAMILY", "FEED") or "NA"
+            sfld = self._val(sh.get(row, "STAR_FIELD"))
+            rid = f"{self.data_source}:{itbl or 'NA'}:{icol}:{_file_key(fam)}:{_norm_code(sfld or 'NA')}"
+            if rid in seen:
+                rid = f"{rid}:{i}"
+            seen.add(rid)
+            out.append({
+                "map_row_id": rid[:600],
+                "data_source": self.data_source,
+                "feed_family": fam if fam != "NA" else None,
+                "feed_key": _file_key(fam) if fam != "NA" else None,
+                "imds_table": itbl,
+                "imds_column": icol,
+                "target_type": _nz(sh.get(row, "TARGET_TYPE")),
+                "target_nullable": _nz(sh.get(row, "TARGET_NULLABLE")),
+                "star_field": sfld,
+                "star_field_norm": _norm_code(sfld) if sfld else None,
+                "uploader_column": _nz(sh.get(row, "UPLOADER_COLUMN")),
+                "im_logic": self._val(sh.get(row, "IM_LOGIC", "IMDS_TRANSFORMATION_LOGIC")),
+                "sei_equiv_logic": self._val(sh.get(row, "SEI_EQUIV_LOGIC", "EQUIVALENT_SEI_TRANSFORMATION_LOGIC")),
+                "sei_object": self._val(sh.get(row, "SEI_SOURCE_OBJECT")),
+                "sei_field": self._val(sh.get(row, "SEI_SOURCE_FIELD")),
+                "sei_join_logic": self._val(sh.get(row, "SEI_JOIN_LOGIC")),
+                "comparison_id": _nz(sh.get(row, "COMPARISON_ID")),
+                "evidence_completeness": _nz(sh.get(row, "EVIDENCE_COMPLETENESS")),
+                "business_decision": self._yn(sh.get(row, "BUSINESS_DECISION_FLAG")),
+                "approval_status": _nz(sh.get(row, "APPROVAL_STATUS", "STATUS")),
+                "notes": sh.get(row, "REMARKS", "NOTES"),
+                **self._where(sh, row),
+            })
+        return out
+
+    # LINK_STATUS as the sheet spells it -> the class the screen stacks by
+    _LINK = {"E2E_LINKED": "E2E", "DIRECT_SEI_TO_IMDS": "SEI_DIRECT",
+             "STAR_FIELD_NOT_IN_FILE_MAP": "STAR_NOT_IN_FILE_MAP", "NO_SEI_SOURCE": "NO_SEI_SOURCE"}
+
+    @classmethod
+    def _link_class(cls, given, sei, star, imds):
+        """E2E | SEI_DIRECT | NO_SEI_SOURCE | STAR_NOT_IN_FILE_MAP | STAR_ONLY.
+        The sheet's own word wins; a row without one is classed by which
+        ends it has."""
+        g = (given or "").strip().upper().replace("-", "_").replace(" ", "_")
+        if g in cls._LINK:
+            return cls._LINK[g]
+        if g:
+            if "NOT_IN" in g:
+                return "STAR_NOT_IN_FILE_MAP"
+            if "NO_SEI" in g or "NO_SOURCE" in g:
+                return "NO_SEI_SOURCE"
+            if "DIRECT" in g:
+                return "SEI_DIRECT"
+            if "E2E" in g or "LINKED" in g or "END" in g:
+                return "E2E"
+        if not sei:
+            return "NO_SEI_SOURCE" if imds else "STAR_ONLY"
+        if star and imds:
+            return "E2E"
+        return "SEI_DIRECT" if imds else "STAR_ONLY"
+
+    def _e2e(self, sh, starfld):
+        """SEI_STAR_IMDS_E2E_XWALK -- one SEI -> STAR -> IMDS path per row."""
+        if not sh:
+            return []
+        cols = ("FEED_FAMILY", "FEED", "SEI_SOURCE", "SEI_SOURCE_OBJECT", "SEI_SOURCE_FIELD", "SEI_TO_STAR_MAP_KIND",
+                "MAP_KIND", "SEI_TO_STAR_LOGIC", "STAR_FIELD", "IMDS_TARGET_OBJECT", "TARGET_OBJECT",
+                "IMDS_TARGET_ATTRIBUTE", "TARGET_ATTRIBUTE", "STAR_TO_IMDS_LOGIC", "IM_LOGIC",
+                "SEI_TO_IMDS_EQUIV_LOGIC", "SEI_EQUIV_LOGIC", "LINK_STATUS", "LINK_TYPE", "CROSSWALK_STATUS",
+                "STATUS", "APPROVAL_STATUS", "NOTES") + self._DOC + self._WHERE
+        self._unconsumed(sh, "sei_e2e_xwalk", *cols)
+        layout = {(_file_key(r["feed_family"] or ""), r.get("field_norm")) for r in (starfld or [])}
+        out, seen = [], set()
+        for i, row in enumerate(sh.rows(), 1):
+            itbl = sh.get(row, "IMDS_TARGET_OBJECT", "TARGET_OBJECT")
+            icol = sh.get(row, "IMDS_TARGET_ATTRIBUTE", "TARGET_ATTRIBUTE")
+            sfld = self._val(sh.get(row, "STAR_FIELD"))
+            src = self._val(sh.get(row, "SEI_SOURCE"))
+            eobj, efld = self._val(sh.get(row, "SEI_SOURCE_OBJECT")), self._val(sh.get(row, "SEI_SOURCE_FIELD"))
+            if src and not (eobj or efld):
+                eobj, _, efld = src.partition(".")
+                eobj, efld = (eobj.strip() or None), (efld.strip() or None)
+                if not efld:                              # a bare field with no object
+                    eobj, efld = None, eobj
+            if not (icol or sfld or efld):
+                continue
+            fam = sh.get(row, "FEED_FAMILY", "FEED")
+            given = sh.get(row, "LINK_STATUS", "LINK_TYPE")
+            rid = f"{self.data_source}:{itbl or 'NA'}:{icol or 'NA'}:{_file_key(fam or 'NA')}:{_norm_code(sfld or 'NA')}:{_norm_code(eobj or 'NA')}.{_norm_code(efld or 'NA')}"
+            if rid in seen:
+                rid = f"{rid}:{i}"
+            seen.add(rid)
+            out.append({
+                "xwalk_row_id": rid[:700],
+                "data_source": self.data_source,
+                "feed_family": fam,
+                "feed_key": _file_key(fam) if fam else None,
+                "sei_source": src or (f"{eobj}.{efld}" if eobj and efld else efld or eobj),
+                "sei_object": eobj,
+                "sei_field": efld,
+                "sei_field_norm": _norm_code(efld) if efld else None,
+                "map_kind": self._val(sh.get(row, "SEI_TO_STAR_MAP_KIND", "MAP_KIND")),
+                "sei_star_logic": self._val(sh.get(row, "SEI_TO_STAR_LOGIC")),
+                "star_field": sfld,
+                "star_field_norm": _norm_code(sfld) if sfld else None,
+                "star_in_layout": ("Y" if (_file_key(fam or ""), _norm_code(sfld)) in layout else "N") if (sfld and layout) else None,
+                "imds_table": itbl,
+                "imds_column": icol,
+                "star_imds_logic": self._val(sh.get(row, "STAR_TO_IMDS_LOGIC", "IM_LOGIC")),
+                "sei_imds_logic": self._val(sh.get(row, "SEI_TO_IMDS_EQUIV_LOGIC", "SEI_EQUIV_LOGIC")),
+                "link_status": _nz(given),
+                "link_class": self._link_class(given, efld, sfld, icol),
+                "crosswalk_status": _nz(sh.get(row, "CROSSWALK_STATUS")),
+                "approval_status": _nz(sh.get(row, "APPROVAL_STATUS", "STATUS")),
+                "notes": sh.get(row, "NOTES"),
+                **self._where(sh, row),
+            })
+        return out
+
+    def _refcode(self, sh):
+        """REFERENCE_CODE_XWALK -- one code value, and what it maps to. The
+        same shape as CODE_SET but kept apart: these come from the mapping
+        documents and are DRAFT, and MAPS_TO_CODE = UNKNOWN is a real
+        answer (the document lists the codes, not their mappings)."""
+        if not sh:
+            return []
+        cols = ("CODE_SET_NAME", "CODE_SET", "CODE_DOMAIN", "SIDE", "CODE_VALUE", "CODE", "CODE_DESCRIPTION", "DESCRIPTION",
+                "MAPS_TO_SIDE", "MAPS_TO_CODE", "MAPS_TO_DESCRIPTION", "MAPPING_RULE", "RULE", "NOTES", "STATUS",
+                "APPROVAL_STATUS") + self._DOC + self._WHERE
+        self._unconsumed(sh, "sei_reference_code_xwalk", *cols)
+        out, seen = [], set()
+        for i, row in enumerate(sh.rows(), 1):
+            code = sh.get(row, "CODE_VALUE", "CODE")
+            if code is None or code == "":
+                continue
+            cset = sh.get(row, "CODE_SET_NAME", "CODE_SET", "CODE_DOMAIN") or "NA"
+            side = sh.get(row, "SIDE") or "NA"
+            to_code = sh.get(row, "MAPS_TO_CODE")
+            rid = f"{self.data_source}:{_file_key(cset)}:{side.upper()}:{code}:{to_code or 'NA'}"
+            if rid in seen:
+                rid = f"{rid}:{i}"
+            seen.add(rid)
+            out.append({
+                "code_row_id": rid[:600],
+                "data_source": self.data_source,
+                "code_set_name": cset if cset != "NA" else None,
+                "side": side.upper() if side != "NA" else None,
+                "code_value": code,
+                "code_description": sh.get(row, "CODE_DESCRIPTION", "DESCRIPTION"),
+                "maps_to_side": _nz(sh.get(row, "MAPS_TO_SIDE")),
+                "maps_to_code": to_code,
+                "maps_to_description": sh.get(row, "MAPS_TO_DESCRIPTION"),
+                # UNKNOWN is the document saying it does not know; stored, and
+                # counted apart from a mapped code and from a blank
+                "is_mapped": "N" if (to_code or "").strip().upper() in ("", "UNKNOWN", "N/A", "NA", "TBD") else "Y",
+                "mapping_rule": _nz(sh.get(row, "MAPPING_RULE", "RULE")),
+                "approval_status": _nz(sh.get(row, "APPROVAL_STATUS", "STATUS")),
+                "notes": sh.get(row, "NOTES"),
+                **self._where(sh, row),
+            })
+        return out
+
+    def _entityid(self, sh):
+        """ENTITY_ID_DERIVATION -- one step of the Entity ID logic, legacy
+        PL/SQL beside how the step works under SEI."""
+        if not sh:
+            return []
+        cols = ("FEED_FAMILY", "FEED", "STEP", "SEQ", "LEGACY_IMDS_LOGIC", "LEGACY_LOGIC", "LOGIC_COMMENT", "COMMENT",
+                "SEI_MIGRATION_RULE", "SEI_RULE", "NOTES", "STATUS", "APPROVAL_STATUS") + self._DOC + self._WHERE
+        self._unconsumed(sh, "sei_entity_id_derivation", *cols)
+        out, seen = [], set()
+        for i, row in enumerate(sh.rows(), 1):
+            legacy = sh.get(row, "LEGACY_IMDS_LOGIC", "LEGACY_LOGIC")
+            sei = sh.get(row, "SEI_MIGRATION_RULE", "SEI_RULE")
+            if not legacy and not sei:
+                continue
+            fam = sh.get(row, "FEED_FAMILY", "FEED") or "NA"
+            seq = _num(sh.get(row, "STEP", "SEQ"))
+            sid = f"{self.data_source}:{_file_key(fam)}:{seq if seq is not None else i}"
+            if sid in seen:
+                sid = f"{sid}:{i}"
+            seen.add(sid)
+            out.append({
+                "step_id": sid[:200],
+                "data_source": self.data_source,
+                "feed_family": fam if fam != "NA" else None,
+                "seq": seq if seq is not None else i,
+                "legacy_logic": legacy,
+                "logic_comment": sh.get(row, "LOGIC_COMMENT", "COMMENT"),
+                "sei_rule": sei,
+                "approval_status": _nz(sh.get(row, "APPROVAL_STATUS", "STATUS")),
+                "notes": sh.get(row, "NOTES"),
+                **self._where(sh, row),
+            })
+        return out
+
+    def _usageexc(self, sh):
+        """USAGE_RECON_EXCEPTIONS -- one disagreement between the usage matrix
+        and a mapping document. RESULT is the workbook's own word
+        (USED_BUT_UNMAPPED, UNUSED_BUT_MAPPED, CONFLICT) and is stored as
+        given, for the same reason STAR_FIELD_USAGE_RECON stores its."""
+        if not sh:
+            return []
+        cols = ("FEED_FAMILY", "FEED", "FIELD_NAME", "STAR_FIELD", "FIELD", "MATRIX_USAGE", "USAGE_STATUS",
+                "MAPPING_DOC_USAGE", "DOC_USAGE", "SEI_SOURCE_MAPPED", "SEI_MAPPED", "SEI_SOURCE", "RESULT",
+                "EXCEPTION_TYPE", "RECON_RESULT", "DETAIL", "NOTES") + self._DOC + self._WHERE
+        self._unconsumed(sh, "star_usage_mapping_exception", *cols)
+        out, seen = [], set()
+        for i, row in enumerate(sh.rows(), 1):
+            fld = sh.get(row, "FIELD_NAME", "STAR_FIELD", "FIELD")
+            if not fld:
+                continue
+            fam = sh.get(row, "FEED_FAMILY", "FEED") or "NA"
+            result = (sh.get(row, "RESULT", "EXCEPTION_TYPE", "RECON_RESULT") or "OTHER").strip().upper().replace(" ", "_")
+            rid = f"{self.data_source}:{result}:{_file_key(fam)}:{_norm_code(fld)}"
+            if rid in seen:
+                rid = f"{rid}:{i}"
+            seen.add(rid)
+            out.append({
+                "exc_row_id": rid[:600],
+                "data_source": self.data_source,
+                "result": result[:60],
+                "feed_family": fam if fam != "NA" else None,
+                "feed_key": _file_key(fam) if fam != "NA" else None,
+                "field_name": fld,
+                "field_norm": _norm_code(fld),
+                "matrix_usage": _nz(sh.get(row, "MATRIX_USAGE", "USAGE_STATUS")),
+                "doc_usage": _nz(sh.get(row, "MAPPING_DOC_USAGE", "DOC_USAGE")),
+                "sei_source_mapped": self._yn(sh.get(row, "SEI_SOURCE_MAPPED", "SEI_MAPPED", "SEI_SOURCE")),
+                "detail": sh.get(row, "DETAIL", "NOTES"),
+                **self._where(sh, row),
+            })
+        return out
+
+    def _formula_check(self, wb, by_key, names):
+        """A sheet counted by formula has no values at all if the workbook
+        was written by a program and never opened in Excel: data_only=True
+        returns None for every formula cell. Say so, by name, rather than
+        loading a summary of blanks."""
+        try:
+            wbf = load_workbook(self.xlsx_path, read_only=True)       # formulas, not values
+        except Exception:                                            # noqa: BLE001
+            return
+        for want in names:
+            real = by_key.get(_hkey(want))
+            if not real:
+                continue
+            try:
+                ws_f, ws_v = wbf[real], wb[real]
+                rf = next(ws_f.iter_rows(min_row=2, max_row=2, values_only=True), ())
+                rv = next(ws_v.iter_rows(min_row=2, max_row=2, values_only=True), ())
+            except Exception:                                        # noqa: BLE001
+                continue
+            formulas = [i for i, c in enumerate(rf) if isinstance(c, str) and c.startswith("=")]
+            blank = [i for i in formulas if i < len(rv) and rv[i] is None]
+            if formulas and blank:
+                log.warning("%s: %d of its %d formula cells have no cached value, so they load as blank. "
+                            "Open the workbook in Excel and save it once, then re-run. The screens "
+                            "recompute these counts from TRANSFORMATION_COMPARISON and the usage matrix anyway.",
+                            real, len(blank), len(formulas))
 
     # ------------------------------------------------------------- load ----
     _TARGETS = [
@@ -1555,6 +2064,13 @@ class SeiCrosswalkConnector:
         ("usage",      "star_field_usage",         ("usage_id",)),
         ("usagesum",   "star_field_usage_summary", ("summary_id",)),
         ("usagerecon", "star_field_usage_recon",   ("recon_id",)),
+        ("mapsrc",     "sei_mapping_source",       ("source_id",)),
+        ("seistar",    "sei_star_field_map",       ("map_row_id",)),
+        ("starstage",  "star_imds_stage_map",      ("map_row_id",)),
+        ("e2e",        "sei_e2e_xwalk",            ("xwalk_row_id",)),
+        ("refcode",    "sei_reference_code_xwalk", ("code_row_id",)),
+        ("entityid",   "sei_entity_id_derivation", ("step_id",)),
+        ("usageexc",   "star_usage_mapping_exception", ("exc_row_id",)),
     ]
 
     # legacy_lineage and legacy_source_file are SHARED with whatever loaded the
@@ -1723,6 +2239,13 @@ class SeiCrosswalkConnector:
             ("star_field_usage", "data_source = :ds"),
             ("star_field_usage_summary", "data_source = :ds"),
             ("star_field_usage_recon", "data_source = :ds"),
+            ("sei_mapping_source", "data_source = :ds"),
+            ("sei_star_field_map", "data_source = :ds"),
+            ("star_imds_stage_map", "data_source = :ds"),
+            ("sei_e2e_xwalk", "data_source = :ds"),
+            ("sei_reference_code_xwalk", "data_source = :ds"),
+            ("sei_entity_id_derivation", "data_source = :ds"),
+            ("star_usage_mapping_exception", "data_source = :ds"),
         ]
         for table, where in scoped:
             if mode == "attach" and table in shared:

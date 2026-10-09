@@ -2345,6 +2345,22 @@ def star_usage_health(data_source: str | None = None):
     return out
 
 
+def _with_doc_columns(rows, ds):
+    """The SEI-mapped share and the used-but-unmapped count per family
+    (sql/79), merged by feed family. Its own statement so a warehouse
+    without sql/79 keeps its summary; the extra keys are then None."""
+    extra = {r.get("feed_family"): r for r in _safe("""
+        SELECT feed_family, sei_mapped_fields, sei_mapped_percent, used_no_sei_source,
+               usage_conflicts, added_from_mapping_doc, mapping_document
+        FROM   star_field_usage_summary WHERE data_source = :ds""", {"ds": ds})}
+    for r in rows:
+        e = extra.get(r.get("feed_family")) or {}
+        for k in ("sei_mapped_fields", "sei_mapped_percent", "used_no_sei_source", "usage_conflicts",
+                  "added_from_mapping_doc", "mapping_document"):
+            r[k] = e.get(k)
+    return rows
+
+
 @router.get("/star-usage/summary")
 def star_usage_summary(data_source: str | None = None):
     """Per family: published, used, unused, and the layout-side counts.
@@ -2382,7 +2398,7 @@ def star_usage_summary(data_source: str | None = None):
     used = sum(r.get("used_fields") or 0 for r in rows)
     return {
         "data_source": ds,
-        "families": rows,
+        "families": _with_doc_columns(rows, ds),
         "totals": {
             "families": len(rows),
             "published": tot,
@@ -2420,14 +2436,27 @@ def star_usage_fields(data_source: str | None = None,
         where.append("is_used = 'N'")
     elif st == "unknown":
         where.append("is_used IS NULL")
-    return {"data_source": ds, "feed_family": feed_family, "status": status,
-            "fields": _safe(f"""
-        SELECT feed_family, field_name, field_norm, usage_status, is_used,
+    fields = _safe(f"""
+        SELECT usage_id, feed_family, field_name, field_norm, usage_status, is_used,
                matrix_value, source_sheet, source_row, source_document
         FROM   star_field_usage
         WHERE  {' AND '.join(where)}
         ORDER  BY feed_family, field_name
+        FETCH FIRST :lim ROWS ONLY""", params)
+    # What the mapping documents say (sql/79), read separately so a
+    # warehouse that has not run sql/79 still gets the usage rows: a
+    # missing column fails only this statement.
+    extra = {r.get("usage_id"): r for r in _safe(f"""
+        SELECT usage_id, doc_usage_status, sei_mapped, usage_check, mapping_document
+        FROM   star_field_usage WHERE {' AND '.join(where)}
         FETCH FIRST :lim ROWS ONLY""", params)}
+    for f in fields:
+        e = extra.get(f.get("usage_id")) or {}
+        f["doc_usage_status"] = e.get("doc_usage_status")
+        f["sei_mapped"] = e.get("sei_mapped")
+        f["usage_check"] = e.get("usage_check")
+        f["mapping_document"] = e.get("mapping_document")
+    return {"data_source": ds, "feed_family": feed_family, "status": status, "fields": fields}
 
 
 @router.get("/star-usage/recon")
@@ -2616,3 +2645,247 @@ def star_usage_coverage(data_source: str | None = None):
                  "still a field the contract publishes; whether that puts "
                  "it out of scope is a decision about the contract."),
     }
+
+
+# =============================================================================
+# The mapping documents (sql/79). Seven sheets built from the SEI mapping
+# documents: three lanes of field maps, the register they came from, the code
+# crosswalk, the Entity ID derivation and the usage disagreements. Every
+# endpoint aggregates in Python over a slim select so the counts, the rows
+# and the tests all read the same statement, and a warehouse without sql/79
+# gets empty shapes rather than a 500.
+# =============================================================================
+
+LINK_ORDER = ["E2E", "SEI_DIRECT", "STAR_NOT_IN_FILE_MAP", "NO_SEI_SOURCE", "STAR_ONLY"]
+LINK_LABEL = {"E2E": "linked SEI → STAR → IMDS", "SEI_DIRECT": "SEI straight to IMDS",
+              "STAR_NOT_IN_FILE_MAP": "STAR field not in the file map", "NO_SEI_SOURCE": "no SEI source",
+              "STAR_ONLY": "STAR without a target"}
+COMPLETENESS_ORDER = ["BOTH_LOGICS_DOCUMENTED", "IM_LOGIC_AND_SEI_SOURCE_DOCUMENTED", "SEI_ONLY_DOCUMENTED",
+                      "IM_ONLY_DOCUMENTED", "NO_MAPPING"]
+COVERED = {"BOTH_LOGICS_DOCUMENTED", "IM_LOGIC_AND_SEI_SOURCE_DOCUMENTED", "SEI_ONLY_DOCUMENTED"}
+
+
+def _tally(rows, key, order=None):
+    c = {}
+    for r in rows:
+        k = r.get(key) or "(none)"
+        c[k] = c.get(k, 0) + 1
+    keys = [k for k in (order or []) if k in c] + sorted(k for k in c if k not in (order or []))
+    return [{"key": k, "n": c[k]} for k in keys]
+
+
+def _pct100(n, d):
+    return round(100.0 * n / d, 1) if d else None
+
+
+@router.get("/mapping-docs")
+def mapping_docs(data_source: str | None = None):
+    """The register of mapping documents, with what each one loaded, beside
+    what the three lane tables actually hold for its feed. The two columns
+    agreeing is the check; a register that says 120 and a lane that holds
+    80 is a load that dropped rows."""
+    ds = _ds(data_source)
+    reg = _safe("""SELECT feed_family, feed_key, source_document, sei_star_rows, sei_star_mapped, open_dependencies,
+                          imds_targets, imds_stage_rows, new_comparison_rows, already_in_catalog, notes
+                   FROM sei_mapping_source WHERE data_source = :ds ORDER BY feed_family""", {"ds": ds})
+    s2s = _safe("SELECT feed_key, sei_field, mapping_status, map_kind, open_dependency, star_in_layout FROM sei_star_field_map WHERE data_source = :ds", {"ds": ds})
+    stg = _safe("SELECT feed_key, imds_table, evidence_completeness, business_decision FROM star_imds_stage_map WHERE data_source = :ds", {"ds": ds})
+    e2e = _safe("SELECT feed_key, link_class FROM sei_e2e_xwalk WHERE data_source = :ds", {"ds": ds})
+    by_feed = {}
+
+    def slot(k):
+        return by_feed.setdefault(k or "NA", {"s2s_rows": 0, "s2s_mapped": 0, "s2s_open": 0, "s2s_not_in_layout": 0,
+                                               "stage_rows": 0, "imds_tables": set(), "business_decisions": 0,
+                                               "e2e_rows": 0, "links": {}})
+    for r in s2s:
+        f = slot(r.get("feed_key")); f["s2s_rows"] += 1
+        f["s2s_mapped"] += bool(r.get("sei_field")) and (r.get("mapping_status") or "") != "NO_SEI_SOURCE"
+        f["s2s_open"] += r.get("open_dependency") == "Y"
+        f["s2s_not_in_layout"] += r.get("star_in_layout") == "N"
+    for r in stg:
+        f = slot(r.get("feed_key")); f["stage_rows"] += 1
+        if r.get("imds_table"):
+            f["imds_tables"].add(r["imds_table"])
+        f["business_decisions"] += r.get("business_decision") == "Y"
+    for r in e2e:
+        f = slot(r.get("feed_key")); f["e2e_rows"] += 1
+        lc = r.get("link_class") or "(none)"
+        f["links"][lc] = f["links"].get(lc, 0) + 1
+    docs = []
+    seen = set()
+    for r in reg:
+        k = r.get("feed_key") or "NA"; seen.add(k)
+        f = by_feed.get(k, {})
+        declared, loaded = r.get("sei_star_rows"), f.get("s2s_rows", 0)
+        docs.append({**r, "loaded": {**{x: y for x, y in f.items() if x != "imds_tables"},
+                                     "imds_tables": sorted(f.get("imds_tables", []))},
+                     "agrees": (declared is None) or (int(declared) == loaded)})
+    for k, f in by_feed.items():
+        if k not in seen:
+            docs.append({"feed_family": k, "feed_key": k, "source_document": None, "sei_star_rows": None,
+                         "loaded": {**{x: y for x, y in f.items() if x != "imds_tables"}, "imds_tables": sorted(f["imds_tables"])},
+                         "agrees": None, "unregistered": True})
+    tot = {"documents": len(reg), "feeds": len(docs), "s2s_rows": len(s2s), "stage_rows": len(stg), "e2e_rows": len(e2e),
+           "s2s_mapped": sum(1 for r in s2s if r.get("sei_field") and (r.get("mapping_status") or "") != "NO_SEI_SOURCE"),
+           "open_dependencies": sum(1 for r in s2s if r.get("open_dependency") == "Y"),
+           "imds_tables": len({r.get("imds_table") for r in stg if r.get("imds_table")}),
+           "disagreements": sum(1 for d in docs if d.get("agrees") is False)}
+    tot["s2s_mapped_pct"] = _pct100(tot["s2s_mapped"], tot["s2s_rows"])
+    return {"data_source": ds, "docs": docs, "totals": tot,
+            "by_mapping_status": _tally(s2s, "mapping_status"), "by_map_kind": _tally(s2s, "map_kind"),
+            "headline": (f"{tot['documents']} mapping documents · {tot['s2s_rows']} STAR fields, {tot['s2s_mapped']} with a SEI source · "
+                         f"{tot['e2e_rows']} end-to-end paths over {tot['imds_tables']} IMDS tables · everything DRAFT_REVIEW_REQUIRED"
+                         if tot["s2s_rows"] or tot["e2e_rows"] else "No mapping documents loaded.")}
+
+
+@router.get("/e2e-coverage")
+def e2e_coverage(data_source: str | None = None):
+    """SEI -> STAR -> IMDS, per IMDS target table: how many paths link all
+    the way, how many go SEI straight to IMDS, how many have no SEI source,
+    and how many point at a STAR field the file map does not have. Coverage
+    counts the first two; the other two are the gap."""
+    ds = _ds(data_source)
+    rows = _safe("""SELECT imds_table, feed_family, link_class, link_status, crosswalk_status, approval_status
+                    FROM sei_e2e_xwalk WHERE data_source = :ds""", {"ds": ds})
+    tables, feeds = {}, {}
+    for r in rows:
+        for key, bucket in ((r.get("imds_table") or "(no target)", tables), (r.get("feed_family") or "(no feed)", feeds)):
+            t = bucket.setdefault(key, {"name": key, "rows": 0, "links": {}, "gap": 0, "candidate": 0})
+            t["rows"] += 1
+            lc = r.get("link_class") or "(none)"
+            t["links"][lc] = t["links"].get(lc, 0) + 1
+            t["gap"] += (r.get("crosswalk_status") or "").upper() == "GAP"
+            t["candidate"] += (r.get("crosswalk_status") or "").upper() == "CANDIDATE"
+    def finish(d):
+        out = []
+        for t in d.values():
+            covered = t["links"].get("E2E", 0) + t["links"].get("SEI_DIRECT", 0)
+            out.append({**t, "covered": covered, "coverage_pct": _pct100(covered, t["rows"]),
+                        "e2e": t["links"].get("E2E", 0), "sei_direct": t["links"].get("SEI_DIRECT", 0),
+                        "no_sei_source": t["links"].get("NO_SEI_SOURCE", 0),
+                        "not_in_file_map": t["links"].get("STAR_NOT_IN_FILE_MAP", 0)})
+        return sorted(out, key=lambda x: (-(x["coverage_pct"] or 0), x["name"]))
+    total = len(rows)
+    links = _tally(rows, "link_class", LINK_ORDER)
+    for l in links:
+        l["label"] = LINK_LABEL.get(l["key"], l["key"])
+    covered = sum(1 for r in rows if r.get("link_class") in ("E2E", "SEI_DIRECT"))
+    return {"data_source": ds, "total": total, "covered": covered, "coverage_pct": _pct100(covered, total),
+            "by_link": links, "by_status": _tally(rows, "crosswalk_status"), "by_approval": _tally(rows, "approval_status"),
+            "tables": finish(tables), "feeds": finish(feeds),
+            "headline": (f"{covered} of {total} paths reach IMDS from a SEI source ({_pct100(covered, total)}%)"
+                         if total else "No end-to-end crosswalk loaded.")}
+
+
+@router.get("/e2e-rows")
+def e2e_rows(data_source: str | None = None, table: str | None = None, feed: str | None = None,
+             link: str | None = None, q: str | None = None, limit: int = 500):
+    ds = _ds(data_source)
+    where, params = ["data_source = :ds"], {"ds": ds}
+    if table:
+        where.append("imds_table = :t"); params["t"] = table
+    if feed:
+        where.append("feed_family = :f"); params["f"] = feed
+    if link:
+        where.append("link_class = :l"); params["l"] = link.upper()
+    if q:
+        where.append("(UPPER(star_field) LIKE :q OR UPPER(imds_column) LIKE :q OR UPPER(sei_source) LIKE :q)")
+        params["q"] = f"%{q.strip().upper()}%"
+    rows = _safe(f"""SELECT xwalk_row_id, feed_family, sei_source, sei_object, sei_field, map_kind, sei_star_logic,
+                            star_field, star_in_layout, imds_table, imds_column, star_imds_logic, sei_imds_logic,
+                            link_status, link_class, crosswalk_status, approval_status, source_document
+                     FROM sei_e2e_xwalk WHERE {' AND '.join(where)}
+                     ORDER BY imds_table, imds_column, feed_family, star_field""", params)
+    return {"data_source": ds, "rows": rows[:max(1, min(limit, 5000))], "total": len(rows)}
+
+
+@router.get("/transformation-summary")
+def transformation_summary(data_source: str | None = None):
+    """TRANSFORMATION_SUMMARY, recomputed: one row per IMDS target table from
+    the comparison rows, counts by evidence completeness and the SEI
+    coverage share. The sheet's own row is a formula, so it is blank unless
+    the workbook was saved in Excel; what SEI_CONTROL holds of it is
+    returned beside the computed row for the reader to compare."""
+    ds = _ds(data_source)
+    rows = _safe("""SELECT target_object, evidence_completeness, approval_status, equivalence
+                    FROM sei_transformation_compare WHERE data_source = :ds""", {"ds": ds})
+    declared = {r.get("control_name"): r for r in _safe(
+        """SELECT control_name, result, status, detail FROM sei_control
+           WHERE data_source = :ds AND source_sheet = 'TRANSFORMATION_SUMMARY'""", {"ds": ds})}
+    tables = {}
+    for r in rows:
+        t = tables.setdefault(r.get("target_object") or "(none)", {"target_object": r.get("target_object") or "(none)", "rows": 0, "by": {}, "approved": 0})
+        t["rows"] += 1
+        ec = r.get("evidence_completeness") or "(none)"
+        t["by"][ec] = t["by"].get(ec, 0) + 1
+        t["approved"] += str(r.get("approval_status") or "").upper().startswith("APPROVED")
+    out = []
+    for t in tables.values():
+        covered = sum(n for k, n in t["by"].items() if k in COVERED)
+        d = declared.get(t["target_object"])
+        out.append({**t, "covered": covered, "coverage_pct": _pct100(covered, t["rows"]),
+                    "declared_rows": (d or {}).get("result"), "declared_status": (d or {}).get("status")})
+    out.sort(key=lambda x: (-(x["coverage_pct"] or 0), x["target_object"]))
+    total = len(rows)
+    covered = sum(1 for r in rows if r.get("evidence_completeness") in COVERED)
+    return {"data_source": ds, "tables": out, "total": total, "covered": covered, "coverage_pct": _pct100(covered, total),
+            "by_completeness": _tally(rows, "evidence_completeness", COMPLETENESS_ORDER),
+            "by_approval": _tally(rows, "approval_status"),
+            "declared_total": (declared.get("TOTAL") or {}).get("result"),
+            "headline": (f"{len(out)} IMDS target tables · {covered} of {total} comparison rows have a SEI source"
+                         if total else "No transformation comparison loaded.")}
+
+
+@router.get("/reference-codes")
+def reference_codes(data_source: str | None = None, code_set: str | None = None):
+    ds = _ds(data_source)
+    params = {"ds": ds}
+    sql = """SELECT code_set_name, side, code_value, code_description, maps_to_side, maps_to_code, maps_to_description,
+                    is_mapped, mapping_rule, source_document FROM sei_reference_code_xwalk WHERE data_source = :ds"""
+    if code_set:
+        sql += " AND code_set_name = :cs"; params["cs"] = code_set
+    rows = _safe(sql + " ORDER BY code_set_name, side, code_value", params)
+    sets = {}
+    for r in rows:
+        s = sets.setdefault(r.get("code_set_name") or "(none)", {"code_set_name": r.get("code_set_name") or "(none)", "n": 0, "mapped": 0, "unknown": 0, "sides": set(), "rules": set()})
+        s["n"] += 1; s["mapped"] += r.get("is_mapped") == "Y"; s["unknown"] += r.get("is_mapped") != "Y"
+        if r.get("side"): s["sides"].add(r["side"])
+        if r.get("mapping_rule"): s["rules"].add(r["mapping_rule"])
+    by_set = [{**s, "sides": sorted(s["sides"]), "rules": sorted(s["rules"]), "mapped_pct": _pct100(s["mapped"], s["n"])}
+              for s in sorted(sets.values(), key=lambda x: x["code_set_name"])]
+    return {"data_source": ds, "rows": rows, "total": len(rows), "by_set": by_set,
+            "mapped": sum(1 for r in rows if r.get("is_mapped") == "Y")}
+
+
+@router.get("/entity-id")
+def entity_id(data_source: str | None = None):
+    ds = _ds(data_source)
+    rows = _safe("""SELECT feed_family, seq, legacy_logic, logic_comment, sei_rule, approval_status, source_document, source_row
+                    FROM sei_entity_id_derivation WHERE data_source = :ds ORDER BY feed_family, seq""", {"ds": ds})
+    feeds = {}
+    for r in rows:
+        feeds.setdefault(r.get("feed_family") or "(none)", []).append(r)
+    return {"data_source": ds, "feeds": [{"feed_family": k, "steps": v} for k, v in feeds.items()], "total": len(rows)}
+
+
+@router.get("/usage-exceptions")
+def usage_exceptions(data_source: str | None = None, result: str | None = None, feed: str | None = None):
+    ds = _ds(data_source)
+    where, params = ["data_source = :ds"], {"ds": ds}
+    if result:
+        where.append("result = :r"); params["r"] = result.upper()
+    if feed:
+        where.append("feed_family = :f"); params["f"] = feed
+    rows = _safe(f"""SELECT result, feed_family, field_name, matrix_usage, doc_usage, sei_source_mapped, detail,
+                            source_document, source_row
+                     FROM star_usage_mapping_exception WHERE {' AND '.join(where)}
+                     ORDER BY result, feed_family, field_name""", params)
+    by_feed = {}
+    for r in rows:
+        f = by_feed.setdefault(r.get("feed_family") or "(none)", {"feed_family": r.get("feed_family") or "(none)", "n": 0, "by": {}})
+        f["n"] += 1; f["by"][r.get("result") or "(none)"] = f["by"].get(r.get("result") or "(none)", 0) + 1
+    return {"data_source": ds, "rows": rows, "total": len(rows),
+            "by_result": _tally(rows, "result", ["USED_BUT_UNMAPPED", "UNUSED_BUT_MAPPED", "CONFLICT"]),
+            "by_feed": sorted(by_feed.values(), key=lambda x: -x["n"]),
+            "note": ("Used in the matrix with no SEI source is work; unused in the matrix but mapped in a document "
+                     "is a scope question (the matrix may be stale, or the document maps more than anybody reads).")}

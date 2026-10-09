@@ -319,6 +319,18 @@ function Drill({ t, family, rows, filter, setFilter, onClose }) {
                            : r.is_used === "N" ? "#eef2f5" : "rgba(232,163,61,.15)" }}>
                       {r.usage_status || "not stated"}</span>
                   </td>
+                  {/* What the mapping document says about the same field
+                      (sql/79). Beside the matrix's word, never merged with
+                      it: the two disagreeing is the finding. */}
+                  {(r.doc_usage_status || r.sei_mapped || r.usage_check) && (
+                    <td style={{ padding: "5px 10px", fontSize: 10.5, whiteSpace: "nowrap" }}>
+                      {r.doc_usage_status && <span style={{ color: t.sub }}>doc: {r.doc_usage_status}</span>}
+                      {r.sei_mapped && <span style={{ marginLeft: 6, fontWeight: 700,
+                        color: r.sei_mapped === "Y" ? C.used : C.bad }}>{r.sei_mapped === "Y" ? "SEI source" : "no SEI source"}</span>}
+                      {r.usage_check && !/^(AGREE|CONSISTENT)$/i.test(r.usage_check) && (
+                        <span style={{ marginLeft: 6, padding: "1px 6px", borderRadius: 999, fontSize: 9.5, fontWeight: 700,
+                          color: "#b45309", background: "#fae5d3" }}>{r.usage_check.toLowerCase().replace(/_/g, " ")}</span>)}
+                    </td>)}
                   {/* Where the claim came from. An unsourced usage call is
                       an opinion; this names the document and the row. */}
                   <td style={{ padding: "5px 13px", color: t.sub, fontSize: 11,

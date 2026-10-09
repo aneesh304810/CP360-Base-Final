@@ -1,0 +1,310 @@
+// The SEI mapping documents, on the crosswalk dashboard.
+//
+// Seven sheets became seven tables (sql/79): three lanes of field maps
+// (SEI → STAR, STAR → IMDS, and the two joined end to end), the register
+// of documents they came from, the reference-code crosswalk, the Entity ID
+// derivation, and where the usage matrix and the documents disagree.
+//
+// WHAT THIS PANEL IS FOR. Before these documents the crosswalk could say a
+// SEI datapoint exists and whether its type and logic match for ONE IMDS
+// table. Now it can say, for fourteen, which SEI source reaches which IMDS
+// column and by which STAR field — or that none does. Every row is
+// DRAFT_REVIEW_REQUIRED: none of the documents is an approved SEI-to-STAR
+// crosswalk, so nothing here changes a verdict, and the panel says so.
+
+import React, { useEffect, useMemo, useState } from "react";
+import { mappingDocs, LINK_INFO, LINK_ORDER, COMPLETENESS_INFO } from "./seiCrosswalkApi.js";
+
+const VIEWS = ["Coverage", "Documents", "Transformations", "Reference codes", "Entity ID", "Usage exceptions"];
+
+const Tile = ({ t, v, label, sub, c }) => (
+  <div style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: t.radius.md, padding: "10px 14px", minWidth: 140 }}>
+    <div style={{ fontSize: 24, fontWeight: 800, color: c || t.navy, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{v ?? "—"}</div>
+    <div style={{ fontSize: 10, color: t.textMuted, textTransform: "uppercase", letterSpacing: ".6px", marginTop: 5 }}>{label}</div>
+    {sub && <div style={{ fontSize: 11, color: t.sub, marginTop: 3 }}>{sub}</div>}
+  </div>);
+
+const Pill = ({ info, children, onClick, active }) => (
+  <span onClick={onClick} role={onClick ? "button" : undefined} tabIndex={onClick ? 0 : undefined}
+    style={{ display: "inline-block", fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 999, whiteSpace: "nowrap",
+      color: active ? "#fff" : info.c, background: active ? info.c : info.bg || `${info.c}1a`, cursor: onClick ? "pointer" : "default" }}>{children}</span>);
+
+const th = (t) => ({ textAlign: "left", fontSize: 9.5, color: t.textMuted, textTransform: "uppercase", letterSpacing: ".6px",
+  padding: "6px 9px", borderBottom: `1px solid ${t.border}`, fontWeight: 700, whiteSpace: "nowrap", position: "sticky", top: 0, background: t.panel });
+const td = (t) => ({ padding: "6px 9px", borderBottom: `1px solid ${t.panel2}`, fontSize: 12, color: t.text, verticalAlign: "top" });
+const num = (t) => ({ ...td(t), textAlign: "right", fontVariantNumeric: "tabular-nums" });
+const mono = { fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace", fontSize: 11, whiteSpace: "pre-wrap", wordBreak: "break-word" };
+
+/* A stacked bar of link classes, in LINK_ORDER. */
+export function LinkStack({ links, total, h = 10 }) {
+  const n = total || LINK_ORDER.reduce((a, k) => a + (links[k] || 0), 0);
+  return (
+    <div style={{ display: "flex", height: h, borderRadius: h / 2, overflow: "hidden", background: "#e9eef3", minWidth: 120 }}
+      title={LINK_ORDER.filter((k) => links[k]).map((k) => `${LINK_INFO[k].t} ${links[k]}`).join(" · ")}>
+      {LINK_ORDER.filter((k) => links[k]).map((k) => <div key={k} style={{ width: `${100 * links[k] / Math.max(1, n)}%`, background: LINK_INFO[k].c }} />)}
+    </div>);
+}
+
+/* The headline numbers and the draft warning. Pure of the fetch. */
+export function headlineOf(reg, cov) {
+  const T = reg?.totals || {};
+  return {
+    documents: T.documents || 0, s2sRows: T.s2s_rows || 0, s2sMapped: T.s2s_mapped || 0, s2sPct: T.s2s_mapped_pct,
+    e2eRows: cov?.total || 0, covered: cov?.covered || 0, coveragePct: cov?.coverage_pct, tables: T.imds_tables || 0,
+    noSei: (cov?.by_link || []).find((l) => l.key === "NO_SEI_SOURCE")?.n || 0,
+    notInMap: (cov?.by_link || []).find((l) => l.key === "STAR_NOT_IN_FILE_MAP")?.n || 0,
+    drafts: (cov?.by_approval || []).reduce((a, x) => a + (/DRAFT/i.test(x.key) ? x.n : 0), 0),
+    loaded: (T.s2s_rows || 0) + (cov?.total || 0) > 0,
+  };
+}
+
+export default function MappingDocsPanel({ t, dataSource, initial, onOpenColumn }) {
+  const ds = dataSource || "IMDS";
+  const [reg, setReg] = useState(initial?.register || null);
+  const [cov, setCov] = useState(initial?.coverage || null);
+  const [xs, setXs] = useState(initial?.transformations || null);
+  const [codes, setCodes] = useState(initial?.codes || null);
+  const [ent, setEnt] = useState(initial?.entity || null);
+  const [exc, setExc] = useState(initial?.exceptions || null);
+  const [view, setView] = useState(initial?.view || "Coverage");
+  const [table, setTable] = useState(initial?.table || null);
+  const [link, setLink] = useState("");
+  const [q, setQ] = useState("");
+  const [rows, setRows] = useState(initial?.rows || null);
+  const [openRow, setOpenRow] = useState(null);
+  useEffect(() => {
+    if (initial) return undefined;
+    let on = true;
+    Promise.all([mappingDocs.register(ds), mappingDocs.e2eCoverage(ds), mappingDocs.transformationSummary(ds),
+                 mappingDocs.referenceCodes(ds), mappingDocs.entityId(ds), mappingDocs.usageExceptions(ds)])
+      .then(([r, c, x, k, e, u]) => { if (on) { setReg(r); setCov(c); setXs(x); setCodes(k); setEnt(e); setExc(u); } });
+    return () => { on = false; };
+  }, [ds]);
+  useEffect(() => {
+    if (!table || initial?.rows) return undefined;
+    let on = true;
+    setRows("loading");
+    mappingDocs.e2eRows({ data_source: ds, table, link, q, limit: 1000 }).then((d) => { if (on) setRows(d.rows || []); });
+    return () => { on = false; };
+  }, [ds, table, link, q]);
+  const H = useMemo(() => headlineOf(reg, cov), [reg, cov]);
+  if (reg && cov && !H.loaded) return null;        // nothing loaded: the dashboard stays as it was
+
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: t.sub, lineHeight: 1.5, marginBottom: 10 }}>
+        {reg?.headline || "Loading the mapping documents…"}
+      </div>
+      <div style={{ border: `1px solid #e67e22`, borderLeft: "4px solid #e67e22", background: "#e67e2212", borderRadius: t.radius.md,
+        padding: "8px 12px", marginBottom: 12, fontSize: 12, lineHeight: 1.5 }}>
+        <b style={{ color: "#b45309" }}>Every row here is a draft.</b> The documents are mapping candidates, not an approved
+        SEI-to-STAR crosswalk ({H.drafts} rows carry DRAFT_REVIEW_REQUIRED). No verdict on this dashboard changes because of them.
+      </div>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+        <Tile t={t} v={H.documents} label="mapping documents" sub={`${H.s2sRows} STAR fields read`} />
+        <Tile t={t} v={H.s2sPct == null ? "—" : `${H.s2sPct}%`} label="STAR fields with a SEI source" sub={`${H.s2sMapped} of ${H.s2sRows}`} c={t.success} />
+        <Tile t={t} v={H.coveragePct == null ? "—" : `${H.coveragePct}%`} label="end-to-end coverage" sub={`${H.covered} of ${H.e2eRows} paths reach IMDS from SEI`} c={t.accent} />
+        <Tile t={t} v={H.tables} label="IMDS target tables" sub="up from one" />
+        <Tile t={t} v={H.noSei} label="paths with no SEI source" sub={H.notInMap ? `+${H.notInMap} point at a STAR field not in the map` : ""} c={t.danger} />
+        <Tile t={t} v={exc?.total ?? "—"} label="usage disagreements" sub="matrix vs mapping document" c={t.warning} />
+      </div>
+      <div style={{ display: "flex", gap: 0, borderBottom: `1px solid ${t.border}`, marginBottom: 12 }}>
+        {VIEWS.map((v) => (
+          <div key={v} onClick={() => setView(v)} role="tab" tabIndex={0} aria-selected={view === v}
+            style={{ padding: "6px 14px", fontSize: 12, cursor: "pointer", color: view === v ? t.accent : t.sub,
+              borderBottom: view === v ? `2px solid ${t.accent}` : "2px solid transparent", marginBottom: -1 }}>{v}</div>))}
+      </div>
+
+      {view === "Coverage" && cov && (
+        <div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
+            {(cov.by_link || []).map((l) => <Pill key={l.key} info={LINK_INFO[l.key] || { c: "#6b7c8a" }}>{(LINK_INFO[l.key] || {}).t || l.key} · {l.n}</Pill>)}
+            <span style={{ fontSize: 11, color: t.textMuted, marginLeft: "auto" }}>coverage = linked end to end + SEI straight to IMDS · click a table for its paths</span>
+          </div>
+          <div style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: t.radius.md, overflow: "auto", maxHeight: 420 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr><th style={th(t)}>IMDS target table</th><th style={{ ...th(t), textAlign: "right" }}>Paths</th><th style={th(t)}>Links</th>
+                <th style={{ ...th(t), textAlign: "right" }}>Coverage</th><th style={{ ...th(t), textAlign: "right" }}>No SEI source</th>
+                <th style={{ ...th(t), textAlign: "right" }}>Not in map</th><th style={{ ...th(t), textAlign: "right" }}>Gaps</th></tr></thead>
+              <tbody>
+                {(cov.tables || []).map((x) => (
+                  <tr key={x.name} onClick={() => { setTable(table === x.name ? null : x.name); setOpenRow(null); }}
+                    style={{ cursor: "pointer", background: table === x.name ? t.infoBg : "transparent" }}>
+                    <td style={{ ...td(t), fontWeight: 700, color: t.navy, whiteSpace: "nowrap" }}>{x.name}</td>
+                    <td style={num(t)}>{x.rows}</td>
+                    <td style={{ ...td(t), minWidth: 160 }}><LinkStack links={x.links} total={x.rows} /></td>
+                    <td style={{ ...num(t), fontWeight: 700, color: x.coverage_pct >= 70 ? t.success : x.coverage_pct >= 30 ? t.warning : t.danger }}>{x.coverage_pct == null ? "—" : `${x.coverage_pct}%`}</td>
+                    <td style={{ ...num(t), color: x.no_sei_source ? t.danger : t.textMuted }}>{x.no_sei_source || "—"}</td>
+                    <td style={{ ...num(t), color: x.not_in_file_map ? "#7c3aed" : t.textMuted }}>{x.not_in_file_map || "—"}</td>
+                    <td style={{ ...num(t), color: t.sub }}>{x.gap || "—"}</td>
+                  </tr>))}
+              </tbody>
+            </table>
+          </div>
+          {table && (
+            <div style={{ marginTop: 12, background: t.panel, border: `1px solid ${t.border}`, borderRadius: t.radius.md }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", borderBottom: `1px solid ${t.border}`, background: t.bg }}>
+                <b style={{ fontSize: 12.5 }}>{table}</b>
+                {LINK_ORDER.map((k) => <Pill key={k} info={LINK_INFO[k]} active={link === k} onClick={() => setLink(link === k ? "" : k)}>{LINK_INFO[k].t}</Pill>)}
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="STAR field, IMDS column, SEI source…"
+                  style={{ fontSize: 11.5, padding: "3px 8px", border: `1px solid ${t.border}`, borderRadius: 4, width: 240, marginLeft: "auto" }} />
+                <span onClick={() => { setTable(null); setOpenRow(null); }} role="button" tabIndex={0} style={{ fontSize: 11, color: t.accent, fontWeight: 700, cursor: "pointer" }}>close ✕</span>
+              </div>
+              {rows === "loading" && <div style={{ padding: 14, fontSize: 12, color: t.sub }}>Loading…</div>}
+              {Array.isArray(rows) && (
+                <div style={{ maxHeight: 460, overflow: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead><tr><th style={th(t)}>SEI source</th><th style={th(t)}>→ STAR field</th><th style={th(t)}>→ IMDS column</th><th style={th(t)}>Link</th><th style={th(t)}>Status</th></tr></thead>
+                    <tbody>
+                      {rows.map((r) => (
+                        <React.Fragment key={r.xwalk_row_id}>
+                          <tr onClick={() => setOpenRow(openRow === r.xwalk_row_id ? null : r.xwalk_row_id)} style={{ cursor: "pointer" }}>
+                            <td style={{ ...td(t), color: r.sei_source ? t.navy : t.danger, fontWeight: r.sei_source ? 600 : 400 }}>{r.sei_source || "(no SEI source)"}{r.map_kind ? <span style={{ fontSize: 10, color: t.textMuted }}> · {r.map_kind}</span> : null}</td>
+                            <td style={{ ...td(t), color: r.star_in_layout === "N" ? "#7c3aed" : t.text }}>{r.star_field || <span style={{ color: t.textMuted }}>(direct)</span>}{r.star_in_layout === "N" ? " ⚠" : ""}</td>
+                            <td style={{ ...td(t), fontWeight: 700, color: t.navy }}>{r.imds_column}
+                              {onOpenColumn && <span onClick={(e) => { e.stopPropagation(); onOpenColumn(r.imds_table, r.imds_column); }} role="button" tabIndex={0}
+                                style={{ fontSize: 10, color: t.accent, marginLeft: 6, cursor: "pointer" }}>verdict ▸</span>}</td>
+                            <td style={td(t)}><Pill info={LINK_INFO[r.link_class] || { c: "#6b7c8a" }}>{(LINK_INFO[r.link_class] || {}).t || r.link_class}</Pill></td>
+                            <td style={{ ...td(t), fontSize: 10.5, color: t.sub }}>{r.crosswalk_status}{r.approval_status ? ` · ${r.approval_status.toLowerCase().replace(/_/g, " ")}` : ""}</td>
+                          </tr>
+                          {openRow === r.xwalk_row_id && (
+                            <tr><td colSpan={5} style={{ ...td(t), background: t.bg }}>
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                                {[["SEI → STAR logic", r.sei_star_logic], ["STAR → IMDS (legacy)", r.star_imds_logic], ["SEI → IMDS (equivalent)", r.sei_imds_logic]].map(([k, v]) => (
+                                  <div key={k}><div style={{ fontSize: 9.5, color: t.textMuted, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 4 }}>{k}</div>
+                                    <div style={{ ...mono, background: "#fff", border: `1px solid ${t.border}`, borderRadius: 3, padding: "6px 8px", minHeight: 30 }}>{v || "—"}</div></div>))}
+                              </div>
+                              <div style={{ fontSize: 10.5, color: t.textMuted, marginTop: 6 }}>{r.source_document}{r.link_status ? ` · ${r.link_status}` : ""}</div>
+                            </td></tr>)}
+                        </React.Fragment>))}
+                      {!rows.length && <tr><td style={td(t)} colSpan={5}><span style={{ color: t.textMuted }}>no paths match</span></td></tr>}
+                    </tbody>
+                  </table>
+                </div>)}
+            </div>)}
+        </div>)}
+
+      {view === "Documents" && reg && (
+        <div style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: t.radius.md, overflow: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr><th style={th(t)}>STAR feed</th><th style={th(t)}>Mapping document</th><th style={{ ...th(t), textAlign: "right" }}>STAR fields</th>
+              <th style={{ ...th(t), textAlign: "right" }}>With SEI source</th><th style={{ ...th(t), textAlign: "right" }}>Open dependencies</th>
+              <th style={th(t)}>IMDS targets</th><th style={{ ...th(t), textAlign: "right" }}>Stage rows</th><th style={{ ...th(t), textAlign: "right" }}>New comparisons</th>
+              <th style={{ ...th(t), textAlign: "right" }}>Already in catalog</th><th style={th(t)}>Loaded</th></tr></thead>
+            <tbody>
+              {(reg.docs || []).map((d) => (
+                <tr key={d.feed_key}>
+                  <td style={{ ...td(t), fontWeight: 700, color: t.navy }}>{d.feed_family}</td>
+                  <td style={{ ...td(t), color: t.sub }}>{d.source_document || <i style={{ color: t.warning }}>not in the register</i>}</td>
+                  <td style={num(t)}>{d.sei_star_rows ?? "—"}</td>
+                  <td style={num(t)}>{d.sei_star_mapped ?? "—"}</td>
+                  <td style={{ ...num(t), color: d.open_dependencies ? t.warning : t.textMuted }}>{d.open_dependencies ?? "—"}</td>
+                  <td style={{ ...td(t), fontSize: 11, color: t.sub }}>{(d.imds_targets || "").split(";").filter(Boolean).join(" · ") || (d.loaded?.imds_tables || []).join(" · ")}</td>
+                  <td style={num(t)}>{d.imds_stage_rows ?? d.loaded?.stage_rows ?? "—"}</td>
+                  <td style={num(t)}>{d.new_comparison_rows ?? "—"}</td>
+                  <td style={{ ...num(t), color: t.textMuted }}>{d.already_in_catalog ?? "—"}</td>
+                  <td style={{ ...td(t), fontSize: 11, whiteSpace: "nowrap", color: d.agrees === false ? t.danger : t.success, fontWeight: 700 }}>
+                    {d.loaded?.s2s_rows ?? 0} fields · {d.loaded?.e2e_rows ?? 0} paths{d.agrees === false ? " ≠ declared" : d.agrees ? " ✓" : ""}</td>
+                </tr>))}
+            </tbody>
+          </table>
+          <div style={{ fontSize: 11, color: t.textMuted, padding: "6px 10px" }}>"Loaded" counts the lane tables; it should equal the register's declared count. A difference is rows the load dropped.</div>
+        </div>)}
+
+      {view === "Transformations" && xs && (
+        <div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
+            {(xs.by_completeness || []).map((c) => <Pill key={c.key} info={COMPLETENESS_INFO[c.key] || { c: "#6b7c8a" }}>{(COMPLETENESS_INFO[c.key] || {}).t || c.key} · {c.n}</Pill>)}
+            <span style={{ fontSize: 11, color: t.textMuted, marginLeft: "auto" }}>{xs.headline}{xs.declared_total ? ` · the sheet's own total: ${xs.declared_total}` : ""}</span>
+          </div>
+          <div style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: t.radius.md, overflow: "auto", maxHeight: 420 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr><th style={th(t)}>IMDS target table</th><th style={{ ...th(t), textAlign: "right" }}>Comparison rows</th><th style={th(t)}>Evidence</th>
+                <th style={{ ...th(t), textAlign: "right" }}>SEI coverage</th><th style={{ ...th(t), textAlign: "right" }}>Approved</th><th style={th(t)}>Sheet says</th></tr></thead>
+              <tbody>
+                {(xs.tables || []).map((x) => (
+                  <tr key={x.target_object}>
+                    <td style={{ ...td(t), fontWeight: 700, color: t.navy, whiteSpace: "nowrap" }}>{x.target_object}</td>
+                    <td style={num(t)}>{x.rows}</td>
+                    <td style={{ ...td(t), minWidth: 160 }}>
+                      <div style={{ display: "flex", height: 10, borderRadius: 5, overflow: "hidden", background: "#e9eef3" }}
+                        title={Object.entries(x.by).map(([k, n]) => `${(COMPLETENESS_INFO[k] || {}).t || k} ${n}`).join(" · ")}>
+                        {Object.keys(COMPLETENESS_INFO).filter((k) => x.by[k]).map((k) => <div key={k} style={{ width: `${100 * x.by[k] / x.rows}%`, background: COMPLETENESS_INFO[k].c }} />)}
+                      </div></td>
+                    <td style={{ ...num(t), fontWeight: 700, color: x.coverage_pct >= 70 ? t.success : x.coverage_pct >= 30 ? t.warning : t.danger }}>{x.coverage_pct == null ? "—" : `${x.coverage_pct}%`}</td>
+                    <td style={{ ...num(t), color: x.approved ? t.success : t.textMuted }}>{x.approved || "none"}</td>
+                    <td style={{ ...td(t), fontSize: 11, color: t.textMuted }}>{x.declared_rows != null ? `${x.declared_rows} rows · ${x.declared_status || ""}` : "no cached value"}</td>
+                  </tr>))}
+              </tbody>
+            </table>
+          </div>
+        </div>)}
+
+      {view === "Reference codes" && codes && (
+        <div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+            {(codes.by_set || []).map((s) => <Tile key={s.code_set_name} t={t} v={s.n} label={s.code_set_name} sub={`${s.mapped} mapped · ${s.unknown} unknown · ${s.rules.join(", ")}`} c={s.unknown ? t.warning : t.success} />)}
+          </div>
+          <div style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: t.radius.md, overflow: "auto", maxHeight: 420 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr><th style={th(t)}>Code set</th><th style={th(t)}>Side</th><th style={th(t)}>Code</th><th style={th(t)}>Description</th><th style={th(t)}>Maps to</th><th style={th(t)}>Rule</th></tr></thead>
+              <tbody>
+                {(codes.rows || []).map((r, i) => (
+                  <tr key={i}>
+                    <td style={{ ...td(t), color: t.sub, whiteSpace: "nowrap" }}>{r.code_set_name}</td>
+                    <td style={{ ...td(t), fontSize: 10.5, fontWeight: 700, color: r.side === "SEI" ? "#0091bf" : "#b5651d" }}>{r.side}</td>
+                    <td style={{ ...td(t), fontWeight: 700, color: t.navy }}>{r.code_value}</td>
+                    <td style={{ ...td(t), color: t.sub }}>{r.code_description}</td>
+                    <td style={{ ...td(t), color: r.is_mapped === "Y" ? t.text : t.warning }}>{r.is_mapped === "Y" ? `${r.maps_to_side || ""} ${r.maps_to_code}${r.maps_to_description ? ` · ${r.maps_to_description}` : ""}` : (r.maps_to_code || "not mapped")}</td>
+                    <td style={{ ...td(t), fontSize: 10.5, color: t.textMuted }}>{r.mapping_rule}</td>
+                  </tr>))}
+              </tbody>
+            </table>
+          </div>
+        </div>)}
+
+      {view === "Entity ID" && ent && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 12 }}>
+          {(ent.feeds || []).map((f) => (
+            <div key={f.feed_family} style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: t.radius.md, padding: "10px 12px" }}>
+              <div style={{ fontSize: 12.5, fontWeight: 800, color: t.navy, marginBottom: 8 }}>{f.feed_family} <span style={{ fontSize: 10.5, color: t.textMuted, fontWeight: 400 }}>· how Entity ID is built, step by step</span></div>
+              {f.steps.map((s) => (
+                <div key={s.seq} style={{ display: "grid", gridTemplateColumns: "28px 1fr 1fr", gap: 8, padding: "6px 0", borderTop: `1px solid ${t.panel2}` }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: t.accent }}>{s.seq}</div>
+                  <div><div style={{ fontSize: 9.5, color: t.textMuted, textTransform: "uppercase", letterSpacing: ".5px" }}>legacy IMDS</div>
+                    <div style={{ ...mono, color: t.text }}>{s.legacy_logic || "—"}</div>
+                    {s.logic_comment && <div style={{ fontSize: 10.5, color: t.textMuted, marginTop: 2 }}>{s.logic_comment}</div>}</div>
+                  <div><div style={{ fontSize: 9.5, color: "#0091bf", textTransform: "uppercase", letterSpacing: ".5px" }}>under SEI</div>
+                    <div style={{ fontSize: 12, color: t.text }}>{s.sei_rule || <span style={{ color: t.danger }}>not stated</span>}</div></div>
+                </div>))}
+            </div>))}
+          {!(ent.feeds || []).length && <div style={{ fontSize: 12, color: t.textMuted }}>no derivation steps loaded</div>}
+        </div>)}
+
+      {view === "Usage exceptions" && exc && (
+        <div>
+          <div style={{ fontSize: 12, color: t.sub, marginBottom: 8, lineHeight: 1.5 }}>{exc.note}</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+            {(exc.by_result || []).map((r) => <Pill key={r.key} info={{ c: r.key === "USED_BUT_UNMAPPED" ? "#c1113a" : r.key === "CONFLICT" ? "#7c3aed" : "#e67e22" }}>{r.key.toLowerCase().replace(/_/g, " ")} · {r.n}</Pill>)}
+            {(exc.by_feed || []).map((f) => <span key={f.feed_family} style={{ fontSize: 11, color: t.sub }}>{f.feed_family} {f.n}</span>)}
+          </div>
+          <div style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: t.radius.md, overflow: "auto", maxHeight: 420 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr><th style={th(t)}>Result</th><th style={th(t)}>Feed</th><th style={th(t)}>STAR field</th><th style={th(t)}>Matrix says</th><th style={th(t)}>Document says</th><th style={th(t)}>SEI source</th><th style={th(t)}>Document</th></tr></thead>
+              <tbody>
+                {(exc.rows || []).map((r, i) => (
+                  <tr key={i}>
+                    <td style={{ ...td(t), fontSize: 10.5, fontWeight: 700, color: r.result === "USED_BUT_UNMAPPED" ? "#c1113a" : r.result === "CONFLICT" ? "#7c3aed" : "#e67e22", whiteSpace: "nowrap" }}>{(r.result || "").toLowerCase().replace(/_/g, " ")}</td>
+                    <td style={{ ...td(t), color: t.sub }}>{r.feed_family}</td>
+                    <td style={{ ...td(t), fontWeight: 700, color: t.navy }}>{r.field_name}</td>
+                    <td style={td(t)}>{r.matrix_usage || "—"}</td>
+                    <td style={td(t)}>{r.doc_usage || "—"}</td>
+                    <td style={{ ...td(t), color: r.sei_source_mapped === "Y" ? t.success : t.danger }}>{r.sei_source_mapped === "Y" ? "mapped" : "none"}</td>
+                    <td style={{ ...td(t), fontSize: 11, color: t.textMuted }}>{r.source_document}{r.source_row ? ` · row ${r.source_row}` : ""}</td>
+                  </tr>))}
+              </tbody>
+            </table>
+          </div>
+        </div>)}
+    </div>);
+}

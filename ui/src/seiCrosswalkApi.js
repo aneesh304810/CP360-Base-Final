@@ -236,6 +236,48 @@ export const starUsage = {
       () => ({ by_type: [], rows: [] })),
 };
 
+// ---- the mapping documents (sql/79) ------------------------------------
+// Three lanes of field maps (SEI -> STAR, STAR -> IMDS, end to end), the
+// register they came from, the reference-code crosswalk, the Entity ID
+// derivation and the usage disagreements. Every row is DRAFT until the
+// workbook says otherwise; the client carries no opinion about that.
+export const mappingDocs = {
+  register: (data_source) =>
+    _get(`/sei-crosswalk/mapping-docs${_qs({ data_source })}`,
+      () => ({ docs: [], totals: { documents: 0, s2s_rows: 0, e2e_rows: 0 }, by_mapping_status: [], by_map_kind: [], headline: "" })),
+  e2eCoverage: (data_source) =>
+    _get(`/sei-crosswalk/e2e-coverage${_qs({ data_source })}`,
+      () => ({ total: 0, covered: 0, coverage_pct: null, by_link: [], by_status: [], by_approval: [], tables: [], feeds: [], headline: "" })),
+  e2eRows: (o = {}) =>
+    _get(`/sei-crosswalk/e2e-rows${_qs(o)}`, () => ({ rows: [], total: 0 })),
+  transformationSummary: (data_source) =>
+    _get(`/sei-crosswalk/transformation-summary${_qs({ data_source })}`,
+      () => ({ tables: [], total: 0, covered: 0, coverage_pct: null, by_completeness: [], by_approval: [], headline: "" })),
+  referenceCodes: (data_source, code_set) =>
+    _get(`/sei-crosswalk/reference-codes${_qs({ data_source, code_set })}`,
+      () => ({ rows: [], total: 0, by_set: [], mapped: 0 })),
+  entityId: (data_source) =>
+    _get(`/sei-crosswalk/entity-id${_qs({ data_source })}`, () => ({ feeds: [], total: 0 })),
+  usageExceptions: (data_source, result, feed) =>
+    _get(`/sei-crosswalk/usage-exceptions${_qs({ data_source, result, feed })}`,
+      () => ({ rows: [], total: 0, by_result: [], by_feed: [], note: "" })),
+};
+export const LINK_INFO = {
+  E2E:                  { t: "linked end to end",      c: "#159943", bg: "#d0ebd9" },
+  SEI_DIRECT:           { t: "SEI straight to IMDS",   c: "#0091bf", bg: "#e0f5fd" },
+  STAR_NOT_IN_FILE_MAP: { t: "STAR field not in map",  c: "#7c3aed", bg: "#efe6fb" },
+  NO_SEI_SOURCE:        { t: "no SEI source",          c: "#c1113a", bg: "#f3d2d7" },
+  STAR_ONLY:            { t: "no IMDS target",         c: "#6b7c8a", bg: "#eef2f5" },
+};
+export const LINK_ORDER = ["E2E", "SEI_DIRECT", "STAR_NOT_IN_FILE_MAP", "NO_SEI_SOURCE", "STAR_ONLY"];
+export const COMPLETENESS_INFO = {
+  BOTH_LOGICS_DOCUMENTED:             { t: "both logics",          c: "#159943" },
+  IM_LOGIC_AND_SEI_SOURCE_DOCUMENTED: { t: "IM logic + SEI source", c: "#0091bf" },
+  SEI_ONLY_DOCUMENTED:                { t: "SEI only",             c: "#5f87a7" },
+  IM_ONLY_DOCUMENTED:                 { t: "IM only",              c: "#e67e22" },
+  NO_MAPPING:                         { t: "no mapping",           c: "#c1113a" },
+};
+
 export const LANE_C = { STAR: "#b5651d", UAF: "#0b7d7d", SEI: "#0091bf",
                         ADDVANTAGE: "#6d3ac0", CRD: "#0b7d7d" };
 

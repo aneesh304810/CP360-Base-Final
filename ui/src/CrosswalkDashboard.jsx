@@ -8,6 +8,7 @@ import { useFeedNames, feedName } from "./feedNames.js";
 import ChainRules from "./ChainRules.jsx";
 import SeiBusinessSummary from "./SeiBusinessSummary.jsx";
 import StarFieldUsage from "./StarFieldUsage.jsx";
+import MappingDocsPanel from "./MappingDocs.jsx";
 
 // =====================================================================
 // CrosswalkDashboard — mapping, analysis and divergence for one warehouse.
@@ -700,6 +701,14 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
           note={xf.headline || "equivalence is about the logic; approval is about who has looked at it"}>
           <TransformationPanel t={t} xf={xf} onOpenColumn={openCol} />
         </Panel>)}
+
+      {/* The SEI mapping documents (sql/79): three lanes of field maps and
+          what they reach. Self-hides when nothing is loaded, so a warehouse
+          without them looks exactly as it did. */}
+      <Panel t={t} title="The SEI mapping documents"
+        note="SEI → STAR → IMDS, per IMDS table · every row a draft until an approved crosswalk says otherwise">
+        <MappingDocsPanel t={t} dataSource={ds} onOpenColumn={openCol} />
+      </Panel>
 
       {/* Every final column as one cell. The spread says how many; this says
           where — and a contiguous run is one gap with one owner, not many. */}
