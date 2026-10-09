@@ -27,6 +27,30 @@ loader says so by sheet name. Open the workbook in Excel and save it once.
 The screens recompute both summaries from the comparison rows and the
 usage matrix anyway, so a blank summary costs nothing on screen.
 
+## What a good load looks like
+
+The first real load of the v2 workbook printed this count line; a reload
+should match it:
+
+    sei_crosswalk[IMDS]: ... e2e=1121, entityid=12, mapsrc=7, refcode=250,
+    seistar=479, starstage=1121, usage=693, usageexc=105, usagesum=9,
+    xcompare=1121, xform=672, control=102, feed=15 ...
+
+`usagesum=9` is the ten summary rows minus TOTAL. `feed=15` is the ten
+STAR feeds (OTDDIFI1 included) plus five UAF.
+
+One warning is expected and harmless: `star_field_usage_summary[OTDDIFI1]:
+declared 1.0% but 43/43 is 100.0%`. The sheet stores a fully-used family's
+percentage as the number 1, which cannot be told from 1%; the loader uses
+the computed 43/43 and says so.
+
+Three rows were rejected on that first load for width: a 19,991-character
+mapping rule in SEI_INPUT_LINEAGE, a 581-character SEI object expression
+in the stage map, a 434-character normalised SEI field in the crosswalk.
+The columns are widened (re-run `sql/79`) and the loader now cuts any cell
+that still outruns its column, ending it with `… [cut: N chars]`, so the
+row lands and the cut is visible. The full text stays in the workbook.
+
 ## The seven new sheets
 
 | Sheet | Table (sql/79) | Grain | Key |

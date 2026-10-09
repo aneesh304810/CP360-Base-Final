@@ -210,6 +210,11 @@ ok(len(ctl) == 2 and ctl[0]["control_name"] == "HOLDINGDBO.POSITION" and str(ctl
    and ctl[0]["status"] == "DRAFT_REVIEW_REQUIRED" and "BOTHLOGICSDOCUMENTED=1" in ctl[0]["detail"],
    "one control per target table: rows as the result, the counts in the detail", ctl)
 
+print("-- a cell that outruns its column lands, cut and marked, rather than dropping the row")
+big = SeiCrosswalkConnector._fit("x" * 19991, 4000)
+ok(len(big) == 4000 and big.endswith("… [cut: 19991 chars]"), "the cut says what it cut", (len(big), big[-24:]))
+ok(SeiCrosswalkConnector._fit("short", 4000) == "short" and SeiCrosswalkConnector._fit(None, 10) is None, "a cell that fits is untouched")
+
 print("-- the new STAR feed")
 ok(any(f.get("src_file", "").upper().startswith("OTDDIFI1") or "OTDDIFI1" in str(f) for f in parsed["feed"]), "OTDDIFI1 lands with the other feeds")
 

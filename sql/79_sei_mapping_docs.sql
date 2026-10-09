@@ -38,9 +38,10 @@ DECLARE
   PROCEDURE ddl(p_sql VARCHAR2) IS
     e_exists EXCEPTION; PRAGMA EXCEPTION_INIT(e_exists, -955);
     e_col    EXCEPTION; PRAGMA EXCEPTION_INIT(e_col,    -1430);
+    e_shrink EXCEPTION; PRAGMA EXCEPTION_INIT(e_shrink, -1441);
   BEGIN
     EXECUTE IMMEDIATE p_sql;
-  EXCEPTION WHEN e_exists THEN NULL; WHEN e_col THEN NULL;
+  EXCEPTION WHEN e_exists THEN NULL; WHEN e_col THEN NULL; WHEN e_shrink THEN NULL;
   END;
 BEGIN
   ddl('CREATE TABLE sei_mapping_source (
@@ -206,6 +207,17 @@ BEGIN
         loaded_at            TIMESTAMP DEFAULT SYSTIMESTAMP,
         CONSTRAINT pk_star_usage_mapping_exc PRIMARY KEY (exc_row_id))');
   ddl('CREATE INDEX ix_sume_result ON star_usage_mapping_exception (data_source, result)');
+
+  -- The first real load (2026-10-09) rejected one stage row whose SEI
+  -- object is an expression of 581 characters and one crosswalk row whose
+  -- normalised SEI field runs to 434. Widened; the loader also cuts with a
+  -- marker, so a cell beyond even these lands rather than drops the row.
+  -- MODIFY to a wider type is idempotent (ORA-1441 only when shrinking).
+  ddl('ALTER TABLE star_imds_stage_map MODIFY (sei_object VARCHAR2(1000))');
+  ddl('ALTER TABLE sei_star_field_map MODIFY (sei_object VARCHAR2(1000))');
+  ddl('ALTER TABLE sei_star_field_map MODIFY (sei_field_norm VARCHAR2(1000))');
+  ddl('ALTER TABLE sei_e2e_xwalk MODIFY (sei_object VARCHAR2(1000))');
+  ddl('ALTER TABLE sei_e2e_xwalk MODIFY (sei_field_norm VARCHAR2(1000))');
 
   -- STAR_FIELD_USAGE_MATRIX, columns J-M
   ddl('ALTER TABLE star_field_usage ADD (doc_usage_status VARCHAR2(40))');

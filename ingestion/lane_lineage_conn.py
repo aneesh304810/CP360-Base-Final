@@ -942,7 +942,7 @@ class SeiCrosswalkConnector:
                 "code_set_name": _nz(sh.get(row, "CODE_SET_NAME")),
                 "acceptable_values": sh.get(row, "ACCEPTABLE_VALUES"),
                 "mapping_status": _nz(sh.get(row, "MAPPING_STATUS")),
-                "source_mapping_rule": sh.get(row, "MAPPING_LOGIC", "SOURCE_MAPPING_RULE"),
+                "source_mapping_rule": self._fit(sh.get(row, "MAPPING_LOGIC", "SOURCE_MAPPING_RULE"), 4000),
                 "upstream_object": sh.get(row, "SOURCE_OBJECT", "UPSTREAM_SOURCE_OBJECT", "UPSTREAM_OBJECT"),
                 "upstream_field": sh.get(row, "SOURCE_FIELD", "UPSTREAM_SOURCE_FIELD", "UPSTREAM_FIELD"),
                 "origin_workbook": sh.get(row, "SOURCE_WORKBOOK", "ORIGINAL_WORKBOOK", "ORIGIN_WORKBOOK"),
@@ -1644,6 +1644,20 @@ class SeiCrosswalkConnector:
     _WHERE = ("SOURCE_SHEET", "SOURCE_ROW", "ROW_NUMBER")
 
     @staticmethod
+    def _fit(v, width):
+        """Cut a cell to its column, saying so at the end. One mapping rule
+        in SEI_INPUT_LINEAGE runs to 19,991 characters and would be
+        rejected whole; a cut row with a marker beats no row. The full text
+        is in the workbook."""
+        if v is None:
+            return None
+        t = str(v)
+        if len(t) <= width:
+            return t
+        tail = f" … [cut: {len(t)} chars]"
+        return t[:width - len(tail)] + tail
+
+    @staticmethod
     def _val(v):
         """A cell, with the documents' placeholders read as empty: a dash,
         an em dash, n/a. "—" in SEI_SOURCE_FIELD is no field, not a field
@@ -1739,14 +1753,14 @@ class SeiCrosswalkConnector:
                 "star_field": sfld,
                 "star_field_norm": _norm_code(sfld),
                 "star_in_layout": ("Y" if (_file_key(fam), _norm_code(sfld)) in layout else "N") if layout else None,
-                "business_description": sh.get(row, "BUSINESS_DESCRIPTION", "DESCRIPTION"),
                 "doc_usage_status": _nz(sh.get(row, "DOC_USAGE_STATUS", "USAGE_STATUS")),
-                "sei_object": eobj,
-                "sei_field": efld,
-                "sei_field_norm": _norm_code(efld) if efld else None,
+                "sei_object": self._fit(eobj, 1000),
+                "sei_field": self._fit(efld, 1000),
+                "sei_field_norm": _norm_code(efld)[:1000] if efld else None,
                 "sei_type": _nz(sh.get(row, "SEI_TYPE")),
                 "sei_nullable": _nz(sh.get(row, "SEI_NULLABLE")),
-                "join_logic": self._val(sh.get(row, "JOIN_TRANSFORMATION_LOGIC", "JOIN_LOGIC", "TRANSFORMATION")),
+                "join_logic": self._fit(self._val(sh.get(row, "JOIN_TRANSFORMATION_LOGIC", "JOIN_LOGIC", "TRANSFORMATION")), 4000),
+                "business_description": self._fit(sh.get(row, "BUSINESS_DESCRIPTION", "DESCRIPTION"), 4000),
                 "map_kind": _nz(sh.get(row, "MAP_KIND", "MAPPING_TYPE")),
                 "open_dependency": self._yn(sh.get(row, "OPEN_DEPENDENCY")),
                 "mapping_status": _nz(sh.get(row, "MAPPING_STATUS")),
@@ -1793,11 +1807,11 @@ class SeiCrosswalkConnector:
                 "star_field": sfld,
                 "star_field_norm": _norm_code(sfld) if sfld else None,
                 "uploader_column": _nz(sh.get(row, "UPLOADER_COLUMN")),
-                "im_logic": self._val(sh.get(row, "IM_LOGIC", "IMDS_TRANSFORMATION_LOGIC")),
-                "sei_equiv_logic": self._val(sh.get(row, "SEI_EQUIV_LOGIC", "EQUIVALENT_SEI_TRANSFORMATION_LOGIC")),
-                "sei_object": self._val(sh.get(row, "SEI_SOURCE_OBJECT")),
-                "sei_field": self._val(sh.get(row, "SEI_SOURCE_FIELD")),
-                "sei_join_logic": self._val(sh.get(row, "SEI_JOIN_LOGIC")),
+                "sei_object": self._fit(self._val(sh.get(row, "SEI_SOURCE_OBJECT")), 1000),
+                "sei_field": self._fit(self._val(sh.get(row, "SEI_SOURCE_FIELD")), 1000),
+                "sei_join_logic": self._fit(self._val(sh.get(row, "SEI_JOIN_LOGIC")), 4000),
+                "im_logic": self._fit(self._val(sh.get(row, "IM_LOGIC", "IMDS_TRANSFORMATION_LOGIC")), 4000),
+                "sei_equiv_logic": self._fit(self._val(sh.get(row, "SEI_EQUIV_LOGIC", "EQUIVALENT_SEI_TRANSFORMATION_LOGIC")), 4000),
                 "comparison_id": _nz(sh.get(row, "COMPARISON_ID")),
                 "evidence_completeness": _nz(sh.get(row, "EVIDENCE_COMPLETENESS")),
                 "business_decision": self._yn(sh.get(row, "BUSINESS_DECISION_FLAG")),
@@ -1870,19 +1884,19 @@ class SeiCrosswalkConnector:
                 "data_source": self.data_source,
                 "feed_family": fam,
                 "feed_key": _file_key(fam) if fam else None,
-                "sei_source": src or (f"{eobj}.{efld}" if eobj and efld else efld or eobj),
-                "sei_object": eobj,
-                "sei_field": efld,
-                "sei_field_norm": _norm_code(efld) if efld else None,
+                "sei_source": self._fit(src or (f"{eobj}.{efld}" if eobj and efld else efld or eobj), 1000),
+                "sei_object": self._fit(eobj, 1000),
+                "sei_field": self._fit(efld, 1000),
+                "sei_field_norm": _norm_code(efld)[:1000] if efld else None,
                 "map_kind": self._val(sh.get(row, "SEI_TO_STAR_MAP_KIND", "MAP_KIND")),
-                "sei_star_logic": self._val(sh.get(row, "SEI_TO_STAR_LOGIC")),
+                "sei_star_logic": self._fit(self._val(sh.get(row, "SEI_TO_STAR_LOGIC")), 4000),
                 "star_field": sfld,
                 "star_field_norm": _norm_code(sfld) if sfld else None,
                 "star_in_layout": ("Y" if (_file_key(fam or ""), _norm_code(sfld)) in layout else "N") if (sfld and layout) else None,
                 "imds_table": itbl,
                 "imds_column": icol,
-                "star_imds_logic": self._val(sh.get(row, "STAR_TO_IMDS_LOGIC", "IM_LOGIC")),
-                "sei_imds_logic": self._val(sh.get(row, "SEI_TO_IMDS_EQUIV_LOGIC", "SEI_EQUIV_LOGIC")),
+                "star_imds_logic": self._fit(self._val(sh.get(row, "STAR_TO_IMDS_LOGIC", "IM_LOGIC")), 4000),
+                "sei_imds_logic": self._fit(self._val(sh.get(row, "SEI_TO_IMDS_EQUIV_LOGIC", "SEI_EQUIV_LOGIC")), 4000),
                 "link_status": _nz(given),
                 "link_class": self._link_class(given, efld, sfld, icol),
                 "crosswalk_status": _nz(sh.get(row, "CROSSWALK_STATUS")),
