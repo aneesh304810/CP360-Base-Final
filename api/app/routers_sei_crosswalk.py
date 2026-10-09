@@ -218,12 +218,18 @@ def lane_systems(data_source: str | None = None):
         GROUP  BY source_system""", {"ds": ds}), "feed_register")
 
     # D. the lane register itself, for a warehouse whose lanes are declared
-    #    but whose feeds and verify rows are both still to come
-    take(_safe("""
-        SELECT source_system AS source_system, 0 AS columns_
-        FROM   legacy_lane
-        WHERE  data_source = :ds AND source_system IS NOT NULL""",
-        {"ds": ds}), "lane_declared")
+    #    but whose feeds and verify rows are both still to come. A FALLBACK,
+    #    not a fourth vote: the register seeds lanes it has no evidence for
+    #    (ADDVANTAGE_IMDS says so in its own notes), and counting it beside
+    #    the routes that found STAR and UAF is how IMDS came to offer
+    #    AddVantage — and, with nothing in that lane to scope by, to show
+    #    every file under it.
+    if not found:
+        take(_safe("""
+            SELECT source_system AS source_system, 0 AS columns_
+            FROM   legacy_lane
+            WHERE  data_source = :ds AND source_system IS NOT NULL""",
+            {"ds": ds}), "lane_declared")
 
     systems = [{"source_system": k, "columns_": v}
                for k, v in sorted(found.items(), key=lambda kv: (-kv[1], kv[0]))]

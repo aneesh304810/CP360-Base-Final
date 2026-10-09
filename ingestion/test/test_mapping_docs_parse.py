@@ -307,52 +307,68 @@ ok(not [r for r in v4["e2e"] if r["link_class"] not in ("E2E", "SEI_DIRECT", "NO
    "every v4 row has a class the screens know")
 
 
-print("-- the SEI -> STAR -> IMDS lane, from the lineage rows")
-L = {r["dwh_target_column"]: r for r in v4["seilineage"]}
-ok(len(v4["seilineage"]) == 4 and set(L) == {"QUANTITY", "EFFECTIVE_DATE", "COST_BASIS", "UPDATE_SOURCE"} and all(r["lineage_id"].startswith("IMDS:SEI_IMDS:") for r in v4["seilineage"]),
-   "one lineage row per IMDS column; the orphan STAR field has no target and stays out; ids carry the lane", sorted(L))
+print("-- the mapping documents' rows, into the STAR lane, the SEI mapping beside each")
+L = {r["dwh_target_column"]: r for r in v4["doclineage"]}
+ok(set(L) == {"QUANTITY", "EFFECTIVE_DATE", "COST_BASIS", "UPDATE_SOURCE"} and all(r["lineage_id"].startswith("IMDS:DOC:") for r in v4["doclineage"]),
+   "one row per IMDS column; the orphan STAR field stays out; ids carry the document prefix", sorted(L))
 q = L["QUANTITY"]
-ok(q["src_source_table"] == "Taxlot" and q["src_source_column"] == "QUANTITY_HELD" and q["stg1_source_table"] == "PEDDIFI1" and q["stg1_source_column"] == "Lot Quantity"
-   and q["stg2_source_table"] is None and q["dwh_target_table"] == "HOLDINGDBO.POSITION",
-   "SRC is the SEI feed file and field, STG1 the STAR-compatible field, DWH the IMDS column", q)
-ok(q["src_to_stg1_transform"] == "TAXLOT_TYPE_CODE = 2" and q["stg1_to_stg2_transform"] == "SUM(lot_qty)" and q["lineage_status"] == "MAPPED"
-   and q["dwh_type"] == "NUMBER" and q["dwh_length"] == "28" and q["dwh_precision"] == "12" and "the STAR -> IMDS logic is kept" in q["lineage_status_detail"]
-   and "draft" in q["lineage_status_detail"],
-   "SEI -> STAR logic on the first hop, the kept STAR -> IMDS logic into the warehouse; the type split; a draft that says so", q)
-e = L["EFFECTIVE_DATE"]
-ok(e["src_source_table"] == "SYSTEM (job run)" and e["src_source_column"] == "PROCESSING_DATE" and e["stg1_source_column"] is None
-   and e["src_to_stg1_transform"] == "Processing_Date" and e["lineage_status"] == "MAPPED", "SEI straight to IMDS: no STAR stage, the SEI -> IMDS logic on the one hop", e)
+ok(q["src_source_table"] == "PEDDIFI1" and q["src_source_column"] == "Lot Quantity" and q["src_to_stg1_transform"] == "SUM(lot_qty)"
+   and "replaced by SEI Taxlot.QUANTITY_HELD; Taxlot.FX_RATE (verified in feed spec)" in q["lineage_status_detail"] and q["dwh_precision"] == "12",
+   "the first of several STAR fields is the source column; the SEI replacement named with its file resolution", q)
 c = L["COST_BASIS"]
-ok(c["src_source_table"] is None and c["stg1_source_column"] == "Phantom Field" and c["lineage_status"] == "GAP" and "business decision open" in c["lineage_status_detail"],
-   "no SEI source: the STAR field with nothing before it, a GAP, the decision flagged", c)
+ok(c["src_source_table"] == "PEDDIFI1" and c["src_source_column"] == "Phantom Field" and c["src_to_stg1_transform"] == "to_number(cost)"
+   and c["stg1_source_table"] is None and c["dwh_target_table"] == "HOLDINGDBO.POSITION" and c["lineage_status"] == "MAPPED",
+   "STAR feed -> IMDS column directly, the load logic on the hop, as LANE_LINEAGE's own rows", c)
+ok("no SEI source named (gap)" in c["lineage_status_detail"] and "business decision open" in c["lineage_status_detail"] and "draft" in c["lineage_status_detail"],
+   "the SEI mapping in words: here the gap, the decision, the draft", c["lineage_status_detail"])
+e = L["EFFECTIVE_DATE"]
+ok(e["src_source_table"] == "PEDDIFI1" and e["src_source_column"] is None and e["src_to_stg1_transform"] == "sysdate" and e["lineage_status"] == "MAPPED"
+   and "STAR field not resolved" in e["lineage_status_detail"] and "replaced by SEI SYSTEM (job run).PROCESSING_DATE (system or constant)" in e["lineage_status_detail"],
+   "load logic with no STAR field: mapped from the feed, column unresolved; the SEI replacement named", e)
 u = L["UPDATE_SOURCE"]
-ok(u["src_source_table"] is None and u["stg1_source_table"] is None and u["lineage_status"] == "NOT_APPLICABLE" and u["dwh_type"] == "VARCHAR2" and u["dwh_length"] == "50",
-   "a column the STAR load never writes: the warehouse node alone, not applicable", u)
-lanes = {r["dwh_target_column"]: r for r in v4["seilinelane"]}
-ok(len(lanes) == 4 and all(r["lane_id"] == "SEI_IMDS" and r["source_system"] == "SEI" for r in lanes.values()) and lanes["QUANTITY"]["src_file_key"] == "TAXLOT",
-   "every row is tagged SEI_IMDS / SEI with its SEI file key", lanes.get("QUANTITY"))
-xf = {r["dwh_target_column"]: r for r in v4["seilinexform"]}
-ok(xf["QUANTITY"]["legacy_transformation_id"] == "LLP-1-IM" and xf["QUANTITY"]["sei_transformation_id"] == "LLP-1-SEI" and xf["QUANTITY"]["sei_equivalent_transformation"] == "SUM(Taxlot.QUANTITY_HELD)"
-   and xf["QUANTITY"]["sei_source_fields"] == "Taxlot.QUANTITY_HELD; Taxlot.FX_RATE" and xf["QUANTITY"]["dwh_nullable"] == "No" and xf["QUANTITY"]["transformation_approval"] == "DRAFT_REVIEW_REQUIRED"
+ok(u["src_source_table"] is None and u["lineage_status"] == "NOT_APPLICABLE" and u["dwh_type"] == "VARCHAR2" and u["dwh_length"] == "50"
+   and "nothing for SEI to replace" in u["lineage_status_detail"], "a column the STAR load never writes: not applicable, the type split", u)
+lanes = {r["dwh_target_column"]: r for r in v4["doclinelane"]}
+ok(len(lanes) == 4 and all(r["lane_id"] == "STAR_IMDS" and r["source_system"] == "STAR" for r in lanes.values()) and lanes["COST_BASIS"]["src_file_key"] == "PEDDIFI1",
+   "every row is the STAR lane's, keyed by its STAR feed", lanes.get("COST_BASIS"))
+xf = {r["dwh_target_column"]: r for r in v4["doclinexform"]}
+ok(xf["EFFECTIVE_DATE"]["legacy_transformation_id"] == "LLP-2-IM" and xf["EFFECTIVE_DATE"]["sei_transformation_id"] == "LLP-2-SEI"
+   and xf["EFFECTIVE_DATE"]["sei_equivalent_transformation"] == "Processing_Date" and xf["EFFECTIVE_DATE"]["sei_source_objects"] == "SYSTEM (job run)"
+   and xf["EFFECTIVE_DATE"]["sei_source_fields"] == "SYSTEM (job run).PROCESSING_DATE" and xf["EFFECTIVE_DATE"]["dwh_nullable"] == "Yes"
    and "LLP" not in (xf["UPDATE_SOURCE"]["legacy_transformation_id"] or ""),
-   "the side row: the two transformation ids off the comparison, the SEI-equivalent logic, the SEI fields; EXISTING_LLP_ROW is no id", xf.get("QUANTITY"))
-files = {f["src_file"]: f for f in v4["seifile"]}
-ok(set(files) == {"Taxlot", "SYSTEM (job run)"} and files["Taxlot"]["source_system"] == "SEI" and files["Taxlot"]["src_file_key"] == "TAXLOT" and files["SYSTEM (job run)"]["dataset"] == "System-generated value",
-   "the SEI feed files as source files of the SEI system, so the lane badge scopes to them", files)
-cols4 = {c["src_source_column"]: c for c in v4["seisrccol"]}
-ok(set(cols4) == {"QUANTITY_HELD", "PROCESSING_DATE"} and cols4["QUANTITY_HELD"]["evidence"] == "SEI_FEED_SPEC" and cols4["PROCESSING_DATE"]["evidence"] == "SEI_MAPPING_DOC",
-   "one source column per SEI field, its evidence the file resolution", cols4)
-ok(len(parsed["seilineage"]) == 5 and {r["lineage_status"] for r in parsed["seilineage"]} == {"MAPPED", "GAP"} and parsed["seilineage"][0]["src_source_table"] == "Taxlot",
-   "the v2 e2e sheet builds the lane too, from the document's object spelling", [(r["dwh_target_column"], r["lineage_status"]) for r in parsed["seilineage"]])
-os.environ["CP_SEI_LANE"] = "0"
+   "the side table the column page reads: the SEI file and field, the SEI-equivalent logic, the two ids; EXISTING_LLP_ROW is no id", xf.get("EFFECTIVE_DATE"))
+cols4 = {c["src_source_column"]: c for c in v4["docsrccol"]}
+ok(set(cols4) == {"Lot Quantity", "Phantom Field"} and cols4["Phantom Field"]["evidence"] == "MAPPING_DOC" and cols4["Lot Quantity"]["src_type"] == "NUM"
+   and cols4["Lot Quantity"]["src_length"] == "18" and cols4["Phantom Field"]["src_type"] is None,
+   "one STAR source column per field the documents name, typed from the published layout where it is in it", cols4)
+ok(not v4.get("seifile") and "seifile" not in v4, "no SEI source files: SEI is the mapping, not a feed into IMDS")
+ok(len(parsed["doclineage"]) == 5 and {r["src_source_table"] for r in parsed["doclineage"]} == {"PEDDIFI1", "ODDDIFI1", None}
+   and next(r for r in parsed["doclineage"] if r["src_source_table"] is None)["lineage_status"] == "NOT_APPLICABLE",
+   "the v2 e2e sheet builds the rows too; SEI straight to IMDS with no load logic is no STAR source", [(r["dwh_target_column"], r["src_source_table"]) for r in parsed["doclineage"]])
+# a column LANE_LINEAGE already has keeps its verified row; the document's is skipped
+V4B = dict(V4)
+V4B["LANE_LINEAGE"] = (["LANE_ID", "DATA_SOURCE", "DWH_TARGET_TABLE", "DWH_TARGET_COLUMN", "DWH_TYPE", "SRC_SOURCE_TABLE", "SRC_SOURCE_COLUMN",
+                        "SRC_TO_STG1_TRANSFORM", "LINEAGE_STATUS", "LINEAGE_STATUS_DETAIL", "SUBJECT_AREA"],
+                       [["STAR_IMDS", "IMDS", "HOLDINGDBO.POSITION", "QUANTITY", "NUMBER", "PEDDIFI1", "Quantity_98", "SUM(qty)", "MAPPED", "Documented STAR source mapping", "Positions & Holdings"]])
+with tempfile.TemporaryDirectory() as d:
+    path = os.path.join(d, "v4b.xlsx")
+    SHEETS_V2 = SHEETS
+    SHEETS = V4B
+    build(path)
+    SHEETS = SHEETS_V2
+    v4b = SeiCrosswalkConnector(xlsx_path=path, data_source="IMDS").parse()
+ok(len(v4b["lineage"]) == 1 and {r["dwh_target_column"] for r in v4b["doclineage"]} == {"EFFECTIVE_DATE", "COST_BASIS", "UPDATE_SOURCE"}
+   and all(r["functional_group"] == "Positions & Holdings" for r in v4b["doclineage"]),
+   "beside a LANE_LINEAGE baseline the document's row for a baseline column is skipped; the table's group is inherited", [r["dwh_target_column"] for r in v4b["doclineage"]])
+os.environ["CP_SEI_DOC_LINEAGE"] = "0"
 try:
     with tempfile.TemporaryDirectory() as d:
         path = os.path.join(d, "v2b.xlsx")
         build(path)
         off = SeiCrosswalkConnector(xlsx_path=path, data_source="IMDS").parse()
 finally:
-    del os.environ["CP_SEI_LANE"]
-ok(off["seilineage"] == [] and off["seifile"] == [] and len(off["e2e"]) == 5, "CP_SEI_LANE=0 leaves the lane out and nothing else")
+    del os.environ["CP_SEI_DOC_LINEAGE"]
+ok(off["doclineage"] == [] and len(off["e2e"]) == 5, "CP_SEI_DOC_LINEAGE=0 leaves the rows out and nothing else")
 
 print(("\n%d assertion(s) failed" % BAD) if BAD else "\nmapping-docs parse assertions pass")
 sys.exit(1 if BAD else 0)

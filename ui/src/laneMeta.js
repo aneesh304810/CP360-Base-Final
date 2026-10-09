@@ -25,10 +25,8 @@ export const LANE_META = {
                 stage1: { icon: "⚙️", label: "Job",   sub: "command job" } },
   CRD:        { icon: "🧭", label: "CRD",        sub: "extract",         c: "#2563eb",
                 stage1: { icon: "📥", label: "Landed", sub: "staging 1" } },
-  // The SEI lane's first stage is the STAR-compatible field: the contract
-  // SEI honours so the STAR -> IMDS load keeps its transformation.
-  SEI:        { icon: "☁️", label: "SEI",        sub: "EOD feed file",   c: "#0091bf",
-                stage1: { icon: "📄", label: "STAR contract", sub: "STAR-compatible field" } },
+  SEI:        { icon: "☁️", label: "SEI",        sub: "EOD file",        c: "#0091bf",
+                stage1: { icon: "🧬", label: "Canonical", sub: "conformed keys" } },
 };
 
 export function laneMeta(system) {

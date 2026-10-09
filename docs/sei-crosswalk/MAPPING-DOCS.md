@@ -85,42 +85,37 @@ says the workbook does not resolve files.
 Expected count line for a v4 load: `e2e=1285, seistar=571, xform=687,
 control=` (102 plus the 23 LINEAGE_SUMMARY rows), the rest as for v2.
 
-## The SEI → STAR → IMDS lane (`SEI_IMDS`)
+## The mapping documents on the Lineage page (STAR lane)
 
-The Lineage page draws lanes: `STAR_IMDS` and `UAF_IMDS`, from
-`LANE_LINEAGE`. The crosswalk loader now adds a third from the end-to-end
-rows, `SEI_IMDS`, into the same lineage tables the screens read, so it
-sits beside the incumbents under the SEI chip of the system badge row and
-its files appear in the source-first view.
+The Lineage page reads STAR feed → IMDS column: the source files are
+STAR's and UAF's, the warehouse is IMDS, and SEI is the mapping on that
+chain, not a source file of its own. `LANE_LINEAGE` gave the STAR lane 108
+rows. The mapping documents describe 1,121 IMDS stage columns over 14
+tables in the same shape (STAR feed, STAR field, the load logic), and the
+workbook tags them `LANE_ID = STAR_IMDS` itself, so the loader puts them
+into the STAR lane of the same lineage tables, each carrying its SEI
+mapping beside it.
 
-| Stage | What it holds |
+| Column | What it holds |
 |---|---|
-| SRC | the SEI feed file and field the source resolves to (`SEI_SOURCE_FILE` / `_FIELDS`; the document's object and field before v4). `SYSTEM (job run)` and `CONSTANT` are files too, so they are findable. |
-| → | the SEI → STAR join or derivation |
-| STG1 | the STAR-compatible field: the STAR feed and the field the load reads today. The contract SEI honours. |
-| → | the legacy STAR → IMDS logic, **kept** (bridged onto the edge into the warehouse, as the STAR lane's own rows are) |
-| DWH | the IMDS table and column, with the type split into type, length and precision |
+| SRC | the STAR feed and the STAR field the load reads today (the uploader column when the document names no field); the published type and length from `STAR_LAYOUT_DETAIL` on the source column |
+| → | the legacy STAR → IMDS load logic, on the one hop, as `LANE_LINEAGE`'s own rows |
+| DWH | the IMDS table and column, the type split into type, length and precision |
+| status | `MAPPED` when a STAR field or load logic is documented; `NOT_APPLICABLE` for a column the STAR load never writes |
+| detail | which of those, then the SEI mapping in words: *replaced by SEI Taxlot.QUANTITY_HELD (verified in feed spec)*, or *no SEI source named (gap)*, or *STAR field not in the file map*, or *nothing for SEI to replace*; an open business decision; and that the row is a draft from a named document |
+| side table | `legacy_lineage_xform`, which the column page's chain rules read: the SEI file and field that replaces the STAR input, the SEI-equivalent logic, the two transformation ids off the comparison (`<COMPARISON_ID>-IM` / `-SEI`), the equivalence verdict, approval, evidence, nullability |
 
-Status: `MAPPED` for a path linked end to end or SEI straight to IMDS;
-`GAP` when no SEI source is named or the STAR field is not in the file map;
-`NOT_APPLICABLE` for a column the STAR load never writes. The detail says
-which, how well the SEI file resolved, whether a business decision is
-open, and that the row is a draft from a named document. A STAR field with
-no IMDS target is not a lineage row and stays out.
+A column `LANE_LINEAGE` already has keeps its verified row; the document's
+row for it is skipped and counted in the log. A STAR field with no IMDS
+target is not a lineage row and stays out. Row ids carry a prefix
+(`{ds}:DOC:{table}:{column}:{chain}`), so the rows load in both lineage
+modes — load and attach — and a reload (`CP_SEI_RELOAD=1`) purges them by
+that prefix without touching the baseline. `CP_SEI_DOC_LINEAGE=0` leaves
+them out.
 
-`legacy_lineage_xform` carries, per row, the two transformation ids off the
-comparison (`<COMPARISON_ID>-IM` and `-SEI`), the SEI-equivalent logic,
-the SEI files and fields, the equivalence verdict from
-`TRANSFORMATION_COMPARISON`, approval and evidence. `legacy_src_column`
-gets one row per SEI field (evidence `SEI_FEED_SPEC` when the file
-resolution verified it, else `SEI_MAPPING_DOC`); `legacy_source_file` one
-row per SEI feed file under system `SEI`.
-
-The lane is the loader's in both lineage modes — load and attach — and is
-purged by lane (`CP_SEI_RELOAD=1`) without touching the baseline. Row ids
-carry the lane (`{ds}:SEI_IMDS:{table}:{column}:{chain}`), so a column fed
-by STAR today and SEI after cutover is two rows, not one overwriting the
-other. `CP_SEI_LANE=0` leaves the lane out.
+On the Lineage page's system badge row, a lane the register declares with
+no feed, verify or lineage row behind it (ADDVANTAGE_IMDS, "seeded lane")
+is now offered only when nothing else is, so IMDS offers STAR and UAF.
 
 ## The seven new sheets
 

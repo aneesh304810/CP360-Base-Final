@@ -397,7 +397,6 @@ class SeiCrosswalkConnector:
         # the same workbook publishes, so it is read after STAR_LAYOUT_DETAIL
         out["e2e"] = self._e2e(sheets.get("e2e"), out["starfld"])
         out["seistar"] = self._seistar(sheets.get("seistar"), out["starfld"])
-        out.update(self._sei_lane(out))
         self._formula_check(wb, by_key, ("STAR_FIELD_USAGE_SUMMARY", "TRANSFORMATION_SUMMARY", "LINEAGE_SUMMARY"))
         # the three summary sheets, into one table, tagged by origin
         for want, label in self.CONTROL_SHEETS:
@@ -406,6 +405,9 @@ class SeiCrosswalkConnector:
                 out["control"] += self._control(Sheet(wb[real]), label)
         out["lineage"], out["srccol"], out["linelane"], out["linexform"] = \
             self._lineage(sheets.get("lineage"), lanes)
+        # the mapping documents' rows join the STAR lane AFTER the baseline is
+        # read, because a column the baseline has keeps its verified row
+        out.update(self._doc_lineage(out))
         # DISPOSITION lost its LANE_ID column in the new workbook — it is
         # keyed on (table, column) alone now. Every query that scoped a
         # disposition to a warehouse went through LANE_ID, so left as-is the
@@ -1986,17 +1988,20 @@ class SeiCrosswalkConnector:
             })
         return out
 
-    # ------------------------------------ the SEI -> STAR -> IMDS lane ----
-    # The lineage screens draw lanes: STAR_IMDS and UAF_IMDS today, from
-    # LANE_LINEAGE. This is the third, SEI_IMDS, from the end-to-end rows:
-    # SRC = the SEI feed file and field the source resolves to, STG1 = the
-    # STAR-compatible field (the contract SEI must honour), DWH = the IMDS
-    # column. The SEI -> STAR logic rides the first hop; the legacy
-    # STAR -> IMDS logic rides into the warehouse — the transformation is
-    # kept, the input is replaced — and the SEI-equivalent logic sits in
-    # the side table beside the comparison it came from. Every row is a
-    # draft and says so. CP_SEI_LANE=0 leaves the lane out.
-    SEI_LANE = "SEI_IMDS"
+    # ------------------- the mapping documents' rows, into the STAR lane ----
+    # The lineage screens read STAR feed -> IMDS column: the source files are
+    # STAR's (and UAF's), the warehouse is IMDS, and SEI is the mapping ON
+    # that chain, not a source file of its own. LANE_LINEAGE gave the STAR
+    # lane 108 rows; the mapping documents describe 1,121 IMDS stage columns
+    # over 14 tables with the same shape — STAR feed, STAR field, the load
+    # logic — and the workbook tags them LANE_ID = STAR_IMDS itself. They go
+    # into the STAR lane here, each carrying its SEI mapping in the detail
+    # and in the side table the column page reads (the SEI file and field
+    # that replaces the STAR input, the SEI-equivalent logic, the
+    # comparison's verdict). A column LANE_LINEAGE already has keeps its
+    # verified row; the document's row for it is skipped and counted.
+    # CP_SEI_DOC_LINEAGE=0 leaves them out.
+    DOC_PREFIX = "DOC"
 
     @staticmethod
     def _split_type(t):
@@ -2010,88 +2015,91 @@ class SeiCrosswalkConnector:
             return t[:60], None, None
         return m.group(1).strip().upper()[:60], m.group(2), m.group(3)
 
-    def _sei_lane(self, out):
-        empty = {"seifile": [], "seisrccol": [], "seilineage": [], "seilinelane": [], "seilinexform": []}
-        if os.environ.get("CP_SEI_LANE", "1").strip().lower() in ("0", "false", "no", "off"):
-            log.info("sei_crosswalk: CP_SEI_LANE=0, the %s lane is not built", self.SEI_LANE)
+    def _doc_lineage(self, out):
+        empty = {"docsrccol": [], "doclineage": [], "doclinelane": [], "doclinexform": []}
+        if os.environ.get("CP_SEI_DOC_LINEAGE", "1").strip().lower() in ("0", "false", "no", "off"):
+            log.info("sei_crosswalk: CP_SEI_DOC_LINEAGE=0, the mapping documents' lineage rows are not built")
             return empty
         rows = out.get("e2e") or []
         if not rows:
             return empty
         ds = self.data_source
+        baseline = {(r.get("dwh_target_table"), r.get("dwh_target_column")) for r in (out.get("lineage") or [])}
+        base_cols = {r.get("src_col_id") for r in (out.get("srccol") or [])}
         group_of = {r.get("dwh_target_table"): r.get("functional_group") for r in (out.get("lineage") or []) if r.get("functional_group")}
         equiv_of = {r.get("comparison_id"): r.get("equivalence") for r in (out.get("xcompare") or []) if r.get("comparison_id")}
-        area_of = {}
-        for f in out.get("seifeed") or []:
-            if f.get("sei_feed"):
-                area_of[_file_key(f["sei_feed"])] = f.get("subject_area")
-        status_of = {"E2E": "MAPPED", "SEI_DIRECT": "MAPPED", "NO_SEI_SOURCE": "GAP", "STAR_NOT_IN_FILE_MAP": "GAP",
-                     "NOT_POPULATED": "NOT_APPLICABLE"}
-        detail_of = {"E2E": "SEI feed file -> STAR-compatible field -> IMDS column; the STAR -> IMDS logic is kept",
-                     "SEI_DIRECT": "SEI feed file straight to the IMDS column; no STAR field between",
-                     "NO_SEI_SOURCE": "No SEI source named for this STAR field: the gap",
-                     "STAR_NOT_IN_FILE_MAP": "The STAR field the load reads is not in the file map",
-                     "NOT_POPULATED": "Not populated by the STAR load; nothing for SEI to replace"}
-        lin, lanes, xforms, cols, files = [], [], [], {}, {}
+        layout = {(_file_key(r.get("feed_family") or ""), r.get("field_norm")): r for r in (out.get("starfld") or [])}
+        # the stage map knows the uploader column the load reads when the
+        # document names no STAR field
+        uploader = {}
+        for r in out.get("starstage") or []:
+            if r.get("uploader_column"):
+                uploader[(r.get("imds_table"), r.get("imds_column"), r.get("feed_key"))] = r["uploader_column"]
+        lin, lanes, xforms, cols = [], [], [], {}
         seen, skipped = set(), {}
         for r in rows:
             tbl, col = r.get("imds_table"), r.get("imds_column")
             cls = r.get("link_class") or "NO_SEI_SOURCE"
             if not tbl or not col:
-                skipped[cls] = skipped.get(cls, 0) + 1
+                skipped["no IMDS target"] = skipped.get("no IMDS target", 0) + 1
                 continue
-            sfiles = [x.strip() for x in str(r.get("sei_file") or "").split(";") if x.strip()]
-            pairs = [x.strip() for x in str(r.get("sei_file_fields") or "").split(";") if x.strip()]
-            src_t = sfiles[0] if sfiles else (r.get("sei_object") or None)
-            src_c = None
-            if pairs:
-                src_c = pairs[0].rpartition(".")[2].strip() or None
-            if not src_c:
-                src_c = r.get("sei_field") or None
-            if src_c and not src_t:
-                src_t = "SEI"                                   # a bare field with no file: the system
-            if cls in ("NO_SEI_SOURCE", "NOT_POPULATED", "STAR_NOT_IN_FILE_MAP") and not (sfiles or r.get("sei_field")):
-                src_t, src_c = None, None
+            if (tbl, col) in baseline:
+                skipped["already in LANE_LINEAGE"] = skipped.get("already in LANE_LINEAGE", 0) + 1
+                continue
+            feed = r.get("feed_family")
+            fk = _file_key(feed) if feed else None
             star = [x.strip() for x in str(r.get("star_field") or "").split(";") if x.strip()]
-            stg1_t = r.get("feed_family") if star else None
-            stg1_c = star[0] if star else None
+            src_c = star[0] if star else uploader.get((tbl, col, fk))
+            im = r.get("star_imds_logic")
+            populated = bool(src_c or (im and im.strip().lower() not in ("null", "n/a")))
+            if cls == "NOT_POPULATED":
+                populated = False
             dtype, dlen, dprec = self._split_type(r.get("imds_type"))
-            status = status_of.get(cls, "GAP")
+            # the SEI mapping, in words
+            sfile = r.get("sei_file_fields") or r.get("sei_file") or r.get("sei_source")
             fstat = r.get("sei_file_status")
+            if cls == "NOT_POPULATED":
+                sei_note = "not populated by the STAR load; nothing for SEI to replace"
+            elif sfile:
+                sei_note = f"replaced by SEI {sfile}" + (f" ({fstat.lower().replace('_', ' ')})" if fstat else "")
+            elif cls == "STAR_NOT_IN_FILE_MAP":
+                sei_note = "STAR field not in the file map; no SEI source"
+            else:
+                sei_note = "no SEI source named (gap)"
+            if r.get("business_decision") == "Y":
+                sei_note += " · business decision open"
             rec = {
                 "dwh_target_table": tbl, "dwh_target_column": col,
                 "dwh_type": dtype, "dwh_length": dlen, "dwh_precision": dprec,
                 "stg2_source_table": None, "stg2_source_column": None, "stg2_to_dwh_transform": None,
                 "stg2_type": None, "stg2_length": None, "stg2_precision": None,
-                "stg1_source_table": stg1_t, "stg1_source_column": stg1_c,
-                "stg1_type": None, "stg1_length": None, "stg1_precision": None,
-                # SEI -> STAR on the first hop; the kept STAR -> IMDS logic into the warehouse.
-                # With no STAR field the SEI -> IMDS logic is the one hop there is.
-                "src_source_table": src_t, "src_source_column": src_c,
-                "src_to_stg1_transform": self._fit(r.get("sei_star_logic") if stg1_c else (r.get("sei_imds_logic") or r.get("sei_star_logic")), 4000),
-                "stg1_to_stg2_transform": self._fit(r.get("star_imds_logic"), 4000) if stg1_c else None,
-                "lineage_status": status,
-                "lineage_status_detail": (f"{detail_of.get(cls, cls)}"
-                                          + (f" · SEI file {fstat.lower().replace('_', ' ')}" if fstat else "")
-                                          + (" · business decision open" if r.get("business_decision") == "Y" else "")
-                                          + f" · draft ({r.get('source_document') or 'mapping document'})")[:1000],
+                "stg1_source_table": None, "stg1_source_column": None,
+                "stg1_type": None, "stg1_length": None, "stg1_precision": None, "stg1_to_stg2_transform": None,
+                # STAR feed -> IMDS directly, the load logic on the one hop, as LANE_LINEAGE's own rows
+                "src_source_table": feed if populated else None,
+                "src_source_column": src_c if populated else None,
+                "src_to_stg1_transform": self._fit(im, 4000) if populated else None,
+                "lineage_status": "MAPPED" if populated else "NOT_APPLICABLE",
+                "lineage_status_detail": ((("Documented STAR source mapping" if src_c else "Load logic documented; STAR field not resolved")
+                                           if populated else "No STAR source field")
+                                          + f" · {sei_note} · draft ({r.get('source_document') or 'mapping document'})")[:1000],
                 "functional_group": group_of.get(tbl),
                 "table_type": None,
                 "data_source": ds, "is_ud": "N", "ud_key": None,
             }
-            lid = f"{ds}:{self.SEI_LANE}:{tbl}:{col}:{_chain_hash(rec)}"
+            lid = f"{ds}:{self.DOC_PREFIX}:{tbl}:{col}:{_chain_hash(rec)}"
             if lid in seen:
                 lid = f"{lid}:{len(lin) + 1}"
             seen.add(lid)
             rec["lineage_id"] = lid[:400]
             lin.append(rec)
-            lanes.append({"lineage_id": rec["lineage_id"], "lane_id": self.SEI_LANE, "source_system": "SEI", "data_source": ds,
+            lanes.append({"lineage_id": rec["lineage_id"], "lane_id": "STAR_IMDS", "source_system": "STAR", "data_source": ds,
                           "dwh_target_table": tbl, "dwh_target_column": col,
-                          "src_source_table": src_t, "src_file_key": _file_key(src_t) if src_t else None})
+                          "src_source_table": feed, "src_file_key": fk})
             cid = r.get("comparison_id")
             cid = cid if cid and cid.upper() not in ("EXISTING_LLP_ROW", "NULL") else None
             xf = {
-                "legacy_transformation_id": f"{cid}-IM" if cid and r.get("star_imds_logic") else None,
+                "legacy_transformation_id": f"{cid}-IM" if cid and im else None,
                 "sei_transformation_id": f"{cid}-SEI" if cid and r.get("sei_imds_logic") else None,
                 "sei_equivalent_transformation": r.get("sei_imds_logic"),
                 "sei_source_objects": self._fit(r.get("sei_file") or r.get("sei_object"), 2000),
@@ -2105,28 +2113,23 @@ class SeiCrosswalkConnector:
             if any(v for v in xf.values()):
                 xforms.append({**xf, "lineage_id": rec["lineage_id"], "data_source": ds,
                                "dwh_target_table": tbl, "dwh_target_column": col})
-            if src_t:
-                fk = _file_key(src_t)
-                f = files.setdefault(fk, {"src_file": src_t[:400], "src_file_key": fk, "source_system": "SEI", "data_source": ds,
-                                          "dataset": area_of.get(fk) or ("System-generated value" if src_t.upper().startswith("SYSTEM")
-                                                                         else "Constant" if src_t.upper() == "CONSTANT" else None)})
-                if src_c:
-                    cid2 = f"{ds}:{fk}:{src_c}"[:600]
-                    if cid2 not in cols:
-                        cols[cid2] = {"src_col_id": cid2, "data_source": ds, "src_file_key": fk, "src_source_column": src_c[:200],
-                                      "src_col_norm": _norm_code(src_c)[:200], "src_type": None, "src_length": None, "src_precision": None,
-                                      "src_nullable": None, "src_description": None, "unit_of_measure": None, "currency_basis": None,
-                                      "sign_convention": None, "code_set_name": None,
-                                      "evidence": "SEI_FEED_SPEC" if fstat == "VERIFIED_IN_FEED_SPEC" else "SEI_MAPPING_DOC",
-                                      "source_doc": r.get("source_document")}
+            if populated and fk and src_c:
+                cid2 = f"{ds}:{fk}:{src_c}"[:600]
+                if cid2 not in cols and cid2 not in base_cols:
+                    lay = layout.get((fk, _norm_code(src_c))) or {}
+                    cols[cid2] = {"src_col_id": cid2, "data_source": ds, "src_file_key": fk, "src_source_column": src_c[:200],
+                                  "src_col_norm": _norm_code(src_c)[:200], "src_type": _nz(lay.get("published_type")),
+                                  "src_length": _nz(lay.get("published_length")), "src_precision": None, "src_nullable": None,
+                                  "src_description": self._fit(lay.get("description"), 4000), "unit_of_measure": None,
+                                  "currency_basis": None, "sign_convention": None, "code_set_name": None,
+                                  "evidence": "MAPPING_DOC", "source_doc": r.get("source_document")}
         by = {}
         for r in lin:
             by[r["lineage_status"]] = by.get(r["lineage_status"], 0) + 1
-        log.info("sei_crosswalk: %s lane — %d lineage rows (%s), %d SEI files, %d SEI fields; %s rows without an IMDS target left out",
-                 self.SEI_LANE, len(lin), ", ".join(f"{k}={v}" for k, v in sorted(by.items())), len(files), len(cols),
-                 ", ".join(f"{k}={v}" for k, v in sorted(skipped.items())) or "no")
-        return {"seifile": list(files.values()), "seisrccol": list(cols.values()), "seilineage": lin,
-                "seilinelane": lanes, "seilinexform": xforms}
+        log.info("sei_crosswalk: mapping documents -> STAR_IMDS lane: %d lineage rows (%s), %d STAR fields; left out: %s",
+                 len(lin), ", ".join(f"{k}={v}" for k, v in sorted(by.items())), len(cols),
+                 ", ".join(f"{k}={v}" for k, v in sorted(skipped.items())) or "none")
+        return {"docsrccol": list(cols.values()), "doclineage": lin, "doclinelane": lanes, "doclinexform": xforms}
 
     def _refcode(self, sh):
         """REFERENCE_CODE_XWALK -- one code value, and what it maps to. The
@@ -2307,14 +2310,14 @@ class SeiCrosswalkConnector:
         ("refcode",    "sei_reference_code_xwalk", ("code_row_id",)),
         ("entityid",   "sei_entity_id_derivation", ("step_id",)),
         ("usageexc",   "star_usage_mapping_exception", ("exc_row_id",)),
-        # the SEI -> STAR -> IMDS lane (SEI_IMDS), into the lineage tables the
-        # screens read. Owned by this connector in BOTH modes: these rows are
-        # the workbook's, whichever loader supplied the baseline.
-        ("seifile",     "legacy_source_file",   ("src_file",)),
-        ("seisrccol",   "legacy_src_column",    ("src_col_id",)),
-        ("seilineage",  "legacy_lineage",       ("lineage_id",)),
-        ("seilinelane", "legacy_lineage_lane",  ("lineage_id",)),
-        ("seilinexform", "legacy_lineage_xform", ("lineage_id",)),
+        # the mapping documents' STAR -> IMDS rows, into the STAR_IMDS lane
+        # of the lineage tables the screens read, the SEI mapping beside each.
+        # Owned by this connector in BOTH modes: these rows are the
+        # workbook's, whichever loader supplied the baseline.
+        ("docsrccol",   "legacy_src_column",    ("src_col_id",)),
+        ("doclineage",  "legacy_lineage",       ("lineage_id",)),
+        ("doclinelane", "legacy_lineage_lane",  ("lineage_id",)),
+        ("doclinexform", "legacy_lineage_xform", ("lineage_id",)),
     ]
 
     # legacy_lineage and legacy_source_file are SHARED with whatever loaded the
@@ -2491,24 +2494,30 @@ class SeiCrosswalkConnector:
             ("sei_entity_id_derivation", "data_source = :ds"),
             ("star_usage_mapping_exception", "data_source = :ds"),
         ]
-        # The SEI_IMDS lane is this connector's in both modes, so it is
-        # purged by lane in both — the lane table says which lineage rows
-        # are its, the evidence word which source columns, the system
-        # which files. Lineage first, lane last, or the subquery is empty.
-        for sql in (
-            f"DELETE FROM legacy_lineage_xform WHERE data_source = :ds AND lineage_id IN "
-            f"(SELECT lineage_id FROM legacy_lineage_lane WHERE data_source = :ds AND lane_id = '{self.SEI_LANE}')",
-            f"DELETE FROM legacy_lineage WHERE data_source = :ds AND lineage_id IN "
-            f"(SELECT lineage_id FROM legacy_lineage_lane WHERE data_source = :ds AND lane_id = '{self.SEI_LANE}')",
-            f"DELETE FROM legacy_lineage_lane WHERE data_source = :ds AND lane_id = '{self.SEI_LANE}'",
-            "DELETE FROM legacy_src_column WHERE data_source = :ds AND evidence LIKE 'SEI_%'",
-            "DELETE FROM legacy_source_file WHERE data_source = :ds AND source_system = 'SEI'",
+        # The mapping documents' lineage rows are this connector's in both
+        # modes, so they are purged in both, by their id prefix — never the
+        # baseline's rows beside them. The ones the earlier SEI_IMDS lane
+        # wrote (source files of system SEI) go with them.
+        pfx = f"{self.data_source}:{self.DOC_PREFIX}:%"
+        for sql, params in (
+            ("DELETE FROM legacy_lineage_xform WHERE data_source = :ds AND lineage_id LIKE :p", {"ds": self.data_source, "p": pfx}),
+            ("DELETE FROM legacy_lineage WHERE data_source = :ds AND lineage_id LIKE :p", {"ds": self.data_source, "p": pfx}),
+            ("DELETE FROM legacy_lineage_lane WHERE data_source = :ds AND lineage_id LIKE :p", {"ds": self.data_source, "p": pfx}),
+            ("DELETE FROM legacy_src_column WHERE data_source = :ds AND evidence = 'MAPPING_DOC'", {"ds": self.data_source}),
+            ("DELETE FROM legacy_lineage_xform WHERE data_source = :ds AND lineage_id IN "
+             "(SELECT lineage_id FROM legacy_lineage_lane WHERE data_source = :ds AND lane_id = 'SEI_IMDS')", {"ds": self.data_source}),
+            ("DELETE FROM legacy_lineage WHERE data_source = :ds AND lineage_id IN "
+             "(SELECT lineage_id FROM legacy_lineage_lane WHERE data_source = :ds AND lane_id = 'SEI_IMDS')", {"ds": self.data_source}),
+            ("DELETE FROM legacy_lineage_lane WHERE data_source = :ds AND lane_id = 'SEI_IMDS'", {"ds": self.data_source}),
+            ("DELETE FROM legacy_src_column WHERE data_source = :ds AND evidence LIKE 'SEI_%'", {"ds": self.data_source}),
+            ("DELETE FROM legacy_source_file WHERE data_source = :ds AND source_system = 'SEI'", {"ds": self.data_source}),
         ):
             try:
-                cur.execute(sql, {"ds": self.data_source})
-                log.info("purge %s lane: %d rows (%s)", self.SEI_LANE, cur.rowcount, sql.split(" WHERE")[0][12:])
+                cur.execute(sql, params)
+                if cur.rowcount:
+                    log.info("purge mapping-document lineage: %d rows (%s)", cur.rowcount, sql.split(" WHERE")[0][12:])
             except Exception as e:                              # noqa: BLE001
-                log.warning("purge %s lane skipped (%s)", self.SEI_LANE, e)
+                log.warning("purge mapping-document lineage skipped (%s)", e)
         for table, where in scoped:
             if mode == "attach" and table in shared:
                 log.info("purge %s: skipped — attach mode does not own these rows", table)
