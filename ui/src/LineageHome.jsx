@@ -30,6 +30,9 @@ const SYS_META = {
  // UAF feeds IMDS through PDPA009/PDBA016 and was missing from this list
  // entirely, so IMDS's second incumbent could not be selected at all.
  UAF: { label: "UAF", c: "#0b7d7d", bg: "#e6f6f6" },
+ // SEI -> STAR -> IMDS: the successor lane, from the mapping documents. It
+ // appears only where the lane register declares it for the warehouse.
+ SEI: { label: "SEI", c: "#0091bf", bg: "#e0f5fd" },
 };
 const SOURCES = [
  { id: "PBDW", icon: "🏪", name: "PB Data Warehouse",

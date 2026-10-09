@@ -85,6 +85,43 @@ says the workbook does not resolve files.
 Expected count line for a v4 load: `e2e=1285, seistar=571, xform=687,
 control=` (102 plus the 23 LINEAGE_SUMMARY rows), the rest as for v2.
 
+## The SEI → STAR → IMDS lane (`SEI_IMDS`)
+
+The Lineage page draws lanes: `STAR_IMDS` and `UAF_IMDS`, from
+`LANE_LINEAGE`. The crosswalk loader now adds a third from the end-to-end
+rows, `SEI_IMDS`, into the same lineage tables the screens read, so it
+sits beside the incumbents under the SEI chip of the system badge row and
+its files appear in the source-first view.
+
+| Stage | What it holds |
+|---|---|
+| SRC | the SEI feed file and field the source resolves to (`SEI_SOURCE_FILE` / `_FIELDS`; the document's object and field before v4). `SYSTEM (job run)` and `CONSTANT` are files too, so they are findable. |
+| → | the SEI → STAR join or derivation |
+| STG1 | the STAR-compatible field: the STAR feed and the field the load reads today. The contract SEI honours. |
+| → | the legacy STAR → IMDS logic, **kept** (bridged onto the edge into the warehouse, as the STAR lane's own rows are) |
+| DWH | the IMDS table and column, with the type split into type, length and precision |
+
+Status: `MAPPED` for a path linked end to end or SEI straight to IMDS;
+`GAP` when no SEI source is named or the STAR field is not in the file map;
+`NOT_APPLICABLE` for a column the STAR load never writes. The detail says
+which, how well the SEI file resolved, whether a business decision is
+open, and that the row is a draft from a named document. A STAR field with
+no IMDS target is not a lineage row and stays out.
+
+`legacy_lineage_xform` carries, per row, the two transformation ids off the
+comparison (`<COMPARISON_ID>-IM` and `-SEI`), the SEI-equivalent logic,
+the SEI files and fields, the equivalence verdict from
+`TRANSFORMATION_COMPARISON`, approval and evidence. `legacy_src_column`
+gets one row per SEI field (evidence `SEI_FEED_SPEC` when the file
+resolution verified it, else `SEI_MAPPING_DOC`); `legacy_source_file` one
+row per SEI feed file under system `SEI`.
+
+The lane is the loader's in both lineage modes — load and attach — and is
+purged by lane (`CP_SEI_RELOAD=1`) without touching the baseline. Row ids
+carry the lane (`{ds}:SEI_IMDS:{table}:{column}:{chain}`), so a column fed
+by STAR today and SEI after cutover is two rows, not one overwriting the
+other. `CP_SEI_LANE=0` leaves the lane out.
+
 ## The seven new sheets
 
 | Sheet | Table (sql/79) | Grain | Key |

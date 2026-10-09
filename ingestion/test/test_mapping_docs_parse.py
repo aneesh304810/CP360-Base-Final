@@ -306,5 +306,53 @@ ok(len(ctl) == 3 and ctl[0]["control_name"] == "PEDDIFI1 \u2192 HOLDINGDBO.POSIT
 ok(not [r for r in v4["e2e"] if r["link_class"] not in ("E2E", "SEI_DIRECT", "NO_SEI_SOURCE", "STAR_ONLY", "NOT_POPULATED", "STAR_NOT_IN_FILE_MAP")],
    "every v4 row has a class the screens know")
 
+
+print("-- the SEI -> STAR -> IMDS lane, from the lineage rows")
+L = {r["dwh_target_column"]: r for r in v4["seilineage"]}
+ok(len(v4["seilineage"]) == 4 and set(L) == {"QUANTITY", "EFFECTIVE_DATE", "COST_BASIS", "UPDATE_SOURCE"} and all(r["lineage_id"].startswith("IMDS:SEI_IMDS:") for r in v4["seilineage"]),
+   "one lineage row per IMDS column; the orphan STAR field has no target and stays out; ids carry the lane", sorted(L))
+q = L["QUANTITY"]
+ok(q["src_source_table"] == "Taxlot" and q["src_source_column"] == "QUANTITY_HELD" and q["stg1_source_table"] == "PEDDIFI1" and q["stg1_source_column"] == "Lot Quantity"
+   and q["stg2_source_table"] is None and q["dwh_target_table"] == "HOLDINGDBO.POSITION",
+   "SRC is the SEI feed file and field, STG1 the STAR-compatible field, DWH the IMDS column", q)
+ok(q["src_to_stg1_transform"] == "TAXLOT_TYPE_CODE = 2" and q["stg1_to_stg2_transform"] == "SUM(lot_qty)" and q["lineage_status"] == "MAPPED"
+   and q["dwh_type"] == "NUMBER" and q["dwh_length"] == "28" and q["dwh_precision"] == "12" and "the STAR -> IMDS logic is kept" in q["lineage_status_detail"]
+   and "draft" in q["lineage_status_detail"],
+   "SEI -> STAR logic on the first hop, the kept STAR -> IMDS logic into the warehouse; the type split; a draft that says so", q)
+e = L["EFFECTIVE_DATE"]
+ok(e["src_source_table"] == "SYSTEM (job run)" and e["src_source_column"] == "PROCESSING_DATE" and e["stg1_source_column"] is None
+   and e["src_to_stg1_transform"] == "Processing_Date" and e["lineage_status"] == "MAPPED", "SEI straight to IMDS: no STAR stage, the SEI -> IMDS logic on the one hop", e)
+c = L["COST_BASIS"]
+ok(c["src_source_table"] is None and c["stg1_source_column"] == "Phantom Field" and c["lineage_status"] == "GAP" and "business decision open" in c["lineage_status_detail"],
+   "no SEI source: the STAR field with nothing before it, a GAP, the decision flagged", c)
+u = L["UPDATE_SOURCE"]
+ok(u["src_source_table"] is None and u["stg1_source_table"] is None and u["lineage_status"] == "NOT_APPLICABLE" and u["dwh_type"] == "VARCHAR2" and u["dwh_length"] == "50",
+   "a column the STAR load never writes: the warehouse node alone, not applicable", u)
+lanes = {r["dwh_target_column"]: r for r in v4["seilinelane"]}
+ok(len(lanes) == 4 and all(r["lane_id"] == "SEI_IMDS" and r["source_system"] == "SEI" for r in lanes.values()) and lanes["QUANTITY"]["src_file_key"] == "TAXLOT",
+   "every row is tagged SEI_IMDS / SEI with its SEI file key", lanes.get("QUANTITY"))
+xf = {r["dwh_target_column"]: r for r in v4["seilinexform"]}
+ok(xf["QUANTITY"]["legacy_transformation_id"] == "LLP-1-IM" and xf["QUANTITY"]["sei_transformation_id"] == "LLP-1-SEI" and xf["QUANTITY"]["sei_equivalent_transformation"] == "SUM(Taxlot.QUANTITY_HELD)"
+   and xf["QUANTITY"]["sei_source_fields"] == "Taxlot.QUANTITY_HELD; Taxlot.FX_RATE" and xf["QUANTITY"]["dwh_nullable"] == "No" and xf["QUANTITY"]["transformation_approval"] == "DRAFT_REVIEW_REQUIRED"
+   and "LLP" not in (xf["UPDATE_SOURCE"]["legacy_transformation_id"] or ""),
+   "the side row: the two transformation ids off the comparison, the SEI-equivalent logic, the SEI fields; EXISTING_LLP_ROW is no id", xf.get("QUANTITY"))
+files = {f["src_file"]: f for f in v4["seifile"]}
+ok(set(files) == {"Taxlot", "SYSTEM (job run)"} and files["Taxlot"]["source_system"] == "SEI" and files["Taxlot"]["src_file_key"] == "TAXLOT" and files["SYSTEM (job run)"]["dataset"] == "System-generated value",
+   "the SEI feed files as source files of the SEI system, so the lane badge scopes to them", files)
+cols4 = {c["src_source_column"]: c for c in v4["seisrccol"]}
+ok(set(cols4) == {"QUANTITY_HELD", "PROCESSING_DATE"} and cols4["QUANTITY_HELD"]["evidence"] == "SEI_FEED_SPEC" and cols4["PROCESSING_DATE"]["evidence"] == "SEI_MAPPING_DOC",
+   "one source column per SEI field, its evidence the file resolution", cols4)
+ok(len(parsed["seilineage"]) == 5 and {r["lineage_status"] for r in parsed["seilineage"]} == {"MAPPED", "GAP"} and parsed["seilineage"][0]["src_source_table"] == "Taxlot",
+   "the v2 e2e sheet builds the lane too, from the document's object spelling", [(r["dwh_target_column"], r["lineage_status"]) for r in parsed["seilineage"]])
+os.environ["CP_SEI_LANE"] = "0"
+try:
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "v2b.xlsx")
+        build(path)
+        off = SeiCrosswalkConnector(xlsx_path=path, data_source="IMDS").parse()
+finally:
+    del os.environ["CP_SEI_LANE"]
+ok(off["seilineage"] == [] and off["seifile"] == [] and len(off["e2e"]) == 5, "CP_SEI_LANE=0 leaves the lane out and nothing else")
+
 print(("\n%d assertion(s) failed" % BAD) if BAD else "\nmapping-docs parse assertions pass")
 sys.exit(1 if BAD else 0)
