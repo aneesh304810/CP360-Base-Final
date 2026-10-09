@@ -1,9 +1,11 @@
-# SEI mapping documents — the v2 crosswalk workbook
+# SEI mapping documents — the v2 and v4 crosswalk workbooks
 
 `STAR_IMDS_SEI_Lineage_Catalog_v2_Transformations-Usage-Matrix.xlsx` read
 seven SEI mapping documents into the catalog. Seven sheets are new, eight
-changed. This is what the loader does with each, and what to expect on
-screen.
+changed. `STAR_IMDS_SEI_Lineage_Catalog_v4_SEI-Source-Files.xlsx` then
+resolved every SEI source to the SEI feed file that carries it and rebuilt
+the end-to-end sheet at a wider grain (see **v4** below). This is what the
+loader does with each, and what to expect on screen.
 
 Nothing in these documents is an approved SEI-to-STAR crosswalk. Every row
 carries `DRAFT_REVIEW_REQUIRED` as written, and no verdict in `SEI_VERIFY`
@@ -13,9 +15,13 @@ changes because of them.
 
 ```
 sql/79_sei_mapping_docs.sql            once; additive, idempotent
-$env:CP_SEI_XLSX = "<path to the v2 workbook>"
+sql/80_sei_lineage_v4.sql              once, before the v4 workbook; additive, idempotent
+$env:CP_SEI_XLSX = "<path to the v2 or v4 workbook>"
 .\local\load.ps1 sei_crosswalk           (or: python -m ingestion.run sei_crosswalk)
 ```
+
+Load v4 with `CP_SEI_RELOAD=1`: its lineage rows are keyed by `LINEAGE_ID`,
+not by the v2 path key, so a merge on top of a v2 load would hold both.
 
 Set `CP_SEI_RELOAD=1` to replace the lane's rows rather than merge: the
 seven new tables are purged by `DATA_SOURCE` with the rest.
@@ -50,6 +56,34 @@ in the stage map, a 434-character normalised SEI field in the crosswalk.
 The columns are widened (re-run `sql/79`) and the loader now cuts any cell
 that still outruns its column, ending it with `… [cut: N chars]`, so the
 row lands and the cut is visible. The full text stays in the workbook.
+
+## v4 — SEI source files (`STAR_IMDS_SEI_Lineage_Catalog_v4_SEI-Source-Files.xlsx`)
+
+35 sheets, 10,565 rows. Everything the v2 loader read still loads; what
+changed is read into the same tables, so every screen keeps working and
+gains what v4 adds.
+
+| Change | What the loader does |
+|---|---|
+| **`SEI_STAR_IMDS_LINEAGE`** replaces `SEI_STAR_IMDS_E2E_XWALK` (1,285 rows, was 1,121). One row per IMDS column *or orphan STAR field*; `LINEAGE_COMPLETENESS` in place of `LINK_STATUS`; `LINEAGE_ID` key. | Lands in `sei_e2e_xwalk`, keyed `{ds}:{LINEAGE_ID}`. The completeness word is the `link_class`: `FULL_SEI_STAR_IMDS` → `E2E`, `SEI_TO_IMDS_NO_STAR_FIELD` → `SEI_DIRECT`, `STAR_TO_IMDS_NO_SEI_SOURCE` → `NO_SEI_SOURCE`, and two new ones: `SEI_TO_STAR_NO_IMDS_TARGET` → **`STAR_ONLY`** (a STAR field the documents map but nothing loads; `IMDS_TARGET_OBJECT = NOT_IDENTIFIED` reads as no target) and `NOT_POPULATED_IN_LOAD` → **`NOT_POPULATED`** (an IMDS column the STAR load never writes). The word itself stays in `link_status`. `STAR_FIELDS` may list several (`;`): kept whole, normalised by the first, `star_in_layout = Y` only when every one is in the published layout. `LINEAGE_STATUS` → `crosswalk_status`; `BUSINESS_DECISION_FLAG`, `COMPARISON_ID`, `IMDS_TYPE`, `IMDS_NULLABLE`, `STAR_FIELD_RESOLUTION`, `SEI_TO_IMDS_LOGIC_ORIGIN` land in columns of the same name (sql/80). |
+| **`SEI_SOURCE_FILE` / `_FIELDS` / `_STATUS`** on the lineage, `SEI_TO_STAR_FIELD_MAP` and `LOT_LEVEL_POSITION_MAP` (and the stage map if present). | `sei_file`, `sei_file_fields`, `sei_file_status` on each table (sql/80). The status vocabulary is stored as given: `VERIFIED_IN_FEED_SPEC`, `PARTIALLY_VERIFIED`, `FILE_ONLY_NO_FIELD`, `SYSTEM_OR_CONSTANT`, `DERIVED_AT_RUNTIME`, `FIELD_NOT_IN_FEED_SPEC`, `NOT_AVAILABLE_IN_SEI_FEEDS`, `UNRESOLVED`, `NO_SEI_SOURCE`. |
+| **`SEI_TO_STAR_FIELD_MAP`** 571 rows, was 479: 92 STAR layout fields no document mentions, `SOURCE_SHEET = STAR_LAYOUT_DETAIL`. | Loaded as rows; the register counts a document's own rows against what it declared and reports the layout-added ones apart (`s2s_from_layout`), so the register still agrees. |
+| **`LINEAGE_SUMMARY`** (formula counts per STAR feed + IMDS table). | Lands in `sei_control` as `LINEAGE_SUMMARY`, control `feed → table`, `ROWS` the result, the counts in the detail. `/sei-crosswalk/lineage-summary` recomputes it from the lineage rows and returns the sheet's rows beside. Formula cells need the workbook saved in Excel once, as before. |
+| `STAR_FEED` (10 rows), `SEI_FEED` (53), `TRANSFORMATION_REGISTER` (687), `LANE_LINEAGE` (46 columns). | Rows only; they load as before. `STAR_FEED.LAYOUT_AVAILABLE` and `SEI_TO_STAR.TARGET_STAR_USAGE_*` are not read. |
+
+**Coverage is over the paths in scope.** `STAR_ONLY` and `NOT_POPULATED`
+rows are not paths a SEI source could cover: one loads nothing, the other
+has nothing to replace. `/e2e-coverage` reports `total`, `in_scope`,
+`not_populated` and `star_only`; `coverage_pct` divides by `in_scope`. The
+candidate ribbon leaves both out and says how many (`excluded`). The
+ribbon's SEI node is the resolved feed file where there is one.
+
+**A warehouse that has not run sql/80** still answers: the API tries the
+wide select first and falls back to the v2 columns, and the SEI files view
+says the workbook does not resolve files.
+
+Expected count line for a v4 load: `e2e=1285, seistar=571, xform=687,
+control=` (102 plus the 23 LINEAGE_SUMMARY rows), the rest as for v2.
 
 ## The seven new sheets
 
@@ -132,9 +166,16 @@ documents**, below "Does the new logic compute the same value?":
   *stays until a SEI source is named*. Business decisions flagged in the
   document are counted and marked on the rule.
 - **Coverage.** Per IMDS target table: paths, a stacked bar of link
-  classes, coverage, no-SEI-source and not-in-map counts. Click a table for
-  its paths, filter by link class, open a row for the three logics side by
-  side, and jump to the column's verdict.
+  classes, coverage over the paths in scope, no-SEI-source, not-in-map and
+  (v4) not-loaded counts. Click a table for its paths, filter by link
+  class, open a row for the three logics side by side, and jump to the
+  column's verdict. A row shows the SEI feed file its source resolves to
+  and how well. A click on the candidate ribbon above scopes this view.
+- **SEI files** (v4). Every SEI source resolved to the published SEI feed
+  file: status pills, one row per file with the paths it carries, how many
+  are verified in the feed spec, the IMDS tables it reaches and the STAR
+  feeds it goes through; where the SEI → IMDS logic comes from and how the
+  STAR field was found.
 - **Documents.** The register, with what each document declared beside what
   the lane tables actually hold. A difference is rows the load dropped.
 - **Transformations.** The per-table summary, recomputed, with the sheet's
@@ -155,6 +196,7 @@ GET /sei-crosswalk/reference-codes?code_set=
 GET /sei-crosswalk/entity-id
 GET /sei-crosswalk/usage-exceptions?result=&feed=
 GET /sei-crosswalk/flow-candidates
+GET /sei-crosswalk/lineage-summary                  v4: per STAR feed + IMDS table, recomputed, the sheet's rows beside
 GET /sei-crosswalk/cutover-lineage?feed=&q=         one row per IMDS column: STAR today, SEI after, the rule and its state
 ```
 

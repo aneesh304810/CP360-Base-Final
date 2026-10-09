@@ -250,6 +250,8 @@ export const mappingDocs = {
       () => ({ total: 0, covered: 0, coverage_pct: null, by_link: [], by_status: [], by_approval: [], tables: [], feeds: [], headline: "" })),
   e2eRows: (o = {}) =>
     _get(`/sei-crosswalk/e2e-rows${_qs(o)}`, () => ({ rows: [], total: 0 })),
+  lineageSummary: (data_source) =>
+    _get(`/sei-crosswalk/lineage-summary${_qs({ data_source })}`, () => ({ rows: [], total: {}, sheet: [] })),
   transformationSummary: (data_source) =>
     _get(`/sei-crosswalk/transformation-summary${_qs({ data_source })}`,
       () => ({ tables: [], total: 0, covered: 0, coverage_pct: null, by_completeness: [], by_approval: [], headline: "" })),
@@ -278,8 +280,26 @@ export const LINK_INFO = {
   STAR_NOT_IN_FILE_MAP: { t: "STAR field not in map",  c: "#7c3aed", bg: "#efe6fb" },
   NO_SEI_SOURCE:        { t: "no SEI source",          c: "#c1113a", bg: "#f3d2d7" },
   STAR_ONLY:            { t: "no IMDS target",         c: "#6b7c8a", bg: "#eef2f5" },
+  NOT_POPULATED:        { t: "not loaded by STAR",     c: "#9aa5b1", bg: "#f1f3f5" },
 };
-export const LINK_ORDER = ["E2E", "SEI_DIRECT", "STAR_NOT_IN_FILE_MAP", "NO_SEI_SOURCE", "STAR_ONLY"];
+export const LINK_ORDER = ["E2E", "SEI_DIRECT", "STAR_NOT_IN_FILE_MAP", "NO_SEI_SOURCE", "STAR_ONLY", "NOT_POPULATED"];
+// The two v4 shapes that are not paths to cover: an orphan STAR field loads
+// nothing; a column the STAR load never writes has nothing to replace.
+export const OUT_OF_SCOPE = ["STAR_ONLY", "NOT_POPULATED"];
+// v4: how well the SEI source resolved to a published SEI feed file.
+export const FILE_STATUS_INFO = {
+  VERIFIED_IN_FEED_SPEC:      { t: "verified in the feed spec", c: "#159943" },
+  PARTIALLY_VERIFIED:         { t: "partly verified",           c: "#5fa36b" },
+  FILE_ONLY_NO_FIELD:         { t: "file known, field not",     c: "#0091bf" },
+  SYSTEM_OR_CONSTANT:         { t: "system or constant",        c: "#5f87a7" },
+  DERIVED_AT_RUNTIME:         { t: "derived at run time",       c: "#5f87a7" },
+  FIELD_NOT_IN_FEED_SPEC:     { t: "field not in the feed spec", c: "#e67e22" },
+  NOT_AVAILABLE_IN_SEI_FEEDS: { t: "not in any SEI feed",       c: "#c1113a" },
+  UNRESOLVED:                 { t: "unresolved",                c: "#b45309" },
+  NO_SEI_SOURCE:              { t: "no SEI source",             c: "#c1113a" },
+};
+export const FILE_STATUS_ORDER = Object.keys(FILE_STATUS_INFO);
+export const fileStatusLabel = (k) => (FILE_STATUS_INFO[k] || {}).t || String(k || "").toLowerCase().replace(/_/g, " ");
 // The ribbon's vocabulary when it draws the mapping documents' candidate
 // paths instead of the proposals: link classes, in paths, every one a draft.
 export const CANDIDATE_VOCAB = {
@@ -290,6 +310,7 @@ export const CANDIDATE_VOCAB = {
     STAR_NOT_IN_FILE_MAP: "The IMDS column is fed by a STAR field the file map does not have.",
     NO_SEI_SOURCE: "No SEI source is named for this path. The gap.",
     STAR_ONLY: "A STAR field with no IMDS target on this row.",
+    NOT_POPULATED: "An IMDS column the STAR load never writes. Nothing to replace.",
   }[k] || k),
   bypass: "SEI straight to IMDS, no STAR field (dashed)",
   bypassShort: "DIRECT_SEI_TO_IMDS: the document maps the SEI source onto the IMDS column without a STAR field between.",

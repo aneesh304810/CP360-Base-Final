@@ -298,7 +298,10 @@ class SeiCrosswalkConnector:
         "mapsrc":    ("MAPPING_SOURCE_REGISTER", "MAPPING_SOURCES"),
         "seistar":   ("SEI_TO_STAR_FIELD_MAP", "SEI_TO_STAR_MAP"),
         "starstage": ("STAR_TO_IMDS_STAGE_MAP", "STAR_TO_IMDS_MAP"),
-        "e2e":       ("SEI_STAR_IMDS_E2E_XWALK", "E2E_XWALK", "SEI_STAR_IMDS_XWALK"),
+        # v4 rebuilt the end-to-end sheet as SEI_STAR_IMDS_LINEAGE (one row
+        # per IMDS column or orphan STAR field, LINEAGE_COMPLETENESS instead
+        # of LINK_STATUS). Both spellings land in the same table.
+        "e2e":       ("SEI_STAR_IMDS_LINEAGE", "SEI_STAR_IMDS_E2E_XWALK", "E2E_XWALK", "SEI_STAR_IMDS_XWALK"),
         "refcode":   ("REFERENCE_CODE_XWALK", "REFERENCE_CODES", "CODE_XWALK"),
         "entityid":  ("ENTITY_ID_DERIVATION", "ENTITY_ID"),
         "usageexc":  ("USAGE_RECON_EXCEPTIONS", "USAGE_EXCEPTIONS"),
@@ -310,7 +313,8 @@ class SeiCrosswalkConnector:
     # panel.
     CONTROL_SHEETS = (("_MANIFEST", "MANIFEST"),
                       ("FINAL_VERIFICATION", "FINAL_VERIFICATION"),
-                      ("TRANSFORMATION_SUMMARY", "TRANSFORMATION_SUMMARY"))
+                      ("TRANSFORMATION_SUMMARY", "TRANSFORMATION_SUMMARY"),
+                      ("LINEAGE_SUMMARY", "LINEAGE_SUMMARY"))
 
     def __init__(self, xlsx_path=None, data_source=None, reload_scope=False,
                  lineage_mode=None):
@@ -393,7 +397,7 @@ class SeiCrosswalkConnector:
         # the same workbook publishes, so it is read after STAR_LAYOUT_DETAIL
         out["e2e"] = self._e2e(sheets.get("e2e"), out["starfld"])
         out["seistar"] = self._seistar(sheets.get("seistar"), out["starfld"])
-        self._formula_check(wb, by_key, ("STAR_FIELD_USAGE_SUMMARY", "TRANSFORMATION_SUMMARY"))
+        self._formula_check(wb, by_key, ("STAR_FIELD_USAGE_SUMMARY", "TRANSFORMATION_SUMMARY", "LINEAGE_SUMMARY"))
         # the three summary sheets, into one table, tagged by origin
         for want, label in self.CONTROL_SHEETS:
             real = by_key.get(_hkey(want))
@@ -1299,6 +1303,9 @@ class SeiCrosswalkConnector:
                 "sei_source_object": sh.get(row, "SEI_SOURCE_OBJECT"),
                 "sei_source_field": sh.get(row, "SEI_SOURCE_FIELD"),
                 "remarks": sh.get(row, "REMARKS"),
+                "sei_source_file": self._fit(self._val(sh.get(row, "SEI_SOURCE_FILE")), 400),
+                "sei_source_file_fields": self._fit(self._val(sh.get(row, "SEI_SOURCE_FILE_FIELDS")), 1000),
+                "sei_source_file_status": _nz(sh.get(row, "SEI_SOURCE_FILE_STATUS")),
                 "source_document": sh.get(row, "SOURCE_DOCUMENT", "SOURCE_DOC"),
             })
         return out
@@ -1594,16 +1601,21 @@ class SeiCrosswalkConnector:
         # here: the table is the control, the comparison count its result,
         # and every other column goes into the detail by name, so a column
         # added later is carried rather than dropped.
+        tbl_cols = ("TARGET_TABLE", "TARGET_OBJECT", "IMDS_TARGET_OBJECT", "IMDS_TARGET", "IMDS_TABLE", "DWH_TARGET_TABLE")
         per_table = not any(_hkey(k) in sh.idx for k in ("CONTROL", "ITEM", "METRIC")) and any(
-            _hkey(k) in sh.idx for k in ("TARGET_TABLE", "TARGET_OBJECT", "IMDS_TARGET", "IMDS_TABLE", "DWH_TARGET_TABLE"))
+            _hkey(k) in sh.idx for k in tbl_cols)
         if per_table:
             for i, row in enumerate(sh.rows(), 1):
-                tbl = sh.get(row, "TARGET_TABLE", "TARGET_OBJECT", "IMDS_TARGET", "IMDS_TABLE", "DWH_TARGET_TABLE")
-                if not tbl:
+                tbl = sh.get(row, *tbl_cols)
+                # LINEAGE_SUMMARY (v4) is per STAR feed + IMDS table; its TOTAL
+                # row has a feed and no table. The control is "feed -> table".
+                feed = sh.get(row, "STAR_FEED", "FEED_FAMILY")
+                if not tbl and not feed:
                     continue
+                tbl = f"{feed} \u2192 {tbl}" if feed and tbl else (tbl or feed)
                 result = sh.get(row, "TARGET_ROWS", "COMPARISON_ROWS", "COMPARISONS", "COMPARED", "COMPARISON_COUNT", "ROWS", "TOTAL")
                 detail = "; ".join(f"{k}={_s(row[ix])}" for k, ix in sorted(sh.idx.items(), key=lambda kv: kv[1])
-                                   if ix < len(row) and _s(row[ix]) and k not in ("TARGETTABLE", "TARGETOBJECT", "STATUS"))
+                                   if ix < len(row) and _s(row[ix]) and k not in ("TARGETTABLE", "TARGETOBJECT", "IMDSTARGETOBJECT", "STARFEED", "STATUS"))
                 out.append({
                     "control_id": f"{self.data_source}:{sheet_label}:{i}",
                     "data_source": self.data_source,
@@ -1727,7 +1739,7 @@ class SeiCrosswalkConnector:
                 "SEI_SOURCE_OBJECT", "SEI_OBJECT", "SEI_SOURCE_FIELD", "SEI_FIELD", "SEI_TYPE", "SEI_NULLABLE",
                 "JOIN_TRANSFORMATION_LOGIC", "JOIN_LOGIC", "TRANSFORMATION", "MAP_KIND", "MAPPING_TYPE",
                 "OPEN_DEPENDENCY", "NOTES", "NOTE", "MAPPING_STATUS", "APPROVAL_STATUS", "STATUS"
-                ) + self._DOC + self._WHERE
+                ) + self._FILE + self._DOC + self._WHERE
         self._unconsumed(sh, "sei_star_field_map", *cols)
         layout = {(_file_key(r["feed_family"] or ""), r.get("field_norm")) for r in (starfld or [])}
         out, seen = [], set()
@@ -1766,9 +1778,21 @@ class SeiCrosswalkConnector:
                 "mapping_status": _nz(sh.get(row, "MAPPING_STATUS")),
                 "approval_status": _nz(sh.get(row, "APPROVAL_STATUS", "STATUS")),
                 "notes": sh.get(row, "NOTES", "NOTE"),
+                **self._sei_file(sh, row),
                 **self._where(sh, row),
             })
         return out
+
+    # The v4 workbook resolves every SEI source to the SEI feed FILE that
+    # carries it (from the published feed spec), the exact File.FIELD pairs,
+    # and how well that resolution went. Three columns, read on every lane.
+    _FILE = ("SEI_SOURCE_FILE", "SEI_FILE", "SEI_SOURCE_FILE_FIELDS", "SEI_FILE_FIELDS",
+             "SEI_SOURCE_FILE_STATUS", "SEI_FILE_STATUS")
+
+    def _sei_file(self, sh, row):
+        return {"sei_file": self._fit(self._val(sh.get(row, "SEI_SOURCE_FILE", "SEI_FILE")), 400),
+                "sei_file_fields": self._fit(self._val(sh.get(row, "SEI_SOURCE_FILE_FIELDS", "SEI_FILE_FIELDS")), 1000),
+                "sei_file_status": _nz(sh.get(row, "SEI_SOURCE_FILE_STATUS", "SEI_FILE_STATUS"))}
 
     def _starstage(self, sh):
         """STAR_TO_IMDS_STAGE_MAP -- one IMDS column, the STAR field that feeds
@@ -1781,7 +1805,7 @@ class SeiCrosswalkConnector:
                 "TARGET_TYPE", "TARGET_NULLABLE", "STAR_FIELD", "UPLOADER_COLUMN", "IM_LOGIC", "IMDS_TRANSFORMATION_LOGIC",
                 "SEI_EQUIV_LOGIC", "EQUIVALENT_SEI_TRANSFORMATION_LOGIC", "SEI_SOURCE_OBJECT", "SEI_SOURCE_FIELD",
                 "SEI_JOIN_LOGIC", "REMARKS", "NOTES", "COMPARISON_ID", "EVIDENCE_COMPLETENESS",
-                "BUSINESS_DECISION_FLAG", "APPROVAL_STATUS", "STATUS") + self._DOC + self._WHERE
+                "BUSINESS_DECISION_FLAG", "APPROVAL_STATUS", "STATUS") + self._FILE + self._DOC + self._WHERE
         self._unconsumed(sh, "star_imds_stage_map", *cols)
         out, seen = [], set()
         for i, row in enumerate(sh.rows(), 1):
@@ -1817,23 +1841,33 @@ class SeiCrosswalkConnector:
                 "business_decision": self._yn(sh.get(row, "BUSINESS_DECISION_FLAG")),
                 "approval_status": _nz(sh.get(row, "APPROVAL_STATUS", "STATUS")),
                 "notes": sh.get(row, "REMARKS", "NOTES"),
+                **self._sei_file(sh, row),
                 **self._where(sh, row),
             })
         return out
 
     # LINK_STATUS as the sheet spells it -> the class the screen stacks by
     _LINK = {"E2E_LINKED": "E2E", "DIRECT_SEI_TO_IMDS": "SEI_DIRECT",
-             "STAR_FIELD_NOT_IN_FILE_MAP": "STAR_NOT_IN_FILE_MAP", "NO_SEI_SOURCE": "NO_SEI_SOURCE"}
+             "STAR_FIELD_NOT_IN_FILE_MAP": "STAR_NOT_IN_FILE_MAP", "NO_SEI_SOURCE": "NO_SEI_SOURCE",
+             # v4: LINEAGE_COMPLETENESS, the row's shape, in place of LINK_STATUS
+             "FULL_SEI_STAR_IMDS": "E2E", "SEI_TO_IMDS_NO_STAR_FIELD": "SEI_DIRECT",
+             "STAR_TO_IMDS_NO_SEI_SOURCE": "NO_SEI_SOURCE", "SEI_TO_STAR_NO_IMDS_TARGET": "STAR_ONLY",
+             "NOT_POPULATED_IN_LOAD": "NOT_POPULATED"}
 
     @classmethod
     def _link_class(cls, given, sei, star, imds):
-        """E2E | SEI_DIRECT | NO_SEI_SOURCE | STAR_NOT_IN_FILE_MAP | STAR_ONLY.
-        The sheet's own word wins; a row without one is classed by which
-        ends it has."""
+        """E2E | SEI_DIRECT | NO_SEI_SOURCE | STAR_NOT_IN_FILE_MAP | STAR_ONLY
+        | NOT_POPULATED. The sheet's own word wins (LINK_STATUS, or v4's
+        LINEAGE_COMPLETENESS); a row without one is classed by which ends
+        it has."""
         g = (given or "").strip().upper().replace("-", "_").replace(" ", "_")
         if g in cls._LINK:
             return cls._LINK[g]
         if g:
+            if "NOT_POPULATED" in g:
+                return "NOT_POPULATED"
+            if "NO_IMDS" in g:
+                return "STAR_ONLY"
             if "NOT_IN" in g:
                 return "STAR_NOT_IN_FILE_MAP"
             if "NO_SEI" in g or "NO_SOURCE" in g:
@@ -1848,39 +1882,77 @@ class SeiCrosswalkConnector:
             return "E2E"
         return "SEI_DIRECT" if imds else "STAR_ONLY"
 
+    @staticmethod
+    def _split_source(src):
+        """'Object.Field; Object.Field' -> (object, field) of the first pair.
+        A bare name with no dot is a field with no object."""
+        first = (src or "").split(";")[0].strip()
+        if not first:
+            return None, None
+        obj, _, fld = first.partition(".")
+        obj, fld = obj.strip() or None, fld.strip() or None
+        if not fld:
+            return None, obj
+        return obj, fld
+
     def _e2e(self, sh, starfld):
-        """SEI_STAR_IMDS_E2E_XWALK -- one SEI -> STAR -> IMDS path per row."""
+        """SEI_STAR_IMDS_LINEAGE (v4) or SEI_STAR_IMDS_E2E_XWALK (v2): one
+        SEI -> STAR -> IMDS path per row, into one table.
+
+        v4 widened the grain: a row is an IMDS column OR an orphan STAR
+        field (IMDS_TARGET_OBJECT = NOT_IDENTIFIED), and LINK_STATUS gave
+        way to LINEAGE_COMPLETENESS, whose two new shapes get two new link
+        classes: STAR_ONLY (mapped from SEI, loads nothing) and
+        NOT_POPULATED (an IMDS column the STAR load never writes). The
+        completeness word is kept in link_status as the sheet's own. STAR
+        fields may be several, ; separated: the text is kept whole, the
+        norm is the first field's, and star_in_layout is Y only when every
+        one is in the published layout."""
         if not sh:
             return []
-        cols = ("FEED_FAMILY", "FEED", "SEI_SOURCE", "SEI_SOURCE_OBJECT", "SEI_SOURCE_FIELD", "SEI_TO_STAR_MAP_KIND",
-                "MAP_KIND", "SEI_TO_STAR_LOGIC", "STAR_FIELD", "IMDS_TARGET_OBJECT", "TARGET_OBJECT",
-                "IMDS_TARGET_ATTRIBUTE", "TARGET_ATTRIBUTE", "STAR_TO_IMDS_LOGIC", "IM_LOGIC",
-                "SEI_TO_IMDS_EQUIV_LOGIC", "SEI_EQUIV_LOGIC", "LINK_STATUS", "LINK_TYPE", "CROSSWALK_STATUS",
-                "STATUS", "APPROVAL_STATUS", "NOTES") + self._DOC + self._WHERE
+        cols = ("LINEAGE_ID", "FEED_FAMILY", "FEED", "STAR_FEED", "SEI_SOURCE", "SEI_SOURCE_OBJECT", "SEI_SOURCE_FIELD",
+                "SEI_TO_STAR_MAP_KIND", "MAP_KIND", "SEI_TO_STAR_LOGIC", "STAR_FIELD", "STAR_FIELDS", "STAR_FIELD_RESOLUTION",
+                "IMDS_TARGET_OBJECT", "TARGET_OBJECT", "IMDS_TARGET_ATTRIBUTE", "TARGET_ATTRIBUTE", "IMDS_TYPE", "IMDS_NULLABLE",
+                "STAR_TO_IMDS_LOGIC", "IM_LOGIC", "SEI_TO_IMDS_EQUIV_LOGIC", "SEI_TO_IMDS_LOGIC", "SEI_EQUIV_LOGIC",
+                "SEI_TO_IMDS_LOGIC_ORIGIN", "LINK_STATUS", "LINK_TYPE", "LINEAGE_COMPLETENESS", "BUSINESS_DECISION_FLAG",
+                "CROSSWALK_STATUS", "LINEAGE_STATUS", "STATUS", "APPROVAL_STATUS", "COMPARISON_ID", "NOTES"
+                ) + self._FILE + self._DOC + self._WHERE
         self._unconsumed(sh, "sei_e2e_xwalk", *cols)
         layout = {(_file_key(r["feed_family"] or ""), r.get("field_norm")) for r in (starfld or [])}
         out, seen = [], set()
         for i, row in enumerate(sh.rows(), 1):
-            itbl = sh.get(row, "IMDS_TARGET_OBJECT", "TARGET_OBJECT")
-            icol = sh.get(row, "IMDS_TARGET_ATTRIBUTE", "TARGET_ATTRIBUTE")
-            sfld = self._val(sh.get(row, "STAR_FIELD"))
+            itbl = self._val(sh.get(row, "IMDS_TARGET_OBJECT", "TARGET_OBJECT"))
+            icol = self._val(sh.get(row, "IMDS_TARGET_ATTRIBUTE", "TARGET_ATTRIBUTE"))
+            if (itbl or "").strip().upper() == "NOT_IDENTIFIED":
+                itbl = None
+            if (icol or "").strip().upper() == "NOT_IDENTIFIED":
+                icol = None
+            sfld = self._val(sh.get(row, "STAR_FIELD", "STAR_FIELDS"))
             src = self._val(sh.get(row, "SEI_SOURCE"))
             eobj, efld = self._val(sh.get(row, "SEI_SOURCE_OBJECT")), self._val(sh.get(row, "SEI_SOURCE_FIELD"))
             if src and not (eobj or efld):
-                eobj, _, efld = src.partition(".")
-                eobj, efld = (eobj.strip() or None), (efld.strip() or None)
-                if not efld:                              # a bare field with no object
-                    eobj, efld = None, eobj
+                eobj, efld = self._split_source(src)
             if not (icol or sfld or efld):
                 continue
-            fam = sh.get(row, "FEED_FAMILY", "FEED")
-            given = sh.get(row, "LINK_STATUS", "LINK_TYPE")
-            rid = f"{self.data_source}:{itbl or 'NA'}:{icol or 'NA'}:{_file_key(fam or 'NA')}:{_norm_code(sfld or 'NA')}:{_norm_code(eobj or 'NA')}.{_norm_code(efld or 'NA')}"
+            fam = sh.get(row, "FEED_FAMILY", "FEED", "STAR_FEED")
+            # the sheet's own word for the row's shape: LINK_STATUS (v2) or
+            # LINEAGE_COMPLETENESS (v4)
+            given = sh.get(row, "LINK_STATUS", "LINK_TYPE", "LINEAGE_COMPLETENESS")
+            lin_id = self._val(sh.get(row, "LINEAGE_ID"))
+            if lin_id:
+                rid = f"{self.data_source}:{lin_id}"
+            else:
+                rid = f"{self.data_source}:{itbl or 'NA'}:{icol or 'NA'}:{_file_key(fam or 'NA')}:{_norm_code(sfld or 'NA')}:{_norm_code(eobj or 'NA')}.{_norm_code(efld or 'NA')}"
             if rid in seen:
                 rid = f"{rid}:{i}"
             seen.add(rid)
+            fields = [f.strip() for f in (sfld or "").split(";") if f.strip()]
+            in_layout = None
+            if fields and layout:
+                in_layout = "Y" if all((_file_key(fam or ""), _norm_code(f)) in layout for f in fields) else "N"
             out.append({
                 "xwalk_row_id": rid[:700],
+                "lineage_id": lin_id[:120] if lin_id else None,
                 "data_source": self.data_source,
                 "feed_family": fam,
                 "feed_key": _file_key(fam) if fam else None,
@@ -1888,20 +1960,27 @@ class SeiCrosswalkConnector:
                 "sei_object": self._fit(eobj, 1000),
                 "sei_field": self._fit(efld, 1000),
                 "sei_field_norm": _norm_code(efld)[:1000] if efld else None,
-                "map_kind": self._val(sh.get(row, "SEI_TO_STAR_MAP_KIND", "MAP_KIND")),
+                "map_kind": _nz(self._val(sh.get(row, "SEI_TO_STAR_MAP_KIND", "MAP_KIND"))),
                 "sei_star_logic": self._fit(self._val(sh.get(row, "SEI_TO_STAR_LOGIC")), 4000),
-                "star_field": sfld,
-                "star_field_norm": _norm_code(sfld) if sfld else None,
-                "star_in_layout": ("Y" if (_file_key(fam or ""), _norm_code(sfld)) in layout else "N") if (sfld and layout) else None,
+                "star_field": self._fit(sfld, 400),
+                "star_field_norm": _norm_code(fields[0])[:400] if fields else None,
+                "star_in_layout": in_layout,
+                "star_field_resolution": _nz(sh.get(row, "STAR_FIELD_RESOLUTION")),
                 "imds_table": itbl,
                 "imds_column": icol,
+                "imds_type": _nz(sh.get(row, "IMDS_TYPE")),
+                "imds_nullable": _nz(sh.get(row, "IMDS_NULLABLE")),
                 "star_imds_logic": self._fit(self._val(sh.get(row, "STAR_TO_IMDS_LOGIC", "IM_LOGIC")), 4000),
-                "sei_imds_logic": self._fit(self._val(sh.get(row, "SEI_TO_IMDS_EQUIV_LOGIC", "SEI_EQUIV_LOGIC")), 4000),
+                "sei_imds_logic": self._fit(self._val(sh.get(row, "SEI_TO_IMDS_EQUIV_LOGIC", "SEI_TO_IMDS_LOGIC", "SEI_EQUIV_LOGIC")), 4000),
+                "sei_imds_logic_origin": _nz(sh.get(row, "SEI_TO_IMDS_LOGIC_ORIGIN")),
                 "link_status": _nz(given),
                 "link_class": self._link_class(given, efld, sfld, icol),
-                "crosswalk_status": _nz(sh.get(row, "CROSSWALK_STATUS")),
+                "crosswalk_status": _nz(sh.get(row, "CROSSWALK_STATUS", "LINEAGE_STATUS")),
+                "business_decision": self._yn(sh.get(row, "BUSINESS_DECISION_FLAG")),
                 "approval_status": _nz(sh.get(row, "APPROVAL_STATUS", "STATUS")),
+                "comparison_id": _nz(sh.get(row, "COMPARISON_ID")),
                 "notes": sh.get(row, "NOTES"),
+                **self._sei_file(sh, row),
                 **self._where(sh, row),
             })
         return out

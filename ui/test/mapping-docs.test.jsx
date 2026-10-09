@@ -5,7 +5,7 @@ import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { tLight } from "../src/bbhTheme.js";
 import MappingDocsPanel, { headlineOf, LinkStack } from "../src/MappingDocs.jsx";
-import { LINK_INFO, LINK_ORDER, COMPLETENESS_INFO, mappingDocs } from "../src/seiCrosswalkApi.js";
+import { LINK_INFO, LINK_ORDER, COMPLETENESS_INFO, mappingDocs, OUT_OF_SCOPE, FILE_STATUS_ORDER, fileStatusLabel } from "../src/seiCrosswalkApi.js";
 
 let bad = 0;
 const ok = (c, m, got) => { console.log(`${c ? "ok  " : "FAIL"} ${m}${c ? "" : `  -> ${String(got).slice(0, 240)}`}`); if (!c) bad++; };
@@ -44,7 +44,7 @@ const H = headlineOf(register, coverage);
 ok(H.documents === 7 && H.s2sRows === 479 && H.s2sPct === 80.2 && H.e2eRows === 1121 && H.coveragePct === 30.5 && H.tables === 14, "counts from the register and the coverage", H);
 ok(H.noSei === 771 && H.notInMap === 8 && H.drafts === 1121 && H.loaded === true, "the gap numbers and the draft count");
 ok(headlineOf({ totals: {} }, { total: 0, by_link: [], by_approval: [] }).loaded === false, "nothing loaded is known");
-ok(LINK_ORDER.length === 5 && Object.keys(LINK_INFO).length === 5 && Object.keys(COMPLETENESS_INFO).includes("IM_ONLY_DOCUMENTED"), "vocabularies, the new completeness value included");
+ok(LINK_ORDER.length === 6 && Object.keys(LINK_INFO).length === 6 && Object.keys(COMPLETENESS_INFO).includes("IM_ONLY_DOCUMENTED"), "vocabularies, the new completeness value included");
 ok(typeof mappingDocs.e2eRows === "function" && typeof mappingDocs.usageExceptions === "function", "the client has the seven calls");
 
 console.log("-- the picture");
@@ -74,6 +74,33 @@ ok(/onDrill=\{\(filter\) => focusDocs\(filter\)\}/.test(dash) && /focus=\{docFoc
    "the candidate ribbon's drill hands its scope to the panel; the no-SEI-source node is the link class");
 const scoped = renderToStaticMarkup(<MappingDocsPanel t={tLight} dataSource="IMDS" initial={{ register, coverage, feed: "PEDDIFI1", rows, view: "Coverage" }} />);
 ok(/STAR feed PEDDIFI1/.test(scoped) && /EFFECTIVE_DATE/.test(scoped), "scoped by feed alone, the drill names the feed and shows its rows");
+
+console.log("-- v4: the lineage at its wider grain, the SEI feed files");
+ok(LINK_INFO.NOT_POPULATED && LINK_ORDER[LINK_ORDER.length - 1] === "NOT_POPULATED" && OUT_OF_SCOPE.join("|") === "STAR_ONLY|NOT_POPULATED",
+   "the not-loaded class, last in the stack, and the two out-of-scope shapes");
+ok(FILE_STATUS_ORDER[0] === "VERIFIED_IN_FEED_SPEC" && fileStatusLabel("FIELD_NOT_IN_FEED_SPEC") === "field not in the feed spec" && fileStatusLabel("ODD_ONE") === "odd one",
+   "the file-status vocabulary, with a fallback label");
+ok(typeof mappingDocs.lineageSummary === "function", "the lineage-summary call");
+const cov4 = { ...coverage, total: 105, in_scope: 100, covered: 60, coverage_pct: 60, not_populated: 3, star_only: 2, has_files: true,
+  by_link: [...coverage.by_link, { key: "NOT_POPULATED", n: 3 }],
+  by_file_status: [{ key: "VERIFIED_IN_FEED_SPEC", n: 40 }, { key: "UNRESOLVED", n: 2 }],
+  by_origin: [{ key: "DOCUMENTED", n: 10 }, { key: "COMPOSED_FROM_STAR_LOGIC", n: 5 }],
+  by_resolution: [{ key: "DOCUMENTED", n: 9 }],
+  files: [{ file: "Taxlot", paths: 30, verified: 30, tables: ["HOLDINGDBO.POSITION", "HOLDINGDBO.LOT_LEVEL_POSITION"], feeds: ["PEDDIFI1"] },
+          { file: "SYSTEM (job run)", paths: 4, verified: 0, tables: ["HOLDINGDBO.POSITION"], feeds: ["PEDDIFI1", "ODDDIFI1"] }],
+  tables: coverage.tables.map((x) => ({ ...x, not_populated: 2 })) };
+const files = renderToStaticMarkup(<MappingDocsPanel t={tLight} dataSource="IMDS" initial={{ register, coverage: cov4, view: "SEI files" }} />);
+ok(/>SEI files</.test(files) && /verified in the feed spec · 40/.test(files) && />Taxlot</.test(files) && /HOLDINGDBO\.POSITION · HOLDINGDBO\.LOT_LEVEL_POSITION/.test(files),
+   "the SEI files view: status pills and one row per feed file with the tables it reaches");
+ok(/where the SEI → IMDS logic comes from/.test(files) && /composed from star logic 5/.test(files) && /how the STAR field was found/.test(files), "origin and resolution lines");
+ok(/60 of 100 paths in scope reach IMDS from SEI/.test(files) && /IMDS columns STAR never loads/.test(files) && /2 STAR fields with no IMDS target/.test(files),
+   "the coverage tile counts the paths in scope; the out-of-scope shapes get their own tile");
+const rows4 = rows.map((r, i) => (i === 0 ? { ...r, sei_file: "Taxlot", sei_file_fields: "Taxlot.QUANTITY_HELD", sei_file_status: "VERIFIED_IN_FEED_SPEC" } : r));
+const cov4rows = renderToStaticMarkup(<MappingDocsPanel t={tLight} dataSource="IMDS" initial={{ register, coverage: cov4, table: "RULESDBO.ENTITY", rows: rows4, view: "Coverage" }} />);
+ok(/Not loaded/.test(cov4rows) && /file: Taxlot\.QUANTITY_HELD/.test(cov4rows) && /verified in the feed spec/.test(cov4rows) && /not loaded by STAR · 3/.test(cov4rows),
+   "the coverage table has a not-loaded column; a drill row shows its SEI feed file and status");
+const nofiles = renderToStaticMarkup(<MappingDocsPanel t={tLight} dataSource="IMDS" initial={{ register, coverage, view: "SEI files" }} />);
+ok(/does not resolve SEI sources to feed files/.test(nofiles), "a v2 workbook says why the view is empty");
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\nmapping-docs assertions pass");
 if (bad) process.exit(1);

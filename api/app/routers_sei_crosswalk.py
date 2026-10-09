@@ -2656,10 +2656,32 @@ def star_usage_coverage(data_source: str | None = None):
 # gets empty shapes rather than a 500.
 # =============================================================================
 
-LINK_ORDER = ["E2E", "SEI_DIRECT", "STAR_NOT_IN_FILE_MAP", "NO_SEI_SOURCE", "STAR_ONLY"]
+LINK_ORDER = ["E2E", "SEI_DIRECT", "STAR_NOT_IN_FILE_MAP", "NO_SEI_SOURCE", "STAR_ONLY", "NOT_POPULATED"]
 LINK_LABEL = {"E2E": "linked SEI → STAR → IMDS", "SEI_DIRECT": "SEI straight to IMDS",
               "STAR_NOT_IN_FILE_MAP": "STAR field not in the file map", "NO_SEI_SOURCE": "no SEI source",
-              "STAR_ONLY": "STAR without a target"}
+              "STAR_ONLY": "STAR without a target", "NOT_POPULATED": "not loaded by STAR"}
+# The two v4 shapes that are not paths to cover: an orphan STAR field loads
+# nothing, and a column the STAR load never writes has nothing to replace.
+OUT_OF_SCOPE = {"STAR_ONLY", "NOT_POPULATED"}
+ORIGIN_ORDER = ["DOCUMENTED", "COMPOSED_FROM_STAR_LOGIC", "COMPOSED_DIRECT", "SEI_JOIN_LOGIC_ONLY", "MISSING"]
+RESOLUTION_ORDER = ["DOCUMENTED", "PARSED_FROM_IM_LOGIC", "MATCHED_BY_TARGET_NAME", "LANE_LINEAGE", "SEI_TO_STAR_FIELD_MAP", "NOT_RESOLVED"]
+FILE_STATUS_ORDER = ["VERIFIED_IN_FEED_SPEC", "PARTIALLY_VERIFIED", "FILE_ONLY_NO_FIELD", "SYSTEM_OR_CONSTANT",
+                     "DERIVED_AT_RUNTIME", "FIELD_NOT_IN_FEED_SPEC", "NOT_AVAILABLE_IN_SEI_FEEDS", "UNRESOLVED", "NO_SEI_SOURCE"]
+# The columns sql/80 added to the lineage. A warehouse that has not run it
+# answers the wide select with an error, which _safe turns into nothing; the
+# narrow select then answers as before, so the screens never go blank for a
+# missing migration.
+_E2E_V4 = ("lineage_id, sei_file, sei_file_fields, sei_file_status, star_field_resolution, imds_type, imds_nullable, "
+           "sei_imds_logic_origin, business_decision, comparison_id")
+
+
+def _e2e_q(cols, tail, params):
+    rows = _safe(f"SELECT {cols}, {_E2E_V4} FROM sei_e2e_xwalk {tail}", params)
+    return rows or _safe(f"SELECT {cols} FROM sei_e2e_xwalk {tail}", params)
+
+
+def _files_of(v):
+    return [f.strip() for f in str(v or "").split(";") if f.strip()]
 COMPLETENESS_ORDER = ["BOTH_LOGICS_DOCUMENTED", "IM_LOGIC_AND_SEI_SOURCE_DOCUMENTED", "SEI_ONLY_DOCUMENTED",
                       "IM_ONLY_DOCUMENTED", "NO_MAPPING"]
 COVERED = {"BOTH_LOGICS_DOCUMENTED", "IM_LOGIC_AND_SEI_SOURCE_DOCUMENTED", "SEI_ONLY_DOCUMENTED"}
@@ -2688,17 +2710,26 @@ def mapping_docs(data_source: str | None = None):
     reg = _safe("""SELECT feed_family, feed_key, source_document, sei_star_rows, sei_star_mapped, open_dependencies,
                           imds_targets, imds_stage_rows, new_comparison_rows, already_in_catalog, notes
                    FROM sei_mapping_source WHERE data_source = :ds ORDER BY feed_family""", {"ds": ds})
-    s2s = _safe("SELECT feed_key, sei_field, mapping_status, map_kind, open_dependency, star_in_layout FROM sei_star_field_map WHERE data_source = :ds", {"ds": ds})
+    s2s = _safe("SELECT feed_key, sei_field, mapping_status, map_kind, open_dependency, star_in_layout, source_sheet FROM sei_star_field_map WHERE data_source = :ds", {"ds": ds})
     stg = _safe("SELECT feed_key, imds_table, evidence_completeness, business_decision FROM star_imds_stage_map WHERE data_source = :ds", {"ds": ds})
     e2e = _safe("SELECT feed_key, link_class FROM sei_e2e_xwalk WHERE data_source = :ds", {"ds": ds})
     by_feed = {}
 
     def slot(k):
-        return by_feed.setdefault(k or "NA", {"s2s_rows": 0, "s2s_mapped": 0, "s2s_open": 0, "s2s_not_in_layout": 0,
+        return by_feed.setdefault(k or "NA", {"s2s_rows": 0, "s2s_from_layout": 0, "s2s_mapped": 0, "s2s_open": 0, "s2s_not_in_layout": 0,
                                                "stage_rows": 0, "imds_tables": set(), "business_decisions": 0,
                                                "e2e_rows": 0, "links": {}})
+
+    def from_layout(r):
+        # v4 adds the STAR layout fields no document mentions, tagged by
+        # SOURCE_SHEET; the register counts the document's own rows only
+        return (r.get("source_sheet") or "").strip().upper() == "STAR_LAYOUT_DETAIL"
     for r in s2s:
-        f = slot(r.get("feed_key")); f["s2s_rows"] += 1
+        f = slot(r.get("feed_key"))
+        if from_layout(r):
+            f["s2s_from_layout"] += 1
+            continue
+        f["s2s_rows"] += 1
         f["s2s_mapped"] += bool(r.get("sei_field")) and (r.get("mapping_status") or "") != "NO_SEI_SOURCE"
         f["s2s_open"] += r.get("open_dependency") == "Y"
         f["s2s_not_in_layout"] += r.get("star_in_layout") == "N"
@@ -2725,7 +2756,9 @@ def mapping_docs(data_source: str | None = None):
             docs.append({"feed_family": k, "feed_key": k, "source_document": None, "sei_star_rows": None,
                          "loaded": {**{x: y for x, y in f.items() if x != "imds_tables"}, "imds_tables": sorted(f["imds_tables"])},
                          "agrees": None, "unregistered": True})
-    tot = {"documents": len(reg), "feeds": len(docs), "s2s_rows": len(s2s), "stage_rows": len(stg), "e2e_rows": len(e2e),
+    tot = {"documents": len(reg), "feeds": len(docs), "s2s_rows": sum(1 for r in s2s if not from_layout(r)),
+           "stage_rows": len(stg), "e2e_rows": len(e2e),
+           "s2s_from_layout": sum(1 for r in s2s if from_layout(r)),
            "s2s_mapped": sum(1 for r in s2s if r.get("sei_field") and (r.get("mapping_status") or "") != "NO_SEI_SOURCE"),
            "open_dependencies": sum(1 for r in s2s if r.get("open_dependency") == "Y"),
            "imds_tables": len({r.get("imds_table") for r in stg if r.get("imds_table")}),
@@ -2733,8 +2766,10 @@ def mapping_docs(data_source: str | None = None):
     tot["s2s_mapped_pct"] = _pct100(tot["s2s_mapped"], tot["s2s_rows"])
     return {"data_source": ds, "docs": docs, "totals": tot,
             "by_mapping_status": _tally(s2s, "mapping_status"), "by_map_kind": _tally(s2s, "map_kind"),
-            "headline": (f"{tot['documents']} mapping documents · {tot['s2s_rows']} STAR fields, {tot['s2s_mapped']} with a SEI source · "
-                         f"{tot['e2e_rows']} end-to-end paths over {tot['imds_tables']} IMDS tables · everything DRAFT_REVIEW_REQUIRED"
+            "headline": (f"{tot['documents']} mapping documents · {tot['s2s_rows']} STAR fields"
+                         + (f" (+{tot['s2s_from_layout']} from the layout, unmentioned by any document)" if tot["s2s_from_layout"] else "")
+                         + f", {tot['s2s_mapped']} with a SEI source · "
+                         f"{tot['e2e_rows']} lineage rows over {tot['imds_tables']} IMDS tables · everything DRAFT_REVIEW_REQUIRED"
                          if tot["s2s_rows"] or tot["e2e_rows"] else "No mapping documents loaded.")}
 
 
@@ -2745,13 +2780,14 @@ def e2e_coverage(data_source: str | None = None):
     and how many point at a STAR field the file map does not have. Coverage
     counts the first two; the other two are the gap."""
     ds = _ds(data_source)
-    rows = _safe("""SELECT imds_table, feed_family, link_class, link_status, crosswalk_status, approval_status
-                    FROM sei_e2e_xwalk WHERE data_source = :ds""", {"ds": ds})
+    rows = _e2e_q("imds_table, feed_family, link_class, link_status, crosswalk_status, approval_status",
+                  "WHERE data_source = :ds", {"ds": ds})
     tables, feeds = {}, {}
     for r in rows:
         for key, bucket in ((r.get("imds_table") or "(no target)", tables), (r.get("feed_family") or "(no feed)", feeds)):
-            t = bucket.setdefault(key, {"name": key, "rows": 0, "links": {}, "gap": 0, "candidate": 0})
+            t = bucket.setdefault(key, {"name": key, "rows": 0, "in_scope": 0, "links": {}, "gap": 0, "candidate": 0})
             t["rows"] += 1
+            t["in_scope"] += (r.get("link_class") or "") not in OUT_OF_SCOPE
             lc = r.get("link_class") or "(none)"
             t["links"][lc] = t["links"].get(lc, 0) + 1
             t["gap"] += (r.get("crosswalk_status") or "").upper() == "GAP"
@@ -2760,20 +2796,46 @@ def e2e_coverage(data_source: str | None = None):
         out = []
         for t in d.values():
             covered = t["links"].get("E2E", 0) + t["links"].get("SEI_DIRECT", 0)
-            out.append({**t, "covered": covered, "coverage_pct": _pct100(covered, t["rows"]),
+            out.append({**t, "covered": covered, "coverage_pct": _pct100(covered, t["in_scope"]),
                         "e2e": t["links"].get("E2E", 0), "sei_direct": t["links"].get("SEI_DIRECT", 0),
                         "no_sei_source": t["links"].get("NO_SEI_SOURCE", 0),
-                        "not_in_file_map": t["links"].get("STAR_NOT_IN_FILE_MAP", 0)})
+                        "not_in_file_map": t["links"].get("STAR_NOT_IN_FILE_MAP", 0),
+                        "star_only": t["links"].get("STAR_ONLY", 0),
+                        "not_populated": t["links"].get("NOT_POPULATED", 0)})
         return sorted(out, key=lambda x: (-(x["coverage_pct"] or 0), x["name"]))
     total = len(rows)
     links = _tally(rows, "link_class", LINK_ORDER)
     for l in links:
         l["label"] = LINK_LABEL.get(l["key"], l["key"])
+    in_scope = sum(1 for r in rows if (r.get("link_class") or "") not in OUT_OF_SCOPE)
+    not_populated = sum(1 for r in rows if r.get("link_class") == "NOT_POPULATED")
+    star_only = sum(1 for r in rows if r.get("link_class") == "STAR_ONLY")
     covered = sum(1 for r in rows if r.get("link_class") in ("E2E", "SEI_DIRECT"))
-    return {"data_source": ds, "total": total, "covered": covered, "coverage_pct": _pct100(covered, total),
+    # v4: the SEI feed file behind each path, and how well it resolved
+    has_files = any("sei_file_status" in r for r in rows)
+    files = {}
+    for r in rows:
+        for f in _files_of(r.get("sei_file")):
+            x = files.setdefault(f, {"file": f, "paths": 0, "verified": 0, "tables": set(), "feeds": set()})
+            x["paths"] += 1
+            x["verified"] += r.get("sei_file_status") == "VERIFIED_IN_FEED_SPEC"
+            if r.get("imds_table"):
+                x["tables"].add(r["imds_table"])
+            if r.get("feed_family"):
+                x["feeds"].add(r["feed_family"])
+    file_rows = sorted(({**x, "tables": sorted(x["tables"]), "feeds": sorted(x["feeds"])} for x in files.values()),
+                       key=lambda x: (-x["paths"], x["file"]))
+    scope_note = ((f" · {not_populated} IMDS columns the STAR load never writes" if not_populated else "")
+                  + (f" · {star_only} STAR fields with no IMDS target" if star_only else ""))
+    return {"data_source": ds, "total": total, "in_scope": in_scope, "covered": covered, "coverage_pct": _pct100(covered, in_scope),
+            "not_populated": not_populated, "star_only": star_only,
             "by_link": links, "by_status": _tally(rows, "crosswalk_status"), "by_approval": _tally(rows, "approval_status"),
+            "by_file_status": _tally([r for r in rows if r.get("sei_file_status")], "sei_file_status", FILE_STATUS_ORDER) if has_files else [],
+            "by_origin": _tally([r for r in rows if r.get("sei_imds_logic_origin")], "sei_imds_logic_origin", ORIGIN_ORDER) if has_files else [],
+            "by_resolution": _tally([r for r in rows if r.get("star_field_resolution")], "star_field_resolution", RESOLUTION_ORDER) if has_files else [],
+            "files": file_rows, "has_files": has_files,
             "tables": finish(tables), "feeds": finish(feeds),
-            "headline": (f"{covered} of {total} paths reach IMDS from a SEI source ({_pct100(covered, total)}%)"
+            "headline": (f"{covered} of {in_scope} paths in scope reach IMDS from a SEI source ({_pct100(covered, in_scope)}%){scope_note}"
                          if total else "No end-to-end crosswalk loaded.")}
 
 
@@ -2791,10 +2853,7 @@ def e2e_rows(data_source: str | None = None, table: str | None = None, feed: str
     if q:
         where.append("(UPPER(star_field) LIKE :q OR UPPER(imds_column) LIKE :q OR UPPER(sei_source) LIKE :q)")
         params["q"] = f"%{q.strip().upper()}%"
-    rows = _safe(f"""SELECT xwalk_row_id, feed_family, sei_source, sei_object, sei_field, map_kind, sei_star_logic,
-                            star_field, star_in_layout, imds_table, imds_column, star_imds_logic, sei_imds_logic,
-                            link_status, link_class, crosswalk_status, approval_status, source_document
-                     FROM sei_e2e_xwalk WHERE {' AND '.join(where)}
+    rows = _e2e_q("xwalk_row_id, feed_family, sei_source, sei_object, sei_field, map_kind, sei_star_logic, star_field, star_in_layout, imds_table, imds_column, star_imds_logic, sei_imds_logic, link_status, link_class, crosswalk_status, approval_status, source_document", f"""WHERE {' AND '.join(where)}
                      ORDER BY imds_table, imds_column, feed_family, star_field""", params)
     return {"data_source": ds, "rows": rows[:max(1, min(limit, 5000))], "total": len(rows)}
 
@@ -2901,12 +2960,18 @@ def flow_candidates(data_source: str | None = None):
     is. Weight is COUNT(DISTINCT imds column), as the proposal flow counts
     columns, so the two pictures are comparable band for band."""
     ds = _ds(data_source)
-    rows = _safe("""SELECT sei_object, sei_source, feed_family, star_field, imds_table, imds_column, link_class
-                    FROM sei_e2e_xwalk WHERE data_source = :ds""", {"ds": ds})
-    left, right, bypass = {}, {}, {}
+    rows = _e2e_q("sei_object, sei_source, feed_family, star_field, imds_table, imds_column, link_class",
+                  "WHERE data_source = :ds", {"ds": ds})
+    left, right, bypass, excluded = {}, {}, {}, {}
     for r in rows:
         cls = r.get("link_class") or "NO_SEI_SOURCE"
-        src = (r.get("sei_object") or r.get("sei_source") or "").strip() if cls != "NO_SEI_SOURCE" else ""
+        if cls in OUT_OF_SCOPE:
+            excluded[cls] = excluded.get(cls, 0) + 1
+            continue
+        # v4 names the SEI feed file the source resolves to; that is the
+        # node, not the document's free-text spelling of the object
+        files = _files_of(r.get("sei_file"))
+        src = (files[0] if files else (r.get("sei_object") or r.get("sei_source") or "")).strip() if cls != "NO_SEI_SOURCE" else ""
         src = src or "no SEI source"
         tgt = r.get("imds_table") or "(no target)"
         col = f"{tgt}.{r.get('imds_column') or '?'}"
@@ -2916,7 +2981,7 @@ def flow_candidates(data_source: str | None = None):
         mid = r.get("feed_family") or "unmapped"
         left.setdefault((src, mid, cls), set()).add(col)
         right.setdefault((mid, tgt), set()).add(col)
-    return {"data_source": ds, "total": len(rows),
+    return {"data_source": ds, "total": len(rows) - sum(excluded.values()), "excluded": excluded,
             "left": [{"src": k[0], "mid": k[1], "verdict": k[2], "n": len(v)} for k, v in sorted(left.items())],
             "right": [{"mid": k[0], "tgt": k[1], "n": len(v)} for k, v in sorted(right.items())],
             "bypass": [{"src": k[0], "tgt": k[1], "n": len(v)} for k, v in sorted(bypass.items())]}
@@ -2981,6 +3046,38 @@ def rule_state(im_logic, sei_logic, star_field=None, sei_field=None, sei_object=
 RULE_STATE_ORDER = ["SAME", "SUBSTITUTED", "PASS_THROUGH", "ALTERNATIVES", "REWRITTEN", "NEW_RULE", "NO_SEI_RULE"]
 
 
+@router.get("/lineage-summary")
+def lineage_summary(data_source: str | None = None):
+    """LINEAGE_SUMMARY (v4), recomputed from the lineage rows per STAR feed
+    and IMDS table, the sheet's own formula rows beside it. The sheet's
+    FULL_LINEAGE_PERCENT divides by every row; the in-scope share divides
+    by the rows that are paths (not orphan STAR fields, not columns the
+    load never writes), which is the number the cutover needs."""
+    ds = _ds(data_source)
+    rows = _e2e_q("feed_family, imds_table, link_class, sei_imds_logic_origin", "WHERE data_source = :ds", {"ds": ds})
+    by = {}
+    for r in rows:
+        k = (r.get("feed_family") or "(no feed)", r.get("imds_table") or "NOT_IDENTIFIED")
+        x = by.setdefault(k, {"star_feed": k[0], "imds_table": k[1], "rows": 0, "full": 0, "sei_direct": 0, "no_sei_source": 0,
+                              "star_only": 0, "not_populated": 0, "not_in_file_map": 0, "composed": 0})
+        x["rows"] += 1
+        lc = r.get("link_class")
+        x["full"] += lc == "E2E"; x["sei_direct"] += lc == "SEI_DIRECT"; x["no_sei_source"] += lc == "NO_SEI_SOURCE"
+        x["star_only"] += lc == "STAR_ONLY"; x["not_populated"] += lc == "NOT_POPULATED"; x["not_in_file_map"] += lc == "STAR_NOT_IN_FILE_MAP"
+        x["composed"] += (r.get("sei_imds_logic_origin") or "").startswith("COMPOSED")
+    out = []
+    for x in by.values():
+        in_scope = x["rows"] - x["star_only"] - x["not_populated"]
+        out.append({**x, "in_scope": in_scope, "full_pct": _pct100(x["full"], x["rows"]),
+                    "covered_pct": _pct100(x["full"] + x["sei_direct"], in_scope)})
+    out.sort(key=lambda x: (x["star_feed"], x["imds_table"]))
+    tot = {k: sum(x[k] for x in out) for k in ("rows", "full", "sei_direct", "no_sei_source", "star_only", "not_populated", "not_in_file_map", "composed", "in_scope")}
+    tot["full_pct"] = _pct100(tot["full"], tot["rows"]); tot["covered_pct"] = _pct100(tot["full"] + tot["sei_direct"], tot["in_scope"])
+    sheet = _safe("""SELECT control_name, result, status, detail, seq FROM sei_control
+                     WHERE data_source = :ds AND source_sheet = 'LINEAGE_SUMMARY' ORDER BY seq""", {"ds": ds})
+    return {"data_source": ds, "rows": out, "total": tot, "sheet": sheet}
+
+
 @router.get("/cutover-lineage")
 def cutover_lineage(data_source: str | None = None, feed: str | None = None, q: str | None = None):
     """One row per IMDS column of a STAR feed, read as the cutover: the
@@ -3009,9 +3106,10 @@ def cutover_lineage(data_source: str | None = None, feed: str | None = None, q: 
     usage = {r.get("field_norm"): r for r in _safe(
         """SELECT field_norm, usage_status, is_used FROM star_field_usage WHERE data_source = :ds AND feed_family = :f""", p)}
     e2e = {}
-    for r in _safe("""SELECT imds_table, imds_column, star_field_norm, link_status, link_class, crosswalk_status
-                      FROM sei_e2e_xwalk WHERE data_source = :ds AND feed_family = :f""", p):
+    for r in _e2e_q("imds_table, imds_column, star_field_norm, link_status, link_class, crosswalk_status",
+                    "WHERE data_source = :ds AND feed_family = :f", p):
         e2e.setdefault((r.get("imds_table"), r.get("imds_column"), r.get("star_field_norm")), r)
+        e2e.setdefault((r.get("imds_table"), r.get("imds_column"), None), r)
     cols = []
     for r in stg:
         norm = r.get("star_field_norm")
@@ -3022,7 +3120,7 @@ def cutover_lineage(data_source: str | None = None, feed: str | None = None, q: 
         sei_fld = r.get("sei_field") or m.get("sei_field")
         if (m.get("mapping_status") or "") == "NO_SEI_SOURCE" and not r.get("sei_field"):
             sei_obj, sei_fld = None, None
-        link = e2e.get((r.get("imds_table"), r.get("imds_column"), norm)) or {}
+        link = e2e.get((r.get("imds_table"), r.get("imds_column"), norm)) or e2e.get((r.get("imds_table"), r.get("imds_column"), None)) or {}
         state = rule_state(r.get("im_logic"), r.get("sei_equiv_logic"), r.get("star_field"), sei_fld, sei_obj, r.get("uploader_column"))
         if not sei_fld and state in ("SAME", "SUBSTITUTED", "PASS_THROUGH"):
             state = "NO_SEI_RULE" if r.get("im_logic") else "PASS_THROUGH"
@@ -3038,7 +3136,9 @@ def cutover_lineage(data_source: str | None = None, feed: str | None = None, q: 
             "sei": {"object": sei_obj, "field": sei_fld, "source": f"{sei_obj}.{sei_fld}" if sei_obj and sei_fld else (sei_fld or sei_obj),
                     "type": m.get("sei_type"), "join_logic": r.get("sei_join_logic") or m.get("join_logic"), "map_kind": m.get("map_kind"),
                     "open_dependency": m.get("open_dependency"), "mapping_status": m.get("mapping_status"),
-                    "approval_status": m.get("approval_status")},
+                    "approval_status": m.get("approval_status"),
+                    # v4: the SEI feed file the source resolves to
+                    "file": link.get("sei_file"), "file_fields": link.get("sei_file_fields"), "file_status": link.get("sei_file_status")},
             "rule": {"im_logic": r.get("im_logic"), "sei_logic": r.get("sei_equiv_logic"), "state": state,
                      "evidence_completeness": r.get("evidence_completeness"), "business_decision": r.get("business_decision"),
                      "comparison_id": r.get("comparison_id"), "notes": r.get("notes")},

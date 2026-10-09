@@ -237,6 +237,101 @@ ok([x["key"] for x in T["by_state"]] == ["SUBSTITUTED", "PASS_THROUGH", "REWRITT
 ok([c["imds_column"] for c in R.cutover_lineage(feed="PEDDIFI1", q="taxlot")["columns"]] == ["PRICE", "QUANTITY"], "search matches the SEI source too")
 ok(R.cutover_lineage(feed="ODDDIFI1")["totals"]["columns"] == 0, "a feed with no stage rows: empty, no error")
 
+print("-- v4: the lineage at its wider grain, the SEI feed files")
+E2E4 = [
+    {"xwalk_row_id": "IMDS:LIN-1", "lineage_id": "LIN-1", "feed_key": "PEDDIFI1", "feed_family": "PEDDIFI1", "sei_source": "Taxlot.QUANTITY_HELD", "sei_object": "Taxlot", "sei_field": "QUANTITY_HELD",
+     "sei_file": "Taxlot", "sei_file_fields": "Taxlot.QUANTITY_HELD", "sei_file_status": "VERIFIED_IN_FEED_SPEC", "map_kind": "DERIVED", "star_field": "Lot Quantity", "star_field_norm": "LOT_QUANTITY",
+     "star_in_layout": "Y", "imds_table": "HOLDINGDBO.POSITION", "imds_column": "QUANTITY", "link_status": "FULL_SEI_STAR_IMDS", "link_class": "E2E", "crosswalk_status": "CANDIDATE",
+     "approval_status": "DRAFT_REVIEW_REQUIRED", "star_field_resolution": "DOCUMENTED", "sei_imds_logic_origin": "COMPOSED_FROM_STAR_LOGIC", "imds_type": "NUMBER", "imds_nullable": "No", "business_decision": "N", "comparison_id": "LLP-1", "source_document": "pv.xlsx"},
+    {"xwalk_row_id": "IMDS:LIN-2", "lineage_id": "LIN-2", "feed_key": "PEDDIFI1", "feed_family": "PEDDIFI1", "sei_source": "Processing_Date", "sei_object": None, "sei_field": "Processing_Date",
+     "sei_file": "SYSTEM (job run)", "sei_file_fields": "SYSTEM (job run).PROCESSING_DATE", "sei_file_status": "SYSTEM_OR_CONSTANT", "map_kind": "SYSTEM_DATE", "star_field": None, "star_field_norm": None,
+     "star_in_layout": None, "imds_table": "HOLDINGDBO.POSITION", "imds_column": "EFFECTIVE_DATE", "link_status": "SEI_TO_IMDS_NO_STAR_FIELD", "link_class": "SEI_DIRECT", "crosswalk_status": "CANDIDATE",
+     "approval_status": "DRAFT_REVIEW_REQUIRED", "star_field_resolution": "NOT_RESOLVED", "sei_imds_logic_origin": "DOCUMENTED", "imds_type": "DATE", "imds_nullable": "Yes", "business_decision": "N", "comparison_id": "LLP-2", "source_document": "pv.xlsx"},
+    {"xwalk_row_id": "IMDS:LIN-3", "lineage_id": "LIN-3", "feed_key": "PEDDIFI1", "feed_family": "PEDDIFI1", "sei_source": None, "sei_object": None, "sei_field": None,
+     "sei_file": None, "sei_file_fields": None, "sei_file_status": "NO_SEI_SOURCE", "map_kind": None, "star_field": "Phantom Field", "star_field_norm": "PHANTOM_FIELD",
+     "star_in_layout": "N", "imds_table": "HOLDINGDBO.POSITION", "imds_column": "COST_BASIS", "link_status": "STAR_TO_IMDS_NO_SEI_SOURCE", "link_class": "NO_SEI_SOURCE", "crosswalk_status": "BUSINESS_DECISION_REQUIRED",
+     "approval_status": "DRAFT_REVIEW_REQUIRED", "star_field_resolution": "PARSED_FROM_IM_LOGIC", "sei_imds_logic_origin": "MISSING", "imds_type": "NUMBER", "imds_nullable": "Yes", "business_decision": "Y", "comparison_id": "LLP-3", "source_document": "pv.xlsx"},
+    {"xwalk_row_id": "IMDS:LIN-4", "lineage_id": "LIN-4", "feed_key": "PEDDIFI1", "feed_family": "PEDDIFI1", "sei_source": "Account.ACCOUNT_BASE_CURRENCY", "sei_object": "Account", "sei_field": "ACCOUNT_BASE_CURRENCY",
+     "sei_file": "Account", "sei_file_fields": "Account.ACCOUNT_BASE_CURRENCY", "sei_file_status": "VERIFIED_IN_FEED_SPEC", "map_kind": "LOOKUP", "star_field": "Base Currency Code", "star_field_norm": "BASE_CURRENCY_CODE",
+     "star_in_layout": "Y", "imds_table": None, "imds_column": None, "link_status": "SEI_TO_STAR_NO_IMDS_TARGET", "link_class": "STAR_ONLY", "crosswalk_status": "GAP",
+     "approval_status": "DRAFT_REVIEW_REQUIRED", "star_field_resolution": "SEI_TO_STAR_FIELD_MAP", "sei_imds_logic_origin": "MISSING", "imds_type": None, "imds_nullable": None, "business_decision": "N", "comparison_id": None, "source_document": "pv.xlsx"},
+    {"xwalk_row_id": "IMDS:LIN-5", "lineage_id": "LIN-5", "feed_key": "PEDDIFI1", "feed_family": "PEDDIFI1", "sei_source": None, "sei_object": None, "sei_field": None,
+     "sei_file": None, "sei_file_fields": None, "sei_file_status": "NO_SEI_SOURCE", "map_kind": None, "star_field": None, "star_field_norm": None,
+     "star_in_layout": None, "imds_table": "HOLDINGDBO.POSITION", "imds_column": "UPDATE_SOURCE", "link_status": "NOT_POPULATED_IN_LOAD", "link_class": "NOT_POPULATED", "crosswalk_status": "NOT_APPLICABLE",
+     "approval_status": "DRAFT_REVIEW_REQUIRED", "star_field_resolution": "NOT_RESOLVED", "sei_imds_logic_origin": "MISSING", "imds_type": "VARCHAR2(50)", "imds_nullable": "Yes", "business_decision": "N", "comparison_id": "EXISTING_LLP_ROW", "source_document": "pv.xlsx"},
+]
+S2S4 = [dict(r, source_sheet="PVAL File Mapping") for r in S2S] + [
+    {"map_row_id": "l1", "feed_key": "PEDDIFI1", "feed_family": "PEDDIFI1", "star_field": "Entity Name", "star_field_norm": "ENTITY_NAME", "star_in_layout": "Y", "sei_object": None, "sei_field": None, "sei_source": None,
+     "map_kind": "NO_MAPPING", "mapping_status": "NO_SEI_SOURCE", "approval_status": "DRAFT_REVIEW_REQUIRED", "open_dependency": "N", "source_sheet": "STAR_LAYOUT_DETAIL"}]
+CTL4 = [{"control_name": "PEDDIFI1 \u2192 HOLDINGDBO.POSITION", "result": "4", "status": None, "detail": "FULLSEISTARIMDS=1", "seq": 1}]
+WIDE = []
+
+
+def fake4(sql, params=None):
+    params = params or {}
+    s = " ".join(sql.split())
+    if "FROM sei_e2e_xwalk" in s:
+        WIDE.append("sei_file_status" in s)
+        rows = E2E4
+        if "imds_table = :t" in s:
+            rows = [r for r in rows if r["imds_table"] == params["t"]]
+        if "link_class = :l" in s:
+            rows = [r for r in rows if r["link_class"] == params["l"]]
+        return [dict(r) for r in rows]
+    if "FROM sei_control" in s and "LINEAGE_SUMMARY" in s:
+        return [dict(r) for r in CTL4]
+    if "FROM sei_star_field_map" in s:
+        return [dict(r) for r in S2S4]
+    return fake_query(sql, params)
+
+
+R._safe = fake4
+cv = R.e2e_coverage()
+ok(cv["total"] == 5 and cv["in_scope"] == 3 and cv["covered"] == 2 and cv["coverage_pct"] == 66.7 and cv["not_populated"] == 1 and cv["star_only"] == 1,
+   "coverage is over the paths in scope: an orphan STAR field and a column STAR never loads are not paths", cv["headline"])
+tb = next(x for x in cv["tables"] if x["name"] == "HOLDINGDBO.POSITION")
+ok(tb["rows"] == 4 and tb["in_scope"] == 3 and tb["coverage_pct"] == 66.7 and tb["not_populated"] == 1, "per table too, with the not-loaded count", tb)
+ok([x["key"] for x in cv["by_link"]] == ["E2E", "SEI_DIRECT", "NO_SEI_SOURCE", "STAR_ONLY", "NOT_POPULATED"], "the two new classes, in order", cv["by_link"])
+ok(cv["has_files"] and [x["key"] for x in cv["by_file_status"]] == ["VERIFIED_IN_FEED_SPEC", "SYSTEM_OR_CONSTANT", "NO_SEI_SOURCE"]
+   and next(f for f in cv["files"] if f["file"] == "Taxlot") == {"file": "Taxlot", "paths": 1, "verified": 1, "tables": ["HOLDINGDBO.POSITION"], "feeds": ["PEDDIFI1"]}
+   and [f["file"] for f in cv["files"]] == ["Account", "SYSTEM (job run)", "Taxlot"],
+   "the SEI feed files behind the paths, with how well each resolved", cv["files"])
+ok([x["key"] for x in cv["by_origin"]] == ["DOCUMENTED", "COMPOSED_FROM_STAR_LOGIC", "MISSING"] and cv["by_resolution"][0]["key"] == "DOCUMENTED",
+   "logic origin and STAR field resolution tallied, documented first", cv["by_origin"])
+ok(all(WIDE[:1]), "the wide select (sql/80 columns) is tried first")
+fc = R.flow_candidates()
+ok(fc["total"] == 3 and fc["excluded"] == {"STAR_ONLY": 1, "NOT_POPULATED": 1} and fc["bypass"] == [{"src": "SYSTEM (job run)", "tgt": "HOLDINGDBO.POSITION", "n": 1}]
+   and {l["src"] for l in fc["left"]} == {"Taxlot", "no SEI source"},
+   "the ribbon draws the paths in scope, named by the resolved SEI file", fc)
+ls = R.lineage_summary()
+ok(len(ls["rows"]) == 2 and ls["rows"][0]["imds_table"] == "HOLDINGDBO.POSITION" and ls["rows"][0]["full"] == 1 and ls["rows"][0]["full_pct"] == 25.0
+   and ls["rows"][0]["covered_pct"] == 66.7 and ls["rows"][0]["composed"] == 1 and ls["rows"][1]["star_only"] == 1,
+   "the lineage summary recomputed per feed and table: the sheet's full share and the in-scope share", ls["rows"])
+ok(ls["total"]["rows"] == 5 and ls["total"]["full_pct"] == 20.0 and ls["sheet"] == CTL4, "the total, and the sheet's own rows beside")
+rg = R.mapping_docs()
+ok(rg["totals"]["s2s_from_layout"] == 1 and rg["totals"]["s2s_rows"] == 4 and "1 from the layout" in rg["headline"]
+   and next(d for d in rg["docs"] if d["feed_family"] == "PEDDIFI1")["loaded"]["s2s_rows"] == 3,
+   "the register counts the document's own rows; layout-added fields are counted apart", rg["totals"])
+rows4 = R.e2e_rows(table="HOLDINGDBO.POSITION")["rows"]
+ok(len(rows4) == 4 and rows4[0].get("sei_file_status"), "the drill rows carry the file columns")
+# a warehouse that has not run sql/80: the wide select fails, the narrow one answers
+
+
+def fake_old(sql, params=None):
+    s = " ".join(sql.split())
+    if "FROM sei_e2e_xwalk" in s:
+        if "sei_file_status" in s:
+            return []
+        return [{k: v for k, v in r.items() if k not in ("sei_file", "sei_file_fields", "sei_file_status", "lineage_id", "star_field_resolution",
+                                                           "sei_imds_logic_origin", "imds_type", "imds_nullable", "business_decision", "comparison_id")} for r in E2E4]
+    return fake4(sql, params)
+
+
+R._safe = fake_old
+cvo = R.e2e_coverage()
+ok(cvo["total"] == 5 and cvo["in_scope"] == 3 and not cvo["has_files"] and cvo["files"] == [] and cvo["by_file_status"] == [],
+   "without sql/80 the narrow select answers: coverage as before, no files", cvo["headline"])
+
 print("-- an empty warehouse")
 R._safe = lambda sql, params=None: []
 ok(R.mapping_docs()["totals"]["documents"] == 0 and R.e2e_coverage()["coverage_pct"] is None and R.transformation_summary()["tables"] == [],

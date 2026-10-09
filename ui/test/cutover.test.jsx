@@ -16,7 +16,8 @@ const cutover = {
   columns: [
     { row_id: "a", imds_table: "HOLDINGDBO.POSITION", imds_column: "QUANTITY", target_type: "NUMBER(28,12)", target_nullable: "No",
       star: { field: "Lot Quantity", norm: "LOT_QUANTITY", in_layout: "Y", type: "NUM", length: "18", usage_status: "Used", is_used: "Y", doc_usage: "Used" },
-      sei: { object: "Taxlot", field: "QUANTITY", source: "Taxlot.QUANTITY", map_kind: "DERIVED", join_logic: "TAXLOT_TYPE_CODE = 2", mapping_status: "CANDIDATE", approval_status: "DRAFT_REVIEW_REQUIRED" },
+      sei: { object: "Taxlot", field: "QUANTITY", source: "Taxlot.QUANTITY", map_kind: "DERIVED", join_logic: "TAXLOT_TYPE_CODE = 2", mapping_status: "CANDIDATE", approval_status: "DRAFT_REVIEW_REQUIRED",
+             file: "Taxlot", file_fields: "Taxlot.QUANTITY_HELD", file_status: "VERIFIED_IN_FEED_SPEC" },
       rule: { im_logic: "SUM(lot_qty)", sei_logic: "SUM(Taxlot.QUANTITY)", state: "SUBSTITUTED", evidence_completeness: "BOTH_LOGICS_DOCUMENTED", business_decision: "N", comparison_id: "CMP-1" },
       link_status: "E2E_LINKED", link_class: "E2E", crosswalk_status: "CANDIDATE", has_sei: true, source_document: "pv.xlsx", source_row: 13 },
     { row_id: "b", imds_table: "HOLDINGDBO.POSITION", imds_column: "ENTITY_ID", target_type: "CHAR(8)", target_nullable: "No",
@@ -45,6 +46,7 @@ ok(/same rule, SEI input/.test(html) && /SUM\(lot_qty\)/.test(html) && /SUM\(Tax
 ok(/no SEI source/.test(html) && /stays until a SEI source is named/.test(html) && /no SEI rule/.test(html) && /business decision/.test(html), "a column without a SEI source says so, and its rule is the gap");
 ok(/⚠/.test(html) && /read by nothing/.test(html), "a STAR field not in the layout and one read by nothing are marked");
 ok(/>QUANTITY</.test(html) && /verdict ▸/.test(html) && /HOLDINGDBO\.POSITION/.test(html), "the IMDS column with a way to its verdict");
+ok(/file Taxlot\.QUANTITY_HELD/.test(html) && /verified in the feed spec/.test(html), "v4: the SEI feed file the source resolves to, under the source");
 ok(/rule kept/.test(html) && /rule changes/.test(html) && /same rule, SEI input · 1/.test(html) && /rewritten · 1/.test(html), "the tiles and the state chips count");
 const none = renderToStaticMarkup(<Cutover t={tLight} ds="IMDS" feeds={["PEDDIFI1"]} initial={{ feed: "", feeds: [], columns: [], totals: {} }} />);
 ok(/Pick a STAR feed/.test(none) && /PEDDIFI1/.test(none), "no feed picked: the invitation and the feeds");

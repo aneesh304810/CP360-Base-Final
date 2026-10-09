@@ -222,5 +222,89 @@ print("-- the load registry covers every new bundle")
 targets = {k for k, _, _ in SeiCrosswalkConnector._TARGETS}
 ok(all(k in targets for k in ("mapsrc", "seistar", "starstage", "e2e", "refcode", "entityid", "usageexc")), "seven bundles, seven tables")
 
+
+# ---------------------------------------------------------------- v4 -------
+# STAR_IMDS_SEI_Lineage_Catalog_v4_SEI-Source-Files: the end-to-end sheet is
+# SEI_STAR_IMDS_LINEAGE at a wider grain, LINEAGE_COMPLETENESS in place of
+# LINK_STATUS, and every lane carries the SEI feed file the source resolves
+# to. Same table, same screens.
+print("-- v4: the lineage sheet at its wider grain")
+V4 = {k: v for k, v in SHEETS.items() if k != "SEI_STAR_IMDS_E2E_XWALK"}
+FILE = ["SEI_SOURCE_FILE", "SEI_SOURCE_FILE_FIELDS", "SEI_SOURCE_FILE_STATUS"]
+V4["SEI_STAR_IMDS_LINEAGE"] = (
+    ["LINEAGE_ID", "STAR_FEED", "SEI_SOURCE"] + FILE + ["SEI_TO_STAR_MAP_KIND", "SEI_TO_STAR_LOGIC", "STAR_FIELDS", "STAR_FIELD_RESOLUTION",
+     "IMDS_TARGET_OBJECT", "IMDS_TARGET_ATTRIBUTE", "IMDS_TYPE", "IMDS_NULLABLE", "STAR_TO_IMDS_LOGIC", "SEI_TO_IMDS_LOGIC",
+     "SEI_TO_IMDS_LOGIC_ORIGIN", "LINEAGE_COMPLETENESS", "BUSINESS_DECISION_FLAG", "LINEAGE_STATUS", "APPROVAL_STATUS", "COMPARISON_ID"] + WHERE,
+    [["LIN-1", "PEDDIFI1", "Taxlot.QUANTITY_HELD; Taxlot.FX_RATE", "Taxlot", "Taxlot.QUANTITY_HELD; Taxlot.FX_RATE", "VERIFIED_IN_FEED_SPEC",
+      "DERIVED", "TAXLOT_TYPE_CODE = 2", "Lot Quantity; Entity Number", "DOCUMENTED", "HOLDINGDBO.POSITION", "QUANTITY", "NUMBER(28,12)", "No",
+      "SUM(lot_qty)", "SUM(Taxlot.QUANTITY_HELD)", "COMPOSED_FROM_STAR_LOGIC", "FULL_SEI_STAR_IMDS", "N", "CANDIDATE", "DRAFT_REVIEW_REQUIRED",
+      "LLP-1", "Portfolio_Valuation_Mapping.xlsx", "PVAL File Mapping", 17],
+     ["LIN-2", "PEDDIFI1", "Processing_Date", "SYSTEM (job run)", "SYSTEM (job run).PROCESSING_DATE", "SYSTEM_OR_CONSTANT",
+      "SYSTEM_DATE", "", "", "NOT_RESOLVED", "HOLDINGDBO.POSITION", "EFFECTIVE_DATE", "DATE", "Yes",
+      "sysdate", "Processing_Date", "DOCUMENTED", "SEI_TO_IMDS_NO_STAR_FIELD", "N", "CANDIDATE", "DRAFT_REVIEW_REQUIRED",
+      "LLP-2", "Portfolio_Valuation_Mapping.xlsx", "PVAL File Mapping", 18],
+     ["LIN-3", "PEDDIFI1", "", "", "", "NO_SEI_SOURCE",
+      "", "", "Phantom Field", "PARSED_FROM_IM_LOGIC", "HOLDINGDBO.POSITION", "COST_BASIS", "NUMBER", "Yes",
+      "to_number(cost)", "", "MISSING", "STAR_TO_IMDS_NO_SEI_SOURCE", "Y", "BUSINESS_DECISION_REQUIRED", "DRAFT_REVIEW_REQUIRED",
+      "LLP-3", "Portfolio_Valuation_Mapping.xlsx", "PVAL File Mapping", 19],
+     ["LIN-4", "PEDDIFI1", "Account.ACCOUNT_BASE_CURRENCY", "Account", "Account.ACCOUNT_BASE_CURRENCY", "VERIFIED_IN_FEED_SPEC",
+      "LOOKUP", "", "Base Currency Code", "SEI_TO_STAR_FIELD_MAP", "NOT_IDENTIFIED", "NOT_IDENTIFIED", "", "",
+      "", "", "MISSING", "SEI_TO_STAR_NO_IMDS_TARGET", "N", "GAP", "DRAFT_REVIEW_REQUIRED",
+      "", "Portfolio_Valuation_Mapping.xlsx", "PVAL File Mapping", 20],
+     ["LIN-5", "PEDDIFI1", "", "", "", "NO_SEI_SOURCE",
+      "", "", "", "NOT_RESOLVED", "HOLDINGDBO.POSITION", "UPDATE_SOURCE", "VARCHAR2(50)", "Yes",
+      "", "", "MISSING", "NOT_POPULATED_IN_LOAD", "N", "NOT_APPLICABLE", "DRAFT_REVIEW_REQUIRED",
+      "EXISTING_LLP_ROW", "Portfolio_Valuation_Mapping.xlsx", "LOT_LEVEL_POSITION", 3]])
+V4["LINEAGE_SUMMARY"] = (["STAR_FEED", "IMDS_TARGET_OBJECT", "ROWS", "FULL_SEI_STAR_IMDS", "SEI_TO_IMDS_NO_STAR_FIELD", "STAR_TO_IMDS_NO_SEI_SOURCE",
+                          "SEI_TO_STAR_NO_IMDS_TARGET", "NOT_POPULATED_IN_LOAD", "SEI_LOGIC_COMPOSED", "FULL_LINEAGE_PERCENT"],
+                         [["PEDDIFI1", "HOLDINGDBO.POSITION", 4, 1, 1, 1, 0, 1, 1, 0.25],
+                          ["PEDDIFI1", "NOT_IDENTIFIED", 1, 0, 0, 0, 1, 0, 0, 0],
+                          ["TOTAL", "", 5, 1, 1, 1, 1, 1, 1, 0.2]])
+hdr, rows = V4["SEI_TO_STAR_FIELD_MAP"]
+V4["SEI_TO_STAR_FIELD_MAP"] = (hdr + FILE, [r + [None] * (len(hdr) - len(r)) + ["Taxlot", "Taxlot.QUANTITY_HELD", "VERIFIED_IN_FEED_SPEC"] for r in rows[:1]]
+                               + [r for r in rows[1:]]
+                               + [["S2S-LAYOUT-1", "STAR_IMDS", "SEI_TO_STAR", "PEDDIFI1", "Entity Name", "", "NOT_STATED", "", "", "", "", "", "NO_MAPPING", "N",
+                                   "Added from STAR_LAYOUT_DETAIL: field is in the published STAR layout but no mapping document mentions it",
+                                   "NO_SEI_SOURCE", "DRAFT_REVIEW_REQUIRED", "layouts.pdf", "STAR_LAYOUT_DETAIL", 7]])
+
+with tempfile.TemporaryDirectory() as d:
+    path = os.path.join(d, "v4.xlsx")
+    SHEETS_V2 = SHEETS
+    SHEETS = V4
+    build(path)
+    SHEETS = SHEETS_V2
+    v4 = SeiCrosswalkConnector(xlsx_path=path, data_source="IMDS").parse()
+
+e4 = {r["lineage_id"]: r for r in v4["e2e"]}
+ok(len(v4["e2e"]) == 5 and set(e4) == {"LIN-1", "LIN-2", "LIN-3", "LIN-4", "LIN-5"} and e4["LIN-1"]["xwalk_row_id"] == "IMDS:LIN-1",
+   "SEI_STAR_IMDS_LINEAGE lands in the e2e table, keyed by LINEAGE_ID", sorted(e4))
+ok([e4[k]["link_class"] for k in ("LIN-1", "LIN-2", "LIN-3", "LIN-4", "LIN-5")] == ["E2E", "SEI_DIRECT", "NO_SEI_SOURCE", "STAR_ONLY", "NOT_POPULATED"]
+   and e4["LIN-5"]["link_status"] == "NOT_POPULATED_IN_LOAD",
+   "LINEAGE_COMPLETENESS is the link class, the sheet's word kept beside it; two new shapes", [e4[k]["link_class"] for k in sorted(e4)])
+r1 = e4["LIN-1"]
+ok(r1["sei_file"] == "Taxlot" and r1["sei_file_fields"] == "Taxlot.QUANTITY_HELD; Taxlot.FX_RATE" and r1["sei_file_status"] == "VERIFIED_IN_FEED_SPEC",
+   "the SEI feed file, its fields and the resolution status ride along", r1)
+ok(r1["sei_object"] == "Taxlot" and r1["sei_field"] == "QUANTITY_HELD" and r1["star_field"] == "Lot Quantity; Entity Number"
+   and r1["star_field_norm"] == "LOT_QUANTITY" and r1["star_in_layout"] == "Y",
+   "several SEI sources: the first names the object and field; several STAR fields: kept whole, normed by the first, in layout only if all are", r1)
+ok(r1["star_field_resolution"] == "DOCUMENTED" and r1["sei_imds_logic_origin"] == "COMPOSED_FROM_STAR_LOGIC" and r1["imds_type"] == "NUMBER(28,12)"
+   and r1["imds_nullable"] == "No" and r1["comparison_id"] == "LLP-1" and r1["crosswalk_status"] == "CANDIDATE" and r1["business_decision"] == "N",
+   "resolution, origin, type, nullability, comparison, status and the decision flag", r1)
+ok(e4["LIN-2"]["sei_object"] is None and e4["LIN-2"]["sei_field"] == "Processing_Date" and e4["LIN-2"]["sei_file"] == "SYSTEM (job run)",
+   "a bare source is a field with no object; its file is the system", e4["LIN-2"])
+ok(e4["LIN-4"]["imds_table"] is None and e4["LIN-4"]["imds_column"] is None and e4["LIN-3"]["business_decision"] == "Y",
+   "NOT_IDENTIFIED is no target; the decision flag is read", e4["LIN-4"])
+s4 = {r["map_row_id"]: r for r in v4["seistar"]}
+ok(s4["IMDS:S2S-PEDDIFI1-a1"]["sei_file"] == "Taxlot" and s4["IMDS:S2S-PEDDIFI1-a1"]["sei_file_status"] == "VERIFIED_IN_FEED_SPEC",
+   "the SEI -> STAR hop carries the file too", s4.get("IMDS:S2S-PEDDIFI1-a1"))
+ok(s4["IMDS:S2S-LAYOUT-1"]["source_sheet"] == "STAR_LAYOUT_DETAIL" and s4["IMDS:S2S-LAYOUT-1"]["mapping_status"] == "NO_SEI_SOURCE",
+   "a layout field no document mentions is a row, tagged by its source sheet", s4.get("IMDS:S2S-LAYOUT-1"))
+ctl = [c for c in v4["control"] if c["source_sheet"] == "LINEAGE_SUMMARY"]
+ok(len(ctl) == 3 and ctl[0]["control_name"] == "PEDDIFI1 \u2192 HOLDINGDBO.POSITION" and ctl[0]["result"] == "4" and ctl[2]["control_name"] == "TOTAL"
+   and "FULLSEISTARIMDS=1" in (ctl[0]["detail"] or ""),
+   "LINEAGE_SUMMARY lands in SEI_CONTROL as feed -> table, the row count its result, the counts in the detail", ctl)
+ok(not [r for r in v4["e2e"] if r["link_class"] not in ("E2E", "SEI_DIRECT", "NO_SEI_SOURCE", "STAR_ONLY", "NOT_POPULATED", "STAR_NOT_IN_FILE_MAP")],
+   "every v4 row has a class the screens know")
+
 print(("\n%d assertion(s) failed" % BAD) if BAD else "\nmapping-docs parse assertions pass")
 sys.exit(1 if BAD else 0)

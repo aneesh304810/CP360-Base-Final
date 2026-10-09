@@ -13,9 +13,9 @@
 // crosswalk, so nothing here changes a verdict, and the panel says so.
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { mappingDocs, LINK_INFO, LINK_ORDER, COMPLETENESS_INFO, RULE_STATE, RULE_STATE_ORDER } from "./seiCrosswalkApi.js";
+import { mappingDocs, LINK_INFO, LINK_ORDER, COMPLETENESS_INFO, RULE_STATE, RULE_STATE_ORDER, FILE_STATUS_INFO, fileStatusLabel } from "./seiCrosswalkApi.js";
 
-const VIEWS = ["Cutover", "Coverage", "Documents", "Transformations", "Reference codes", "Entity ID", "Usage exceptions"];
+const VIEWS = ["Cutover", "Coverage", "SEI files", "Documents", "Transformations", "Reference codes", "Entity ID", "Usage exceptions"];
 
 const Tile = ({ t, v, label, sub, c }) => (
   <div style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: t.radius.md, padding: "10px 14px", minWidth: 140 }}>
@@ -50,7 +50,8 @@ export function headlineOf(reg, cov) {
   const T = reg?.totals || {};
   return {
     documents: T.documents || 0, s2sRows: T.s2s_rows || 0, s2sMapped: T.s2s_mapped || 0, s2sPct: T.s2s_mapped_pct,
-    e2eRows: cov?.total || 0, covered: cov?.covered || 0, coveragePct: cov?.coverage_pct, tables: T.imds_tables || 0,
+    e2eRows: cov?.in_scope ?? cov?.total ?? 0, allRows: cov?.total || 0, covered: cov?.covered || 0, coveragePct: cov?.coverage_pct, tables: T.imds_tables || 0,
+    notPopulated: cov?.not_populated || 0, starOnly: cov?.star_only || 0,
     noSei: (cov?.by_link || []).find((l) => l.key === "NO_SEI_SOURCE")?.n || 0,
     notInMap: (cov?.by_link || []).find((l) => l.key === "STAR_NOT_IN_FILE_MAP")?.n || 0,
     drafts: (cov?.by_approval || []).reduce((a, x) => a + (/DRAFT/i.test(x.key) ? x.n : 0), 0),
@@ -115,7 +116,8 @@ export default function MappingDocsPanel({ t, dataSource, initial, onOpenColumn,
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
         <Tile t={t} v={H.documents} label="mapping documents" sub={`${H.s2sRows} STAR fields read`} />
         <Tile t={t} v={H.s2sPct == null ? "—" : `${H.s2sPct}%`} label="STAR fields with a SEI source" sub={`${H.s2sMapped} of ${H.s2sRows}`} c={t.success} />
-        <Tile t={t} v={H.coveragePct == null ? "—" : `${H.coveragePct}%`} label="end-to-end coverage" sub={`${H.covered} of ${H.e2eRows} paths reach IMDS from SEI`} c={t.accent} />
+        <Tile t={t} v={H.coveragePct == null ? "—" : `${H.coveragePct}%`} label="end-to-end coverage" sub={`${H.covered} of ${H.e2eRows} paths in scope reach IMDS from SEI`} c={t.accent} />
+        {H.notPopulated > 0 && <Tile t={t} v={H.notPopulated} label="IMDS columns STAR never loads" sub={`out of scope${H.starOnly ? ` · ${H.starOnly} STAR fields with no IMDS target` : ""}`} c={t.textMuted} />}
         <Tile t={t} v={H.tables} label="IMDS target tables" sub="up from one" />
         <Tile t={t} v={H.noSei} label="paths with no SEI source" sub={H.notInMap ? `+${H.notInMap} point at a STAR field not in the map` : ""} c={t.danger} />
         <Tile t={t} v={exc?.total ?? "—"} label="usage disagreements" sub="matrix vs mapping document" c={t.warning} />
@@ -133,13 +135,13 @@ export default function MappingDocsPanel({ t, dataSource, initial, onOpenColumn,
         <div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
             {(cov.by_link || []).map((l) => <Pill key={l.key} info={LINK_INFO[l.key] || { c: "#6b7c8a" }}>{(LINK_INFO[l.key] || {}).t || l.key} · {l.n}</Pill>)}
-            <span style={{ fontSize: 11, color: t.textMuted, marginLeft: "auto" }}>coverage = linked end to end + SEI straight to IMDS · click a table for its paths</span>
+            <span style={{ fontSize: 11, color: t.textMuted, marginLeft: "auto" }}>coverage = linked end to end + SEI straight to IMDS, over the paths in scope · click a table for its paths</span>
           </div>
           <div style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: t.radius.md, overflow: "auto", maxHeight: 420 }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr><th style={th(t)}>IMDS target table</th><th style={{ ...th(t), textAlign: "right" }}>Paths</th><th style={th(t)}>Links</th>
                 <th style={{ ...th(t), textAlign: "right" }}>Coverage</th><th style={{ ...th(t), textAlign: "right" }}>No SEI source</th>
-                <th style={{ ...th(t), textAlign: "right" }}>Not in map</th><th style={{ ...th(t), textAlign: "right" }}>Gaps</th></tr></thead>
+                <th style={{ ...th(t), textAlign: "right" }}>Not in map</th><th style={{ ...th(t), textAlign: "right" }}>Not loaded</th><th style={{ ...th(t), textAlign: "right" }}>Gaps</th></tr></thead>
               <tbody>
                 {(cov.tables || []).map((x) => (
                   <tr key={x.name} onClick={() => { setTable(table === x.name ? null : x.name); setOpenRow(null); }}
@@ -150,6 +152,7 @@ export default function MappingDocsPanel({ t, dataSource, initial, onOpenColumn,
                     <td style={{ ...num(t), fontWeight: 700, color: x.coverage_pct >= 70 ? t.success : x.coverage_pct >= 30 ? t.warning : t.danger }}>{x.coverage_pct == null ? "—" : `${x.coverage_pct}%`}</td>
                     <td style={{ ...num(t), color: x.no_sei_source ? t.danger : t.textMuted }}>{x.no_sei_source || "—"}</td>
                     <td style={{ ...num(t), color: x.not_in_file_map ? "#7c3aed" : t.textMuted }}>{x.not_in_file_map || "—"}</td>
+                    <td title="IMDS columns the STAR load never writes: out of scope" style={{ ...num(t), color: t.textMuted }}>{x.not_populated || "—"}</td>
                     <td style={{ ...num(t), color: t.sub }}>{x.gap || "—"}</td>
                   </tr>))}
               </tbody>
@@ -175,7 +178,10 @@ export default function MappingDocsPanel({ t, dataSource, initial, onOpenColumn,
                       {rows.map((r, i) => (
                         <React.Fragment key={`${r.xwalk_row_id}-${i}`}>
                           <tr onClick={() => setOpenRow(openRow === r.xwalk_row_id ? null : r.xwalk_row_id)} style={{ cursor: "pointer" }}>
-                            <td style={{ ...td(t), color: r.sei_source ? t.navy : t.danger, fontWeight: r.sei_source ? 600 : 400 }}>{r.sei_source || "(no SEI source)"}{r.map_kind ? <span style={{ fontSize: 10, color: t.textMuted }}> · {r.map_kind}</span> : null}</td>
+                            <td style={{ ...td(t), color: r.sei_source ? t.navy : t.danger, fontWeight: r.sei_source ? 600 : 400 }}>{r.sei_source || "(no SEI source)"}{r.map_kind ? <span style={{ fontSize: 10, color: t.textMuted }}> · {r.map_kind}</span> : null}
+                              {(r.sei_file || r.sei_file_status) && <div style={{ fontSize: 10, fontWeight: 400, color: t.sub }}>
+                                {r.sei_file_fields || r.sei_file ? <span>file: {r.sei_file_fields || r.sei_file} </span> : null}
+                                <span style={{ color: (FILE_STATUS_INFO[r.sei_file_status] || {}).c || t.textMuted }}>· {fileStatusLabel(r.sei_file_status)}</span></div>}</td>
                             <td style={{ ...td(t), color: r.star_in_layout === "N" ? "#7c3aed" : t.text }}>{r.star_field || <span style={{ color: t.textMuted }}>(direct)</span>}{r.star_in_layout === "N" ? " ⚠" : ""}</td>
                             <td style={{ ...td(t), fontWeight: 700, color: t.navy }}>{r.imds_column}
                               {onOpenColumn && <span onClick={(e) => { e.stopPropagation(); onOpenColumn(r.imds_table, r.imds_column); }} role="button" tabIndex={0}
@@ -197,6 +203,41 @@ export default function MappingDocsPanel({ t, dataSource, initial, onOpenColumn,
                     </tbody>
                   </table>
                 </div>)}
+            </div>)}
+        </div>)}
+
+      {view === "SEI files" && cov && (
+        <div>
+          {!cov.has_files && (cov.files || []).length === 0 && (
+            <div style={{ fontSize: 12, color: t.sub, padding: "14px 0" }}>
+              This workbook does not resolve SEI sources to feed files (that arrived with v4, STAR_IMDS_SEI_Lineage_Catalog_v4_SEI-Source-Files). Load it and run sql/80.
+            </div>)}
+          {(cov.by_file_status || []).length > 0 && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
+              {cov.by_file_status.map((x) => <Pill key={x.key} info={FILE_STATUS_INFO[x.key] || { c: "#6b7c8a" }}>{fileStatusLabel(x.key)} · {x.n}</Pill>)}
+              <span style={{ fontSize: 11, color: t.textMuted, marginLeft: "auto" }}>every SEI source, resolved to the published SEI feed file that carries it</span>
+            </div>)}
+          {(cov.files || []).length > 0 && (
+            <div style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: t.radius.md, overflow: "auto", maxHeight: 520 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr><th style={th(t)}>SEI feed file</th><th style={{ ...th(t), textAlign: "right" }}>Paths</th><th style={{ ...th(t), textAlign: "right" }}>Verified</th>
+                  <th style={th(t)}>IMDS tables it reaches</th><th style={th(t)}>Through STAR feeds</th></tr></thead>
+                <tbody>
+                  {cov.files.map((f) => (
+                    <tr key={f.file}>
+                      <td style={{ ...td(t), fontWeight: 700, color: t.navy, whiteSpace: "nowrap" }}>{f.file}</td>
+                      <td style={num(t)}>{f.paths}</td>
+                      <td style={{ ...num(t), color: f.verified === f.paths ? t.success : f.verified ? t.warning : t.textMuted }}>{f.verified}</td>
+                      <td style={{ ...td(t), fontSize: 11 }}>{(f.tables || []).join(" · ")}</td>
+                      <td style={{ ...td(t), fontSize: 11, color: t.sub }}>{(f.feeds || []).join(", ")}</td>
+                    </tr>))}
+                </tbody>
+              </table>
+            </div>)}
+          {((cov.by_origin || []).length > 0 || (cov.by_resolution || []).length > 0) && (
+            <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginTop: 12, fontSize: 11, color: t.sub }}>
+              {(cov.by_origin || []).length > 0 && <div><b style={{ color: t.navy }}>where the SEI → IMDS logic comes from</b> · {cov.by_origin.map((x) => `${x.key.toLowerCase().replace(/_/g, " ")} ${x.n}`).join(" · ")}</div>}
+              {(cov.by_resolution || []).length > 0 && <div><b style={{ color: t.navy }}>how the STAR field was found</b> · {cov.by_resolution.map((x) => `${x.key.toLowerCase().replace(/_/g, " ")} ${x.n}`).join(" · ")}</div>}
             </div>)}
         </div>)}
 
@@ -406,6 +447,11 @@ export function Cutover({ t, ds, feeds, initial, onOpenColumn }) {
                         : <span style={{ fontSize: 12, fontWeight: 700, color: t.danger }}>no SEI source</span>}
                       {c.sei.map_kind && <span style={{ fontSize: 9.5, color: t.textMuted }}>{c.sei.map_kind}</span>}
                     </div>
+                    {(c.sei.file || c.sei.file_status) && (
+                      <div style={{ fontSize: 9.5, color: t.sub, margin: "1px 0 0 38px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {c.sei.file_fields || c.sei.file ? <span>file {c.sei.file_fields || c.sei.file} </span> : null}
+                        <span style={{ color: (FILE_STATUS_INFO[c.sei.file_status] || {}).c || t.textMuted }}>· {fileStatusLabel(c.sei.file_status)}</span>
+                      </div>)}
                   </div>
                   <div style={{ textAlign: "center", color: c.has_sei ? t.accent : t.disabled, fontSize: 16 }}>→</div>
                   <div style={{ minWidth: 0 }}>
