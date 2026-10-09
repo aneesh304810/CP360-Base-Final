@@ -355,7 +355,7 @@ export default function LineageHome({ t, focus }) {
              style={{ display: "flex", alignItems: "center", gap: 5,
               fontSize: 11, fontWeight: 700, padding: "4px 11px",
               borderRadius: 999,
-              border: `1.5px solid ${on ? m.c : (t.panel2 || "#dfe6e9")}`,
+              borderWidth: 1.5, borderColor: on ? m.c : (t.panel2 || "#dfe6e9"),
               background: on ? m.c : "#fff",
               color: on ? "#fff" : (t.sub || "#666"),
               // a system nothing attributes to this warehouse is drawn as

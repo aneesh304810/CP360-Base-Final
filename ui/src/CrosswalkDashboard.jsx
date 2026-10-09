@@ -154,6 +154,13 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
   // sql/79 draws the ribbon exactly as before: no candidates, no toggle.
   const [flowCand, setFlowCand] = useState(null);
   const [flowMode, setFlowMode] = useState("proposed");
+  // A click on the candidate ribbon scopes the mapping-documents panel below
+  // to that node or path: the rows the ribbon is made of, not a hint to
+  // find them. The counter makes the same click twice answer twice.
+  const [docFocus, setDocFocus] = useState(null);
+  const focusDocs = (f) => setDocFocus({ table: f.table || null, feed: f.feed || "",
+                                          link: f.verdict || (f.sei_feed === "no SEI source" ? "NO_SEI_SOURCE" : ""),
+                                          q: f.sei_feed && f.sei_feed !== "no SEI source" ? f.sei_feed : "", n: Date.now() });
   useEffect(() => {
     let on = true;
     mappingDocs.flowCandidates(ds).then((f) => { if (on) setFlowCand(f); });
@@ -699,6 +706,7 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
             </div>)}
           {flowMode === "candidates" && hasCand ? (
             <FlowDiagram t={t} flow={flowCand} vocab={CANDIDATE_VOCAB}
+              onDrill={(filter) => focusDocs(filter)}
               onOpenTable={onOpenTechnical
                 ? (tbl) => onOpenTechnical({ table: tbl, column: null })
                 : undefined}
@@ -718,7 +726,7 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
             nameOf={nameOf} />)}
           {flowMode === "candidates" && hasCand && (
             <div style={{ fontSize: 11, color: t.sub, marginTop: 8 }}>
-              The rows behind each ribbon are in <b>The SEI mapping documents</b> below: pick the IMDS table on its Coverage view.
+              Click a node or a ribbon, then <b>open these paths</b>: the rows behind it show in <b>The SEI mapping documents</b> below.
             </div>)}
         </Panel>)}
 
@@ -745,7 +753,7 @@ export default function CrosswalkDashboard({ t, dataSource, onOpenTechnical }) {
           without them looks exactly as it did. */}
       <Panel t={t} title="The SEI mapping documents"
         note="SEI → STAR → IMDS, per IMDS table · every row a draft until an approved crosswalk says otherwise">
-        <MappingDocsPanel t={t} dataSource={ds} onOpenColumn={openCol} />
+        <MappingDocsPanel t={t} dataSource={ds} onOpenColumn={openCol} focus={docFocus} />
       </Panel>
 
       {/* Every final column as one cell. The spread says how many; this says

@@ -12,7 +12,7 @@
 // DRAFT_REVIEW_REQUIRED: none of the documents is an approved SEI-to-STAR
 // crosswalk, so nothing here changes a verdict, and the panel says so.
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { mappingDocs, LINK_INFO, LINK_ORDER, COMPLETENESS_INFO, RULE_STATE, RULE_STATE_ORDER } from "./seiCrosswalkApi.js";
 
 const VIEWS = ["Cutover", "Coverage", "Documents", "Transformations", "Reference codes", "Entity ID", "Usage exceptions"];
@@ -58,7 +58,10 @@ export function headlineOf(reg, cov) {
   };
 }
 
-export default function MappingDocsPanel({ t, dataSource, initial, onOpenColumn }) {
+// focus: a scope handed down from the ribbon — { table, feed, link, q, n }.
+// The panel opens its Coverage view on that scope and scrolls into sight; n
+// changes on every click so the same table twice still answers.
+export default function MappingDocsPanel({ t, dataSource, initial, onOpenColumn, focus }) {
   const ds = dataSource || "IMDS";
   const [reg, setReg] = useState(initial?.register || null);
   const [cov, setCov] = useState(initial?.coverage || null);
@@ -68,8 +71,17 @@ export default function MappingDocsPanel({ t, dataSource, initial, onOpenColumn 
   const [exc, setExc] = useState(initial?.exceptions || null);
   const [view, setView] = useState(initial?.view || "Cutover");
   const [table, setTable] = useState(initial?.table || null);
+  const [feed, setFeed] = useState(initial?.feed || "");
   const [link, setLink] = useState("");
   const [q, setQ] = useState("");
+  const root = useRef(null);
+  useEffect(() => {
+    if (!focus) return;
+    setView("Coverage"); setTable(focus.table || null); setFeed(focus.feed || ""); setLink(focus.link || ""); setQ(focus.q || "");
+    setOpenRow(null);
+    if (root.current && typeof root.current.scrollIntoView === "function") root.current.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [focus]);
+  const scoped = Boolean(table || feed || q || link);
   const [rows, setRows] = useState(initial?.rows || null);
   const [openRow, setOpenRow] = useState(null);
   useEffect(() => {
@@ -81,17 +93,17 @@ export default function MappingDocsPanel({ t, dataSource, initial, onOpenColumn 
     return () => { on = false; };
   }, [ds]);
   useEffect(() => {
-    if (!table || initial?.rows) return undefined;
+    if (!scoped || initial?.rows) return undefined;
     let on = true;
     setRows("loading");
-    mappingDocs.e2eRows({ data_source: ds, table, link, q, limit: 1000 }).then((d) => { if (on) setRows(d.rows || []); });
+    mappingDocs.e2eRows({ data_source: ds, table, feed, link, q, limit: 1000 }).then((d) => { if (on) setRows(d.rows || []); });
     return () => { on = false; };
-  }, [ds, table, link, q]);
+  }, [ds, scoped, table, feed, link, q]);
   const H = useMemo(() => headlineOf(reg, cov), [reg, cov]);
   if (reg && cov && !H.loaded) return null;        // nothing loaded: the dashboard stays as it was
 
   return (
-    <div>
+    <div ref={root}>
       <div style={{ fontSize: 12, color: t.sub, lineHeight: 1.5, marginBottom: 10 }}>
         {reg?.headline || "Loading the mapping documents…"}
       </div>
@@ -143,14 +155,16 @@ export default function MappingDocsPanel({ t, dataSource, initial, onOpenColumn 
               </tbody>
             </table>
           </div>
-          {table && (
+          {scoped && (
             <div style={{ marginTop: 12, background: t.panel, border: `1px solid ${t.border}`, borderRadius: t.radius.md }}>
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", borderBottom: `1px solid ${t.border}`, background: t.bg }}>
-                <b style={{ fontSize: 12.5 }}>{table}</b>
+                <b style={{ fontSize: 12.5 }}>{table || (feed ? `STAR feed ${feed}` : q ? `SEI ${q}` : `${(LINK_INFO[link] || {}).t || link} · every table`)}</b>
+                {table && feed && <span style={{ fontSize: 11, color: t.sub }}>· feed {feed} <span onClick={() => setFeed("")} role="button" tabIndex={0} style={{ color: t.accent, cursor: "pointer", fontWeight: 700 }}>×</span></span>}
+                {Array.isArray(rows) && <span style={{ fontSize: 11, color: t.textMuted }}>· {rows.length} path{rows.length === 1 ? "" : "s"}</span>}
                 {LINK_ORDER.map((k) => <Pill key={k} info={LINK_INFO[k]} active={link === k} onClick={() => setLink(link === k ? "" : k)}>{LINK_INFO[k].t}</Pill>)}
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="STAR field, IMDS column, SEI source…"
                   style={{ fontSize: 11.5, padding: "3px 8px", border: `1px solid ${t.border}`, borderRadius: 4, width: 240, marginLeft: "auto" }} />
-                <span onClick={() => { setTable(null); setOpenRow(null); }} role="button" tabIndex={0} style={{ fontSize: 11, color: t.accent, fontWeight: 700, cursor: "pointer" }}>close ✕</span>
+                <span onClick={() => { setTable(null); setFeed(""); setQ(""); setLink(""); setOpenRow(null); }} role="button" tabIndex={0} style={{ fontSize: 11, color: t.accent, fontWeight: 700, cursor: "pointer" }}>close ✕</span>
               </div>
               {rows === "loading" && <div style={{ padding: 14, fontSize: 12, color: t.sub }}>Loading…</div>}
               {Array.isArray(rows) && (

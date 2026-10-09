@@ -62,9 +62,18 @@ ok(empty === "", "nothing loaded: the panel renders nothing, so the dashboard lo
 
 console.log("-- wired in");
 const dash = fs.readFileSync(path.join(SRC, "CrosswalkDashboard.jsx"), "utf8");
-ok(/import MappingDocsPanel from "\.\/MappingDocs\.jsx"/.test(dash) && /<MappingDocsPanel t=\{t\} dataSource=\{ds\} onOpenColumn=\{openCol\} \/>/.test(dash), "mounted on the crosswalk dashboard with the column opener");
+ok(/import MappingDocsPanel from "\.\/MappingDocs\.jsx"/.test(dash) && /<MappingDocsPanel t=\{t\} dataSource=\{ds\} onOpenColumn=\{openCol\} focus=\{docFocus\} \/>/.test(dash), "mounted on the crosswalk dashboard with the column opener");
 const usage = fs.readFileSync(path.join(SRC, "StarFieldUsage.jsx"), "utf8");
 ok(/r\.doc_usage_status/.test(usage) && /r\.sei_mapped/.test(usage) && /r\.usage_check/.test(usage), "the usage drill shows what the mapping document says");
+
+console.log("-- the ribbon scopes the panel");
+const mdSrc = fs.readFileSync(path.join(SRC, "MappingDocs.jsx"), "utf8");
+ok(/focus\.table \|\| null/.test(mdSrc) && /setView\("Coverage"\)/.test(mdSrc) && /scrollIntoView/.test(mdSrc), "a focus prop opens Coverage on that scope and scrolls to it");
+ok(/e2eRows\(\{ data_source: ds, table, feed, link, q/.test(mdSrc) && /table \|\| feed \|\| q \|\| link/.test(mdSrc), "rows can be scoped by feed, SEI object or link class, not only by table");
+ok(/onDrill=\{\(filter\) => focusDocs\(filter\)\}/.test(dash) && /focus=\{docFocus\}/.test(dash) && /"NO_SEI_SOURCE"/.test(dash),
+   "the candidate ribbon's drill hands its scope to the panel; the no-SEI-source node is the link class");
+const scoped = renderToStaticMarkup(<MappingDocsPanel t={tLight} dataSource="IMDS" initial={{ register, coverage, feed: "PEDDIFI1", rows, view: "Coverage" }} />);
+ok(/STAR feed PEDDIFI1/.test(scoped) && /EFFECTIVE_DATE/.test(scoped), "scoped by feed alone, the drill names the feed and shows its rows");
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\nmapping-docs assertions pass");
 if (bad) process.exit(1);
