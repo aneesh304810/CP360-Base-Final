@@ -1932,6 +1932,30 @@ def source_canvas(src_table: str, data_source: str | None = None,
         if not got and not _table_cols(tbl):
             diag["missing"].append(tbl)
 
+    # ---- the SEI source mapping, per warehouse column ---------------------
+    # The mapping documents name, for each IMDS column this feed loads, the
+    # SEI feed file and field that replaces its STAR input after cutover.
+    # Read apart like every other enrichment: a warehouse without the
+    # crosswalk (or without sql/80) simply draws no SEI column.
+    sei_by: dict[tuple, dict] = {}
+    fp = {"ds": ds, "f": str(src_table or "").strip().upper()}
+    for r in _e2e_q("imds_table, imds_column, sei_source, sei_object, sei_field, link_class, sei_imds_logic, map_kind",
+                    "WHERE data_source = :ds AND (UPPER(feed_family) = :f OR feed_key = :f)", fp):
+        k = (str(r.get("imds_table") or "").upper(), str(r.get("imds_column") or "").upper())
+        if not k[1]:
+            continue
+        files = _files_of(r.get("sei_file")) if "sei_file" in r else []
+        if not files and r.get("sei_object") and (r.get("link_class") or "") not in ("NO_SEI_SOURCE", "NOT_POPULATED", "STAR_NOT_IN_FILE_MAP"):
+            files = [r["sei_object"]]
+        has = bool(files or r.get("sei_field")) and (r.get("link_class") or "") in ("E2E", "SEI_DIRECT")
+        cand = {"files": files, "file": files[0] if files else None,
+                "source": r.get("sei_file_fields") or r.get("sei_source") or (r.get("sei_field") if has else None),
+                "status": r.get("sei_file_status"), "class": r.get("link_class"), "map_kind": r.get("map_kind"),
+                "logic": r.get("sei_imds_logic"), "has": has}
+        if k not in sei_by or (cand["has"] and not sei_by[k]["has"]):
+            sei_by[k] = cand
+    sei_files: dict[str, dict] = {}
+
     # ---- shape ------------------------------------------------------------
     targets: dict[str, dict] = {}
     src_cols: dict[str, int] = {}
@@ -1939,6 +1963,13 @@ def source_canvas(src_table: str, data_source: str | None = None,
         lid = r.get("lineage_id")
         x = xf_by.get(lid) or {}
         tbl = r.get("dwh_target_table") or "(unnamed)"
+        sei = sei_by.get((str(tbl).upper(), str(r.get("dwh_target_column") or "").upper()))
+        if sei and sei["has"]:
+            for fn in sei["files"] or []:
+                sf = sei_files.setdefault(fn, {"file": fn, "n": 0, "verified": 0, "tables": set()})
+                sf["n"] += 1
+                sf["verified"] += sei["status"] == "VERIFIED_IN_FEED_SPEC"
+                sf["tables"].add(tbl)
         t = targets.setdefault(tbl, {"table": tbl, "cols": [],
                                      "functional_group": r.get("functional_group")})
         sc = r.get("src_source_column")
@@ -1971,6 +2002,9 @@ def source_canvas(src_table: str, data_source: str | None = None,
             "logic": logic_by.get(x.get("legacy_transformation_id")),
             "equivalence": x.get("transformation_equivalence"),
             "status": r.get("lineage_status"),
+            # after cutover: the SEI feed file and field that replaces the
+            # STAR input, or why there is none
+            "sei": sei,
         })
 
     feed = _safe("""
@@ -2005,6 +2039,9 @@ def source_canvas(src_table: str, data_source: str | None = None,
         "source_column_use": src_cols,
         "column_count": sum(len(t["cols"]) for t in targets.values()),
         "truncated": len(rows) >= int(limit_cols),
+        "sei_files": [{**f, "tables": sorted(f["tables"])}
+                      for f in sorted(sei_files.values(), key=lambda f: (-f["n"], f["file"]))],
+        "sei_mapped": sum(1 for t in targets.values() for c in t["cols"] if c.get("sei") and c["sei"]["has"]),
         "diagnostics": diag,
     }
 

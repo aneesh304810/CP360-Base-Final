@@ -131,8 +131,22 @@ where it lands in IMDS with a way to the verdict. Fields in the layout no
 document mentions, open dependencies and fields read by nothing are marked.
 Drawn for STAR only, and only when a mapping document covers the feed.
 
+**On the Picture itself.** The canvas gains a toggle, **SEI source
+mapping · n of m**, on by default when the crosswalk knows the feed. On, a
+third column of SEI feed files stands to the right of the warehouse
+tables, and a dashed wire runs from each warehouse column to the SEI file
+that replaces its STAR input: green when the SEI field is verified in the
+published feed spec, orange or red when it is not. Click a wire or a
+column and the detail pane adds *After cutover · SEI source*: the SEI
+file and field, the resolution, and the SEI-equivalent logic beside the
+rule that is kept. The Reading view carries the same as a chip per row.
+**⤓ export CSV** writes the picture as a table, one row per column link:
+feed field, warehouse column, operation, rule, lineage status, SEI file,
+SEI field, resolution, SEI-equivalent logic, equivalence.
+
 ```
 GET /sei-crosswalk/feed-sei-files?feed=PEDDIFI1
+GET /sei-crosswalk/source-canvas?src_table=PEDDIFI1   now carries `sei` per column and `sei_files`
 ```
 
 ## The seven new sheets

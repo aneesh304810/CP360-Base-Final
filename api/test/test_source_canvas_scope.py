@@ -216,5 +216,45 @@ for sql in f.seen:
         ok("data_source = :ds" not in low,
            "an unscoped statement carries no :ds bind", sql[:90])
 
+
+# ---- the SEI source mapping, per column -------------------------------
+# The mapping documents name, for each column the feed loads, the SEI feed
+# file and field that replaces its STAR input. It rides the same payload so
+# the picture, the reading and the export agree.
+class FakeSei(Fake):
+    def query(self, sql, p=None):
+        low = " ".join(sql.lower().split())
+        if "from sei_e2e_xwalk" in low:
+            if "sei_file_status" not in low:
+                return []
+            return [
+                {"imds_table": "T0", "imds_column": "C0", "sei_source": "Taxlot.QUANTITY_HELD", "sei_object": "Taxlot", "sei_field": "QUANTITY_HELD",
+                 "link_class": "E2E", "sei_imds_logic": "SUM(Taxlot.QUANTITY_HELD)", "map_kind": "DERIVED",
+                 "sei_file": "Taxlot", "sei_file_fields": "Taxlot.QUANTITY_HELD", "sei_file_status": "VERIFIED_IN_FEED_SPEC"},
+                {"imds_table": "T0", "imds_column": "C4", "sei_source": None, "sei_object": None, "sei_field": None,
+                 "link_class": "NO_SEI_SOURCE", "sei_imds_logic": None, "map_kind": None, "sei_file": None, "sei_file_fields": None, "sei_file_status": "NO_SEI_SOURCE"},
+                {"imds_table": "T1", "imds_column": "C1", "sei_source": "Processing_Date", "sei_object": None, "sei_field": "Processing_Date",
+                 "link_class": "SEI_DIRECT", "sei_imds_logic": "Processing_Date", "map_kind": "SYSTEM_DATE",
+                 "sei_file": "SYSTEM (job run)", "sei_file_fields": "SYSTEM (job run).PROCESSING_DATE", "sei_file_status": "SYSTEM_OR_CONSTANT"},
+            ]
+        return super().query(sql, p)
+
+
+r = run(FakeSei())
+cols = {(t["table"], c["col"]): c for t in r["targets"] for c in t["cols"]}
+c0 = cols[("T0", "C0")]["sei"]
+ok(c0["has"] and c0["file"] == "Taxlot" and c0["source"] == "Taxlot.QUANTITY_HELD" and c0["status"] == "VERIFIED_IN_FEED_SPEC" and c0["logic"] == "SUM(Taxlot.QUANTITY_HELD)",
+   "a column carries the SEI feed file and field that replaces its input, the resolution and the SEI-equivalent logic", c0)
+ok(cols[("T0", "C4")]["sei"] == {"files": [], "file": None, "source": None, "status": "NO_SEI_SOURCE", "class": "NO_SEI_SOURCE", "map_kind": None, "logic": None, "has": False},
+   "a column with no SEI source says so, and why", cols[("T0", "C4")]["sei"])
+ok(cols[("T1", "C1")]["sei"]["file"] == "SYSTEM (job run)" and cols[("T2", "C2")]["sei"] is None,
+   "SEI straight to IMDS names the system file; a column the crosswalk never mentions carries nothing")
+ok(r["sei_mapped"] == 2 and [f["file"] for f in r["sei_files"]] == ["SYSTEM (job run)", "Taxlot"]
+   and next(f for f in r["sei_files"] if f["file"] == "Taxlot") == {"file": "Taxlot", "n": 1, "verified": 1, "tables": ["T0"]},
+   "the SEI feed files behind the picture, with how many columns each replaces and how many are verified", r["sei_files"])
+r0 = run(Fake())
+ok(r0["sei_files"] == [] and r0["sei_mapped"] == 0 and all(c["sei"] is None for t in r0["targets"] for c in t["cols"]),
+   "without the crosswalk: no SEI column, nothing else changes")
+
 print(f"\n{BAD} assertion(s) failed" if BAD else "\nsource-canvas scope assertions pass")
 sys.exit(1 if BAD else 0)

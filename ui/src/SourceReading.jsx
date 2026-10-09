@@ -346,6 +346,11 @@ function Row({ r, t, last, open, onToggle, onOpenTarget, byTable }) {
           {changed && <Chip bg={C.changedBg} fg={C.changed}>changed</Chip>}
           {r.used === "N" && <Chip bg={C.unreadBg} fg={C.unread}>not read</Chip>}
           {r.pk === "Y" && <Chip bg="#e3eefb" fg="#0f4775" title="primary key">key</Chip>}
+          {r.sei && r.sei.has && (
+            <Chip bg="#e0f5fd" fg="#0091bf" title={`after cutover the input comes from SEI: ${r.sei.source || (r.sei.files || []).join("; ")}${r.sei.status ? ` (${String(r.sei.status).toLowerCase().replace(/_/g, " ")})` : ""}`}>
+              SEI → {r.sei.file || r.sei.source}</Chip>)}
+          {r.sei && !r.sei.has && r.sei.class !== "NOT_POPULATED" && (
+            <Chip bg="#f3d2d7" fg="#c1113a" title="no SEI source is named for this column yet">no SEI source</Chip>)}
           <span style={{ fontSize: 12.5, color: "#4a5560" }}>{r.sentence}</span>
           {r.repeats && (
             <span style={{ fontSize: 11.5, color: C.faint }}>

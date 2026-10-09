@@ -89,6 +89,37 @@ const anchorY = (nodeY, open, index, shownCount) =>
   });
 });
 
+
+// ---- the SEI source mapping: toggle, column, export ----------------------
+import { canvasRows, toCsv } from "../src/SourceCanvas.jsx";
+import fs from "node:fs";
+import path from "node:path";
+const SEI_T = [
+  { table: "HOLDINGDBO.POSITION", cols: [
+    { col: "QUANTITY", type: "NUMBER(28,12)", src: "Lot Quantity", logic: "SUM(lot_qty)", status: "MAPPED", equivalence: "BOTH_LOGICS_PRESENT_REVIEW_EQUIVALENCE",
+      sei: { has: true, files: ["Taxlot"], file: "Taxlot", source: "Taxlot.QUANTITY_HELD", status: "VERIFIED_IN_FEED_SPEC", class: "E2E", map_kind: "DERIVED", logic: "SUM(Taxlot.QUANTITY_HELD)" } },
+    { col: "ENTITY_ID", type: "CHAR(8)", src: "Entity Number", t1: "substr(entity, 1, 8)", status: "MAPPED",
+      sei: { has: false, files: [], file: null, source: null, status: "NO_SEI_SOURCE", class: "NO_SEI_SOURCE", map_kind: null, logic: null } },
+    { col: "UPDATE_SOURCE", type: "VARCHAR2(50)", src: null, status: "NOT_APPLICABLE", sei: null },
+  ] },
+];
+const rows = canvasRows(SEI_T, "PEDDIFI1");
+ok(rows.length === 3 && rows[0].feed === "PEDDIFI1" && rows[0].source_field === "Lot Quantity" && rows[0].imds_column === "QUANTITY"
+   && rows[0].sei_file === "Taxlot" && rows[0].sei_field === "Taxlot.QUANTITY_HELD" && rows[0].sei_resolution === "VERIFIED_IN_FEED_SPEC"
+   && rows[0].sei_logic === "SUM(Taxlot.QUANTITY_HELD)" && rows[0].transformed === "Y",
+   "the export is the picture as a table: feed field, warehouse column, operation, rule, and the SEI side", rows[0]);
+ok(rows[1].sei_file === "" && rows[1].sei_resolution === "NO_SEI_SOURCE" && rows[2].sei_file === "" && rows[2].sei_resolution === "",
+   "a column with no SEI source exports the reason; one the crosswalk never mentions exports blanks", rows.slice(1));
+const csv = toCsv([{ feed: "P", rule: 'a, "b"\nc', sei_file: "Taxlot" }]);
+ok(csv.split("\n").length === 2 && /^feed,source_field,/.test(csv) && /"a, ""b"" c"/.test(csv), "CSV: a header, quoted cells, no raw newlines", csv);
+const srcText = fs.readFileSync(path.join(process.cwd().replace(/[\\/]ui$/, ""), fs.existsSync("src/SourceCanvas.jsx") ? "src/SourceCanvas.jsx" : "ui/src/SourceCanvas.jsx"), "utf8");
+ok(/SEI source mapping · \{seiMapped\} of \{total\.total\}/.test(srcText) && /setShowSei/.test(srcText) && /seiOn \? 3 : 2/.test(srcText),
+   "a toggle adds the SEI column: three node columns when on, two when off");
+ok(/strokeDasharray="6 4"/.test(srcText) && /seiWireColor/.test(srcText) && /SEI feed file · after cutover/.test(srcText),
+   "SEI wires are dashed and coloured by resolution; SEI files are nodes of their own");
+ok(/export CSV/.test(srcText) && /_lineage\.csv/.test(srcText) && /After cutover · SEI source/.test(srcText),
+   "an export button, and the detail pane shows the SEI side of the selected column");
+
 console.log(bad ? `\n${bad} assertion(s) failed` : "\nall source-canvas assertions pass");
 
 // ---- the wire is a click target -----------------------------------------

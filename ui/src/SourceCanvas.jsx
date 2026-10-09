@@ -35,7 +35,45 @@ import { buildRuleGraph } from "./ruleGraph.js";
 import SourceReading from "./SourceReading.jsx";
 
 const MONO = "'Roboto Mono', ui-monospace, Menlo, monospace";
-const SRC_C = "#6d3ac0", DWH_C = "#0f4775";
+const SRC_C = "#6d3ac0", DWH_C = "#0f4775", SEI_C = "#0091bf";
+// The SEI wire's colour is how well the mapping document's SEI source
+// resolved to the published feed spec: verified is the only green.
+const SEI_STATUS_C = {
+  VERIFIED_IN_FEED_SPEC: "#159943", PARTIALLY_VERIFIED: "#5fa36b",
+  FILE_ONLY_NO_FIELD: "#0091bf", SYSTEM_OR_CONSTANT: "#5f87a7", DERIVED_AT_RUNTIME: "#5f87a7",
+  FIELD_NOT_IN_FEED_SPEC: "#e67e22", NOT_AVAILABLE_IN_SEI_FEEDS: "#c1113a", UNRESOLVED: "#b45309",
+};
+const seiWireColor = (st) => SEI_STATUS_C[st] || "#9aa7b2";
+const seiStatusLabel = (st) => String(st || "").toLowerCase().replace(/_/g, " ");
+
+// THE EXPORT IS THE PICTURE AS A TABLE. One row per column link — the
+// feed field, the warehouse column, what happens between them, and the SEI
+// side after cutover — so what the canvas draws can be read in a sheet.
+export function canvasRows(targets, srcTable) {
+  const out = [];
+  (targets || []).forEach((tg) => (tg.cols || []).forEach((c) => {
+    const op = c.__op || classifyLink(c);
+    const sei = c.sei || {};
+    out.push({
+      feed: srcTable || "", source_field: c.src || "", source_type: c.src_type || "",
+      imds_table: tg.table || "", imds_column: c.col || "", imds_type: c.type || "",
+      nullable: c.nullable || "", operation: OP_META[op.op] ? OP_META[op.op].label : op.op,
+      transformed: op.transformed ? "Y" : "N", rule: op.rule || c.t1 || "",
+      lineage_status: c.status || "",
+      sei_file: sei.has ? (sei.files || []).join("; ") : "",
+      sei_field: sei.has ? (sei.source || "") : "",
+      sei_resolution: sei.status || (sei.class ? sei.class : ""),
+      sei_logic: sei.logic || "", equivalence: c.equivalence || "",
+    });
+  }));
+  return out;
+}
+export function toCsv(rows) {
+  const cols = ["feed", "source_field", "source_type", "imds_table", "imds_column", "imds_type", "nullable", "operation",
+                "transformed", "rule", "lineage_status", "sei_file", "sei_field", "sei_resolution", "sei_logic", "equivalence"];
+  const cell = (v) => { const t0 = String(v ?? "").replace(/\r?\n/g, " "); return /[",]/.test(t0) ? `"${t0.replace(/"/g, '""')}"` : t0; };
+  return [cols.join(","), ...rows.map((r) => cols.map((k) => cell(r[k])).join(","))].join("\n");
+}
 // BASE sizes, not fixed ones. These are the smallest the drawing is ever
 // laid out at; the real ones are computed per render from the space the
 // canvas actually has. A 272px node ellipsised
@@ -63,6 +101,10 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
   const [sel, setSel] = useState(null);       // {table, col}
   const [q, setQ] = useState("");
   const [onlyX, setOnlyX] = useState(false);  // only transformed
+  // The SEI source mapping: a third column of SEI feed files, wired from
+  // the warehouse columns they replace the input of. On by default when
+  // the crosswalk knows this feed, and a toggle either way.
+  const [showSei, setShowSei] = useState(true);
   const [z, setZ] = useState({ k: 1, x: 0, y: 0 });
   const [full, setFull] = useState(false);
   // picture | reading. THE SAME PAYLOAD, READ TWO WAYS. The reading view
@@ -115,6 +157,9 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
     return `${c.col} ${c.src || ""}`.toLowerCase().includes(s);
   };
 
+  const seiFiles = useMemo(() => (data && data.sei_files) || [], [data]);
+  const seiOn = showSei && seiFiles.length > 0;
+
   const srcCols = useMemo(() => {
     const m = new Map();
     targets.forEach((tg) => tg.cols.forEach((c) => {
@@ -141,18 +186,20 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
   // back.
   const dims = useMemo(() => {
     const room = Math.max(620, (size.w || 900) - 24);
-    // solved so the two nodes plus the gap plus the padding come to exactly
+    // solved so the nodes plus the gaps plus the padding come to exactly
     // `room` while the gap is at its minimum — otherwise the layout comes
     // out a little wider than the box and fit() scales the whole thing down
     // to compensate, which is the wasted space again in another form.
+    // With the SEI column drawn there are three nodes and two gaps.
+    const ncol = seiOn ? 3 : 2, ngap = ncol - 1;
     const nw = Math.round(Math.min(NW_MAX,
-      Math.max(NW0, (room - PAD * 2 - COLGAP0) / 2)));
-    const gap = Math.round(Math.min(GAP_MAX, Math.max(COLGAP0,
-      room - nw * 2 - PAD * 2)));
+      Math.max(seiOn ? 200 : NW0, (room - PAD * 2 - COLGAP0 * ngap) / ncol)));
+    const gap = Math.round(Math.min(GAP_MAX, Math.max(seiOn ? 150 : COLGAP0,
+      (room - nw * ncol - PAD * 2) / ngap)));
     const cap = Math.max(CAP0,
       Math.floor(((size.h || 380) - HEAD - PAD * 2 - ROW) / ROW));
     return { nw, gap, cap };
-  }, [size.w, size.h]);
+  }, [size.w, size.h, seiOn]);
 
   const view = useMemo(() => {
     const { nw: NW, gap: COLGAP, cap: CAP } = dims;
@@ -168,13 +215,18 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
                h: HEAD + (o ? n * ROW + (n < shown.length ? ROW : 0) + 1 : 0) };
     });
     const totalT = tg.reduce((a, b) => a + b.h, 0) + Math.max(0, tg.length - 1) * GAPY;
-    const H = Math.max(sh, totalT, 120) + PAD * 2;
+    // the SEI feed files: one closed node each, centred like the rest
+    const sn = seiOn ? seiFiles.map((f) => ({ f, h: HEAD + 1 })) : [];
+    const totalS = sn.reduce((a, b) => a + b.h, 0) + Math.max(0, sn.length - 1) * GAPY;
+    const H = Math.max(sh, totalT, totalS, 120) + PAD * 2;
     const src = { x: PAD, y: PAD + (H - PAD * 2 - sh) / 2, w: NW, h: sh,
                   open: sOpen, rows: sRows };
     let y = PAD + (H - PAD * 2 - totalT) / 2;
     tg.forEach((n) => { n.x = PAD + NW + COLGAP; n.y = y; n.w = NW; y += n.h + GAPY; });
-    return { src, tg, W: PAD * 2 + NW * 2 + COLGAP, H, nw: NW, cap: CAP };
-  }, [targets, open, showAll, q, onlyX, srcCols, dims]);   // eslint-disable-line react-hooks/exhaustive-deps
+    let ys = PAD + (H - PAD * 2 - totalS) / 2;
+    sn.forEach((n) => { n.x = PAD + (NW + COLGAP) * 2; n.y = ys; n.w = NW; ys += n.h + GAPY; });
+    return { src, tg, sn, W: PAD * 2 + NW * (seiOn ? 3 : 2) + COLGAP * (seiOn ? 2 : 1), H, nw: NW, cap: CAP };
+  }, [targets, open, showAll, q, onlyX, srcCols, dims, seiOn, seiFiles]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const fit = () => {
     const el = box.current;
@@ -346,6 +398,33 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
     return { x: n.x, y: n.y + HEAD / 2 };
   };
 
+  const anchorTgtOut = (table, col) => {
+    const a = anchorTgt(table, col);
+    return a ? { x: a.x + view.nw, y: a.y } : null;
+  };
+  const anchorSei = (file) => {
+    const n = (view.sn || []).find((x) => x.f.file === file);
+    return n ? { x: n.x, y: n.y + HEAD / 2 } : null;
+  };
+  // the SEI wires: warehouse column -> the SEI feed file that replaces its
+  // input. Merged per anchor pair like the feed wires, coloured by how well
+  // the source resolved to the feed spec.
+  const seiWires = [];
+  if (seiOn) {
+    const sm = new Map();
+    targets.forEach((tg) => tg.cols.forEach((c) => {
+      if (!c.sei || !c.sei.has) return;
+      (c.sei.files || []).forEach((f) => {
+        const a = anchorTgtOut(tg.table, c.col), b = anchorSei(f);
+        if (!a || !b) return;
+        const k = `${a.y}>${b.y}`;
+        if (!sm.has(k)) sm.set(k, { a, b, items: [] });
+        sm.get(k).items.push({ ...c, table: tg.table, file: f });
+      });
+    }));
+    sm.forEach((m) => seiWires.push(m));
+  }
+
   const wires = [];
   const merged = new Map();
   targets.forEach((tg) => tg.cols.forEach((c) => {
@@ -363,6 +442,15 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
   merged.forEach((m) => wires.push(m));
 
   const total = summarise(targets.flatMap((tg) => tg.cols));
+  const seiMapped = targets.reduce((a, tg) => a + tg.cols.filter((c) => c.sei && c.sei.has).length, 0);
+  const exportCsv = () => {
+    const rows = canvasRows(targets, srcTable);
+    const blob = new Blob([toCsv(rows)], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${String(srcTable || "feed").replace(/[^A-Za-z0-9_-]+/g, "_")}_lineage.csv`;
+    a.click();
+  };
   const selected = sel && targets.find((x) => x.table === sel.table)
     ?.cols.find((c) => c.col === sel.col);
 
@@ -453,6 +541,15 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
           style={{ ...ghost, ...(onlyX ? { background: "#e67e22",
             borderColor: "#e67e22", color: "#fff" } : {}) }}>
           only transformed</button>
+        {seiFiles.length > 0 && (
+          <button type="button" onClick={() => setShowSei((v) => !v)} aria-pressed={seiOn}
+            title={`${seiMapped} of ${total.total} column links have a SEI source named for them`}
+            style={{ ...ghost, ...(seiOn ? { background: SEI_C,
+              borderColor: SEI_C, color: "#fff" } : {}) }}>
+            SEI source mapping · {seiMapped} of {total.total}</button>)}
+        <button type="button" onClick={exportCsv} style={ghost}
+          title="every column link as a row: feed field, warehouse column, operation, rule, and the SEI side">
+          ⤓ export CSV</button>
         <span style={{ marginLeft: "auto", display: "flex", gap: 5 }}>
           <button type="button" style={ghost} onClick={() => setOpen(
             new Set(["src", ...targets.map((x) => `t:${x.table}`)]))}>open all</button>
@@ -555,6 +652,47 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
                       <text x={mx} y={my + 3} textAnchor="middle" fill={c}
                         opacity={op} fontFamily={MONO} fontSize="9"
                         fontWeight="700">{m.items.length}</text>
+                    </g>)}
+                </g>);
+            })}
+            {seiWires.map((m, i) => {
+              const vis = m.items.some(hit);
+              const lit = !sel || m.items.some((x) =>
+                x.table === sel.table && x.col === sel.col);
+              const op = !vis ? 0.07 : lit ? 0.75 : 0.14;
+              const w = Math.min(7, 1.3 + Math.log2(m.items.length + 1) * 1.7);
+              const sts = new Set(m.items.map((x) => x.sei && x.sei.status));
+              const c = sts.size === 1 ? seiWireColor([...sts][0]) : SEI_C;
+              const mx = (m.a.x + m.b.x) / 2, my = (m.a.y + m.b.y) / 2;
+              const d = `M${m.a.x},${m.a.y} C${mx},${m.a.y} ${mx},${m.b.y} ${m.b.x},${m.b.y}`;
+              const one = m.items.length === 1 ? m.items[0] : null;
+              const pick = () => {
+                if (m.items.length > 1) {
+                  setOpen((st) => new Set(st).add(`t:${m.items[0].table}`));
+                  setSel({ table: m.items[0].table, col: m.items[0].col });
+                } else {
+                  const same = sel && sel.table === one.table && sel.col === one.col;
+                  setSel(same ? null : { table: one.table, col: one.col });
+                }
+              };
+              return (
+                <g key={`sei-${i}`}>
+                  {vis && (
+                    <path data-node d={d} fill="none" stroke="transparent"
+                      strokeWidth={Math.max(16, w + 10)} strokeLinecap="round" onClick={pick}
+                      style={{ pointerEvents: "stroke", cursor: "pointer" }}>
+                      <title>{one
+                        ? `${one.table}.${one.col} ← after cutover: ${one.sei.source || one.file}`
+                          + (one.sei.status ? `\n${seiStatusLabel(one.sei.status)}` : "")
+                        : `${m.items.length} columns replaced from ${m.items[0].file} — click to open the table`}</title>
+                    </path>)}
+                  <path d={d} fill="none" stroke={c} strokeWidth={w} opacity={op}
+                    strokeLinecap="round" strokeDasharray="6 4" />
+                  {m.items.length > 1 && vis && (
+                    <g data-node onClick={pick} style={{ pointerEvents: "all", cursor: "pointer" }}>
+                      <circle cx={mx} cy={my} r="8.5" fill={t.panel || "#fff"} stroke={c} strokeWidth="1.2" opacity={op} />
+                      <text x={mx} y={my + 3} textAnchor="middle" fill={c} opacity={op}
+                        fontFamily={MONO} fontSize="9" fontWeight="700">{m.items.length}</text>
                     </g>)}
                 </g>);
             })}
@@ -676,6 +814,32 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
                       no column matches the filter</div>)}
                 </div>)}
             </div>))}
+
+          {/* the SEI feed files: what replaces the feed's input after cutover */}
+          {(view.sn || []).map((n) => (
+            <div key={`sei:${n.f.file}`} data-node
+              title={`${n.f.file} — replaces the STAR input of ${n.f.n} column${n.f.n === 1 ? "" : "s"}`
+                + (n.f.verified ? `, ${n.f.verified} verified in the SEI feed spec` : "")
+                + ((n.f.tables || []).length ? `\n${n.f.tables.join(", ")}` : "")}
+              style={{ position: "absolute", left: n.x, top: n.y, width: view.nw,
+                background: t.panel || "#fff", borderRadius: 5,
+                border: `1px solid ${t.panel2 || "#dfe6e9"}`,
+                borderTop: `3px solid ${SEI_C}`, overflow: "hidden",
+                boxShadow: "0 1px 3px rgba(16,25,59,.07)", height: HEAD + 1,
+                display: "flex", gap: 7, alignItems: "center", padding: "6px 9px",
+                boxSizing: "border-box" }}>
+              <span style={{ fontSize: 11 }}>☁️</span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "block", fontSize: 10.5, fontWeight: 500,
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {n.f.file}</span>
+                <span style={{ display: "block", fontSize: 8.5, color: t.muted || "#999" }}>
+                  SEI feed file · after cutover</span>
+              </span>
+              <span style={{ fontSize: 9, color: n.f.verified === n.f.n ? "#159943" : (t.muted || "#999"),
+                whiteSpace: "nowrap" }}>
+                {n.f.n} col{n.f.n === 1 ? "" : "s"}{n.f.verified ? ` · ${n.f.verified} ✓` : ""}</span>
+            </div>))}
         </div>
       </div>
 
@@ -688,6 +852,12 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
               cursor: "help" }}>
             <i style={{ width: 9, height: 9, borderRadius: 2,
               background: OP_META[k].c }} />{OP_META[k].label}</span>))}
+        {seiOn && (
+          <span title="dashed wires: the SEI feed file that replaces the column's STAR input after cutover; green when the SEI field is verified in the published feed spec, orange or red when it is not"
+            style={{ display: "flex", alignItems: "center", gap: 4, cursor: "help" }}>
+            <i style={{ width: 14, height: 0, borderTop: `2px dashed ${SEI_C}` }} />
+            SEI source after cutover · {seiMapped} of {total.total} columns
+            {total.total - seiMapped > 0 ? ` · ${total.total - seiMapped} with none yet` : ""}</span>)}
         <span style={{ marginLeft: "auto", color: t.muted || "#999" }}>
           Wire thickness is columns carried · dots on a row are operations
           between source and target</span>
@@ -827,6 +997,33 @@ function LinkDetail({ t, c, table, srcTable, dataSource }) {
           {c.sign && <span><b style={{ color: t.muted || "#999" }}>sign</b> {c.sign}</span>}
           {c.code_set && <span><b style={{ color: t.muted || "#999" }}>code set</b>{" "}
             <span style={{ fontFamily: MONO }}>{c.code_set}</span></span>}
+        </div>)}
+
+      {/* after cutover: the SEI side of this column, from the mapping document */}
+      {c.sei && (
+        <div style={{ marginTop: 9, paddingTop: 8,
+          borderTop: `1px dashed ${t.panel2 || "#dfe6e9"}` }}>
+          <span style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: 0.5,
+            textTransform: "uppercase", color: SEI_C }}>
+            After cutover · SEI source</span>
+          {c.sei.has ? (
+            <div style={{ fontSize: 10.5, color: t.sub || "#666", lineHeight: 1.6, marginTop: 3 }}>
+              <span style={{ fontFamily: MONO, color: t.navy || "#10193b", fontWeight: 600 }}>{c.sei.source || (c.sei.files || []).join("; ")}</span>
+              {c.sei.map_kind ? <span style={{ color: t.muted || "#999" }}> · {c.sei.map_kind}</span> : null}
+              {c.sei.status && <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 700, padding: "1px 7px", borderRadius: 999,
+                border: `1px solid ${seiWireColor(c.sei.status)}`, color: seiWireColor(c.sei.status) }}>{seiStatusLabel(c.sei.status)}</span>}
+              <div style={{ color: t.muted || "#999", marginTop: 2 }}>
+                replaces {srcTable}.{c.src || "the STAR input"}; the rule above is kept
+                {c.sei.logic ? " — SEI-equivalent logic:" : ""}</div>
+              {c.sei.logic && <pre style={{ margin: "4px 0 0", fontFamily: MONO, fontSize: 10, whiteSpace: "pre-wrap", wordBreak: "break-word",
+                background: t.bg || "#f5f8f8", border: `1px solid ${t.panel2 || "#dfe6e9"}`, borderRadius: 3, padding: "6px 8px",
+                maxHeight: 110, overflow: "auto", color: t.navy || "#10193b" }}>{c.sei.logic}</pre>}
+            </div>
+          ) : (
+            <div style={{ fontSize: 10.5, color: "#c1113a", marginTop: 3 }}>
+              {c.sei.class === "NOT_POPULATED" ? "Not populated by the STAR load; nothing for SEI to replace."
+                : c.sei.class === "STAR_NOT_IN_FILE_MAP" ? "The STAR field the load reads is not in the file map; no SEI source."
+                : "No SEI source named for this column yet."}</div>)}
         </div>)}
 
       {/* the dictionary */}
