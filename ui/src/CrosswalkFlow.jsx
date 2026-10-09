@@ -171,7 +171,7 @@ export function FlowDiagram({ t, flow, onPickVerdict, onDrill, onOpenTable,
                 <text x={n.x + 9} y={n.y + n.h / 2 + 12} fontSize="9.5"
                   fill={muted}>
                   {n.code ? <tspan fontFamily={MONO}>{n.code} · </tspan> : null}
-                  {n.n} column{n.n === 1 ? "" : "s"}</text>
+                  {n.n} {n.n === 1 ? vocab.unit.replace(/s$/, "") : vocab.unit}</text>
               </g>);
           })}
         </svg>
@@ -336,7 +336,7 @@ function SelectionBar({ t, focus, onClear, onDrill, onOpenTable, vocab = DEFAULT
   const { path, total, verdicts } = focus;
   const label = (path.steps || []).join("  →  ")
     + (path.kind === "bypass" ? "   (bypasses the contract)" : "");
-  const title = `${label} · ${total} column${total === 1 ? "" : "s"}`;
+  const title = `${label} · ${total} ${total === 1 ? vocab.unit.replace(/s$/, "") : vocab.unit}`;
   return (
     <div style={{ marginTop: 11, border: `1px solid ${t.panel2 || "#dfe6e9"}`,
       borderLeft: `3px solid ${t.accent || "#0f4775"}`, borderRadius: 4,
@@ -345,7 +345,7 @@ function SelectionBar({ t, focus, onClear, onDrill, onOpenTable, vocab = DEFAULT
         flexWrap: "wrap" }}>
         <span style={{ fontFamily: MONO, fontSize: 11.5,
           color: t.navy || "#10193b" }}>{label}</span>
-        <b style={{ fontSize: 11.5 }}>{total} column{total === 1 ? "" : "s"}</b>
+        <b style={{ fontSize: 11.5 }}>{total} {total === 1 ? vocab.unit.replace(/s$/, "") : vocab.unit}</b>
         <button type="button" onClick={onClear}
           style={{ marginLeft: "auto", background: "none", border: "none",
             padding: 0, font: "inherit", fontSize: 10.5, cursor: "pointer",
