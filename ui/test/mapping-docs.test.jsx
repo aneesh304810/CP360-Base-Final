@@ -50,7 +50,7 @@ ok(typeof mappingDocs.e2eRows === "function" && typeof mappingDocs.usageExceptio
 console.log("-- the picture");
 const stack = renderToStaticMarkup(<LinkStack links={{ E2E: 2, NO_SEI_SOURCE: 6 }} total={8} />);
 ok((stack.match(/width:25%/g) || []).length === 1 && (stack.match(/width:75%/g) || []).length === 1, "a stacked bar in proportion", stack);
-const html = renderToStaticMarkup(<MappingDocsPanel t={tLight} dataSource="IMDS" initial={{ register, coverage, table: "RULESDBO.ENTITY", rows }} />);
+const html = renderToStaticMarkup(<MappingDocsPanel t={tLight} dataSource="IMDS" initial={{ register, coverage, table: "RULESDBO.ENTITY", rows, view: "Coverage" }} />);
 ok(/Every row here is a draft/.test(html) && /1121 rows carry DRAFT_REVIEW_REQUIRED/.test(html), "the draft warning, with the count");
 ok(/RULESDBO\.ENTITY/.test(html) && /3\.9%/.test(html) && /TRADESDBO\.BBH_OPEN_TRADE_STAR/.test(html) && /100%/.test(html), "coverage per IMDS table");
 ok(/EFFECTIVE_DATE/.test(html) && /Accounting Date/.test(html) && /linked end to end/.test(html) && /verdict ▸/.test(html) === false, "the drill rows draw SEI → STAR → IMDS; no verdict link without a handler");

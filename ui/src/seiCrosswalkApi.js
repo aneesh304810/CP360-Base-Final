@@ -263,6 +263,11 @@ export const mappingDocs = {
       () => ({ rows: [], total: 0, by_result: [], by_feed: [], note: "" })),
   // The candidate paths in the ribbon's own shape: SEI object -> STAR feed
   // -> IMDS table, left links grouped by link class, SEI-direct as bypass.
+  // The cutover, one row per IMDS column of a feed: the column keeps its
+  // transformation, the STAR input is replaced by the SEI source.
+  cutoverLineage: (data_source, feed, q) =>
+    _get(`/sei-crosswalk/cutover-lineage${_qs({ data_source, feed, q })}`,
+      () => ({ feeds: [], columns: [], feed: null, totals: {} })),
   flowCandidates: (data_source) =>
     _get(`/sei-crosswalk/flow-candidates${_qs({ data_source })}`,
       () => ({ left: [], right: [], bypass: [], total: 0 })),
@@ -289,6 +294,17 @@ export const CANDIDATE_VOCAB = {
   bypass: "SEI straight to IMDS, no STAR field (dashed)",
   bypassShort: "DIRECT_SEI_TO_IMDS: the document maps the SEI source onto the IMDS column without a STAR field between.",
 };
+// How a column's rule fares when STAR becomes SEI.
+export const RULE_STATE = {
+  SAME:         { t: "same rule",            c: "#159943", hint: "the SEI-equivalent logic is the legacy logic, verbatim" },
+  SUBSTITUTED:  { t: "same rule, SEI input", c: "#159943", hint: "the legacy logic with the STAR input swapped for the SEI input" },
+  PASS_THROUGH: { t: "copied as is",         c: "#5f87a7", hint: "no rule on either side: the value is copied" },
+  ALTERNATIVES: { t: "two SEI versions",     c: "#e67e22", hint: "the document gives two SEI versions (-- ALT:)" },
+  REWRITTEN:    { t: "rewritten",            c: "#e67e22", hint: "a different rule on the SEI side" },
+  NEW_RULE:     { t: "new rule",             c: "#7c3aed", hint: "no legacy rule; a SEI one" },
+  NO_SEI_RULE:  { t: "no SEI rule",          c: "#c1113a", hint: "a legacy rule and nothing on the SEI side" },
+};
+export const RULE_STATE_ORDER = ["SAME", "SUBSTITUTED", "PASS_THROUGH", "ALTERNATIVES", "REWRITTEN", "NEW_RULE", "NO_SEI_RULE"];
 export const COMPLETENESS_INFO = {
   BOTH_LOGICS_DOCUMENTED:             { t: "both logics",          c: "#159943" },
   IM_LOGIC_AND_SEI_SOURCE_DOCUMENTED: { t: "IM logic + SEI source", c: "#0091bf" },

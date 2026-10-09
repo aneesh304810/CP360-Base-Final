@@ -156,6 +156,87 @@ ok(lefts.get(("Taxlot", "PEDDIFI1", "E2E")) == 1 and lefts.get(("no SEI source",
 rights = {(r["mid"], r["tgt"]): r["n"] for r in fc["right"]}
 ok(rights == {("PEDDIFI1", "HOLDINGDBO.POSITION"): 3, ("ODDDIFI1", "HOLDINGDBO.BBH_OPEN_DIVIDENDS"): 1}, "right links: STAR feed -> IMDS table, distinct columns", rights)
 
+print("-- the cutover: the rule's fate when STAR becomes SEI")
+rs = R.rule_state
+ok(rs("SUM(a)", "SUM(a)") == "SAME" and rs("SUM(Lot_Qty)", "SUM(Taxlot.QUANTITY)", "Lot Qty", "QUANTITY", "Taxlot") == "SUBSTITUTED"
+   and rs("substr(lot_qty,1,2)", "substr(QUANTITY,1,2)", "Lot Quantity", "QUANTITY", None, "lot_qty") == "SUBSTITUTED",
+   "same, and the same rule with the STAR input swapped for the SEI input (by field or by stage column, object-prefixed or not)")
+ok(rs("x", "y") == "REWRITTEN" and rs("x", "y -- ALT: z") == "ALTERNATIVES" and rs(None, "y") == "NEW_RULE" and rs(None, None) == "PASS_THROUGH"
+   and rs("x", "") == "NO_SEI_RULE" and rs("  SUM( a )", "sum(a)") == "SAME", "rewritten, alternatives, new rule, pass-through, the gap; whitespace and case ignored")
+ok(R.RULE_STATE_ORDER[0] == "SAME" and R.RULE_STATE_ORDER[-1] == "NO_SEI_RULE" and len(set(R.RULE_STATE_ORDER)) == 7, "seven states, kept ones first")
+
+STG2 = [
+    {"map_row_id": "s1", "star_field": "Lot Quantity", "star_field_norm": "LOT_QUANTITY", "imds_table": "HOLDINGDBO.POSITION", "imds_column": "QUANTITY", "target_type": "NUMBER(28,12)", "target_nullable": "No",
+     "uploader_column": "lot_qty", "im_logic": "SUM(lot_qty)", "sei_equiv_logic": "SUM(Taxlot.QUANTITY)", "sei_object": "Taxlot", "sei_field": "QUANTITY", "sei_join_logic": "TAXLOT_TYPE_CODE = 2",
+     "comparison_id": "CMP-1", "evidence_completeness": "BOTH_LOGICS_DOCUMENTED", "business_decision": "N", "notes": None, "source_document": "pv.xlsx", "source_row": 13},
+    {"map_row_id": "s2", "star_field": "Entity Number", "star_field_norm": "ENTITY_NUMBER", "imds_table": "HOLDINGDBO.POSITION", "imds_column": "ENTITY_ID", "target_type": "CHAR(8)", "target_nullable": "No",
+     "uploader_column": "entity", "im_logic": "substr(entity,1,8)", "sei_equiv_logic": None, "sei_object": None, "sei_field": None, "sei_join_logic": None,
+     "comparison_id": "CMP-2", "evidence_completeness": "IM_ONLY_DOCUMENTED", "business_decision": "Y", "notes": "needs a decision", "source_document": "pv.xlsx", "source_row": 14},
+    {"map_row_id": "s3", "star_field": "Accounting Date", "star_field_norm": "ACCOUNTING_DATE", "imds_table": "HOLDINGDBO.POSITION", "imds_column": "EFFECTIVE_DATE", "target_type": "DATE", "target_nullable": "Yes",
+     "uploader_column": "acct_dt", "im_logic": "to_date(acct_dt,'MM/DD/YYYY')", "sei_equiv_logic": "PROCESSING_DATE", "sei_object": None, "sei_field": None, "sei_join_logic": None,
+     "comparison_id": "CMP-3", "evidence_completeness": "BOTH_LOGICS_DOCUMENTED", "business_decision": "N", "notes": None, "source_document": "pv.xlsx", "source_row": 15},
+    {"map_row_id": "s4", "star_field": "Price", "star_field_norm": "PRICE", "imds_table": "HOLDINGDBO.POSITION", "imds_column": "PRICE", "target_type": "NUMBER", "target_nullable": "Yes",
+     "uploader_column": "price", "im_logic": None, "sei_equiv_logic": None, "sei_object": "Taxlot", "sei_field": "PRICE", "sei_join_logic": None,
+     "comparison_id": "CMP-4", "evidence_completeness": "NO_MAPPING", "business_decision": "N", "notes": None, "source_document": "pv.xlsx", "source_row": 16},
+]
+S2S2 = [
+    {"star_field_norm": "LOT_QUANTITY", "star_in_layout": "Y", "business_description": "Quantity of the lot", "doc_usage_status": "Used", "sei_object": "Taxlot", "sei_field": "QUANTITY", "sei_type": "decimal", "join_logic": "TAXLOT_TYPE_CODE = 2", "map_kind": "DERIVED", "open_dependency": None, "mapping_status": "CANDIDATE", "approval_status": "DRAFT_REVIEW_REQUIRED"},
+    {"star_field_norm": "ENTITY_NUMBER", "star_in_layout": "Y", "business_description": "The entity", "doc_usage_status": "Used", "sei_object": None, "sei_field": None, "sei_type": None, "join_logic": None, "map_kind": "NO_MAPPING", "open_dependency": "entity id derivation", "mapping_status": "NO_SEI_SOURCE", "approval_status": "DRAFT_REVIEW_REQUIRED"},
+    {"star_field_norm": "ACCOUNTING_DATE", "star_in_layout": "N", "business_description": None, "doc_usage_status": "Unused", "sei_object": None, "sei_field": "PROCESSING_DATE", "sei_type": "date", "join_logic": None, "map_kind": "SYSTEM_DATE", "open_dependency": None, "mapping_status": "CANDIDATE", "approval_status": "DRAFT_REVIEW_REQUIRED"},
+]
+LAY = [{"field_norm": "LOT_QUANTITY", "ordinal": 7, "published_type": "NUM", "published_length": "18"}, {"field_norm": "ENTITY_NUMBER", "ordinal": 1, "published_type": "CHAR", "published_length": "8"}, {"field_norm": "PRICE", "ordinal": 9, "published_type": "NUM", "published_length": "18"}]
+USE = [{"field_norm": "LOT_QUANTITY", "usage_status": "Used", "is_used": "Y"}, {"field_norm": "ENTITY_NUMBER", "usage_status": "Used", "is_used": "Y"}, {"field_norm": "ACCOUNTING_DATE", "usage_status": "Unused", "is_used": "N"}]
+E2E2 = [{"imds_table": "HOLDINGDBO.POSITION", "imds_column": "QUANTITY", "star_field_norm": "LOT_QUANTITY", "link_status": "E2E_LINKED", "link_class": "E2E", "crosswalk_status": "CANDIDATE"},
+        {"imds_table": "HOLDINGDBO.POSITION", "imds_column": "ENTITY_ID", "star_field_norm": "ENTITY_NUMBER", "link_status": "NO_SEI_SOURCE", "link_class": "NO_SEI_SOURCE", "crosswalk_status": "GAP"}]
+
+
+def fake2(sql, params=None):
+    params = params or {}
+    s = " ".join(sql.split())
+    if "FROM sei_mapping_source" in s:
+        return [dict(r) for r in REG]
+    if "feed_family = :f" in s and params.get("f") != "PEDDIFI1":
+        return []
+    if "FROM star_imds_stage_map" in s:
+        return [dict(r) for r in STG2]
+    if "FROM sei_star_field_map" in s:
+        return [dict(r) for r in S2S2]
+    if "FROM star_layout_field" in s:
+        return [dict(r) for r in LAY]
+    if "FROM star_field_usage" in s:
+        return [dict(r) for r in USE]
+    if "FROM sei_e2e_xwalk" in s:
+        return [dict(r) for r in E2E2]
+    return []
+
+
+R._safe = fake2
+c0 = R.cutover_lineage()
+ok(c0["feed"] is None and c0["columns"] == [] and len(c0["feeds"]) == len(REG), "no feed asked: the feeds to pick from, no rows")
+cu = R.cutover_lineage(feed="PEDDIFI1")
+byc = {c["imds_column"]: c for c in cu["columns"]}
+ok(list(byc) == ["EFFECTIVE_DATE", "ENTITY_ID", "PRICE", "QUANTITY"], "one row per IMDS column, in table.column order", list(byc))
+q = byc["QUANTITY"]
+ok(q["star"]["field"] == "Lot Quantity" and q["star"]["in_layout"] == "Y" and q["star"]["ordinal"] == 7 and q["star"]["is_used"] == "Y" and q["star"]["uploader_column"] == "lot_qty",
+   "the STAR side: the field, its layout slot and whether anything reads it", q["star"])
+ok(q["sei"]["source"] == "Taxlot.QUANTITY" and q["sei"]["map_kind"] == "DERIVED" and q["sei"]["join_logic"] == "TAXLOT_TYPE_CODE = 2" and q["has_sei"],
+   "the SEI side: object.field, kind and join", q["sei"])
+ok(q["rule"]["state"] == "SUBSTITUTED" and q["link_class"] == "E2E" and q["crosswalk_status"] == "CANDIDATE", "the rule is kept with the SEI input; the e2e link rides along", q["rule"])
+e = byc["ENTITY_ID"]
+ok(not e["has_sei"] and e["sei"]["source"] is None and e["sei"]["mapping_status"] == "NO_SEI_SOURCE" and e["rule"]["state"] == "NO_SEI_RULE" and e["rule"]["business_decision"] == "Y"
+   and e["link_class"] == "NO_SEI_SOURCE", "no SEI source: the rule is the gap, flagged for a business decision", e)
+d = byc["EFFECTIVE_DATE"]
+ok(d["sei"]["source"] == "PROCESSING_DATE" and d["sei"]["map_kind"] == "SYSTEM_DATE" and d["rule"]["state"] == "REWRITTEN" and d["star"]["in_layout"] == "N" and d["star"]["is_used"] == "N",
+   "a SEI source from the SEI->STAR lane when the stage row has none; a rewritten rule; a STAR field outside the layout, read by nothing", d)
+pr = byc["PRICE"]
+ok(pr["rule"]["state"] == "PASS_THROUGH" and pr["has_sei"] and pr["sei"]["source"] == "Taxlot.PRICE" and pr["link_class"] is None, "no rule either side: the value is copied; no e2e row is no link", pr)
+T = cu["totals"]
+ok(T["columns"] == 4 and T["tables"] == 1 and T["with_sei"] == 3 and T["no_sei"] == 1 and T["kept"] == 2 and T["rewritten"] == 1 and T["business_decisions"] == 1 and T["star_fields"] == 4,
+   "the totals", T)
+ok([x["key"] for x in T["by_state"]] == ["SUBSTITUTED", "PASS_THROUGH", "REWRITTEN", "NO_SEI_RULE"], "states counted in order", T["by_state"])
+ok([c["imds_column"] for c in R.cutover_lineage(feed="PEDDIFI1", q="taxlot")["columns"]] == ["PRICE", "QUANTITY"], "search matches the SEI source too")
+ok(R.cutover_lineage(feed="ODDDIFI1")["totals"]["columns"] == 0, "a feed with no stage rows: empty, no error")
+
 print("-- an empty warehouse")
 R._safe = lambda sql, params=None: []
 ok(R.mapping_docs()["totals"]["documents"] == 0 and R.e2e_coverage()["coverage_pct"] is None and R.transformation_summary()["tables"] == [],

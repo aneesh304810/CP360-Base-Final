@@ -2920,3 +2920,145 @@ def flow_candidates(data_source: str | None = None):
             "left": [{"src": k[0], "mid": k[1], "verdict": k[2], "n": len(v)} for k, v in sorted(left.items())],
             "right": [{"mid": k[0], "tgt": k[1], "n": len(v)} for k, v in sorted(right.items())],
             "bypass": [{"src": k[0], "tgt": k[1], "n": len(v)} for k, v in sorted(bypass.items())]}
+
+
+
+# =============================================================================
+# The cutover lineage: STAR is replaced by SEI, the transformation stays.
+# =============================================================================
+
+_WS = re.compile(r"\s+")
+
+
+def _rule_norm(x):
+    return _WS.sub(" ", str(x or "")).strip().lower()
+
+
+def _ident_norm(x):
+    return re.sub(r"[^a-z0-9]", "", str(x or "").lower())
+
+
+def rule_state(im_logic, sei_logic, star_field=None, sei_field=None, sei_object=None, uploader_column=None):
+    """How the IMDS column's rule fares when STAR becomes SEI.
+
+    SAME         the SEI-equivalent logic is the legacy logic, verbatim
+    SUBSTITUTED  the legacy logic with the STAR input swapped for the SEI
+                 input, and nothing else changed: the rule is kept
+    ALTERNATIVES the document gives two SEI versions (-- ALT:)
+    REWRITTEN    a different rule on the SEI side
+    NEW_RULE     no legacy rule, a SEI one
+    PASS_THROUGH neither side has a rule: the value is copied
+    NO_SEI_RULE  a legacy rule and nothing on the SEI side: the gap
+    """
+    im, sei = _rule_norm(im_logic), _rule_norm(sei_logic)
+    if not sei:
+        return "NO_SEI_RULE" if im else "PASS_THROUGH"
+    if not im:
+        return "NEW_RULE"
+    if im == sei or _WS.sub("", im) == _WS.sub("", sei):
+        return "SAME"
+    if "-- alt:" in sei:
+        return "ALTERNATIVES"
+    im_i, sei_i = _ident_norm(im), _ident_norm(sei)
+    if im_i == sei_i:
+        return "SUBSTITUTED"
+    # the STAR input may be named by its field or by the stage column the
+    # legacy rule reads; the SEI input by its field alone or object.field
+    stars = {_ident_norm(x) for x in (star_field, uploader_column) if x}
+    seis = set()
+    if sei_field:
+        f = _ident_norm(str(sei_field).split(".")[-1])
+        seis.add(f)
+        if sei_object:
+            seis.add(_ident_norm(sei_object) + f)
+    for a in stars:
+        for b in seis:
+            if a and b and im_i.replace(a, b) == sei_i:
+                return "SUBSTITUTED"
+    return "REWRITTEN"
+
+
+RULE_STATE_ORDER = ["SAME", "SUBSTITUTED", "PASS_THROUGH", "ALTERNATIVES", "REWRITTEN", "NEW_RULE", "NO_SEI_RULE"]
+
+
+@router.get("/cutover-lineage")
+def cutover_lineage(data_source: str | None = None, feed: str | None = None, q: str | None = None):
+    """One row per IMDS column of a STAR feed, read as the cutover: the
+    column keeps its transformation; the STAR field that feeds it today is
+    replaced by the SEI source the mapping document proposes. The rule is
+    classed by whether it survives the swap (rule_state), and the STAR
+    field carries what the layout and the usage matrix say about it."""
+    ds = _ds(data_source)
+    feeds = _safe("""SELECT feed_family, feed_key, source_document, sei_star_rows, sei_star_mapped, imds_targets
+                     FROM sei_mapping_source WHERE data_source = :ds ORDER BY feed_family""", {"ds": ds})
+    if not feed:
+        return {"data_source": ds, "feeds": feeds, "columns": [], "feed": None, "totals": {}}
+    p = {"ds": ds, "f": feed}
+    stg = _safe("""SELECT map_row_id, star_field, star_field_norm, imds_table, imds_column, target_type, target_nullable,
+                          uploader_column, im_logic, sei_equiv_logic, sei_object, sei_field, sei_join_logic, comparison_id,
+                          evidence_completeness, business_decision, notes, source_document, source_row
+                   FROM star_imds_stage_map WHERE data_source = :ds AND feed_family = :f""", p)
+    s2s = {}
+    for r in _safe("""SELECT star_field_norm, star_in_layout, business_description, doc_usage_status, sei_object, sei_field,
+                             sei_type, join_logic, map_kind, open_dependency, mapping_status, approval_status
+                      FROM sei_star_field_map WHERE data_source = :ds AND feed_family = :f""", p):
+        s2s.setdefault(r.get("star_field_norm"), r)
+    layout = {r.get("field_norm"): r for r in _safe(
+        """SELECT field_norm, ordinal, published_type, published_length FROM star_layout_field
+           WHERE data_source = :ds AND feed_family = :f""", p)}
+    usage = {r.get("field_norm"): r for r in _safe(
+        """SELECT field_norm, usage_status, is_used FROM star_field_usage WHERE data_source = :ds AND feed_family = :f""", p)}
+    e2e = {}
+    for r in _safe("""SELECT imds_table, imds_column, star_field_norm, link_status, link_class, crosswalk_status
+                      FROM sei_e2e_xwalk WHERE data_source = :ds AND feed_family = :f""", p):
+        e2e.setdefault((r.get("imds_table"), r.get("imds_column"), r.get("star_field_norm")), r)
+    cols = []
+    for r in stg:
+        norm = r.get("star_field_norm")
+        m = s2s.get(norm) or {}
+        lay, use = layout.get(norm) or {}, usage.get(norm) or {}
+        # the SEI source: the stage row's own first, else the SEI -> STAR lane's
+        sei_obj = r.get("sei_object") or m.get("sei_object")
+        sei_fld = r.get("sei_field") or m.get("sei_field")
+        if (m.get("mapping_status") or "") == "NO_SEI_SOURCE" and not r.get("sei_field"):
+            sei_obj, sei_fld = None, None
+        link = e2e.get((r.get("imds_table"), r.get("imds_column"), norm)) or {}
+        state = rule_state(r.get("im_logic"), r.get("sei_equiv_logic"), r.get("star_field"), sei_fld, sei_obj, r.get("uploader_column"))
+        if not sei_fld and state in ("SAME", "SUBSTITUTED", "PASS_THROUGH"):
+            state = "NO_SEI_RULE" if r.get("im_logic") else "PASS_THROUGH"
+        cols.append({
+            "row_id": r.get("map_row_id"),
+            "imds_table": r.get("imds_table"), "imds_column": r.get("imds_column"),
+            "target_type": r.get("target_type"), "target_nullable": r.get("target_nullable"),
+            "star": {"field": r.get("star_field"), "norm": norm, "in_layout": ("Y" if norm in layout else m.get("star_in_layout")) if norm else None,
+                     "ordinal": lay.get("ordinal"), "type": lay.get("published_type"), "length": lay.get("published_length"),
+                     "usage_status": use.get("usage_status"), "is_used": use.get("is_used"),
+                     "doc_usage": m.get("doc_usage_status"), "description": m.get("business_description"),
+                     "uploader_column": r.get("uploader_column")},
+            "sei": {"object": sei_obj, "field": sei_fld, "source": f"{sei_obj}.{sei_fld}" if sei_obj and sei_fld else (sei_fld or sei_obj),
+                    "type": m.get("sei_type"), "join_logic": r.get("sei_join_logic") or m.get("join_logic"), "map_kind": m.get("map_kind"),
+                    "open_dependency": m.get("open_dependency"), "mapping_status": m.get("mapping_status"),
+                    "approval_status": m.get("approval_status")},
+            "rule": {"im_logic": r.get("im_logic"), "sei_logic": r.get("sei_equiv_logic"), "state": state,
+                     "evidence_completeness": r.get("evidence_completeness"), "business_decision": r.get("business_decision"),
+                     "comparison_id": r.get("comparison_id"), "notes": r.get("notes")},
+            "link_status": link.get("link_status"), "link_class": link.get("link_class"), "crosswalk_status": link.get("crosswalk_status"),
+            "has_sei": bool(sei_fld or sei_obj),
+            "source_document": r.get("source_document"), "source_row": r.get("source_row"),
+        })
+    if q:
+        qq = q.strip().upper()
+        cols = [c for c in cols if qq in f"{c['imds_table']}.{c['imds_column']}".upper() or qq in (c["star"]["field"] or "").upper()
+                or qq in (c["sei"]["source"] or "").upper() or qq in (c["rule"]["im_logic"] or "").upper()]
+    cols.sort(key=lambda c: (c["imds_table"] or "", c["imds_column"] or ""))
+    by_state = {}
+    for c in cols:
+        by_state[c["rule"]["state"]] = by_state.get(c["rule"]["state"], 0) + 1
+    tot = {"columns": len(cols), "tables": len({c["imds_table"] for c in cols}),
+           "with_sei": sum(1 for c in cols if c["has_sei"]), "no_sei": sum(1 for c in cols if not c["has_sei"]),
+           "kept": sum(1 for c in cols if c["rule"]["state"] in ("SAME", "SUBSTITUTED", "PASS_THROUGH")),
+           "rewritten": sum(1 for c in cols if c["rule"]["state"] in ("REWRITTEN", "ALTERNATIVES", "NEW_RULE")),
+           "business_decisions": sum(1 for c in cols if c["rule"]["business_decision"] == "Y"),
+           "star_fields": len({c["star"]["norm"] for c in cols if c["star"]["norm"]}),
+           "by_state": [{"key": k, "n": by_state[k]} for k in RULE_STATE_ORDER if k in by_state]}
+    return {"data_source": ds, "feed": feed, "feeds": feeds, "columns": cols, "totals": tot}

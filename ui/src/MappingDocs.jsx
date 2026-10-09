@@ -13,9 +13,9 @@
 // crosswalk, so nothing here changes a verdict, and the panel says so.
 
 import React, { useEffect, useMemo, useState } from "react";
-import { mappingDocs, LINK_INFO, LINK_ORDER, COMPLETENESS_INFO } from "./seiCrosswalkApi.js";
+import { mappingDocs, LINK_INFO, LINK_ORDER, COMPLETENESS_INFO, RULE_STATE, RULE_STATE_ORDER } from "./seiCrosswalkApi.js";
 
-const VIEWS = ["Coverage", "Documents", "Transformations", "Reference codes", "Entity ID", "Usage exceptions"];
+const VIEWS = ["Cutover", "Coverage", "Documents", "Transformations", "Reference codes", "Entity ID", "Usage exceptions"];
 
 const Tile = ({ t, v, label, sub, c }) => (
   <div style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: t.radius.md, padding: "10px 14px", minWidth: 140 }}>
@@ -66,7 +66,7 @@ export default function MappingDocsPanel({ t, dataSource, initial, onOpenColumn 
   const [codes, setCodes] = useState(initial?.codes || null);
   const [ent, setEnt] = useState(initial?.entity || null);
   const [exc, setExc] = useState(initial?.exceptions || null);
-  const [view, setView] = useState(initial?.view || "Coverage");
+  const [view, setView] = useState(initial?.view || "Cutover");
   const [table, setTable] = useState(initial?.table || null);
   const [link, setLink] = useState("");
   const [q, setQ] = useState("");
@@ -115,6 +115,8 @@ export default function MappingDocsPanel({ t, dataSource, initial, onOpenColumn 
               borderBottom: view === v ? `2px solid ${t.accent}` : "2px solid transparent", marginBottom: -1 }}>{v}</div>))}
       </div>
 
+      {view === "Cutover" && <Cutover t={t} ds={ds} initial={initial?.cutover} feeds={(reg?.docs || []).map((d) => d.feed_family)} onOpenColumn={onOpenColumn} />}
+
       {view === "Coverage" && cov && (
         <div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
@@ -156,8 +158,8 @@ export default function MappingDocsPanel({ t, dataSource, initial, onOpenColumn 
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead><tr><th style={th(t)}>SEI source</th><th style={th(t)}>→ STAR field</th><th style={th(t)}>→ IMDS column</th><th style={th(t)}>Link</th><th style={th(t)}>Status</th></tr></thead>
                     <tbody>
-                      {rows.map((r) => (
-                        <React.Fragment key={r.xwalk_row_id}>
+                      {rows.map((r, i) => (
+                        <React.Fragment key={`${r.xwalk_row_id}-${i}`}>
                           <tr onClick={() => setOpenRow(openRow === r.xwalk_row_id ? null : r.xwalk_row_id)} style={{ cursor: "pointer" }}>
                             <td style={{ ...td(t), color: r.sei_source ? t.navy : t.danger, fontWeight: r.sei_source ? 600 : 400 }}>{r.sei_source || "(no SEI source)"}{r.map_kind ? <span style={{ fontSize: 10, color: t.textMuted }}> · {r.map_kind}</span> : null}</td>
                             <td style={{ ...td(t), color: r.star_in_layout === "N" ? "#7c3aed" : t.text }}>{r.star_field || <span style={{ color: t.textMuted }}>(direct)</span>}{r.star_in_layout === "N" ? " ⚠" : ""}</td>
@@ -265,11 +267,11 @@ export default function MappingDocsPanel({ t, dataSource, initial, onOpenColumn 
 
       {view === "Entity ID" && ent && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 12 }}>
-          {(ent.feeds || []).map((f) => (
-            <div key={f.feed_family} style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: t.radius.md, padding: "10px 12px" }}>
+          {(ent.feeds || []).map((f, fi) => (
+            <div key={`${f.feed_family}-${fi}`} style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: t.radius.md, padding: "10px 12px" }}>
               <div style={{ fontSize: 12.5, fontWeight: 800, color: t.navy, marginBottom: 8 }}>{f.feed_family} <span style={{ fontSize: 10.5, color: t.textMuted, fontWeight: 400 }}>· how Entity ID is built, step by step</span></div>
-              {f.steps.map((s) => (
-                <div key={s.seq} style={{ display: "grid", gridTemplateColumns: "28px 1fr 1fr", gap: 8, padding: "6px 0", borderTop: `1px solid ${t.panel2}` }}>
+              {f.steps.map((s, i) => (
+                <div key={`${f.feed_family}-${s.seq}-${i}`} style={{ display: "grid", gridTemplateColumns: "28px 1fr 1fr", gap: 8, padding: "6px 0", borderTop: `1px solid ${t.panel2}` }}>
                   <div style={{ fontSize: 12, fontWeight: 800, color: t.accent }}>{s.seq}</div>
                   <div><div style={{ fontSize: 9.5, color: t.textMuted, textTransform: "uppercase", letterSpacing: ".5px" }}>legacy IMDS</div>
                     <div style={{ ...mono, color: t.text }}>{s.legacy_logic || "—"}</div>
@@ -306,5 +308,132 @@ export default function MappingDocsPanel({ t, dataSource, initial, onOpenColumn 
             </table>
           </div>
         </div>)}
+    </div>);
+}
+
+
+/* THE CUTOVER. One row per IMDS column of a feed, read the way the
+   migration reads it: the column keeps its transformation; the STAR field
+   that feeds it today is replaced by the SEI source the document proposes.
+   The rule in the middle says whether it survives the swap. Pure of the
+   fetch below the first render, so a test can hand it rows. */
+export function ruleLabel(state) { return (RULE_STATE[state] || {}).t || (state || "").toLowerCase(); }
+
+export function Cutover({ t, ds, feeds, initial, onOpenColumn }) {
+  const [feed, setFeed] = useState(initial?.feed || "");
+  const [data, setData] = useState(initial || null);
+  const [q, setQ] = useState("");
+  const [state, setState] = useState("");
+  const [open, setOpen] = useState(null);
+  useEffect(() => {
+    if (initial) return undefined;
+    let on = true;
+    mappingDocs.cutoverLineage(ds, feed || undefined).then((d) => { if (on) setData(d); });
+    return () => { on = false; };
+  }, [ds, feed]);
+  const feedList = (data?.feeds || []).map((f) => f.feed_family).concat(feeds || []).filter((v, i, a) => v && a.indexOf(v) === i);
+  const cols = (data?.columns || []).filter((c) => !state || c.rule.state === state)
+    .filter((c) => !q || `${c.imds_table}.${c.imds_column} ${c.star.field || ""} ${c.sei.source || ""} ${c.rule.im_logic || ""}`.toUpperCase().includes(q.toUpperCase()));
+  const T = data?.totals || {};
+  const mono = { fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace", fontSize: 11, whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: 1.45 };
+  const lab = (txt, c) => <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: ".6px", color: c || t.textMuted, textTransform: "uppercase" }}>{txt}</div>;
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
+        <select value={feed} onChange={(e) => { setFeed(e.target.value); setOpen(null); }}
+          style={{ fontSize: 11.5, padding: "4px 8px", border: `1px solid ${t.border}`, borderRadius: 4, background: "#fff", fontFamily: t.font }}>
+          <option value="">pick a STAR feed…</option>{feedList.map((f) => <option key={f} value={f}>{f}</option>)}</select>
+        {feed && <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="IMDS column, STAR field, SEI source, rule…"
+          style={{ fontSize: 11.5, padding: "4px 8px", border: `1px solid ${t.border}`, borderRadius: 4, width: 260 }} />}
+        <span style={{ fontSize: 11.5, color: t.sub, marginLeft: "auto" }}>
+          read left to right: the STAR input is <b>replaced</b> by the SEI source · the transformation into IMDS is <b>kept</b> where the rule allows</span>
+      </div>
+      {!feed && <div style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: t.radius.md, padding: 20, fontSize: 12.5, color: t.textMuted }}>
+        Pick a STAR feed. Each IMDS column it feeds is drawn with the STAR field it reads today on top, the SEI source that replaces it beneath, and the transformation between them marked as kept, swapped or rewritten.</div>}
+      {feed && data && (
+        <>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+            <Tile t={t} v={T.columns} label="IMDS columns" sub={`${T.tables || 0} tables · ${T.star_fields || 0} STAR fields read today`} />
+            <Tile t={t} v={T.with_sei} label="with a SEI source" sub={`${T.no_sei || 0} without one yet`} c={T.no_sei ? t.warning : t.success} />
+            <Tile t={t} v={T.kept} label="rule kept" sub="same rule, or the input swapped" c={t.success} />
+            <Tile t={t} v={T.rewritten} label="rule changes" sub="rewritten, two versions, or new" c={t.warning} />
+            <Tile t={t} v={(T.by_state || []).find((x) => x.key === "NO_SEI_RULE")?.n || 0} label="no SEI rule" sub="a legacy rule with nothing on the SEI side" c={t.danger} />
+            <Tile t={t} v={T.business_decisions} label="business decisions" sub="flagged in the document" c={T.business_decisions ? t.warning : t.textMuted} />
+          </div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+            {(T.by_state || []).map((x) => <Pill key={x.key} info={RULE_STATE[x.key] || { c: "#6b7c8a" }} active={state === x.key}
+              onClick={() => setState(state === x.key ? "" : x.key)}>{ruleLabel(x.key)} · {x.n}</Pill>)}
+          </div>
+          <div style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: t.radius.md }}>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.25fr) 28px minmax(0,1.5fr) 28px minmax(0,1fr)", gap: 0,
+              padding: "6px 12px", borderBottom: `1px solid ${t.border}`, fontSize: 9.5, color: t.textMuted, textTransform: "uppercase", letterSpacing: ".6px", fontWeight: 700 }}>
+              <div>Source · STAR today, SEI after cutover</div><div /><div>Transformation · kept into IMDS</div><div /><div>IMDS column</div>
+            </div>
+            {cols.map((c, i) => {
+              const rs = RULE_STATE[c.rule.state] || { c: "#6b7c8a", t: c.rule.state };
+              const isOpen = open === c.row_id;
+              return (
+                <div key={`${c.row_id}-${i}`} onClick={() => setOpen(isOpen ? null : c.row_id)}
+                  style={{ display: "grid", gridTemplateColumns: "minmax(0,1.25fr) 28px minmax(0,1.5fr) 28px minmax(0,1fr)", alignItems: "center",
+                    padding: "9px 12px", borderBottom: `1px solid ${t.panel2}`, cursor: "pointer", background: isOpen ? t.infoBg : "transparent" }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+                      <span style={{ fontSize: 9, fontWeight: 800, color: "#b5651d", width: 30 }}>STAR</span>
+                      <span style={{ fontSize: 12, color: t.sub, textDecoration: c.has_sei ? "line-through" : "none", textDecorationColor: "#b5651d99" }}>
+                        {c.star.field || <i style={{ color: t.textMuted }}>no STAR field</i>}</span>
+                      {c.star.in_layout === "N" && <span title="not in the STAR file layout" style={{ color: "#7c3aed", fontSize: 11 }}>⚠</span>}
+                      {c.star.is_used === "N" && <span style={{ fontSize: 9.5, color: t.textMuted }}>read by nothing</span>}
+                    </div>
+                    <div style={{ fontSize: 9.5, color: t.textMuted, margin: "1px 0 1px 38px" }}>{c.has_sei ? "replaced by ↓" : "stays until a SEI source is named"}</div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+                      <span style={{ fontSize: 9, fontWeight: 800, color: "#0091bf", width: 30 }}>SEI</span>
+                      {c.has_sei
+                        ? <span style={{ fontSize: 12, fontWeight: 700, color: t.navy, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.sei.source}</span>
+                        : <span style={{ fontSize: 12, fontWeight: 700, color: t.danger }}>no SEI source</span>}
+                      {c.sei.map_kind && <span style={{ fontSize: 9.5, color: t.textMuted }}>{c.sei.map_kind}</span>}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "center", color: c.has_sei ? t.accent : t.disabled, fontSize: 16 }}>→</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 3 }}>
+                      <Pill info={rs}>{ruleLabel(c.rule.state)}</Pill>
+                      {c.rule.business_decision === "Y" && <span style={{ fontSize: 9.5, color: t.warning, fontWeight: 700 }}>business decision</span>}
+                      {c.rule.evidence_completeness && <span style={{ fontSize: 9.5, color: t.textMuted }}>{(COMPLETENESS_INFO[c.rule.evidence_completeness] || {}).t || c.rule.evidence_completeness}</span>}
+                    </div>
+                    <div style={{ ...mono, color: t.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: isOpen ? "pre-wrap" : "nowrap" }}>
+                      {c.rule.im_logic || (c.rule.sei_logic ? "" : "copied as is")}</div>
+                    {c.rule.sei_logic && c.rule.state !== "SAME" && (
+                      <div style={{ ...mono, color: "#0091bf", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: isOpen ? "pre-wrap" : "nowrap" }}>
+                        <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: ".5px" }}>SEI </span>{c.rule.sei_logic}</div>)}
+                  </div>
+                  <div style={{ textAlign: "center", color: t.accent, fontSize: 16 }}>→</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 9.5, color: t.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.imds_table}</div>
+                    <div style={{ fontSize: 12.5, fontWeight: 800, color: t.navy }}>{c.imds_column}
+                      {onOpenColumn && <span onClick={(e) => { e.stopPropagation(); onOpenColumn(c.imds_table, c.imds_column); }} role="button" tabIndex={0}
+                        style={{ fontSize: 10, color: t.accent, marginLeft: 6, cursor: "pointer", fontWeight: 700 }}>verdict ▸</span>}</div>
+                    <div style={{ fontSize: 10, color: t.sub }}>{c.target_type || ""}{c.target_nullable ? ` · null ${c.target_nullable}` : ""}
+                      {c.link_class && <span style={{ marginLeft: 6 }}><Pill info={LINK_INFO[c.link_class] || { c: "#6b7c8a" }}>{(LINK_INFO[c.link_class] || {}).t || c.link_class}</Pill></span>}</div>
+                  </div>
+                  {isOpen && (
+                    <div style={{ gridColumn: "1 / -1", marginTop: 8, paddingTop: 8, borderTop: `1px dashed ${t.border}`, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, fontSize: 11 }}>
+                      <div>{lab("STAR field today", "#b5651d")}
+                        <div style={{ color: t.text }}>{c.star.field || "—"}{c.star.type ? ` · ${c.star.type}${c.star.length ? `(${c.star.length})` : ""}` : ""}{c.star.ordinal != null ? ` · #${c.star.ordinal}` : ""}</div>
+                        <div style={{ color: t.sub }}>usage matrix: {c.star.usage_status || "not stated"}{c.star.doc_usage ? ` · document: ${c.star.doc_usage}` : ""}{c.star.uploader_column ? ` · uploader ${c.star.uploader_column}` : ""}</div>
+                        {c.star.description && <div style={{ color: t.sub, marginTop: 3 }}>{c.star.description}</div>}</div>
+                      <div>{lab("SEI source after cutover", "#0091bf")}
+                        <div style={{ color: t.text, fontWeight: 700 }}>{c.sei.source || "none named"}{c.sei.type ? ` · ${c.sei.type}` : ""}</div>
+                        {c.sei.join_logic && <div style={{ ...mono, color: t.text, marginTop: 3 }}>{c.sei.join_logic}</div>}
+                        <div style={{ color: t.sub, marginTop: 3 }}>{[c.sei.map_kind, c.sei.mapping_status, c.sei.open_dependency === "Y" ? "open dependency" : null, c.sei.approval_status ? c.sei.approval_status.toLowerCase().replace(/_/g, " ") : null].filter(Boolean).join(" · ")}</div></div>
+                      <div>{lab("the rule, both sides")}
+                        <div style={{ color: t.sub }}>{(RULE_STATE[c.rule.state] || {}).hint}</div>
+                        {c.rule.notes && <div style={{ color: t.sub, marginTop: 3 }}>{c.rule.notes}</div>}
+                        <div style={{ color: t.textMuted, marginTop: 3 }}>{c.rule.comparison_id ? `comparison ${c.rule.comparison_id} · ` : ""}{c.source_document}{c.source_row ? ` · row ${c.source_row}` : ""}{c.link_status ? ` · ${c.link_status}` : ""}</div></div>
+                    </div>)}
+                </div>);
+            })}
+            {!cols.length && <div style={{ padding: 14, fontSize: 12, color: t.textMuted }}>no IMDS columns match</div>}
+          </div>
+        </>)}
     </div>);
 }

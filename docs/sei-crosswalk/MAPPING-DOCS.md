@@ -111,6 +111,26 @@ reads`); a sheet that parses to nothing prints its header row.
 Lineage → the crosswalk dashboard gains a panel, **The SEI mapping
 documents**, below "Does the new logic compute the same value?":
 
+- **Cutover** (the default). One row per IMDS column of a STAR feed, read
+  left to right: the STAR field that feeds it today, struck through and
+  *replaced by* the SEI source the document proposes; the transformation,
+  *kept* into IMDS; the IMDS column, with a way to its verdict. The rule
+  in the middle is classed by whether it survives the swap:
+
+  | state | meaning |
+  |---|---|
+  | same rule | the SEI-equivalent logic is the legacy logic, verbatim |
+  | same rule, SEI input | the legacy logic with the STAR input swapped for the SEI input and nothing else changed |
+  | copied as is | neither side has a rule: the value passes through |
+  | two SEI versions | the document gives an `-- ALT:` alternative |
+  | rewritten | a different rule on the SEI side |
+  | new rule | no legacy rule, a SEI one |
+  | no SEI rule | a legacy rule and nothing on the SEI side: the gap |
+
+  A STAR field outside the published layout is marked ⚠, one the usage
+  matrix says is read by nothing says so, and a column with no SEI source
+  *stays until a SEI source is named*. Business decisions flagged in the
+  document are counted and marked on the rule.
 - **Coverage.** Per IMDS target table: paths, a stacked bar of link
   classes, coverage, no-SEI-source and not-in-map counts. Click a table for
   its paths, filter by link class, open a row for the three logics side by
@@ -134,6 +154,8 @@ GET /sei-crosswalk/transformation-summary
 GET /sei-crosswalk/reference-codes?code_set=
 GET /sei-crosswalk/entity-id
 GET /sei-crosswalk/usage-exceptions?result=&feed=
+GET /sei-crosswalk/flow-candidates
+GET /sei-crosswalk/cutover-lineage?feed=&q=         one row per IMDS column: STAR today, SEI after, the rule and its state
 ```
 
 ## Tests
