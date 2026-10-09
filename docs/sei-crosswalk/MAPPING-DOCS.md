@@ -140,6 +140,12 @@ published feed spec, orange or red when it is not. Click a wire or a
 column and the detail pane adds *After cutover · SEI source*: the SEI
 file and field, the resolution, and the SEI-equivalent logic beside the
 rule that is kept. The Reading view carries the same as a chip per row.
+A SEI file node opens, like the feed and the tables, to the file's own
+fields as Data 360's inbound-feed catalogue holds them (`SWP_EOD_Data_Feeds`
+→ DATASETS/COLUMNS): the fields this feed's columns are replaced from
+first, with the wires landing on them, then the rest with type, length,
+key and PII marks. A file the catalogue does not hold still draws, and a
+field the mapping names but the catalogue lacks is marked.
 **⤓ export CSV** writes the picture as a table, one row per column link:
 feed field, warehouse column, operation, rule, lineage status, SEI file,
 SEI field, resolution, SEI-equivalent logic, equivalence.

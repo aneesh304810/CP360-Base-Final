@@ -224,6 +224,12 @@ for sql in f.seen:
 class FakeSei(Fake):
     def query(self, sql, p=None):
         low = " ".join(sql.lower().split())
+        if "from columns c" in low:
+            if p.get("o") != "TAXLOT":
+                return []
+            return [{"column_name": "ACCOUNT_NUMBER", "data_type": "VARCHAR2", "max_length": 20, "nullable": "N", "is_pk": "Y", "position_order": 1, "is_pii": "N", "business_desc": "the account", "workstream": "Positions", "domain": "taxlots"},
+                    {"column_name": "QUANTITY_HELD", "data_type": "NUMBER", "max_length": 17, "nullable": "Y", "is_pk": "N", "position_order": 9, "is_pii": "N", "business_desc": "units held", "workstream": "Positions", "domain": "taxlots"},
+                    {"column_name": "FX_RATE", "data_type": "NUMBER", "max_length": 17, "nullable": "Y", "is_pk": "N", "position_order": 12, "is_pii": "N", "business_desc": None, "workstream": "Positions", "domain": "taxlots"}]
         if "from sei_e2e_xwalk" in low:
             if "sei_file_status" not in low:
                 return []
@@ -245,13 +251,22 @@ cols = {(t["table"], c["col"]): c for t in r["targets"] for c in t["cols"]}
 c0 = cols[("T0", "C0")]["sei"]
 ok(c0["has"] and c0["file"] == "Taxlot" and c0["source"] == "Taxlot.QUANTITY_HELD" and c0["status"] == "VERIFIED_IN_FEED_SPEC" and c0["logic"] == "SUM(Taxlot.QUANTITY_HELD)",
    "a column carries the SEI feed file and field that replaces its input, the resolution and the SEI-equivalent logic", c0)
-ok(cols[("T0", "C4")]["sei"] == {"files": [], "file": None, "source": None, "status": "NO_SEI_SOURCE", "class": "NO_SEI_SOURCE", "map_kind": None, "logic": None, "has": False},
-   "a column with no SEI source says so, and why", cols[("T0", "C4")]["sei"])
+c4 = cols[("T0", "C4")]["sei"]
+ok(c4["has"] is False and c4["files"] == [] and c4["fields"] == [] and c4["status"] == "NO_SEI_SOURCE" and c4["class"] == "NO_SEI_SOURCE",
+   "a column with no SEI source says so, and why", c4)
+ok(c0["fields"] == [{"file": "Taxlot", "field": "QUANTITY_HELD"}], "the File.FIELD pairs, so a wire can land on the field row", c0["fields"])
 ok(cols[("T1", "C1")]["sei"]["file"] == "SYSTEM (job run)" and cols[("T2", "C2")]["sei"] is None,
    "SEI straight to IMDS names the system file; a column the crosswalk never mentions carries nothing")
+tx = next(f for f in r["sei_files"] if f["file"] == "Taxlot")
 ok(r["sei_mapped"] == 2 and [f["file"] for f in r["sei_files"]] == ["SYSTEM (job run)", "Taxlot"]
-   and next(f for f in r["sei_files"] if f["file"] == "Taxlot") == {"file": "Taxlot", "n": 1, "verified": 1, "tables": ["T0"]},
+   and tx["n"] == 1 and tx["verified"] == 1 and tx["tables"] == ["T0"],
    "the SEI feed files behind the picture, with how many columns each replaces and how many are verified", r["sei_files"])
+ok(tx["in_data360"] and tx["field_count"] == 3 and tx["workstream"] == "Positions" and [f["name"] for f in tx["fields"]] == ["QUANTITY_HELD", "ACCOUNT_NUMBER", "FX_RATE"]
+   and tx["fields"][0]["used_by"] == 1 and tx["fields"][0]["type"] == "NUMBER" and tx["fields"][0]["length"] == 17 and tx["fields"][1]["pk"] == "Y",
+   "the file's own columns as Data 360 ingested them, the ones this feed is replaced from first", tx["fields"])
+sy = next(f for f in r["sei_files"] if f["file"] == "SYSTEM (job run)")
+ok(not sy["in_data360"] and sy["fields"] == [{"name": "PROCESSING_DATE", "type": None, "length": None, "nullable": None, "pk": None, "pii": None, "desc": None, "used_by": 1, "not_in_catalog": True}],
+   "a file the catalogue does not hold still lists the field the mapping names, marked", sy["fields"])
 r0 = run(Fake())
 ok(r0["sei_files"] == [] and r0["sei_mapped"] == 0 and all(c["sei"] is None for t in r0["targets"] for c in t["cols"]),
    "without the crosswalk: no SEI column, nothing else changes")

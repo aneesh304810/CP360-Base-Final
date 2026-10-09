@@ -1948,7 +1948,14 @@ def source_canvas(src_table: str, data_source: str | None = None,
         if not files and r.get("sei_object") and (r.get("link_class") or "") not in ("NO_SEI_SOURCE", "NOT_POPULATED", "STAR_NOT_IN_FILE_MAP"):
             files = [r["sei_object"]]
         has = bool(files or r.get("sei_field")) and (r.get("link_class") or "") in ("E2E", "SEI_DIRECT")
-        cand = {"files": files, "file": files[0] if files else None,
+        pairs = []
+        for pr in _files_of(r.get("sei_file_fields") or ""):
+            fobj, _, ffld = pr.rpartition(".")
+            if fobj and ffld:
+                pairs.append({"file": fobj.strip(), "field": ffld.strip()})
+        if not pairs and has and r.get("sei_field"):
+            pairs.append({"file": files[0] if files else (r.get("sei_object") or ""), "field": str(r["sei_field"]).rpartition(".")[2]})
+        cand = {"files": files, "file": files[0] if files else None, "fields": pairs,
                 "source": r.get("sei_file_fields") or r.get("sei_source") or (r.get("sei_field") if has else None),
                 "status": r.get("sei_file_status"), "class": r.get("link_class"), "map_kind": r.get("map_kind"),
                 "logic": r.get("sei_imds_logic"), "has": has}
@@ -2006,6 +2013,49 @@ def source_canvas(src_table: str, data_source: str | None = None,
             # STAR input, or why there is none
             "sei": sei,
         })
+
+    # ---- the SEI files' own columns, as Data 360 ingested them -------------
+    # SWP_EOD_Data_Feeds.xlsx lands in DATASETS (object_type = FEED) and
+    # COLUMNS. The node opens to the file's fields: the ones this feed's
+    # columns are replaced from first, marked, then the rest. A file the
+    # catalogue does not hold still draws, closed, and says so.
+    for fn, sf in sei_files.items():
+        used: dict[str, int] = {}
+        for t in targets.values():
+            for c in t["cols"]:
+                for pr in ((c.get("sei") or {}).get("fields") or []):
+                    if _name_key(pr["file"]) == _name_key(fn):
+                        used[pr["field"].upper()] = used.get(pr["field"].upper(), 0) + 1
+        crows = _safe("""
+            SELECT c.column_name, c.data_type, c.max_length, c.nullable, c.is_pk, c.position_order,
+                   NVL(c.is_pii, 'N') AS is_pii, COALESCE(c.business_desc, c.tech_desc) AS business_desc,
+                   d.tags AS workstream, d.domain
+            FROM   columns c
+            LEFT   JOIN datasets d ON d.platform_id = c.platform_id AND d.schema_name = c.schema_name
+                   AND d.object_name = c.object_name AND d.object_type = 'FEED'
+            WHERE  UPPER(c.object_name) = :o
+            ORDER  BY CASE WHEN d.object_name IS NULL THEN 1 ELSE 0 END, c.position_order""", {"o": fn.upper()})
+        seen_f = set()
+        fields = []
+        for cr in crows:
+            nm = str(cr.get("column_name") or "")
+            if not nm or nm.upper() in seen_f:
+                continue
+            seen_f.add(nm.upper())
+            fields.append({"name": nm, "type": cr.get("data_type"), "length": cr.get("max_length"),
+                           "nullable": cr.get("nullable"), "pk": cr.get("is_pk"), "pii": cr.get("is_pii"),
+                           "desc": cr.get("business_desc"), "used_by": used.get(nm.upper(), 0)})
+        # a field the mapping names but the catalogue does not hold is still a row
+        for nm, n in used.items():
+            if nm not in seen_f:
+                fields.append({"name": nm, "type": None, "length": None, "nullable": None, "pk": None, "pii": None,
+                               "desc": None, "used_by": n, "not_in_catalog": True})
+        fields.sort(key=lambda f: (-f["used_by"], f.get("not_in_catalog", False), str(f["name"])))
+        sf["fields"] = fields
+        sf["in_data360"] = bool(crows)
+        sf["field_count"] = len(crows)
+        sf["workstream"] = next((cr.get("workstream") for cr in crows if cr.get("workstream")), None)
+        sf["domain"] = next((cr.get("domain") for cr in crows if cr.get("domain")), None)
 
     feed = _safe("""
         SELECT f.src_file, f.dataset, f.source_system,

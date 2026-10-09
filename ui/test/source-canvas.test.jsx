@@ -119,6 +119,8 @@ ok(/strokeDasharray="6 4"/.test(srcText) && /seiWireColor/.test(srcText) && /SEI
    "SEI wires are dashed and coloured by resolution; SEI files are nodes of their own");
 ok(/export CSV/.test(srcText) && /_lineage\.csv/.test(srcText) && /After cutover · SEI source/.test(srcText),
    "an export button, and the detail pane shows the SEI side of the selected column");
+ok(/open\.has\(`s:\$\{f\.file\}`\)/.test(srcText) && /anchorSei\(pr\.file, pr\.field\)/.test(srcText) && /fields in Data 360/.test(srcText) && /more fields/.test(srcText),
+   "a SEI file node opens to its Data 360 fields, and a wire lands on the field row that replaces the column");
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\nall source-canvas assertions pass");
 

@@ -154,7 +154,7 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
     if (onlyX && !c.__op.transformed) return false;
     if (!q) return true;
     const s = q.toLowerCase();
-    return `${c.col} ${c.src || ""}`.toLowerCase().includes(s);
+    return `${c.col} ${c.src || ""} ${(c.sei && c.sei.source) || ""}`.toLowerCase().includes(s);
   };
 
   const seiFiles = useMemo(() => (data && data.sei_files) || [], [data]);
@@ -215,8 +215,15 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
                h: HEAD + (o ? n * ROW + (n < shown.length ? ROW : 0) + 1 : 0) };
     });
     const totalT = tg.reduce((a, b) => a + b.h, 0) + Math.max(0, tg.length - 1) * GAPY;
-    // the SEI feed files: one closed node each, centred like the rest
-    const sn = seiOn ? seiFiles.map((f) => ({ f, h: HEAD + 1 })) : [];
+    // the SEI feed files: a node each, openable to the file's own fields as
+    // Data 360 ingested them — the ones this feed is replaced from first
+    const sn = seiOn ? seiFiles.map((f) => {
+      const o = open.has(`s:${f.file}`);
+      const flds = o ? (f.fields || []) : [];
+      const n = showAll.has(`s:${f.file}`) ? flds.length : Math.min(flds.length, CAP);
+      // an open node with no fields still shows one line saying so
+      return { f, open: o, flds, n, h: HEAD + (o ? n * ROW + (n < flds.length ? ROW : 0) + (flds.length ? 0 : ROW) + 1 : 0) };
+    }) : [];
     const totalS = sn.reduce((a, b) => a + b.h, 0) + Math.max(0, sn.length - 1) * GAPY;
     const H = Math.max(sh, totalT, totalS, 120) + PAD * 2;
     const src = { x: PAD, y: PAD + (H - PAD * 2 - sh) / 2, w: NW, h: sh,
@@ -402,9 +409,15 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
     const a = anchorTgt(table, col);
     return a ? { x: a.x + view.nw, y: a.y } : null;
   };
-  const anchorSei = (file) => {
-    const n = (view.sn || []).find((x) => x.f.file === file);
-    return n ? { x: n.x, y: n.y + HEAD / 2 } : null;
+  const keyOf = (v) => String(v || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const anchorSei = (file, field) => {
+    const n = (view.sn || []).find((x) => keyOf(x.f.file) === keyOf(file));
+    if (!n) return null;
+    if (n.open && field) {
+      const i = n.flds.findIndex((f) => keyOf(f.name) === keyOf(field));
+      if (i >= 0 && i < n.n) return { x: n.x, y: n.y + HEAD + 1 + i * ROW + ROW / 2 };
+    }
+    return { x: n.x, y: n.y + HEAD / 2 };
   };
   // the SEI wires: warehouse column -> the SEI feed file that replaces its
   // input. Merged per anchor pair like the feed wires, coloured by how well
@@ -414,12 +427,14 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
     const sm = new Map();
     targets.forEach((tg) => tg.cols.forEach((c) => {
       if (!c.sei || !c.sei.has) return;
-      (c.sei.files || []).forEach((f) => {
-        const a = anchorTgtOut(tg.table, c.col), b = anchorSei(f);
+      const pairs = (c.sei.fields && c.sei.fields.length)
+        ? c.sei.fields : (c.sei.files || []).map((f) => ({ file: f, field: null }));
+      pairs.forEach((pr) => {
+        const a = anchorTgtOut(tg.table, c.col), b = anchorSei(pr.file, pr.field);
         if (!a || !b) return;
         const k = `${a.y}>${b.y}`;
         if (!sm.has(k)) sm.set(k, { a, b, items: [] });
-        sm.get(k).items.push({ ...c, table: tg.table, file: f });
+        sm.get(k).items.push({ ...c, table: tg.table, file: pr.file, field: pr.field });
       });
     }));
     sm.forEach((m) => seiWires.push(m));
@@ -552,7 +567,8 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
           ⤓ export CSV</button>
         <span style={{ marginLeft: "auto", display: "flex", gap: 5 }}>
           <button type="button" style={ghost} onClick={() => setOpen(
-            new Set(["src", ...targets.map((x) => `t:${x.table}`)]))}>open all</button>
+            new Set(["src", ...targets.map((x) => `t:${x.table}`),
+                     ...(seiOn ? seiFiles.map((f) => `s:${f.file}`) : [])]))}>open all</button>
           <button type="button" style={ghost}
             onClick={() => setOpen(new Set())}>close all</button>
           <button type="button" style={ghost} onClick={fit}>fit</button>
@@ -815,30 +831,79 @@ export default function SourceCanvas({ t, srcTable, dataSource, feedName,
                 </div>)}
             </div>))}
 
-          {/* the SEI feed files: what replaces the feed's input after cutover */}
+          {/* the SEI feed files: what replaces the feed's input after cutover.
+              Open, the file's own fields as Data 360's inbound-feed catalogue
+              holds them, the ones this feed is replaced from first. */}
           {(view.sn || []).map((n) => (
-            <div key={`sei:${n.f.file}`} data-node
-              title={`${n.f.file} — replaces the STAR input of ${n.f.n} column${n.f.n === 1 ? "" : "s"}`
-                + (n.f.verified ? `, ${n.f.verified} verified in the SEI feed spec` : "")
-                + ((n.f.tables || []).length ? `\n${n.f.tables.join(", ")}` : "")}
-              style={{ position: "absolute", left: n.x, top: n.y, width: view.nw,
+            <div key={`sei:${n.f.file}`} style={{ position: "absolute", left: n.x, top: n.y, width: view.nw,
                 background: t.panel || "#fff", borderRadius: 5,
                 border: `1px solid ${t.panel2 || "#dfe6e9"}`,
                 borderTop: `3px solid ${SEI_C}`, overflow: "hidden",
-                boxShadow: "0 1px 3px rgba(16,25,59,.07)", height: HEAD + 1,
-                display: "flex", gap: 7, alignItems: "center", padding: "6px 9px",
-                boxSizing: "border-box" }}>
-              <span style={{ fontSize: 11 }}>☁️</span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: "block", fontSize: 10.5, fontWeight: 500,
-                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {n.f.file}</span>
-                <span style={{ display: "block", fontSize: 8.5, color: t.muted || "#999" }}>
-                  SEI feed file · after cutover</span>
-              </span>
-              <span style={{ fontSize: 9, color: n.f.verified === n.f.n ? "#159943" : (t.muted || "#999"),
-                whiteSpace: "nowrap" }}>
-                {n.f.n} col{n.f.n === 1 ? "" : "s"}{n.f.verified ? ` · ${n.f.verified} ✓` : ""}</span>
+                boxShadow: "0 1px 3px rgba(16,25,59,.07)" }}>
+              <button type="button" data-node
+                onClick={() => setOpen((st) => {
+                  const k = `s:${n.f.file}`, x = new Set(st);
+                  x.has(k) ? x.delete(k) : x.add(k); return x; })}
+                title={`${n.f.file} — replaces the STAR input of ${n.f.n} column${n.f.n === 1 ? "" : "s"}`
+                  + (n.f.verified ? `, ${n.f.verified} verified in the SEI feed spec` : "")
+                  + (n.f.in_data360 ? `\n${n.f.field_count} fields in Data 360 · inbound feeds` : "\nnot in Data 360's inbound-feed catalogue")
+                  + ((n.f.tables || []).length ? `\n${n.f.tables.join(", ")}` : "")}
+                style={{ display: "flex", gap: 7, alignItems: "center", width: "100%",
+                  textAlign: "left", font: "inherit", background: "none", border: 0,
+                  padding: "6px 9px", cursor: "pointer", color: "inherit", height: HEAD }}>
+                <span style={{ fontSize: 9, color: t.muted || "#999", width: 9,
+                  transform: n.open ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▶</span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: "block", fontSize: 10.5, fontWeight: 500,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    ☁️ {n.f.file}</span>
+                  <span style={{ display: "block", fontSize: 8.5, color: t.muted || "#999",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {n.f.in_data360
+                      ? `SEI feed · ${n.f.field_count} fields in Data 360${n.f.workstream ? ` · ${n.f.workstream}` : ""}`
+                      : "SEI feed file · after cutover"}</span>
+                </span>
+                <span style={{ fontSize: 9, color: n.f.verified === n.f.n ? "#159943" : (t.muted || "#999"),
+                  whiteSpace: "nowrap" }}>
+                  {n.f.n} col{n.f.n === 1 ? "" : "s"}{n.f.verified ? ` · ${n.f.verified} ✓` : ""}</span>
+              </button>
+              {n.open && (
+                <div style={{ borderTop: `1px solid ${t.panel2 || "#dfe6e9"}` }}>
+                  {n.flds.slice(0, n.n).map((f) => (
+                    <button key={f.name} type="button" data-node
+                      onClick={() => setQ(q === f.name ? "" : f.name)}
+                      title={`${n.f.file}.${f.name}`
+                        + (f.type ? ` · ${f.type}${f.length ? `(${f.length})` : ""}` : "")
+                        + (f.desc ? `\n${f.desc}` : "")
+                        + (f.used_by ? `\nreplaces the input of ${f.used_by} column${f.used_by === 1 ? "" : "s"} of this feed` : "")
+                        + (f.not_in_catalog ? "\nnamed by the mapping document; not in Data 360's inbound-feed catalogue" : "")}
+                      style={{ display: "flex", gap: 6, alignItems: "center", width: "100%",
+                        textAlign: "left", font: "inherit", background: f.used_by ? "rgba(0,145,191,.07)" : "none",
+                        border: 0, cursor: "pointer", color: "inherit", height: ROW,
+                        padding: "3px 8px 3px 10px", borderTop: `1px solid ${t.panel2 || "#dfe6e9"}` }}>
+                      <i style={{ width: 6, height: 6, borderRadius: 1.5, flexShrink: 0,
+                        background: f.used_by ? SEI_C : "#d7dee4" }} />
+                      <span style={{ fontFamily: MONO, fontSize: 9.5, flex: 1, minWidth: 0,
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        fontWeight: f.used_by ? 700 : 400, color: f.not_in_catalog ? "#b45309" : "inherit" }}>
+                        {f.name}</span>
+                      {f.pii === "Y" && <span title="PII" style={{ fontSize: 7.5, fontWeight: 800, color: "#c1113a" }}>PII</span>}
+                      {f.pk === "Y" && <span title="key" style={{ fontSize: 7.5, fontWeight: 800, color: t.muted || "#999" }}>KEY</span>}
+                      <span style={{ fontSize: 8, color: t.muted || "#999", flexShrink: 0 }}>
+                        {f.type ? `${f.type}${f.length ? `(${f.length})` : ""}` : (f.not_in_catalog ? "not in catalogue" : "")}</span>
+                      {f.used_by > 0 && <span style={{ fontSize: 8.5, color: SEI_C, fontWeight: 700 }}>{f.used_by}</span>}
+                    </button>))}
+                  {n.n < n.flds.length && (
+                    <button type="button" data-node
+                      onClick={() => setShowAll((st) => new Set(st).add(`s:${n.f.file}`))}
+                      style={{ width: "100%", height: ROW, font: "inherit", fontSize: 9,
+                        background: "none", cursor: "pointer", border: 0,
+                        borderTop: `1px solid ${t.panel2 || "#dfe6e9"}`, color: t.accent || "#0f4775" }}>
+                      +{n.flds.length - n.n} more fields</button>)}
+                  {!n.flds.length && (
+                    <div style={{ padding: "6px 10px", fontSize: 9.5, color: t.muted || "#999" }}>
+                      no fields known for this file</div>)}
+                </div>)}
             </div>))}
         </div>
       </div>
