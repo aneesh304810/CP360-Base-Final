@@ -3052,6 +3052,85 @@ def rule_state(im_logic, sei_logic, star_field=None, sei_field=None, sei_object=
 RULE_STATE_ORDER = ["SAME", "SUBSTITUTED", "PASS_THROUGH", "ALTERNATIVES", "REWRITTEN", "NEW_RULE", "NO_SEI_RULE"]
 
 
+_S2S_V4 = "sei_file, sei_file_fields, sei_file_status"
+
+
+def _s2s_q(cols, tail, params):
+    rows = _safe(f"SELECT {cols}, {_S2S_V4} FROM sei_star_field_map {tail}", params)
+    return rows or _safe(f"SELECT {cols} FROM sei_star_field_map {tail}", params)
+
+
+def _name_key(v):
+    return re.sub(r"[^A-Z0-9]", "", str(v or "").upper())
+
+
+@router.get("/feed-sei-files")
+def feed_sei_files(feed: str, data_source: str | None = None):
+    """The step after STAR -> IMDS on the source view: for one STAR feed,
+    the SEI feed files that replace its fields. One row per STAR field of
+    the feed with the SEI file and field the mapping document names, how
+    well that resolved to the published feed spec, and the IMDS columns
+    the field reaches; one card per SEI file, with what the SEI feed
+    register says it is."""
+    ds = _ds(data_source)
+    p = {"ds": ds, "f": feed.strip().upper()}
+    where = "WHERE data_source = :ds AND (UPPER(feed_family) = :f OR feed_key = :f)"
+    s2s = _s2s_q("star_field, star_field_norm, star_in_layout, doc_usage_status, sei_object, sei_field, sei_type, map_kind, "
+                 "mapping_status, open_dependency, join_logic, source_sheet", where, p)
+    usage = {r.get("field_norm"): r for r in _safe(
+        "SELECT field_norm, usage_status, is_used FROM star_field_usage " + where, p)}
+    lands = {}
+    for r in _e2e_q("star_field_norm, imds_table, imds_column, link_class", where, p):
+        if r.get("imds_column") and r.get("star_field_norm"):
+            lands.setdefault(r["star_field_norm"], set()).add(f"{r.get('imds_table')}.{r['imds_column']}")
+    register = {}
+    for r in _safe("""SELECT sei_feed, sei_entity, subject_area, frequency, grain, key_fields
+                      FROM sei_feed WHERE data_source = :ds""", {"ds": ds}):
+        register.setdefault(_name_key(r.get("sei_feed")), r)
+    fields, files = [], {}
+    for r in s2s:
+        norm = r.get("star_field_norm")
+        fnames = _files_of(r.get("sei_file")) if "sei_file" in r else []
+        if not fnames and r.get("sei_object") and (r.get("mapping_status") or "") != "NO_SEI_SOURCE":
+            fnames = [r["sei_object"]]
+        src = r.get("sei_file_fields") or (f"{r.get('sei_object')}.{r.get('sei_field')}" if r.get("sei_object") and r.get("sei_field") else (r.get("sei_field") or None))
+        has = bool(fnames or r.get("sei_field")) and (r.get("mapping_status") or "") != "NO_SEI_SOURCE"
+        u = usage.get(norm) or {}
+        cols = sorted(lands.get(norm, []))
+        fields.append({
+            "star_field": r.get("star_field"), "norm": norm, "in_layout": r.get("star_in_layout"),
+            "usage": u.get("usage_status") or r.get("doc_usage_status"), "is_used": u.get("is_used"),
+            "from_layout": (r.get("source_sheet") or "").strip().upper() == "STAR_LAYOUT_DETAIL",
+            "sei_files": fnames, "sei_source": src, "sei_type": r.get("sei_type"), "map_kind": r.get("map_kind"),
+            "mapping_status": r.get("mapping_status"), "open_dependency": r.get("open_dependency"),
+            "file_status": r.get("sei_file_status"), "join_logic": r.get("join_logic"),
+            "has_sei": has, "imds_columns": cols,
+        })
+        for fn in fnames:
+            x = files.setdefault(fn, {"file": fn, "fields": 0, "verified": 0, "star_fields": [], "imds_tables": set()})
+            x["fields"] += 1
+            x["verified"] += r.get("sei_file_status") == "VERIFIED_IN_FEED_SPEC"
+            x["star_fields"].append(r.get("star_field"))
+            for c in cols:
+                x["imds_tables"].add(c.rsplit(".", 1)[0])
+    out_files = []
+    for x in sorted(files.values(), key=lambda x: (-x["fields"], x["file"])):
+        reg = register.get(_name_key(x["file"])) or {}
+        out_files.append({**x, "imds_tables": sorted(x["imds_tables"]),
+                          "domain": reg.get("subject_area"), "frequency": reg.get("frequency"), "grain": reg.get("grain"),
+                          "key_fields": reg.get("key_fields"), "in_register": bool(reg)})
+    fields.sort(key=lambda f: (not f["has_sei"], f["star_field"] or ""))
+    tot = {"star_fields": len(fields), "with_sei": sum(1 for f in fields if f["has_sei"]),
+           "without": sum(1 for f in fields if not f["has_sei"]), "files": len(out_files),
+           "verified": sum(1 for f in fields if f["file_status"] == "VERIFIED_IN_FEED_SPEC"),
+           "from_layout": sum(1 for f in fields if f["from_layout"]),
+           "open_dependencies": sum(1 for f in fields if f["open_dependency"] == "Y")}
+    return {"data_source": ds, "feed": feed, "fields": fields, "files": out_files, "totals": tot,
+            "by_file_status": _tally([f for f in fields if f["file_status"]], "file_status", FILE_STATUS_ORDER),
+            "headline": (f"{tot['with_sei']} of {tot['star_fields']} fields of {feed} have a SEI source, in {tot['files']} SEI feed file"
+                         f"{'' if tot['files'] == 1 else 's'}; {tot['without']} have none yet" if fields else f"No mapping document covers {feed}.")}
+
+
 @router.get("/lineage-summary")
 def lineage_summary(data_source: str | None = None):
     """LINEAGE_SUMMARY (v4), recomputed from the lineage rows per STAR feed

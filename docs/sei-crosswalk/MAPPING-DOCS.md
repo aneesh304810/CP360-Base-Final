@@ -117,6 +117,24 @@ On the Lineage page's system badge row, a lane the register declares with
 no feed, verify or lineage row behind it (ADDVANTAGE_IMDS, "seeded lane")
 is now offered only when nothing else is, so IMDS offers STAR and UAF.
 
+## The step after STAR → IMDS on the source view
+
+Lineage → Source view → open a STAR feed. Under its picture of what it
+loads into IMDS sits the next node on the spine, **SEI feed files**: the
+SEI outbound files (Taxlot, Account Outbound Interface, End of Day
+Positions, …) that replace this feed's fields after cutover. One card per
+SEI file with what the SEI feed register says it is, how many of the
+feed's fields it carries, how many of those are verified in the published
+feed spec, and the IMDS tables they reach; then, on demand, the field
+table: STAR field today → SEI file.field after cutover, how it resolved,
+where it lands in IMDS with a way to the verdict. Fields in the layout no
+document mentions, open dependencies and fields read by nothing are marked.
+Drawn for STAR only, and only when a mapping document covers the feed.
+
+```
+GET /sei-crosswalk/feed-sei-files?feed=PEDDIFI1
+```
+
 ## The seven new sheets
 
 | Sheet | Table (sql/79) | Grain | Key |

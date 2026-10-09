@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import SeiNextStep from "./SeiNextStep.jsx";
 import { lineageApi } from "./lineage_api_additions.js";
 import LineageGraph from "./LineageGraph.jsx";
 import { stageMeta, laneMeta } from "./laneMeta.js";
@@ -616,6 +617,15 @@ export default function SourceLineage({ t, system, dictSystem,
                    fontFamily: "inherit", color: accent }}>
           See all {st.field_count} fields in this file →
         </button>
+        {/* The step after the warehouse: for a STAR feed, the SEI feed files
+            that replace its fields after cutover. SEI is not a source file
+            of this picture; it is what comes next, so it sits under it.
+            Draws nothing for a feed no mapping document covers. */}
+        {(system || "").toUpperCase() === "STAR" && (
+          <SeiNextStep t={t} feed={file} ds={ds}
+            onOpenColumn={onOpenTechnical
+              ? (tbl, col) => onOpenTechnical({ table: tbl, column: col })
+              : undefined} />)}
       </div>);
   };
 

@@ -250,6 +250,8 @@ export const mappingDocs = {
       () => ({ total: 0, covered: 0, coverage_pct: null, by_link: [], by_status: [], by_approval: [], tables: [], feeds: [], headline: "" })),
   e2eRows: (o = {}) =>
     _get(`/sei-crosswalk/e2e-rows${_qs(o)}`, () => ({ rows: [], total: 0 })),
+  feedSeiFiles: (feed, data_source) =>
+    _get(`/sei-crosswalk/feed-sei-files${_qs({ feed, data_source })}`, () => ({ fields: [], files: [], totals: {}, headline: "" })),
   lineageSummary: (data_source) =>
     _get(`/sei-crosswalk/lineage-summary${_qs({ data_source })}`, () => ({ rows: [], total: {}, sheet: [] })),
   transformationSummary: (data_source) =>

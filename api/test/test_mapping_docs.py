@@ -332,6 +332,64 @@ cvo = R.e2e_coverage()
 ok(cvo["total"] == 5 and cvo["in_scope"] == 3 and not cvo["has_files"] and cvo["files"] == [] and cvo["by_file_status"] == [],
    "without sql/80 the narrow select answers: coverage as before, no files", cvo["headline"])
 
+print("-- the step after STAR -> IMDS on the source view: the SEI feed files of one STAR feed")
+S2S5 = [
+    {"star_field": "Lot Quantity", "star_field_norm": "LOT_QUANTITY", "star_in_layout": "Y", "doc_usage_status": "Used", "sei_object": "Taxlot", "sei_field": "QUANTITY_HELD", "sei_type": "NUMBER(17,3)",
+     "map_kind": "DERIVED", "mapping_status": "CANDIDATE", "open_dependency": "N", "join_logic": "TAXLOT_TYPE_CODE = 2", "source_sheet": "PVAL File Mapping",
+     "sei_file": "Taxlot", "sei_file_fields": "Taxlot.QUANTITY_HELD", "sei_file_status": "VERIFIED_IN_FEED_SPEC"},
+    {"star_field": "Accounting Date", "star_field_norm": "ACCOUNTING_DATE", "star_in_layout": "Y", "doc_usage_status": "Used", "sei_object": None, "sei_field": "Processing_Date", "sei_type": None,
+     "map_kind": "SYSTEM_DATE", "mapping_status": "CANDIDATE", "open_dependency": "N", "join_logic": None, "source_sheet": "PVAL File Mapping",
+     "sei_file": "SYSTEM (job run)", "sei_file_fields": "SYSTEM (job run).PROCESSING_DATE", "sei_file_status": "SYSTEM_OR_CONSTANT"},
+    {"star_field": "Entity Number", "star_field_norm": "ENTITY_NUMBER", "star_in_layout": "Y", "doc_usage_status": "Used", "sei_object": None, "sei_field": None, "sei_type": None,
+     "map_kind": "NO_MAPPING", "mapping_status": "NO_SEI_SOURCE", "open_dependency": "Y", "join_logic": None, "source_sheet": "PVAL File Mapping",
+     "sei_file": None, "sei_file_fields": None, "sei_file_status": "NO_SEI_SOURCE"},
+    {"star_field": "Entity Name", "star_field_norm": "ENTITY_NAME", "star_in_layout": "Y", "doc_usage_status": "NOT_STATED", "sei_object": None, "sei_field": None, "sei_type": None,
+     "map_kind": "NO_MAPPING", "mapping_status": "NO_SEI_SOURCE", "open_dependency": "N", "join_logic": None, "source_sheet": "STAR_LAYOUT_DETAIL",
+     "sei_file": None, "sei_file_fields": None, "sei_file_status": "NO_SEI_SOURCE"},
+]
+USE5 = [{"field_norm": "LOT_QUANTITY", "usage_status": "Used", "is_used": "Y"}, {"field_norm": "ENTITY_NAME", "usage_status": "Unused", "is_used": "N"}]
+E2E5 = [{"star_field_norm": "LOT_QUANTITY", "imds_table": "HOLDINGDBO.POSITION", "imds_column": "QUANTITY", "link_class": "E2E"},
+        {"star_field_norm": "LOT_QUANTITY", "imds_table": "HOLDINGDBO.LOT_LEVEL_POSITION", "imds_column": "QUANTITY", "link_class": "E2E"},
+        {"star_field_norm": "ENTITY_NUMBER", "imds_table": "HOLDINGDBO.POSITION", "imds_column": "ENTITY_ID", "link_class": "NO_SEI_SOURCE"}]
+REG5 = [{"sei_feed": "Taxlot", "sei_entity": "Taxlot", "subject_area": "taxlots", "frequency": "EOD", "grain": "One Taxlot record", "key_fields": "ACCOUNT_NUMBER|TAXLOT_ID"}]
+
+
+def fake5(sql, params=None):
+    params = params or {}
+    s = " ".join(sql.split())
+    if "FROM sei_star_field_map" in s:
+        return [dict(r) for r in S2S5] if params.get("f") == "PEDDIFI1" else []
+    if "FROM star_field_usage " in s:
+        return [dict(r) for r in USE5]
+    if "FROM sei_e2e_xwalk" in s:
+        return [dict(r) for r in E2E5] if params.get("f") == "PEDDIFI1" else []
+    if "FROM sei_feed" in s:
+        return [dict(r) for r in REG5]
+    return []
+
+
+R._safe = fake5
+nx = R.feed_sei_files(feed="PEDDIFI1")
+ok(nx["totals"] == {"star_fields": 4, "with_sei": 2, "without": 2, "files": 2, "verified": 1, "from_layout": 1, "open_dependencies": 1},
+   "the totals: fields with a SEI source, without, files, verified, layout-added, open dependencies", nx["totals"])
+ok(nx["headline"] == "2 of 4 fields of PEDDIFI1 have a SEI source, in 2 SEI feed files; 2 have none yet", "the sentence", nx["headline"])
+fl = {f["file"]: f for f in nx["files"]}
+ok(fl["Taxlot"]["fields"] == 1 and fl["Taxlot"]["verified"] == 1 and fl["Taxlot"]["imds_tables"] == ["HOLDINGDBO.LOT_LEVEL_POSITION", "HOLDINGDBO.POSITION"]
+   and fl["Taxlot"]["domain"] == "taxlots" and fl["Taxlot"]["frequency"] == "EOD" and fl["Taxlot"]["in_register"]
+   and fl["SYSTEM (job run)"]["in_register"] is False,
+   "one card per SEI feed file: its fields of this feed, the tables they reach, what the SEI register says it is", fl)
+fd = {f["star_field"]: f for f in nx["fields"]}
+ok(fd["Lot Quantity"]["sei_source"] == "Taxlot.QUANTITY_HELD" and fd["Lot Quantity"]["file_status"] == "VERIFIED_IN_FEED_SPEC" and fd["Lot Quantity"]["is_used"] == "Y"
+   and fd["Lot Quantity"]["imds_columns"] == ["HOLDINGDBO.LOT_LEVEL_POSITION.QUANTITY", "HOLDINGDBO.POSITION.QUANTITY"],
+   "a field: the SEI file.field, the resolution, the usage, where it lands", fd["Lot Quantity"])
+ok(not fd["Entity Number"]["has_sei"] and fd["Entity Number"]["open_dependency"] == "Y" and fd["Entity Number"]["imds_columns"] == ["HOLDINGDBO.POSITION.ENTITY_ID"]
+   and fd["Entity Name"]["from_layout"] and fd["Entity Name"]["is_used"] == "N",
+   "a field without a SEI source still shows where it lands; a layout-added field is marked, read by nothing", fd["Entity Number"])
+ok([f["star_field"] for f in nx["fields"]][:2] == ["Accounting Date", "Lot Quantity"] and [x["key"] for x in nx["by_file_status"]] == ["VERIFIED_IN_FEED_SPEC", "SYSTEM_OR_CONSTANT", "NO_SEI_SOURCE"],
+   "fields with a SEI source first; the resolution tally in order")
+ok(R.feed_sei_files(feed="UAF Account Detail")["fields"] == [] and "No mapping document covers" in R.feed_sei_files(feed="UAF Account Detail")["headline"],
+   "a feed no document covers: nothing, said so")
+
 print("-- an empty warehouse")
 R._safe = lambda sql, params=None: []
 ok(R.mapping_docs()["totals"]["documents"] == 0 and R.e2e_coverage()["coverage_pct"] is None and R.transformation_summary()["tables"] == [],
