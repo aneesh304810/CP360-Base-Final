@@ -3164,8 +3164,9 @@ def feed_sei_files(feed: str, data_source: str | None = None):
     where = "WHERE data_source = :ds AND (UPPER(feed_family) = :f OR feed_key = :f)"
     s2s = _s2s_q("star_field, star_field_norm, star_in_layout, doc_usage_status, sei_object, sei_field, sei_type, map_kind, "
                  "mapping_status, open_dependency, join_logic, source_sheet", where, p)
+    # star_field_usage carries feed_family only, no feed_key (sql/65)
     usage = {r.get("field_norm"): r for r in _safe(
-        "SELECT field_norm, usage_status, is_used FROM star_field_usage " + where, p)}
+        "SELECT field_norm, usage_status, is_used FROM star_field_usage WHERE data_source = :ds AND UPPER(feed_family) = :f", p)}
     lands = {}
     for r in _e2e_q("star_field_norm, imds_table, imds_column, link_class", where, p):
         if r.get("imds_column") and r.get("star_field_norm"):
