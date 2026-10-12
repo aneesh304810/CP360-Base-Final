@@ -197,7 +197,7 @@ function ContainerFig({ t }) {
       <rect x={226} y={52} width={200} height={58} rx={3} fill="none" stroke={C.line} strokeWidth={1.25} />
       <text x={237} y={69} fontSize={11.5} fontWeight={600} fill={C.ink}>every application repo</text>
       <text x={237} y={83} fontSize={9.5} fill={C.mut}>its own db/changelog · rollback blocks</text>
-      <text x={237} y={95} fontSize={9.5} fill={C.mut}>same layout, same job, own changelog table</text>
+      <text x={237} y={95} fontSize={9.5} fill={C.mut}>same layout · own changelog table</text>
       <rect x={438} y={52} width={200} height={58} rx={3} fill="none" stroke={C.line} strokeWidth={1.25} />
       <text x={449} y={69} fontSize={11.5} fontWeight={600} fill={C.ink}>3 image repos</text>
       <text x={449} y={83} fontSize={9.5} fill={C.mut}>base · workbench · agent</text>
@@ -246,7 +246,7 @@ function ContainerFig({ t }) {
       <path d="M114,114 L114,146" fill="none" stroke={C.fast} strokeWidth={1.4} markerEnd="url(#d360b)" />
       <path d="M114,200 L114,210" fill="none" stroke={C.fast} strokeWidth={1.4} markerEnd="url(#d360b)" />
       <path d="M326,114 L326,146" fill="none" stroke={C.fast} strokeWidth={1.4} markerEnd="url(#d360b)" />
-      <path d="M326,200 L326,210" fill="none" stroke={C.fast} strokeWidth={1.4} markerEnd="url(#d360b)" />
+      <path d="M218,243 L222,243" fill="none" stroke={C.fast} strokeWidth={1.4} markerEnd="url(#d360b)" />
       <path d="M538,114 L538,146" fill="none" stroke={C.fast} strokeWidth={1.4} markerEnd="url(#d360b)" />
       <path d="M538,200 L538,210" fill="none" stroke={C.fast} strokeWidth={1.4} markerEnd="url(#d360b)" />
       <path d="M114,276 L114,308" fill="none" stroke={C.fast} strokeWidth={1.4} markerEnd="url(#d360b)" />
@@ -608,7 +608,7 @@ function SwimDb({ t }) {
       <rect x={758} y={186} width={118} height={50} rx={3} fill="none" stroke={C.pin} strokeWidth={1.5} />
       <text x={769} y={203} fontSize={11.5} fontWeight={600} fill={C.ink}>Ahead of code</text>
       <text x={769} y={217} fontSize={9.5} fill={C.mut}>the deploy stage of the</text>
-      <text x={769} y={229} fontSize={9.5} fill={C.mut}>same job CHECKS this tag</text>
+      <text x={769} y={229} fontSize={9.5} fill={C.mut}>this job CHECKS it</text>
       <path d="M236,67.0 L241.0,67.0 L241.0,139.0 L244,139.0" fill="none" stroke={C.pin} strokeWidth={1.5} markerEnd="url(#swp2)" />
       <path d="M364,139.0 L369.0,139.0 L369.0,211.0 L372,211.0" fill="none" stroke={C.pin} strokeWidth={1.5} markerEnd="url(#swp2)" />
       <path d="M492,211.0 L497.0,211.0 L497.0,283.0 L500,283.0" fill="none" stroke={C.pin} strokeWidth={1.5} markerEnd="url(#swp2)" />
