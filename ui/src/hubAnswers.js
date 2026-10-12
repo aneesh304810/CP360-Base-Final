@@ -1832,9 +1832,11 @@ export const SEED_ANSWERS = [
 
 { n: 106, conf: "codebase", fig: "deploy",
   body:
-"Liquibase, running as its own pipeline on its own cadence rather than "
-+ "inside the application build — which is the main structural decision and "
-+ "is already made.\n\n"
+"Liquibase, running as the first stage of each application's own build, "
++ "from a db/changelog in the application's repo, rather than as a separate "
++ "pipeline — the structural decision, now settled: every application owns "
++ "its schema changes beside its code, with its own changelog table on the "
++ "database.\n\n"
 + "guardrail_changeset records, per change: the author, the filename, a "
 + "description, the change type, WHETHER A ROLLBACK IS DECLARED, WHETHER IT "
 + "IS DATA-SAFE, the release and build that carried it, its labels and "

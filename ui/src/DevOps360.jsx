@@ -45,7 +45,7 @@ export const NAMING = [
   { thing: "App release", fmt: "v + date", example: "v2026.10.01",
     perEnv: false, by: "Jenkins, merge build only" },
   { thing: "Database tag", fmt: "env + build", example: "qc-1201",
-    perEnv: true, by: "Liquibase job, per environment" },
+    perEnv: true, by: "schema stage of the application job, per environment" },
   { thing: "Image", fmt: "date + build, pinned by digest",
     example: "2026.10.01-1189 → @sha256:9f3c…", perEnv: false, by: "image job" },
   { thing: "Guardrail library", fmt: "semver", example: "3.2.0",
@@ -133,7 +133,7 @@ function CtxFig({ t }) {
       <rect x={254} y={112} width={252} height={132} rx={3} fill="none" stroke={C.fast} strokeWidth={2.4} />
       <text x={380.0} y={129} fontSize={11.5} fontWeight={600} fill={C.fast} textAnchor="middle">CP Integration delivery</text>
       <text x={380.0} y={143} fontSize={9.5} fill={C.mut} textAnchor="middle">Jenkins · Liquibase · OpenShift</text>
-      <text x={380.0} y={167} fontSize={9.5} fill={C.mut} textAnchor="middle">three pipelines, four Hub</text>
+      <text x={380.0} y={167} fontSize={9.5} fill={C.mut} textAnchor="middle">two jobs, four Hub</text>
       <text x={380.0} y={179} fontSize={9.5} fill={C.mut} textAnchor="middle">instances, one guardrail library</text>
       <rect x={14} y={36} width={196} height={62} rx={3} fill="none" stroke={C.line} strokeWidth={1.25} />
       <text x={25} y={53} fontSize={11.5} fontWeight={600} fill={C.ink}>Data engineer</text>
@@ -182,7 +182,7 @@ function CtxFig({ t }) {
 function ContainerFig({ t }) {
   const C = PAL(t);
   return (
-    <Frame t={t} vw={820} vh={392} aria={'C4 containers: source repos for the data pipeline, Liquibase changelog, three image repos and the guardrail library; a Jenkins controller and the cp-airflow-agent; three jobs for application, Liquibase and images; and targets of OpenShift namespaces, the Oracle estate, the image registry and the release store. The guardrail library is called by all three jobs.'}>
+    <Frame t={t} vw={820} vh={392} aria={'C4 containers: one repo per application holding its dbt models, DAGs and its own Liquibase changelog, three image repos and the guardrail library; a Jenkins controller and the cp-airflow-agent; two jobs, application and images, with the schema stage inside the application job; and targets of OpenShift namespaces, the Oracle estate, the image registry and the release store. The guardrail library is called by both jobs.'}>
       <defs>
       <marker id="d360b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={C.fast} /></marker>
       <marker id="d360q" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={C.pin} /></marker>
@@ -192,12 +192,12 @@ function ContainerFig({ t }) {
       <text x={14} y={44} fontSize={11} fontWeight={800} letterSpacing=".6" fill={C.ink}>SOURCE</text>
       <rect x={14} y={52} width={200} height={58} rx={3} fill="none" stroke={C.line} strokeWidth={1.25} />
       <text x={25} y={69} fontSize={11.5} fontWeight={600} fill={C.ink}>cp-data-pipeline</text>
-      <text x={25} y={83} fontSize={9.5} fill={C.mut}>dbt models · Airflow DAGs</text>
+      <text x={25} y={83} fontSize={9.5} fill={C.mut}>dbt models · DAGs · db/changelog</text>
       <text x={25} y={95} fontSize={9.5} fill={C.mut}>pins base digest + policy</text>
       <rect x={226} y={52} width={200} height={58} rx={3} fill="none" stroke={C.line} strokeWidth={1.25} />
-      <text x={237} y={69} fontSize={11.5} fontWeight={600} fill={C.ink}>cp-liquibase</text>
-      <text x={237} y={83} fontSize={9.5} fill={C.mut}>changelog · rollback blocks</text>
-      <text x={237} y={95} fontSize={9.5} fill={C.mut}>its own release cadence</text>
+      <text x={237} y={69} fontSize={11.5} fontWeight={600} fill={C.ink}>every application repo</text>
+      <text x={237} y={83} fontSize={9.5} fill={C.mut}>its own db/changelog · rollback blocks</text>
+      <text x={237} y={95} fontSize={9.5} fill={C.mut}>same layout, same job, own changelog table</text>
       <rect x={438} y={52} width={200} height={58} rx={3} fill="none" stroke={C.line} strokeWidth={1.25} />
       <text x={449} y={69} fontSize={11.5} fontWeight={600} fill={C.ink}>3 image repos</text>
       <text x={449} y={83} fontSize={9.5} fill={C.mut}>base · workbench · agent</text>
@@ -218,10 +218,10 @@ function ContainerFig({ t }) {
       <text x={25} y={231} fontSize={11.5} fontWeight={600} fill={C.fast}>Application job</text>
       <text x={25} y={245} fontSize={9.5} fill={C.mut}>4 stages · 14 gates</text>
       <text x={25} y={257} fontSize={9.5} fill={C.mut}>thin artifact or DAG bundle</text>
-      <rect x={226} y={214} width={200} height={58} rx={3} fill="none" stroke={C.pin} strokeWidth={1.25} />
-      <text x={237} y={231} fontSize={11.5} fontWeight={600} fill={C.pin}>Liquibase job</text>
+      <rect x={226} y={214} width={200} height={58} rx={3} fill="none" stroke={C.pin} strokeWidth={1.25} strokeDasharray="4 3" />
+      <text x={237} y={231} fontSize={11.5} fontWeight={600} fill={C.pin}>Schema stage · Liquibase</text>
       <text x={237} y={245} fontSize={9.5} fill={C.mut}>validate · update · tag</text>
-      <text x={237} y={257} fontSize={9.5} fill={C.mut}>one changelog, four databases</text>
+      <text x={237} y={257} fontSize={9.5} fill={C.mut}>first stage of the application job</text>
       <rect x={438} y={214} width={200} height={58} rx={3} fill="none" stroke={C.pin} strokeWidth={1.25} />
       <text x={449} y={231} fontSize={11.5} fontWeight={600} fill={C.pin}>Image job</text>
       <text x={449} y={245} fontSize={9.5} fill={C.mut}>build · scan · sign · SBOM</text>
@@ -253,14 +253,14 @@ function ContainerFig({ t }) {
       <path d="M326,276 L326,308" fill="none" stroke={C.pin} strokeWidth={1.4} strokeDasharray="4 3" markerEnd="url(#d360q)" />
       <path d="M538,276 L538,308" fill="none" stroke={C.pin} strokeWidth={1.4} strokeDasharray="4 3" markerEnd="url(#d360q)" />
       <path d="M729,114 L729,243 L642,243" fill="none" stroke={C.pin} strokeWidth={1.4} strokeDasharray="4 3" markerEnd="url(#d360q)" />
-      <text x={646} y={236} fontSize={9.5} fill={C.pin}>called by all three jobs</text>
+      <text x={646} y={236} fontSize={9.5} fill={C.pin}>called by both jobs</text>
       <path d="M642,341 L646,341" fill="none" stroke={C.pin} strokeWidth={1.4} strokeDasharray="4 3" markerEnd="url(#d360q)" />
     </Frame>);
 }
 function ComponentFig({ t }) {
   const C = PAL(t);
   return (
-    <Frame t={t} vw={820} vh={546} aria={'C4 components inside the application job: checkout and resolve pins, then four gate stages each emitting gate run rows, then the report publisher, artifact builder and deployer each emitting release, tag and deployment rows.'}>
+    <Frame t={t} vw={820} vh={546} aria={'C4 components inside the application job: checkout, resolve pins and apply the changelog, then four gate stages each emitting gate run rows, then the report publisher, artifact builder and deployer each emitting release, tag and deployment rows.'}>
       <defs>
       <marker id="d360c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={C.fast} /></marker>
       <marker id="d360r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={C.pin} /></marker>
@@ -269,8 +269,8 @@ function ComponentFig({ t }) {
       <text x={170} y={20} fontSize={9.5} fill={C.mut} opacity={.8}>inside the application job — every stage and what it emits</text>
       <rect x={14} y={38} width={470} height={56} rx={3} fill="none" stroke={C.fast} strokeWidth={1.8} />
       <text x={25} y={55} fontSize={11.5} fontWeight={600} fill={C.fast}>Checkout + resolve pins</text>
-      <text x={25} y={69} fontSize={9.5} fill={C.mut}>reads: base digest · policy version · required db tag</text>
-      <text x={25} y={81} fontSize={9.5} fill={C.mut}>fails fast if the db tag is not applied in the target</text>
+      <text x={25} y={69} fontSize={9.5} fill={C.mut}>reads: base digest · policy version · applies db/changelog → mints the db tag</text>
+      <text x={25} y={81} fontSize={9.5} fill={C.mut}>fails fast if the changelog cannot be applied; the deployer checks the tag</text>
       <rect x={14} y={104} width={470} height={44} rx={3} fill="none" stroke={C.fast} strokeWidth={1.8} />
       <text x={25} y={121} fontSize={11.5} fontWeight={600} fill={C.fast}>Stage 1 · Governance</text>
       <text x={25} y={135} fontSize={9.5} fill={C.mut}>schema · naming · lineage · orphan models</text>
@@ -322,7 +322,7 @@ function ComponentFig({ t }) {
       <path d="M249,428 L249,434" fill="none" stroke={C.fast} strokeWidth={1.4} markerEnd="url(#d360c)" />
       <text x={512} y={26} fontSize={11} fontWeight={800} letterSpacing=".6" fill={C.pin}>EMITS — every row the dashboard later reads</text>
       <text x={14} y={512} fontSize={9.5} fill={C.mut}>A stage that fails stops the job. Stage 4 is the exception: it reports unless the finding is CRITICAL.</text>
-      <text x={14} y={530} fontSize={9.5} fill={C.mut}>Nothing here runs Liquibase and nothing here builds a base image — both are resolved as pins in the first component.</text>
+      <text x={14} y={530} fontSize={9.5} fill={C.mut}>Liquibase runs in the first component, from the same checkout — validate, update, tag. The base image is still resolved as a pin, never built here.</text>
     </Frame>);
 }
 
@@ -341,8 +341,8 @@ function VersionFig({ t }) {
       <text x={25} y={71} fontSize={9.5} fill={C.mut}>mints: build_number · commit_sha · app_tag</text>
       <path d="M230,67 L262,67" fill="none" stroke={C.pin} strokeWidth={1.4} strokeDasharray="4 3" markerEnd="url(#d360d)" />
       <rect x={14} y={118} width={212} height={54} rx={3} fill="none" stroke={C.pin} strokeWidth={1.25} />
-      <text x={25} y={135} fontSize={11.5} fontWeight={600} fill={C.pin}>Liquibase job</text>
-      <text x={25} y={149} fontSize={9.5} fill={C.mut}>mints: db_tag</text>
+      <text x={25} y={135} fontSize={11.5} fontWeight={600} fill={C.pin}>Schema stage · Liquibase</text>
+      <text x={25} y={149} fontSize={9.5} fill={C.mut}>mints: db_tag — per application, per env</text>
       <path d="M230,145 L262,145" fill="none" stroke={C.pin} strokeWidth={1.4} strokeDasharray="4 3" markerEnd="url(#d360d)" />
       <rect x={14} y={196} width={212} height={54} rx={3} fill="none" stroke={C.pin} strokeWidth={1.25} />
       <text x={25} y={213} fontSize={11.5} fontWeight={600} fill={C.pin}>Image job</text>
@@ -465,7 +465,7 @@ function PromotionFig({ t }) {
       <text x={150} y={287} fontSize={9.5} fill={C.mut}>the thin artifact and its app_tag · build_number · commit_sha move forward unchanged</text>
       <rect x={14} y={306} width={792} height={30} rx={3} fill="none" stroke={C.pin} strokeWidth={1.2} strokeOpacity={.65} />
       <text x={26} y={325} fontSize={11.5} fontWeight={600} fill={C.pin}>Re-pointed</text>
-      <text x={150} y={325} fontSize={9.5} fill={C.mut}>the db_tag is re-evaluated per instance — Liquibase applies its own changesets and tags locally</text>
+      <text x={150} y={325} fontSize={9.5} fill={C.mut}>the db_tag is re-evaluated per instance — the schema stage applies the changesets and tags locally</text>
       <rect x={14} y={344} width={792} height={30} rx={3} fill="none" stroke={C.pin} strokeWidth={1.2} strokeOpacity={.65} />
       <text x={26} y={363} fontSize={11.5} fontWeight={600} fill={C.pin}>Never moves</text>
       <text x={150} y={363} fontSize={9.5} fill={C.mut}>the image digest. It is already identical everywhere; promoting it would be a no-op</text>
@@ -556,7 +556,7 @@ function SwimApp({ t }) {
 function SwimDb({ t }) {
   const C = PAL(t);
   return (
-    <Frame t={t} vw={892} vh={424} aria={'Swimlane for the database pipeline: author a changeset with a rollback block, review for expand and contract, validate, apply to the target changelog, tag per environment, record applied rows, and finish ahead of the code which only checks the tag.'}>
+    <Frame t={t} vw={892} vh={424} aria={'Swimlane for the schema stage of the application job: author a changeset with a rollback block in the application repo, review for expand and contract, validate, apply to the target changelog, tag per environment, record applied rows, and finish ahead of the deploy stage of the same job, which only checks the tag.'}>
       <defs>
       <marker id="swp2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={C.pin} /></marker>
       </defs>
@@ -565,10 +565,10 @@ function SwimDb({ t }) {
       <text x={16} y={72} fontSize={9.5} fill={C.mut}>authors the changeset</text>
       <rect x={8} y={106} width={876} height={66} rx={3} fill={C.ink} fillOpacity={0.015} stroke="none" />
       <text x={16} y={130} fontSize={11.5} fontWeight={600} fill={C.ink}>GitHub</text>
-      <text x={16} y={144} fontSize={9.5} fill={C.mut}>cp-liquibase repo</text>
+      <text x={16} y={144} fontSize={9.5} fill={C.mut}>the application repo · db/changelog</text>
       <rect x={8} y={178} width={876} height={66} rx={3} fill={C.ink} fillOpacity={0.04} stroke="none" />
       <text x={16} y={202} fontSize={11.5} fontWeight={600} fill={C.pin}>Jenkins</text>
-      <text x={16} y={216} fontSize={9.5} fill={C.mut}>Liquibase job</text>
+      <text x={16} y={216} fontSize={9.5} fill={C.mut}>application job · schema stage</text>
       <rect x={8} y={250} width={876} height={66} rx={3} fill={C.ink} fillOpacity={0.015} stroke="none" />
       <text x={16} y={274} fontSize={11.5} fontWeight={600} fill={C.ink}>Oracle</text>
       <text x={16} y={288} fontSize={9.5} fill={C.mut}>IMDS · PBDW per env</text>
@@ -607,14 +607,14 @@ function SwimDb({ t }) {
       <text x={641} y={373} fontSize={9.5} fill={C.mut}>per environment</text>
       <rect x={758} y={186} width={118} height={50} rx={3} fill="none" stroke={C.pin} strokeWidth={1.5} />
       <text x={769} y={203} fontSize={11.5} fontWeight={600} fill={C.ink}>Ahead of code</text>
-      <text x={769} y={217} fontSize={9.5} fill={C.mut}>the app pipeline only</text>
-      <text x={769} y={229} fontSize={9.5} fill={C.mut}>CHECKS this tag</text>
+      <text x={769} y={217} fontSize={9.5} fill={C.mut}>the deploy stage of the</text>
+      <text x={769} y={229} fontSize={9.5} fill={C.mut}>same job CHECKS this tag</text>
       <path d="M236,67.0 L241.0,67.0 L241.0,139.0 L244,139.0" fill="none" stroke={C.pin} strokeWidth={1.5} markerEnd="url(#swp2)" />
       <path d="M364,139.0 L369.0,139.0 L369.0,211.0 L372,211.0" fill="none" stroke={C.pin} strokeWidth={1.5} markerEnd="url(#swp2)" />
       <path d="M492,211.0 L497.0,211.0 L497.0,283.0 L500,283.0" fill="none" stroke={C.pin} strokeWidth={1.5} markerEnd="url(#swp2)" />
       <path d="M620,283.0 L628,283.0" fill="none" stroke={C.pin} strokeWidth={1.5} markerEnd="url(#swp2)" />
       <path d="M748,283.0 L753.0,283.0 L753.0,211.0 L756,211.0" fill="none" stroke={C.pin} strokeWidth={1.5} markerEnd="url(#swp2)" />
-      <text x={16} y={414} fontSize={9.5} fill={C.mut}>Runs per release, never per commit. A drop is always a separate, later release.</text>
+      <text x={16} y={414} fontSize={9.5} fill={C.mut}>Runs per release as the first stage of the application job, never per commit. A drop is always a separate, later release.</text>
       <path d="M689,308 L689,326" fill="none" stroke={C.pin} strokeWidth={1.1} strokeDasharray="3 2" markerEnd="url(#swp2)" />
     </Frame>);
 }
@@ -763,15 +763,31 @@ export function Context({ t }) {
 
 export function Containers({ t }) {
   return (<>
-    <H t={t} sub="Open the centre box. Four rows: where code lives, what builds it, the three jobs, and what they write to.">
+    <H t={t} sub="Open the centre box. Four rows: where code lives, what builds it, the two jobs, and what they write to.">
       The runnable pieces</H>
     <ContainerFig t={t} />
-    <Caption t={t}><b style={{ color: t.text }}>One controller, three jobs,
-      one library they all call.</b> Only the application job is on the daily
-      path; the other two run on their own cadence and hand over an
-      identifier. The release store is the container most easily forgotten —
-      without it there is no dashboard, because nothing else keeps a history
-      of what ran where.</Caption>
+    <Caption t={t}><b style={{ color: t.text }}>One controller, two jobs,
+      one library they both call.</b> The schema is a stage of the application
+      job, not a job of its own: every application repo carries its own
+      Liquibase changelog beside its dbt models and DAGs, and the stage applies
+      it from the same checkout, before the deploy stage, under the same
+      release tag. Only the application job is on the daily path; the image
+      job runs on its own cadence and hands over a digest. The release store
+      is the container most easily forgotten — without it there is no
+      dashboard, because nothing else keeps a history of what ran where.</Caption>
+    <Note t={t}><b style={{ color: t.text }}>Where the schema lives, and who
+      owns what.</b> One repo per application holds its code, its dbt project,
+      its DAGs and its <M>db/changelog</M>; they are versioned, reviewed and
+      released together, and the schema stage runs first so code never meets a
+      table it has not been given. Each application keeps its own changelog
+      table and lock on the database (<M>DATABASECHANGELOG_&lt;APP&gt;</M>), so
+      two applications on one Oracle instance never serialise or confuse each
+      other's deploys, and a tag is always one application's. Every object has
+      exactly one owning application; a table several applications read is
+      changed only in its owner's changelog. dbt owns what it builds — models,
+      tests, seeds, their contracts — and Liquibase owns everything dbt does
+      not create: landing and stage tables, sequences, grants, control and
+      reference tables, partitions.</Note>
   </>);
 }
 
@@ -871,12 +887,12 @@ export function Pipelines({ t }) {
       later.</Caption>
     <div style={{ fontSize: 13, fontWeight: 600, color: t.text, margin: "16px 0 8px" }}>
       2 · Database · Liquibase <span style={{ fontWeight: 400,
-        color: t.textMuted, fontSize: 11.5 }}>per release</span></div>
+        color: t.textMuted, fontSize: 11.5 }}>per release · the first stage of the application job</span></div>
     <SwimDb t={t} />
-    <Caption t={t}><b style={{ color: t.text }}>This lane finishes before the
-      application lane starts.</b> Every box is per release, not per commit,
-      and the last one is the handover: a tag the other pipeline reads and
-      never writes.</Caption>
+    <Caption t={t}><b style={{ color: t.text }}>This lane is the first stage
+      of the application job, from the same repo.</b> Every box is per
+      release, not per commit, and the last one is the handover: a tag the
+      deploy stage of the same job reads and never writes.</Caption>
     <div style={{ fontSize: 13, fontWeight: 600, color: t.text, margin: "16px 0 8px" }}>
       3 · Infrastructure image &amp; security <span style={{ fontWeight: 400,
         color: t.textMuted, fontSize: 11.5 }}>CVE / bumps</span></div>
@@ -909,7 +925,7 @@ export function Deployment({ t }) {
       ["SDC event listener", <><M>Deployment</M> — long-running consumer</>,
         "SEI event hub · the event staging store"],
       ["G5 / G6 recon gates", <M>CronJob</M>, "Oracle · the guardrail event tables"],
-      ["Schema", <><b>not deployed here at all</b> — applied by the Liquibase job and recorded as a tag</>,
+      ["Schema", <><b>not deployed here at all</b> — applied by the schema stage of the application job, from the same repo, and recorded as a tag</>,
         "IMDS · PBDW changelog tables"],
       ["Guardrail policies", <>a <b>pinned library version</b> resolved at job start, not an object in the namespace</>,
         "the Jenkins job, not the runtime"],
@@ -931,7 +947,7 @@ const ENV_ORDER = ["DEV", "SIT", "UAT", "PROD"];
 const ENV_LABEL = { DEV: "RD DEV", SIT: "RD SIT", UAT: "QC · UAT", PROD: "PROD" };
 const PIPES = [
   ["app", "Application data pipeline", "dbt + Airflow · daily", "SwimApp"],
-  ["db", "Database · Liquibase", "per release · ships ahead", "SwimDb"],
+  ["db", "Database · Liquibase", "per release · first stage of the app job", "SwimDb"],
   ["img", "Infrastructure image & security", "CVE / bumps · one digest", "SwimImg"],
 ];
 
@@ -945,7 +961,7 @@ export function FlowFig({ t, envs, open, onOpen }) {
   return (
     <Frame t={t} vw={980} vh={410}
       aria="Interactive delivery map. Three pipelines across the top — the
-        application data pipeline, the Liquibase database pipeline and the
+        application data pipeline, its Liquibase schema stage drawn as a lane, and the
         infrastructure image pipeline — feed four Hub environments in order:
         RD DEV, RD SIT, QC which is UAT, and production. Each environment box
         shows the application tag, build number and database tag currently
@@ -1108,7 +1124,7 @@ export function Detail({ t, open, envs, hist, onClose }) {
   // which cannot tell a dynamic tag from a missing import.
   const PIPE_TITLE = {
     app: ["Application data pipeline", "daily — the only chain on the critical path"],
-    db: ["Database · Liquibase", "per release — finishes before the application lane starts"],
+    db: ["Database · Liquibase", "per release — the first stage of the application job; the deploy stage waits for its tag"],
     img: ["Infrastructure image & security", "CVE / bumps — one signed digest for all four"],
   }[open];
   if (PIPE_TITLE) {
@@ -1135,11 +1151,11 @@ export function Detail({ t, open, envs, hist, onClose }) {
             <span style={{ color: t.success }}>in use</span>],
           [<M>guardrail_gate_run</M>, "application job, per stage", "gate per build per region",
             <span style={{ color: t.warning }}>needs the full roster incl. not_run</span>],
-          [<M>guardrail_deployment</M>, "application and Liquibase jobs", "deployment event",
+          [<M>guardrail_deployment</M>, "application job, deploy stage", "deployment event",
             <span style={{ color: t.warning }}>missing image_digest</span>],
-          [<M>guardrail_changeset</M>, "Liquibase job", "changeset in the changelog",
+          [<M>guardrail_changeset</M>, "application job, schema stage", "changeset in the changelog",
             <span style={{ color: t.success }}>in use</span>],
-          [<M>guardrail_changeset_applied</M>, "Liquibase job, per environment", "(changeset, environment)",
+          [<M>guardrail_changeset_applied</M>, "schema stage, per environment", "(changeset, environment)",
             <span style={{ color: t.success }}>in use</span>],
           [<M>guardrail_events</M>, "Airflow / dbt — G0 to G6", "gate per run per dataset",
             <span style={{ color: t.danger, fontWeight: 600 }}>no producer, and no business_date column</span>],

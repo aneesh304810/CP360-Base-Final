@@ -194,5 +194,17 @@ ok(/\['devops360', 'DevOps 360'/.test(NAV), "AppShell.jsx has the nav entry", ""
 ok(/promotionApi\.deployments\(\)/.test(JSX) && /promotionApi\.releases\(\)/.test(JSX),
    "and it reads the real endpoints rather than a local fixture", "");
 
+
+// ---- the schema lives in each application's repo -----------------------
+// Liquibase is a stage of the application job, applied from a db/changelog
+// in the application's own repo, not a separate pipeline on its own cadence.
+const devSrc = fs.readFileSync(path.join(process.cwd(), fs.existsSync("src/DevOps360.jsx") ? "src/DevOps360.jsx" : "ui/src/DevOps360.jsx"), "utf8");
+ok(!/cp-liquibase/.test(devSrc) && !/Liquibase job/.test(devSrc), "no separate Liquibase repo or job remains on the page");
+ok(/db\/changelog/.test(devSrc) && /Schema stage · Liquibase/.test(devSrc) && /first stage of the application job/.test(devSrc),
+   "each application repo carries its own db/changelog; the schema stage is the first stage of the application job");
+ok(/DATABASECHANGELOG_/.test(devSrc) && /exactly one owning application/.test(devSrc) && /Liquibase owns everything dbt does/.test(devSrc),
+   "ownership is stated: a changelog table per application, one owner per object, dbt owns what it builds");
+ok(NAMING.find((n) => n.thing === "Database tag").by === "schema stage of the application job, per environment", "the database tag is minted by the schema stage");
+
 console.log(bad ? `\n${bad} assertion(s) failed` : "\ndevops360 assertions pass");
 if (bad) process.exit(1);
