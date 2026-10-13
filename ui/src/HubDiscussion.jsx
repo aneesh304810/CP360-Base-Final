@@ -513,7 +513,7 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
       </div>
 
       {asking && (
-        <div style={S.ask}>
+        <div style={S.askBox}>
           <textarea style={S.ta} placeholder="What do you need to know? One question per entry — a question with two halves gets half-answered."
             value={draft.body || ""}
             onChange={(e) => setDraft({ ...draft, body: e.target.value })} />
@@ -969,7 +969,8 @@ export const sty = (t) => ({
     borderTop: `1px solid ${t.panel2 || "#dfe6e9"}` },
   cRow: { display: "flex", gap: 7, alignItems: "center", marginTop: 7,
     flexWrap: "wrap" },
-  ask: { border: `1px solid ${t.accent || "#0f4775"}`, borderRadius: 6,
+  // The composer for a new question; `ask` above is the blue "Ask SEI" callout.
+  askBox: { border: `1px solid ${t.accent || "#0f4775"}`, borderRadius: 6,
     padding: "14px 16px", margin: "4px 0 12px", background: t.bg },
   askRow: { display: "flex", gap: 8, alignItems: "center", marginTop: 10,
     flexWrap: "wrap" },
