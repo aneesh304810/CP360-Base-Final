@@ -25,7 +25,7 @@ import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import DevOps360, { PAL, NAMING, FlowFig, Dashboard, Detail, Context,
   Containers, Components, Versions, Promotion, Pipelines,
-  Deployment, Built, BUILT, PENDING } from "../src/DevOps360.jsx";
+  Deployment, Built, BUILT, PENDING, PIPES, sp, Legend, PendingList } from "../src/DevOps360.jsx";
 import { tLight, tDark } from "../src/bbhTheme.js";
 
 let bad = 0;
@@ -168,6 +168,7 @@ for (const P of [Context, Containers, Components, Versions, Promotion,
                  Pipelines, Deployment, () => <FlowFig t={tLight} envs={ENVS}
                    open={null} onOpen={() => {}} />]) {
   for (const m of renderToStaticMarkup(<P t={tLight} />).matchAll(/<svg\b[^>]*>/g)) {
+    if (/aria-hidden="true"/.test(m[0])) continue;   // legend swatches are decoration
     svgs++;
     const lab = (m[0].match(/aria-label="([^"]*)"/) || [])[1] || "";
     if (!/role="img"/.test(m[0]) || lab.length < 60) unlabelled++;
@@ -233,10 +234,44 @@ ok(PENDING.length >= 8 && /control ID/i.test(PENDING[0][0]),
 ok(!/testbbh|apps\.ocp|https?:\/\/|:7990/.test(devSrc),
    "no hostname, URL or port from the guardrails repo is on the page — the endpoint stays in the runbook");
 const shell2 = renderToStaticMarkup(<DevOps360 t={tLight} />);
-ok(/Built today/.test(shell2) && /built today · vs the design · pending/.test(shell2),
-   "the shell offers the Built reference chip and points the intro at it");
+ok(!/built today · vs the design · pending/.test(shell2) && /Pending, in the order that unlocks the rest/.test(shell2),
+   "no separate click-through: the pending list is on the page under the map");
 ok(/What runs today is\s+not this figure yet/.test(renderToStaticMarkup(<Components t={tLight} />)),
    "the components figure carries the warning that the running job is a different shape");
+
+// ---- status as a colour pattern, the same on every figure -------------
+// Built, partial and pending are three styles, each with its word, and
+// the map, the containers and the components figure all carry them.
+const C = PAL(tLight);
+ok(sp(C, "built").stroke === tLight.success && sp(C, "partial").stroke === tLight.warning
+   && sp(C, "pending").strokeDasharray && !sp(C, "built").strokeDasharray,
+   "built is the success colour, partial the warning colour, pending is dashed");
+const leg = renderToStaticMarkup(<Legend t={tLight} />);
+ok(/BUILT/.test(leg) && /PARTIAL/.test(leg) && /PENDING/.test(leg) && /runs today/.test(leg) && /nothing yet/.test(leg),
+   "the legend names the three statuses in words as well as colour");
+ok(/BUILT/.test(flow) && /PARTIAL/.test(flow) && /PENDING/.test(flow) && /not connected yet/.test(flow),
+   "the map carries all three statuses, and the library says it is not connected");
+ok(PIPES.length === 4 && PIPES[0][0] === "intake" && PIPES[0][3] === "built"
+   && PIPES.find((p) => p[0] === "db")[3] === "pending" && PIPES.find((p) => p[0] === "img")[3] === "pending"
+   && PIPES.find((p) => p[0] === "app")[3] === "partial",
+   "four pipeline nodes: the intake is built, the application partial, schema and image pending");
+const cont = renderToStaticMarkup(<Containers t={tLight} />);
+ok((cont.match(/>PENDING</g) || []).length >= 3 && (cont.match(/>BUILT</g) || []).length >= 4
+   && /sie-webhook-bridge/.test(cont) && /not connected yet/.test(cont),
+   "the containers figure colours every box, shows the bridge as built and the library as not connected");
+const compAll = renderToStaticMarkup(<Components t={tLight} />);
+const comp = compAll.slice(compAll.indexOf('role="img"'));   // the figure, not the legend
+ok((comp.match(/>BUILT</g) || []).length === 3 && (comp.match(/>PENDING</g) || []).length === 2
+   && /DevSecOps thresholds not connected/.test(comp),
+   "inside the job: governance, performance and testing run as gates; security is partial without the library; builder and deployer pending");
+ok(/intake/.test(renderToStaticMarkup(<Detail t={tLight} open="intake" envs={ENVS} hist={HIST} onClose={() => {}} />))
+   && /Built today, against the design/.test(renderToStaticMarkup(<Detail t={tLight} open="intake" envs={ENVS} hist={HIST} onClose={() => {}} />)),
+   "the intake node opens the stage-by-stage reconciliation");
+ok(BUILT.some((r) => /DevSecOps shared library/.test(r.design[0]) && r.status === "pending")
+   && /Connect the DevSecOps shared library/.test(PENDING[1][0]),
+   "the DevSecOps library is a pending row and the second item of work");
+ok(/>pending</.test(renderToStaticMarkup(<Pipelines t={tLight} />)) && renderToStaticMarkup(<PendingList t={tLight} />).length > 800,
+   "the swimlane headings carry their status, and the pending list renders on its own");
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\ndevops360 assertions pass");
 if (bad) process.exit(1);

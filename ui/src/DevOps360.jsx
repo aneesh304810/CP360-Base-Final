@@ -55,6 +55,50 @@ export const NAMING = [
 ];
 
 
+// Build status as a colour pattern, the same on every figure. The figures
+// draw the design; the pattern says how much of it exists today. Built is
+// a green stroke on a green tint, partial an amber stroke on an amber tint,
+// pending a grey dashed stroke on nothing — and each box also carries the
+// word, so the status survives a monochrome print.
+export const STATUS_TEXT = {
+  built: "runs today",
+  partial: "the concern is covered, not the way the design specifies it",
+  pending: "nothing yet",
+};
+export function sp(C, s) {
+  if (s === "built") return { fill: "rgba(21,153,67,.10)", stroke: C.ok,
+    strokeWidth: 1.8, strokeDasharray: undefined };
+  if (s === "partial") return { fill: "rgba(230,126,34,.12)", stroke: C.wa,
+    strokeWidth: 1.8, strokeDasharray: undefined };
+  return { fill: "none", stroke: C.mut, strokeWidth: 1.2, strokeDasharray: "4 3" };
+}
+function SBox({ C, s, x, y, w, h, rx = 3, stroke, strokeWidth }) {
+  const p = sp(C, s);
+  return (<>
+    <rect x={x} y={y} width={w} height={h} rx={rx} fill={p.fill}
+      stroke={stroke || p.stroke} strokeWidth={strokeWidth || p.strokeWidth}
+      strokeDasharray={p.strokeDasharray} />
+    <text x={x + w - 6} y={y + 10} textAnchor="end" fontSize={7.5} fontWeight={800}
+      letterSpacing=".4" fill={p.stroke}>{s.toUpperCase()}</text>
+  </>);
+}
+export function Legend({ t, note }) {
+  const C = PAL(t);
+  return (
+    <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap",
+      fontSize: 11, color: t.sub, margin: "0 0 8px" }}>
+      {["built", "partial", "pending"].map((s) => { const p = sp(C, s); return (
+        <span key={s} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <svg width={26} height={14} aria-hidden="true">
+            <rect x={1} y={1} width={24} height={12} rx={2} fill={p.fill}
+              stroke={p.stroke} strokeWidth={1.4} strokeDasharray={p.strokeDasharray} /></svg>
+          <b style={{ color: p.stroke, fontSize: 9.5, letterSpacing: .4 }}>{s.toUpperCase()}</b>
+          <span>{STATUS_TEXT[s]}</span>
+        </span>); })}
+      {note && <span style={{ color: t.textMuted }}>{note}</span>}
+    </div>);
+}
+
 // Every figure is wrapped the same way: a scroll frame so a wide diagram
 // scrolls inside its own box rather than pushing the page sideways, and
 // role="img" with the aria text so the claim survives for a reader who
@@ -182,7 +226,7 @@ function CtxFig({ t }) {
 function ContainerFig({ t }) {
   const C = PAL(t);
   return (
-    <Frame t={t} vw={820} vh={392} aria={'C4 containers: one repo per application holding its dbt models, DAGs and its own Liquibase changelog, three image repos and the guardrail library; a Jenkins controller and the cp-airflow-agent; two jobs, application and images, with the schema stage inside the application job; and targets of OpenShift namespaces, the Oracle estate, the image registry and the release store. The guardrail library is called by both jobs.'}>
+    <Frame t={t} vw={820} vh={392} aria={'C4 containers, each coloured by build status: one repo per application holding its dbt models, DAGs and its own Liquibase changelog, three image repos and the guardrail library which is not connected yet; a Jenkins controller, the webhook bridge that starts the Guardrails job, and the agent pod; two jobs, application and images, with the schema stage inside the application job; and targets of OpenShift namespaces, the Oracle estate, the image registry and the release store. Green runs today, amber is partly there, dashed grey is pending.'}>
       <defs>
       <marker id="d360b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={C.fast} /></marker>
       <marker id="d360q" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={C.pin} /></marker>
@@ -190,65 +234,70 @@ function ContainerFig({ t }) {
       <text x={14} y={20} fontSize={11} fontWeight={800} letterSpacing=".6" fill={C.ink}>L2 · CONTAINERS</text>
       <text x={148} y={20} fontSize={9.5} fill={C.mut} opacity={.8}>the runnable pieces, and what crosses between them</text>
       <text x={14} y={44} fontSize={11} fontWeight={800} letterSpacing=".6" fill={C.ink}>SOURCE</text>
-      <rect x={14} y={52} width={200} height={58} rx={3} fill="none" stroke={C.line} strokeWidth={1.25} />
+      <SBox C={C} s="partial" x={14} y={52} w={200} h={58} />
       <text x={25} y={69} fontSize={11.5} fontWeight={600} fill={C.ink}>cp-data-pipeline</text>
-      <text x={25} y={83} fontSize={9.5} fill={C.mut}>dbt models · DAGs · db/changelog</text>
-      <text x={25} y={95} fontSize={9.5} fill={C.mut}>pins base digest + policy</text>
-      <rect x={226} y={52} width={200} height={58} rx={3} fill="none" stroke={C.line} strokeWidth={1.25} />
+      <text x={25} y={83} fontSize={9.5} fill={C.mut}>dbt models · DAGs — in Bitbucket today</text>
+      <text x={25} y={95} fontSize={9.5} fill={C.mut}>db/changelog · pins: not yet</text>
+      <SBox C={C} s="pending" x={226} y={52} w={200} h={58} />
       <text x={237} y={69} fontSize={11.5} fontWeight={600} fill={C.ink}>every application repo</text>
       <text x={237} y={83} fontSize={9.5} fill={C.mut}>its own db/changelog · rollback blocks</text>
       <text x={237} y={95} fontSize={9.5} fill={C.mut}>same layout · own changelog table</text>
-      <rect x={438} y={52} width={200} height={58} rx={3} fill="none" stroke={C.line} strokeWidth={1.25} />
+      <SBox C={C} s="partial" x={438} y={52} w={200} h={58} />
       <text x={449} y={69} fontSize={11.5} fontWeight={600} fill={C.ink}>3 image repos</text>
       <text x={449} y={83} fontSize={9.5} fill={C.mut}>base · workbench · agent</text>
-      <text x={449} y={95} fontSize={9.5} fill={C.mut}>Dockerfiles + SBOM config</text>
-      <rect x={650} y={52} width={158} height={58} rx={3} fill="none" stroke={C.pin} strokeWidth={1.25} strokeDasharray="4 3" />
+      <text x={449} y={95} fontSize={9.5} fill={C.mut}>agent image in use · SBOM: not yet</text>
+      <SBox C={C} s="pending" x={650} y={52} w={158} h={58} />
       <text x={661} y={69} fontSize={11.5} fontWeight={600} fill={C.pin}>Guardrail library</text>
-      <text x={661} y={83} fontSize={9.5} fill={C.mut}>shared lib + OPA bundle</text>
-      <text x={661} y={95} fontSize={9.5} fill={C.mut}>semver, pinned per job</text>
+      <text x={661} y={83} fontSize={9.5} fill={C.mut}>DevSecOps shared lib + OPA</text>
+      <text x={661} y={95} fontSize={9.5} fill={C.mut}>not connected yet</text>
       <text x={14} y={142} fontSize={11} fontWeight={800} letterSpacing=".6" fill={C.ink}>BUILD</text>
-      <rect x={14} y={150} width={624} height={46} rx={3} fill="none" stroke={C.fast} strokeWidth={1.8} />
+      <SBox C={C} s="built" x={14} y={150} w={412} h={46} />
       <text x={25} y={167} fontSize={11.5} fontWeight={600} fill={C.fast}>Jenkins controller</text>
-      <text x={25} y={181} fontSize={9.5} fill={C.mut}>schedules jobs · posts status back to GitHub · holds the required-check contract</text>
-      <rect x={650} y={150} width={158} height={46} rx={3} fill="none" stroke={C.line} strokeWidth={1.25} />
+      <text x={25} y={181} fontSize={9.5} fill={C.mut}>runs the Guardrails job on the agent · result goes out through the bridge</text>
+      <SBox C={C} s="built" x={438} y={150} w={200} h={46} />
+      <text x={449} y={167} fontSize={11.5} fontWeight={600} fill={C.fast}>sie-webhook-bridge</text>
+      <text x={449} y={181} fontSize={9.5} fill={C.mut}>PR webhooks in · job start</text>
+      <text x={449} y={193} fontSize={9.5} fill={C.mut}>summary out → Silver + email</text>
+      <SBox C={C} s="built" x={650} y={150} w={158} h={46} />
       <text x={661} y={167} fontSize={11.5} fontWeight={600} fill={C.ink}>cp-airflow-agent</text>
       <text x={661} y={181} fontSize={9.5} fill={C.mut}>pod on OpenShift</text>
       <text x={661} y={193} fontSize={9.5} fill={C.mut}>pinned per Jenkinsfile</text>
-      <rect x={14} y={214} width={200} height={58} rx={3} fill="none" stroke={C.fast} strokeWidth={1.8} />
+      <SBox C={C} s="partial" x={14} y={214} w={200} h={58} />
       <text x={25} y={231} fontSize={11.5} fontWeight={600} fill={C.fast}>Application job</text>
-      <text x={25} y={245} fontSize={9.5} fill={C.mut}>4 stages · 14 gates</text>
-      <text x={25} y={257} fontSize={9.5} fill={C.mut}>thin artifact or DAG bundle</text>
-      <rect x={226} y={214} width={200} height={58} rx={3} fill="none" stroke={C.pin} strokeWidth={1.25} strokeDasharray="4 3" />
+      <text x={25} y={245} fontSize={9.5} fill={C.mut}>5 gates run · ends at the report</text>
+      <text x={25} y={257} fontSize={9.5} fill={C.mut}>no artifact, no deploy yet</text>
+      <SBox C={C} s="pending" x={226} y={214} w={200} h={58} />
       <text x={237} y={231} fontSize={11.5} fontWeight={600} fill={C.pin}>Schema stage · Liquibase</text>
       <text x={237} y={245} fontSize={9.5} fill={C.mut}>validate · update · tag</text>
       <text x={237} y={257} fontSize={9.5} fill={C.mut}>first stage of the application job</text>
-      <rect x={438} y={214} width={200} height={58} rx={3} fill="none" stroke={C.pin} strokeWidth={1.25} />
+      <SBox C={C} s="pending" x={438} y={214} w={200} h={58} />
       <text x={449} y={231} fontSize={11.5} fontWeight={600} fill={C.pin}>Image job</text>
       <text x={449} y={245} fontSize={9.5} fill={C.mut}>build · scan · sign · SBOM</text>
       <text x={449} y={257} fontSize={9.5} fill={C.mut}>push by digest</text>
       <text x={14} y={304} fontSize={11} fontWeight={800} letterSpacing=".6" fill={C.ink}>TARGETS</text>
-      <rect x={14} y={312} width={200} height={58} rx={3} fill="none" stroke={C.line} strokeWidth={1.25} />
+      <SBox C={C} s="built" x={14} y={312} w={200} h={58} />
       <text x={25} y={329} fontSize={11.5} fontWeight={600} fill={C.ink}>OpenShift namespaces</text>
       <text x={25} y={343} fontSize={9.5} fill={C.mut}>DEV · SIT · QC · PROD</text>
       <text x={25} y={355} fontSize={9.5} fill={C.mut}>Deployments, CronJobs, Secrets</text>
-      <rect x={226} y={312} width={200} height={58} rx={3} fill="none" stroke={C.line} strokeWidth={1.25} />
+      <SBox C={C} s="partial" x={226} y={312} w={200} h={58} />
       <text x={237} y={329} fontSize={11.5} fontWeight={600} fill={C.ink}>Oracle · IMDS + PBDW</text>
       <text x={237} y={343} fontSize={9.5} fill={C.mut}>a pair per environment</text>
-      <text x={237} y={355} fontSize={9.5} fill={C.mut}>changelog table per env</text>
-      <rect x={438} y={312} width={200} height={58} rx={3} fill="none" stroke={C.line} strokeWidth={1.25} />
+      <text x={237} y={355} fontSize={9.5} fill={C.mut}>changelog table per env: not yet</text>
+      <SBox C={C} s="partial" x={438} y={312} w={200} h={58} />
       <text x={449} y={329} fontSize={11.5} fontWeight={600} fill={C.ink}>Image registry</text>
-      <text x={449} y={343} fontSize={9.5} fill={C.mut}>one signed digest</text>
+      <text x={449} y={343} fontSize={9.5} fill={C.mut}>one digest · signing: not yet</text>
       <text x={449} y={355} fontSize={9.5} fill={C.mut}>referenced by all four</text>
-      <rect x={650} y={312} width={158} height={58} rx={3} fill="none" stroke={C.pin} strokeWidth={1.25} strokeDasharray="4 3" />
+      <SBox C={C} s="partial" x={650} y={312} w={158} h={58} />
       <text x={661} y={329} fontSize={11.5} fontWeight={600} fill={C.pin}>Release store</text>
-      <text x={661} y={343} fontSize={9.5} fill={C.mut}>guardrail_* tables</text>
-      <text x={661} y={355} fontSize={9.5} fill={C.mut}>feeds the dashboard</text>
+      <text x={661} y={343} fontSize={9.5} fill={C.mut}>summary → Silver today</text>
+      <text x={661} y={355} fontSize={9.5} fill={C.mut}>guardrail_* rows: not yet</text>
       <path d="M114,114 L114,146" fill="none" stroke={C.fast} strokeWidth={1.4} markerEnd="url(#d360b)" />
       <path d="M114,200 L114,210" fill="none" stroke={C.fast} strokeWidth={1.4} markerEnd="url(#d360b)" />
       <path d="M326,114 L326,146" fill="none" stroke={C.fast} strokeWidth={1.4} markerEnd="url(#d360b)" />
       <path d="M218,243 L222,243" fill="none" stroke={C.fast} strokeWidth={1.4} markerEnd="url(#d360b)" />
       <path d="M538,114 L538,146" fill="none" stroke={C.fast} strokeWidth={1.4} markerEnd="url(#d360b)" />
-      <path d="M538,200 L538,210" fill="none" stroke={C.fast} strokeWidth={1.4} markerEnd="url(#d360b)" />
+      <path d="M438,173 L430,173" fill="none" stroke={C.fast} strokeWidth={1.4} markerEnd="url(#d360b)" />
+      <path d="M400,196 L400,204 L538,204 L538,210" fill="none" stroke={C.pin} strokeWidth={1.4} strokeDasharray="4 3" markerEnd="url(#d360q)" />
       <path d="M114,276 L114,308" fill="none" stroke={C.fast} strokeWidth={1.4} markerEnd="url(#d360b)" />
       <path d="M326,276 L326,308" fill="none" stroke={C.pin} strokeWidth={1.4} strokeDasharray="4 3" markerEnd="url(#d360q)" />
       <path d="M538,276 L538,308" fill="none" stroke={C.pin} strokeWidth={1.4} strokeDasharray="4 3" markerEnd="url(#d360q)" />
@@ -260,54 +309,54 @@ function ContainerFig({ t }) {
 function ComponentFig({ t }) {
   const C = PAL(t);
   return (
-    <Frame t={t} vw={820} vh={546} aria={'C4 components inside the application job: checkout, resolve pins and apply the changelog, then four gate stages each emitting gate run rows, then the report publisher, artifact builder and deployer each emitting release, tag and deployment rows.'}>
+    <Frame t={t} vw={820} vh={546} aria={'C4 components inside the application job, each coloured by build status: checkout with pins and the changelog partly there, then four gate stages of which governance, performance and testing run today as Gates 1 to 4 and security runs partly as Gate 5 without the DevSecOps thresholds, then the report publisher partly there, and the artifact builder and deployer pending. The right column lists the rows each component is meant to emit.'}>
       <defs>
       <marker id="d360c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={C.fast} /></marker>
       <marker id="d360r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={C.pin} /></marker>
       </defs>
       <text x={14} y={20} fontSize={11} fontWeight={800} letterSpacing=".6" fill={C.ink}>L3 · COMPONENTS</text>
       <text x={170} y={20} fontSize={9.5} fill={C.mut} opacity={.8}>inside the application job — every stage and what it emits</text>
-      <rect x={14} y={38} width={470} height={56} rx={3} fill="none" stroke={C.fast} strokeWidth={1.8} />
+      <SBox C={C} s="partial" x={14} y={38} w={470} h={56} />
       <text x={25} y={55} fontSize={11.5} fontWeight={600} fill={C.fast}>Checkout + resolve pins</text>
-      <text x={25} y={69} fontSize={9.5} fill={C.mut}>reads: base digest · policy version · applies db/changelog → mints the db tag</text>
-      <text x={25} y={81} fontSize={9.5} fill={C.mut}>fails fast if the changelog cannot be applied; the deployer checks the tag</text>
-      <rect x={14} y={104} width={470} height={44} rx={3} fill="none" stroke={C.fast} strokeWidth={1.8} />
+      <text x={25} y={69} fontSize={9.5} fill={C.mut}>today: checkout of the PR’s repo, branch and commit · toolchain set up</text>
+      <text x={25} y={81} fontSize={9.5} fill={C.mut}>not yet: base digest · policy version · db/changelog → the db tag</text>
+      <SBox C={C} s="built" x={14} y={104} w={470} h={44} />
       <text x={25} y={121} fontSize={11.5} fontWeight={600} fill={C.fast}>Stage 1 · Governance</text>
-      <text x={25} y={135} fontSize={9.5} fill={C.mut}>schema · naming · lineage · orphan models</text>
+      <text x={25} y={135} fontSize={9.5} fill={C.mut}>Gate 1 code quality + Gate 2 schema vs Oracle · lineage, orphans: not yet</text>
       <rect x={512} y={111} width={296} height={30} rx={3} fill="none" stroke={C.pin} strokeWidth={1} strokeDasharray="3 2" />
       <text x={523} y={128} fontSize={9.5} fill={C.mut}>gate_run × 4</text>
       <path d="M488,126.0 L508,126.0" fill="none" stroke={C.pin} strokeWidth={1} strokeDasharray="3 2" markerEnd="url(#d360r)" />
-      <rect x={14} y={158} width={470} height={44} rx={3} fill="none" stroke={C.fast} strokeWidth={1.8} />
+      <SBox C={C} s="built" x={14} y={158} w={470} h={44} />
       <text x={25} y={175} fontSize={11.5} fontWeight={600} fill={C.fast}>Stage 2 · Performance</text>
-      <text x={25} y={189} fontSize={9.5} fill={C.mut}>EXPLAIN PLAN · SLA 10K–5M · pruning · SCD2 cost</text>
+      <text x={25} y={189} fontSize={9.5} fill={C.mut}>Gate 4 · Oracle thresholds and benchmarks · skippable by parameter</text>
       <rect x={512} y={165} width={296} height={30} rx={3} fill="none" stroke={C.pin} strokeWidth={1} strokeDasharray="3 2" />
       <text x={523} y={182} fontSize={9.5} fill={C.mut}>gate_run × 4</text>
       <path d="M488,180.0 L508,180.0" fill="none" stroke={C.pin} strokeWidth={1} strokeDasharray="3 2" markerEnd="url(#d360r)" />
-      <rect x={14} y={212} width={470} height={44} rx={3} fill="none" stroke={C.fast} strokeWidth={1.8} />
+      <SBox C={C} s="built" x={14} y={212} w={470} h={44} />
       <text x={25} y={229} fontSize={11.5} fontWeight={600} fill={C.fast}>Stage 3 · Testing</text>
-      <text x={25} y={243} fontSize={9.5} fill={C.mut}>dbt tests · business rules · seed→gold · regression</text>
+      <text x={25} y={243} fontSize={9.5} fill={C.mut}>Gate 3 · dbt compile, dbt test, custom transformation assertions</text>
       <rect x={512} y={219} width={296} height={30} rx={3} fill="none" stroke={C.pin} strokeWidth={1} strokeDasharray="3 2" />
       <text x={523} y={236} fontSize={9.5} fill={C.mut}>gate_run × 4 + manifest + run_results</text>
       <path d="M488,234.0 L508,234.0" fill="none" stroke={C.pin} strokeWidth={1} strokeDasharray="3 2" markerEnd="url(#d360r)" />
-      <rect x={14} y={266} width={470} height={44} rx={3} fill="none" stroke={C.fast} strokeWidth={1.8} />
+      <SBox C={C} s="partial" x={14} y={266} w={470} h={44} />
       <text x={25} y={283} fontSize={11.5} fontWeight={600} fill={C.fast}>Stage 4 · Security</text>
-      <text x={25} y={297} fontSize={9.5} fill={C.mut}>secrets · CVE · SQLi · image scan — blocks on CRITICAL only</text>
+      <text x={25} y={297} fontSize={9.5} fill={C.mut}>Gate 5 · Bandit + SAST · DevSecOps thresholds not connected · no secrets scan</text>
       <rect x={512} y={273} width={296} height={30} rx={3} fill="none" stroke={C.pin} strokeWidth={1} strokeDasharray="3 2" />
       <text x={523} y={290} fontSize={9.5} fill={C.mut}>gate_run × 4 (severity-gated)</text>
       <path d="M488,288.0 L508,288.0" fill="none" stroke={C.pin} strokeWidth={1} strokeDasharray="3 2" markerEnd="url(#d360r)" />
-      <rect x={14} y={330} width={470} height={44} rx={3} fill="none" stroke={C.pin} strokeWidth={1.4} />
+      <SBox C={C} s="partial" x={14} y={330} w={470} h={44} />
       <text x={25} y={347} fontSize={11.5} fontWeight={600} fill={C.pin}>Report publisher</text>
-      <text x={25} y={361} fontSize={9.5} fill={C.mut}>posts the status GitHub's required-check list is watching</text>
+      <text x={25} y={361} fontSize={9.5} fill={C.mut}>summary.json + .html → bridge → Silver + email · no required check yet</text>
       <rect x={512} y={337} width={296} height={30} rx={3} fill="none" stroke={C.pin} strokeWidth={1} strokeDasharray="3 2" />
       <text x={523} y={354} fontSize={9.5} fill={C.mut}>guardrail_release + gate_run rows</text>
       <path d="M488,352.0 L508,352.0" fill="none" stroke={C.pin} strokeWidth={1} strokeDasharray="3 2" markerEnd="url(#d360r)" />
-      <rect x={14} y={384} width={470} height={44} rx={3} fill="none" stroke={C.pin} strokeWidth={1.4} />
+      <SBox C={C} s="pending" x={14} y={384} w={470} h={44} />
       <text x={25} y={401} fontSize={11.5} fontWeight={600} fill={C.pin}>Artifact builder</text>
       <text x={25} y={415} fontSize={9.5} fill={C.mut}>thin layer on the pinned digest, or a Git DAG bundle</text>
       <rect x={512} y={391} width={296} height={30} rx={3} fill="none" stroke={C.pin} strokeWidth={1} strokeDasharray="3 2" />
       <text x={523} y={408} fontSize={9.5} fill={C.mut}>app_tag + commit_sha</text>
       <path d="M488,406.0 L508,406.0" fill="none" stroke={C.pin} strokeWidth={1} strokeDasharray="3 2" markerEnd="url(#d360r)" />
-      <rect x={14} y={438} width={470} height={44} rx={3} fill="none" stroke={C.pin} strokeWidth={1.4} />
+      <SBox C={C} s="pending" x={14} y={438} w={470} h={44} />
       <text x={25} y={455} fontSize={11.5} fontWeight={600} fill={C.pin}>Deployer</text>
       <text x={25} y={469} fontSize={9.5} fill={C.mut}>oc apply into the target namespace · smoke check</text>
       <rect x={512} y={445} width={296} height={30} rx={3} fill="none" stroke={C.pin} strokeWidth={1} strokeDasharray="3 2" />
@@ -321,7 +370,7 @@ function ComponentFig({ t }) {
       <path d="M249,374 L249,380" fill="none" stroke={C.fast} strokeWidth={1.4} markerEnd="url(#d360c)" />
       <path d="M249,428 L249,434" fill="none" stroke={C.fast} strokeWidth={1.4} markerEnd="url(#d360c)" />
       <text x={512} y={26} fontSize={11} fontWeight={800} letterSpacing=".6" fill={C.pin}>EMITS — every row the dashboard later reads</text>
-      <text x={14} y={512} fontSize={9.5} fill={C.mut}>A stage that fails stops the job. Stage 4 is the exception: it reports unless the finding is CRITICAL.</text>
+      <text x={14} y={512} fontSize={9.5} fill={C.mut}>Today the job writes one summary per gate, not the rows on the right: the EMITS column is the contract still to meet.</text>
       <text x={14} y={530} fontSize={9.5} fill={C.mut}>Liquibase runs in the first component, from the same checkout — validate, update, tag. The base image is still resolved as a pin, never built here.</text>
     </Frame>);
 }
@@ -765,6 +814,7 @@ export function Containers({ t }) {
   return (<>
     <H t={t} sub="Open the centre box. Four rows: where code lives, what builds it, the two jobs, and what they write to.">
       The runnable pieces</H>
+    <Legend t={t} />
     <ContainerFig t={t} />
     <Caption t={t}><b style={{ color: t.text }}>One controller, two jobs,
       one library they both call.</b> The schema is a stage of the application
@@ -795,6 +845,7 @@ export function Components({ t }) {
   return (<>
     <H t={t} sub="The drill-down. Left is what runs, right is what it writes — and the right-hand column is exactly what the release dashboard reads back.">
       Inside the application job</H>
+    <Legend t={t} />
     <ComponentFig t={t} />
     <Caption t={t}><b style={{ color: t.text }}>Each component names the rows
       it emits, because that is the contract with the dashboard.</b> A screen
@@ -807,8 +858,8 @@ export function Components({ t }) {
       transformation quality, performance benchmark, security scan. Governance
       here is Gates 1 and 2, Performance is Gate 4, Testing is Gate 3 and
       Security is Gate 5; the schema stage, the artifact builder and the
-      deployer are not in it. The gap, stage by stage, is under Reference
-      &rarr; Built today.</Note>
+      deployer are not in it. The gap, stage by stage, opens from the
+      PR intake box on the map.</Note>
   </>);
 }
 
@@ -887,7 +938,7 @@ export function Pipelines({ t }) {
       A swimlane per pipeline</H>
     <div style={{ fontSize: 13, fontWeight: 600, color: t.text, margin: "16px 0 8px" }}>
       1 · Application data pipeline <span style={{ fontWeight: 400,
-        color: t.textMuted, fontSize: 11.5 }}>daily</span></div>
+        color: t.textMuted, fontSize: 11.5 }}>daily</span> <Status t={t} s="partial" /></div>
     <SwimApp t={t} />
     <Caption t={t}><b style={{ color: t.text }}>Five actors, seven steps, one
       human wait.</b> The release store lane is on the diagram because rows
@@ -895,7 +946,7 @@ export function Pipelines({ t }) {
       later.</Caption>
     <div style={{ fontSize: 13, fontWeight: 600, color: t.text, margin: "16px 0 8px" }}>
       2 · Database · Liquibase <span style={{ fontWeight: 400,
-        color: t.textMuted, fontSize: 11.5 }}>per release · the first stage of the application job</span></div>
+        color: t.textMuted, fontSize: 11.5 }}>per release · the first stage of the application job</span> <Status t={t} s="pending" /></div>
     <SwimDb t={t} />
     <Caption t={t}><b style={{ color: t.text }}>This lane is the first stage
       of the application job, from the same repo.</b> Every box is per
@@ -903,7 +954,7 @@ export function Pipelines({ t }) {
       deploy stage of the same job reads and never writes.</Caption>
     <div style={{ fontSize: 13, fontWeight: 600, color: t.text, margin: "16px 0 8px" }}>
       3 · Infrastructure image &amp; security <span style={{ fontWeight: 400,
-        color: t.textMuted, fontSize: 11.5 }}>CVE / bumps</span></div>
+        color: t.textMuted, fontSize: 11.5 }}>CVE / bumps</span> <Status t={t} s="pending" /></div>
     <SwimImg t={t} />
     <Caption t={t}><b style={{ color: t.text }}>Seven steps, and the seventh
       is the one that gets dropped.</b> Building and scanning a new image
@@ -996,29 +1047,27 @@ function BuiltFig({ t }) {
         every pull request · the Guardrails job, brokered by the webhook bridge</text>
 
       {/* row 1: trigger, bridge, library */}
-      <rect x={14} y={40} width={118} height={56} rx={3} fill="none"
-        stroke={C.ink} strokeWidth={1.4} />
+      <SBox C={C} s="built" x={14} y={40} w={118} h={56} />
       <text x={25} y={59} fontSize={11.5} fontWeight={600} fill={C.ink}>Pull request</text>
       <text x={25} y={74} fontSize={9.5} fill={C.mut}>Bitbucket · source repo</text>
       <text x={25} y={87} fontSize={9.5} fill={C.mut}>one bridge, many repos</text>
       <path d="M132,68 L176,68" fill="none" stroke={C.fast} strokeWidth={1.4}
         markerEnd="url(#b360a)" />
       <text x={154} y={62} fontSize={8.5} fill={C.mut} textAnchor="middle">webhook</text>
-      <rect x={180} y={40} width={190} height={56} rx={3} fill="none"
-        stroke={C.fast} strokeWidth={1.8} />
+      <SBox C={C} s="built" x={180} y={40} w={190} h={56} />
       <text x={191} y={59} fontSize={11.5} fontWeight={600} fill={C.fast}>sie-webhook-bridge</text>
       <text x={191} y={74} fontSize={9.5} fill={C.mut}>intake · route · start the job</text>
       <text x={191} y={87} fontSize={9.5} fill={C.mut}>collect · upload · email</text>
       <path d="M265,96 L265,116" fill="none" stroke={C.fast} strokeWidth={1.4}
         markerEnd="url(#b360a)" />
       <text x={272} y={110} fontSize={8.5} fill={C.mut}>repo · branch · commit</text>
-      <rect x={640} y={40} width={326} height={56} rx={3} fill="none"
-        stroke={C.pin} strokeWidth={1.2} strokeDasharray="4 3" />
-      <text x={651} y={59} fontSize={11.5} fontWeight={600} fill={C.pin}>DevSecOps shared library</text>
-      <text x={651} y={74} fontSize={9.5} fill={C.mut}>stage order · severity thresholds · release rules · HTML outcome</text>
-      <text x={651} y={87} fontSize={9.5} fill={C.mut}>pinned by the job — a team cannot relax its gates locally</text>
-      <path d="M803,96 L803,116" fill="none" stroke={C.pin} strokeWidth={1.2}
+      <SBox C={C} s="pending" x={640} y={40} w={326} h={56} />
+      <text x={651} y={59} fontSize={11.5} fontWeight={600} fill={C.pin}>DevSecOps shared library — not connected yet</text>
+      <text x={651} y={74} fontSize={9.5} fill={C.mut}>to wire: stage order · severity thresholds · release rules · HTML outcome</text>
+      <text x={651} y={87} fontSize={9.5} fill={C.mut}>once pinned by the job, a team cannot relax its gates locally</text>
+      <path d="M803,96 L803,116" fill="none" stroke={C.mut} strokeWidth={1.2}
         strokeDasharray="4 3" markerEnd="url(#b360p)" />
+      <text x={810} y={110} fontSize={8.5} fill={C.mut}>to connect</text>
 
       {/* row 2: the job */}
       <rect x={14} y={120} width={972} height={120} rx={3} fill="none"
@@ -1029,8 +1078,8 @@ function BuiltFig({ t }) {
         const gate = /^Gate/.test(name), skip = name === "Gate 4";
         return (
           <g key={name}>
-            <rect x={xs[i]} y={150} width={w} height={48} rx={3} fill="none"
-              stroke={gate ? C.fast : C.mut} strokeWidth={gate ? 1.6 : 1}
+            <rect x={xs[i]} y={150} width={w} height={48} rx={3} fill={sp(C, "built").fill}
+              stroke={gate ? C.fast : C.ok} strokeWidth={gate ? 1.6 : 1}
               strokeDasharray={skip ? "4 3" : undefined} />
             <text x={xs[i] + 7} y={168} fontSize={9.5} fontWeight={700}
               fill={gate ? C.fast : C.ink}>{name}</text>
@@ -1053,8 +1102,7 @@ function BuiltFig({ t }) {
       <text x={25} y={293} fontSize={11.5} fontWeight={600} fill={C.pin}>reports/** archived</text>
       <text x={25} y={308} fontSize={9.5} fill={C.mut}>on the Jenkins build · workspace cleaned after</text>
       <text x={25} y={321} fontSize={9.5} fill={C.mut}>overall: fail if any gate fails, else pass, else skip</text>
-      <rect x={330} y={274} width={250} height={56} rx={3} fill="none"
-        stroke={C.fast} strokeWidth={1.8} />
+      <SBox C={C} s="built" x={330} y={274} w={250} h={56} />
       <text x={341} y={293} fontSize={11.5} fontWeight={600} fill={C.fast}>Bridge collects the run</text>
       <text x={341} y={308} fontSize={9.5} fill={C.mut}>summary.json + summary.html</text>
       <text x={341} y={321} fontSize={9.5} fill={C.mut}>also when the job failed</text>
@@ -1062,16 +1110,14 @@ function BuiltFig({ t }) {
         markerEnd="url(#b360a)" />
       <path d="M580,308 L636,328" fill="none" stroke={C.fast} strokeWidth={1.4}
         markerEnd="url(#b360a)" />
-      <rect x={640} y={262} width={326} height={36} rx={3} fill="none"
-        stroke={C.pin} strokeWidth={1.4} />
+      <SBox C={C} s="built" x={640} y={262} w={326} h={36} />
       <text x={651} y={278} fontSize={11} fontWeight={600} fill={C.pin}>Silver schema</text>
       <text x={651} y={291} fontSize={9.5} fill={C.mut}>run outputs, one upload per build — per gate, not per control</text>
-      <rect x={640} y={310} width={326} height={36} rx={3} fill="none"
-        stroke={C.pin} strokeWidth={1.4} />
+      <SBox C={C} s="built" x={640} y={310} w={326} h={36} />
       <text x={651} y={326} fontSize={11} fontWeight={600} fill={C.pin}>Email to the PR's developers and reviewers</text>
       <text x={651} y={339} fontSize={9.5} fill={C.mut}>summary.html · a delivery failure is logged, never a gate result</text>
       <text x={14} y={366} fontSize={9.5} fill={C.mut}>
-        The job ends at pass or fail. Nothing in it deploys, applies a schema or writes a per-control row — those are the pending items below.</text>
+        The job ends at pass or fail. Nothing in it deploys, applies a schema, writes a per-control row or reads the shared library — those are the pending items.</text>
     </Frame>);
 }
 
@@ -1099,9 +1145,9 @@ export const BUILT = [
   { design: ["Stage 8", "DagBag import in the scheduler's own image, then cp.airflow"],
     today: "Gate 1 reads the DAGs statically; nothing imports them in the runtime image", status: "partial" },
   { design: ["Stages 9–10", "Semgrep · Bandit · Trivy · Checkov · Sonar quality gate"],
-    today: "Gate 5: Bandit, plus SAST findings normalised against the shared library's severity thresholds", status: "partial" },
+    today: "Gate 5: Bandit, plus SAST findings normalised by severity; the shared library's thresholds are not connected", status: "partial" },
   { design: ["Stage 11", "unit tests with an 80 % coverage floor"],
-    today: "the shared library owns the coverage rule; no gate publishes a coverage number", status: "partial" },
+    today: "nothing; the coverage rule would come from the shared library, which is not connected", status: "pending" },
   { design: ["Stage 12", "dbt build into an ephemeral CI schema, state:modified+, source freshness"],
     today: "Gate 3: dbt test plus custom transformation assertions, against a fixed target", status: "partial" },
   { design: ["Stage 13", "integration tests in qa, uat and prod"],
@@ -1109,7 +1155,7 @@ export const BUILT = [
   { design: ["Stage 14", "architecture: lineage depth ≤ 8, fan-out ≤ 40"],
     today: "Gate 4 benchmarks Oracle performance thresholds instead; depth and fan-out are not measured", status: "partial" },
   { design: ["Stages 15–16", "cp.deploy deployment gate, manual approval with separation of duties"],
-    today: "the shared library blocks artefact promotion on policy outcomes; no deployment request, no approver record", status: "partial" },
+    today: "nothing; the promotion block would come from the shared library, which is not connected", status: "pending" },
   { design: ["Stages 17–18", "signed promotion, post-deploy validation, automatic rollback"],
     today: "nothing: the job ends at pass or fail", status: "pending" },
   { design: ["post block", "reports and metrics on every outcome, cleanup"],
@@ -1126,10 +1172,13 @@ export const BUILT = [
     today: "nothing", status: "pending" },
   { design: ["Schema stage", "Liquibase from db/changelog as the first stage — this page's own design"],
     today: "Gate 2 reads Oracle metadata and applies nothing", status: "pending" },
+  { design: ["DevSecOps shared library", "stage order, severity thresholds, coverage rule and release rules from one pinned library"],
+    today: "not connected: the job runs its own five gates with its own thresholds in config/guardrails.yaml", status: "pending" },
 ];
 
 export const PENDING = [
   ["A control ID on every result", "a row per control per build, in summary.json and in Silver. Everything below reads from it: the score, the dashboards, the exceptions."],
+  ["Connect the DevSecOps shared library", "pin it in the Jenkinsfile, take stage order, severity thresholds, the coverage rule and the promotion block from it, and retire the local thresholds. Until then no team is held to the same gate."],
   ["Secrets scan as a gate", "gitleaks on the pull request, full history on main. The cheapest blocking control still missing."],
   ["Policy stages", "cp.dbt after compile, cp.airflow after a DagBag import in the runtime image, cp.deploy before any promotion."],
   ["Gate 3 at scale", "dbt build into an ephemeral CI schema with state-based selection and source freshness, so the gate survives the first hundred models."],
@@ -1152,7 +1201,7 @@ export function Built({ t }) {
   const C = PAL(t);
   const n = (s) => BUILT.filter((r) => r.status === s).length;
   return (<>
-    <H t={t} sub="The design on this page and the pipeline running on every pull request are not the same thing yet. This is the reconciliation: what the design asks for, what runs, and the gap — so the figures above are read as the target, not as production.">
+    <H t={t} sub="The design on this page and the pipeline running on every pull request are not the same thing yet. This is the reconciliation: what the design asks for, what runs, and the gap.">
       Built today, against the design</H>
     <BuiltFig t={t} />
     <Caption t={t}><b style={{ color: t.text }}>Five gates after a checkout,
@@ -1187,9 +1236,16 @@ export function Built({ t }) {
       drift the policy stages would miss; and Gate 4 benchmarks against Oracle
       performance thresholds. Both belong in the design when it is next
       revised — they are not deviations to remove.</Note>
-    <div style={{ fontSize: 13, fontWeight: 600, color: t.text,
-      margin: "4px 0 8px" }}>Pending, in the order that unlocks the rest</div>
-    <ol style={{ margin: "0 0 20px", paddingLeft: 22, fontSize: 12.5,
+  </>);
+}
+
+export function PendingList({ t }) {
+  return (<>
+    <div style={{ fontSize: 15, fontWeight: 700, color: t.text,
+      margin: "22px 0 2px" }}>Pending, in the order that unlocks the rest</div>
+    <div style={{ fontSize: 10.5, color: t.sub, marginBottom: 8 }}>
+      the dashed and amber boxes above, as work</div>
+    <ol style={{ margin: "0 0 6px", paddingLeft: 22, fontSize: 12.5,
       color: t.sub, lineHeight: 1.6, maxWidth: "80ch" }}>
       {PENDING.map(([head, body]) => (
         <li key={head} style={{ marginBottom: 5 }}>
@@ -1212,10 +1268,11 @@ export function Built({ t }) {
 // that says v2026.10.01 says it because a row says so.
 const ENV_ORDER = ["DEV", "SIT", "UAT", "PROD"];
 const ENV_LABEL = { DEV: "RD DEV", SIT: "RD SIT", UAT: "QC · UAT", PROD: "PROD" };
-const PIPES = [
-  ["app", "Application data pipeline", "dbt + Airflow · daily", "SwimApp"],
-  ["db", "Database · Liquibase", "per release · first stage of the app job", "SwimDb"],
-  ["img", "Infrastructure image & security", "CVE / bumps · one digest", "SwimImg"],
+export const PIPES = [
+  ["intake", "PR intake · webhook bridge", "every PR · 5 gates · Silver · email", "built"],
+  ["app", "Application data pipeline", "dbt + Airflow · daily", "partial"],
+  ["db", "Database · Liquibase", "per release · first stage of the app job", "pending"],
+  ["img", "Infrastructure image & security", "CVE / bumps · one digest", "pending"],
 ];
 
 export function FlowFig({ t, envs, open, onOpen }) {
@@ -1227,9 +1284,11 @@ export function FlowFig({ t, envs, open, onOpen }) {
   (envs || []).forEach((e) => { byEnv[e.environment] = e; });
   return (
     <Frame t={t} vw={980} vh={410}
-      aria="Interactive delivery map. Three pipelines across the top — the
-        application data pipeline, its Liquibase schema stage drawn as a lane, and the
-        infrastructure image pipeline — feed four Hub environments in order:
+      aria="Interactive delivery map, coloured by build status. Four pipelines
+        across the top — the pull request intake through the webhook bridge, which
+        is built; the application data pipeline, partly built; its Liquibase schema
+        stage drawn as a lane, and the infrastructure image pipeline, both pending —
+        feed four Hub environments in order:
         RD DEV, RD SIT, QC which is UAT, and production. Each environment box
         shows the application tag, build number and database tag currently
         deployed there. Below, the release store that every pipeline writes to
@@ -1248,14 +1307,15 @@ export function FlowFig({ t, envs, open, onOpen }) {
         fill={C.mut}>PIPELINES</text>
       <text x={110} y={20} fontSize={9.5} fill={C.mut} opacity={.8}>
         click any box</text>
-      {PIPES.map(([k, name, sub], i) => (
+      {PIPES.map(([k, name, sub, st], i) => (
         <g key={k} onClick={() => onOpen(node(k) ? null : k)} style={{ cursor: "pointer" }}>
-          <rect x={20 + i * 320} y={30} width={300} height={56} rx={4} fill={t.panel}
-            stroke={ring(k, i === 0 ? C.fast : C.pin)} strokeWidth={node(k) ? 2.6 : i === 0 ? 1.8 : 1.3} />
-          <text x={32 + i * 320} y={50} fontSize={11.5} fontWeight={600}
-            fill={i === 0 ? C.fast : C.pin}>{name}</text>
-          <text x={32 + i * 320} y={65} fontSize={9.5} fill={C.mut}>{sub}</text>
-          <text x={32 + i * 320} y={78} fontSize={9} fill={C.fast}>▾ open swimlane</text>
+          <SBox C={C} s={st} x={20 + i * 240} y={30} w={230} h={56} rx={4}
+            stroke={node(k) ? C.fast : undefined} strokeWidth={node(k) ? 2.6 : undefined} />
+          <text x={32 + i * 240} y={50} fontSize={11.5} fontWeight={600}
+            fill={i < 2 ? C.fast : C.pin}>{name}</text>
+          <text x={32 + i * 240} y={65} fontSize={9.5} fill={C.mut}>{sub}</text>
+          <text x={32 + i * 240} y={78} fontSize={9} fill={C.fast}>
+            {k === "intake" ? "▾ what runs, stage by stage" : "▾ open swimlane"}</text>
         </g>))}
 
       <text x={20} y={112} fontSize={11} fontWeight={800} letterSpacing=".6"
@@ -1290,28 +1350,26 @@ export function FlowFig({ t, envs, open, onOpen }) {
         <path key={i} d={`M${EX(i) + EW},188 L${EX(i + 1) - 4},188`} fill="none"
           stroke={C.fast} strokeWidth={1.8} markerEnd="url(#f360a)" />))}
       {PIPES.map((_, i) => (
-        <path key={i} d={`M${170 + i * 320},90 L${170 + i * 320},126 L${134 + i * 242},126 L${134 + i * 242},132`}
+        <path key={i} d={`M${140 + i * 240},90 L${140 + i * 240},126 L${134 + i * 242},126 L${134 + i * 242},132`}
           fill="none" stroke={C.pin} strokeWidth={1.2} strokeDasharray="4 3"
           markerEnd="url(#f360p)" />))}
 
       <g onClick={() => onOpen(node("store") ? null : "store")} style={{ cursor: "pointer" }}>
-        <rect x={20} y={282} width={460} height={56} rx={4} fill={t.panel}
-          stroke={ring("store", C.pin)} strokeWidth={node("store") ? 2.6 : 1.3}
-          strokeDasharray="4 3" />
+        <SBox C={C} s="partial" x={20} y={282} w={460} h={56} rx={4}
+          stroke={node("store") ? C.fast : undefined} strokeWidth={node("store") ? 2.6 : undefined} />
         <text x={32} y={302} fontSize={11.5} fontWeight={600} fill={C.pin}>
           Release store</text>
         <text x={32} y={317} fontSize={9.5} fill={C.mut}>
-          guardrail_release · gate_run · deployment · changeset — every row below comes from here</text>
+          summary.json lands in Silver today · guardrail_release · gate_run · deployment · changeset: not yet</text>
         <text x={32} y={330} fontSize={9} fill={C.fast}>▾ what writes what</text>
       </g>
       <g onClick={() => onOpen(node("lib") ? null : "lib")} style={{ cursor: "pointer" }}>
-        <rect x={500} y={282} width={460} height={56} rx={4} fill={t.panel}
-          stroke={ring("lib", C.pin)} strokeWidth={node("lib") ? 2.6 : 1.3}
-          strokeDasharray="4 3" />
+        <SBox C={C} s="pending" x={500} y={282} w={460} h={56} rx={4}
+          stroke={node("lib") ? C.fast : undefined} strokeWidth={node("lib") ? 2.6 : undefined} />
         <text x={512} y={302} fontSize={11.5} fontWeight={600} fill={C.pin}>
-          Guardrail library · versions and tags</text>
+          Guardrail library · DevSecOps — not connected yet</text>
         <text x={512} y={317} fontSize={9.5} fill={C.mut}>
-          semver, pinned per job — and the naming standard for every identifier</text>
+          to wire: stage order · thresholds · release rules · semver pinned per job · the naming standard</text>
         <text x={512} y={330} fontSize={9} fill={C.fast}>▾ the standard</text>
       </g>
       <path d="M250,244 L250,278" fill="none" stroke={C.pin} strokeWidth={1.2}
@@ -1320,8 +1378,8 @@ export function FlowFig({ t, envs, open, onOpen }) {
         Solid arrows are promotion — the same artifact moving forward. Dashed arrows are pinned
         versions and written rows: nothing waits on them.</text>
       <text x={20} y={396} fontSize={9.5} fill={C.mut}>
-        An environment box is blank where no deployment row exists yet, rather than showing a
-        zero that would read as a real version.</text>
+        Colour is build status: green runs today, amber is covered but not as designed, dashed grey
+        is nothing yet. An environment box is blank where no deployment row exists.</text>
     </Frame>);
 }
 
@@ -1390,15 +1448,17 @@ export function Detail({ t, open, envs, hist, onClose }) {
   // variable and rendered as <Fig /> defeats the repo's own import check,
   // which cannot tell a dynamic tag from a missing import.
   const PIPE_TITLE = {
-    app: ["Application data pipeline", "daily — the only chain on the critical path"],
-    db: ["Database · Liquibase", "per release — the first stage of the application job; the deploy stage waits for its tag"],
-    img: ["Infrastructure image & security", "CVE / bumps — one signed digest for all four"],
+    intake: ["PR intake · webhook bridge", "built — what runs on every pull request today, and the design stage by stage"],
+    app: ["Application data pipeline", "partial — the five gates run; the artifact and the deploy do not exist yet"],
+    db: ["Database · Liquibase", "pending — per release, the first stage of the application job; the deploy stage waits for its tag"],
+    img: ["Infrastructure image & security", "pending — CVE / bumps, one signed digest for all four"],
   }[open];
   if (PIPE_TITLE) {
     const [title, sub] = PIPE_TITLE;
     return (
       <Card t={t}>
         {head(title, sub)}
+        {open === "intake" && <Built t={t} />}
         {open === "app" && <SwimApp t={t} />}
         {open === "db" && <SwimDb t={t} />}
         {open === "img" && <SwimImg t={t} />}
@@ -1406,6 +1466,7 @@ export function Detail({ t, open, envs, hist, onClose }) {
           <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: .5,
             textTransform: "uppercase", color: t.textMuted, margin: "6px 0" }}>
             Inside the job — and the rows each stage writes</div>
+          <Legend t={t} />
           <ComponentFig t={t} /></>}
       </Card>);
   }
@@ -1637,14 +1698,16 @@ export default function DevOps360({ t }) {
         the map opens; the dashboard underneath is{" "}
         <b style={{ color: t.text }}>guardrail_deployment</b>, filtered and
         exportable. For the gate matrix and the changeset-level compare, use{" "}
-        <b style={{ color: t.text }}>Quality Guardrails → Releases</b>. The
-        maps draw the target; what runs on every pull request today, and the
-        gap, is under <b style={{ color: t.text }}>Reference → Built today</b>.
+        <b style={{ color: t.text }}>Quality Guardrails → Releases</b>. Every
+        figure is coloured by build status, so the design and what runs on
+        every pull request today are read together, not on separate pages.
       </div>
 
+      <Legend t={t} note="— the figures draw the design; the colour says how much of it exists" />
       <FlowFig t={t} envs={envs} open={open} onOpen={setOpen} />
       <Detail t={t} open={open} envs={envs} hist={hist}
         onClose={() => setOpen(null)} />
+      <PendingList t={t} />
 
       {/* The dashboard moved to Governance -> Release Delivery. This page
           is the DESIGN of the delivery system; "what is live where" is an
@@ -1664,10 +1727,9 @@ export default function DevOps360({ t }) {
       <div style={{ fontSize: 15, fontWeight: 700, color: t.text,
         margin: "26px 0 4px" }}>Reference</div>
       <div style={{ fontSize: 10.5, color: t.sub, marginBottom: 10 }}>
-        the design behind the map — opens in place, nothing here is live</div>
+        the design behind the map, coloured by what exists — opens in place, nothing here is live</div>
       <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
-        {[["Built", "built today · vs the design · pending"],
-          ["Context", "C4 · who uses it"], ["Containers", "C4 · the runnable pieces"],
+        {[["Context", "C4 · who uses it"], ["Containers", "C4 · the runnable pieces"],
           ["Promotion", "what moves between regions"],
           ["Deployment", "what each component becomes"]].map(([k, label]) => (
           <span key={k} onClick={() => setRef(ref === k ? null : k)}
@@ -1678,7 +1740,6 @@ export default function DevOps360({ t }) {
               background: ref === k ? t.bg : t.panel }}>{label}</span>))}
       </div>
       {ref && <Card t={t}>
-        {ref === "Built" && <Built t={t} />}
         {ref === "Context" && <Context t={t} />}
         {ref === "Containers" && <Containers t={t} />}
         {ref === "Promotion" && <Promotion t={t} />}
