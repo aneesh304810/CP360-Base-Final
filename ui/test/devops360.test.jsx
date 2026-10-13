@@ -25,7 +25,7 @@ import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import DevOps360, { PAL, NAMING, FlowFig, Dashboard, Detail, Context,
   Containers, Components, Versions, Promotion, Pipelines,
-  Deployment, Built, BUILT, PENDING, PIPES, sp, Legend, PendingList } from "../src/DevOps360.jsx";
+  Deployment, Built, BUILT, PENDING, PIPES, sp, Legend, PendingList, DB_PROCESS, IMG_PROCESS, Process } from "../src/DevOps360.jsx";
 import { tLight, tDark } from "../src/bbhTheme.js";
 
 let bad = 0;
@@ -223,12 +223,13 @@ ok(/Gate 1/.test(built) && /Gate 5/.test(built) && /sie-webhook-bridge/.test(bui
 ok(BUILT.length >= 20 && BUILT.every((r) => ["built", "partial", "pending"].includes(r.status) && r.design.length === 2 && r.today),
    "every design row has a status of built, partial or pending", BUILT.length);
 const cnt = (s) => BUILT.filter((r) => r.status === s).length;
-ok(cnt("built") >= 4 && cnt("partial") >= 8 && cnt("pending") >= 6 && cnt("built") < cnt("partial") + cnt("pending"),
+ok(cnt("built") >= 6 && cnt("partial") >= 8 && cnt("pending") >= 6 && cnt("built") < cnt("partial") + cnt("pending"),
    "the honest shape: fewer rows built than partial or pending", `${cnt("built")}/${cnt("partial")}/${cnt("pending")}`);
-ok(BUILT.some((r) => /Schema stage/.test(r.design[0]) && r.status === "pending")
+ok(BUILT.some((r) => /Schema stage/.test(r.design[0]) && r.status === "built")
+   && BUILT.some((r) => /Image pipeline/.test(r.design[0]) && r.status === "built")
    && BUILT.some((r) => /Stages 17–18/.test(r.design[0]) && r.status === "pending")
    && BUILT.some((r) => /Control catalogue/.test(r.design[0]) && r.status === "pending"),
-   "the schema stage, deployment and the control catalogue are stated as pending — the job ends at the report");
+   "the schema stage and the image pipeline are built; deployment and the control catalogue are pending — the job ends at the report");
 ok(PENDING.length >= 8 && /control ID/i.test(PENDING[0][0]),
    "the pending list exists and the control ID is first, because everything else reads from it", PENDING.map((p) => p[0]).join(" | "));
 ok(!/testbbh|apps\.ocp|https?:\/\/|:7990/.test(devSrc),
@@ -252,26 +253,47 @@ ok(/BUILT/.test(leg) && /PARTIAL/.test(leg) && /PENDING/.test(leg) && /runs toda
 ok(/BUILT/.test(flow) && /PARTIAL/.test(flow) && /PENDING/.test(flow) && /not connected yet/.test(flow),
    "the map carries all three statuses, and the library says it is not connected");
 ok(PIPES.length === 4 && PIPES[0][0] === "intake" && PIPES[0][3] === "built"
-   && PIPES.find((p) => p[0] === "db")[3] === "pending" && PIPES.find((p) => p[0] === "img")[3] === "pending"
+   && PIPES.find((p) => p[0] === "db")[3] === "built" && PIPES.find((p) => p[0] === "img")[3] === "built"
    && PIPES.find((p) => p[0] === "app")[3] === "partial",
-   "four pipeline nodes: the intake is built, the application partial, schema and image pending");
-const cont = renderToStaticMarkup(<Containers t={tLight} />);
-ok((cont.match(/>PENDING</g) || []).length >= 3 && (cont.match(/>BUILT</g) || []).length >= 4
+   "four pipeline nodes: the intake, schema and image pipelines are built, the application partial");
+const contAll = renderToStaticMarkup(<Containers t={tLight} />);
+const cont = contAll.slice(contAll.indexOf('role="img"'));   // the figure, not the legend
+ok((cont.match(/>PENDING</g) || []).length === 1 && (cont.match(/>BUILT</g) || []).length >= 9
    && /sie-webhook-bridge/.test(cont) && /not connected yet/.test(cont),
    "the containers figure colours every box, shows the bridge as built and the library as not connected");
 const compAll = renderToStaticMarkup(<Components t={tLight} />);
 const comp = compAll.slice(compAll.indexOf('role="img"'));   // the figure, not the legend
-ok((comp.match(/>BUILT</g) || []).length === 3 && (comp.match(/>PENDING</g) || []).length === 2
+ok((comp.match(/>BUILT</g) || []).length === 4 && (comp.match(/>PENDING</g) || []).length === 2
    && /DevSecOps thresholds not connected/.test(comp),
-   "inside the job: governance, performance and testing run as gates; security is partial without the library; builder and deployer pending");
+   "inside the job: checkout with the changelog, governance, performance and testing are built; security is partial without the library; builder and deployer pending");
 ok(/intake/.test(renderToStaticMarkup(<Detail t={tLight} open="intake" envs={ENVS} hist={HIST} onClose={() => {}} />))
    && /Built today, against the design/.test(renderToStaticMarkup(<Detail t={tLight} open="intake" envs={ENVS} hist={HIST} onClose={() => {}} />)),
    "the intake node opens the stage-by-stage reconciliation");
 ok(BUILT.some((r) => /DevSecOps shared library/.test(r.design[0]) && r.status === "pending")
    && /Connect the DevSecOps shared library/.test(PENDING[1][0]),
    "the DevSecOps library is a pending row and the second item of work");
-ok(/>pending</.test(renderToStaticMarkup(<Pipelines t={tLight} />)) && renderToStaticMarkup(<PendingList t={tLight} />).length > 800,
+ok(/>built</.test(renderToStaticMarkup(<Pipelines t={tLight} />)) && /1 · Application data pipeline[^]*?>partial</.test(renderToStaticMarkup(<Pipelines t={tLight} />)) && renderToStaticMarkup(<PendingList t={tLight} />).length > 800,
    "the swimlane headings carry their status, and the pending list renders on its own");
+
+
+// ---- the two built pipelines, as process --------------------------------
+// Every step names who does it, what has to be true to pass, and what it
+// writes — so the swimlane is not the only record of the process.
+for (const P of [DB_PROCESS, IMG_PROCESS]) {
+  ok(P.steps.length >= 6 && P.steps.every((st) => st.length === 5 && st.every((c) => c && c.length > 0)) && P.rules.length >= 3,
+     `${P.title}: every step has who, what, a pass condition and a writer`, P.steps.map((x) => x[0]).join(" | "));
+}
+ok(DB_PROCESS.steps.some((st) => /DATABASECHANGELOG_\{APP\}/.test(st[2])) && DB_PROCESS.steps.some((st) => /guardrail_changeset_applied/.test(st[4]))
+   && DB_PROCESS.steps.some((st) => /deploy refuses/.test(st[3])),
+   "the schema process names the per-application changelog table, the applied rows, and the deploy that checks the tag");
+ok(IMG_PROCESS.steps.some((st) => /CRITICAL fails/.test(st[3])) && IMG_PROCESS.steps.some((st) => /unsigned image never/.test(st[3]))
+   && IMG_PROCESS.steps[IMG_PROCESS.steps.length - 1][0].includes("Bump PR"),
+   "the image process blocks on CRITICAL, refuses unsigned images, and ends with the bump into every consumer");
+const dbDetail = renderToStaticMarkup(<Detail t={tLight} open="db" envs={ENVS} hist={HIST} onClose={() => {}} />);
+ok(/The process · Database · Liquibase/.test(dbDetail) && /Passes when/.test(dbDetail)
+   && /The process · Infrastructure image/.test(renderToStaticMarkup(<Pipelines t={tLight} />)),
+   "the process table opens with the swimlane on the map and sits under it in the reference");
+ok(renderToStaticMarkup(<Process t={tDark} p={IMG_PROCESS} />).length > 1500, "the process table renders in dark");
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\ndevops360 assertions pass");
 if (bad) process.exit(1);

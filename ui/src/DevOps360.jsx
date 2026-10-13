@@ -226,7 +226,7 @@ function CtxFig({ t }) {
 function ContainerFig({ t }) {
   const C = PAL(t);
   return (
-    <Frame t={t} vw={820} vh={392} aria={'C4 containers, each coloured by build status: one repo per application holding its dbt models, DAGs and its own Liquibase changelog, three image repos and the guardrail library which is not connected yet; a Jenkins controller, the webhook bridge that starts the Guardrails job, and the agent pod; two jobs, application and images, with the schema stage inside the application job; and targets of OpenShift namespaces, the Oracle estate, the image registry and the release store. Green runs today, amber is partly there, dashed grey is pending.'}>
+    <Frame t={t} vw={820} vh={392} aria={'C4 containers, each coloured by build status: one repo per application holding its dbt models, DAGs and its own Liquibase changelog, three image repos, all built, and the guardrail library which is not connected yet; a Jenkins controller, the webhook bridge that starts the Guardrails job, and the agent pod, all built; two jobs, application and images, with the schema stage inside the application job, the image job and schema stage built and the application job partly built; and targets of OpenShift namespaces, the Oracle estate, the image registry, all built, and the release store, partly. Green runs today, amber is partly there, dashed grey is pending.'}>
       <defs>
       <marker id="d360b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={C.fast} /></marker>
       <marker id="d360q" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={C.pin} /></marker>
@@ -234,18 +234,18 @@ function ContainerFig({ t }) {
       <text x={14} y={20} fontSize={11} fontWeight={800} letterSpacing=".6" fill={C.ink}>L2 · CONTAINERS</text>
       <text x={148} y={20} fontSize={9.5} fill={C.mut} opacity={.8}>the runnable pieces, and what crosses between them</text>
       <text x={14} y={44} fontSize={11} fontWeight={800} letterSpacing=".6" fill={C.ink}>SOURCE</text>
-      <SBox C={C} s="partial" x={14} y={52} w={200} h={58} />
+      <SBox C={C} s="built" x={14} y={52} w={200} h={58} />
       <text x={25} y={69} fontSize={11.5} fontWeight={600} fill={C.ink}>cp-data-pipeline</text>
-      <text x={25} y={83} fontSize={9.5} fill={C.mut}>dbt models · DAGs — in Bitbucket today</text>
-      <text x={25} y={95} fontSize={9.5} fill={C.mut}>db/changelog · pins: not yet</text>
-      <SBox C={C} s="pending" x={226} y={52} w={200} h={58} />
+      <text x={25} y={83} fontSize={9.5} fill={C.mut}>dbt models · DAGs · db/changelog</text>
+      <text x={25} y={95} fontSize={9.5} fill={C.mut}>in Bitbucket · pins base digest</text>
+      <SBox C={C} s="built" x={226} y={52} w={200} h={58} />
       <text x={237} y={69} fontSize={11.5} fontWeight={600} fill={C.ink}>every application repo</text>
       <text x={237} y={83} fontSize={9.5} fill={C.mut}>its own db/changelog · rollback blocks</text>
       <text x={237} y={95} fontSize={9.5} fill={C.mut}>same layout · own changelog table</text>
-      <SBox C={C} s="partial" x={438} y={52} w={200} h={58} />
+      <SBox C={C} s="built" x={438} y={52} w={200} h={58} />
       <text x={449} y={69} fontSize={11.5} fontWeight={600} fill={C.ink}>3 image repos</text>
       <text x={449} y={83} fontSize={9.5} fill={C.mut}>base · workbench · agent</text>
-      <text x={449} y={95} fontSize={9.5} fill={C.mut}>agent image in use · SBOM: not yet</text>
+      <text x={449} y={95} fontSize={9.5} fill={C.mut}>Dockerfiles + SBOM config</text>
       <SBox C={C} s="pending" x={650} y={52} w={158} h={58} />
       <text x={661} y={69} fontSize={11.5} fontWeight={600} fill={C.pin}>Guardrail library</text>
       <text x={661} y={83} fontSize={9.5} fill={C.mut}>DevSecOps shared lib + OPA</text>
@@ -264,13 +264,13 @@ function ContainerFig({ t }) {
       <text x={661} y={193} fontSize={9.5} fill={C.mut}>pinned per Jenkinsfile</text>
       <SBox C={C} s="partial" x={14} y={214} w={200} h={58} />
       <text x={25} y={231} fontSize={11.5} fontWeight={600} fill={C.fast}>Application job</text>
-      <text x={25} y={245} fontSize={9.5} fill={C.mut}>5 gates run · ends at the report</text>
-      <text x={25} y={257} fontSize={9.5} fill={C.mut}>no artifact, no deploy yet</text>
-      <SBox C={C} s="pending" x={226} y={214} w={200} h={58} />
+      <text x={25} y={245} fontSize={9.5} fill={C.mut}>schema stage + 5 gates run</text>
+      <text x={25} y={257} fontSize={9.5} fill={C.mut}>ends at the report · no artifact, no deploy yet</text>
+      <SBox C={C} s="built" x={226} y={214} w={200} h={58} />
       <text x={237} y={231} fontSize={11.5} fontWeight={600} fill={C.pin}>Schema stage · Liquibase</text>
       <text x={237} y={245} fontSize={9.5} fill={C.mut}>validate · update · tag</text>
       <text x={237} y={257} fontSize={9.5} fill={C.mut}>first stage of the application job</text>
-      <SBox C={C} s="pending" x={438} y={214} w={200} h={58} />
+      <SBox C={C} s="built" x={438} y={214} w={200} h={58} />
       <text x={449} y={231} fontSize={11.5} fontWeight={600} fill={C.pin}>Image job</text>
       <text x={449} y={245} fontSize={9.5} fill={C.mut}>build · scan · sign · SBOM</text>
       <text x={449} y={257} fontSize={9.5} fill={C.mut}>push by digest</text>
@@ -279,13 +279,13 @@ function ContainerFig({ t }) {
       <text x={25} y={329} fontSize={11.5} fontWeight={600} fill={C.ink}>OpenShift namespaces</text>
       <text x={25} y={343} fontSize={9.5} fill={C.mut}>DEV · SIT · QC · PROD</text>
       <text x={25} y={355} fontSize={9.5} fill={C.mut}>Deployments, CronJobs, Secrets</text>
-      <SBox C={C} s="partial" x={226} y={312} w={200} h={58} />
+      <SBox C={C} s="built" x={226} y={312} w={200} h={58} />
       <text x={237} y={329} fontSize={11.5} fontWeight={600} fill={C.ink}>Oracle · IMDS + PBDW</text>
       <text x={237} y={343} fontSize={9.5} fill={C.mut}>a pair per environment</text>
-      <text x={237} y={355} fontSize={9.5} fill={C.mut}>changelog table per env: not yet</text>
-      <SBox C={C} s="partial" x={438} y={312} w={200} h={58} />
+      <text x={237} y={355} fontSize={9.5} fill={C.mut}>changelog table per env</text>
+      <SBox C={C} s="built" x={438} y={312} w={200} h={58} />
       <text x={449} y={329} fontSize={11.5} fontWeight={600} fill={C.ink}>Image registry</text>
-      <text x={449} y={343} fontSize={9.5} fill={C.mut}>one digest · signing: not yet</text>
+      <text x={449} y={343} fontSize={9.5} fill={C.mut}>one signed digest</text>
       <text x={449} y={355} fontSize={9.5} fill={C.mut}>referenced by all four</text>
       <SBox C={C} s="partial" x={650} y={312} w={158} h={58} />
       <text x={661} y={329} fontSize={11.5} fontWeight={600} fill={C.pin}>Release store</text>
@@ -309,17 +309,17 @@ function ContainerFig({ t }) {
 function ComponentFig({ t }) {
   const C = PAL(t);
   return (
-    <Frame t={t} vw={820} vh={546} aria={'C4 components inside the application job, each coloured by build status: checkout with pins and the changelog partly there, then four gate stages of which governance, performance and testing run today as Gates 1 to 4 and security runs partly as Gate 5 without the DevSecOps thresholds, then the report publisher partly there, and the artifact builder and deployer pending. The right column lists the rows each component is meant to emit.'}>
+    <Frame t={t} vw={820} vh={546} aria={'C4 components inside the application job, each coloured by build status: checkout with pins and the Liquibase changelog built, then four gate stages of which governance, performance and testing run today as Gates 1 to 4 and security runs partly as Gate 5 without the DevSecOps thresholds, then the report publisher partly there, and the artifact builder and deployer pending. The right column lists the rows each component is meant to emit.'}>
       <defs>
       <marker id="d360c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={C.fast} /></marker>
       <marker id="d360r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={C.pin} /></marker>
       </defs>
       <text x={14} y={20} fontSize={11} fontWeight={800} letterSpacing=".6" fill={C.ink}>L3 · COMPONENTS</text>
       <text x={170} y={20} fontSize={9.5} fill={C.mut} opacity={.8}>inside the application job — every stage and what it emits</text>
-      <SBox C={C} s="partial" x={14} y={38} w={470} h={56} />
+      <SBox C={C} s="built" x={14} y={38} w={470} h={56} />
       <text x={25} y={55} fontSize={11.5} fontWeight={600} fill={C.fast}>Checkout + resolve pins</text>
-      <text x={25} y={69} fontSize={9.5} fill={C.mut}>today: checkout of the PR’s repo, branch and commit · toolchain set up</text>
-      <text x={25} y={81} fontSize={9.5} fill={C.mut}>not yet: base digest · policy version · db/changelog → the db tag</text>
+      <text x={25} y={69} fontSize={9.5} fill={C.mut}>checkout of the PR’s repo, branch and commit · base digest · applies db/changelog → the db tag</text>
+      <text x={25} y={81} fontSize={9.5} fill={C.mut}>policy version: not yet, the library is not connected</text>
       <SBox C={C} s="built" x={14} y={104} w={470} h={44} />
       <text x={25} y={121} fontSize={11.5} fontWeight={600} fill={C.fast}>Stage 1 · Governance</text>
       <text x={25} y={135} fontSize={9.5} fill={C.mut}>Gate 1 code quality + Gate 2 schema vs Oracle · lineage, orphans: not yet</text>
@@ -857,9 +857,9 @@ export function Components({ t }) {
       Guardrails pipeline: code quality, schema validation against Oracle,
       transformation quality, performance benchmark, security scan. Governance
       here is Gates 1 and 2, Performance is Gate 4, Testing is Gate 3 and
-      Security is Gate 5; the schema stage, the artifact builder and the
-      deployer are not in it. The gap, stage by stage, opens from the
-      PR intake box on the map.</Note>
+      Security is Gate 5; the schema stage runs first; the artifact builder
+      and the deployer are not in it. The gap, stage by stage, opens from
+      the PR intake box on the map.</Note>
   </>);
 }
 
@@ -946,21 +946,23 @@ export function Pipelines({ t }) {
       later.</Caption>
     <div style={{ fontSize: 13, fontWeight: 600, color: t.text, margin: "16px 0 8px" }}>
       2 · Database · Liquibase <span style={{ fontWeight: 400,
-        color: t.textMuted, fontSize: 11.5 }}>per release · the first stage of the application job</span> <Status t={t} s="pending" /></div>
+        color: t.textMuted, fontSize: 11.5 }}>per release · the first stage of the application job</span> <Status t={t} s="built" /></div>
     <SwimDb t={t} />
     <Caption t={t}><b style={{ color: t.text }}>This lane is the first stage
       of the application job, from the same repo.</b> Every box is per
       release, not per commit, and the last one is the handover: a tag the
       deploy stage of the same job reads and never writes.</Caption>
+    <Process t={t} p={DB_PROCESS} />
     <div style={{ fontSize: 13, fontWeight: 600, color: t.text, margin: "16px 0 8px" }}>
       3 · Infrastructure image &amp; security <span style={{ fontWeight: 400,
-        color: t.textMuted, fontSize: 11.5 }}>CVE / bumps</span> <Status t={t} s="pending" /></div>
+        color: t.textMuted, fontSize: 11.5 }}>CVE / bumps</span> <Status t={t} s="built" /></div>
     <SwimImg t={t} />
     <Caption t={t}><b style={{ color: t.text }}>Seven steps, and the seventh
       is the one that gets dropped.</b> Building and scanning a new image
       changes nothing on its own — the fix is live only when the digest bump
       is merged in each consumer. That step needs an owner and an SLA or the
       pins quietly rot.</Caption>
+    <Process t={t} p={IMG_PROCESS} />
   </>);
 }
 
@@ -994,6 +996,110 @@ export function Deployment({ t }) {
   </>);
 }
 
+
+// ===================================================================
+// The two built pipelines, as process
+// ===================================================================
+// The swimlanes draw the steps; these tables say who does each one,
+// what has to be true to pass it, and what it writes. Data, so the test
+// can check every step names a gate and a writer.
+export const DB_PROCESS = {
+  title: "Database · Liquibase",
+  cadence: "per release, as the first stage of the application job — never per commit",
+  steps: [
+    ["1 · Author", "Engineer",
+      "Writes a changeset in the application repo's db/changelog: one logical change, a rollback block, labels and contexts. Additive now; a drop is a later release.",
+      "The standards check rejects a changeset without a rollback block or a destructive change with no prior expand release.",
+      "—"],
+    ["2 · Pull request", "Tech lead",
+      "Reviews for expand-and-contract, naming and whether the rollback is data-safe. The PR run validates the changelog and shows what would apply, as a dry run against DEV.",
+      "Approval, plus a clean validate and status.",
+      "—"],
+    ["3 · Validate", "Schema stage",
+      "liquibase validate, then status and a checksum compare against the rows already applied in the target.",
+      "A changed checksum, or a changeset the target cannot parse, stops the job before anything else runs.",
+      "—"],
+    ["4 · Update", "Schema stage",
+      "liquibase update against the application's own changelog table, DATABASECHANGELOG_{APP}, under the application's lock, with the environment as context.",
+      "Any failing changeset fails the job; no gate and no deploy runs after it.",
+      "guardrail_changeset — one row per changeset: author, type, rollback_declared, data_safe, release, build"],
+    ["5 · Tag", "Schema stage",
+      "liquibase tag <env>-<build>, so the instance carries the release's database tag.",
+      "The tag is minted only after every changeset applied.",
+      "guardrail_changeset_applied — (changeset, environment), checksum, applied_at; the db_tag the map shows"],
+    ["6 · Ahead of code", "Deploy stage of the same job",
+      "Reads the tag before applying the application. The schema may be ahead of the code, by design; it is never behind.",
+      "No tag for this release on the target: the deploy refuses.",
+      "guardrail_deployment — the schema lane"],
+  ],
+  rules: [
+    "Rollback is liquibase rollback to the previous tag, and only for data-safe changesets. A destructive change rolls forward with a new changeset.",
+    "The same changelog runs in every environment; only the tag differs. DEV and SIT on merge, QC on promotion, PROD on approval.",
+    "Every object has exactly one owning application; a shared table changes only in its owner's changelog. dbt owns what it builds, Liquibase the rest.",
+  ],
+};
+
+export const IMG_PROCESS = {
+  title: "Infrastructure image & security",
+  cadence: "on a CVE or a version bump, on its own clock — the application job never builds an image",
+  steps: [
+    ["1 · Bump", "Platform engineering",
+      "A CVE patch or base version bump in one of the three image repos: base, workbench, agent.",
+      "Triggered by a scanner finding or a scheduled rebuild; a bump with no reason is questioned in review.",
+      "—"],
+    ["2 · Pull request", "Platform engineering + reviewer",
+      "Dockerfile and SBOM configuration. The base is pinned by digest; no floating tags.",
+      "Review, plus the Dockerfile checks: no root, no privileged, resource limits present.",
+      "—"],
+    ["3 · Build", "Image job",
+      "Builds base first, then workbench and agent on the new base digest.",
+      "A failed build pushes nothing.",
+      "—"],
+    ["4 · Scan", "Image job",
+      "Scans the image and its dependencies for CVEs.",
+      "CRITICAL fails the job; HIGH fails an image bound for production.",
+      "scan report, archived on the build"],
+    ["5 · Sign + SBOM", "Image job",
+      "Signs the image and attaches the SBOM and provenance as attestations.",
+      "An unsigned image never reaches the registry.",
+      "signature + SBOM in the registry, beside the digest"],
+    ["6 · Push by digest", "Image job",
+      "Pushes one immutable sha256. The date-build tag is a label; the digest is the identity.",
+      "The push is the release; there is no promotion step for an image.",
+      "the image record: date + build → digest"],
+    ["7 · Bump PR", "Image job",
+      "Raises a pull request into every repository that pins the digest: application repos for the base, the Jenkinsfile for the agent.",
+      "A consumer adopts the fix only when it merges the bump — this step needs an owner and an SLA.",
+      "—"],
+  ],
+  rules: [
+    "The digest never moves between environments; it is already identical in all four. Admission only runs signed digests from the internal registry.",
+    "A new image changes nothing on its own: the fix is live when the last consumer merges its bump and redeploys.",
+    "The three images are rebuilt together so workbench and agent never sit on an older base than the one just patched.",
+  ],
+};
+
+export function Process({ t, p }) {
+  return (
+    <div style={{ margin: "4px 0 18px" }}>
+      <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: .5,
+        textTransform: "uppercase", color: t.textMuted, margin: "6px 0 2px" }}>
+        The process · {p.title}</div>
+      <div style={{ fontSize: 11.5, color: t.sub, marginBottom: 8 }}>{p.cadence}</div>
+      <Tbl t={t} head={["Step", "Who", "What happens", "Passes when", "Writes"]}
+        rows={p.steps.map(([step, who, what, gate, writes]) => [
+          <b style={{ color: t.text, whiteSpace: "nowrap" }}>{step}</b>,
+          <span style={{ color: t.sub }}>{who}</span>,
+          <span style={{ color: t.sub }}>{what}</span>,
+          <span style={{ color: t.sub }}>{gate}</span>,
+          <span style={{ color: t.sub, fontFamily: writes === "—" ? "inherit" : "monospace",
+            fontSize: writes === "—" ? "inherit" : ".9em" }}>{writes}</span>])} />
+      <ul style={{ margin: "0 0 4px", paddingLeft: 20, fontSize: 12.5, color: t.sub,
+        lineHeight: 1.6, maxWidth: "80ch" }}>
+        {p.rules.map((r) => <li key={r.slice(0, 24)} style={{ marginBottom: 3 }}>{r}</li>)}
+      </ul>
+    </div>);
+}
 
 // ===================================================================
 // Built today, against the design
@@ -1117,7 +1223,7 @@ function BuiltFig({ t }) {
       <text x={651} y={326} fontSize={11} fontWeight={600} fill={C.pin}>Email to the PR's developers and reviewers</text>
       <text x={651} y={339} fontSize={9.5} fill={C.mut}>summary.html · a delivery failure is logged, never a gate result</text>
       <text x={14} y={366} fontSize={9.5} fill={C.mut}>
-        The job ends at pass or fail. Nothing in it deploys, applies a schema, writes a per-control row or reads the shared library — those are the pending items.</text>
+        The job ends at pass or fail. Nothing in it deploys, writes a per-control row or reads the shared library — those are the pending items.</text>
     </Frame>);
 }
 
@@ -1171,7 +1277,9 @@ export const BUILT = [
   { design: ["Exceptions", "90-day, two approvers, expiry enforced in the deploy policy"],
     today: "nothing", status: "pending" },
   { design: ["Schema stage", "Liquibase from db/changelog as the first stage — this page's own design"],
-    today: "Gate 2 reads Oracle metadata and applies nothing", status: "pending" },
+    today: "built: the changelog in each application repo is applied first and tagged per environment; Gate 2 then checks the contracts against what Oracle holds", status: "built" },
+  { design: ["Image pipeline", "build, scan, sign, SBOM, one digest pinned by every consumer"],
+    today: "built: the image job runs on its own cadence and hands over a digest", status: "built" },
   { design: ["DevSecOps shared library", "stage order, severity thresholds, coverage rule and release rules from one pinned library"],
     today: "not connected: the job runs its own five gates with its own thresholds in config/guardrails.yaml", status: "pending" },
 ];
@@ -1182,8 +1290,7 @@ export const PENDING = [
   ["Secrets scan as a gate", "gitleaks on the pull request, full history on main. The cheapest blocking control still missing."],
   ["Policy stages", "cp.dbt after compile, cp.airflow after a DagBag import in the runtime image, cp.deploy before any promotion."],
   ["Gate 3 at scale", "dbt build into an ephemeral CI schema with state-based selection and source freshness, so the gate survives the first hundred models."],
-  ["Deployment inside the job", "deploy gate, approval gate with the approver recorded, signed artefact promotion, post-deploy smoke tests with rollback. Today the job stops at the report."],
-  ["The schema stage", "Liquibase from each application's db/changelog as the first stage, minting the database tag the deploy stage checks."],
+  ["Deployment inside the job", "deploy gate, approval gate with the approver recorded, signed artefact promotion, post-deploy smoke tests with rollback. Today the job stops at the report, and the deploy stage has no database tag to check against."],
   ["Secrets from Vault", "a short-lived token per stage replacing the OpenShift secret."],
   ["Dashboards on the Silver rows", "Grafana for engineers, Power BI for governance, and the immutable seven-year store behind both."],
   ["Exceptions as records", "scoped to one control and one asset, two approvers, expiry enforced by the deploy policy rather than a calendar."],
@@ -1212,8 +1319,8 @@ export function Built({ t }) {
       the pull request. The gates decide pass or fail; the bridge only
       delivers that decision. Read against the application job above,
       Governance is Gates 1 and 2, Performance is Gate 4, Testing is Gate 3
-      and Security is Gate 5. The schema stage, the artifact builder and the
-      deployer do not exist in it.</Caption>
+      and Security is Gate 5. The schema stage runs first; the artifact
+      builder and the deployer do not exist in it.</Caption>
     <div style={{ display: "flex", gap: 14, alignItems: "baseline",
       flexWrap: "wrap", margin: "0 0 10px" }}>
       <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>
@@ -1271,8 +1378,8 @@ const ENV_LABEL = { DEV: "RD DEV", SIT: "RD SIT", UAT: "QC · UAT", PROD: "PROD"
 export const PIPES = [
   ["intake", "PR intake · webhook bridge", "every PR · 5 gates · Silver · email", "built"],
   ["app", "Application data pipeline", "dbt + Airflow · daily", "partial"],
-  ["db", "Database · Liquibase", "per release · first stage of the app job", "pending"],
-  ["img", "Infrastructure image & security", "CVE / bumps · one digest", "pending"],
+  ["db", "Database · Liquibase", "per release · first stage of the app job", "built"],
+  ["img", "Infrastructure image & security", "CVE / bumps · one digest", "built"],
 ];
 
 export function FlowFig({ t, envs, open, onOpen }) {
@@ -1287,7 +1394,7 @@ export function FlowFig({ t, envs, open, onOpen }) {
       aria="Interactive delivery map, coloured by build status. Four pipelines
         across the top — the pull request intake through the webhook bridge, which
         is built; the application data pipeline, partly built; its Liquibase schema
-        stage drawn as a lane, and the infrastructure image pipeline, both pending —
+        stage drawn as a lane, and the infrastructure image pipeline, both built —
         feed four Hub environments in order:
         RD DEV, RD SIT, QC which is UAT, and production. Each environment box
         shows the application tag, build number and database tag currently
@@ -1450,8 +1557,8 @@ export function Detail({ t, open, envs, hist, onClose }) {
   const PIPE_TITLE = {
     intake: ["PR intake · webhook bridge", "built — what runs on every pull request today, and the design stage by stage"],
     app: ["Application data pipeline", "partial — the five gates run; the artifact and the deploy do not exist yet"],
-    db: ["Database · Liquibase", "pending — per release, the first stage of the application job; the deploy stage waits for its tag"],
-    img: ["Infrastructure image & security", "pending — CVE / bumps, one signed digest for all four"],
+    db: ["Database · Liquibase", "built — per release, the first stage of the application job; the deploy stage waits for its tag"],
+    img: ["Infrastructure image & security", "built — CVE / bumps, one signed digest for all four"],
   }[open];
   if (PIPE_TITLE) {
     const [title, sub] = PIPE_TITLE;
@@ -1460,8 +1567,8 @@ export function Detail({ t, open, envs, hist, onClose }) {
         {head(title, sub)}
         {open === "intake" && <Built t={t} />}
         {open === "app" && <SwimApp t={t} />}
-        {open === "db" && <SwimDb t={t} />}
-        {open === "img" && <SwimImg t={t} />}
+        {open === "db" && <><SwimDb t={t} /><Process t={t} p={DB_PROCESS} /></>}
+        {open === "img" && <><SwimImg t={t} /><Process t={t} p={IMG_PROCESS} /></>}
         {open === "app" && <>
           <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: .5,
             textTransform: "uppercase", color: t.textMuted, margin: "6px 0" }}>
