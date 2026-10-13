@@ -801,6 +801,14 @@ export function Components({ t }) {
       can only show what something wrote: the release board is downstream of
       this column, and any field missing here is a column that will be blank
       there.</Caption>
+    <Note t={t} tone="warn"><b style={{ color: t.text }}>What runs today is
+      not this figure yet.</b> The job on every pull request is the five-gate
+      Guardrails pipeline: code quality, schema validation against Oracle,
+      transformation quality, performance benchmark, security scan. Governance
+      here is Gates 1 and 2, Performance is Gate 4, Testing is Gate 3 and
+      Security is Gate 5; the schema stage, the artifact builder and the
+      deployer are not in it. The gap, stage by stage, is under Reference
+      &rarr; Built today.</Note>
   </>);
 }
 
@@ -935,6 +943,265 @@ export function Deployment({ t }) {
   </>);
 }
 
+
+// ===================================================================
+// Built today, against the design
+// ===================================================================
+// The pipeline that runs on every pull request now is a different shape
+// from the job the figures above draw: a webhook bridge, a checkout, five
+// gates, and a report — no schema stage, no deployer. This section is the
+// reconciliation, so nobody reads the C4 figures as a description of what
+// is in production. The rows are data so the test can count them.
+const GATES = [
+  ["Load secrets", "OpenShift secret", 86],
+  ["Init", "groovy", 60],
+  ["Checkout", "branch · commit", 96],
+  ["Setup env", "toolchain", 84],
+  ["Gate 1", "code quality", 96],
+  ["Gate 2", "schema vs Oracle", 96],
+  ["Gate 3", "transformation", 104],
+  ["Gate 4", "perf · skippable", 96],
+  ["Gate 5", "security · SAST", 96],
+  ["Aggregate", "json + html", 84],
+];
+
+function BuiltFig({ t }) {
+  const C = PAL(t);
+  const xs = []; let x = 22;
+  GATES.forEach(([, , w]) => { xs.push(x); x += w + 6; });
+  return (
+    <Frame t={t} vw={1000} vh={380}
+      aria="The Guardrails pipeline as it runs today. A pull request in Bitbucket
+        sends a webhook to the sie-webhook-bridge, which starts the Jenkins
+        Guardrails job with the repository, branch and commit. The job loads
+        secrets, initialises, checks out the source, sets up the toolchain, then
+        runs five gates in order: code quality, schema validation against Oracle,
+        transformation quality, performance benchmark which can be skipped, and
+        security scan; an aggregator writes summary.json and summary.html. The
+        bridge collects both, uploads them to the Silver schema and emails the
+        HTML report to the pull request's developers and reviewers. A DevSecOps
+        shared library, pinned by the job, supplies stage order, thresholds and
+        release rules.">
+      <defs>
+        <marker id="b360a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5"
+          markerHeight="5" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill={C.fast} /></marker>
+        <marker id="b360p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5"
+          markerHeight="5" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill={C.pin} /></marker>
+      </defs>
+      <text x={14} y={20} fontSize={11} fontWeight={800} letterSpacing=".6"
+        fill={C.ink}>RUNS TODAY</text>
+      <text x={110} y={20} fontSize={9.5} fill={C.mut} opacity={.8}>
+        every pull request · the Guardrails job, brokered by the webhook bridge</text>
+
+      {/* row 1: trigger, bridge, library */}
+      <rect x={14} y={40} width={118} height={56} rx={3} fill="none"
+        stroke={C.ink} strokeWidth={1.4} />
+      <text x={25} y={59} fontSize={11.5} fontWeight={600} fill={C.ink}>Pull request</text>
+      <text x={25} y={74} fontSize={9.5} fill={C.mut}>Bitbucket · source repo</text>
+      <text x={25} y={87} fontSize={9.5} fill={C.mut}>one bridge, many repos</text>
+      <path d="M132,68 L176,68" fill="none" stroke={C.fast} strokeWidth={1.4}
+        markerEnd="url(#b360a)" />
+      <text x={154} y={62} fontSize={8.5} fill={C.mut} textAnchor="middle">webhook</text>
+      <rect x={180} y={40} width={190} height={56} rx={3} fill="none"
+        stroke={C.fast} strokeWidth={1.8} />
+      <text x={191} y={59} fontSize={11.5} fontWeight={600} fill={C.fast}>sie-webhook-bridge</text>
+      <text x={191} y={74} fontSize={9.5} fill={C.mut}>intake · route · start the job</text>
+      <text x={191} y={87} fontSize={9.5} fill={C.mut}>collect · upload · email</text>
+      <path d="M265,96 L265,116" fill="none" stroke={C.fast} strokeWidth={1.4}
+        markerEnd="url(#b360a)" />
+      <text x={272} y={110} fontSize={8.5} fill={C.mut}>repo · branch · commit</text>
+      <rect x={640} y={40} width={326} height={56} rx={3} fill="none"
+        stroke={C.pin} strokeWidth={1.2} strokeDasharray="4 3" />
+      <text x={651} y={59} fontSize={11.5} fontWeight={600} fill={C.pin}>DevSecOps shared library</text>
+      <text x={651} y={74} fontSize={9.5} fill={C.mut}>stage order · severity thresholds · release rules · HTML outcome</text>
+      <text x={651} y={87} fontSize={9.5} fill={C.mut}>pinned by the job — a team cannot relax its gates locally</text>
+      <path d="M803,96 L803,116" fill="none" stroke={C.pin} strokeWidth={1.2}
+        strokeDasharray="4 3" markerEnd="url(#b360p)" />
+
+      {/* row 2: the job */}
+      <rect x={14} y={120} width={972} height={120} rx={3} fill="none"
+        stroke={C.fast} strokeWidth={1.8} />
+      <text x={25} y={138} fontSize={11.5} fontWeight={600} fill={C.fast}>Jenkins · Guardrails job</text>
+      <text x={185} y={138} fontSize={9.5} fill={C.mut}>declarative · parameters SOURCE_REPO_URL · SOURCE_BRANCH · SOURCE_COMMIT · SKIP_GATE4 · FAST_FAIL</text>
+      {GATES.map(([name, sub, w], i) => {
+        const gate = /^Gate/.test(name), skip = name === "Gate 4";
+        return (
+          <g key={name}>
+            <rect x={xs[i]} y={150} width={w} height={48} rx={3} fill="none"
+              stroke={gate ? C.fast : C.mut} strokeWidth={gate ? 1.6 : 1}
+              strokeDasharray={skip ? "4 3" : undefined} />
+            <text x={xs[i] + 7} y={168} fontSize={9.5} fontWeight={700}
+              fill={gate ? C.fast : C.ink}>{name}</text>
+            <text x={xs[i] + 7} y={182} fontSize={8.3} fill={C.mut}>{sub}</text>
+            {i < GATES.length - 1 && (
+              <path d={`M${xs[i] + w},174 L${xs[i + 1] - 1},174`} fill="none"
+                stroke={C.fast} strokeWidth={1.2} markerEnd="url(#b360a)" />)}
+          </g>);
+      })}
+      <text x={25} y={226} fontSize={9.5} fill={C.mut}>
+        each gate writes reports/gate{"{"}n{"}"}/ · with FAST_FAIL a failed gate skips the rest · a gate is pass, fail, skip or unknown</text>
+
+      {/* row 3: what leaves the job */}
+      <path d="M932,198 L932,256 L455,256 L455,270" fill="none" stroke={C.fast}
+        strokeWidth={1.4} markerEnd="url(#b360a)" />
+      <path d="M154,240 L154,270" fill="none" stroke={C.pin} strokeWidth={1.2}
+        strokeDasharray="4 3" markerEnd="url(#b360p)" />
+      <rect x={14} y={274} width={280} height={56} rx={3} fill="none"
+        stroke={C.pin} strokeWidth={1.2} strokeDasharray="4 3" />
+      <text x={25} y={293} fontSize={11.5} fontWeight={600} fill={C.pin}>reports/** archived</text>
+      <text x={25} y={308} fontSize={9.5} fill={C.mut}>on the Jenkins build · workspace cleaned after</text>
+      <text x={25} y={321} fontSize={9.5} fill={C.mut}>overall: fail if any gate fails, else pass, else skip</text>
+      <rect x={330} y={274} width={250} height={56} rx={3} fill="none"
+        stroke={C.fast} strokeWidth={1.8} />
+      <text x={341} y={293} fontSize={11.5} fontWeight={600} fill={C.fast}>Bridge collects the run</text>
+      <text x={341} y={308} fontSize={9.5} fill={C.mut}>summary.json + summary.html</text>
+      <text x={341} y={321} fontSize={9.5} fill={C.mut}>also when the job failed</text>
+      <path d="M580,296 L636,280" fill="none" stroke={C.fast} strokeWidth={1.4}
+        markerEnd="url(#b360a)" />
+      <path d="M580,308 L636,328" fill="none" stroke={C.fast} strokeWidth={1.4}
+        markerEnd="url(#b360a)" />
+      <rect x={640} y={262} width={326} height={36} rx={3} fill="none"
+        stroke={C.pin} strokeWidth={1.4} />
+      <text x={651} y={278} fontSize={11} fontWeight={600} fill={C.pin}>Silver schema</text>
+      <text x={651} y={291} fontSize={9.5} fill={C.mut}>run outputs, one upload per build — per gate, not per control</text>
+      <rect x={640} y={310} width={326} height={36} rx={3} fill="none"
+        stroke={C.pin} strokeWidth={1.4} />
+      <text x={651} y={326} fontSize={11} fontWeight={600} fill={C.pin}>Email to the PR's developers and reviewers</text>
+      <text x={651} y={339} fontSize={9.5} fill={C.mut}>summary.html · a delivery failure is logged, never a gate result</text>
+      <text x={14} y={366} fontSize={9.5} fill={C.mut}>
+        The job ends at pass or fail. Nothing in it deploys, applies a schema or writes a per-control row — those are the pending items below.</text>
+    </Frame>);
+}
+
+// One row per thing the design asks for. `status` is built, partial or
+// pending; the test counts them and the page shows the count.
+export const BUILT = [
+  { design: ["Trigger", "a GitHub Enterprise pull request webhook straight into Jenkins"],
+    today: "a Bitbucket pull request webhook into sie-webhook-bridge, which starts the Guardrails job with repository, branch and commit", status: "built" },
+  { design: ["Stage 1", "checkout, commit SHA recorded"],
+    today: "Checkout Source Repo into the job workspace; SOURCE_COMMIT can pin the SHA", status: "built" },
+  { design: ["Stage 2", "PR validation: branch name, no tracked build dirs, no file over 5 MB"],
+    today: "the repository checks inside Gate 1; the three rules are not evidenced one by one", status: "partial" },
+  { design: ["Stage 3", "bootstrap from a pinned requirements file through the mirror"],
+    today: "the Setup Environment stage; pinning is not evidenced", status: "partial" },
+  { design: ["Stage 4a–c", "SQLFluff · dbt standards · DAG standards by AST parse"],
+    today: "Gate 1 code quality: lint, format, DAG and repository checks", status: "built" },
+  { design: ["Stage 4d", "gitleaks on the PR, full history on main"],
+    today: "nothing in a gate; Gate 5 is Bandit plus SAST normalisation", status: "pending" },
+  { design: ["Stage 5", "dbt parse and compile, manifest written"],
+    today: "inside Gate 3", status: "built" },
+  { design: ["Stage 6", "OPA cp.dbt: owners, PII, lineage-based layer rules"],
+    today: "no policy engine. Gate 2 compares the dbt YAML contracts to Oracle metadata instead — a check the design did not have", status: "partial" },
+  { design: ["Stage 7", "documentation coverage thresholds"],
+    today: "nothing", status: "pending" },
+  { design: ["Stage 8", "DagBag import in the scheduler's own image, then cp.airflow"],
+    today: "Gate 1 reads the DAGs statically; nothing imports them in the runtime image", status: "partial" },
+  { design: ["Stages 9–10", "Semgrep · Bandit · Trivy · Checkov · Sonar quality gate"],
+    today: "Gate 5: Bandit, plus SAST findings normalised against the shared library's severity thresholds", status: "partial" },
+  { design: ["Stage 11", "unit tests with an 80 % coverage floor"],
+    today: "the shared library owns the coverage rule; no gate publishes a coverage number", status: "partial" },
+  { design: ["Stage 12", "dbt build into an ephemeral CI schema, state:modified+, source freshness"],
+    today: "Gate 3: dbt test plus custom transformation assertions, against a fixed target", status: "partial" },
+  { design: ["Stage 13", "integration tests in qa, uat and prod"],
+    today: "nothing", status: "pending" },
+  { design: ["Stage 14", "architecture: lineage depth ≤ 8, fan-out ≤ 40"],
+    today: "Gate 4 benchmarks Oracle performance thresholds instead; depth and fan-out are not measured", status: "partial" },
+  { design: ["Stages 15–16", "cp.deploy deployment gate, manual approval with separation of duties"],
+    today: "the shared library blocks artefact promotion on policy outcomes; no deployment request, no approver record", status: "partial" },
+  { design: ["Stages 17–18", "signed promotion, post-deploy validation, automatic rollback"],
+    today: "nothing: the job ends at pass or fail", status: "pending" },
+  { design: ["post block", "reports and metrics on every outcome, cleanup"],
+    today: "the report aggregator writes summary.json and summary.html; reports archived; workspace cleaned", status: "built" },
+  { design: ["Secrets", "Vault, a short-lived token scoped to the stage"],
+    today: "an OpenShift secret holding the Oracle connection values, loaded as job environment", status: "partial" },
+  { design: ["Results store", "a row per control per build in Oracle SILVER, Prometheus beside it"],
+    today: "the bridge uploads each run's summary to the Silver schema — per gate, not per control", status: "partial" },
+  { design: ["Dashboards", "Grafana for engineers, Power BI for governance, a seven-year audit store"],
+    today: "the HTML report, emailed to the pull request's developers and reviewers", status: "pending" },
+  { design: ["Control catalogue", "176 control IDs — DBT, AF, CP-OPA, CP-DEP — on every result"],
+    today: "results are pass, fail, skip or unknown per gate; no control ID anywhere", status: "pending" },
+  { design: ["Exceptions", "90-day, two approvers, expiry enforced in the deploy policy"],
+    today: "nothing", status: "pending" },
+  { design: ["Schema stage", "Liquibase from db/changelog as the first stage — this page's own design"],
+    today: "Gate 2 reads Oracle metadata and applies nothing", status: "pending" },
+];
+
+export const PENDING = [
+  ["A control ID on every result", "a row per control per build, in summary.json and in Silver. Everything below reads from it: the score, the dashboards, the exceptions."],
+  ["Secrets scan as a gate", "gitleaks on the pull request, full history on main. The cheapest blocking control still missing."],
+  ["Policy stages", "cp.dbt after compile, cp.airflow after a DagBag import in the runtime image, cp.deploy before any promotion."],
+  ["Gate 3 at scale", "dbt build into an ephemeral CI schema with state-based selection and source freshness, so the gate survives the first hundred models."],
+  ["Deployment inside the job", "deploy gate, approval gate with the approver recorded, signed artefact promotion, post-deploy smoke tests with rollback. Today the job stops at the report."],
+  ["The schema stage", "Liquibase from each application's db/changelog as the first stage, minting the database tag the deploy stage checks."],
+  ["Secrets from Vault", "a short-lived token per stage replacing the OpenShift secret."],
+  ["Dashboards on the Silver rows", "Grafana for engineers, Power BI for governance, and the immutable seven-year store behind both."],
+  ["Exceptions as records", "scoped to one control and one asset, two approvers, expiry enforced by the deploy policy rather than a calendar."],
+];
+
+const STATUS = { built: ["built", "ok"], partial: ["partial", "wa"], pending: ["pending", "no"] };
+function Status({ t, s }) {
+  const C = PAL(t);
+  const [label, k] = STATUS[s];
+  return <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: .4,
+    textTransform: "uppercase", color: C[k], whiteSpace: "nowrap" }}>{label}</span>;
+}
+
+export function Built({ t }) {
+  const C = PAL(t);
+  const n = (s) => BUILT.filter((r) => r.status === s).length;
+  return (<>
+    <H t={t} sub="The design on this page and the pipeline running on every pull request are not the same thing yet. This is the reconciliation: what the design asks for, what runs, and the gap — so the figures above are read as the target, not as production.">
+      Built today, against the design</H>
+    <BuiltFig t={t} />
+    <Caption t={t}><b style={{ color: t.text }}>Five gates after a checkout,
+      a report at the end, and a bridge on both sides.</b> The bridge is the
+      part the design did not draw: one intake for every repository's pull
+      request webhooks, and one custody path for the evidence afterwards —
+      the summary lands in the Silver schema and in the inbox of everyone on
+      the pull request. The gates decide pass or fail; the bridge only
+      delivers that decision. Read against the application job above,
+      Governance is Gates 1 and 2, Performance is Gate 4, Testing is Gate 3
+      and Security is Gate 5. The schema stage, the artifact builder and the
+      deployer do not exist in it.</Caption>
+    <div style={{ display: "flex", gap: 14, alignItems: "baseline",
+      flexWrap: "wrap", margin: "0 0 10px" }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>
+        The design's stages, one by one</div>
+      {["built", "partial", "pending"].map((s) => (
+        <span key={s} style={{ fontSize: 11, color: t.sub }}>
+          <Status t={t} s={s} /> {n(s)}</span>))}
+      <span style={{ fontSize: 10.5, color: t.textMuted }}>
+        partial = the concern is covered, not the way the design specifies it</span>
+    </div>
+    <Tbl t={t} head={["In the design", "Runs today as", "Status"]}
+      rows={BUILT.map((r) => [
+        <><b style={{ color: t.text }}>{r.design[0]}</b>
+          <span style={{ color: t.sub }}> · {r.design[1]}</span></>,
+        <span style={{ color: t.sub }}>{r.today}</span>,
+        <Status t={t} s={r.status} />])} />
+    <Note t={t} tone="warn"><b style={{ color: t.text }}>Two things the
+      built pipeline has that the design does not.</b> Gate 2 compares the
+      dbt YAML contracts to what Oracle actually holds, which catches schema
+      drift the policy stages would miss; and Gate 4 benchmarks against Oracle
+      performance thresholds. Both belong in the design when it is next
+      revised — they are not deviations to remove.</Note>
+    <div style={{ fontSize: 13, fontWeight: 600, color: t.text,
+      margin: "4px 0 8px" }}>Pending, in the order that unlocks the rest</div>
+    <ol style={{ margin: "0 0 20px", paddingLeft: 22, fontSize: 12.5,
+      color: t.sub, lineHeight: 1.6, maxWidth: "80ch" }}>
+      {PENDING.map(([head, body]) => (
+        <li key={head} style={{ marginBottom: 5 }}>
+          <b style={{ color: t.text }}>{head}</b> — {body}</li>))}
+    </ol>
+    <Note t={t}>The first item is the one that changes what every later
+      screen can show. A result keyed by gate says a build failed; a result
+      keyed by control says which rule, on which asset, owned by whom — which
+      is what the compliance score, the exception register and the audit chain
+      are all built from.</Note>
+  </>);
+}
 
 // ===================================================================
 // The live plane
@@ -1370,7 +1637,9 @@ export default function DevOps360({ t }) {
         the map opens; the dashboard underneath is{" "}
         <b style={{ color: t.text }}>guardrail_deployment</b>, filtered and
         exportable. For the gate matrix and the changeset-level compare, use{" "}
-        <b style={{ color: t.text }}>Quality Guardrails → Releases</b>.
+        <b style={{ color: t.text }}>Quality Guardrails → Releases</b>. The
+        maps draw the target; what runs on every pull request today, and the
+        gap, is under <b style={{ color: t.text }}>Reference → Built today</b>.
       </div>
 
       <FlowFig t={t} envs={envs} open={open} onOpen={setOpen} />
@@ -1397,7 +1666,8 @@ export default function DevOps360({ t }) {
       <div style={{ fontSize: 10.5, color: t.sub, marginBottom: 10 }}>
         the design behind the map — opens in place, nothing here is live</div>
       <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
-        {[["Context", "C4 · who uses it"], ["Containers", "C4 · the runnable pieces"],
+        {[["Built", "built today · vs the design · pending"],
+          ["Context", "C4 · who uses it"], ["Containers", "C4 · the runnable pieces"],
           ["Promotion", "what moves between regions"],
           ["Deployment", "what each component becomes"]].map(([k, label]) => (
           <span key={k} onClick={() => setRef(ref === k ? null : k)}
@@ -1408,6 +1678,7 @@ export default function DevOps360({ t }) {
               background: ref === k ? t.bg : t.panel }}>{label}</span>))}
       </div>
       {ref && <Card t={t}>
+        {ref === "Built" && <Built t={t} />}
         {ref === "Context" && <Context t={t} />}
         {ref === "Containers" && <Containers t={t} />}
         {ref === "Promotion" && <Promotion t={t} />}

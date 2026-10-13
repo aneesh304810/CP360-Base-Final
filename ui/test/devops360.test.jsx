@@ -25,7 +25,7 @@ import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import DevOps360, { PAL, NAMING, FlowFig, Dashboard, Detail, Context,
   Containers, Components, Versions, Promotion, Pipelines,
-  Deployment } from "../src/DevOps360.jsx";
+  Deployment, Built, BUILT, PENDING } from "../src/DevOps360.jsx";
 import { tLight, tDark } from "../src/bbhTheme.js";
 
 let bad = 0;
@@ -205,6 +205,38 @@ ok(/db\/changelog/.test(devSrc) && /Schema stage · Liquibase/.test(devSrc) && /
 ok(/DATABASECHANGELOG_/.test(devSrc) && /exactly one owning application/.test(devSrc) && /Liquibase owns everything dbt does/.test(devSrc),
    "ownership is stated: a changelog table per application, one owner per object, dbt owns what it builds");
 ok(NAMING.find((n) => n.thing === "Database tag").by === "schema stage of the application job, per environment", "the database tag is minted by the schema stage");
+
+
+// ---- built today, against the design ---------------------------------
+// The page draws the target. The pipeline on every pull request today is
+// the five-gate Guardrails job behind a webhook bridge; the Built section
+// reconciles the two so the figures are never read as production.
+for (const [tn, t] of [["light", tLight], ["dark", tDark]]) {
+  const h = renderToStaticMarkup(<Built t={t} />);
+  ok(h.length > 2000 && !/NaN|undefined|\[object Object\]/.test(h), `Built renders cleanly in ${tn}`, h.length);
+}
+const built = renderToStaticMarkup(<Built t={tLight} />);
+ok(/Gate 1/.test(built) && /Gate 5/.test(built) && /sie-webhook-bridge/.test(built) && /Silver schema/.test(built)
+   && /summary\.json/.test(built) && /DevSecOps shared library/.test(built),
+   "the figure shows the bridge, the five gates, the summary files, the Silver upload and the shared library");
+ok(BUILT.length >= 20 && BUILT.every((r) => ["built", "partial", "pending"].includes(r.status) && r.design.length === 2 && r.today),
+   "every design row has a status of built, partial or pending", BUILT.length);
+const cnt = (s) => BUILT.filter((r) => r.status === s).length;
+ok(cnt("built") >= 4 && cnt("partial") >= 8 && cnt("pending") >= 6 && cnt("built") < cnt("partial") + cnt("pending"),
+   "the honest shape: fewer rows built than partial or pending", `${cnt("built")}/${cnt("partial")}/${cnt("pending")}`);
+ok(BUILT.some((r) => /Schema stage/.test(r.design[0]) && r.status === "pending")
+   && BUILT.some((r) => /Stages 17–18/.test(r.design[0]) && r.status === "pending")
+   && BUILT.some((r) => /Control catalogue/.test(r.design[0]) && r.status === "pending"),
+   "the schema stage, deployment and the control catalogue are stated as pending — the job ends at the report");
+ok(PENDING.length >= 8 && /control ID/i.test(PENDING[0][0]),
+   "the pending list exists and the control ID is first, because everything else reads from it", PENDING.map((p) => p[0]).join(" | "));
+ok(!/testbbh|apps\.ocp|https?:\/\/|:7990/.test(devSrc),
+   "no hostname, URL or port from the guardrails repo is on the page — the endpoint stays in the runbook");
+const shell2 = renderToStaticMarkup(<DevOps360 t={tLight} />);
+ok(/Built today/.test(shell2) && /built today · vs the design · pending/.test(shell2),
+   "the shell offers the Built reference chip and points the intro at it");
+ok(/What runs today is\s+not this figure yet/.test(renderToStaticMarkup(<Components t={tLight} />)),
+   "the components figure carries the warning that the running job is a different shape");
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\ndevops360 assertions pass");
 if (bad) process.exit(1);
