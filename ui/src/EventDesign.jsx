@@ -121,6 +121,14 @@ export const DESIGN = {
       "When one key carries several ops in one batch, the last op in batch order wins and earlier ops are recorded in lineage, not applied.",
       "Silver applies tombstones as soft deletes with the batch id, so a reconciliation can still see the row left.",
     ]],
+    ["Dependencies", "PROPOSED", [
+      "Inside a batch there is no order across topics, so the batch is the unit: pull every key first, then load Stage 1 in the registry's view order — client and reference, account, assets, transaction, positions — never in arrival order.",
+      "Most dependencies dissolve in the pull: a child row read as of the batch's End timestamp already carries its parent's attributes as they stood in that commit.",
+      "A child whose parent has not landed is never loaded with a placeholder key. Stage 1 accepts it as raw as-of state; Stage 2 parks it as an OPEN missing-dimension row with the batch id, and every batch SUCCESS retries the OPEN set.",
+      "A deleted parent is a tombstone; its children are flagged orphans in the same OPEN set, not cascaded by BBH.",
+      "Two events on one column change resolve to the same row at the same as-of time; the label makes the second a skip.",
+      "A System Event says a process finished, not that data is complete; end-of-day jobs trigger on it after the day's last batch SUCCESS, never on a count of events.",
+    ]],
     ["Ordering", "PROPOSED", [
       "The micro-batch id is parsed to (timestamp, integer group) and compared as a tuple, never as text.",
       "Within a batch, event order is the order on the topic; across topics there is no order until the gate closes.",
@@ -200,6 +208,7 @@ export const DESIGN = {
   window: "For a 5-minute processing window: keep the distinct keys between Start and End, check the processed registry before retrieving, and commit the checkpoint only after the downstream load succeeds.",
   askSei: [
     "Does SDC emit an event for every affected view key when a change fans out across denormalised views?",
+    "When a parent row is deleted or re-keyed, are the child view keys emitted, or must BBH re-read the child views itself?",
     "What happens on delete: is a D event the whole signal, and can I and D for one key share a batch?",
     "Are the Start/End markers published to every partition of every domain topic, and is the gate per topic or per partition?",
     "Can the micro-batch id become a numeric, monotonic sequence?",
@@ -456,6 +465,53 @@ function KeyFig() {
     </Fig>);
 }
 
+// E. Dependencies: the load order inside a batch, and what happens to a
+// child whose parent has not landed.
+function DepFig() {
+  const order = [["Client · Reference", "8 + system"], ["Account", "48 events"], ["Assets", "17 events"], ["Transaction", "20 events"], ["Positions", "from the views"]];
+  return (
+    <Fig vw={1000} vh={236}
+      aria="Dependencies are handled in two places. Inside a batch, every key is pulled first and Stage 1 is loaded in a fixed view order: client and reference, then account, then assets, then transaction, then positions, never in arrival order. Across batches, a child row whose parent has not landed is accepted into Stage 1 as raw state, then parked by Stage 2 as an OPEN missing-dimension row with its batch id; every later batch SUCCESS retries the OPEN set, and the row loads once the parent exists. Nothing is ever loaded with a placeholder key. A deleted parent leaves a tombstone and its children become flagged orphans in the same OPEN set.">
+      <T x={14} y={20} s={11} w={800} c={P.ink}>1 · LOAD ORDER INSIDE A BATCH</T>
+      <T x={222} y={20} c={P.sub}>all keys pulled first, then loaded in this order — never arrival order</T>
+      {order.map(([n, sub], i) => (
+        <g key={n}>
+          <Box x={14 + i * 96} y={34} w={86} h={40} c={P.link} />
+          <T x={57 + i * 96} y={50} s={8.8} w={700} c={P.link} a="middle">{n}</T>
+          <T x={57 + i * 96} y={64} s={7.8} c={P.sub} a="middle">{sub}</T>
+          {i < 4 && <path d={`M${100 + i * 96},54 L${108 + i * 96},54`} fill="none" stroke={P.link} strokeWidth={1.2} markerEnd="url(#ed-b)" />}
+        </g>))}
+      <T x={14} y={92} s={8.5} c={P.sub}>a child view is loaded only after every view it references; the order lives in the registry, with the key columns</T>
+      <T x={14} y={106} s={8.5} c={P.sub}>the pull makes most of it moot: a row read as of the batch's End already carries its parent as it stood in that commit</T>
+
+      <T x={560} y={20} s={11} w={800} c={P.ink}>2 · A PARENT THAT HAS NOT LANDED</T>
+      <Box x={560} y={34} w={120} h={34} c={P.link} />
+      <T x={620} y={48} s={8.8} w={700} c={P.link} a="middle">Stage 1 accepts</T>
+      <T x={620} y={61} s={7.8} c={P.sub} a="middle">raw as-of state + batch id</T>
+      <path d="M680,51 L700,51" fill="none" stroke={P.ink} strokeWidth={1.2} markerEnd="url(#ed-k)" />
+      <Box x={704} y={34} w={120} h={34} c={P.ink} />
+      <T x={764} y={48} s={8.8} w={700} c={P.ink} a="middle">Stage 2: key resolves?</T>
+      <T x={764} y={61} s={7.8} c={P.sub} a="middle">parent row present</T>
+      <path d="M824,45 L856,45" fill="none" stroke={P.ok} strokeWidth={1.2} markerEnd="url(#ed-k)" />
+      <T x={830} y={41} s={7.8} c={P.ok}>yes</T>
+      <Box x={860} y={34} w={126} h={22} c={P.ok} fill="rgba(21,153,67,.08)" sw={1} />
+      <T x={923} y={49} s={8.5} w={700} c={P.ok} a="middle">load into Silver</T>
+      <path d="M764,68 L764,92" fill="none" stroke={P.danger} strokeWidth={1.2} markerEnd="url(#ed-r)" />
+      <T x={770} y={84} s={7.8} c={P.danger}>no</T>
+      <Box x={660} y={96} w={208} h={36} c={P.warnInk} dash="4 3" sw={1.2} />
+      <T x={764} y={111} s={8.8} w={700} c={P.warnInk} a="middle">OPEN missing-dimension row</T>
+      <T x={764} y={125} s={7.8} c={P.sub} a="middle">keeps its batch id · counted, never dropped</T>
+      <path d="M868,114 L930,114 L930,60" fill="none" stroke={P.warnInk} strokeWidth={1.2} strokeDasharray="4 3" markerEnd="url(#ed-k)" />
+      <T x={876} y={108} s={7.8} c={P.warnInk}>retried on every</T>
+      <T x={876} y={119} s={7.8} c={P.warnInk}>batch SUCCESS</T>
+      <Box x={560} y={146} w={426} h={22} c={P.danger} dash="3 2" sw={1} />
+      <T x={773} y={161} s={8.5} w={700} c={P.danger} a="middle">never a placeholder key: eligible rows = loaded rows + OPEN rows</T>
+      <T x={560} y={188} s={8.5} c={P.sub}>a deleted parent is a tombstone; its children become flagged orphans in the same OPEN set</T>
+      <T x={560} y={202} s={8.5} c={P.sub}>whether SDC emits the child keys on a parent change is the fan-out question — ASK SEI</T>
+      <T x={14} y={228} s={8.5} c={P.sub}>Both halves use what already exists: the registry carries the order, and Stage 2's missing-dimension rule is the one the dbt design states.</T>
+    </Fig>);
+}
+
 /* ------------------------------------------------------------- pieces */
 function H({ children, sub }) {
   return (
@@ -547,6 +603,9 @@ export default function EventDesign() {
 
       <H sub="Where the design is slow or fragile under load, and what takes the edge off each one.">Bottlenecks</H>
       <Tbl head={["#", "Bottleneck", "Why it matters", "Mitigation"]} rows={DESIGN.bottlenecks} />
+
+      <H sub="Two places, one rule each: a fixed load order inside the batch, and an OPEN-and-retry set for a child whose parent has not landed.">Dependencies between the data</H>
+      <DepFig />
 
       <H sub="How the pipeline behaves when things repeat, fail, or have to be run again. These are the rules an operator reads at three in the morning.">How we will run it</H>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 12, marginBottom: 6 }}>

@@ -20,18 +20,24 @@ ok(html.length > 6000 && !/NaN|undefined|\[object Object\]/.test(html), "the tab
 ok(/THE DESIGN WE ARE GOING WITH/.test(html) && /Notify-then-pull/.test(html), "it states the decision, not a comparison of options");
 ok(/role="img"/.test(html) && /aria-label="[^"]{200,}/.test(html), "the path figure carries a sentence a reader without the picture can use");
 const figs = [...html.matchAll(/<svg\b[^>]*role="img"[^>]*>/g)];
-ok(figs.length === 5 && figs.every((m) => ((m[0].match(/aria-label="([^"]*)"/) || [])[1] || "").length >= 150),
-   "five mechanism figures — the path, the checkpoint, the label, the pull, the composite key — each with a sentence for a reader without the picture", figs.length);
+ok(figs.length === 6 && figs.every((m) => ((m[0].match(/aria-label="([^"]*)"/) || [])[1] || "").length >= 150),
+   "six mechanism figures — the path, the checkpoint, the label, the pull, the composite key, the dependencies — each with a sentence for a reader without the picture", figs.length);
 ok(/THE REPLAY FLOOR/.test(html) && /THE LABEL/.test(html) && /THE PULL/.test(html) && /COMPOSITE KEY/.test(html) && /LAST partition/.test(html),
    "the figures draw the gate, the replay floor, the label decision, the pull and the key split");
 ok(!/57620755|501850|2338/.test(html), "no example key value from the deck is reproduced");
+const dep = DESIGN.rules.find((r) => r[0] === "Dependencies");
+ok(dep && dep[1] === "PROPOSED" && dep[2].some((b) => /never loaded with a placeholder key/.test(b)) && dep[2].some((b) => /never in arrival order/.test(b)),
+   "dependencies: a fixed load order inside the batch, and no placeholder keys — OPEN rows retried on each SUCCESS");
+ok(/LOAD ORDER INSIDE A BATCH/.test(html) && /A PARENT THAT HAS NOT LANDED/.test(html) && /OPEN missing-dimension row/.test(html),
+   "the dependencies figure draws both halves");
+ok(DESIGN.askSei.some((q) => /parent row is deleted/.test(q)), "the cascade question is on the list for SEI");
 
 const marks = Object.keys(MARK);
 ok(DESIGN.cons.length >= 7 && DESIGN.cons.every((c) => c.length === 4 && c[2].length > 20 && marks.includes(c[3])),
    "every risk has a handling and one of the three marks", DESIGN.cons.map((c) => c[3]).join(","));
 ok(DESIGN.bottlenecks.length === 6 && DESIGN.bottlenecks.every((b) => b[3].length > 20), "six bottlenecks, each with a mitigation");
 const topics = DESIGN.rules.map((r) => r[0]);
-for (const t of ["Duplicates", "Errors", "Replay", "Deletes and op collisions", "Ordering", "Consistency", "Fan-out", "The gate", "Monitoring and SLAs"]) {
+for (const t of ["Duplicates", "Errors", "Replay", "Deletes and op collisions", "Dependencies", "Ordering", "Consistency", "Fan-out", "The gate", "Monitoring and SLAs"]) {
   ok(topics.includes(t), `the operating rules cover ${t}`, topics.join(" | "));
 }
 ok(DESIGN.rules.every((r) => marks.includes(r[1]) && r[2].length >= 2), "every rule is marked and has at least two bullets");
