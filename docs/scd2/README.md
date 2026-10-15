@@ -30,6 +30,22 @@ window gaps, open-row counts, the ACTIVE_IND disagreement and freshness
 are filled from read-only counts. No key value from the warehouse is
 stored; the top-keys list scd2lens prints stays on the console.
 
+## The review loop
+
+The tool writes the rules; a named person confirms them. The two are kept
+apart on the screen and in the database.
+
+```
+python tools/scd2_review_export.py --out local-data/scd2_review.xlsx     # one row per rule, three columns to fill
+# reviewers fill BUSINESS_MEANING, CONFIRMED (Y/N), REVIEWER, REVIEWER_NOTE — Copilot may help them write
+$env:CP_SCD2_REVIEW_XLSX = "local-data/scd2_review.xlsx"
+python -m ingestion.run scd2_review                                       # -> scd2_rule_review (sql/82)
+```
+
+A row is loaded only with a reviewer; N needs a note. The rule text the
+reviewer saw is stored, so a rule rewritten by a later run is flagged
+"changed since this review" rather than shown as still confirmed.
+
 ## Reading a card
 
 * **PROVEN** — the ODI code or the database says it.

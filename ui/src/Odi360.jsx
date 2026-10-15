@@ -18,6 +18,20 @@ function Chip({ c, children, title }) {
   return <span title={title} style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: .4, color: c, border: `1px solid ${c}`,
     borderRadius: 3, padding: "1px 6px", whiteSpace: "nowrap" }}>{children}</span>;
 }
+// The sign-off beside a rule: what a named person said, kept apart from
+// what the tool read. A rule rewritten by a later run than the one that
+// was confirmed is flagged, because the confirmation no longer applies.
+export function Review({ t, r }) {
+  if (!r.reviewer) return <span style={{ fontSize: 10.5, color: t.textMuted }}>not reviewed</span>;
+  const yes = r.confirmed === "Y", no = r.confirmed === "N";
+  return (
+    <div style={{ fontSize: 10.5, lineHeight: 1.4 }}>
+      <Chip c={yes ? t.success : no ? t.danger : t.warning}>{yes ? "CONFIRMED" : no ? "REJECTED" : "ANNOTATED"}</Chip>
+      <div style={{ color: t.sub, marginTop: 3 }}>{r.reviewer}{r.reviewed_at ? ` · ${String(r.reviewed_at).slice(0, 10)}` : ""}</div>
+      {r.reviewer_note && <div style={{ color: t.text }}>{r.reviewer_note}</div>}
+      {r.rule_changed_since === "Y" && <div style={{ color: t.warning }}>the rule changed since this review</div>}
+    </div>);
+}
 function Tile({ t, label, value, c, sub }) {
   return (
     <div style={{ border: `1px solid ${t.border}`, borderTop: `3px solid ${c || t.accent}`, borderRadius: t.radius.md,
@@ -86,10 +100,12 @@ export function CardDetail({ t, d, onClose }) {
       </div>
 
       <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: .5, textTransform: "uppercase", color: t.textMuted, margin: "10px 0 6px" }}>The rules</div>
-      <Tbl t={t} head={["Id", "Rule", "Confidence", "Evidence"]} rows={(d.rules || []).map((r) => [
-        <b style={{ fontFamily: "monospace" }}>{r.rule_id}</b>, r.rule_text,
+      <Tbl t={t} head={["Id", "Rule", "Confidence", "Evidence", "Review"]} rows={(d.rules || []).map((r) => [
+        <b style={{ fontFamily: "monospace" }}>{r.rule_id}</b>,
+        <>{r.rule_text}{r.business_meaning && <div style={{ color: t.text, marginTop: 3, fontStyle: "italic" }}>“{r.business_meaning}”</div>}</>,
         <Chip c={(CONF_INFO[r.confidence] || {}).c || t.sub} title={(CONF_INFO[r.confidence] || {}).t}>{r.confidence}</Chip>,
-        <span style={{ fontSize: 11 }}>{r.evidence}</span>])} />
+        <span style={{ fontSize: 11 }}>{r.evidence}</span>,
+        <Review t={t} r={r} />])} />
 
       <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: .5, textTransform: "uppercase", color: t.textMuted, margin: "10px 0 6px" }}>
         Quality {c.row_count == null && <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>· not profiled — run the ingestion with CP_SCD2_WITH_DB=1</span>}</div>
@@ -141,6 +157,8 @@ export function Scd2Tab({ t, summary, cards, detail, onOpen, onClose }) {
       <Tile t={t} label="rules proven" value={total ? `${conf.proven} / ${total}` : null} c={t.success} />
       <Tile t={t} label="truncated · to re-export" value={conf.unknown} c={conf.unknown ? t.danger : t.success} />
       <Tile t={t} label="open questions" value={s.open_questions} c={s.open_questions ? t.warning : t.success} />
+      <Tile t={t} label="rules confirmed" value={total ? `${(s.review || {}).confirmed || 0} / ${total}` : null}
+        c={(s.review || {}).confirmed ? t.success : t.textMuted} sub={(s.review || {}).rejected ? `${s.review.rejected} rejected` : ((s.review || {}).reviewers ? `${s.review.reviewers} reviewer(s)` : "export the review workbook")} />
       <Tile t={t} label="stale tables" value={s.stale} c={s.stale ? t.danger : t.success} sub="freshness alert" />
     </div>
     {(s.by_pattern || []).length > 0 && (
@@ -170,6 +188,8 @@ export function Scd2Tab({ t, summary, cards, detail, onOpen, onClose }) {
             {c.inferred_count > 0 && <span style={{ color: CONF_INFO.INFERRED.c }}>{c.inferred_count} inferred</span>}
             {c.unknown_count > 0 && <span style={{ color: CONF_INFO.UNKNOWN_TRUNCATED.c }}>{c.unknown_count} truncated</span>}
             {c.open_count > 0 && <span style={{ color: t.warning }}>{c.open_count} open</span>}
+            {c.confirmed_count > 0 && <span style={{ color: t.success }}>✓ {c.confirmed_count} confirmed</span>}
+            {c.rejected_count > 0 && <span style={{ color: t.danger }}>✗ {c.rejected_count} rejected</span>}
             {c.row_count != null && <span style={{ color: Number(c.dup_pct) >= 5 ? t.danger : t.sub }}>{c.dup_pct}% dup</span>}
             {c.freshness_alert && <span style={{ color: t.danger }}>stale</span>}
           </div>
@@ -205,6 +225,7 @@ export default function Odi360({ t }) {
         What the ODI repository says the warehouse loads do, read from the export and checked against the warehouse.
         A rule is <b style={{ color: CONF_INFO.PROVEN.c }}>proven</b> when the code says it, <b style={{ color: CONF_INFO.INFERRED.c }}>inferred</b> when the data
         points to it, and <b style={{ color: CONF_INFO.UNKNOWN_TRUNCATED.c }}>truncated</b> when the export cut the code before the rule.
+        A named reviewer then <b style={{ color: t.success }}>confirms</b> it, or rejects it with a reason; the two are shown side by side and never merged.
       </div>
       <div style={{ display: "flex", gap: 0, marginBottom: 16 }}>
         {TABS.map(([k, l], i) => (

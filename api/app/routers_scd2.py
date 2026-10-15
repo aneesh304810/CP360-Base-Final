@@ -38,11 +38,16 @@ def cards():
                            freshness_alert, volume_alerts, rule_count, proven_count, inferred_count, unknown_count,
                            open_count, notes, ran_at
                     FROM   scd2_card ORDER BY table_name""")
+    rv = {x["table_name"]: x for x in _safe("""SELECT table_name, SUM(CASE WHEN confirmed = 'Y' THEN 1 ELSE 0 END) AS confirmed,
+                                                       SUM(CASE WHEN confirmed = 'N' THEN 1 ELSE 0 END) AS rejected
+                                                FROM scd2_rule_review GROUP BY table_name""")}
     for r in rows:
         try:
             r["partition_values"] = json.loads(r["partition_values"]) if r.get("partition_values") else None
         except Exception:  # noqa: BLE001
             pass
+        v = rv.get(r["table_name"]) or {}
+        r["confirmed_count"], r["rejected_count"] = v.get("confirmed") or 0, v.get("rejected") or 0
     return {"cards": rows, "loaded": bool(rows), "count": len(rows)}
 
 
@@ -56,7 +61,11 @@ def summary():
                             SUM(CASE WHEN freshness_alert IS NOT NULL THEN 1 ELSE 0 END) AS stale,
                             MAX(ran_at) AS last_run
                      FROM   scd2_card""") or [{}])[0]
-    return {"by_pattern": [{"pattern": p, "n": by_pattern.get(p, 0)} for p in PATTERN_ORDER if by_pattern.get(p)],
+    rv = (_safe("""SELECT SUM(CASE WHEN confirmed = 'Y' THEN 1 ELSE 0 END) AS confirmed,
+                          SUM(CASE WHEN confirmed = 'N' THEN 1 ELSE 0 END) AS rejected,
+                          COUNT(DISTINCT reviewer) AS reviewers FROM scd2_rule_review""") or [{}])[0]
+    return {"review": {"confirmed": rv.get("confirmed") or 0, "rejected": rv.get("rejected") or 0, "reviewers": rv.get("reviewers") or 0},
+            "by_pattern": [{"pattern": p, "n": by_pattern.get(p, 0)} for p in PATTERN_ORDER if by_pattern.get(p)],
             "confidence": {"proven": conf.get("proven") or 0, "inferred": conf.get("inferred") or 0, "unknown": conf.get("unknown") or 0},
             "tables": conf.get("tables_") or 0, "profiled": conf.get("profiled") or 0, "stale": conf.get("stale") or 0,
             "open_questions": conf.get("open_questions") or 0, "last_run": conf.get("last_run"),
@@ -79,8 +88,15 @@ def card(table: str):
     p = {"t": t, **({"ra": ra} if ra else {})}
     return {
         "table": t, "loaded": True, "card": c,
-        "rules": _safe(f"SELECT rule_id, rule_text, confidence, evidence FROM scd2_rule WHERE table_name = :t{at} "
-                       "ORDER BY TO_NUMBER(REGEXP_SUBSTR(rule_id, '[0-9]+'))", p),
+        "rules": _safe(f"""SELECT r.rule_id, r.rule_text, r.confidence, r.evidence,
+                                  v.business_meaning, v.confirmed, v.reviewer, v.reviewer_note, v.reviewed_at,
+                                  CASE WHEN v.rule_text_seen IS NOT NULL AND v.rule_text_seen <> r.rule_text THEN 'Y' ELSE 'N' END AS rule_changed_since
+                           FROM   scd2_rule r
+                           LEFT JOIN scd2_rule_review v ON v.table_name = r.table_name AND v.rule_id = r.rule_id
+                           WHERE  r.table_name = :t{at.replace('ran_at', 'r.ran_at')}
+                           ORDER BY TO_NUMBER(REGEXP_SUBSTR(r.rule_id, '[0-9]+'))""", p)
+                 or _safe(f"SELECT rule_id, rule_text, confidence, evidence FROM scd2_rule WHERE table_name = :t{at} "
+                          "ORDER BY TO_NUMBER(REGEXP_SUBSTR(rule_id, '[0-9]+'))", p),
         "mapping": _safe(f"SELECT pbdw_column, data360_attr FROM scd2_mapping WHERE table_name = :t{at} ORDER BY pbdw_column", p),
         "open_questions": _safe(f"SELECT seq, question FROM scd2_open_question WHERE table_name = :t{at} ORDER BY seq", p),
         "dup_by_month": _safe(f"SELECT month, versions, dup_rows FROM scd2_dup_month WHERE table_name = :t{at} ORDER BY month", p),

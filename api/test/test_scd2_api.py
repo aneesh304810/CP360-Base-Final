@@ -36,9 +36,14 @@ def fake_safe(sql, params=None):
         return [{"proven": 14, "inferred": 1, "unknown": 2, "open_questions": 3, "tables_": 3, "profiled": 1, "stale": 1, "last_run": "2026-10-15T10:00:00"}]
     if "from scd2_card order by" in s:
         return [dict(CARD)]
-    if "from scd2_rule" in s:
-        assert params.get("ra") == CARD["ran_at"], "children are read at the card's ran_at"
-        return [{"rule_id": "R2", "rule_text": "closes", "confidence": "PROVEN", "evidence": "e"}, {"rule_id": "R10", "rule_text": "x", "confidence": "INFERRED", "evidence": "db"}]
+    if "from scd2_rule r" in s:
+        assert params.get("ra") == CARD["ran_at"] and "left join scd2_rule_review" in s and "r.ran_at = :ra" in s, "rules joined to their sign-off at the card's ran_at"
+        return [{"rule_id": "R2", "rule_text": "closes", "confidence": "PROVEN", "evidence": "e", "confirmed": "Y", "reviewer": "A", "rule_changed_since": "N"},
+                {"rule_id": "R10", "rule_text": "x", "confidence": "INFERRED", "evidence": "db", "confirmed": None, "reviewer": None, "rule_changed_since": "N"}]
+    if "from scd2_rule_review group by" in s:
+        return [{"table_name": "DIM_ACCOUNT", "confirmed": 1, "rejected": 0}]
+    if "from scd2_rule_review" in s:
+        return [{"confirmed": 5, "rejected": 1, "reviewers": 2}]
     if "from scd2_mapping" in s:
         return [{"pbdw_column": "ACTIVE_IND", "data360_attr": "IS_CURRENT (unreliable)"}]
     if "from scd2_open_question" in s:
@@ -56,12 +61,15 @@ s = R.summary()
 ok(s["loaded"] and s["tables"] == 3 and s["confidence"] == {"proven": 14, "inferred": 1, "unknown": 2} and s["stale"] == 1,
    "summary: tables, confidence mix, stale count", s)
 ok([p["pattern"] for p in s["by_pattern"]] == ["MERGE_SCD2", "TRUNCATE_APPEND_HIST"], "patterns in the fixed order", s["by_pattern"])
+ok(s["review"] == {"confirmed": 5, "rejected": 1, "reviewers": 2}, "summary carries the sign-off counts", s["review"])
 
 c = R.cards()
 ok(c["loaded"] and c["count"] == 1 and c["cards"][0]["partition_values"] == {"N": "SCN_DIM_ACCOUNT", "Y": "SCN_DIM_MASTER_ACCOUNT"},
    "cards: the partition JSON is decoded", c["cards"][0].get("partition_values"))
+ok(c["cards"][0]["confirmed_count"] == 1 and c["cards"][0]["rejected_count"] == 0, "cards carry their confirmed / rejected counts")
 
 d = R.card("dim_account")
+ok(d["rules"][0]["confirmed"] == "Y" and d["rules"][0]["reviewer"] == "A" and d["rules"][1]["reviewer"] is None, "the card's rules carry the sign-off beside the evidence")
 ok(d["loaded"] and d["table"] == "DIM_ACCOUNT" and len(d["rules"]) == 2 and d["mapping"][0]["pbdw_column"] == "ACTIVE_IND"
    and d["open_questions"][0]["seq"] == 1 and d["dup_by_month"][0]["versions"] == 409 and d["column_roles"]["valid_from"] == "START_DATE",
    "card: head, rules, mapping, questions, months and the scan roles", {k: len(v) if isinstance(v, list) else v for k, v in d.items() if k != "card"})

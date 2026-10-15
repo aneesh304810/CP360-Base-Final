@@ -43,6 +43,7 @@ STEPS = [
     "sei_migration",     # Data Analysis: SEI's merged source-file catalog in CP_SEI_MIGRATION_DIR (sql/78)
     "event360",          # Event 360: the SEI event specification workbook
     "sdc_compute",       # SDC client compute sizing: the read-back bill, per view
+    "scd2_review",       # ODI 360: the reviewed SCD2 workbook (CP_SCD2_REVIEW_XLSX) -> sign-offs; sql/82
     "scd2",              # ODI 360: SCD2 rule cards from the ODI export in CP_ODI_DIR (+ warehouse profile with CP_SCD2_WITH_DB=1); sql/81
     "event_subscription",# who consumes which event, from CSV — BBH's own decision
     "hub_corpus",        # Hub Discussion: the 108 review questions + drafted answers
@@ -250,6 +251,12 @@ def _run_step(step, conn, loader, resolver) -> None:
         c = Scd2Connector.from_env()
         n = c.load(loader, c.parse())
         log.info("scd2: merged %s rows", n)
+        return
+    if step == "scd2_review":
+        from .scd2_review_conn import Scd2ReviewConnector
+        c = Scd2ReviewConnector.from_env()
+        n = c.load(loader, c.parse())
+        log.info("scd2_review: merged %s sign-offs", n)
         return
     if step == "sdc_compute":
         from .sdc_compute_conn import SdcComputeConnector
