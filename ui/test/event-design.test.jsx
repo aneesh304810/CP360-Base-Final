@@ -19,6 +19,12 @@ const html = renderToStaticMarkup(<EventDesign />);
 ok(html.length > 6000 && !/NaN|undefined|\[object Object\]/.test(html), "the tab renders cleanly", html.length);
 ok(/THE DESIGN WE ARE GOING WITH/.test(html) && /Notify-then-pull/.test(html), "it states the decision, not a comparison of options");
 ok(/role="img"/.test(html) && /aria-label="[^"]{200,}/.test(html), "the path figure carries a sentence a reader without the picture can use");
+const figs = [...html.matchAll(/<svg\b[^>]*role="img"[^>]*>/g)];
+ok(figs.length === 5 && figs.every((m) => ((m[0].match(/aria-label="([^"]*)"/) || [])[1] || "").length >= 150),
+   "five mechanism figures — the path, the checkpoint, the label, the pull, the composite key — each with a sentence for a reader without the picture", figs.length);
+ok(/THE REPLAY FLOOR/.test(html) && /THE LABEL/.test(html) && /THE PULL/.test(html) && /COMPOSITE KEY/.test(html) && /LAST partition/.test(html),
+   "the figures draw the gate, the replay floor, the label decision, the pull and the key split");
+ok(!/57620755|501850|2338/.test(html), "no example key value from the deck is reproduced");
 
 const marks = Object.keys(MARK);
 ok(DESIGN.cons.length >= 7 && DESIGN.cons.every((c) => c.length === 4 && c[2].length > 20 && marks.includes(c[3])),

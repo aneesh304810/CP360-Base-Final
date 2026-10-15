@@ -260,6 +260,202 @@ function FlowFig() {
     </div>);
 }
 
+/* ------------------------------------------------------ more figures */
+// Shared frame for the mechanism figures below: a scroll box so a wide
+// figure scrolls in place rather than pushing the tab sideways.
+function Fig({ vw, vh, aria, children }) {
+  return (
+    <div style={{ overflowX: "auto", border: `1px solid ${P.rule}`, borderRadius: 6,
+      background: P.panel, padding: "12px 12px 8px", margin: "0 0 12px" }}>
+      <svg viewBox={`0 0 ${vw} ${vh}`} role="img" aria-label={aria}
+        style={{ display: "block", minWidth: 720, width: "100%", height: "auto" }}>
+        <defs>
+          <marker id="ed-k" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill={P.ink} /></marker>
+          <marker id="ed-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill={P.link} /></marker>
+          <marker id="ed-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill={P.danger} /></marker>
+        </defs>
+        {children}
+      </svg>
+    </div>);
+}
+const Box = ({ x, y, w, h, c = P.ink, fill = P.panel, dash, sw = 1.4, rx = 3 }) => (
+  <rect x={x} y={y} width={w} height={h} rx={rx} fill={fill} stroke={c} strokeWidth={sw} strokeDasharray={dash} />);
+const T = ({ x, y, s = 9.5, w = 400, c = P.ink, a, f, children }) => (
+  <text x={x} y={y} fontSize={s} fontWeight={w} fill={c} textAnchor={a} fontFamily={f}>{children}</text>);
+
+// A. The listener: three partitions assembling one batch, the gate, and
+// the checkpoint's four states with the replay floor underneath.
+function CheckpointFig() {
+  const lanes = [0, 1, 2];
+  const y0 = 46, dy = 40;
+  const st = [["LISTENED", P.sub], ["READ", P.warnInk], ["PROCESSING", P.link], ["SUCCESS", P.ok]];
+  return (
+    <Fig vw={1000} vh={284}
+      aria="The listener assembles one micro-batch across three domain partitions: each partition receives a Start marker, zero or more events, then an End marker, and the gate opens only when all three have both markers for the same micro-batch id. On the right, the checkpoint moves through four states, LISTENED, READ, PROCESSING and SUCCESS, and only SUCCESS is committed after the downstream load. Underneath, the replay floor: a micro-batch id below the checkpoint is ignored, the current id resumes from its last safe offset after a restart, and a higher id waits its turn.">
+      <T x={14} y={20} s={11} w={800} c={P.ink}>1 · ASSEMBLE THE BATCH</T>
+      <T x={190} y={20} c={P.sub}>one Start and one End per partition, same id</T>
+      {lanes.map((i) => {
+        const y = y0 + i * dy;
+        const ev = [[0, 2], [1], [2]][i];
+        return (
+          <g key={i}>
+            <T x={14} y={y + 15} c={P.sub}>partition {i}</T>
+            <line x1={80} y1={y + 11} x2={470} y2={y + 11} stroke={P.rule} strokeWidth={1} />
+            <Box x={84} y={y} w={62} h={22} c={P.accent} fill={P.accent} />
+            <T x={115} y={y + 15} s={8.5} w={700} c="#fff" a="middle">START n</T>
+            {ev.map((k) => (<g key={k}>
+              <Box x={170 + k * 70} y={y} w={56} h={22} c={P.link} />
+              <T x={198 + k * 70} y={y + 15} s={8.5} c={P.link} a="middle">event</T></g>))}
+            <Box x={400} y={y} w={62} h={22} c={P.accent} fill={P.accent} />
+            <T x={431} y={y + 15} s={8.5} w={700} c="#fff" a="middle">END n</T>
+          </g>);
+      })}
+      <line x1={470} y1={38} x2={470} y2={y0 + 3 * dy - 10} stroke={P.danger} strokeWidth={1.4} strokeDasharray="4 3" />
+      <T x={476} y={y0 + 8} s={8.5} w={700} c={P.danger}>gate</T>
+      <T x={476} y={y0 + 20} s={8} c={P.sub}>opens when the</T>
+      <T x={476} y={y0 + 31} s={8} c={P.sub}>LAST partition</T>
+      <T x={476} y={y0 + 42} s={8} c={P.sub}>has END n</T>
+      <Box x={14} y={y0 + 3 * dy} w={448} h={20} c={P.link} fill={P.tint} dash="3 2" sw={1} />
+      <T x={238} y={y0 + 3 * dy + 13} s={8.5} c={P.link} a="middle">a partition with no events between its markers is still complete</T>
+
+      <T x={560} y={20} s={11} w={800} c={P.ink}>2 · THE CHECKPOINT</T>
+      <T x={690} y={20} c={P.sub}>per partition: offset · micro-batch id · status</T>
+      {st.map(([name, c], i) => (
+        <g key={name}>
+          <Box x={560 + i * 108} y={40} w={96} h={28} c={c} fill={i === 3 ? "rgba(21,153,67,.10)" : P.panel} sw={i === 3 ? 1.8 : 1.3} />
+          <T x={608 + i * 108} y={58} s={9} w={800} c={c} a="middle">{name}</T>
+          {i < 3 && <path d={`M${656 + i * 108},54 L${666 + i * 108},54`} fill="none" stroke={P.ink} strokeWidth={1.2} markerEnd="url(#ed-k)" />}
+        </g>))}
+      <T x={560} y={88} s={8.5} c={P.sub}>events kept</T>
+      <T x={668} y={88} s={8.5} c={P.sub}>staged, not processed</T>
+      <T x={776} y={88} s={8.5} c={P.sub}>load running</T>
+      <T x={884} y={88} s={8.5} c={P.sub}>after downstream OK</T>
+      <path d="M940,68 L940,104 L608,104 L608,118" fill="none" stroke={P.ok} strokeWidth={1.2} strokeDasharray="4 3" markerEnd="url(#ed-k)" />
+      <T x={620} y={100} s={8.5} c={P.ok}>SUCCESS commits the checkpoint and moves the floor</T>
+      <Box x={560} y={120} w={420} h={24} c={P.warnInk} fill={P.panel} dash="3 2" sw={1} />
+      <T x={770} y={136} s={8.5} c={P.warnInk} a="middle">restart: resume from the last safe offset of the CURRENT id · never replay an older batch</T>
+
+      <T x={14} y={212} s={11} w={800} c={P.ink}>3 · THE REPLAY FLOOR</T>
+      <T x={170} y={212} c={P.sub}>what happens to an incoming id, compared with the checkpointed id</T>
+      {[["id < checkpoint", "ignored · logged, never applied", P.danger],
+        ["id = checkpoint", "resume from the last safe offset", P.warnInk],
+        ["id > checkpoint", "next batch · waits for its gate", P.ok]].map(([h, b, c], i) => (
+        <g key={h}>
+          <Box x={14 + i * 330} y={224} w={316} h={44} c={c} />
+          <T x={26 + i * 330} y={242} s={9.5} w={700} c={c} f={MONO}>{h}</T>
+          <T x={26 + i * 330} y={258} s={8.5} c={P.sub}>{b}</T>
+        </g>))}
+    </Fig>);
+}
+
+// B. The consumer: the payload is retrieval metadata; five steps turn it
+// into one bound query per view, and the output carries the batch id.
+function ConsumerFig() {
+  const steps = ["Parse", "Validate", "Predicates", "Execute", "Lineage"];
+  return (
+    <Fig vw={1000} vh={214}
+      aria="The consumer reads the event payload, which holds a view name, a key, an op and an event type, as retrieval metadata. Five steps follow: parse it, validate the view against the allowlist and resolve its key columns from the registry, build predicates with the keys for the same view grouped into one IN-list, execute the query with bound values as of the batch's End timestamp, and attach lineage. The output is the selected rows plus the original event metadata plus the micro-batch id. Nothing in the payload is ever treated as SQL.">
+      <T x={14} y={20} s={11} w={800} c={P.ink}>THE PULL</T>
+      <T x={76} y={20} c={P.sub}>the payload is metadata about what to fetch — never SQL</T>
+      <Box x={14} y={34} w={170} h={118} c={P.accent} />
+      <T x={24} y={52} s={9.5} w={700} c={P.accent}>event payload</T>
+      {[["view", "an approved view name"], ["key", "value(s) joined by |"], ["op", "I · U · D · kept"], ["eventType", "the catalog id — kept"]].map(([k, v], i) => (
+        <g key={k}>
+          <T x={24} y={72 + i * 19} s={9} w={700} c={P.ink} f={MONO}>{k}</T>
+          <T x={90} y={72 + i * 19} s={8.5} c={P.sub}>{v}</T>
+        </g>))}
+      <path d="M184,92 L206,92" fill="none" stroke={P.ink} strokeWidth={1.2} markerEnd="url(#ed-k)" />
+      {steps.map((n, i) => (
+        <g key={n}>
+          <Box x={210 + i * 112} y={70} w={100} h={44} c={P.link} />
+          <T x={220 + i * 112} y={88} s={9.5} w={700} c={P.link}>{i + 1} · {n}</T>
+          <T x={220 + i * 112} y={104} s={8} c={P.sub}>{["view · key · op · type", "allowlist · registry", "keys grouped per view", "bound values · as-of", "payload · result · id"][i]}</T>
+          {i < 4 && <path d={`M${310 + i * 112},92 L${320 + i * 112},92`} fill="none" stroke={P.link} strokeWidth={1.2} markerEnd="url(#ed-b)" />}
+        </g>))}
+      <path d="M436,114 L436,128" fill="none" stroke={P.danger} strokeWidth={1.2} strokeDasharray="3 2" markerEnd="url(#ed-r)" />
+      <Box x={360} y={130} w={152} h={22} c={P.danger} dash="4 3" sw={1} />
+      <T x={436} y={145} s={8.5} c={P.danger} a="middle">unknown view or bad key → dead letter</T>
+      <Box x={790} y={34} w={196} h={118} c={P.ok} fill="rgba(21,153,67,.06)" />
+      <T x={800} y={52} s={9.5} w={700} c={P.ok}>output of one pull</T>
+      {["the selected view rows", "+ the original event metadata", "+ the current micro-batch id", "+ the as-of timestamp it read at"].map((l, i) => (
+        <T key={l} x={800} y={72 + i * 19} s={8.5} c={P.sub}>{l}</T>))}
+      <Box x={14} y={166} w={972} h={36} c={P.rule} fill={P.tint} sw={1} />
+      <T x={24} y={181} s={9} w={700} c={P.ink} f={MONO}>select &lt;explicit columns&gt; from &lt;approved view&gt; where &lt;key column&gt; in (:k1, :k2, …) — at the batch's End timestamp</T>
+      <T x={24} y={195} s={8.5} c={P.sub}>one query per view per batch; the view name comes from the allowlist and the values from bind parameters</T>
+    </Fig>);
+}
+
+// C. The idempotency label, and the decision it drives.
+function LabelFig() {
+  const parts = [["micro-batch id", "the batch the event belongs to"], ["normalised key", "trimmed · cased · in registry order"], ["view name", "the approved view"]];
+  return (
+    <Fig vw={1000} vh={150}
+      aria="The idempotency label is three parts joined: the micro-batch id, the normalised key values, and the view name. It is a unique constraint on the staging store. If the label already exists the event is neither retrieved nor staged again; if it is new, the pull runs and the row is staged under the label. A redelivered event and a replayed batch both hit the same check.">
+      <T x={14} y={20} s={11} w={800} c={P.ink}>THE LABEL</T>
+      <T x={92} y={20} c={P.sub}>one unique constraint stops a duplicate before it costs a query</T>
+      {parts.map(([h, b], i) => (
+        <g key={h}>
+          <Box x={14 + i * 190} y={34} w={176} h={46} c={P.accent} />
+          <T x={24 + i * 190} y={52} s={9.5} w={700} c={P.accent}>{h}</T>
+          <T x={24 + i * 190} y={68} s={8} c={P.sub}>{b}</T>
+          {i < 2 && <T x={190 + i * 190 + 7} y={61} s={13} w={700} c={P.ink} a="middle">+</T>}
+        </g>))}
+      <path d="M584,57 L606,57" fill="none" stroke={P.ink} strokeWidth={1.2} markerEnd="url(#ed-k)" />
+      <Box x={610} y={34} w={150} h={46} c={P.ink} />
+      <T x={685} y={52} s={9.5} w={700} c={P.ink} a="middle">label</T>
+      <T x={685} y={68} s={8} c={P.sub} a="middle">unique constraint</T>
+      <path d="M760,46 L800,46" fill="none" stroke={P.ok} strokeWidth={1.2} markerEnd="url(#ed-k)" />
+      <path d="M760,68 L800,68" fill="none" stroke={P.danger} strokeWidth={1.2} markerEnd="url(#ed-r)" />
+      <Box x={804} y={34} w={182} h={20} c={P.ok} fill="rgba(21,153,67,.08)" sw={1} />
+      <T x={812} y={48} s={8.5} w={700} c={P.ok}>new → pull, stage under the label</T>
+      <Box x={804} y={60} w={182} h={20} c={P.danger} dash="3 2" sw={1} />
+      <T x={812} y={74} s={8.5} w={700} c={P.danger}>exists → skip: no retrieve, no stage</T>
+      <T x={14} y={108} s={8.5} c={P.sub}>a redelivered event, a replayed batch and a key that appears twice inside one batch all meet the same check</T>
+      <T x={14} y={124} s={8.5} c={P.sub}>second stop, if one slips through: Stage 1 merges on primary key, so the row still lands once</T>
+      <T x={14} y={140} s={8.5} c={P.warnInk}>what the label cannot do: tell an insert from a delete on the same key in one batch — that is the op-collision rule</T>
+    </Fig>);
+}
+
+// D. Composite key resolution: split in the registry's order, bind one
+// value per column. Letters, not the deck's example values.
+function KeyFig() {
+  const vals = ["A", "B", "C", "D"], cols = ["ORG", "FIRM", "USER", "ROLE"];
+  return (
+    <Fig vw={1000} vh={178}
+      aria="A composite key arrives as four values joined by pipes. The registry entry for the payload's view gives the ordered key columns and the expected segment count. The consumer splits the key, checks the count, converts types, and binds one value to one column in the registry's order. Keys stay deterministic only while the registry's column order matches the order the values were joined in.">
+      <T x={14} y={20} s={11} w={800} c={P.ink}>COMPOSITE KEY</T>
+      <T x={128} y={20} c={P.sub}>split by the registry, never by guesswork</T>
+      <Box x={14} y={34} w={176} h={34} c={P.accent} />
+      <T x={24} y={48} s={8} c={P.sub}>payload.key</T>
+      <T x={24} y={62} s={10} w={700} c={P.ink} f={MONO}>"A|B|C|D"</T>
+      <path d="M190,51 L212,51" fill="none" stroke={P.ink} strokeWidth={1.2} markerEnd="url(#ed-k)" />
+      {vals.map((v, i) => (
+        <g key={v}>
+          <Box x={216 + i * 44} y={34} w={38} h={34} c={P.link} />
+          <T x={235 + i * 44} y={56} s={10} w={700} c={P.link} a="middle" f={MONO}>{v}</T>
+        </g>))}
+      <T x={216} y={84} s={8.5} c={P.sub}>4 segments — must equal the registry's count</T>
+      <Box x={420} y={34} w={300} h={64} c={P.ink} />
+      <T x={430} y={50} s={9.5} w={700} c={P.ink}>registry · for this view</T>
+      <T x={430} y={66} s={8.5} c={P.sub}>ordered key columns</T>
+      {cols.map((c, i) => (<T key={c} x={540 + i * 44} y={66} s={8.5} w={700} c={P.ink} f={MONO}>{c}</T>))}
+      <T x={430} y={82} s={8.5} c={P.sub}>segments 4 · types per column · approved view</T>
+      <T x={430} y={94} s={8.5} c={P.sub}>under version control; a change is signed</T>
+      <path d="M720,66 L742,66" fill="none" stroke={P.ink} strokeWidth={1.2} markerEnd="url(#ed-k)" />
+      <Box x={746} y={34} w={240} h={64} c={P.ok} fill="rgba(21,153,67,.06)" />
+      <T x={756} y={50} s={9.5} w={700} c={P.ok}>bound predicates</T>
+      {cols.map((c, i) => (<T key={c} x={756 + (i % 2) * 118} y={68 + Math.floor(i / 2) * 16} s={8.5} c={P.ink} f={MONO}>{c} = :k{i + 1} ({vals[i]})</T>))}
+      {vals.map((v, i) => (
+        <path key={v} d={`M${235 + i * 44},68 L${235 + i * 44},108 L${560 + i * 44},108 L${560 + i * 44},100`} fill="none" stroke={P.rule} strokeWidth={1} strokeDasharray="2 2" />))}
+      <Box x={14} y={120} w={972} h={24} c={P.warn} fill={P.panel} dash="4 3" sw={1} />
+      <T x={500} y={136} s={9} w={700} c={P.warnInk} a="middle">deterministic only while the registry's column order matches the payload's value order — a pipe inside a value, a null segment or a count mismatch rejects the key to the dead letter</T>
+      <T x={14} y={166} s={8.5} c={P.sub}>a single-key view is the same path with one segment; the registry row says so</T>
+    </Fig>);
+}
+
 /* ------------------------------------------------------------- pieces */
 function H({ children, sub }) {
   return (
@@ -309,6 +505,7 @@ export default function EventDesign() {
       <Tbl head={["Component", "What it does"]} rows={DESIGN.components} />
 
       <H sub={DESIGN.gate}>The listener, step by step</H>
+      <CheckpointFig />
       <Tbl head={["", "Step", "What happens"]} rows={DESIGN.listener} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16, marginTop: 6 }}>
         <div>
@@ -324,13 +521,16 @@ export default function EventDesign() {
             The idempotency label is micro-batch id + normalised key values + view name, a unique constraint. If the label exists, the event is neither retrieved nor staged again.</div>
         </div>
       </div>
+      <LabelFig />
       <div style={{ border: `1px solid ${P.rule}`, borderLeft: `3px solid ${P.warn}`, borderRadius: 4, padding: "8px 12px", margin: "8px 0 4px", fontSize: 12, color: P.sub, maxWidth: "88ch", lineHeight: 1.5 }}>
         <b style={{ color: P.ink }}>The window.</b> {DESIGN.window}</div>
 
       <H sub={DESIGN.consumerOut}>The consumer, step by step</H>
+      <ConsumerFig />
       <Tbl head={["", "Step", "What happens"]} rows={DESIGN.consumer} />
 
       <H sub={DESIGN.registry.rule}>Composite keys and the registry</H>
+      <KeyFig />
       <Tbl head={["View", "Key columns, in payload order", "Segments"]} rows={DESIGN.registry.rows.map(([v, k, n]) => [<span style={{ fontFamily: MONO, fontSize: 11 }}>{v}</span>, <span style={{ fontFamily: MONO, fontSize: 11 }}>{k}</span>, n])} />
 
       <H sub="The six pieces the BBH Integration Hub builds and maintains; SDC owns the views, the events and the markers.">What BBH builds</H>
