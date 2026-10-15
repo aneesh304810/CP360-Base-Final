@@ -54,6 +54,7 @@ const NAV_GROUPS = [
  items: [
  ['system', 'System Design', '⛬'],
  ['devops360', 'DevOps 360', '⚙'],
+ ['odi360', 'ODI 360', '⟲'],
  ]
 },
 ];

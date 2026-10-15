@@ -244,6 +244,12 @@ def _run_step(step, conn, loader, resolver) -> None:
         n = c.load(loader, c.parse())
         log.info("event_subscription: merged %s rows", n)
         return
+    if step == "scd2":
+        from .scd2_conn import Scd2Connector
+        c = Scd2Connector.from_env()
+        n = c.load(loader, c.parse())
+        log.info("scd2: merged %s rows", n)
+        return
     if step == "sdc_compute":
         from .sdc_compute_conn import SdcComputeConnector
         c = SdcComputeConnector.from_env()
