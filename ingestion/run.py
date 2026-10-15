@@ -43,6 +43,7 @@ STEPS = [
     "sei_migration",     # Data Analysis: SEI's merged source-file catalog in CP_SEI_MIGRATION_DIR (sql/78)
     "event360",          # Event 360: the SEI event specification workbook
     "sdc_compute",       # SDC client compute sizing: the read-back bill, per view
+    "scd2",              # ODI 360: SCD2 rule cards from the ODI export in CP_ODI_DIR (+ warehouse profile with CP_SCD2_WITH_DB=1); sql/81
     "event_subscription",# who consumes which event, from CSV — BBH's own decision
     "hub_corpus",        # Hub Discussion: the 108 review questions + drafted answers
     "search_index",      # MUST be last - indexes everything for full-text search
