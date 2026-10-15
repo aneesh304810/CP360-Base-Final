@@ -6,6 +6,7 @@ thin mode does not do that lookup itself.
 """
 from __future__ import annotations
 
+import os
 import re
 from typing import Any, Callable
 
@@ -44,13 +45,51 @@ def _ldap3_lookup(host: str, port: int, alias: str, base: str) -> str | None:
     return None
 
 
-def connect(creds: Credentials | None = None, call_timeout_ms: int = 600_000) -> Any:
+_THICK = {"on": False}
+
+
+def init_thick(lib_dir: str | None = None) -> bool:
+    """Switch python-oracledb to thick mode, once, using an Oracle Instant Client.
+
+    Needed when the listener requires Native Network Encryption (DPY-3001):
+    thin mode cannot negotiate it. lib_dir comes from ORACLE_CLIENT_LIB, or
+    the client is found on PATH (Windows) / the loader path (Linux).
+    """
+    if _THICK["on"]:
+        return True
+    import oracledb
+    lib = lib_dir or os.environ.get("ORACLE_CLIENT_LIB") or None
+    try:
+        oracledb.init_oracle_client(lib_dir=lib) if lib else oracledb.init_oracle_client()
+    except Exception as e:
+        raise RuntimeError(
+            "thick mode needs an Oracle Instant Client: install it, then set ORACLE_CLIENT_LIB to its folder "
+            "(for example the instantclient_23_x directory) or put it on PATH. " + str(e).splitlines()[0]) from e
+    _THICK["on"] = True
+    return True
+
+
+def connect(creds: Credentials | None = None, call_timeout_ms: int = 600_000, connector: Callable | None = None) -> Any:
+    """Open the session. Thick mode is used when PBDW_THICK=1 or ORACLE_CLIENT_LIB is set,
+    and tried automatically when the server demands Native Network Encryption."""
     creds = creds or Credentials.from_env()
     if creds is None:
         raise RuntimeError("set PBDW_DSN, PBDW_USER and PBDW_PASSWORD in the environment")
     import oracledb
+    connector = connector or oracledb.connect
+    if os.environ.get("PBDW_THICK", "").strip() in ("1", "true", "yes") or os.environ.get("ORACLE_CLIENT_LIB"):
+        init_thick()
     dsn = resolve_ldap_dsn(creds.dsn)
-    conn = oracledb.connect(user=creds.user, password=creds.password, dsn=dsn)
+    try:
+        conn = connector(user=creds.user, password=creds.password, dsn=dsn)
+    except Exception as e:
+        msg = str(e)
+        if "DPY-3001" in msg and not _THICK["on"]:
+            # the listener insists on Native Network Encryption: only thick mode can do it
+            init_thick()
+            conn = connector(user=creds.user, password=creds.password, dsn=dsn)
+        else:
+            raise
     conn.call_timeout = call_timeout_ms
     return conn
 

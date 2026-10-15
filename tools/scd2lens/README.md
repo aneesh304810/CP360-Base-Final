@@ -41,6 +41,23 @@ directory before connecting; that needs the `ldap3` extra. The session is
 read-only by construction: the tool issues `SELECT` only, uses bind
 variables for every value, and interpolates only validated identifiers.
 
+### When the listener requires Native Network Encryption (DPY-3001)
+
+python-oracledb's default thin mode cannot negotiate Oracle Native Network
+Encryption. If the connection fails with `DPY-3001`, the tool switches to
+thick mode and retries, which needs an Oracle Instant Client on the machine:
+
+1. download Instant Client **Basic Light** for your platform and unzip it,
+   for example to `C:\oracle\instantclient_23_8`;
+2. set `ORACLE_CLIENT_LIB` to that folder (or add it to `PATH`), and
+   optionally `PBDW_THICK=1` to start in thick mode without the retry;
+3. run the command again.
+
+Thick mode can also read a `tnsnames.ora` / `ldap.ora` under `TNS_ADMIN`,
+so a plain alias name works as `PBDW_DSN` once Oracle Net is configured.
+The alternative, if the DBA offers it, is a TCPS (TLS) listener endpoint,
+which thin mode supports without a client install.
+
 ## Hard constraints the code enforces
 
 * no DDL, no DML, no temporary tables — inline subqueries only;

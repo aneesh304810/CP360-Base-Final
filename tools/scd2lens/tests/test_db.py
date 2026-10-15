@@ -127,3 +127,42 @@ def test_runner_refuses_anything_but_select():
     assert r("select 1 from dual") == [{"a": 1}]
     with pytest.raises(RuntimeError):
         r("delete from t")
+
+
+def test_connect_switches_to_thick_mode_on_dpy_3001(monkeypatch):
+    """The listener demands Native Network Encryption: thin fails with DPY-3001, thick is initialised, the retry succeeds."""
+    from scd2lens.db import conn as c
+    from scd2lens.config import Credentials
+    monkeypatch.setattr(c, "_THICK", {"on": False})
+    calls = {"init": 0, "connect": 0}
+    monkeypatch.setattr(c, "init_thick", lambda lib_dir=None: calls.__setitem__("init", calls["init"] + 1) or c._THICK.__setitem__("on", True) or True)
+
+    class Conn:
+        call_timeout = None
+
+    def connector(user, password, dsn):
+        calls["connect"] += 1
+        if calls["connect"] == 1:
+            raise RuntimeError("DPY-6005: cannot connect to database. DPY-3001: Native Network Encryption and Data Integrity is only supported in python-oracledb thick mode")
+        assert dsn == "h:1521/svc" and user == "u"
+        return Conn()
+
+    monkeypatch.delenv("PBDW_THICK", raising=False); monkeypatch.delenv("ORACLE_CLIENT_LIB", raising=False)
+    out = c.connect(Credentials(dsn="h:1521/svc", user="u", password="p"), connector=connector)
+    assert isinstance(out, Conn) and calls == {"init": 1, "connect": 2}
+
+
+def test_connect_uses_thick_when_asked_and_reraises_other_errors(monkeypatch):
+    from scd2lens.db import conn as c
+    from scd2lens.config import Credentials
+    monkeypatch.setattr(c, "_THICK", {"on": False})
+    seen = []
+    monkeypatch.setattr(c, "init_thick", lambda lib_dir=None: seen.append("thick") or c._THICK.__setitem__("on", True) or True)
+    monkeypatch.setenv("PBDW_THICK", "1")
+
+    def bad(user, password, dsn):
+        raise RuntimeError("ORA-01017: invalid username/password")
+
+    with pytest.raises(RuntimeError, match="ORA-01017"):
+        c.connect(Credentials(dsn="h:1521/svc", user="u", password="p"), connector=bad)
+    assert seen == ["thick"]
