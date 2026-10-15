@@ -66,5 +66,34 @@ ok(card["row_count"] is None and card["proven_count"] == 7 and card["unknown_cou
    "offline: quality empty, confidence counts filled", card)
 ok(not any(k in str(L.rows) for k in ("57620755", "501850")), "no warehouse key value anywhere in the rows")
 
+
+# ---- the scan's inputs: a missing CSV is a warning, the warehouse is a fallback ---
+import tempfile, shutil
+tmp = tempfile.mkdtemp()
+try:
+    for f in os.listdir(FIX):
+        if f.endswith(".csv") and f != "scd2_pbdw.csv":
+            shutil.copy(os.path.join(FIX, f), tmp)
+    c2 = Scd2Connector(tmp, columns_csv=os.path.join(tmp, "nope.csv"))
+    for v in ("PBDW_DSN", "PBDW_USER", "PBDW_PASSWORD"):
+        os.environ.pop(v, None)
+    ok(c2.ensure_scan() == [] and not os.path.exists(os.path.join(tmp, "scd2_pbdw.csv")),
+       "a missing columns CSV and no credentials: the scan is skipped, nothing crashes")
+
+    def fake_runner(sql, binds):
+        assert "all_tab_columns" in sql and binds == {"o": "PBDWAPP"}
+        return [{"t": "DIM_ACCOUNT", "c": "ACCOUNT_KEY", "ty": "NUMBER", "n": "N"}, {"t": "DIM_ACCOUNT", "c": "ACCOUNT_NUMBER", "ty": "VARCHAR2", "n": "N"},
+                {"t": "DIM_ACCOUNT", "c": "START_DATE", "ty": "DATE", "n": "N"}, {"t": "DIM_ACCOUNT", "c": "END_DATE", "ty": "DATE", "n": "N"},
+                {"t": "DIM_ACCOUNT", "c": "ACTIVE_IND", "ty": "NUMBER", "n": "N"}, {"t": "FACT_POS", "c": "AS_OF_DT", "ty": "DATE", "n": "N"}]
+    inv = c2.columns_from_warehouse(runner=fake_runner)
+    ok(set(inv) == {"DIM_ACCOUNT", "FACT_POS"} and len(inv["DIM_ACCOUNT"]) == 5, "the inventory can come from ALL_TAB_COLUMNS through the read-only session", inv)
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+    from tools.scd2_scan import report
+    rows = report(inv, os.path.join(tmp, "scd2_pbdw.csv"))
+    ok([r["verdict"] for r in rows] == ["SCD2", "SNAPSHOT"] and os.path.exists(os.path.join(tmp, "scd2_pbdw.csv")),
+       "and the scan written from it classifies the tables", rows)
+finally:
+    shutil.rmtree(tmp, ignore_errors=True)
+
 print(f"\n{BAD} assertion(s) failed" if BAD else "\nscd2-conn assertions pass")
 sys.exit(1 if BAD else 0)

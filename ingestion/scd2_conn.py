@@ -15,7 +15,8 @@ the card's RAN_AT only, so a rerun that produces fewer rules does not leave
 a stale rule beside the fresh ones.
 
     $env:CP_ODI_DIR="local-data/odi_export"      # the export, never committed
-    $env:CP_SCD2_COLUMNS_CSV="local-data/pbdw_columns.csv"   # optional, for the scan
+    $env:CP_SCD2_COLUMNS_CSV="local-data/pbdw_columns.csv"   # optional; without it and with PBDW_*
+                                                            # set, the inventory is read from ALL_TAB_COLUMNS
     $env:CP_SCD2_WITH_DB="1"; $env:PBDW_DSN=...; $env:PBDW_USER=...; $env:PBDW_PASSWORD=...
     python -m ingestion.run scd2
 
@@ -73,15 +74,47 @@ class Scd2Connector:
             import csv
             with open(target, newline="", encoding="utf-8-sig") as f:
                 return list(csv.DictReader(f))
-        if not self.columns_csv:
-            log.warning("scd2: no scd2_pbdw.csv in %s and no CP_SCD2_COLUMNS_CSV — the scan is skipped and only tables named in the export are carded", self.odi_dir)
-            return []
         sys.path.insert(0, ROOT)
         from tools.scd2_scan import read_csv, report
+        tables = None
+        if self.columns_csv and os.path.exists(self.columns_csv):
+            tables = read_csv(self.columns_csv)
+            log.info("scd2: column inventory from %s (%s tables)", self.columns_csv, len(tables))
+        elif self.columns_csv:
+            log.warning("scd2: CP_SCD2_COLUMNS_CSV=%s does not exist", self.columns_csv)
+        if tables is None:
+            tables = self.columns_from_warehouse()
+        if tables is None:
+            log.warning("scd2: no scd2_pbdw.csv in %s, no column CSV and no PBDW_* credentials — the scan is skipped; "
+                        "only tables named CP_SCD2_TABLES are carded", self.odi_dir)
+            return []
         os.makedirs(self.odi_dir, exist_ok=True)
-        rows = report(read_csv(self.columns_csv), target)
+        rows = report(tables, target)
         log.info("scd2: scan wrote %s rows to %s", len(rows), target)
         return rows
+
+    def columns_from_warehouse(self, runner=None):
+        """The column inventory straight from ALL_TAB_COLUMNS of the warehouse schema, read-only.
+
+        Used when no CSV is given and PBDW_DSN / PBDW_USER / PBDW_PASSWORD are set.
+        Metadata only: table, column, type, nullable.
+        """
+        if LENS not in sys.path:
+            sys.path.insert(0, LENS)
+        from scd2lens.config import Credentials
+        if runner is None:
+            if Credentials.from_env() is None:
+                return None
+            from scd2lens.db import conn as dbc
+            runner = dbc.Runner(dbc.connect())
+        from scd2lens.db.ident import ident
+        rows = runner("SELECT table_name AS t, column_name AS c, data_type AS ty, nullable AS n FROM all_tab_columns "
+                      "WHERE owner = :o ORDER BY table_name, column_id", {"o": ident(self.schema)})
+        out = {}
+        for r in rows:
+            out.setdefault(r["t"], []).append({"column": r["c"], "type": r["ty"], "nullable": r["n"]})
+        log.info("scd2: column inventory from the warehouse: %s tables in %s", len(out), self.schema)
+        return out
 
     # ---- 2. the cards ------------------------------------------------------
     def parse(self) -> dict:
