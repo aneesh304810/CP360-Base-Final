@@ -1,0 +1,5 @@
+table,verdict,confidence,surrogate_key,valid_from,valid_to,current_flag,business_date,audit,maps_to,notes
+DIM_ACCOUNT,SCD2,high,ACCOUNT_KEY,START_DATE,END_DATE,ACTIVE_IND,,LOAD_DATE,ACTIVE_IND -> IS_CURRENT,ACCOUNT_KEY taken as the surrogate by convention
+DIM_SECURITY,SCD2,high,SECURITY_KEY,START_DATE,END_DATE,ACTIVE_IND,,LOAD_DATE,,
+DIM_IP_RELATIONSHIP,SCD2,high,IP_RELATIONSHIP_KEY,START_DATE,END_DATE,ACTIVE_IND,,LOAD_DATE,,
+FACT_POS,SNAPSHOT,high,,,,,AS_OF_DATE,,,

@@ -1,0 +1,2 @@
+src_type,src,relation,dst_type,dst,detail
+TABLE,STG2_ACCOUNT,feeds,TABLE,DIM_ACCOUNT,SCN_DIM_ACCOUNT

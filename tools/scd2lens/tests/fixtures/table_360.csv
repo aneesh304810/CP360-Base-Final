@@ -1,0 +1,2 @@
+table,written_by_scenarios,read_by_scenarios,write_operations,indexes,layer
+DIM_ACCOUNT,SCN_DIM_ACCOUNT;SCN_DIM_MASTER_ACCOUNT,SCN_FACT_POS,MERGE;UPDATE,PK_DIM_ACCOUNT,DIM

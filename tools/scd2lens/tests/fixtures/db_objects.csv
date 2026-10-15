@@ -1,0 +1,2 @@
+object_type,schema,name,on_table,columns,used_by
+PROCEDURE,PBDWAPP,PRC_ACCOUNT_EDM_END_DATE,DIM_ACCOUNT,,SCN_DIM_ACCOUNT

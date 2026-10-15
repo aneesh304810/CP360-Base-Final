@@ -1,0 +1,10 @@
+# scd2lens configuration. Credentials never live here: set PBDW_DSN,
+# PBDW_USER and PBDW_PASSWORD in the environment.
+odi_dir: ./odi_export
+schema: PBDWAPP
+tech_columns: [START_DATE, END_DATE, ACTIVE_IND, LOAD_DATE, LOAD_TYPE, BATCH_ID, CREATED_TSP, UPDATED_TSP]
+hash_chunk_size: 8
+lob_types: [CLOB, BLOB, NCLOB, LONG, LONG RAW]
+db_sample_since: null        # e.g. 2024-01-01 for fast runs
+freshness_alert_days: 10
+tables: auto                 # or an explicit list
