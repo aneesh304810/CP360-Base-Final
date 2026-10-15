@@ -21,6 +21,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { evt360 } from './event360_api_additions.js';
 import EventMicroBatch from './EventMicroBatch.jsx';
+import EventDesign from './EventDesign.jsx';
 import EventFlowSim from './EventFlowSim.jsx';
 // Re-exported so anything already importing them from here keeps working.
 import { P, TC, BC } from './eventPalette.js';
@@ -99,7 +100,7 @@ const mtd = { ...td, fontFamily: P.mono, fontSize: 11 };
 
 const TABS = [['est', 'Estate'], ['swm', 'Swimlanes'], ['lnk', 'Link view'],
   ['dep', 'Interdependence'], ['sub', 'Subscriptions & cost'],
-  ['mb', 'Commit boundary'], ['run', 'Run-through']];
+  ['mb', 'Commit boundary'], ['run', 'Run-through'], ['dsn', 'Design']];
 
 export default function Event360() {
   const [tab, setTab] = useState('est');
@@ -210,6 +211,11 @@ export default function Event360() {
               hand-written from SEI's own answers and says so in its first
               paragraph rather than borrowing the estate's authority. */}
           {tab === 'run' && <EventFlowSim />}
+          {/* Prop-less like the two above. The decision record for
+              notify-then-pull: pros, cons, bottlenecks, and the operating
+              rules for duplicates, errors and replay, each marked decided,
+              proposed or ask-SEI. Its palette comes from eventPalette. */}
+          {tab === 'dsn' && <EventDesign />}
         </>}
     </div>);
 }
