@@ -29,6 +29,11 @@ export const MARK = {
   PROPOSED: { c: P.warnInk, t: "BBH's handling, to confirm at the design review" },
   "ASK SEI": { c: P.danger, t: "the deck does not answer it; only SEI can" },
 };
+function Outcome({ k }) {
+  const [t, c] = DESIGN.outcomes[k];
+  return <span title={t} style={{ fontSize: 9, fontWeight: 800, letterSpacing: .4, color: "#fff",
+    background: c, borderRadius: 3, padding: "2px 6px", whiteSpace: "nowrap" }}>{k}</span>;
+}
 function Mark({ m }) {
   const x = MARK[m] || MARK.PROPOSED;
   return <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: .4, color: x.c,
@@ -206,6 +211,47 @@ export const DESIGN = {
   ],
   consumerOut: "Output of a pull: the selected view rows, the original event metadata, and the current micro-batch id. Incoming object names and key values are never treated as SQL.",
   window: "For a 5-minute processing window: keep the distinct keys between Start and End, check the processed registry before retrieving, and commit the checkpoint only after the downstream load succeeds.",
+  // Four outcomes cover every exception; each scenario maps to exactly one,
+  // so an operator never invents a response. "covered" means the Run-through
+  // tab already plays it or a rule above already states it.
+  outcomes: {
+    SKIP: ["skip under the label", P.ok],
+    "DEAD LETTER": ["dead-letter the row · block SUCCESS", P.danger],
+    PARK: ["park the batch · alert", P.warnInk],
+    OPEN: ["park the row as OPEN · retry on SUCCESS", P.link],
+  },
+  // [stage, scenario, handling, outcome, mark]  mark: covered | PROPOSED | ASK SEI
+  exceptions: [
+    ["Intake", "No End marker", "A timeout on the gate parks the batch and alerts; nothing downstream runs.", "PARK", "covered"],
+    ["Intake", "One partition or topic down", "The gate stalls every domain; heartbeat per partition, alert, no partial processing.", "PARK", "covered"],
+    ["Intake", "End without Start, or markers out of order", "The batch is invalid; park it and ask SDC to republish.", "PARK", "ASK SEI"],
+    ["Intake", "Marker for an id below the floor", "Ignored and logged, never applied.", "SKIP", "covered"],
+    ["Intake", "Marker for an id far above the current one", "A gap means a missed batch: park, alert, never advance the floor past the gap.", "PARK", "PROPOSED"],
+    ["Intake", "Malformed event — missing field, wrong type, unknown event id", "Dead letter with the batch id; the rest of the batch proceeds.", "DEAD LETTER", "PROPOSED"],
+    ["Intake", "Event for a view not on the allowlist", "Dead letter; SUCCESS blocked until a named person dismisses or replays it.", "DEAD LETTER", "PROPOSED"],
+    ["Intake", "Composite key that does not parse", "Wrong segment count, a pipe inside a value, a null segment: dead letter.", "DEAD LETTER", "PROPOSED"],
+    ["Intake", "Duplicate event or duplicate batch", "The idempotency label makes the second a skip.", "SKIP", "covered"],
+    ["Intake", "Same key, several ops in one batch", "Last op in batch order wins; earlier ops kept as lineage.", "SKIP", "ASK SEI"],
+    ["Pull", "Snowflake unreachable, warehouse suspended, JDBC timeout", "Transient: retry with backoff three times, then park the batch. SUCCESS never written.", "PARK", "PROPOSED"],
+    ["Pull", "Time Travel window exceeded on a replay", "Fail the replay explicitly; never fall back to a current read without recording it.", "PARK", "PROPOSED"],
+    ["Pull", "Key returns no row", "For I or U: fan-out or ordering — OPEN, retry on the next SUCCESS. For D: expected, lands as a tombstone.", "OPEN", "ASK SEI"],
+    ["Pull", "Key returns more than one row", "The registry's key is not unique for that view: dead letter and a registry defect.", "DEAD LETTER", "PROPOSED"],
+    ["Pull", "View gained or lost a column", "The column drift check before the batch fails the batch, not the row.", "PARK", "PROPOSED"],
+    ["Pull", "IN-list over the limit, or a query over its time budget", "Chunk the keys; a chunk that still fails parks the batch.", "PARK", "PROPOSED"],
+    ["Load", "Oracle merge fails mid-batch", "The batch fails as a unit; its Stage 1 rows are rolled back or marked invalid; no partial SUCCESS.", "PARK", "PROPOSED"],
+    ["Load", "Parent not yet landed", "OPEN missing-dimension row, retried on every SUCCESS, never a placeholder key.", "OPEN", "covered"],
+    ["Load", "Parent deleted with live children", "Tombstone, and flagged orphans in the OPEN set.", "OPEN", "ASK SEI"],
+    ["Load", "Business rule rejection in Stage 2", "To the DQ store with the batch id, counted in the reconciliation identity, not dropped.", "OPEN", "PROPOSED"],
+    ["Load", "Key normalisation disagrees between staged and pulled row", "Dead letter and a registry defect.", "DEAD LETTER", "PROPOSED"],
+    ["Checkpoint", "Crash after READ, before SUCCESS", "Resume from the last safe offset of the current id; the pull reruns; the label keeps it idempotent.", "SKIP", "covered"],
+    ["Checkpoint", "Crash after downstream succeeded, before SUCCESS was written", "The batch reruns, every row is a skip under the label, SUCCESS is then written.", "SKIP", "PROPOSED"],
+    ["Checkpoint", "Deliberate replay of an old batch", "The floor is lowered explicitly with a reason; the as-of read reproduces the batch.", "SKIP", "covered"],
+    ["Checkpoint", "Checkpoint store unavailable", "The listener stops consuming rather than consume without a checkpoint.", "PARK", "PROPOSED"],
+    ["Operational", "Backlog after an outage", "Replays in order, one batch at a time; lag per feed group on the dashboard; an SLA breach pages.", "PARK", "covered"],
+    ["Operational", "Dead-letter rows ageing", "A dead letter older than its threshold is an incident, not a queue.", "DEAD LETTER", "PROPOSED"],
+    ["Operational", "Silver upload or notification fails after the result", "Logged and surfaced; never changes the batch result.", "SKIP", "PROPOSED"],
+    ["Operational", "A feed that is not an event fails", "Holdings, CRM and a full refeed carry their own run id and their own failure path, outside the batch floor.", "PARK", "PROPOSED"],
+  ],
   askSei: [
     "Does SDC emit an event for every affected view key when a change fans out across denormalised views?",
     "When a parent row is deleted or re-keyed, are the child view keys emitted, or must BBH re-read the child views itself?",
@@ -213,6 +259,7 @@ export const DESIGN = {
     "Are the Start/End markers published to every partition of every domain topic, and is the gate per topic or per partition?",
     "Can the micro-batch id become a numeric, monotonic sequence?",
     "What Time Travel retention will SDC guarantee on the custom views?",
+    "If markers arrive out of order, or a Start is lost, will SDC republish the batch on request?",
     "Are the view column lists and the key registry versioned, and who signs a change?",
   ],
 };
@@ -619,6 +666,20 @@ export default function EventDesign() {
             </ul>
           </div>))}
       </div>
+
+      <H sub="Every exception maps to exactly one of four outcomes, so an operator never invents a response. 'covered' means the Run-through tab already plays it or a rule above already states it.">The exceptions, one by one</H>
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 11.5, color: P.sub, margin: "0 0 10px" }}>
+        {Object.keys(DESIGN.outcomes).map((k) => (
+          <span key={k} style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+            <Outcome k={k} /> {DESIGN.outcomes[k][0]} · {DESIGN.exceptions.filter((e) => e[3] === k).length}</span>))}
+      </div>
+      <Tbl head={["Stage", "Scenario", "Handling", "Outcome", ""]}
+        rows={DESIGN.exceptions.map(([st, sc, h, o, m], i) => [
+          <span style={{ color: P.sub, fontWeight: 400 }}>{st}</span>,
+          <b style={{ color: P.ink }}>{i + 1} · {sc}</b>,
+          <span style={{ color: P.sub }}>{h}</span>,
+          <Outcome k={o} />,
+          m === "covered" ? <span style={{ fontSize: 9.5, fontWeight: 700, color: P.sub }}>covered</span> : <Mark m={m} />])} />
 
       <H sub="The deck does not answer these and BBH cannot. They go to SEI before the design is signed.">Questions for SEI</H>
       <ol style={{ margin: "0 0 10px", paddingLeft: 22, fontSize: 12.5, color: P.sub, lineHeight: 1.55, maxWidth: "88ch" }}>

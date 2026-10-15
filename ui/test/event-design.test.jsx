@@ -31,6 +31,14 @@ ok(dep && dep[1] === "PROPOSED" && dep[2].some((b) => /never loaded with a place
 ok(/LOAD ORDER INSIDE A BATCH/.test(html) && /A PARENT THAT HAS NOT LANDED/.test(html) && /OPEN missing-dimension row/.test(html),
    "the dependencies figure draws both halves");
 ok(DESIGN.askSei.some((q) => /parent row is deleted/.test(q)), "the cascade question is on the list for SEI");
+const OUT = Object.keys(DESIGN.outcomes);
+ok(DESIGN.exceptions.length === 29 && DESIGN.exceptions.every((e) => e.length === 5 && OUT.includes(e[3]) && ["covered", ...Object.keys(MARK)].includes(e[4]) && e[2].length > 20),
+   "29 exception scenarios, each with a handling, one of four outcomes, and covered / proposed / ask-SEI", DESIGN.exceptions.length);
+ok(OUT.every((k) => DESIGN.exceptions.some((e) => e[3] === k)) && new Set(DESIGN.exceptions.map((e) => e[0])).size === 5,
+   "every outcome is used and the scenarios span intake, pull, load, checkpoint and operations");
+ok(DESIGN.exceptions.filter((e) => e[4] === "covered").length >= 8 && DESIGN.exceptions.some((e) => /before SUCCESS was written/.test(e[1]) && e[3] === "SKIP"),
+   "the Run-through's paths count as covered, and the crash-after-downstream case is a skip under the label");
+ok(/The exceptions, one by one/.test(html) && (html.match(/>DEAD LETTER</g) || []).length >= 6, "the matrix renders with its outcome tags");
 
 const marks = Object.keys(MARK);
 ok(DESIGN.cons.length >= 7 && DESIGN.cons.every((c) => c.length === 4 && c[2].length > 20 && marks.includes(c[3])),
