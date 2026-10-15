@@ -502,8 +502,8 @@ function DepFig() {
       <T x={764} y={111} s={8.8} w={700} c={P.warnInk} a="middle">OPEN missing-dimension row</T>
       <T x={764} y={125} s={7.8} c={P.sub} a="middle">keeps its batch id · counted, never dropped</T>
       <path d="M868,114 L930,114 L930,60" fill="none" stroke={P.warnInk} strokeWidth={1.2} strokeDasharray="4 3" markerEnd="url(#ed-k)" />
-      <T x={876} y={108} s={7.8} c={P.warnInk}>retried on every</T>
-      <T x={876} y={119} s={7.8} c={P.warnInk}>batch SUCCESS</T>
+      <T x={936} y={82} s={7.8} c={P.warnInk}>retried on</T>
+      <T x={936} y={93} s={7.8} c={P.warnInk}>every SUCCESS</T>
       <Box x={560} y={146} w={426} h={22} c={P.danger} dash="3 2" sw={1} />
       <T x={773} y={161} s={8.5} w={700} c={P.danger} a="middle">never a placeholder key: eligible rows = loaded rows + OPEN rows</T>
       <T x={560} y={188} s={8.5} c={P.sub}>a deleted parent is a tombstone; its children become flagged orphans in the same OPEN set</T>
