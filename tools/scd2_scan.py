@@ -195,6 +195,19 @@ def classify(columns: list[dict]) -> dict:
     if "VALID_TO" in pick:
         to_conv = "NULL = open" if pick["VALID_TO"][2] == "Y" else "high date = open (NOT NULL)"
 
+    # A bare *_KEY is a weak match on its own -- it may be the natural key.
+    # On a table that keeps history it is almost always the surrogate (the
+    # SEI dbt design merges SCD2 on ACCOUNT_KEY, never the natural key), so
+    # on an SCD2 verdict it is accepted by convention and flagged to confirm.
+    notes = []
+    if verdict.startswith("SCD2") and "SURROGATE_KEY" in pick and pick["SURROGATE_KEY"][1] < 2:
+        pick["SURROGATE_KEY"] = (pick["SURROGATE_KEY"][0], 2, pick["SURROGATE_KEY"][2])
+        notes.append(f"{pick['SURROGATE_KEY'][0]} taken as the surrogate by convention; confirm it is not the natural key")
+    if "VALID_TO" in pick and pick["VALID_TO"][2] == "N":
+        notes.append("open rows carry a sentinel end date; confirm the value (9999-12-31 or 2099-12-31) before mapping to NULL")
+    if verdict.startswith("SCD2") and not has("VERSION", 4):
+        notes.append("no version column; RECORD_VERSION can be derived as ROW_NUMBER over the start date within the natural key")
+
     missing = []
     if verdict.startswith("SCD2"):
         for r in ("VALID_FROM", "VALID_TO", "CURRENT_FLAG", "VERSION", "SURROGATE_KEY"):
@@ -210,6 +223,7 @@ def classify(columns: list[dict]) -> dict:
         "to_convention": to_conv,
         "missing_for_full_scd2": missing,
         "maps_to": {pick[r][0]: ROLES[r]["maps_to"] for r in pick if r != "AUDIT"},
+        "notes": notes,
         "column_count": len(columns),
     }
 
@@ -290,7 +304,8 @@ def report(tables: dict[str, list[dict]], out_path: str | None) -> list[dict]:
                      **{role.lower(): r["roles"].get(role, "") for role in ROLE_ORDER},
                      "to_convention": r["to_convention"],
                      "missing_for_full_scd2": " ".join(r["missing_for_full_scd2"]),
-                     "maps_to": "; ".join(f"{c} -> {m}" for c, m in r["maps_to"].items())})
+                     "maps_to": "; ".join(f"{c} -> {m}" for c, m in r["maps_to"].items()),
+                     "notes": " | ".join(r["notes"])})
     if out_path:
         with open(out_path, "w", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, fieldnames=list(rows[0].keys()) if rows else ["table"])

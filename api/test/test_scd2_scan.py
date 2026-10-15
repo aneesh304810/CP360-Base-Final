@@ -52,6 +52,12 @@ ok(dim["roles"]["VALID_FROM"] == "EFF_START_DT" and dim["roles"]["VALID_TO"] == 
    and dim["roles"]["SURROGATE_KEY"] == "ACCT_SK", "and each role names its column", dim["roles"])
 ok(dim["to_convention"] == "high date = open (NOT NULL)", "a NOT NULL end date means the high-date convention", dim["to_convention"])
 ok(dim["missing_for_full_scd2"] == ["VERSION"], "what the target design adds: a version number", dim["missing_for_full_scd2"])
+conv = classify(cols(("ACCOUNT_KEY", "NUMBER(18)", "N"), ("ACCOUNT_ID", "VARCHAR2(20)", "N"), ("START_DATE", "DATE", "N"),
+                     ("END_DATE", "DATE", "N"), ("ACTIVE_IND", "NUMBER(1)", "N"), ("LOAD_DATE", "DATE", "N")))
+ok(conv["verdict"] == "SCD2" and "SURROGATE_KEY" not in conv["missing_for_full_scd2"] and conv["roles"]["SURROGATE_KEY"] == "ACCOUNT_KEY",
+   "on an SCD2 table a bare *_KEY is taken as the surrogate by convention", conv)
+ok(any("confirm it is not the natural key" in n for n in conv["notes"]) and any("sentinel end date" in n for n in conv["notes"])
+   and any("RECORD_VERSION can be derived" in n for n in conv["notes"]), "and the notes say what to confirm and what to derive", conv["notes"])
 ok("EFF_START_DT -> VALID_FROM_DATE / EFFECTIVE_FROM_TS" in [f"{c} -> {m}" for c, m in dim["maps_to"].items()], "the crosswalk names the target attribute")
 
 nullable_end = classify(cols(("VALID_FROM_DT", "DATE", "N"), ("VALID_TO_DT", "DATE", "Y"), ("CLIENT_ID", "VARCHAR2(12)", "N")))
