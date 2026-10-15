@@ -119,8 +119,8 @@ export function CardDetail({ t, d, onClose }) {
           {d.column_roles && <>
             <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: .5, textTransform: "uppercase", color: t.textMuted, margin: "12px 0 6px" }}>Column scan</div>
             <div style={{ fontSize: 12, color: t.sub, lineHeight: 1.6 }}>
-              {["surrogate_key", "valid_from", "valid_to", "current_flag", "version", "row_hash", "business_date", "audit"].filter((k) => d.column_roles[k]).map((k) => (
-                <div key={k}><span style={{ color: t.textMuted }}>{k.replace("_", " ")}</span> <span style={{ fontFamily: "monospace", color: t.text }}>{d.column_roles[k]}</span></div>))}
+              {["surrogate_key", "valid_from", "valid_to", "current_flag", "version", "row_hash", "business_date", "audit_col"].filter((k) => d.column_roles[k]).map((k) => (
+                <div key={k}><span style={{ color: t.textMuted }}>{k === "audit_col" ? "audit" : k.replace("_", " ")}</span> <span style={{ fontFamily: "monospace", color: t.text }}>{d.column_roles[k]}</span></div>))}
               {d.column_roles.to_convention && <div><span style={{ color: t.textMuted }}>open row</span> {d.column_roles.to_convention}</div>}
               {d.column_roles.notes && <div style={{ color: t.warning }}>{d.column_roles.notes}</div>}
             </div></>}

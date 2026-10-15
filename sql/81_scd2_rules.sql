@@ -126,7 +126,7 @@ BEGIN
       version        VARCHAR2(128),
       row_hash       VARCHAR2(128),
       business_date  VARCHAR2(128),
-      audit          VARCHAR2(128),
+      audit_col      VARCHAR2(128),   -- AUDIT is reserved in Oracle
       to_convention  VARCHAR2(200),
       missing_roles  VARCHAR2(400),
       maps_to        VARCHAR2(2000),

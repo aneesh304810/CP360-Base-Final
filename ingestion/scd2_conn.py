@@ -172,7 +172,7 @@ class Scd2Connector:
                 continue
             loader._merge("scd2_column_role", ("table_name",), {
                 "table_name": t, "verdict": _s(row.get("verdict"), 40), "confidence": _s(row.get("confidence"), 20),
-                **{r: _s(row.get(r), 128) for r in roles},
+                **{("audit_col" if r == "audit" else r): _s(row.get(r), 128) for r in roles},
                 "to_convention": _s(row.get("to_convention"), 200), "missing_roles": _s(row.get("missing_for_full_scd2"), 400),
                 "maps_to": _s(row.get("maps_to"), 2000), "notes": _s(row.get("notes"), 2000), "ran_at": ran_at})
             n += 1

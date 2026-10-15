@@ -28,7 +28,7 @@ const detail = { table: "DIM_ACCOUNT", loaded: true,
   mapping: [{ pbdw_column: "ACTIVE_IND", data360_attr: "IS_CURRENT (unreliable)" }],
   open_questions: [{ seq: 1, question: "re-export untruncated: SCN_DIM_ACCOUNT step 9 task 50" }],
   dup_by_month: [{ month: "2025-12", versions: 400, dup_rows: 10 }, { month: "2026-01", versions: 409, dup_rows: 20 }, { month: "2026-02", versions: 6, dup_rows: 0 }],
-  column_roles: { valid_from: "START_DATE", valid_to: "END_DATE", current_flag: "ACTIVE_IND", surrogate_key: "ACCOUNT_KEY", to_convention: "high date = open (NOT NULL)" } };
+  column_roles: { valid_from: "START_DATE", valid_to: "END_DATE", current_flag: "ACTIVE_IND", surrogate_key: "ACCOUNT_KEY", audit_col: "LOAD_DATE", to_convention: "high date = open (NOT NULL)" } };
 
 console.log("-- the tab");
 for (const [tn, t] of [["light", tLight], ["dark", tDark]]) {
@@ -42,7 +42,7 @@ ok(/DIM_ACCOUNT/.test(h) && /split by MASTER_IND/.test(h) && /7 proven/.test(h) 
 ok(/PRC_ACCOUNT_EDM_END_DATE/.test(h) && />PROVEN</.test(h) && />INFERRED</.test(h) && /IS_CURRENT \(unreliable\)/.test(h) && /task 50/.test(h), "the detail: rules with evidence and confidence, the mapping, the open question");
 ok(/272373/.test(h) && /275 \(0.1%\)/.test(h) && /4000 \/ 0/.test(h) && /20 days behind/.test(h), "the quality tiles carry the profile");
 ok(/role="img"/.test(h) && /Versions opened per month for 3 months/.test(h), "the month bars carry a sentence");
-ok(/open row<\/span> high date = open/.test(h) && /START_DATE/.test(h), "the column scan's roles and convention are shown");
+ok(/open row<\/span> high date = open/.test(h) && /START_DATE/.test(h) && />audit<\/span> <span[^>]*>LOAD_DATE/.test(h), "the column scan's roles and convention are shown, audit under its plain name");
 
 console.log("-- empty");
 const e = renderToStaticMarkup(<Scd2Tab t={tLight} summary={{ loaded: false, confidence: {} }} cards={[]} detail={null} onOpen={() => {}} onClose={() => {}} />);

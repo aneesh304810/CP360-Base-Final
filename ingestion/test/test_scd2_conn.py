@@ -58,7 +58,8 @@ ok(len(acc) == 7 and all(r["confidence"] == "PROVEN" and r["evidence"] for r in 
 ok(any(r["pbdw_column"] == "ACTIVE_IND" and "unreliable" in r["data360_attr"] for r in by["scd2_mapping"]), "the mapping flags ACTIVE_IND as unreliable")
 ok(any("task 50" in r["question"] for r in by["scd2_open_question"]), "the truncated LKM task is an open question")
 roles = {r["table_name"]: r for r in by["scd2_column_role"]}
-ok(roles["DIM_ACCOUNT"]["valid_from"] == "START_DATE" and roles["DIM_ACCOUNT"]["current_flag"] == "ACTIVE_IND" and "FACT_POS" in roles,
+ok(roles["DIM_ACCOUNT"]["valid_from"] == "START_DATE" and roles["DIM_ACCOUNT"]["current_flag"] == "ACTIVE_IND" and "FACT_POS" in roles
+   and roles["DIM_ACCOUNT"]["audit_col"] == "LOAD_DATE" and "audit" not in roles["DIM_ACCOUNT"],
    "the column scan's roles land for every scanned table, SCD2 or not", roles.get("DIM_ACCOUNT"))
 card = by["scd2_card"][0]
 ok(card["row_count"] is None and card["proven_count"] == 7 and card["unknown_count"] == 0 and card["open_count"] >= 1,
