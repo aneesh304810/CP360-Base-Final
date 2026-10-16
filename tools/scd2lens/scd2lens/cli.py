@@ -160,7 +160,8 @@ def all_(out: str = typer.Option("./out", "--out"), repo: str = typer.Option(Non
     s = _settings(config, repo)
     ex = load_export(s.odi_dir)
     df = ex.scd2_pbdw
-    tables = sorted(df[df["verdict"].str.upper().str.startswith("SCD2")]["table"].str.upper().unique()) if isinstance(s.tables, str) else [t.upper() for t in s.tables]
+    v = df["verdict"].str.upper()
+    tables = sorted(df[v.str.startswith("SCD2") & ~v.str.contains("WEAK")]["table"].str.upper().unique()) if isinstance(s.tables, str) else [t.upper() for t in s.tables]
     cards = []
     o = Path(out); o.mkdir(parents=True, exist_ok=True)
     for t in tables:

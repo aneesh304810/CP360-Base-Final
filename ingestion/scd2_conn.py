@@ -131,7 +131,10 @@ class Scd2Connector:
             tables = self.tables
         else:
             df = ex.scd2_pbdw
-            tables = sorted(df[df["verdict"].str.upper().str.startswith("SCD2")]["table"].str.upper().unique())
+            # SCD2 and SCD2 (probable). A "(weak)" verdict is one lone date column; it stays in the
+            # scan CSV but is not worth a card unless named in CP_SCD2_TABLES.
+            v = df["verdict"].str.upper()
+            tables = sorted(df[v.str.startswith("SCD2") & ~v.str.contains("WEAK")]["table"].str.upper().unique())
         ran_at = _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0)
         cards = []
         for t in tables:

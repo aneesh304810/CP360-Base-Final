@@ -161,10 +161,18 @@ def role_of(column: str, data_type: str | None) -> tuple[str | None, int]:
     return best, best_w
 
 
-def classify(columns: list[dict]) -> dict:
+def classify(columns: list[dict], table: str | None = None) -> dict:
     """One table's columns -> roles, verdict and evidence.
 
     columns: [{"column": str, "type": str|None, "nullable": "Y"|"N"|None}]
+    table:   optional name; only its prefix is read (VW_ / FACT_) for a note.
+
+    TUNED ON THE FIRST REAL SCAN (261 tables). A start date plus an active
+    flag and NO end date was rated SCD2 high, which swept in transaction
+    facts carrying EFFECTIVE_DATE beside a VALUATION_DATE, and an
+    inactivation date plus a flag with no start was rated the same. Neither
+    is a versioned row: nothing opens a version in one, nothing closes it in
+    the other. High now needs the window — both ends.
     """
     found: dict[str, list[tuple[str, int, str]]] = defaultdict(list)
     for c in columns:
@@ -179,8 +187,24 @@ def classify(columns: list[dict]) -> dict:
     flag, ver, bdate = has("CURRENT_FLAG", 3), has("VERSION", 4), has("BUSINESS_DATE", 4)
     audit = has("AUDIT", 4)
 
-    if (strong_from and strong_to) or (strong_from and flag) or (strong_to and flag):
+    notes = []
+    if strong_from and strong_to:
         verdict, conf = "SCD2", "high"
+    elif strong_from and flag and bdate:
+        # EFFECTIVE_DATE + ACTIVE_IND beside an as-of date, no end date: the
+        # date is an attribute of the event, the flag a status. Snapshot grain.
+        verdict, conf = "SNAPSHOT", "medium"
+        notes.append(f"{pick['VALID_FROM'][0]} and {pick['CURRENT_FLAG'][0]} beside {pick['BUSINESS_DATE'][0]} with no end date: "
+                     "the date reads as an attribute of the row, the flag as a status; nothing closes a version")
+    elif strong_from and flag:
+        verdict, conf = "SCD2 (probable)", "medium"
+        notes.append(f"no end date: {pick['CURRENT_FLAG'][0]} may be a status rather than a version flag; "
+                     "confirm a closing rule exists before treating rows as versioned")
+    elif strong_to and flag:
+        # an inactivation date and a flag close the ENTITY, not a version
+        verdict, conf = "SCD1", "medium"
+        notes.append(f"{pick['VALID_TO'][0]} and {pick['CURRENT_FLAG'][0]} with no start date close the entity, not a version; "
+                     "overwrite-in-place with a status")
     elif (strong_from or strong_to) and (ver or has("ROW_HASH", 5) or has("CURRENT_FLAG", 2)):
         verdict, conf = "SCD2 (probable)", "medium"
     elif flag and ver:
@@ -203,7 +227,13 @@ def classify(columns: list[dict]) -> dict:
     # On a table that keeps history it is almost always the surrogate (the
     # SEI dbt design merges SCD2 on ACCOUNT_KEY, never the natural key), so
     # on an SCD2 verdict it is accepted by convention and flagged to confirm.
-    notes = []
+    name = (table or "").upper().split(".")[-1]
+    if name.startswith("VW_"):
+        notes.append("a view: it inherits its base table's history columns; profile and card the base table")
+    elif name.startswith("FACT_") and verdict == "SCD2":
+        notes.append("a fact table with a validity window: confirm rows are versioned in place and not effective-dated events")
+    if verdict == "SCD2" and not flag and not has("SURROGATE_KEY", 2):
+        notes.append("window only, no flag and no surrogate: effective-dated reference rows; confirm versions are closed, not merely dated")
     if verdict.startswith("SCD2") and "SURROGATE_KEY" in pick and pick["SURROGATE_KEY"][1] < 2:
         pick["SURROGATE_KEY"] = (pick["SURROGATE_KEY"][0], 2, pick["SURROGATE_KEY"][2])
         notes.append(f"{pick['SURROGATE_KEY'][0]} taken as the surrogate by convention; confirm it is not the natural key")
@@ -328,7 +358,7 @@ ROLE_ORDER = ["SURROGATE_KEY", "VALID_FROM", "VALID_TO", "CURRENT_FLAG", "VERSIO
 def report(tables: dict[str, list[dict]], out_path: str | None) -> list[dict]:
     rows = []
     for t in sorted(tables):
-        r = classify(tables[t])
+        r = classify(tables[t], t)
         rows.append({"table": t, "columns": r["column_count"], "verdict": r["verdict"], "confidence": r["confidence"],
                      **{role.lower(): r["roles"].get(role, "") for role in ROLE_ORDER},
                      "to_convention": r["to_convention"],

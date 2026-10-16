@@ -72,6 +72,23 @@ ok(snap["verdict"] == "SNAPSHOT", "an as-of date with no window is a periodic sn
 scd1 = classify(cols(("ID", "NUMBER", "N"), ("NAME", "VARCHAR2(50)", "Y"), ("UPDATE_TS", "TIMESTAMP", "Y"), ("UPDATED_BY", "VARCHAR2(30)", "Y")))
 ok(scd1["verdict"] == "SCD1", "audit stamps alone are overwrite-in-place", scd1["verdict"])
 
+# tuned on the first real scan: high needs the window, both ends
+half = classify(cols(("ITEM_ID", "NUMBER", "N"), ("EFFECTIVE_DATE", "DATE", "N"), ("ACTIVE_IND", "NUMBER(1)", "N"), ("LOAD_DATE", "DATE", "N")))
+ok(half["verdict"] == "SCD2 (probable)" and half["confidence"] == "medium" and any("no end date" in n for n in half["notes"]),
+   "a start date and a flag with no end date is probable, and the note says the flag may be a status", half)
+fact = classify(cols(("ACCT_KEY", "NUMBER", "N"), ("EFFECTIVE_DATE", "DATE", "N"), ("VALUATION_DATE", "DATE", "N"),
+                     ("ACTIVE_IND", "NUMBER(1)", "N"), ("AMOUNT", "NUMBER", "Y"), ("BATCH_ID", "NUMBER", "N")), "PBDWAPP.FACT_THINGS")
+ok(fact["verdict"] == "SNAPSHOT" and any("attribute of the row" in n for n in fact["notes"]),
+   "an effective date and a flag beside an as-of date, no end date, is snapshot grain, not SCD2", fact)
+closed = classify(cols(("IPS_ID", "NUMBER", "N"), ("INACTIVE_DATE", "DATE", "Y"), ("ACTIVE_IND", "NUMBER(1)", "N"), ("LOAD_DATE", "DATE", "N")))
+ok(closed["verdict"] == "SCD1" and any("close the entity" in n for n in closed["notes"]),
+   "an inactivation date and a flag with no start date close the entity, not a version", closed)
+view = classify(cols(("ACCT_SK", "NUMBER(18)", "N"), ("EFF_START_DT", "DATE", "N"), ("EFF_END_DT", "DATE", "N")), "PBDWAPP.VW_DIM_ACCT")
+ok(view["verdict"] == "SCD2" and any("a view" in n for n in view["notes"]), "a VW_ table is noted as a view of its base table", view["notes"])
+window_only = classify(cols(("RULE_CD", "VARCHAR2(10)", "N"), ("EFF_DATE", "DATE", "N"), ("END_DATE", "DATE", "N"), ("LOAD_DATE", "DATE", "N")))
+ok(window_only["verdict"] == "SCD2" and any("effective-dated reference" in n for n in window_only["notes"]),
+   "a window with no flag and no surrogate is SCD2-shaped reference data, and says so", window_only["notes"])
+
 none = classify(cols(("ID", "NUMBER", "N"), ("DESCRIPTION", "VARCHAR2(50)", "Y"), ("TRADE_DATE", "DATE", "Y")))
 ok(none["verdict"] == "NONE", "nothing that tracks change is NONE", none["verdict"])
 
