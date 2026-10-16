@@ -8,6 +8,10 @@ TRUNCATE_APPEND_HIST = "TRUNCATE_APPEND_HIST"
 SNAPSHOT = "SNAPSHOT"
 SCD1 = "SCD1"
 UNKNOWN = "UNKNOWN"
+# The column scan says SCD2 but the export cut the writer's code before the
+# merge, so the load pattern could not be READ. Distinct from UNKNOWN (no
+# writer at all) because the fix is different: re-export, not investigate.
+SCD2_UNVERIFIED = "SCD2_UNVERIFIED"
 
 
 @dataclass
@@ -20,6 +24,7 @@ class Signals:
     insert_hist_proc: bool = False
     as_of_grain: bool = False
     delete_insert_by_date: bool = False
+    code_truncated: bool = False          # a writer's code was cut by the export before it could be parsed
     notes: list[str] = field(default_factory=list)
 
 
@@ -36,6 +41,10 @@ def classify(sig: Signals, scan_verdict: str | None = None) -> tuple[str, list[s
     elif sig.merge_on_includes_valid_from and not sig.enddate_proc:
         pattern = MERGE_SCD2
         notes.append("merge keys on the validity date but no end-date procedure was found; closing rule UNKNOWN")
+    elif sig.code_truncated and scan_verdict and scan_verdict.upper().startswith("SCD2"):
+        pattern = SCD2_UNVERIFIED
+        notes.append(f"column scan said {scan_verdict}; the writer's code is truncated in the export, so the load "
+                     "pattern was not read — re-export the scenario untruncated to confirm")
     else:
         pattern = UNKNOWN
     if scan_verdict:

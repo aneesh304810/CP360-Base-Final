@@ -51,3 +51,15 @@ def test_reports_render(export, settings, tmp_path):
     wb = load_workbook(p)
     assert wb.sheetnames == ["cards", "rules", "quality", "dup_by_month", "open_questions", "catalog_mapping"]
     assert wb["cards"].max_row == 3 and wb["cards"]["A1"].fill.fgColor.rgb.endswith("10193B")
+
+
+def test_cut_flow_tasks_are_one_open_question_per_scenario(export, settings):
+    """A load plan with many truncated flow tasks is one re-export, not one open question per task."""
+    c = build_card(export, "DIM_ACCOUNT", settings)
+    flow = [q for q in c.open_questions if "flow task(s) cut" in q]
+    assert flow and all(q.count("SCN_") == 1 for q in flow)
+    per_scn = {}
+    for q in flow:
+        per_scn[q.split(" — ")[0]] = per_scn.get(q.split(" — ")[0], 0) + 1
+    assert all(n == 1 for n in per_scn.values()), per_scn
+    assert any("task 50" in q for q in flow)

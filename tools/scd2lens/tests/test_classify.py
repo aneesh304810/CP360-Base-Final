@@ -17,3 +17,13 @@ def test_cards_classify_the_three_fixtures(export, settings):
     c = build_card(export, "DIM_IP_RELATIONSHIP", settings)
     assert c.pattern == TRUNCATE_APPEND_HIST
     assert any("not versioned in place" in n for n in c.notes)
+
+
+def test_scan_stands_in_when_the_writer_code_is_cut():
+    """The real export truncates code_preview, so most SCD2 dimensions parse to nothing. With the scan
+    saying SCD2, that is SCD2_UNVERIFIED and the note says to re-export — not UNKNOWN, which means no writer."""
+    from scd2lens.odi.classify import SCD2_UNVERIFIED
+    p, notes = classify(Signals(code_truncated=True), "SCD2")
+    assert p == SCD2_UNVERIFIED and any("re-export" in n for n in notes)
+    assert classify(Signals(code_truncated=True), "NONE")[0] == UNKNOWN       # the scan does not say SCD2
+    assert classify(Signals(code_truncated=True))[0] == UNKNOWN               # no scan at all

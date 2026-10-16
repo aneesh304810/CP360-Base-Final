@@ -103,12 +103,15 @@ def build_card(ex: OdiExport, table: str, settings: Settings, runtime: dict | No
             sig.insert_hist_proc = True
 
     truncated_flow: list[str] = []
+    cut_by_scenario: dict[str, list[str]] = {}      # scenario -> "step S task T — name" for every cut flow task
     for _, r in all_tasks.iterrows():
         names = " ".join(str(r[k]) for k in ("task_name1", "task_name2", "task_name3")).lower()
         if str(r["task_type"]).upper() in ("C", "J") and is_truncated(str(r["code_preview"]), int(r["code_chars"])):
             ev = f"{evidence(r)} ({int(r['code_chars']):,} chars, preview {len(str(r['code_preview']))})"
             if ev not in truncated:
                 truncated_flow.append(ev)
+            short = evidence(r).split(": ", 1)[-1]
+            cut_by_scenario.setdefault(str(r["scenario"]), []).append(short.split(" ", 1)[-1] if short.startswith(str(r["scenario"])) else short)
         if "truncate target table" in names:
             sig.truncate = True
         if "control append" in names and "merge" not in names:
@@ -116,6 +119,7 @@ def build_card(ex: OdiExport, table: str, settings: Settings, runtime: dict | No
         if re.search(r"_INSERT_HIST", names, re.I):
             sig.insert_hist_proc = True
 
+    sig.code_truncated = bool(truncated or truncated_flow)
     card.pattern, notes = cls.classify(sig, card.scan_verdict)
     card.notes += notes
 
@@ -215,8 +219,14 @@ def build_card(ex: OdiExport, table: str, settings: Settings, runtime: dict | No
     card.quality = q
     card.rules = rules
 
-    for ev in truncated + truncated_flow:
+    # The merge and end-date tasks are named one by one: they are the rules.
+    # The flow tasks are counted PER SCENARIO: a load plan with 300 cut
+    # tasks is one re-export, not 300 open questions.
+    for ev in truncated:
         card.open_questions.append(f"re-export untruncated: {ev}")
+    for scn, tasks_ in cut_by_scenario.items():
+        eg = "; ".join(tasks_[:3]) + (f"; … {len(tasks_) - 3} more" if len(tasks_) > 3 else "")
+        card.open_questions.append(f"re-export untruncated: {scn} — {len(tasks_)} flow task(s) cut by the export ({eg})")
 
     cm = {}
     if card.surrogate_key:

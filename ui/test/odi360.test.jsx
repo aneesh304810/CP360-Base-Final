@@ -59,7 +59,7 @@ ok(/ODI 360/.test(renderToStaticMarkup(<Odi360 t={tLight} />)) && /NO ROWS YET/.
 
 console.log("-- wiring");
 ok(typeof scd2.summary === "function" && typeof scd2.cards === "function" && typeof scd2.card === "function", "the client exposes three calls");
-ok(Object.keys(PATTERN_INFO).length === 5 && Object.keys(CONF_INFO).length === 3, "pattern and confidence vocabularies");
+ok(Object.keys(PATTERN_INFO).length === 6 && PATTERN_INFO.SCD2_UNVERIFIED && Object.keys(CONF_INFO).length === 3, "pattern and confidence vocabularies — six patterns, SCD2_UNVERIFIED for a writer the export cut");
 const APP = fs.readFileSync(path.join(SRC, "App.jsx"), "utf8"), NAV = fs.readFileSync(path.join(SRC, "AppShell.jsx"), "utf8");
 ok(/import Odi360 from "\.\/Odi360\.jsx"/.test(APP) && /odi360: <Odi360 t=\{t\} \/>/.test(APP), "App.jsx routes it");
 ok(/\['odi360', 'ODI 360'/.test(NAV), "AppShell.jsx has the nav entry");

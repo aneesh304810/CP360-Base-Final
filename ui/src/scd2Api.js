@@ -22,6 +22,7 @@ export const PATTERN_INFO = {
   TRUNCATE_APPEND_HIST: { label: 'truncate + history', c: '#e67e22', t: 'reloaded whole each run; history kept by an *_INSERT_HIST procedure, not versioned in place' },
   SNAPSHOT: { label: 'snapshot', c: '#0091bf', t: 'one row per as-of date; history by repetition' },
   SCD1: { label: 'SCD1', c: '#7c3aed', t: 'overwritten in place; no history' },
+  SCD2_UNVERIFIED: { label: 'SCD2 · unverified', c: '#b7791f', t: 'the column scan says SCD2 but the export cut the writer code before the merge — re-export the scenario to confirm' },
   UNKNOWN: { label: 'unknown', c: '#999999', t: 'no writer scenario found in the export' },
 };
 export const CONF_INFO = {

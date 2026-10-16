@@ -18,7 +18,7 @@ from .db import query
 log = logging.getLogger("cp.scd2")
 router = APIRouter(prefix="/scd2", tags=["scd2"])
 
-PATTERN_ORDER = ["MERGE_SCD2", "TRUNCATE_APPEND_HIST", "SNAPSHOT", "SCD1", "UNKNOWN"]
+PATTERN_ORDER = ["MERGE_SCD2", "TRUNCATE_APPEND_HIST", "SNAPSHOT", "SCD1", "SCD2_UNVERIFIED", "UNKNOWN"]
 
 
 def _safe(sql, params=None):
