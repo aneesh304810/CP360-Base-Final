@@ -48,6 +48,13 @@ def _count(s, sep=";"):
     return len([p for p in str(s or "").split(sep) if p.strip()])
 
 
+def _key(x, n, default="-"):
+    """A key column: never NULL. The real export leaves src_type / dst_type /
+    relation blank on some edges and object_type blank on some objects; the
+    row is still worth keeping, and "-" says the export did not say."""
+    return _s(x, n) or default
+
+
 class OdiRepoConnector:
     def __init__(self, odi_dir: str):
         self.odi_dir = odi_dir
@@ -111,12 +118,12 @@ class OdiRepoConnector:
                      "indexes": _s(r["indexes"]), "layer": _s(r["layer"], 60),
                      "writer_count": _count(r["written_by_scenarios"]), "reader_count": _count(r["read_by_scenarios"])}
                     for _, r in ex.table_360.iterrows() if str(r["table"]).strip()]
-        obj_rows = [{"object_type": _s(str(r["object_type"]).upper(), 60), "schema_name": _s(str(r["schema"]).upper() or "-", 128),
+        obj_rows = [{"object_type": _key(str(r["object_type"]).upper(), 60), "schema_name": _key(str(r["schema"]).upper(), 128),
                      "name": _s(r["name"], 200), "on_table": _s(str(r["on_table"]).upper(), 128), "columns": _s(r["columns"]),
                      "used_by": _s(r["used_by"])}
                     for _, r in ex.db_objects.iterrows() if str(r["name"]).strip()]
-        edge_rows = [{"src_type": _s(str(r["src_type"]).upper(), 40), "src": _s(r["src"], 200), "relation": _s(r["relation"], 40),
-                      "dst_type": _s(str(r["dst_type"]).upper(), 40), "dst": _s(r["dst"], 200), "detail": _s(r["detail"], 400) or "-"}
+        edge_rows = [{"src_type": _key(str(r["src_type"]).upper(), 40), "src": _s(r["src"], 200), "relation": _key(r["relation"], 40),
+                      "dst_type": _key(str(r["dst_type"]).upper(), 40), "dst": _s(r["dst"], 200), "detail": _key(r["detail"], 400)}
                      for _, r in ex.lineage_edges.iterrows() if str(r["src"]).strip() and str(r["dst"]).strip()]
         log.info("odi_repo: %s scenarios, %s tasks (%s truncated), %s variables, %s tables, %s objects, %s edges from %s",
                  len(scn_rows), len(task_rows), sum(1 for x in task_rows if x["truncated"] == "Y"), len(var_rows),

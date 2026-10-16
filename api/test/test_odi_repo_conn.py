@@ -53,6 +53,22 @@ ok(n == sum(len(v) for v in ld.rows.values()) and set(ld.rows) == {"odi_scenario
    "load merges every row into the six sql/83 tables and returns the count", (n, sorted(ld.rows)))
 ok(all(len(k) <= 128 for k in tabs) and all(r["detail"] for r in ld.rows["odi_edge"]), "keys fit their columns; an edge's detail is never null (it is in the key)")
 
+# the real export leaves type columns blank on some rows; a key column is never NULL (ORA-01400 on the first run)
+import csv, tempfile  # noqa: E402
+with tempfile.TemporaryDirectory() as d:
+    with open(os.path.join(d, "lineage_edges.csv"), "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f); w.writerow(["src_type", "src", "relation", "dst_type", "dst", "detail"])
+        w.writerow(["", "STG2_X", "", "", "DIM_X", ""]); w.writerow(["TABLE", "", "feeds", "TABLE", "DIM_X", "x"])
+    with open(os.path.join(d, "db_objects.csv"), "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f); w.writerow(["object_type", "schema", "name", "on_table", "columns", "used_by"])
+        w.writerow(["", "", "IDX_X", "DIM_X", "COL", ""])
+    bb = OdiRepoConnector(d).parse()
+    e = bb["edges"]
+    ok(len(e) == 1 and e[0]["src_type"] == "-" and e[0]["relation"] == "-" and e[0]["dst_type"] == "-" and e[0]["detail"] == "-",
+       "blank edge types, relation and detail become '-' rather than NULL; an edge with no src is dropped", e)
+    ok(bb["objects"][0]["object_type"] == "-" and bb["objects"][0]["schema_name"] == "-", "a blank object type or schema becomes '-'", bb["objects"])
+    ld2 = FakeLoader(); c.load(ld2, bb)   # the FakeLoader asserts every key column is non-null
+
 missing = OdiRepoConnector(os.path.join(FIX, "nope")).parse()
 ok(len(missing["missing"]) >= 6 and missing["scenarios"] == [] and missing["tasks"] == [], "an absent export is all-missing and loads nothing, without raising", missing["missing"])
 
