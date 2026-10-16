@@ -1,4 +1,29 @@
-# SCD2 rule cards · ODI 360
+# ODI 360 · the repository and the SCD2 rule cards
+
+ODI 360 sits under **Catalog**. Six tabs: Overview, Processes, Tables &
+mapping, Variables, Objects — the ODI repository export as the hub holds
+it — and SCD2 rule cards, the dimensions that keep history, checked
+against the warehouse.
+
+## The repository (step `odi_repo`, sql/83)
+
+| Piece | Where | What it does |
+|---|---|---|
+| ingestion | `ingestion/odi_repo_conn.py` · `sql/83_odi_repo.sql` | lands the export's six CSVs as `odi_scenario`, `odi_task`, `odi_variable`, `odi_table`, `odi_object`, `odi_edge` |
+| API | `api/app/routers_odi.py` | `/odi/summary`, `/odi/scenarios`, `/odi/scenario/{name}`, `/odi/tables`, `/odi/table/{name}`, `/odi/variables`, `/odi/objects`, `/odi/edges` |
+| screen | `ui/src/OdiRepoTabs.jsx` | a scenario step by step with each task's code as the export cut it; a table with its sources, writers, readers, edges and objects, linked to its rule card |
+
+```
+sqlplus ... @sql/83_odi_repo.sql                  # once
+$env:CP_ODI_DIR = "local-data/odi_export"         # the export CSVs (never committed)
+python -m ingestion.run odi_repo
+```
+
+A task whose code the export cut is marked TRUNCATED and the Overview
+counts them. The scenario XML files hold the full code; re-export the
+writer scenarios of the SCD2 dimensions first.
+
+## The SCD2 rule cards (step `scd2`, sql/81)
 
 Three tools and one ingestion step turn the old warehouse's history
 mechanics into cards a screen can show.
@@ -19,6 +44,7 @@ sqlplus ... @sql/81_scd2_rules.sql                 # once
 $env:CP_ODI_DIR = "local-data/odi_export"          # the ODI export CSVs (never committed)
 $env:CP_SCD2_COLUMNS_CSV = "local-data/pbdw_columns.csv"   # optional: table,column,type,nullable for the scan
 $env:CP_SCD2_WITH_DB = "1"                         # optional: profile against the warehouse
+$env:CP_SCD2_PARTITIONS = "DIM_ACCOUNT=MASTER_IND"  # default; the sub-population column per table when the code that proves it is cut
 $env:PBDW_DSN = ...; $env:PBDW_USER = ...; $env:PBDW_PASSWORD = ...
 $env:ORACLE_CLIENT_LIB = "C:\oracle\instantclient_23_8"    # when the listener requires native encryption
 python -m ingestion.run scd2

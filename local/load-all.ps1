@@ -68,6 +68,7 @@ $env:CP_ODI_DIR          = Join-Path $Root "local-data\odi_export"
 # $env:CP_SCD2_COLUMNS_CSV = Join-Path $Root "local-data\pbdw_columns.csv"  # optional: without it the
                                                                           # inventory is read from the warehouse
 $env:CP_SCD2_WITH_DB     = "1"             # profile against the warehouse; unset for ODI rules only
+# $env:CP_SCD2_PARTITIONS = "DIM_ACCOUNT=MASTER_IND"   # the default; add TABLE=COLUMN pairs for other split dimensions
 # The PBDW listener requires Native Network Encryption, which only thick
 # mode can do, and python-oracledb fixes thin or thick at the FIRST
 # connection of the process. Set here, before ingestion.run opens the

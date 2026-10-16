@@ -1,6 +1,10 @@
 // ODI 360 — what the ODI repository says the warehouse loads do.
 //
-// First tab: SCD2. One card per dimension that keeps history, written by
+// Six tabs. Overview, Processes, Tables & mapping, Variables and Objects
+// read the repository export itself (sql/83, OdiRepoTabs.jsx). The last,
+// SCD2 rule cards, is below.
+//
+// SCD2 tab: One card per dimension that keeps history, written by
 // the scd2 ingestion from the ODI export and, when it ran with the
 // database, the read-only profile. The screen never invents a card: an
 // empty estate says to run the ingestion.
@@ -11,8 +15,9 @@
 // and the open questions say exactly which task.
 import React, { useEffect, useState } from "react";
 import { CONF_INFO, PATTERN_INFO, scd2 } from "./scd2Api.js";
+import { RepoTabs } from "./OdiRepoTabs.jsx";
 
-const TABS = [["scd2", "SCD2 rule cards"]];
+export const TABS = [["overview", "Overview"], ["proc", "Processes"], ["tables", "Tables & mapping"], ["vars", "Variables"], ["objs", "Objects"], ["scd2", "SCD2 rule cards"]];
 
 function Chip({ c, children, title }) {
   return <span title={title} style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: .4, color: c, border: `1px solid ${c}`,
@@ -199,7 +204,7 @@ export function Scd2Tab({ t, summary, cards, detail, onOpen, onClose }) {
 }
 
 export default function Odi360({ t }) {
-  const [tab, setTab] = useState("scd2");
+  const [tab, setTab] = useState("overview");
   const [summary, setSummary] = useState(null);
   const [cards, setCards] = useState([]);
   const [detail, setDetail] = useState(null);
@@ -213,6 +218,8 @@ export default function Odi360({ t }) {
     if (detail && detail.table === table) return setDetail(null);
     scd2.card(table).then((d) => setDetail(d));
   };
+  // a table on the mapping tab links across to its rule card
+  const openScd2 = (table) => { setTab("scd2"); scd2.card(table).then((d) => setDetail(d)); };
   return (
     <div style={{ padding: "20px 24px 60px", maxWidth: 1260 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
@@ -222,7 +229,8 @@ export default function Odi360({ t }) {
           {summary && summary.loaded ? "● LOADED" : "○ NO ROWS YET"}</span>
       </div>
       <div style={{ fontSize: 13, color: t.sub, maxWidth: "80ch", lineHeight: 1.6, margin: "4px 0 14px" }}>
-        What the ODI repository says the warehouse loads do, read from the export and checked against the warehouse.
+        What the ODI repository says the warehouse loads do: every scenario step by step, every table with who writes and reads it,
+        the variables and database objects they lean on, and for the dimensions that keep history, a rule card checked against the warehouse.
         A rule is <b style={{ color: CONF_INFO.PROVEN.c }}>proven</b> when the code says it, <b style={{ color: CONF_INFO.INFERRED.c }}>inferred</b> when the data
         points to it, and <b style={{ color: CONF_INFO.UNKNOWN_TRUNCATED.c }}>truncated</b> when the export cut the code before the rule.
         A named reviewer then <b style={{ color: t.success }}>confirms</b> it, or rejects it with a reason; the two are shown side by side and never merged.
@@ -233,6 +241,7 @@ export default function Odi360({ t }) {
             cursor: "pointer", border: `1px solid ${tab === k ? t.accent : t.border}`, borderRadius: i === 0 ? "4px 0 0 4px" : 0,
             background: tab === k ? t.accent : t.panel, color: tab === k ? "#fff" : t.text }}>{l}</button>))}
       </div>
+      {tab !== "scd2" && <RepoTabs t={t} tab={tab} onScd2={openScd2} />}
       {tab === "scd2" && <Scd2Tab t={t} summary={summary} cards={cards} detail={detail} onOpen={open} onClose={() => setDetail(null)} />}
     </div>);
 }

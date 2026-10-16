@@ -126,6 +126,14 @@ class Scd2Connector:
         scan_rows = self.ensure_scan()
         settings = Settings(schema=self.schema)
         settings.odi_dir = self.odi_dir
+        # CP_SCD2_PARTITIONS="DIM_ACCOUNT=MASTER_IND,DIM_X=REGION_CD": the sub-population column per
+        # table, for when the end-date procedures that would prove it are truncated in the export.
+        parts = {}
+        for pair in (os.environ.get("CP_SCD2_PARTITIONS") or "DIM_ACCOUNT=MASTER_IND").split(","):
+            if "=" in pair:
+                k, v = pair.split("=", 1)
+                parts[k.strip().upper()] = v.strip().upper()
+        settings.partitions = parts
         ex = load_export(self.odi_dir)
         if self.tables:
             tables = self.tables

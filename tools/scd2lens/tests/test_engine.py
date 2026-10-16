@@ -26,7 +26,7 @@ def test_dim_account_card_offline(export, settings):
     assert "SCN_DIM_ACCOUNT step 14 task 10" in ev and "PRC_ACCOUNT_EDM_END_DATE" in ev and "task 420" in ev
     assert any("task 50" in q for q in c.open_questions), c.open_questions
     assert c.catalog_mapping["ACCOUNT_KEY"] == "ENTITY_SK" and c.catalog_mapping["ACCOUNT_NUMBER"] == "BUSINESS_KEY"
-    assert c.catalog_mapping["ACTIVE_IND"] == "IS_CURRENT (unreliable)" and c.catalog_mapping["END_DATE"] == "VALID_TO_TS"
+    assert c.catalog_mapping["ACTIVE_IND"] == "IS_CURRENT (unreliable)" and c.catalog_mapping["END_DATE"] == "VALID_TO_TS (NULL = open)"
 
 
 def test_runtime_evidence_adds_inferred_rule(export, settings):
@@ -63,3 +63,18 @@ def test_cut_flow_tasks_are_one_open_question_per_scenario(export, settings):
         per_scn[q.split(" — ")[0]] = per_scn.get(q.split(" — ")[0], 0) + 1
     assert all(n == 1 for n in per_scn.values()), per_scn
     assert any("task 50" in q for q in flow)
+
+
+def test_declared_partition_when_code_is_cut_and_notes_answer_the_scan(export, settings):
+    """DIM_ACCOUNT's MASTER_IND comes from the end-date procedures when they parse. When they are cut,
+    config declares it; the note says so. And the merge keys settle the scan's surrogate question and
+    the open-row convention."""
+    from scd2lens.config import Settings
+    c = build_card(export, "DIM_ACCOUNT", settings)
+    assert c.partition and c.partition.column == "MASTER_IND" and c.partition.values           # read from code here
+    assert any("ACCOUNT_KEY confirmed as the surrogate" in n and "ACCOUNT_NUMBER" in n for n in c.notes)
+    assert any("open row = END_DATE IS NULL" in n for n in c.notes) and c.catalog_mapping["END_DATE"] == "VALID_TO_TS (NULL = open)"
+    s2 = Settings(); s2.odi_dir = settings.odi_dir; s2.partitions = {"DIM_SECURITY": "ISSUER_TYPE"}
+    d = build_card(export, "DIM_SECURITY", s2)
+    assert d.partition and d.partition.column == "ISSUER_TYPE" and d.partition.values == {}
+    assert any("declared in config, not read from code" in n for n in d.notes)

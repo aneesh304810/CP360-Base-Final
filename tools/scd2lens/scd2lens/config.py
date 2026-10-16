@@ -24,6 +24,12 @@ class Settings(BaseModel):
     db_sample_since: str | None = None
     freshness_alert_days: int = 10
     tables: str | list[str] = "auto"
+    # Sub-population column per table, declared when the code that would
+    # prove it is truncated in the export: {"DIM_ACCOUNT": "MASTER_IND"}.
+    # Regular and master accounts share DIM_ACCOUNT and get their versions
+    # from separate scenarios, so a version number partitioned on the
+    # natural key alone merges two histories.
+    partitions: dict[str, str] = {}
 
     model_config = {"populate_by_name": True}
 

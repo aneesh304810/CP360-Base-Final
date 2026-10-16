@@ -145,6 +145,19 @@ def build_card(ex: OdiExport, table: str, settings: Settings, runtime: dict | No
         if len(vals) > 1 or col == "MASTER_IND":
             card.partition = Partition(column=col, values=vals)
             break
+    declared = {k.upper(): v.upper() for k, v in (settings.partitions or {}).items()}
+    if card.partition is None and t in declared:
+        card.partition = Partition(column=declared[t], values={})
+        card.notes.append(f"sub-population column {declared[t]} declared in config, not read from code "
+                          "(the end-date procedures are truncated in the export); versions are partitioned by it")
+    elif card.partition is not None and t in declared and card.partition.column != declared[t]:
+        card.notes.append(f"config declares {declared[t]} as the sub-population column but the code shows {card.partition.column}; the code wins")
+    # the surrogate question the column scan leaves open is answered by the merge keys
+    if card.surrogate_key and card.natural_key and card.surrogate_key not in [k.upper() for k in card.natural_key]:
+        card.notes.append(f"{card.surrogate_key} confirmed as the surrogate: the merge joins on {', '.join(card.natural_key)}, not on it")
+    # the open-row convention: the code outranks the scan's nullability reading
+    if any(ep.end_is_null for ep, _ in enddates):
+        card.notes.append(f"open row = {valid_to} IS NULL, read from the end-date procedure; the scan's nullability reading does not apply")
 
     rules: list[Rule] = []
     n = 0
@@ -234,7 +247,7 @@ def build_card(ex: OdiExport, table: str, settings: Settings, runtime: dict | No
     for k in card.natural_key:
         cm[k] = "BUSINESS_KEY"
     cm[valid_from] = "VALID_FROM_TS"
-    cm[valid_to] = "VALID_TO_TS"
+    cm[valid_to] = "VALID_TO_TS (NULL = open)" if any(ep.end_is_null for ep, _ in enddates) else "VALID_TO_TS"
     if (scan.get("current_flag") or "").upper():
         cm[scan["current_flag"].upper()] = "IS_CURRENT (unreliable)" if enddates and not enddates[0][0].sets_active_ind else "IS_CURRENT"
     if (scan.get("audit") or "").upper():

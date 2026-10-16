@@ -14,6 +14,7 @@ const NAV_GROUPS = [
  ['api', 'API 360', '\u25C8'],
  ['data', 'Data 360', '\u25A4'],
  ['datapoint', 'Datapoint 360', '\u25C9'],
+ ['odi360', 'ODI 360', '\u27F2'],
  ] },
  { group: 'Lineage', items: [
  ['lineage', 'Lineage', '\u{1F9EC}'],
@@ -54,7 +55,6 @@ const NAV_GROUPS = [
  items: [
  ['system', 'System Design', '⛬'],
  ['devops360', 'DevOps 360', '⚙'],
- ['odi360', 'ODI 360', '⟲'],
  ]
 },
 ];

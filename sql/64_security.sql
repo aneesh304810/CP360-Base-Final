@@ -122,6 +122,7 @@ MERGE INTO sec_module t USING (SELECT 'home' k, 'Home' n, NULL g,
   UNION ALL SELECT 'api','API 360','Catalog','API inventory, specifications and consumers','N',11 FROM dual
   UNION ALL SELECT 'data','Data 360','Catalog','Tables, columns and the graph between them','N',12 FROM dual
   UNION ALL SELECT 'datapoint','Datapoint 360','Catalog','Business data points and their definitions','N',13 FROM dual
+  UNION ALL SELECT 'odi360','ODI 360','Catalog','The ODI repository: scenarios, tasks, table mappings, variables and SCD2 rule cards','N',14 FROM dual
   UNION ALL SELECT 'lineage','Lineage','Lineage','End-to-end lineage, business and technical','N',20 FROM dual
   UNION ALL SELECT 'event360','Event 360','Events','The event contract, subscriptions and cost','N',30 FROM dual
   UNION ALL SELECT 'mapper','Auto Mapper','Utilities','Suggested mappings between sources and targets','N',40 FROM dual

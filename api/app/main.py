@@ -63,6 +63,7 @@ for _mod in (
         "routers_env_infra",
         "routers_event360",
         "routers_scd2",
+        "routers_odi",
 
         # Legacy routers
         "routers_legacy_lineage",
