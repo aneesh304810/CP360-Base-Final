@@ -1,4 +1,5 @@
-// The 108 architecture-review questions, as data.
+// The 108 architecture-review questions, as data — plus the two that
+// arrived by email afterwards (109, 110), kept here for the same reason.
 //
 // WHY A FILE AND NOT A TABLE SEED. These came from a review, not from
 // the app, and they are the starting corpus rather than user content —
@@ -23,9 +24,12 @@ export const OWNERS = {
   GM: { name: "Ganender Middha", focus: "Ingestion framework, SLAs, retention, DR, go-live" },
   SA: { name: "Sudhakar Annam", focus: "OpenShift storage, concurrency, observability" },
   KK: { name: "Kartheek Kollipara", focus: "Platform support, upskilling, threshold controls" },
+  // Not a review owner: raised by email in 2026-10, after the review, and
+  // numbered on from 108 so the meeting can refer to them the same way.
+  PB: { name: "Pavel Bredus", focus: "Quarantine and totals, validation scope and cost of the SEI proposal" },
 };
 
-export const OWNER_TOTALS = {"KB": 42, "GL": 29, "GM": 20, "SA": 12, "KK": 5};
+export const OWNER_TOTALS = {"KB": 42, "GL": 29, "GM": 20, "SA": 12, "KK": 5, "PB": 2};
 
 export const TOPICS = [
   { no: 1, title: "SEI Data Structure / Enriched Data", comps: ["15", "40", "37"] },
@@ -156,6 +160,9 @@ export const QUESTIONS = [
   { n: 106, topic: 17, owner: "GM", body: "How are schema changes deployed safely?", comps: ["60", "59"] },
   { n: 107, topic: 17, owner: "GL", body: "Rollback and cutover: Rolling back the software doesn't undo Gold data already committed by a bad release. Provide a tested data compensation/restore process and evidence of ODI-to-dbt record and value parity.", comps: ["59", "63", "16"] },
   { n: 108, topic: 17, owner: "GM", body: "What are the measurable go-live acceptance criteria?", comps: ["57", "30"] },
+  // ---- raised by email, 2026-10 (Pavel Bredus) ------------------------
+  { n: 109, topic: 8, owner: "PB", body: "Quarantined records: if a transaction with a missing payee name is excluded from the load, the funds-available total for that account is wrong. SWP uses the same approach today. How does the design stop quarantined records from producing incorrect totals?", comps: ["23", "25", "28", "16"], note: "raised by email, 2026-10" },
+  { n: 110, topic: 5, owner: "PB", body: "Platform data should be gold-plated so downstream consumers need not validate it. SEI proposes redundant business validation on the PB and IMDS ingest, with new tools and Exadata; for intra-company data only technical validation is needed. Why not extract into the same file format and reuse the current processing, instead of adding cost and complexity?", comps: ["6", "23", "40", "16"], note: "raised by email, 2026-10" },
 ];
 
 // Resolved from the topic unless the question overrides it.

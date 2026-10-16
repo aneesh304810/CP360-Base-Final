@@ -330,7 +330,7 @@ export default function HubDiscussion({ t, onOpenComponent, onBack, me }) {
 
   // ---- Export -------------------------------------------------------
   //
-  // EXPORTS WHAT IS ON SCREEN, AND SAYS SO. Exporting all 108 when the
+  // EXPORTS WHAT IS ON SCREEN, AND SAYS SO. Exporting all 110 when the
   // reader has filtered to one owner surprises them in a meeting; a
   // 12-question file that reads as the whole review is worse. The filter
   // is carried into the file's own header.

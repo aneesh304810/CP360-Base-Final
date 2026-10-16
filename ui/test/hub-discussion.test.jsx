@@ -72,11 +72,12 @@ const DISC = strip("ui/src/HubDiscussion.jsx");
 const UI_SRC = DISC;
 
 // ---- the corpus matches the review's own published totals -----------
-ok(QUESTIONS.length === 108, "all 108 questions are present", QUESTIONS.length);
+// 108 from the review, plus 109 and 110 raised by email afterwards.
+ok(QUESTIONS.length === 110, "all 110 questions are present", QUESTIONS.length);
 ok(TOPICS.length === 17, "in 17 topic groups", TOPICS.length);
 const nums = QUESTIONS.map((q) => q.n);
 ok(nums.every((n, i) => n === i + 1),
-   "numbered 1..108 with no gaps — the numbers are how people refer to "
+   "numbered 1..110 with no gaps — the numbers are how people refer to "
    + "them in the meeting", nums.filter((n, i) => n !== i + 1).slice(0, 5));
 const derived = {};
 QUESTIONS.forEach((q) => { derived[q.owner] = (derived[q.owner] || 0) + 1; });
@@ -85,8 +86,8 @@ for (const [k, n] of Object.entries(OWNER_TOTALS)) {
      `${OWNERS[k].name}: the summary says ${n} and the rows give ${derived[k]}`,
      `${derived[k]} vs ${n}`);
 }
-ok(Object.values(derived).reduce((a, b) => a + b, 0) === 108,
-   "and they add to 108 — re-assign a question without updating the "
+ok(Object.values(derived).reduce((a, b) => a + b, 0) === 110,
+   "and they add to 110 — re-assign a question without updating the "
    + "summary and this fails rather than the screen disagreeing with the "
    + "document in everyone's inbox", "");
 ok(QUESTIONS.every((q) => compsFor(q).length > 0),
@@ -534,7 +535,7 @@ for (const [tn, t] of [["light", tLight], ["dark", tDark]]) {
   ok(h.length > 2000, `renders in ${tn}`, h.length);
   ok(!/NaN|undefined|\[object Object\]/.test(h), `clean in ${tn}`,
      (h.match(/.{0,50}(NaN|undefined).{0,30}/) || [])[0]);
-  ok(/108/.test(h) && /Kelley Barnhardt/.test(h),
+  ok(/110/.test(h) && /Kelley Barnhardt/.test(h) && /Pavel Bredus/.test(h),
      `the corpus reaches the screen in ${tn}`, "");
 }
 const html = renderToStaticMarkup(<HubDiscussion t={tLight} />);
@@ -641,7 +642,7 @@ if (fs.existsSync(CORPUS)) {
        .every((a) => (aById.get(a.n) || {}).quote),
      "a document answer keeps its quote through the export — the rule has "
      + "to survive the hop into Oracle, not just hold in the bundle", "");
-  ok(c.topics.length === TOPICS.length && c.owners.length === 5,
+  ok(c.topics.length === TOPICS.length && c.owners.length === Object.keys(OWNERS).length,
      "topics and owners are exported too, so the screen does not read "
      + "questions from the database and their grouping from the bundle",
      `${c.topics.length}/${c.owners.length}`);
@@ -752,7 +753,7 @@ if (fs.existsSync(DOC)) {
         if (cells.length < 4) return;              // questions are column 2
         (cells[2].match(/\b\d{1,3}\b/g) || []).forEach((n) => {
           const v = Number(n);
-          if (v >= 1 && v <= 108) set.add(v);
+          if (v >= 1 && v <= 110) set.add(v);
         });
       });
     return set;

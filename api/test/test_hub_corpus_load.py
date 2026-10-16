@@ -57,17 +57,17 @@ for frag in (":conf", ":gap", ":quote", ":fig", ":ev", ":is_draft"):
 
 # ---- the exported corpus matches what the MERGEs bind ---------------
 corpus = read_corpus(DEFAULT_FILE)
-ok(len(corpus["questions"]) == 108, "the export carries all 108 questions",
+ok(len(corpus["questions"]) == 110, "the export carries all 110 questions",
    len(corpus["questions"]))
-ok(len(corpus["topics"]) == 17 and len(corpus["owners"]) == 5,
+ok(len(corpus["topics"]) == 17 and len(corpus["owners"]) == 6,
    "with their topics and owners — otherwise the screen reads questions "
    "from the database and their grouping from the bundle",
    f'{len(corpus["topics"])}/{len(corpus["owners"])}')
 ok(all(q_["body"] and q_["comps"] for q_ in corpus["questions"]),
    "every exported question has a body and at least one component link",
    [q_["qid"] for q_ in corpus["questions"] if not (q_["body"] and q_["comps"])][:5])
-ok(sum(o["declared_total"] or 0 for o in corpus["owners"]) == 108,
-   "and the owners' declared totals still add to 108",
+ok(sum(o["declared_total"] or 0 for o in corpus["owners"]) == 110,
+   "and the owners' declared totals still add to 110",
    sum(o["declared_total"] or 0 for o in corpus["owners"]))
 ok(all(a_["conf"] and a_["body"] for a_ in corpus["answers"]),
    "every exported answer carries its evidence class",

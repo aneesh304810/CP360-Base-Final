@@ -1901,6 +1901,95 @@ export const SEED_ANSWERS = [
 + "one-eighth of production CPU (question 86), so a UAT timing is not "
 + "evidence for a production SLA.",
   ev: ["guardrail_gate_run (sql/67)", "Recon 360", "Variance 360"] },
+// ---- raised by email, 2026-10 (Pavel Bredus) ------------------------
+// Two questions put to BBH after the review, answered from the same
+// material as 32, 34 and 38 and from the crosswalk's lane model. They
+// are drafts like every other entry here: the reply that goes back by
+// email is a person's, once one of these is accepted.
+
+{ n: 109, conf: "document", fig: "dqstore",
+  body:
+"The design holds and replays; it never drops a record and never fakes "
++ "the total. A record that fails a check is written to "
++ "DQ_VALIDATION_FAILURE at the layer that caught it, carries "
++ "resolution_status OPEN → RESOLVED / CLOSED, and is re-derived from INT "
++ "once the cause is resolved (answers 32 and 33). The reconciliation "
++ "identity at the INT → FACT boundary is: eligible INT rows = FACT rows "
++ "loaded + OPEN rows in the DQ store — so a transaction missing from FACT "
++ "is accounted for, and a report reading FACT plus the DQ store adds back "
++ "to the input (answer 34). Nothing is loaded on a placeholder key to keep "
++ "a count up.\n\n"
++ "Whether the payee-name example reaches that store at all depends on "
++ "which kind of rule it is. A missing payee name is an attribute fault, "
++ "not a structural one: it does not stop the amount posting, so the right "
++ "treatment is to ANNOTATE the row (fail reason recorded, row loaded) "
++ "rather than hold it. Only a file that fails header, trailer or shape "
++ "checks is quarantined, and that happens before anything is written to "
++ "RAW — the whole file, never a row.\n\n"
++ "So the funds-available total is wrong only if a rule that should "
++ "annotate is written to block. That is a rule-inventory decision, not a "
++ "property of the design — and it is the same decision SWP made the other "
++ "way today.",
+  gap:
+"Three things the design does not yet settle, each already recorded "
++ "against an earlier question. No per-business-date “FACT is complete” "
++ "signal is published, so a consumer reading FACT while rows sit OPEN "
++ "cannot tell (answer 34). There is no inventory saying which rule blocks "
++ "and which annotates, per interface — payee name is exactly the case that "
++ "inventory has to decide (answer 38). And anything still OPEN at the "
++ "seven-day edge is CLOSED and alerted, with no named owner for the alert "
++ "(answer 32).\n\n"
++ "Until the inventory exists, the honest reply to “will this produce "
++ "incorrect totals” is: only if we write the rules that way, and we have "
++ "not written them yet.",
+  quote: "No record that fails a DQ check proceeds to the next layer: "
+       + "failures are held in the DQ store and replayed once resolvable — "
+       + "never silently dropped and never loaded with placeholder keys.",
+  ev: ["dbt design doc §3.2 — Design Principles (p.8)",
+       "dbt design doc §7.1 — Capture and Publishing (p.17)",
+       "dbt design doc §7.2 — Reconciliation Boundaries (p.18)",
+       "ingest design §4 (p.7) · Appendix B.2 (p.20) — a header or trailer failure quarantines the file before RAW",
+       "Hub Discussion answers 32, 34 and 38"] },
+
+{ n: 110, conf: "codebase",
+  body:
+"Largely agreed — and most of it is already how the Hub is built. The "
++ "crosswalk's lane model treats SEI as the replacement for an incumbent "
++ "lane (ADDVANTAGE → PBDW, STAR → IMDS), and SEI lands in the shape the "
++ "incumbent already delivers; the existing pipeline carries it from there. "
++ "SEI never gets a lineage chain of its own, and SEI_SOURCE_MAP maps each "
++ "contract field once. That IS “extract into the same file format and "
++ "reuse the current processing”, and it is the position every Crosswalk "
++ "360 verdict is computed against.\n\n"
++ "Where the two views differ is narrower than the email suggests. "
++ "Validation at the provider boundary is not redundant: Contract DQ (does "
++ "the file match the agreed contract — shape, types, header and trailer, "
++ "record count) and Source DQ (is the record well-formed) are the "
++ "technical checks the email itself asks for, and they are the only ones "
++ "that run before RAW. Business validation — the rules that live in the "
++ "PBDW and IMDS loads today — stays where it is when the file shape is "
++ "reused, so there is no second copy to build or pay for.\n\n"
++ "Exadata is a separate decision from validation. In the design documents "
++ "it is the Stage 3 Pre-Gold tier — dimensions, facts and control totals "
++ "— not a validation engine, and the case for it rests on the size of the "
++ "warehouse build, not on the volume of SEI's checks.",
+  gap:
+"Two things the codebase does not settle. First, whether SEI's proposed "
++ "“business validation on ingest” is new rules or a restatement of the "
++ "Source DQ flag — the design document gives the machinery and no rule "
++ "list (answer 38), so nobody can yet say which of SEI's checks duplicates "
++ "a check the PBDW or IMDS load already performs. Second, the Exadata case "
++ "is argued from tier, not from measured volume; until a real "
++ "business-date volume for the Pre-Gold build is in hand, “needed” and "
++ "“gold-plated” are both opinions.\n\n"
++ "The cost point therefore reduces to one ask of SEI: list the proposed "
++ "ingest validations by interface, each marked blocking or annotating, so "
++ "BBH can strike the ones the incumbent load already performs.",
+  ev: ["sql/51_sei_crosswalk.sql — the lane model: SEI lands in the incumbent's shape and the existing pipeline carries it",
+       "Crosswalk 360 — lane states and the SEI_SOURCE_MAP verdicts",
+       "Design docs — Stage 3 Pre-Gold on Exadata (tier table; findings R1 and R2)",
+       "ingest design §4 (p.7) — header, trailer and contract checks run before RAW",
+       "Hub Discussion answer 38 — no rule inventory per interface"] },
 ];
 
 export const seedFor = (n) => SEED_ANSWERS.find((s) => s.n === n) || null;

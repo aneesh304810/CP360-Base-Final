@@ -292,7 +292,7 @@ python -m ingestion.run
 
 ## Hub Discussion — putting the corpus in the database
 
-The 108 review questions, their topics and owners, and the drafted answers
+The 110 review questions (108 from the review, two raised by email), their topics and owners, and the drafted answers
 are rows in Oracle. The copy in the UI bundle is a cold start only: if the
 API is unreachable or the loader has not run, the screen renders the shipped
 corpus read-only and says **bundled copy** rather than **from the database**.

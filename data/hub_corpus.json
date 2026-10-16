@@ -30,6 +30,12 @@
    "name": "Kartheek Kollipara",
    "focus": "Platform support, upskilling, threshold controls",
    "declared_total": 5
+  },
+  {
+   "owner_code": "PB",
+   "name": "Pavel Bredus",
+   "focus": "Quarantine and totals, validation scope and cost of the SEI proposal",
+   "declared_total": 2
   }
  ],
  "topics": [
@@ -1216,6 +1222,26 @@
    "body": "What are the measurable go-live acceptance criteria?",
    "comps": "57,30",
    "note": null
+  },
+  {
+   "qid": 109,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 8,
+   "owner_code": "PB",
+   "body": "Quarantined records: if a transaction with a missing payee name is excluded from the load, the funds-available total for that account is wrong. SWP uses the same approach today. How does the design stop quarantined records from producing incorrect totals?",
+   "comps": "23,25,28,16",
+   "note": "raised by email, 2026-10"
+  },
+  {
+   "qid": 110,
+   "source": "review",
+   "seeded": "Y",
+   "topic": 5,
+   "owner_code": "PB",
+   "body": "Platform data should be gold-plated so downstream consumers need not validate it. SEI proposes redundant business validation on the PB and IMDS ingest, with new tools and Exadata; for intra-company data only technical validation is needed. Why not extract into the same file format and reuse the current processing, instead of adding cost and complexity?",
+   "comps": "6,23,40,16",
+   "note": "raised by email, 2026-10"
   }
  ],
  "answers": [
@@ -2327,7 +2353,7 @@
   {
    "answer_id": "seed106",
    "qid": 106,
-   "body": "Liquibase, running as its own pipeline on its own cadence rather than inside the application build — which is the main structural decision and is already made.\n\nguardrail_changeset records, per change: the author, the filename, a description, the change type, WHETHER A ROLLBACK IS DECLARED, WHETHER IT IS DATA-SAFE, the release and build that carried it, its labels and contexts, and its position in the changelog.\n\nguardrail_changeset_applied records where it actually landed: environment, tag, applied-at, exec type and CHECKSUM.\n\nThe checksum is the safety property that matters most here. A changeset whose checksum differs between two environments has been edited after it was applied somewhere — Liquibase will refuse it, and Compare shows it before the pipeline gets there. Compare also shows, for any two environments, exactly which changesets one is ahead by and what risk each one carries.",
+   "body": "Liquibase, running as the first stage of each application's own build, from a db/changelog in the application's repo, rather than as a separate pipeline — the structural decision, now settled: every application owns its schema changes beside its code, with its own changelog table on the database.\n\nguardrail_changeset records, per change: the author, the filename, a description, the change type, WHETHER A ROLLBACK IS DECLARED, WHETHER IT IS DATA-SAFE, the release and build that carried it, its labels and contexts, and its position in the changelog.\n\nguardrail_changeset_applied records where it actually landed: environment, tag, applied-at, exec type and CHECKSUM.\n\nThe checksum is the safety property that matters most here. A changeset whose checksum differs between two environments has been edited after it was applied somewhere — Liquibase will refuse it, and Compare shows it before the pipeline gets there. Compare also shows, for any two environments, exactly which changesets one is ahead by and what risk each one carries.",
    "author": "CP360 · drafted from the codebase",
    "is_draft": "Y",
    "conf": "codebase",
@@ -2362,6 +2388,32 @@
    "sei_ask": null,
    "fig": null,
    "ev": "guardrail_gate_run (sql/67) | Recon 360 | Variance 360"
+  },
+  {
+   "answer_id": "seed109",
+   "qid": 109,
+   "body": "The design holds and replays; it never drops a record and never fakes the total. A record that fails a check is written to DQ_VALIDATION_FAILURE at the layer that caught it, carries resolution_status OPEN → RESOLVED / CLOSED, and is re-derived from INT once the cause is resolved (answers 32 and 33). The reconciliation identity at the INT → FACT boundary is: eligible INT rows = FACT rows loaded + OPEN rows in the DQ store — so a transaction missing from FACT is accounted for, and a report reading FACT plus the DQ store adds back to the input (answer 34). Nothing is loaded on a placeholder key to keep a count up.\n\nWhether the payee-name example reaches that store at all depends on which kind of rule it is. A missing payee name is an attribute fault, not a structural one: it does not stop the amount posting, so the right treatment is to ANNOTATE the row (fail reason recorded, row loaded) rather than hold it. Only a file that fails header, trailer or shape checks is quarantined, and that happens before anything is written to RAW — the whole file, never a row.\n\nSo the funds-available total is wrong only if a rule that should annotate is written to block. That is a rule-inventory decision, not a property of the design — and it is the same decision SWP made the other way today.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "document",
+   "gap": "Three things the design does not yet settle, each already recorded against an earlier question. No per-business-date “FACT is complete” signal is published, so a consumer reading FACT while rows sit OPEN cannot tell (answer 34). There is no inventory saying which rule blocks and which annotates, per interface — payee name is exactly the case that inventory has to decide (answer 38). And anything still OPEN at the seven-day edge is CLOSED and alerted, with no named owner for the alert (answer 32).\n\nUntil the inventory exists, the honest reply to “will this produce incorrect totals” is: only if we write the rules that way, and we have not written them yet.",
+   "quote": "No record that fails a DQ check proceeds to the next layer: failures are held in the DQ store and replayed once resolvable — never silently dropped and never loaded with placeholder keys.",
+   "sei_ask": null,
+   "fig": "dqstore",
+   "ev": "dbt design doc §3.2 — Design Principles (p.8) | dbt design doc §7.1 — Capture and Publishing (p.17) | dbt design doc §7.2 — Reconciliation Boundaries (p.18) | ingest design §4 (p.7) · Appendix B.2 (p.20) — a header or trailer failure quarantines the file before RAW | Hub Discussion answers 32, 34 and 38"
+  },
+  {
+   "answer_id": "seed110",
+   "qid": 110,
+   "body": "Largely agreed — and most of it is already how the Hub is built. The crosswalk's lane model treats SEI as the replacement for an incumbent lane (ADDVANTAGE → PBDW, STAR → IMDS), and SEI lands in the shape the incumbent already delivers; the existing pipeline carries it from there. SEI never gets a lineage chain of its own, and SEI_SOURCE_MAP maps each contract field once. That IS “extract into the same file format and reuse the current processing”, and it is the position every Crosswalk 360 verdict is computed against.\n\nWhere the two views differ is narrower than the email suggests. Validation at the provider boundary is not redundant: Contract DQ (does the file match the agreed contract — shape, types, header and trailer, record count) and Source DQ (is the record well-formed) are the technical checks the email itself asks for, and they are the only ones that run before RAW. Business validation — the rules that live in the PBDW and IMDS loads today — stays where it is when the file shape is reused, so there is no second copy to build or pay for.\n\nExadata is a separate decision from validation. In the design documents it is the Stage 3 Pre-Gold tier — dimensions, facts and control totals — not a validation engine, and the case for it rests on the size of the warehouse build, not on the volume of SEI's checks.",
+   "author": "CP360 · drafted from the codebase",
+   "is_draft": "Y",
+   "conf": "codebase",
+   "gap": "Two things the codebase does not settle. First, whether SEI's proposed “business validation on ingest” is new rules or a restatement of the Source DQ flag — the design document gives the machinery and no rule list (answer 38), so nobody can yet say which of SEI's checks duplicates a check the PBDW or IMDS load already performs. Second, the Exadata case is argued from tier, not from measured volume; until a real business-date volume for the Pre-Gold build is in hand, “needed” and “gold-plated” are both opinions.\n\nThe cost point therefore reduces to one ask of SEI: list the proposed ingest validations by interface, each marked blocking or annotating, so BBH can strike the ones the incumbent load already performs.",
+   "quote": null,
+   "sei_ask": null,
+   "fig": null,
+   "ev": "sql/51_sei_crosswalk.sql — the lane model: SEI lands in the incumbent's shape and the existing pipeline carries it | Crosswalk 360 — lane states and the SEI_SOURCE_MAP verdicts | Design docs — Stage 3 Pre-Gold on Exadata (tier table; findings R1 and R2) | ingest design §4 (p.7) — header, trailer and contract checks run before RAW | Hub Discussion answer 38 — no rule inventory per interface"
   }
  ]
 }
