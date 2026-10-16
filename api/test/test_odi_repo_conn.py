@@ -29,6 +29,9 @@ class FakeLoader:
             assert k in values and values[k] is not None, (table, k, values)
         self.rows.setdefault(table, []).append(values)
 
+    def commit(self):
+        self.committed = sum(len(v) for v in self.rows.values())
+
 
 c = OdiRepoConnector(FIX)
 b = c.parse()
@@ -52,6 +55,7 @@ n = c.load(ld, b)
 ok(n == sum(len(v) for v in ld.rows.values()) and set(ld.rows) == {"odi_scenario", "odi_task", "odi_variable", "odi_table", "odi_object", "odi_edge"},
    "load merges every row into the six sql/83 tables and returns the count", (n, sorted(ld.rows)))
 ok(all(len(k) <= 128 for k in tabs) and all(r["detail"] for r in ld.rows["odi_edge"]), "keys fit their columns; an edge's detail is never null (it is in the key)")
+ok(getattr(ld, "committed", 0) == n, "and load() COMMITS after the last merge — the first real run merged 82,651 rows and kept none", getattr(ld, "committed", None))
 
 # the real export leaves type columns blank on some rows; a key column is never NULL (ORA-01400 on the first run)
 import csv, tempfile  # noqa: E402

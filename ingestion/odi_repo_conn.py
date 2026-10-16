@@ -154,4 +154,8 @@ class OdiRepoConnector:
                 n += 1
         if patched:
             log.warning("odi_repo: %s blank key value(s) stored as '-' — the export left them empty", patched)
+        # The loader's contract: _merge, then commit. Without this the run closes
+        # its connection and Oracle rolls every row back — "merged 82,651 rows"
+        # in the log and six empty tables in the schema.
+        loader.commit()
         return n
