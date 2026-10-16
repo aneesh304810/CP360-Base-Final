@@ -59,6 +59,22 @@ $env:ORACLE_PROD_SCHEMAS = "PBDWAPP"
 $env:ORACLE_PLATFORM_ID  = "PBDWAPP"
 $env:ORACLE_CLIENT_DIR   = "C:\instantclient_23_0"
 
+# ---- ODI 360 / SCD2 --------------------------------------------------
+# PBDW_DSN, PBDW_USER and PBDW_PASSWORD come from secrets.ps1 -- the
+# warehouse login is a credential like the others and does NOT go here.
+# The ODI repository export and the column inventory are BBH material:
+# local-data\ is in .gitignore, sample-artifacts\ is not.
+$env:CP_ODI_DIR          = Join-Path $Root "local-data\odi_export"
+# $env:CP_SCD2_COLUMNS_CSV = Join-Path $Root "local-data\pbdw_columns.csv"  # optional: without it the
+                                                                          # inventory is read from the warehouse
+$env:CP_SCD2_WITH_DB     = "1"             # profile against the warehouse; unset for ODI rules only
+# The PBDW listener requires Native Network Encryption, which only thick
+# mode can do, and python-oracledb fixes thin or thick at the FIRST
+# connection of the process. Set here, before ingestion.run opens the
+# hub connection, so the whole run is thick. Same client as above.
+$env:ORACLE_CLIENT_LIB   = $env:ORACLE_CLIENT_DIR
+$env:PBDW_THICK          = "1"
+
 # ---- DATA-FEEDS (rich feed dictionary + reference list) --------------
 $env:DATA360_FEED_DICTIONARY_PATH = "$Artifacts\DATA-FEEDS\SWP_EOD_Data_Feeds.xlsx"
 $env:REFERENCE_DATA_XLSX          = "$Artifacts\DATA-FEEDS\SWP_EOD_Data_Feeds-Reference.xlsx"
@@ -290,6 +306,7 @@ $inputs = [ordered]@{
   "Event consumers.csv"      = (Join-Path $env:CP_EVENT_SUB_DIR "consumers.csv")
   "Event subscriptions.csv"  = (Join-Path $env:CP_EVENT_SUB_DIR "subscriptions.csv")
   "SDC compute"              = $env:CP_SDC_COMPUTE_XLSX
+  "ODI export (SCD2)"        = $env:CP_ODI_DIR
   "Environment inventory"    = $env:CP_ENV_WORKBOOK
   "Swagger (API-SPEC)"       = $env:API_SPEC_ROOT
   "dbt manifest"             = $env:DBT_MANIFEST_PATH
