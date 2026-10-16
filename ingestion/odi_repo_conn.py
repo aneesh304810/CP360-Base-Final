@@ -131,18 +131,27 @@ class OdiRepoConnector:
         return {"scenarios": scn_rows, "tasks": task_rows, "variables": var_rows, "tables": tbl_rows,
                 "objects": obj_rows, "edges": edge_rows, "missing": list(ex.missing)}
 
+    PLAN = (("scenarios", "odi_scenario", ("scenario",)),
+            ("tasks", "odi_task", ("scenario", "step_no", "task_no")),
+            ("variables", "odi_variable", ("name",)),
+            ("tables", "odi_table", ("table_name",)),
+            ("objects", "odi_object", ("object_type", "schema_name", "name")),
+            ("edges", "odi_edge", ("src_type", "src", "relation", "dst_type", "dst", "detail")))
+
     def load(self, loader, bundle: dict) -> int:
+        """Merge every row. A key column is never sent as NULL: whatever parse()
+        produced, a None in a key part becomes "-" here and is counted, so one
+        odd row in a 2,000-edge export is a warning line, not a failed step."""
         n = 0
-        for r in bundle["scenarios"]:
-            loader._merge("odi_scenario", ("scenario",), r); n += 1
-        for r in bundle["tasks"]:
-            loader._merge("odi_task", ("scenario", "step_no", "task_no"), r); n += 1
-        for r in bundle["variables"]:
-            loader._merge("odi_variable", ("name",), r); n += 1
-        for r in bundle["tables"]:
-            loader._merge("odi_table", ("table_name",), r); n += 1
-        for r in bundle["objects"]:
-            loader._merge("odi_object", ("object_type", "schema_name", "name"), r); n += 1
-        for r in bundle["edges"]:
-            loader._merge("odi_edge", ("src_type", "src", "relation", "dst_type", "dst", "detail"), r); n += 1
+        patched = 0
+        for key, table, pk in self.PLAN:
+            for r in bundle.get(key) or []:
+                for k in pk:
+                    if r.get(k) is None or (isinstance(r.get(k), str) and not r[k].strip()):
+                        r[k] = 0 if k in ("step_no", "task_no") else "-"
+                        patched += 1
+                loader._merge(table, pk, r)
+                n += 1
+        if patched:
+            log.warning("odi_repo: %s blank key value(s) stored as '-' — the export left them empty", patched)
         return n
