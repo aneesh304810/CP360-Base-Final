@@ -54,6 +54,8 @@ def build_card(ex: OdiExport, table: str, settings: Settings, runtime: dict | No
     card.surrogate_key = (scan.get("surrogate_key") or "").upper() or None
     valid_from = (scan.get("valid_from") or "START_DATE").upper()
     valid_to = (scan.get("valid_to") or "END_DATE").upper()
+    card.valid_from, card.valid_to = valid_from, valid_to
+    card.current_flag = (scan.get("current_flag") or "").upper() or None
     card.writers = writers_of(ex, t)
     if ex.missing:
         card.notes.append("export files not found: " + ", ".join(ex.missing))

@@ -14,10 +14,19 @@ from .hashexpr import hash_expr
 from .ident import ident, idents
 
 
-def _since(settings: Settings) -> tuple[str, dict]:
+# DIM_ACCOUNT's names, used when a caller does not say otherwise. The
+# ingestion passes each table's own columns from the scan.
+VF, VT, FLAG = "START_DATE", "END_DATE", "ACTIVE_IND"
+
+
+def _since(settings: Settings, vf: str = VF) -> tuple[str, dict]:
     if settings.db_sample_since:
-        return " AND start_date >= :since", {"since": datetime.fromisoformat(settings.db_sample_since)}
+        return f" AND {ident(vf)} >= :since", {"since": datetime.fromisoformat(settings.db_sample_since)}
     return "", {}
+
+
+def _hist(vf: str, vt: str, flag: str | None = None) -> dict:
+    return {"vf": ident(vf), "vt": ident(vt), "flag": ident(flag) if flag else "NULL"}
 
 
 def _nk_parts(nk: list[str], part: list[str]) -> dict:
@@ -35,18 +44,20 @@ def _strip_header(text: str) -> str:
     return "\n".join(l for l in text.splitlines() if not l.startswith("--")).strip()
 
 
-def base_view(settings: Settings, table: str, nk: list[str], part: list[str], tracked: list[dict]) -> tuple[str, dict]:
-    since, binds = _since(settings)
+def base_view(settings: Settings, table: str, nk: list[str], part: list[str], tracked: list[dict],
+              vf: str = VF, vt: str = VT) -> tuple[str, dict]:
+    since, binds = _since(settings, vf)
     f = _nk_parts(nk, part)
     text = _strip_header(sql("base_hash")).format(schema=ident(settings.schema_name), tbl=ident(table), since_clause=since,
-                                   hash_expr=hash_expr(tracked, settings.hash_chunk_size), **f)
+                                   hash_expr=hash_expr(tracked, settings.hash_chunk_size), **f, **_hist(vf, vt))
     return text, binds
 
 
-def dup_checks(run, settings: Settings, table: str, nk: list[str], part: list[str], tracked: list[dict], top_n: int = 10) -> dict:
-    base, binds = base_view(settings, table, nk, part, tracked)
+def dup_checks(run, settings: Settings, table: str, nk: list[str], part: list[str], tracked: list[dict], top_n: int = 10,
+               vf: str = VF, vt: str = VT) -> dict:
+    base, binds = base_view(settings, table, nk, part, tracked, vf, vt)
     base = _strip_header(base)
-    f = _nk_parts(nk, part)
+    f = {**_nk_parts(nk, part), **_hist(vf, vt)}
     out = {}
     out["dup_summary"] = (run(_strip_header(sql("dup_summary")).format(base=base, **f), binds) or [{}])[0]
     out["dup_by_month"] = run(_strip_header(sql("dup_by_month")).format(base=base, **f), binds)
@@ -54,9 +65,10 @@ def dup_checks(run, settings: Settings, table: str, nk: list[str], part: list[st
     return out
 
 
-def window_checks(run, settings: Settings, table: str, nk: list[str], part: list[str], offset_days: int = 1) -> dict:
-    since, binds = _since(settings)
-    f = _nk_parts(nk, part)
+def window_checks(run, settings: Settings, table: str, nk: list[str], part: list[str], offset_days: int = 1,
+                  vf: str = VF, vt: str = VT) -> dict:
+    since, binds = _since(settings, vf)
+    f = {**_nk_parts(nk, part), **_hist(vf, vt)}
     sch, tbl = ident(settings.schema_name), ident(table)
     out = {}
     out["windows"] = (run(_strip_header(sql("windows_gap_overlap")).format(schema=sch, tbl=tbl, since_clause=since, **f),
@@ -65,13 +77,21 @@ def window_checks(run, settings: Settings, table: str, nk: list[str], part: list
     return out
 
 
-def flag_check(run, settings: Settings, table: str) -> dict:
-    return (run(_strip_header(sql("active_ind_consistency")).format(schema=ident(settings.schema_name), tbl=ident(table)), {}) or [{}])[0]
+def flag_check(run, settings: Settings, table: str, vt: str = VT, flag: str = FLAG) -> dict:
+    return (run(_strip_header(sql("active_ind_consistency")).format(schema=ident(settings.schema_name), tbl=ident(table),
+                                                                     **_hist(VF, vt, flag)), {}) or [{}])[0]
 
 
-def freshness(run, settings: Settings, table: str) -> dict:
+def freshness(run, settings: Settings, table: str, vf: str = VF, have: set[str] | None = None) -> dict:
+    """have = the table's column names; LOAD_DATE / UPDATED_TSP are asked for only when present.
+    None keeps the DIM_ACCOUNT behaviour (both asked for)."""
     sch, tbl = ident(settings.schema_name), ident(table)
-    f = (run(_strip_header(sql("freshness")).format(schema=sch, tbl=tbl), {}) or [{}])[0]
+    extra = ""
+    if have is None or "LOAD_DATE" in have:
+        extra += ", MAX(load_date) AS max_load"
+    if have is None or "UPDATED_TSP" in have:
+        extra += ", MAX(updated_tsp) AS max_updated"
+    f = (run(_strip_header(sql("freshness")).format(schema=sch, tbl=tbl, vf=ident(vf), extra=extra), {}) or [{}])[0]
     try:
         ctl = (run(_strip_header(sql("control_dates")).format(schema=sch), {}) or [{}])[0]
     except Exception:

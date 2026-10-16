@@ -140,8 +140,12 @@ class Scd2Connector:
                 try:
                     from scd2lens.cli import _runtime
                     rt = _runtime(settings, t, card, "all")
+                    skipped = rt.pop("skipped", []) if rt else []
                     if rt:
                         card = build_card(ex, t, settings, runtime=rt)
+                    for s_ in skipped:
+                        card.notes.append(s_)
+                        log.info("scd2: %s %s", t, s_)
                 except Exception as e:  # noqa: BLE001 — one table's profile must not stop the run
                     card.notes.append(f"db profile failed: {str(e).splitlines()[0][:160]}")
                     log.warning("scd2: %s profile failed: %s", t, str(e).splitlines()[0][:160])

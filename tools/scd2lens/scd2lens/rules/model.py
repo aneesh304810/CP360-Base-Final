@@ -51,3 +51,8 @@ class RuleCard(BaseModel):
     open_questions: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
     scan_verdict: str | None = None
+    # The table's own history columns, from the scan. The profile queries
+    # are built from these, not from the DIM_ACCOUNT names.
+    valid_from: str | None = None
+    valid_to: str | None = None
+    current_flag: str | None = None

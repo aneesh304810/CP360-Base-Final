@@ -52,8 +52,8 @@ def test_profile_queries_bind_values_and_partition_by_keys(fake_run):
     s = Settings(); s.db_sample_since = "2024-01-01"
     tracked = [{"column_name": "ACCOUNT_TYPE", "data_type": "VARCHAR2"}, {"column_name": "BASE_CCY", "data_type": "VARCHAR2"}]
     base, binds = base_view(s, "DIM_ACCOUNT", ["ACCOUNT_NUMBER"], ["MASTER_IND"], tracked)
-    assert "PARTITION BY ACCOUNT_NUMBER, MASTER_IND ORDER BY start_date" in base
-    assert "start_date >= :since" in base and "since" in binds and "2024" not in base
+    assert "PARTITION BY ACCOUNT_NUMBER, MASTER_IND ORDER BY START_DATE" in base
+    assert "START_DATE >= :since" in base and "since" in binds and "2024" not in base
     run = fake_run({"dup_pct": [{"total_rows": 10, "dup_rows": 1, "dup_pct": 10.0, "dup_keys": 1}], "ROWNUM <= :n": [{"key_value": "k", "versions": 3, "dup_rows": 1}]})
     out = dup_checks(run, s, "DIM_ACCOUNT", ["ACCOUNT_NUMBER"], ["MASTER_IND"], tracked)
     assert out["dup_summary"]["dup_pct"] == 10.0 and out["top_keys"][0]["versions"] == 3
@@ -193,3 +193,61 @@ def test_init_thick_adopts_a_process_already_thick(monkeypatch):
     monkeypatch.setattr(oracledb, "is_thin_mode", lambda: False)
     monkeypatch.setattr(oracledb, "init_oracle_client", lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not init")))
     assert c.init_thick() is True and c._THICK["on"] is True
+
+
+def _runner_with_columns(cols, answers=None):
+    """A fake session: the column list for tracked_columns, canned rows for anything else, and a log of the SQL run."""
+    seen = []
+
+    def run(q, binds=None):
+        seen.append(q)
+        if "all_tab_columns" in q:
+            return [{"column_name": c, "data_type": "DATE" if "DATE" in c or c.endswith("_TS") else "VARCHAR2", "nullable": "Y"} for c in cols]
+        if "'YYYY-MM'" in q:            # dup_by_month: a list of month rows, empty here
+            return []
+        for frag, rows in (answers or {}).items():
+            if frag in q:
+                return rows
+        return [{}]
+    run.seen = seen
+    return run
+
+
+def test_profile_uses_the_tables_own_history_columns():
+    """A table whose window is EFFECTIVE_FROM / EFFECTIVE_TO is profiled with those names, not DIM_ACCOUNT's."""
+    from scd2lens.cli import profile_table
+    from scd2lens.rules.model import RuleCard
+    s = Settings()
+    card = RuleCard(table="DIM_THING", pattern="MERGE_SCD2", natural_key=["THING_CODE"], valid_from="EFFECTIVE_FROM",
+                    valid_to="EFFECTIVE_TO", current_flag="CURRENT_IND")
+    run = _runner_with_columns(["THING_KEY", "THING_CODE", "THING_NAME", "EFFECTIVE_FROM", "EFFECTIVE_TO", "CURRENT_IND", "LOAD_DATE"])
+    out = profile_table(run, s, "DIM_THING", card)
+    body = "\n".join(q for q in run.seen if "all_tab_columns" not in q)
+    assert "EFFECTIVE_FROM" in body and "EFFECTIVE_TO" in body and "CURRENT_IND" in body
+    assert "START_DATE" not in body and "END_DATE" not in body and "ACTIVE_IND" not in body
+    assert "MAX(load_date)" in body and "updated_tsp" not in body       # asks only for the audit columns the table has
+    assert out["skipped"] == []
+    assert {"dup_summary", "windows", "open_rows", "active_ind", "freshness"} <= set(out)
+
+
+def test_profile_skips_what_a_table_cannot_support():
+    """A config table with no history window and no key: nothing is queried that would raise ORA-00904,
+    and the reasons come back for the card's notes."""
+    from scd2lens.cli import profile_table
+    from scd2lens.rules.model import RuleCard
+    s = Settings()
+    card = RuleCard(table="CFG_BACK_DATED_LIST", pattern="UNKNOWN", natural_key=[], valid_from="START_DATE", valid_to="END_DATE")
+    run = _runner_with_columns(["LIST_ID", "BUSINESS_DATE", "REASON"])
+    out = profile_table(run, s, "CFG_BACK_DATED_LIST", card)
+    assert len(run.seen) == 1 and "all_tab_columns" in run.seen[0]
+    txt = " | ".join(out["skipped"])
+    assert "no history window" in txt and "no natural key" in txt and "flag check skipped" in txt and "freshness skipped" in txt
+    assert "dup_summary" not in out and "freshness" not in out
+
+
+def test_profile_names_a_table_the_account_cannot_see():
+    from scd2lens.cli import profile_table
+    from scd2lens.rules.model import RuleCard
+    run = _runner_with_columns([])
+    out = profile_table(run, Settings(), "DIM_GONE", RuleCard(table="DIM_GONE", pattern="UNKNOWN"))
+    assert len(out["skipped"]) == 1 and "not in PBDWAPP" in out["skipped"][0]

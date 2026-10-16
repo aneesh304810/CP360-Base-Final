@@ -27,27 +27,69 @@ def _settings(config: str | None, repo: str | None) -> Settings:
 def _runtime(settings: Settings, table: str, card, checks: str, top_n: int = 10) -> dict:
     """Open the read-only session and run the profile for one table."""
     from .db import conn as dbc
-    from .db.columns import tracked_columns
-    from .db.profile import dup_checks, flag_check, freshness, volume_drop, window_checks
     creds = Credentials.from_env()
     if creds is None:
         typer.echo("no PBDW_DSN / PBDW_USER / PBDW_PASSWORD in the environment — offline mode", err=True)
         return {}
     run = dbc.Runner(dbc.connect(creds))
-    nk = card.natural_key or ["ACCOUNT_NUMBER"]
-    part = [card.partition.column] if card.partition else []
+    return profile_table(run, settings, table, card, checks, top_n)
+
+
+def profile_table(run, settings: Settings, table: str, card, checks: str = "all", top_n: int = 10) -> dict:
+    """Run the checks this table can support, with the column names the scan found for it.
+
+    The queries were written for DIM_ACCOUNT (START_DATE, END_DATE, ACTIVE_IND,
+    ACCOUNT_NUMBER). Most tables name these differently or lack some of them, and
+    an ORA-00904 for every such table told the operator nothing. So the table's
+    columns are read first, each check runs only when its columns exist, and
+    what was skipped and why goes back as `skipped`, for the card's notes.
+    """
+    from .db.columns import filter_tracked
+    from .db.profile import dup_checks, flag_check, freshness, volume_drop, window_checks
+    from .sqlfiles import sql
+    from .db.ident import ident
+    cols = run(sql("tracked_columns"), {"owner": ident(settings.schema_name), "tbl": ident(table)})
+    have = {str(c["column_name"]).upper() for c in cols}
+    out: dict = {"skipped": []}
+    skip = out["skipped"].append
+    if not have:
+        skip(f"profile skipped: {table} is not in {settings.schema_name} (or the account cannot see it)")
+        return out
+    vf = (getattr(card, "valid_from", None) or "START_DATE").upper()
+    vt = (getattr(card, "valid_to", None) or "END_DATE").upper()
+    flag = (getattr(card, "current_flag", None) or "").upper() or None
+    hist_ok = vf in have and vt in have
+    if not hist_ok:
+        skip(f"profile skipped: no history window — needs {vf} and {vt}, table has "
+             + ("neither" if vf not in have and vt not in have else ("no " + (vf if vf not in have else vt))))
+    nk = [k.upper() for k in (card.natural_key or [])]
+    if nk and not all(k in have for k in nk):
+        skip(f"profile: natural key {', '.join(nk)} not all present; key checks skipped")
+        nk = []
+    if not nk:
+        if "ACCOUNT_NUMBER" in have and not card.natural_key:
+            nk = ["ACCOUNT_NUMBER"]
+        else:
+            if card.natural_key is not None and not card.natural_key:
+                skip("profile: no natural key known (no merge key in the ODI export); duplicate and window checks skipped")
+    part = [card.partition.column] if card.partition and card.partition.column.upper() in have else []
     want = {c.strip() for c in checks.split(",")} if checks != "all" else {"dup", "windows", "flag", "freshness"}
-    out: dict = {}
-    if "dup" in want:
-        tracked = tracked_columns(run, settings.schema_name, table, settings, card.surrogate_key)
-        out.update(dup_checks(run, settings, table, nk, part, tracked, top_n))
+    if "dup" in want and hist_ok and nk:
+        tracked = filter_tracked(cols, table, settings, card.surrogate_key)
+        out.update(dup_checks(run, settings, table, nk, part, tracked, top_n, vf=vf, vt=vt))
         out["volume_alerts"] = volume_drop(out.get("dup_by_month") or [])
-    if "windows" in want:
-        out.update(window_checks(run, settings, table, nk, part, offset_days=1))
+    if "windows" in want and hist_ok and nk:
+        out.update(window_checks(run, settings, table, nk, part, offset_days=1, vf=vf, vt=vt))
     if "flag" in want:
-        out["active_ind"] = flag_check(run, settings, table)
+        if flag and vt in have:
+            out["active_ind"] = flag_check(run, settings, table, vt=vt, flag=flag)
+        elif not flag:
+            skip("profile: no current-row flag column; flag check skipped")
     if "freshness" in want:
-        out["freshness"] = freshness(run, settings, table)
+        if vf in have:
+            out["freshness"] = freshness(run, settings, table, vf=vf, have=have)
+        else:
+            skip(f"profile: no {vf} column; freshness skipped")
     return out
 
 
