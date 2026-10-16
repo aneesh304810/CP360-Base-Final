@@ -27,9 +27,19 @@ export const OWNERS = {
   // Not a review owner: raised by email in 2026-10, after the review, and
   // numbered on from 108 so the meeting can refer to them the same way.
   PB: { name: "Pavel Bredus", focus: "Quarantine and totals, validation scope and cost of the SEI proposal" },
+  // People who can raise and sign off questions in the app but own none
+  // of the review's rows. Listed so the owner and signer dropdowns offer
+  // a real name rather than a free text box. Declared total 0.
+  JT: { name: "Jigar T", focus: "Raised in discussion" },
+  OD: { name: "Olimpio D", focus: "Raised in discussion" },
+  JS: { name: "Jay S", focus: "Raised in discussion" },
+  JG: { name: "John G", focus: "Raised in discussion" },
+  AX: { name: "Alex", focus: "Raised in discussion" },
+  MK: { name: "Mohammed Khan", focus: "Raised in discussion" },
 };
 
-export const OWNER_TOTALS = {"KB": 42, "GL": 29, "GM": 20, "SA": 12, "KK": 5, "PB": 2};
+export const OWNER_TOTALS = {"KB": 42, "GL": 29, "GM": 20, "SA": 12, "KK": 5, "PB": 2,
+                             "JT": 0, "OD": 0, "JS": 0, "JG": 0, "AX": 0, "MK": 0};
 
 export const TOPICS = [
   { no: 1, title: "SEI Data Structure / Enriched Data", comps: ["15", "40", "37"] },

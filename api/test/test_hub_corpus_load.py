@@ -59,7 +59,8 @@ for frag in (":conf", ":gap", ":quote", ":fig", ":ev", ":is_draft"):
 corpus = read_corpus(DEFAULT_FILE)
 ok(len(corpus["questions"]) == 110, "the export carries all 110 questions",
    len(corpus["questions"]))
-ok(len(corpus["topics"]) == 17 and len(corpus["owners"]) == 6,
+# 5 review owners, Pavel Bredus, and six people who raise questions in the app.
+ok(len(corpus["topics"]) == 17 and len(corpus["owners"]) == 12,
    "with their topics and owners — otherwise the screen reads questions "
    "from the database and their grouping from the bundle",
    f'{len(corpus["topics"])}/{len(corpus["owners"])}')

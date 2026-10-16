@@ -82,9 +82,9 @@ ok(nums.every((n, i) => n === i + 1),
 const derived = {};
 QUESTIONS.forEach((q) => { derived[q.owner] = (derived[q.owner] || 0) + 1; });
 for (const [k, n] of Object.entries(OWNER_TOTALS)) {
-  ok(derived[k] === n,
-     `${OWNERS[k].name}: the summary says ${n} and the rows give ${derived[k]}`,
-     `${derived[k]} vs ${n}`);
+  ok((derived[k] || 0) === n,
+     `${OWNERS[k].name}: the summary says ${n} and the rows give ${derived[k] || 0}`,
+     `${derived[k] || 0} vs ${n}`);
 }
 ok(Object.values(derived).reduce((a, b) => a + b, 0) === 110,
    "and they add to 110 — re-assign a question without updating the "
