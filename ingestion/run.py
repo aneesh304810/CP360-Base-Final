@@ -51,8 +51,31 @@ STEPS = [
 ]
 
 
+def _thick_if_asked():
+    """python-oracledb picks its mode at the FIRST connection and cannot
+    change it afterwards (DPY-2019). The hub connection below is that first
+    connection, so a step that later needs thick mode — scd2 profiling a
+    warehouse whose listener demands Native Network Encryption — would be
+    refused. If the operator asked for thick mode, start it here, once,
+    for every connection in this run; the hub is fine in either mode."""
+    want = (os.environ.get("PBDW_THICK", "").strip().lower() in ("1", "true", "yes")
+            or os.environ.get("ORACLE_CLIENT_LIB") or os.environ.get("CP_ORACLE_CLIENT_DIR"))
+    if not want:
+        return
+    import oracledb
+    if not oracledb.is_thin_mode():
+        return
+    lib = os.environ.get("ORACLE_CLIENT_LIB") or os.environ.get("CP_ORACLE_CLIENT_DIR") or None
+    try:
+        oracledb.init_oracle_client(lib_dir=lib) if lib else oracledb.init_oracle_client()
+        log.info("oracledb thick mode on (client: %s)", lib or "PATH")
+    except Exception as e:  # noqa: BLE001 - the hub may still work thin; the step that needs thick says so
+        log.warning("oracledb thick mode requested but not started: %s", str(e).splitlines()[0])
+
+
 def _connect():
     import oracledb
+    _thick_if_asked()
     dsn = os.environ["CP_CATALOG_DB_DSN"]
     # accept oracle://user:pass@host:port/service
     if dsn.startswith("oracle://"):

@@ -166,3 +166,30 @@ def test_connect_uses_thick_when_asked_and_reraises_other_errors(monkeypatch):
     with pytest.raises(RuntimeError, match="ORA-01017"):
         c.connect(Credentials(dsn="h:1521/svc", user="u", password="p"), connector=bad)
     assert seen == ["thick"]
+
+
+def test_init_thick_explains_a_thin_connection_already_open(monkeypatch):
+    """DPY-2019: the process already went thin. The message names the cause and the two ways out,
+    rather than telling the operator to install a client they may already have."""
+    import scd2lens.db.conn as c
+    import oracledb
+    c._THICK["on"] = False
+    monkeypatch.setattr(oracledb, "is_thin_mode", lambda: True)
+
+    def boom(lib_dir=None):
+        raise RuntimeError("DPY-2019: python-oracledb thick mode cannot be used because thin mode has already been enabled")
+    monkeypatch.setattr(oracledb, "init_oracle_client", boom)
+    with pytest.raises(RuntimeError) as ei:
+        c.init_thick()
+    assert "DPY-2019" in str(ei.value) and "BEFORE the first connection" in str(ei.value)
+    assert "ingestion.run" in str(ei.value)
+
+
+def test_init_thick_adopts_a_process_already_thick(monkeypatch):
+    """When the ingestion runner started thick mode first, scd2lens notices and does not call init again."""
+    import scd2lens.db.conn as c
+    import oracledb
+    c._THICK["on"] = False
+    monkeypatch.setattr(oracledb, "is_thin_mode", lambda: False)
+    monkeypatch.setattr(oracledb, "init_oracle_client", lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not init")))
+    assert c.init_thick() is True and c._THICK["on"] is True

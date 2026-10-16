@@ -24,6 +24,15 @@ $env:ORACLE_CLIENT_LIB = "C:\oracle\instantclient_23_8"    # when the listener r
 python -m ingestion.run scd2
 ```
 
+`ORACLE_CLIENT_LIB` has to be set **before** `python -m ingestion.run`
+starts: the runner opens the hub connection first, and python-oracledb
+fixes thin or thick mode at that first connection (`DPY-2019` is what you
+see when thick is asked for afterwards). With the variable set, the runner
+starts thick mode itself and every connection in the run, hub included,
+uses it. Without an Instant Client the step cannot profile a warehouse
+whose listener demands native encryption; run it offline (unset
+`CP_SCD2_WITH_DB`) or give it the columns CSV.
+
 Offline (no `CP_SCD2_WITH_DB`) the cards carry the ODI rules and the
 quality tiles read "not profiled". With the database, the duplicate rate,
 window gaps, open-row counts, the ACTIVE_IND disagreement and freshness

@@ -53,6 +53,12 @@ thick mode and retries, which needs an Oracle Instant Client on the machine:
    optionally `PBDW_THICK=1` to start in thick mode without the retry;
 3. run the command again.
 
+`DPY-2019` ("thin mode has already been enabled") means the process opened
+a thin connection before thick mode was asked for; python-oracledb cannot
+switch after that. Set `ORACLE_CLIENT_LIB` before the run starts — the CP
+360 ingestion runner reads it before its own first connection — rather
+than relying on the DPY-3001 retry inside a process that is already thin.
+
 Thick mode can also read a `tnsnames.ora` / `ldap.ora` under `TNS_ADMIN`,
 so a plain alias name works as `PBDW_DSN` once Oracle Net is configured.
 The alternative, if the DBA offers it, is a TCPS (TLS) listener endpoint,

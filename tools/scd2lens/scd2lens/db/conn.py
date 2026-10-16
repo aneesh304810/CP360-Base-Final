@@ -58,10 +58,20 @@ def init_thick(lib_dir: str | None = None) -> bool:
     if _THICK["on"]:
         return True
     import oracledb
-    lib = lib_dir or os.environ.get("ORACLE_CLIENT_LIB") or None
+    if not oracledb.is_thin_mode():
+        # somebody else in this process (the ingestion runner) already started it
+        _THICK["on"] = True
+        return True
+    lib = lib_dir or os.environ.get("ORACLE_CLIENT_LIB") or os.environ.get("CP_ORACLE_CLIENT_DIR") or None
     try:
         oracledb.init_oracle_client(lib_dir=lib) if lib else oracledb.init_oracle_client()
     except Exception as e:
+        if "DPY-2019" in str(e):
+            raise RuntimeError(
+                "thick mode cannot start now: this process already opened a thin-mode connection, and "
+                "python-oracledb cannot switch afterwards (DPY-2019). Set ORACLE_CLIENT_LIB (or PBDW_THICK=1) "
+                "BEFORE the first connection — ingestion.run does this itself when the variable is set — or run "
+                "scd2lens on its own: python -m scd2lens.cli all") from e
         raise RuntimeError(
             "thick mode needs an Oracle Instant Client: install it, then set ORACLE_CLIENT_LIB to its folder "
             "(for example the instantclient_23_x directory) or put it on PATH. " + str(e).splitlines()[0]) from e
