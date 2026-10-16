@@ -86,5 +86,33 @@ with tempfile.TemporaryDirectory() as d:
     ok("to_convention" in txt and "maps_to" in txt and "EFF_FROM_DT" in txt, "the CSV carries the convention and the crosswalk")
     ok(not any(k in txt for k in ("SELECT", "VALUE")), "the report is structure only — no values")
 
+# ---- the oracle source goes through the warehouse login -------------------
+# The hub account cannot see the warehouse dictionary; run through it the scan
+# reported "tables: 0" and nothing said why. With PBDW_* set, the warehouse
+# session is used; without them, the hub, and an empty result says which door.
+import io  # noqa: E402
+import tools.scd2_scan as S  # noqa: E402
+calls = []
+def fake_runner(sql, binds=None):
+    calls.append(("wh", binds))
+    return [{"s": "PBDWAPP", "t": "DIM_X", "c": "EFF_FROM_DT", "ty": "DATE", "n": "N"}]
+for k in ("PBDW_DSN", "PBDW_USER", "PBDW_PASSWORD"):
+    os.environ[k] = "x"
+S._warehouse_query = lambda: fake_runner
+S._hub_query = lambda: (lambda sql, binds=None: calls.append(("hub", binds)) or [])
+out = S.read_oracle("pbdwapp")
+ok(calls and calls[-1][0] == "wh" and calls[-1][1] == {"o": "PBDWAPP"} and "PBDWAPP.DIM_X" in out,
+   "with PBDW_* set the warehouse session answers, owner upper-cased", calls)
+for k in ("PBDW_DSN", "PBDW_USER", "PBDW_PASSWORD"):
+    os.environ.pop(k, None)
+S._warehouse_query = lambda: None
+err = io.StringIO(); _stderr = sys.stderr; sys.stderr = err
+try:
+    out = S.read_oracle("PBDWAPP")
+finally:
+    sys.stderr = _stderr
+ok(out == {} and calls[-1][0] == "hub" and "PBDW_DSN" in err.getvalue(),
+   "without them the hub answers, and an empty result names the three variables to set", err.getvalue())
+
 print(f"\n{bad} assertion(s) failed" if bad else "\nscd2-scan assertions pass")
 sys.exit(1 if bad else 0)

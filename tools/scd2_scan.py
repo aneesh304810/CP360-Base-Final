@@ -26,7 +26,11 @@ WHERE THE COLUMNS COME FROM (--source):
     catalog    the hub's columns catalog, filtered by --platform and an
                optional --schema. Needs the hub database.
     oracle     ALL_TAB_COLUMNS of the warehouse itself, filtered by
-               --owner. Point CP_DSN at the warehouse, read-only account.
+               --owner. Connects with PBDW_DSN / PBDW_USER / PBDW_PASSWORD
+               (the read-only warehouse login scd2lens uses; thick mode
+               and an ldap:// alias are handled). Without those three it
+               falls back to the hub connection, which sees the warehouse
+               only when the hub account has been granted it.
     csv        a file with columns table,column,type,nullable -- what a
                DBA can hand over without granting any access.
 
@@ -262,15 +266,40 @@ def read_catalog(platform: str, schema: str | None) -> dict[str, list[dict]]:
     return out
 
 
+def _warehouse_query():
+    """The warehouse session scd2lens opens from PBDW_DSN / PBDW_USER / PBDW_PASSWORD, or None when unset.
+
+    The hub account (CP_CATALOG_DB_DSN) is a different login on a different
+    database and normally cannot see the warehouse's dictionary at all: run
+    through it, ALL_TAB_COLUMNS simply returns no rows and the scan reports
+    zero tables, which reads like an empty schema rather than a wrong door.
+    """
+    if not all(os.environ.get(k) for k in ("PBDW_DSN", "PBDW_USER", "PBDW_PASSWORD")):
+        return None
+    lens = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools", "scd2lens")
+    if lens not in sys.path:
+        sys.path.insert(0, lens)
+    from scd2lens.db import conn as dbc   # noqa: E402
+    return dbc.Runner(dbc.connect())
+
+
 def read_oracle(owner: str) -> dict[str, list[dict]]:
     """ALL_TAB_COLUMNS of the warehouse itself. Metadata only; no table is read."""
-    q = _hub_query()
+    q = _warehouse_query()
+    via = "warehouse (PBDW_*)"
+    if q is None:
+        q = _hub_query()
+        via = "hub (CP_CATALOG_DB_DSN)"
     rows = q("""SELECT owner AS s, table_name AS t, column_name AS c, data_type AS ty, nullable AS n
                 FROM   all_tab_columns WHERE UPPER(owner) = :o ORDER BY table_name, column_id""",
              {"o": owner.upper()})
     out = defaultdict(list)
     for r in rows:
         out[f"{r['s']}.{r['t']}"].append({"column": r["c"], "type": r["ty"], "nullable": r["n"]})
+    if not out:
+        print(f"no columns for owner {owner.upper()} via the {via} connection. "
+              + ("Set PBDW_DSN, PBDW_USER and PBDW_PASSWORD to read the warehouse directly."
+                 if via.startswith("hub") else "Check --owner: it is the schema that owns the tables."), file=sys.stderr)
     return out
 
 
