@@ -27,6 +27,7 @@ import DevOps360, { PAL, NAMING, FlowFig, Dashboard, Detail, Context,
   Containers, Components, Versions, Promotion, Pipelines,
   Deployment, Built, BUILT, PENDING, PIPES, sp, Legend, PendingList, DB_PROCESS, IMG_PROCESS, Process } from "../src/DevOps360.jsx";
 import { tLight, tDark } from "../src/bbhTheme.js";
+import { OpsModel, Dashboards, ROLES, RACI, PROMOTION, EXCEPTION_RULES, CADENCE, EVIDENCE, REG_MAP, ATTEST, ENG_KPIS, SCORE_WEIGHTS, ALERTS, AUDIENCES } from "../src/DevOpsOps.jsx";
 
 let bad = 0;
 const ok = (cond, msg, got) => {
@@ -294,6 +295,45 @@ ok(/The process · Database · Liquibase/.test(dbDetail) && /Passes when/.test(d
    && /The process · Infrastructure image/.test(renderToStaticMarkup(<Pipelines t={tLight} />)),
    "the process table opens with the swimlane on the map and sits under it in the reference");
 ok(renderToStaticMarkup(<Process t={tDark} p={IMG_PROCESS} />).length > 1500, "the process table renders in dark");
+
+// ---- the operating model and the compliance dashboard --------------------
+// Two reference cards from the Guardrails documentation, coloured by what
+// exists. Almost all of it is pending, and the cards must say so rather than
+// draw a finished governance system; the webhook host stays off the page.
+const opsSrc = fs.readFileSync(path.join(process.cwd(), fs.existsSync("src/DevOpsOps.jsx") ? "src/DevOpsOps.jsx" : "ui/src/DevOpsOps.jsx"), "utf8");
+for (const [tn, t] of [["light", tLight], ["dark", tDark]]) {
+  const a = renderToStaticMarkup(<OpsModel t={t} />), b = renderToStaticMarkup(<Dashboards t={t} />);
+  ok(a.length > 8000 && b.length > 6000 && !/NaN|undefined|\[object Object\]/.test(a + b), `operating model and dashboard render cleanly in ${tn}`, `${a.length}/${b.length}`);
+}
+const ops = renderToStaticMarkup(<OpsModel t={tLight} />), dsh = renderToStaticMarkup(<Dashboards t={tLight} />);
+ok((ops.match(/role="img"/g) || []).length === 2 && /review flow in ten boxes/.test(ops) && /exception lifecycle in six steps, all pending/.test(ops),
+   "the operating model draws the review flow and the exception lifecycle, each with a sentence");
+ok(ROLES.length === 7 && RACI.length === 15 && RACI.every((r) => r.length === 8) && RACI.every((r) => r.slice(1).some((c) => /A/.test(c))),
+   "seven roles, fifteen RACI rows, every row with exactly one accountable column at least", RACI.filter((r) => !r.slice(1).some((c) => /A/.test(c))).map((r) => r[0]));
+ok(/Security is accountable for severity thresholds, not the Platform Owner/.test(ops) && /Governance is accountable for exceptions/.test(ops), "the two deliberate RACI choices are stated");
+ok(PROMOTION.length === 9 && PROMOTION.every((r) => r.length === 7 && ["built", "partial", "pending"].includes(r[6])) && !PROMOTION.some((r) => r[6] === "built"),
+   "the promotion matrix has nine rows across four environments, each with today's status, and none is fully built", PROMOTION.map((r) => r[6]).join(","));
+ok(/same artefact SHA is promoted at each step/.test(ops) && /hotfix\/\*/.test(ops) && /every blocking control still runs/.test(ops), "promotion is by SHA, and a hotfix skips nothing blocking");
+ok(EXCEPTION_RULES.length === 5 && /Maximum 90 days/.test(EXCEPTION_RULES[0][0]) && /CP-DEP-040/.test(ops) && /CP-DEP-041/.test(ops), "five exception rules, 90 days first, with their control IDs");
+ok(CADENCE.length === 5 && CADENCE.filter((r) => r[3] === "pending").length === 4 && /advisory first for one sprint/.test(ops), "five cadences, four pending; a new blocking control lands as advisory first");
+ok(EVIDENCE.length === 11 && EVIDENCE.filter((r) => r[3] === "pending").length >= 7 && /seven years, immutable, keyed by commit SHA/.test(ops),
+   "the eleven evidence questions, most pending today, and the retention rule", EVIDENCE.map((r) => r[3]).join(","));
+ok(REG_MAP.length === 8 && /supporting<\/b> controls/.test(ops) && /not a compliance claim/.test(ops), "the regulatory mapping carries its own caveat");
+ok(ATTEST.length === 3 && /none of them exists today/.test(ops), "three attestations, honestly absent");
+ok(/Gate 1/.test(ops) && /Webhook intake/.test(ops) && /else <span[^>]*>pass<\/span> if at least one passes/.test(ops), "the control matrix: gates, bridge controls and the aggregation rule");
+ok((dsh.match(/role="img"/g) || []).length === 1 && /Everything past Silver is pending/.test(dsh) && />BUILT</.test(dsh) && />PARTIAL</.test(dsh) && />PENDING</.test(dsh),
+   "the dashboard data flow is coloured: built to Silver, pending beyond");
+ok(AUDIENCES.length === 5 && /Grafana/.test(dsh) && /Power BI/.test(dsh) && /90 days hot/.test(dsh) && /7 years/.test(dsh), "two audiences with their refresh, grain and retention");
+ok(ENG_KPIS.length === 15 && ENG_KPIS.every((r) => r.length === 4) && /Review latency p50/.test(dsh) && /Mean time to green/.test(dsh) && /Bridge trigger success rate/.test(dsh),
+   "fifteen engineering KPIs in the design, the five measurable today, and the bridge telemetry");
+ok(Math.abs(SCORE_WEIGHTS.reduce((a, [, w]) => a + w, 0) - 1) < 1e-9 && SCORE_WEIGHTS[0][0] === "security" && /0\.30 × security/.test(dsh),
+   "the score weights sum to one, security heaviest, and the formula is printed");
+ok(/Waived controls count as failures in the score and as passes in the gate/.test(dsh) && /Advisory controls are excluded/.test(dsh), "the two scoring rules that keep the incentive on remediation");
+ok(ALERTS.length === 8 && ALERTS.filter((r) => r[3]).length === 2 && (dsh.match(/PAGES A HUMAN/g) || []).length === 2 && /cp_guardrail_exception/.test(dsh) && /database constraint/.test(dsh),
+   "eight alert conditions, two page a human, the rest are digests; the 90-day cap is a constraint");
+ok(!/testbbh|apps\.ocp|https?:\/\/|:7990|#cp-/.test(opsSrc), "no hostname, URL, port or channel name from the guardrails docs is on the page");
+const shell3 = renderToStaticMarkup(<DevOps360 t={tLight} />);
+ok(/roles · review · promotion · exceptions · evidence/.test(shell3) && /two audiences · KPIs · score · alerts/.test(shell3), "both cards are offered from the reference row");
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\ndevops360 assertions pass");
 if (bad) process.exit(1);

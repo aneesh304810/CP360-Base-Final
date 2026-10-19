@@ -1767,6 +1767,10 @@ export function Dashboard({ t, live, envs, hist, rels, onPick }) {
 }
 
 // ===================================================================
+// The operating model and the compliance dashboard, from the Guardrails
+// documentation, live in their own module and read this one's palette.
+import { OpsModel, Dashboards } from "./DevOpsOps.jsx";
+
 export default function DevOps360({ t }) {
   const [open, setOpen] = useState(null);
   const [ref, setRef] = useState(null);
@@ -1838,7 +1842,9 @@ export default function DevOps360({ t }) {
       <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
         {[["Context", "C4 · who uses it"], ["Containers", "C4 · the runnable pieces"],
           ["Promotion", "what moves between regions"],
-          ["Deployment", "what each component becomes"]].map(([k, label]) => (
+          ["Deployment", "what each component becomes"],
+          ["Operating model", "roles · review · promotion · exceptions · evidence"],
+          ["Compliance dashboard", "two audiences · KPIs · score · alerts"]].map(([k, label]) => (
           <span key={k} onClick={() => setRef(ref === k ? null : k)}
             style={{ cursor: "pointer", fontSize: 11, fontWeight: 600,
               padding: "6px 12px", borderRadius: 999,
@@ -1851,6 +1857,8 @@ export default function DevOps360({ t }) {
         {ref === "Containers" && <Containers t={t} />}
         {ref === "Promotion" && <Promotion t={t} />}
         {ref === "Deployment" && <Deployment t={t} />}
+        {ref === "Operating model" && <OpsModel t={t} />}
+        {ref === "Compliance dashboard" && <Dashboards t={t} />}
       </Card>}
     </div>);
 }
