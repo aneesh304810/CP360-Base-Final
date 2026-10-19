@@ -27,8 +27,8 @@ import DevOps360, { PAL, NAMING, FlowFig, Dashboard, Detail, Context,
   Containers, Components, Versions, Promotion, Pipelines,
   Deployment, Built, BUILT, PENDING, PIPES, sp, Legend, PendingList, DB_PROCESS, IMG_PROCESS, Process } from "../src/DevOps360.jsx";
 import { tLight, tDark } from "../src/bbhTheme.js";
-import Overview, { ProcessFig, PR_STEPS, FOR_DEVELOPERS, FOR_REVIEWERS } from "../src/DevOpsOverview.jsx";
-import { DOC_TABS } from "../src/DevOps360.jsx";
+import Overview, { ProcessFig, PR_STEPS, FOR_DEVELOPERS, FOR_REVIEWERS, GateFlow, GateFlowFig } from "../src/DevOpsOverview.jsx";
+import { DOC_TABS, GATE_FLOW } from "../src/DevOps360.jsx";
 import { OpsModel, Dashboards, ROLES, RACI, PROMOTION, EXCEPTION_RULES, CADENCE, EVIDENCE, REG_MAP, ATTEST, ENG_KPIS, SCORE_WEIGHTS, ALERTS, AUDIENCES } from "../src/DevOpsOps.jsx";
 
 let bad = 0;
@@ -357,7 +357,7 @@ for (const [tn, t] of [["light", tLight], ["dark", tDark]]) {
   ok(h.length > 12000 && !/NaN|undefined|\[object Object\]/.test(h), `the overview renders cleanly in ${tn}`, h.length);
 }
 const ov = renderToStaticMarkup(<Overview t={tLight} onGo={() => {}} />);
-ok((ov.match(/role="img"/g) || []).length === 1 && /three lanes/.test(ov) && /Liquibase schema stage first, built/.test(ov) && /the deploy to DEV, SIT, QC and PROD, pending/.test(ov),
+ok((ov.match(/role="img"/g) || []).length === 2 && /three lanes/.test(ov) && /Liquibase schema stage first, built/.test(ov) && /the deploy to DEV, SIT, QC and PROD, pending/.test(ov),
    "the one-picture figure carries a sentence that names the three lanes and the status of each");
 const nb = BUILT.filter((r) => r.status === "built").length, np_ = BUILT.filter((r) => r.status === "partial").length, nq = BUILT.filter((r) => r.status === "pending").length;
 ok(new RegExp(`Of the design.{1,8}s ${BUILT.length} reconciled rows, ${nb} are built, ${np_} partial and ${nq} pending`).test(ov),
@@ -371,6 +371,28 @@ ok(PR_STEPS.length === 10 && PR_STEPS.filter((r) => r[4] === "pending").length =
    "the pull request walk-through has ten steps and only the deploy is pending, said plainly");
 ok(FOR_DEVELOPERS.length === 5 && FOR_REVIEWERS.length === 4 && /If you write models and DAGs/.test(ov) && /If you review or approve/.test(ov) && /advisory first for one sprint/.test(ov),
    "a list for developers, a list for reviewers, and the advisory-first rule");
+// ---- the gate flow, expanded --------------------------------------------
+// Five gates, each with its checks, report, rule, the design stages it
+// stands in for and what it does not yet do; the stages before and after;
+// the status words and the aggregate rule. Data first, then the figure.
+ok(GATE_FLOW.gates.length === 5 && GATE_FLOW.gates.every((g, i) => g.n === i + 1 && g.checks.length >= 3 && /^reports\/gate\d\//.test(g.report) && g.rule && g.covers.length >= 1 && g.missing.length >= 1),
+   "five gates in order, each with at least three checks, a report path, a rule, what it stands in for and what is missing");
+ok(GATE_FLOW.before.length === 4 && GATE_FLOW.after.length === 3 && GATE_FLOW.semantics.map(([k]) => k).join(",") === "pass,fail,skip,unknown"
+   && /fail if any gate failed; else pass if at least one gate passed; else skip/.test(GATE_FLOW.aggregate),
+   "four stages before, three after, the four status words and the aggregate rule");
+ok(GATE_FLOW.params.some(([k]) => k === "SKIP_GATE4") && GATE_FLOW.params.some(([k]) => k === "FAST_FAIL") && /skip/.test(GATE_FLOW.gates[3].rule),
+   "the skip and fast-fail parameters are named and Gate 4 says it skips");
+ok(GATE_FLOW.gates[4].status === "partial" && GATE_FLOW.gates[4].missing.some((m) => /DevSecOps/.test(m)) && GATE_FLOW.gates[0].missing.some((m) => /gitleaks/.test(m)),
+   "security is partial without the shared library; the secrets scan is missing from code quality");
+const gf = renderToStaticMarkup(<GateFlow t={tLight} />);
+ok((gf.match(/role="img"/g) || []).length === 1 && /Gate 1 Code quality with 4 checks/.test(gf) && /Gate 5 Security scan with 3 checks/.test(gf) && /a failed gate skips the rest/.test(gf),
+   "the expanded figure carries a sentence that counts every gate's checks");
+ok(/BEFORE THE GATES/.test(gf) && /AFTER THE GATES/.test(gf) && /STANDS IN FOR/.test(gf) && />BUILT</.test(gf) && />PARTIAL</.test(gf) && />PENDING</.test(gf),
+   "the figure shows the stages before and after and colours what each gate stands in for");
+ok(GATE_FLOW.gates.every((g) => gf.includes(g.report) && g.checks.every((c) => gf.includes(c))) && /GUARDRAILS_CONFIG/.test(gf) && /Overall status:/.test(gf),
+   "every gate's report path and every check appear in the detail, with the parameters, environment and the overall rule");
+ok(renderToStaticMarkup(<GateFlowFig t={tDark} />).length > 3000 && /The gate flow, expanded/.test(ov) && gf.length > 6000,
+   "the gate flow renders in dark and sits in the overview");
 ok(!/testbbh|apps\.ocp|https?:\/\/|:7990|#cp-/.test(devSrc), "no hostname, URL, port or channel on the overview or in the data module");
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\ndevops360 assertions pass");

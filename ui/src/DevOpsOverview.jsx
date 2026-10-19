@@ -7,7 +7,7 @@
 // something the rest of the page does not.
 import React from "react";
 import { PAL, sp, Legend } from "./devopsStatus.jsx";
-import { NAMING, PIPES, DB_PROCESS, IMG_PROCESS, BUILT, PENDING } from "./devopsData.js";
+import { NAMING, PIPES, DB_PROCESS, IMG_PROCESS, BUILT, PENDING, GATE_FLOW } from "./devopsData.js";
 
 const mono = { fontFamily: "monospace" };
 function H2({ t, children }) {
@@ -121,6 +121,103 @@ export function ProcessFig({ t }) {
     </div>);
 }
 
+// The gate flow, expanded: the four stages before the gates, the five gates
+// with their checks stacked, the three stages after. Every box carries its
+// status; a gate's column also says which design stages it stands in for.
+export function GateFlowFig({ t }) {
+  const C = PAL(t);
+  const G = GATE_FLOW;
+  const W = 1180, colW = 196, gap = 12, x0 = 14, yTop = 92;
+  const box = (s, x, y, w, h, title, lines, small) => { const p = sp(C, s); return (
+    <g key={`${title}${x}${y}`}>
+      <rect x={x} y={y} width={w} height={h} rx={4} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} strokeDasharray={p.strokeDasharray} />
+      <text x={x + w - 6} y={y + 11} textAnchor="end" fontSize={7.5} fontWeight={800} letterSpacing=".4" fill={p.stroke}>{s.toUpperCase()}</text>
+      <text x={x + 8} y={y + 22} fontSize={small ? 10 : 11} fontWeight={700} fill={C.ink}>{title}</text>
+      {lines.map((l, i) => <text key={i} x={x + 8} y={y + 35 + i * 12} fontSize={9} fill={C.mut}>{l}</text>)}
+    </g>); };
+  const maxChecks = Math.max(...G.gates.map((g) => g.checks.length));
+  const checkH = 30, checkGap = 6;
+  const yChecks = yTop + 64;
+  const yCovers = yChecks + maxChecks * (checkH + checkGap) + 10;
+  const yAfter = yCovers + 86;
+  const H = yAfter + 96;
+  const beforeW = (W - 2 * x0 - 3 * gap) / 4;
+  return (
+    <div style={{ overflowX: "auto", border: `1px solid ${t.border}`, borderRadius: t.radius.md, background: t.panel, padding: "14px 14px 8px", marginBottom: 6 }}>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" style={{ display: "block", minWidth: 900, width: "100%", height: "auto" }}
+        aria-label={`The Guardrails gate flow on every pull request, expanded. Four stages first: load secrets, init, checkout source and setup environment. Then five gates in order, each with its checks stacked: ${G.gates.map((g) => `Gate ${g.n} ${g.name} with ${g.checks.length} checks`).join("; ")}. Under each gate, the design stages it covers and their status. Then three stages after: aggregate, archive, distribute. With fast-fail on, a failed gate skips the rest.`}>
+        <defs><marker id="dvg-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={C.mut} /></marker></defs>
+        <text x={x0} y={18} fontSize={11} fontWeight={800} letterSpacing=".6" fill={C.ink}>THE GUARDRAILS JOB · EVERY PULL REQUEST · GATES RUN IN ORDER, FAST-FAIL AWARE</text>
+        <text x={x0} y={38} fontSize={10} fontWeight={800} letterSpacing=".8" fill={C.mut}>BEFORE THE GATES</text>
+        {G.before.map(([name, what], i) => box("built", x0 + i * (beforeW + gap), 44, beforeW, 40, name, [what.length > 70 ? what.slice(0, 68) + "…" : what], true))}
+        {G.gates.map((g, i) => {
+          const x = x0 + i * (colW + gap);
+          return (<g key={g.n}>
+            {box(g.status, x, yTop, colW, 52, `Gate ${g.n} · ${g.name}`, [g.domain, g.report.replace("reports/", "")])}
+            {i < G.gates.length - 1 && <path d={`M${x + colW + 1} ${yTop + 26} L${x + colW + gap - 1} ${yTop + 26}`} stroke={C.mut} strokeWidth={1.3} markerEnd="url(#dvg-arr)" />}
+            <path d={`M${x + colW / 2} ${yTop + 52} L${x + colW / 2} ${yChecks - 2}`} stroke={C.mut} strokeWidth={1} />
+            {g.checks.map((c, j) => box(g.status, x + 10, yChecks + j * (checkH + checkGap), colW - 20, checkH, c.length > 34 ? c.slice(0, 33) + "…" : c, [], true))}
+            <text x={x + 10} y={yCovers + 8} fontSize={8.5} fontWeight={800} letterSpacing=".6" fill={C.mut}>STANDS IN FOR</text>
+            {g.covers.slice(0, 3).map(([stage, s], j) => { const p = sp(C, s); return (
+              <g key={stage}>
+                <rect x={x + 10} y={yCovers + 14 + j * 20} width={colW - 20} height={16} rx={2} fill={p.fill} stroke={p.stroke} strokeWidth={1} strokeDasharray={p.strokeDasharray} />
+                <text x={x + 15} y={yCovers + 25 + j * 20} fontSize={8.5} fill={C.ink}>{stage.length > 36 ? stage.slice(0, 35) + "…" : stage}</text>
+              </g>); })}
+          </g>);
+        })}
+        <text x={x0} y={yAfter - 10} fontSize={10} fontWeight={800} letterSpacing=".8" fill={C.mut}>AFTER THE GATES</text>
+        {G.after.map(([name, what, s], i) => box(s, x0 + i * (340 + gap), yAfter, 340, 52, name, [what.length > 72 ? what.slice(0, 70) + "…" : what, what.length > 72 ? what.slice(70, 142) : ""], true))}
+        <text x={x0} y={H - 10} fontSize={9.5} fill={C.mut}>Overall: {G.aggregate}. A gate's own status is pass, fail, skip or unknown. Gate 4 skips with SKIP_GATE4, and the report says so.</text>
+      </svg>
+    </div>);
+}
+
+export function GateFlow({ t }) {
+  const G = GATE_FLOW;
+  return (<>
+    <GateFlowFig t={t} />
+    <P t={t}>Each gate below: what it reads, what it checks, what it writes, and the rule that decides pass or fail. Beside it, the design stages the gate stands in for and what the design puts there that the gate does not yet do.</P>
+    {G.gates.map((g) => (
+      <div key={g.n} style={{ background: t.panel, border: `1px solid ${t.border}`, borderLeft: `4px solid ${sp(PAL(t), g.status).stroke}`, borderRadius: t.radius.md, padding: "12px 16px", margin: "10px 0" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
+          <b style={{ color: t.text, fontSize: 14 }}>Gate {g.n} · {g.name}</b><Status t={t} s={g.status} />
+          <span style={{ fontSize: 11.5, color: t.textMuted }}>{g.domain} · writes <span style={mono}>{g.report}</span></span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "4px 24px", marginTop: 8, fontSize: 12.5, color: t.sub, lineHeight: 1.55 }}>
+          <div style={{ minWidth: 0 }}>
+            <div><b style={{ color: t.text }}>Reads</b> {g.inputs}</div>
+            <div style={{ marginTop: 4 }}><b style={{ color: t.text }}>Checks</b><ul style={{ margin: "2px 0 0", paddingLeft: 18 }}>{g.checks.map((c) => <li key={c}>{c}</li>)}</ul></div>
+            <div style={{ marginTop: 4 }}><b style={{ color: t.text }}>Tools</b> {g.tools}</div>
+            <div style={{ marginTop: 4 }}><b style={{ color: t.text }}>Rule</b> {g.rule}</div>
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div><b style={{ color: t.text }}>Stands in for</b></div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, margin: "4px 0 6px" }}>
+              {g.covers.map(([stage, s]) => <div key={stage} style={{ display: "flex", gap: 8, alignItems: "center" }}><Status t={t} s={s} /><span>{stage}</span></div>)}
+            </div>
+            <div><b style={{ color: t.text }}>The design also puts here</b><ul style={{ margin: "2px 0 0", paddingLeft: 18 }}>{g.missing.map((m) => <li key={m}>{m}</li>)}</ul></div>
+          </div>
+        </div>
+      </div>))}
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "6px 28px", marginTop: 14 }}>
+      <div style={{ minWidth: 0 }}>
+        <H3 t={t}>Parameters</H3>
+        <Tbl t={t} head={["Parameter", "Meaning", ""]} rows={G.params.map(([a, b, c]) => [<span style={mono}>{a}</span>, b, <span style={{ fontSize: 11, color: t.textMuted }}>{c}</span>])} />
+        <H3 t={t}>Environment</H3>
+        <Tbl t={t} head={["Setting", "Meaning"]} rows={G.env.map(([a, b]) => [<span style={mono}>{a}</span>, b])} />
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <H3 t={t}>Before and after the gates</H3>
+        <Tbl t={t} head={["Stage", "What happens", "Passes when"]} rows={G.before.map(([a, b, c]) => [a, b, c])} />
+        <Tbl t={t} head={["Stage", "What happens"]} rows={G.after.map(([a, b]) => [a, b])} />
+        <H3 t={t}>Status words</H3>
+        <Tbl t={t} head={["Status", "Means"]} rows={G.semantics.map(([a, b]) => [<span style={mono}>{a}</span>, b])} />
+        <Note t={t}><b style={{ color: t.text }}>Overall status:</b> {G.aggregate}. <b style={{ color: t.text }}>Fast-fail:</b> {G.fastFail}</Note>
+      </div>
+    </div>
+  </>);
+}
+
 export default function Overview({ t, onGo }) {
   const n = (s) => BUILT.filter((r) => r.status === s).length;
   const PIPE_TEXT = {
@@ -157,6 +254,10 @@ export default function Overview({ t, onGo }) {
       <H2 t={t}>A pull request, step by step</H2>
       <P t={t}>What happens between opening a pull request and seeing the report. The gates are the same on every repository; the thresholds live in <span style={mono}>config/guardrails.yaml</span> until the shared library takes them over.</P>
       <Tbl t={t} head={["Step", "Who", "What happens", "Passes when", ""]} rows={PR_STEPS.map(([a, b, c, d, s]) => [a, b, c, d, <Status t={t} s={s} />])} />
+
+      <H2 t={t}>The gate flow, expanded</H2>
+      <P t={t}>The same job, opened up: the four stages before the gates, each gate's checks in the order they run, the report file each one writes, and the three stages after. Under every gate, the design stages it stands in for, coloured by status, and what the design puts at that point that the gate does not do yet.</P>
+      <GateFlow t={t} />
 
       <H2 t={t}>Database deployment: Liquibase in every application repository</H2>
       <P t={t}>There is no separate database job. Schema change is a stage of the application job, applied from a <span style={mono}>db/changelog</span> that lives in the same repository as the code that needs it. It runs {DB_PROCESS.cadence}.</P>

@@ -29,8 +29,8 @@ import React, { useState, useEffect } from "react";
 // cards (DevOpsOps.jsx) can read them without importing this file back.
 import { PAL, sp, STATUS_TEXT, Legend, SBox } from "./devopsStatus.jsx";
 export { PAL, sp, STATUS_TEXT, Legend };
-import { NAMING, PIPES, DB_PROCESS, IMG_PROCESS, BUILT, PENDING } from "./devopsData.js";
-export { NAMING, PIPES, DB_PROCESS, IMG_PROCESS, BUILT, PENDING };
+import { NAMING, PIPES, DB_PROCESS, IMG_PROCESS, BUILT, PENDING, GATE_FLOW } from "./devopsData.js";
+export { NAMING, PIPES, DB_PROCESS, IMG_PROCESS, BUILT, PENDING, GATE_FLOW };
 import { promotionApi } from "./guardrails_api_additions.js";
 
 // Every figure is wrapped the same way: a scroll frame so a wide diagram

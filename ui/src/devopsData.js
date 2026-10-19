@@ -168,3 +168,75 @@ export const PENDING = [
   ["Dashboards on the Silver rows", "Grafana for engineers, Power BI for governance, and the immutable seven-year store behind both."],
   ["Exceptions as records", "scoped to one control and one asset, two approvers, expiry enforced by the deploy policy rather than a calendar."],
 ];
+
+// The gate flow, expanded: what the Guardrails job does on every pull
+// request, stage by stage and check by check. Read by the Overview's gate
+// figure and table. `covers` names the design stages each gate stands in
+// for, with the same built / partial / pending status as BUILT; `missing`
+// is what the design puts at that point and the gate does not do.
+export const GATE_FLOW = {
+  params: [
+    ["SOURCE_REPO_URL", "the repository to check out", "required"],
+    ["SOURCE_BRANCH", "the branch; master by default", "default"],
+    ["SOURCE_COMMIT", "a commit to pin instead of the branch head", "optional"],
+    ["SKIP_GATE4", "skip the performance gate; recorded as skip", "boolean"],
+    ["FAST_FAIL", "stop running gates once the build is marked failed; on by default", "boolean"],
+  ],
+  env: [
+    ["GUARDRAILS_CONFIG", "config/guardrails.yaml in the workspace: gate enablement, thresholds, scanner behaviour, exclusions and test selection"],
+    ["REPORTS_DIR", "reports/ in the workspace; each gate writes under reports/gate{n}/"],
+    ["SOURCE_WORKSPACE", "source/ in the workspace, where the application repository is cloned"],
+    ["Oracle connection", "host, service, port, user and password from an OpenShift secret, loaded as job environment; never in the repository"],
+  ],
+  before: [
+    ["Load secrets", "Pulls the Oracle connection values from the OpenShift secret into the job environment.", "The five values are present.", "built"],
+    ["Init", "Loads pipelines/guardrails.groovy and runs initialize: reads config/guardrails.yaml, prepares reports/.", "The config parses.", "built"],
+    ["Checkout source", "Clones SOURCE_REPO_URL at SOURCE_BRANCH, or SOURCE_COMMIT when given, into source/. Records the commit.", "Workspace populated, commit recorded.", "built"],
+    ["Setup environment", "Installs the toolchain the gates need: dbt, the linters, the scanners.", "dbt resolves.", "built"],
+  ],
+  gates: [
+    { n: 1, name: "Code quality", domain: "code and repository quality", status: "built",
+      inputs: "the checked-out source", report: "reports/gate1/*",
+      checks: ["lint the SQL and Python", "formatting", "DAG standards, read statically", "repository checks: tracked build directories, file sizes, branch name"],
+      tools: "linters and formatters, the DAG checker", rule: "fail on any blocking finding; disabled checks return skip",
+      covers: [["Stage 2 · PR validation", "partial"], ["Stage 4a · SQLFluff", "built"], ["Stage 4b · dbt standards", "built"], ["Stage 4c · DAG standards by AST", "built"]],
+      missing: ["Stage 4d · secrets scan (gitleaks)"] },
+    { n: 2, name: "Schema validation", domain: "schema governance", status: "built",
+      inputs: "the dbt YAML contracts, and Oracle metadata after the schema stage applied the changelog", report: "reports/gate2/schema_validation.json",
+      checks: ["every contracted model exists in Oracle", "every contracted column exists with the declared type", "nothing in Oracle contradicts a contract"],
+      tools: "the schema comparer against the Oracle dictionary", rule: "fail on any contract that Oracle does not hold",
+      covers: [["Stage 6 · OPA cp.dbt", "partial"]],
+      missing: ["owner routability, PII classification, lineage-based layer rules", "Stage 7 · documentation coverage"] },
+    { n: 3, name: "Transformation quality", domain: "data quality and transformation correctness", status: "built",
+      inputs: "the dbt project and a fixed target schema", report: "reports/gate3/transformation_quality.json",
+      checks: ["dbt deps, parse, compile: every ref and source resolves", "dbt test: schema and data tests", "the custom transformation assertions"],
+      tools: "dbt-core with the Oracle adapter", rule: "fail on a compile error, a failed test or a failed assertion",
+      covers: [["Stage 5 · parse and compile", "built"], ["Stage 12 · build and test", "partial"]],
+      missing: ["an ephemeral CI schema per run", "state-based selection, so only changed models rebuild", "source freshness"] },
+    { n: 4, name: "Performance benchmark", domain: "operational performance", status: "built",
+      inputs: "the compiled models and the Oracle target", report: "reports/gate4/benchmark.json",
+      checks: ["runtime thresholds per model", "plan checks against the configured limits", "benchmark comparisons"],
+      tools: "the benchmark runner against Oracle", rule: "fail above threshold; skip, and say so, when SKIP_GATE4 is set",
+      covers: [["Stage 14 · architecture compliance", "partial"]],
+      missing: ["lineage depth and fan-out limits, which are not measured"] },
+    { n: 5, name: "Security scan", domain: "application security", status: "partial",
+      inputs: "the Python in DAGs and plugins, and the SAST output", report: "reports/gate5/sast_validation.json",
+      checks: ["Bandit over the Python", "SAST findings normalised to one shape", "severity thresholding: block above the configured level"],
+      tools: "Bandit and the SAST normaliser", rule: "fail on any finding above the blocking severity; the threshold is local until the shared library owns it",
+      covers: [["Stage 9 · Bandit", "built"], ["Stage 9 · Semgrep, Trivy, Checkov", "pending"], ["Stage 10 · Sonar quality gate", "pending"]],
+      missing: ["the shared DevSecOps library's thresholds and coverage rule", "Stage 11 · unit tests with a coverage floor"] },
+  ],
+  after: [
+    ["Aggregate", "scripts/report_aggregator.py reads every gate's output and writes summary.json and summary.html: build metadata, overall status, per-gate status, per-gate files.", "built"],
+    ["Archive", "reports/** archived on the build; the workspace is cleaned.", "built"],
+    ["Distribute", "The bridge collects summary.json and summary.html, uploads the run to the Silver schema and e-mails the HTML to the pull request's developers and reviewers.", "built"],
+  ],
+  semantics: [
+    ["pass", "every blocking check in the gate passed"],
+    ["fail", "a blocking check failed"],
+    ["skip", "the gate, or every check in it, is disabled in config, or SKIP_GATE4 was set"],
+    ["unknown", "the gate produced no readable result"],
+  ],
+  aggregate: "fail if any gate failed; else pass if at least one gate passed; else skip",
+  fastFail: "With FAST_FAIL on, the default, a failed gate marks the build failed and the remaining gates are skipped. Off, every gate runs and the report shows all failures in one pass, at the cost of the run time.",
+};
