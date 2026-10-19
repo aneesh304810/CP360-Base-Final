@@ -27,6 +27,8 @@ import DevOps360, { PAL, NAMING, FlowFig, Dashboard, Detail, Context,
   Containers, Components, Versions, Promotion, Pipelines,
   Deployment, Built, BUILT, PENDING, PIPES, sp, Legend, PendingList, DB_PROCESS, IMG_PROCESS, Process } from "../src/DevOps360.jsx";
 import { tLight, tDark } from "../src/bbhTheme.js";
+import Overview, { ProcessFig, PR_STEPS, FOR_DEVELOPERS, FOR_REVIEWERS } from "../src/DevOpsOverview.jsx";
+import { DOC_TABS } from "../src/DevOps360.jsx";
 import { OpsModel, Dashboards, ROLES, RACI, PROMOTION, EXCEPTION_RULES, CADENCE, EVIDENCE, REG_MAP, ATTEST, ENG_KPIS, SCORE_WEIGHTS, ALERTS, AUDIENCES } from "../src/DevOpsOps.jsx";
 
 let bad = 0;
@@ -200,7 +202,9 @@ ok(/promotionApi\.deployments\(\)/.test(JSX) && /promotionApi\.releases\(\)/.tes
 // ---- the schema lives in each application's repo -----------------------
 // Liquibase is a stage of the application job, applied from a db/changelog
 // in the application's own repo, not a separate pipeline on its own cadence.
-const devSrc = fs.readFileSync(path.join(process.cwd(), fs.existsSync("src/DevOps360.jsx") ? "src/DevOps360.jsx" : "ui/src/DevOps360.jsx"), "utf8");
+const SRCDIR = fs.existsSync("src/DevOps360.jsx") ? "src" : path.join("ui", "src");
+// the page and its data module together: the rows moved to devopsData.js so the Overview reads the same ones
+const devSrc = ["DevOps360.jsx", "devopsData.js", "DevOpsOverview.jsx"].map((f) => fs.readFileSync(path.join(process.cwd(), SRCDIR, f), "utf8")).join("\n");
 ok(!/cp-liquibase/.test(devSrc) && !/Liquibase job/.test(devSrc), "no separate Liquibase repo or job remains on the page");
 ok(/db\/changelog/.test(devSrc) && /Schema stage · Liquibase/.test(devSrc) && /first stage of the application job/.test(devSrc),
    "each application repo carries its own db/changelog; the schema stage is the first stage of the application job");
@@ -235,7 +239,7 @@ ok(PENDING.length >= 8 && /control ID/i.test(PENDING[0][0]),
    "the pending list exists and the control ID is first, because everything else reads from it", PENDING.map((p) => p[0]).join(" | "));
 ok(!/testbbh|apps\.ocp|https?:\/\/|:7990/.test(devSrc),
    "no hostname, URL or port from the guardrails repo is on the page — the endpoint stays in the runbook");
-const shell2 = renderToStaticMarkup(<DevOps360 t={tLight} />);
+const shell2 = renderToStaticMarkup(<DevOps360 t={tLight} tab="map" />);
 ok(!/built today · vs the design · pending/.test(shell2) && /Pending, in the order that unlocks the rest/.test(shell2),
    "no separate click-through: the pending list is on the page under the map");
 ok(/What runs today is\s+not this figure yet/.test(renderToStaticMarkup(<Components t={tLight} />)),
@@ -334,6 +338,40 @@ ok(ALERTS.length === 8 && ALERTS.filter((r) => r[3]).length === 2 && (dsh.match(
 ok(!/testbbh|apps\.ocp|https?:\/\/|:7990|#cp-/.test(opsSrc), "no hostname, URL, port or channel name from the guardrails docs is on the page");
 const shell3 = renderToStaticMarkup(<DevOps360 t={tLight} />);
 ok(/roles · review · promotion · exceptions · evidence/.test(shell3) && /two audiences · KPIs · score · alerts/.test(shell3), "both cards are offered from the reference row");
+
+// ---- the documentation shape: an Overview first, then the chapters -----
+// The page is the team's DevOps documentation. The overview is read from
+// the same data module as the map, so the two cannot disagree; the tab bar
+// names every chapter with a line, and the default tab is the overview.
+ok(DOC_TABS.length === 6 && DOC_TABS[0][0] === "overview" && DOC_TABS.every((d) => d.length === 3 && d[2].length > 20),
+   "six chapters, overview first, each with a line that says what it holds", DOC_TABS.map((d) => d[0]).join(","));
+const home = renderToStaticMarkup(<DevOps360 t={tLight} />);
+ok(/aria-selected="true"[^>]*>[^]*?Overview/.test(home) && /The process in one picture/.test(home) && /Liquibase in every application repository/.test(home),
+   "the page opens on the overview");
+for (const [k] of DOC_TABS) {
+  const h = renderToStaticMarkup(<DevOps360 t={tLight} tab={k} />);
+  ok(h.length > 3000 && !/NaN|undefined|\[object Object\]/.test(h), `the ${k} tab renders cleanly`, h.length);
+}
+for (const [tn, t] of [["light", tLight], ["dark", tDark]]) {
+  const h = renderToStaticMarkup(<Overview t={t} onGo={() => {}} />);
+  ok(h.length > 12000 && !/NaN|undefined|\[object Object\]/.test(h), `the overview renders cleanly in ${tn}`, h.length);
+}
+const ov = renderToStaticMarkup(<Overview t={tLight} onGo={() => {}} />);
+ok((ov.match(/role="img"/g) || []).length === 1 && /three lanes/.test(ov) && /Liquibase schema stage first, built/.test(ov) && /the deploy to DEV, SIT, QC and PROD, pending/.test(ov),
+   "the one-picture figure carries a sentence that names the three lanes and the status of each");
+const nb = BUILT.filter((r) => r.status === "built").length, np_ = BUILT.filter((r) => r.status === "partial").length, nq = BUILT.filter((r) => r.status === "pending").length;
+ok(new RegExp(`Of the design.{1,8}s ${BUILT.length} reconciled rows, ${nb} are built, ${np_} partial and ${nq} pending`).test(ov),
+   "the honest-shape counts are derived from BUILT, not typed", `${BUILT.length}/${nb}/${np_}/${nq}`);
+ok(PIPES.every(([, title]) => ov.includes(title.replace(/&/g, "&amp;"))) && /There is no separate database job/.test(ov) && /DATABASECHANGELOG_\{APP\}/.test(ov)
+   && DB_PROCESS.rules.every((r) => ov.includes(r.slice(0, 40))) && /Passes when: /.test(ov),
+   "the four pipeline cards, and the Liquibase section reads its six steps and three rules from DB_PROCESS");
+ok(IMG_PROCESS.steps.every(([step]) => ov.includes(step.replace(/^\d+ · /, ""))) && NAMING.every((r) => ov.includes(r.example)) && PENDING.every(([a]) => ov.includes(a)),
+   "the image steps, the naming table and the pending list are the page's own rows");
+ok(PR_STEPS.length === 10 && PR_STEPS.filter((r) => r[4] === "pending").length === 1 && /Merge and deploy/.test(ov) && /Deployment is manual today/.test(ov),
+   "the pull request walk-through has ten steps and only the deploy is pending, said plainly");
+ok(FOR_DEVELOPERS.length === 5 && FOR_REVIEWERS.length === 4 && /If you write models and DAGs/.test(ov) && /If you review or approve/.test(ov) && /advisory first for one sprint/.test(ov),
+   "a list for developers, a list for reviewers, and the advisory-first rule");
+ok(!/testbbh|apps\.ocp|https?:\/\/|:7990|#cp-/.test(devSrc), "no hostname, URL, port or channel on the overview or in the data module");
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\ndevops360 assertions pass");
 if (bad) process.exit(1);

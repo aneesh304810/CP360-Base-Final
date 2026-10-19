@@ -29,25 +29,9 @@ import React, { useState, useEffect } from "react";
 // cards (DevOpsOps.jsx) can read them without importing this file back.
 import { PAL, sp, STATUS_TEXT, Legend, SBox } from "./devopsStatus.jsx";
 export { PAL, sp, STATUS_TEXT, Legend };
+import { NAMING, PIPES, DB_PROCESS, IMG_PROCESS, BUILT, PENDING } from "./devopsData.js";
+export { NAMING, PIPES, DB_PROCESS, IMG_PROCESS, BUILT, PENDING };
 import { promotionApi } from "./guardrails_api_additions.js";
-
-// The naming standard, as data. `perEnv` is not decoration: the rule is
-// that an environment appears in a name IF AND ONLY IF the thing is
-// re-made per environment, and the test checks that over this list.
-export const NAMING = [
-  { thing: "App release", fmt: "v + date", example: "v2026.10.01",
-    perEnv: false, by: "Jenkins, merge build only" },
-  { thing: "Database tag", fmt: "env + build", example: "qc-1201",
-    perEnv: true, by: "schema stage of the application job, per environment" },
-  { thing: "Image", fmt: "date + build, pinned by digest",
-    example: "2026.10.01-1189 → @sha256:9f3c…", perEnv: false, by: "image job" },
-  { thing: "Guardrail library", fmt: "semver", example: "3.2.0",
-    perEnv: false, by: "library repo" },
-  { thing: "Branch", fmt: "type/ticket-slug", example: "feature/CP-1234-scd2",
-    perEnv: false, by: "developer" },
-];
-
-
 
 // Every figure is wrapped the same way: a scroll frame so a wide diagram
 // scrolls inside its own box rather than pushing the page sideways, and
@@ -953,82 +937,6 @@ export function Deployment({ t }) {
 // The swimlanes draw the steps; these tables say who does each one,
 // what has to be true to pass it, and what it writes. Data, so the test
 // can check every step names a gate and a writer.
-export const DB_PROCESS = {
-  title: "Database · Liquibase",
-  cadence: "per release, as the first stage of the application job — never per commit",
-  steps: [
-    ["1 · Author", "Engineer",
-      "Writes a changeset in the application repo's db/changelog: one logical change, a rollback block, labels and contexts. Additive now; a drop is a later release.",
-      "The standards check rejects a changeset without a rollback block or a destructive change with no prior expand release.",
-      "—"],
-    ["2 · Pull request", "Tech lead",
-      "Reviews for expand-and-contract, naming and whether the rollback is data-safe. The PR run validates the changelog and shows what would apply, as a dry run against DEV.",
-      "Approval, plus a clean validate and status.",
-      "—"],
-    ["3 · Validate", "Schema stage",
-      "liquibase validate, then status and a checksum compare against the rows already applied in the target.",
-      "A changed checksum, or a changeset the target cannot parse, stops the job before anything else runs.",
-      "—"],
-    ["4 · Update", "Schema stage",
-      "liquibase update against the application's own changelog table, DATABASECHANGELOG_{APP}, under the application's lock, with the environment as context.",
-      "Any failing changeset fails the job; no gate and no deploy runs after it.",
-      "guardrail_changeset — one row per changeset: author, type, rollback_declared, data_safe, release, build"],
-    ["5 · Tag", "Schema stage",
-      "liquibase tag <env>-<build>, so the instance carries the release's database tag.",
-      "The tag is minted only after every changeset applied.",
-      "guardrail_changeset_applied — (changeset, environment), checksum, applied_at; the db_tag the map shows"],
-    ["6 · Ahead of code", "Deploy stage of the same job",
-      "Reads the tag before applying the application. The schema may be ahead of the code, by design; it is never behind.",
-      "No tag for this release on the target: the deploy refuses.",
-      "guardrail_deployment — the schema lane"],
-  ],
-  rules: [
-    "Rollback is liquibase rollback to the previous tag, and only for data-safe changesets. A destructive change rolls forward with a new changeset.",
-    "The same changelog runs in every environment; only the tag differs. DEV and SIT on merge, QC on promotion, PROD on approval.",
-    "Every object has exactly one owning application; a shared table changes only in its owner's changelog. dbt owns what it builds, Liquibase the rest.",
-  ],
-};
-
-export const IMG_PROCESS = {
-  title: "Infrastructure image & security",
-  cadence: "on a CVE or a version bump, on its own clock — the application job never builds an image",
-  steps: [
-    ["1 · Bump", "Platform engineering",
-      "A CVE patch or base version bump in one of the three image repos: base, workbench, agent.",
-      "Triggered by a scanner finding or a scheduled rebuild; a bump with no reason is questioned in review.",
-      "—"],
-    ["2 · Pull request", "Platform engineering + reviewer",
-      "Dockerfile and SBOM configuration. The base is pinned by digest; no floating tags.",
-      "Review, plus the Dockerfile checks: no root, no privileged, resource limits present.",
-      "—"],
-    ["3 · Build", "Image job",
-      "Builds base first, then workbench and agent on the new base digest.",
-      "A failed build pushes nothing.",
-      "—"],
-    ["4 · Scan", "Image job",
-      "Scans the image and its dependencies for CVEs.",
-      "CRITICAL fails the job; HIGH fails an image bound for production.",
-      "scan report, archived on the build"],
-    ["5 · Sign + SBOM", "Image job",
-      "Signs the image and attaches the SBOM and provenance as attestations.",
-      "An unsigned image never reaches the registry.",
-      "signature + SBOM in the registry, beside the digest"],
-    ["6 · Push by digest", "Image job",
-      "Pushes one immutable sha256. The date-build tag is a label; the digest is the identity.",
-      "The push is the release; there is no promotion step for an image.",
-      "the image record: date + build → digest"],
-    ["7 · Bump PR", "Image job",
-      "Raises a pull request into every repository that pins the digest: application repos for the base, the Jenkinsfile for the agent.",
-      "A consumer adopts the fix only when it merges the bump — this step needs an owner and an SLA.",
-      "—"],
-  ],
-  rules: [
-    "The digest never moves between environments; it is already identical in all four. Admission only runs signed digests from the internal registry.",
-    "A new image changes nothing on its own: the fix is live when the last consumer merges its bump and redeploys.",
-    "The three images are rebuilt together so workbench and agent never sit on an older base than the one just patched.",
-  ],
-};
-
 export function Process({ t, p }) {
   return (
     <div style={{ margin: "4px 0 18px" }}>
@@ -1179,73 +1087,6 @@ function BuiltFig({ t }) {
 
 // One row per thing the design asks for. `status` is built, partial or
 // pending; the test counts them and the page shows the count.
-export const BUILT = [
-  { design: ["Trigger", "a GitHub Enterprise pull request webhook straight into Jenkins"],
-    today: "a Bitbucket pull request webhook into sie-webhook-bridge, which starts the Guardrails job with repository, branch and commit", status: "built" },
-  { design: ["Stage 1", "checkout, commit SHA recorded"],
-    today: "Checkout Source Repo into the job workspace; SOURCE_COMMIT can pin the SHA", status: "built" },
-  { design: ["Stage 2", "PR validation: branch name, no tracked build dirs, no file over 5 MB"],
-    today: "the repository checks inside Gate 1; the three rules are not evidenced one by one", status: "partial" },
-  { design: ["Stage 3", "bootstrap from a pinned requirements file through the mirror"],
-    today: "the Setup Environment stage; pinning is not evidenced", status: "partial" },
-  { design: ["Stage 4a–c", "SQLFluff · dbt standards · DAG standards by AST parse"],
-    today: "Gate 1 code quality: lint, format, DAG and repository checks", status: "built" },
-  { design: ["Stage 4d", "gitleaks on the PR, full history on main"],
-    today: "nothing in a gate; Gate 5 is Bandit plus SAST normalisation", status: "pending" },
-  { design: ["Stage 5", "dbt parse and compile, manifest written"],
-    today: "inside Gate 3", status: "built" },
-  { design: ["Stage 6", "OPA cp.dbt: owners, PII, lineage-based layer rules"],
-    today: "no policy engine. Gate 2 compares the dbt YAML contracts to Oracle metadata instead — a check the design did not have", status: "partial" },
-  { design: ["Stage 7", "documentation coverage thresholds"],
-    today: "nothing", status: "pending" },
-  { design: ["Stage 8", "DagBag import in the scheduler's own image, then cp.airflow"],
-    today: "Gate 1 reads the DAGs statically; nothing imports them in the runtime image", status: "partial" },
-  { design: ["Stages 9–10", "Semgrep · Bandit · Trivy · Checkov · Sonar quality gate"],
-    today: "Gate 5: Bandit, plus SAST findings normalised by severity; the shared library's thresholds are not connected", status: "partial" },
-  { design: ["Stage 11", "unit tests with an 80 % coverage floor"],
-    today: "nothing; the coverage rule would come from the shared library, which is not connected", status: "pending" },
-  { design: ["Stage 12", "dbt build into an ephemeral CI schema, state:modified+, source freshness"],
-    today: "Gate 3: dbt test plus custom transformation assertions, against a fixed target", status: "partial" },
-  { design: ["Stage 13", "integration tests in qa, uat and prod"],
-    today: "nothing", status: "pending" },
-  { design: ["Stage 14", "architecture: lineage depth ≤ 8, fan-out ≤ 40"],
-    today: "Gate 4 benchmarks Oracle performance thresholds instead; depth and fan-out are not measured", status: "partial" },
-  { design: ["Stages 15–16", "cp.deploy deployment gate, manual approval with separation of duties"],
-    today: "nothing; the promotion block would come from the shared library, which is not connected", status: "pending" },
-  { design: ["Stages 17–18", "signed promotion, post-deploy validation, automatic rollback"],
-    today: "nothing: the job ends at pass or fail", status: "pending" },
-  { design: ["post block", "reports and metrics on every outcome, cleanup"],
-    today: "the report aggregator writes summary.json and summary.html; reports archived; workspace cleaned", status: "built" },
-  { design: ["Secrets", "Vault, a short-lived token scoped to the stage"],
-    today: "an OpenShift secret holding the Oracle connection values, loaded as job environment", status: "partial" },
-  { design: ["Results store", "a row per control per build in Oracle SILVER, Prometheus beside it"],
-    today: "the bridge uploads each run's summary to the Silver schema — per gate, not per control", status: "partial" },
-  { design: ["Dashboards", "Grafana for engineers, Power BI for governance, a seven-year audit store"],
-    today: "the HTML report, emailed to the pull request's developers and reviewers", status: "pending" },
-  { design: ["Control catalogue", "176 control IDs — DBT, AF, CP-OPA, CP-DEP — on every result"],
-    today: "results are pass, fail, skip or unknown per gate; no control ID anywhere", status: "pending" },
-  { design: ["Exceptions", "90-day, two approvers, expiry enforced in the deploy policy"],
-    today: "nothing", status: "pending" },
-  { design: ["Schema stage", "Liquibase from db/changelog as the first stage — this page's own design"],
-    today: "built: the changelog in each application repo is applied first and tagged per environment; Gate 2 then checks the contracts against what Oracle holds", status: "built" },
-  { design: ["Image pipeline", "build, scan, sign, SBOM, one digest pinned by every consumer"],
-    today: "built: the image job runs on its own cadence and hands over a digest", status: "built" },
-  { design: ["DevSecOps shared library", "stage order, severity thresholds, coverage rule and release rules from one pinned library"],
-    today: "not connected: the job runs its own five gates with its own thresholds in config/guardrails.yaml", status: "pending" },
-];
-
-export const PENDING = [
-  ["A control ID on every result", "a row per control per build, in summary.json and in Silver. Everything below reads from it: the score, the dashboards, the exceptions."],
-  ["Connect the DevSecOps shared library", "pin it in the Jenkinsfile, take stage order, severity thresholds, the coverage rule and the promotion block from it, and retire the local thresholds. Until then no team is held to the same gate."],
-  ["Secrets scan as a gate", "gitleaks on the pull request, full history on main. The cheapest blocking control still missing."],
-  ["Policy stages", "cp.dbt after compile, cp.airflow after a DagBag import in the runtime image, cp.deploy before any promotion."],
-  ["Gate 3 at scale", "dbt build into an ephemeral CI schema with state-based selection and source freshness, so the gate survives the first hundred models."],
-  ["Deployment inside the job", "deploy gate, approval gate with the approver recorded, signed artefact promotion, post-deploy smoke tests with rollback. Today the job stops at the report, and the deploy stage has no database tag to check against."],
-  ["Secrets from Vault", "a short-lived token per stage replacing the OpenShift secret."],
-  ["Dashboards on the Silver rows", "Grafana for engineers, Power BI for governance, and the immutable seven-year store behind both."],
-  ["Exceptions as records", "scoped to one control and one asset, two approvers, expiry enforced by the deploy policy rather than a calendar."],
-];
-
 const STATUS = { built: ["built", "ok"], partial: ["partial", "wa"], pending: ["pending", "no"] };
 function Status({ t, s }) {
   const C = PAL(t);
@@ -1325,13 +1166,6 @@ export function PendingList({ t }) {
 // that says v2026.10.01 says it because a row says so.
 const ENV_ORDER = ["DEV", "SIT", "UAT", "PROD"];
 const ENV_LABEL = { DEV: "RD DEV", SIT: "RD SIT", UAT: "QC · UAT", PROD: "PROD" };
-export const PIPES = [
-  ["intake", "PR intake · webhook bridge", "every PR · 5 gates · Silver · email", "built"],
-  ["app", "Application data pipeline", "dbt + Airflow · daily", "partial"],
-  ["db", "Database · Liquibase", "per release · first stage of the app job", "built"],
-  ["img", "Infrastructure image & security", "CVE / bumps · one digest", "built"],
-];
-
 export function FlowFig({ t, envs, open, onOpen }) {
   const C = PAL(t);
   const EW = 228, EX = (i) => 20 + i * 242;
@@ -1720,10 +1554,24 @@ export function Dashboard({ t, live, envs, hist, rels, onPick }) {
 // The operating model and the compliance dashboard, from the Guardrails
 // documentation, live in their own module and read this one's palette.
 import { OpsModel, Dashboards } from "./DevOpsOps.jsx";
+import Overview from "./DevOpsOverview.jsx";
 
-export default function DevOps360({ t }) {
+// The page is the team's DevOps documentation, so it is organised as one:
+// an Overview first, then the detail behind it. The tab bar carries a line
+// on each tab so the organisation is readable without opening anything.
+export const DOC_TABS = [
+  ["overview", "Overview", "the process in one picture · what is built · Liquibase in every repo · what comes next"],
+  ["map", "Delivery map", "the four pipelines, live state per environment, the pending list"],
+  ["pipelines", "Pipelines & process", "a swimlane per pipeline and the two built processes step by step"],
+  ["reference", "Design reference", "C4 context, containers, components · versions · promotion · deployment"],
+  ["ops", "Operating model", "roles · review · promotion · exceptions · evidence"],
+  ["dash", "Compliance dashboard", "two audiences · KPIs · score · alerts"],
+];
+
+export default function DevOps360({ t, tab: initialTab }) {
+  const [tab, setTab] = useState(initialTab || "overview");
   const [open, setOpen] = useState(null);
-  const [ref, setRef] = useState(null);
+  const [ref, setRef] = useState("Context");
   const [envs, setEnvs] = useState([]);
   const [hist, setHist] = useState([]);
   const [rels, setRels] = useState([]);
@@ -1754,61 +1602,85 @@ export default function DevOps360({ t }) {
           {live ? "● LIVE" : "○ NO ROWS YET"}</span>
       </div>
       <div style={{ fontSize: 13, color: t.sub, maxWidth: "80ch",
-        lineHeight: 1.6, margin: "4px 0 16px" }}>
-        The delivery system, and what it has actually delivered. Every box on
-        the map opens; the dashboard underneath is{" "}
-        <b style={{ color: t.text }}>guardrail_deployment</b>, filtered and
-        exportable. For the gate matrix and the changeset-level compare, use{" "}
-        <b style={{ color: t.text }}>Quality Guardrails → Releases</b>. Every
-        figure is coloured by build status, so the design and what runs on
-        every pull request today are read together, not on separate pages.
+        lineHeight: 1.6, margin: "4px 0 14px" }}>
+        The team's DevOps documentation: the delivery system, what it has
+        actually delivered, and the design behind it. Every figure is coloured
+        by build status, so the design and what runs on every pull request
+        today are read together, not on separate pages. For what is deployed
+        where, use <b style={{ color: t.text }}>Governance → Release Delivery</b>;
+        for the gate matrix, <b style={{ color: t.text }}>Quality Guardrails → Releases</b>.
       </div>
 
-      <Legend t={t} note="— the figures draw the design; the colour says how much of it exists" />
-      <FlowFig t={t} envs={envs} open={open} onOpen={setOpen} />
-      <Detail t={t} open={open} envs={envs} hist={hist}
-        onClose={() => setOpen(null)} />
-      <PendingList t={t} />
-
-      {/* The dashboard moved to Governance -> Release Delivery. This page
-          is the DESIGN of the delivery system; "what is live where" is an
-          operational question asked by people who never open an
-          architecture page. Two audiences, two screens. */}
-      <div style={{ background: t.panel, border: `1px solid ${t.border}`,
-        borderLeft: `3px solid ${t.accent}`, borderRadius: 8,
-        padding: "13px 17px", margin: "22px 0 0", fontSize: 12.5,
-        color: t.sub, lineHeight: 1.6, maxWidth: "80ch" }}>
-        <b style={{ color: t.text }}>The release delivery dashboard has
-        moved.</b> What is deployed where, with the CSV export, now lives
-        under <b style={{ color: t.text }}>Governance &rarr; Release
-        Delivery</b>. This page keeps the delivery system itself: the maps,
-        the pipelines, what a version is and how promotion works.
+      {/* The documentation's table of contents: one tab per chapter, each
+          with a line that says what it holds. Overview first. */}
+      <div role="tablist" aria-label="DevOps 360 sections" style={{ display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 6, marginBottom: 18 }}>
+        {DOC_TABS.map(([k, label, line]) => (
+          <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
+            style={{ font: "inherit", textAlign: "left", cursor: "pointer", padding: "8px 11px",
+              border: `1px solid ${tab === k ? t.accent : t.border}`, borderRadius: t.radius.md,
+              background: tab === k ? t.accent : t.panel, color: tab === k ? "#fff" : t.text }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700 }}>{label}</div>
+            <div style={{ fontSize: 10.5, opacity: tab === k ? .9 : .75, lineHeight: 1.4,
+              color: tab === k ? "#fff" : t.sub }}>{line}</div>
+          </button>))}
       </div>
 
-      <div style={{ fontSize: 15, fontWeight: 700, color: t.text,
-        margin: "26px 0 4px" }}>Reference</div>
-      <div style={{ fontSize: 10.5, color: t.sub, marginBottom: 10 }}>
-        the design behind the map, coloured by what exists — opens in place, nothing here is live</div>
-      <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
-        {[["Context", "C4 · who uses it"], ["Containers", "C4 · the runnable pieces"],
-          ["Promotion", "what moves between regions"],
-          ["Deployment", "what each component becomes"],
-          ["Operating model", "roles · review · promotion · exceptions · evidence"],
-          ["Compliance dashboard", "two audiences · KPIs · score · alerts"]].map(([k, label]) => (
-          <span key={k} onClick={() => setRef(ref === k ? null : k)}
-            style={{ cursor: "pointer", fontSize: 11, fontWeight: 600,
-              padding: "6px 12px", borderRadius: 999,
-              border: `1px solid ${ref === k ? t.accent : t.border}`,
-              color: ref === k ? t.accent : t.sub,
-              background: ref === k ? t.bg : t.panel }}>{label}</span>))}
-      </div>
-      {ref && <Card t={t}>
-        {ref === "Context" && <Context t={t} />}
-        {ref === "Containers" && <Containers t={t} />}
-        {ref === "Promotion" && <Promotion t={t} />}
-        {ref === "Deployment" && <Deployment t={t} />}
-        {ref === "Operating model" && <OpsModel t={t} />}
-        {ref === "Compliance dashboard" && <Dashboards t={t} />}
-      </Card>}
+      {tab === "overview" && <Overview t={t} onGo={setTab} />}
+
+      {tab === "map" && <>
+        <Legend t={t} note="— the figures draw the design; the colour says how much of it exists" />
+        <FlowFig t={t} envs={envs} open={open} onOpen={setOpen} />
+        <Detail t={t} open={open} envs={envs} hist={hist}
+          onClose={() => setOpen(null)} />
+        <PendingList t={t} />
+        {/* The dashboard moved to Governance -> Release Delivery. This page
+            is the DESIGN of the delivery system; "what is live where" is an
+            operational question asked by people who never open an
+            architecture page. Two audiences, two screens. */}
+        <div style={{ background: t.panel, border: `1px solid ${t.border}`,
+          borderLeft: `3px solid ${t.accent}`, borderRadius: 8,
+          padding: "13px 17px", margin: "22px 0 0", fontSize: 12.5,
+          color: t.sub, lineHeight: 1.6, maxWidth: "80ch" }}>
+          <b style={{ color: t.text }}>The release delivery dashboard has
+          moved.</b> What is deployed where, with the CSV export, now lives
+          under <b style={{ color: t.text }}>Governance &rarr; Release
+          Delivery</b>. This page keeps the delivery system itself: the maps,
+          the pipelines, what a version is and how promotion works.
+        </div>
+      </>}
+
+      {tab === "pipelines" && <>
+        <Legend t={t} />
+        <Pipelines t={t} />
+      </>}
+
+      {tab === "reference" && <>
+        <div style={{ fontSize: 10.5, color: t.sub, marginBottom: 10 }}>
+          the design behind the map, coloured by what exists — nothing here is live</div>
+        <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
+          {[["Context", "C4 · who uses it"], ["Containers", "C4 · the runnable pieces"],
+            ["Components", "inside the job"], ["Versions", "what a version is"],
+            ["Promotion", "what moves between regions"],
+            ["Deployment", "what each component becomes"]].map(([k, label]) => (
+            <span key={k} onClick={() => setRef(k)}
+              style={{ cursor: "pointer", fontSize: 11, fontWeight: 600,
+                padding: "6px 12px", borderRadius: 999,
+                border: `1px solid ${ref === k ? t.accent : t.border}`,
+                color: ref === k ? t.accent : t.sub,
+                background: ref === k ? t.bg : t.panel }}>{label}</span>))}
+        </div>
+        <Card t={t}>
+          {ref === "Context" && <Context t={t} />}
+          {ref === "Containers" && <Containers t={t} />}
+          {ref === "Components" && <Components t={t} />}
+          {ref === "Versions" && <Versions t={t} />}
+          {ref === "Promotion" && <Promotion t={t} />}
+          {ref === "Deployment" && <Deployment t={t} />}
+        </Card>
+      </>}
+
+      {tab === "ops" && <Card t={t}><OpsModel t={t} /></Card>}
+      {tab === "dash" && <Card t={t}><Dashboards t={t} /></Card>}
     </div>);
 }
