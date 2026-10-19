@@ -11,7 +11,7 @@
 //
 // NO ENDPOINT, HOST OR CHANNEL NAME. The runbook holds those.
 import React from "react";
-import { PAL, sp, Legend } from "./DevOps360.jsx";
+import { PAL, sp, Legend } from "./devopsStatus.jsx";
 
 const STATUS = { built: ["built", "ok"], partial: ["partial", "wa"], pending: ["pending", "no"] };
 function Status({ t, s }) {
