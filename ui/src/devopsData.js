@@ -20,7 +20,7 @@ export const NAMING = [
 ];
 
 export const PIPES = [
-  ["intake", "PR intake · webhook bridge", "every PR · 5 gates · Silver · email", "built"],
+  ["intake", "PR intake · webhook bridge", "every PR · 5 gates · Silver (CP 360) · email", "built"],
   ["app", "Application data pipeline", "dbt + Airflow · daily", "partial"],
   ["db", "Database · Liquibase", "per release · first stage of the app job", "built"],
   ["img", "Infrastructure image & security", "CVE / bumps · one digest", "built"],
@@ -142,9 +142,9 @@ export const BUILT = [
   { design: ["Secrets", "Vault, a short-lived token scoped to the stage"],
     today: "an OpenShift secret holding the Oracle connection values, loaded as job environment", status: "partial" },
   { design: ["Results store", "a row per control per build in Oracle SILVER, Prometheus beside it"],
-    today: "the bridge uploads each run's summary to the Silver schema — per gate, not per control", status: "partial" },
+    today: "the bridge uploads each run's summary to the Silver schema — CP 360's own schema, the one Integration 360 reads — per gate, not per control", status: "partial" },
   { design: ["Dashboards", "Grafana for engineers, Power BI for governance, a seven-year audit store"],
-    today: "the HTML report, emailed to the pull request's developers and reviewers", status: "pending" },
+    today: "CP 360 reads the Silver rows on Release Delivery and Quality Guardrails, beside the HTML report by e-mail; Grafana, Power BI and the audit store are not built", status: "partial" },
   { design: ["Control catalogue", "176 control IDs — DBT, AF, CP-OPA, CP-DEP — on every result"],
     today: "results are pass, fail, skip or unknown per gate; no control ID anywhere", status: "pending" },
   { design: ["Exceptions", "90-day, two approvers, expiry enforced in the deploy policy"],
@@ -229,7 +229,7 @@ export const GATE_FLOW = {
   after: [
     ["Aggregate", "scripts/report_aggregator.py reads every gate's output and writes summary.json and summary.html: build metadata, overall status, per-gate status, per-gate files.", "built"],
     ["Archive", "reports/** archived on the build; the workspace is cleaned.", "built"],
-    ["Distribute", "The bridge collects summary.json and summary.html, uploads the run to the Silver schema and e-mails the HTML to the pull request's developers and reviewers.", "built"],
+    ["Distribute", "The bridge collects summary.json and summary.html, uploads the run to the Silver schema — CP 360's own, where Integration 360 and the guardrail screens read it — and e-mails the HTML to the pull request's developers and reviewers.", "built"],
   ],
   semantics: [
     ["pass", "every blocking check in the gate passed"],

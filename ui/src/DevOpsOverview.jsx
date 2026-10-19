@@ -93,13 +93,13 @@ export function ProcessFig({ t }) {
   return (
     <div style={{ overflowX: "auto", border: `1px solid ${t.border}`, borderRadius: t.radius.md, background: t.panel, padding: "14px 14px 8px", marginBottom: 6 }}>
       <svg viewBox="0 0 960 372" role="img" style={{ display: "block", minWidth: 720, width: "100%", height: "auto" }}
-        aria-label="The delivery process in three lanes. On every pull request: the webhook bridge starts the Guardrails job, five gates run, a record goes to the Silver schema and an HTML report is e-mailed; all built. The application job per release: the Liquibase schema stage first, built; the gates, partial; the thin artefact and the deploy to DEV, SIT, QC and PROD, pending. The image job on a vulnerability or a bump: build, scan, sign, push one digest and raise a bump pull request into every consumer; all built.">
+        aria-label="The delivery process in three lanes. On every pull request: the webhook bridge starts the Guardrails job, five gates run, a record goes to the Silver schema, which is CP 360's own schema, and an HTML report is e-mailed; all built. The application job per release: the Liquibase schema stage first, built; the gates, partial; the thin artefact and the deploy to DEV, SIT, QC and PROD, pending. The image job on a vulnerability or a bump: build, scan, sign, push one digest and raise a bump pull request into every consumer; all built.">
         <defs><marker id="dvo-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={C.mut} /></marker></defs>
         {lane(22, "ON EVERY PULL REQUEST · THE INTAKE")}
         {box("built", 14, 34, 150, 50, "Pull request", ["Bitbucket webhook"])}{arrow(164, 59, 188)}
         {box("built", 190, 34, 150, 50, "Webhook bridge", ["repo · branch · commit"])}{arrow(340, 59, 364)}
         {box("built", 366, 34, 296, 50, "Guardrails job · five gates", ["code quality · schema vs Oracle · transformation · performance · security"])}{arrow(662, 59, 686)}
-        {box("built", 688, 34, 124, 50, "Silver schema", ["one record per run"])}{arrow(812, 59, 836)}
+        {box("built", 688, 34, 124, 50, "Silver · CP 360", ["one record per run"])}{arrow(812, 59, 836)}
         {box("built", 838, 34, 108, 50, "HTML report", ["e-mailed to the PR"])}
         <line x1={14} y1={104} x2={946} y2={104} stroke={C.line} />
         {lane(128, "THE APPLICATION JOB · PER RELEASE")}
@@ -221,7 +221,7 @@ export function GateFlow({ t }) {
 export default function Overview({ t, onGo }) {
   const n = (s) => BUILT.filter((r) => r.status === s).length;
   const PIPE_TEXT = {
-    intake: "A Bitbucket pull request webhook reaches the bridge, which starts the Guardrails job with repository, branch and commit. Five gates run in order, fail-fast aware. The aggregator writes a JSON and an HTML summary; the bridge stores the run in the Silver schema and e-mails the report to the developers and reviewers on the pull request.",
+    intake: "A Bitbucket pull request webhook reaches the bridge, which starts the Guardrails job with repository, branch and commit. Five gates run in order, fail-fast aware. The aggregator writes a JSON and an HTML summary; the bridge stores the run in the Silver schema, which is CP 360's own schema, and e-mails the report to the developers and reviewers on the pull request. Release Delivery and Quality Guardrails read those rows here.",
     db: "Each application repository carries its own db/changelog. The schema stage validates it, applies it under the application's own changelog table and tags the instance env-build. Gate 2 then checks the dbt contracts against what Oracle now holds.",
     img: "Base, workbench and agent images are built together, scanned, signed with an SBOM and pushed as one digest. A bump pull request is raised into every repository that pins it.",
     app: "The gates and the schema stage run. The thin artefact, the deploy stage, the approval gate and post-deploy validation are designed and not yet in the job, which today ends at the report.",
@@ -248,6 +248,7 @@ export default function Overview({ t, onGo }) {
             <div style={{ fontSize: 12.5, color: t.sub, lineHeight: 1.55 }}>{PIPE_TEXT[k]}</div>
           </div>))}
       </div>
+      <Note t={t}><b style={{ color: t.text }}>The Silver schema is CP 360.</b> The bridge writes every run into the schema this catalogue runs on, the one Integration 360 reads. That is why Release Delivery and Quality Guardrails can show gate outcomes without a second store, and why the per-control row, when it comes, lands where every screen already looks.</Note>
       <Note t={t}><b style={{ color: t.text }}>The honest shape.</b> Of the design's {BUILT.length} reconciled rows, {n("built")} are built, {n("partial")} partial and {n("pending")} pending.
         The two pending items that unlock the rest are {PENDING[0][0].toLowerCase()} and connecting the shared DevSecOps library, so every team is held to the same thresholds. The row-by-row reconciliation opens from the intake node on the {go("map", "delivery map")}.</Note>
 

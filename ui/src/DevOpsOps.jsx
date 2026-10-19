@@ -111,7 +111,7 @@ export const EXCEPTION_RULES = [
   ["A remediation plan at request time", "“we will fix it later” with no owner or date is rejected", "the exception record"],
 ];
 export const CADENCE = [
-  ["Per build", "control results to the audit store and the dashboard", "per-gate summary to Silver and an HTML report by e-mail", "partial"],
+  ["Per build", "control results to the audit store and the dashboard", "per-gate summary to Silver (CP 360), shown on Release Delivery, and an HTML report by e-mail", "partial"],
   ["Weekly", "engineering scorecard to Tech Leads", "nothing", "pending"],
   ["Monthly", "governance pack: exception population, coverage, trends; the governance forum", "nothing", "pending"],
   ["Quarterly", "owner and PII attestation; control effectiveness review", "nothing", "pending"],
@@ -156,7 +156,7 @@ export const BRIDGE_CONTROLS = [
   ["Webhook intake", "one controlled entry point for PR events from many repositories", "request validation and routing"],
   ["Execution orchestration", "Guardrails is called with the right repository, branch and commit", "bridge to Jenkins invocation"],
   ["Artifact custody", "summary.json and summary.html collected for every completed run", "post-run retrieval"],
-  ["Compliance persistence", "a standard run record in the analytical store", "Silver schema upload"],
+  ["Compliance persistence", "a standard run record in the analytical store", "Silver schema upload — CP 360's own schema"],
   ["Stakeholder notification", "every PR developer and reviewer sees the evidence", "HTML report by e-mail"],
 ];
 
@@ -277,7 +277,7 @@ function DataFlowFig({ t }) {
   const boxes = [
     ["Jenkins", "reports per gate", "built", 10, 30],
     ["Webhook bridge", "collects summary.json/.html", "built", 190, 30],
-    ["Oracle SILVER", "per gate today; per control in the design", "partial", 370, 30],
+    ["Silver · CP 360 schema", "per gate today; per control in the design", "partial", 370, 30],
     ["Metrics ingest API", "a row per control per build", "pending", 370, 96],
     ["Prometheus", "derived, 90 days", "pending", 560, 96],
     ["Grafana", "engineering view, per build", "pending", 740, 96],
@@ -285,13 +285,14 @@ function DataFlowFig({ t }) {
     ["Power BI", "executive view, five pages", "pending", 740, 30],
     ["Immutable audit store", "seven years, keyed by commit", "pending", 560, 162],
     ["HTML report by e-mail", "to the PR's developers and reviewers", "built", 190, 96],
+    ["Release Delivery · Quality Guardrails", "CP 360 screens on the Silver rows", "built", 740, 162],
     ["Airflow StatsD", "scheduler metrics", "pending", 370, 162],
   ];
   return (
-    <Frame t={t} vw={920} vh={240} aria={"The compliance dashboard data flow: Jenkins reports per gate go through the webhook bridge into the Silver schema, which is built today at gate grain, and into an HTML report by e-mail. In the design a metrics ingest API writes a row per control per build to Oracle, Prometheus derives a 90-day view for Grafana, daily dbt marts feed Power BI, and an immutable seven-year audit store sits behind both. Everything past Silver is pending."}>
+    <Frame t={t} vw={920} vh={240} aria={"The compliance dashboard data flow: Jenkins reports per gate go through the webhook bridge into the Silver schema, CP 360's own schema, which is built today at gate grain and read by the Release Delivery and Quality Guardrails screens, and into an HTML report by e-mail. In the design a metrics ingest API writes a row per control per build to Oracle, Prometheus derives a 90-day view for Grafana, daily dbt marts feed Power BI, and an immutable seven-year audit store sits behind both. Everything past Silver is pending."}>
       <text x={10} y={16} fontSize={11} fontWeight={800} letterSpacing=".6" fill={C.ink}>EVERYTHING LANDS IN ORACLE FIRST — PROMETHEUS IS DERIVED, NOT THE RECORD</text>
       {boxes.map(([a, b, s, x, y]) => <SBox key={a} C={C} s={s} x={x} y={y} w={166} h={48} title={a} sub={b} />)}
-      {[[176, 54, 190, 54], [356, 54, 370, 54], [273, 78, 273, 96], [536, 54, 560, 54], [726, 54, 740, 54], [453, 78, 453, 96], [536, 120, 560, 120], [726, 120, 740, 120], [453, 144, 453, 162], [536, 186, 560, 186], [536, 120, 643, 162]]
+      {[[176, 54, 190, 54], [356, 54, 370, 54], [273, 78, 273, 96], [536, 54, 560, 54], [726, 54, 740, 54], [453, 78, 453, 96], [536, 120, 560, 120], [726, 120, 740, 120], [453, 144, 453, 162], [536, 186, 560, 186], [536, 120, 643, 162], [536, 60, 740, 184]]
         .map(([a, b, c, d], i) => <path key={i} d={`M${a} ${b} L${c} ${d}`} stroke={C.mut} strokeWidth={1.2} fill="none" />)}
       <text x={10} y={230} fontSize={9.5} fill={C.mut}>A 90-day metrics store cannot carry a seven-year audit obligation, and metrics stores are lossy by design. The record of truth is the Oracle row.</text>
     </Frame>);
@@ -354,7 +355,7 @@ export function Dashboards({ t }) {
   return (<>
     <H t={t} sub="An engineer needs to know which model is failing which control right now; an executive needs to know whether the control environment is improving. Different questions at different refresh rates, so two dashboards. Today there is one artefact: the HTML report by e-mail, with a per-gate summary in Silver behind it.">
       Compliance dashboard</H>
-    <Legend t={t} note="— built up to the Silver row per gate; everything that reads it is pending" />
+    <Legend t={t} note="— built up to the Silver row per gate and the CP 360 screens that read it; the engineering and executive dashboards are pending" />
 
     <Sub t={t}>Two audiences</Sub>
     <Tbl t={t} head={["", "Grafana · engineering", "Power BI · executive"]} rows={AUDIENCES.map(([a, b, c]) => [<b>{a}</b>, b, c])} />
