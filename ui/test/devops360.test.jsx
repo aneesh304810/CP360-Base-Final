@@ -222,9 +222,9 @@ for (const [tn, t] of [["light", tLight], ["dark", tDark]]) {
   ok(h.length > 2000 && !/NaN|undefined|\[object Object\]/.test(h), `Built renders cleanly in ${tn}`, h.length);
 }
 const built = renderToStaticMarkup(<Built t={tLight} />);
-ok(/Gate 1/.test(built) && /Gate 5/.test(built) && /sie-webhook-bridge/.test(built) && /Silver schema/.test(built)
+ok(/Gate 1/.test(built) && /Gate 5/.test(built) && /sie-webhook-bridge/.test(built) && /CP 360 metadata/.test(built)
    && /summary\.json/.test(built) && /DevSecOps shared library/.test(built),
-   "the figure shows the bridge, the five gates, the summary files, the Silver upload and the shared library");
+   "the figure shows the bridge, the five gates, the summary files, the CP 360 upload and the shared library");
 ok(BUILT.length >= 20 && BUILT.every((r) => ["built", "partial", "pending"].includes(r.status) && r.design.length === 2 && r.today),
    "every design row has a status of built, partial or pending", BUILT.length);
 const cnt = (s) => BUILT.filter((r) => r.status === s).length;
@@ -325,8 +325,8 @@ ok(EVIDENCE.length === 11 && EVIDENCE.filter((r) => r[3] === "pending").length >
 ok(REG_MAP.length === 8 && /supporting<\/b> controls/.test(ops) && /not a compliance claim/.test(ops), "the regulatory mapping carries its own caveat");
 ok(ATTEST.length === 3 && /none of them exists today/.test(ops), "three attestations, honestly absent");
 ok(/Gate 1/.test(ops) && /Webhook intake/.test(ops) && /else <span[^>]*>pass<\/span> if at least one passes/.test(ops), "the control matrix: gates, bridge controls and the aggregation rule");
-ok((dsh.match(/role="img"/g) || []).length === 1 && /Everything past Silver is pending/.test(dsh) && />BUILT</.test(dsh) && />PARTIAL</.test(dsh) && />PENDING</.test(dsh),
-   "the dashboard data flow is coloured: built to Silver, pending beyond");
+ok((dsh.match(/role="img"/g) || []).length === 1 && /Everything past the CP 360 metadata is pending/.test(dsh) && />BUILT</.test(dsh) && />PARTIAL</.test(dsh) && />PENDING</.test(dsh),
+   "the dashboard data flow is coloured: built to CP 360, pending beyond");
 ok(AUDIENCES.length === 5 && /Grafana/.test(dsh) && /Power BI/.test(dsh) && /90 days hot/.test(dsh) && /7 years/.test(dsh), "two audiences with their refresh, grain and retention");
 ok(ENG_KPIS.length === 15 && ENG_KPIS.every((r) => r.length === 4) && /Review latency p50/.test(dsh) && /Mean time to green/.test(dsh) && /Bridge trigger success rate/.test(dsh),
    "fifteen engineering KPIs in the design, the five measurable today, and the bridge telemetry");

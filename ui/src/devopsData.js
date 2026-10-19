@@ -20,7 +20,7 @@ export const NAMING = [
 ];
 
 export const PIPES = [
-  ["intake", "PR intake · webhook bridge", "every PR · 5 gates · Silver (CP 360) · email", "built"],
+  ["intake", "PR intake · webhook bridge", "every PR · 5 gates · CP 360 metadata · email", "built"],
   ["app", "Application data pipeline", "dbt + Airflow · daily", "partial"],
   ["db", "Database · Liquibase", "per release · first stage of the app job", "built"],
   ["img", "Infrastructure image & security", "CVE / bumps · one digest", "built"],
@@ -141,10 +141,10 @@ export const BUILT = [
     today: "the report aggregator writes summary.json and summary.html; reports archived; workspace cleaned", status: "built" },
   { design: ["Secrets", "Vault, a short-lived token scoped to the stage"],
     today: "an OpenShift secret holding the Oracle connection values, loaded as job environment", status: "partial" },
-  { design: ["Results store", "a row per control per build in Oracle SILVER, Prometheus beside it"],
-    today: "the bridge uploads each run's summary to the Silver schema — CP 360's own schema, the one Integration 360 reads — per gate, not per control", status: "partial" },
+  { design: ["Results store", "a row per control per build in the CP 360 metadata, Prometheus beside it"],
+    today: "the bridge uploads each run's summary to the CP 360 metadata, the schema Integration 360 reads, per gate, not per control", status: "partial" },
   { design: ["Dashboards", "Grafana for engineers, Power BI for governance, a seven-year audit store"],
-    today: "CP 360 reads the Silver rows on Release Delivery and Quality Guardrails, beside the HTML report by e-mail; Grafana, Power BI and the audit store are not built", status: "partial" },
+    today: "CP 360 reads its own metadata rows on Release Delivery and Quality Guardrails, beside the HTML report by e-mail; Grafana, Power BI and the audit store are not built", status: "partial" },
   { design: ["Control catalogue", "176 control IDs — DBT, AF, CP-OPA, CP-DEP — on every result"],
     today: "results are pass, fail, skip or unknown per gate; no control ID anywhere", status: "pending" },
   { design: ["Exceptions", "90-day, two approvers, expiry enforced in the deploy policy"],
@@ -158,14 +158,14 @@ export const BUILT = [
 ];
 
 export const PENDING = [
-  ["A control ID on every result", "a row per control per build, in summary.json and in Silver. Everything below reads from it: the score, the dashboards, the exceptions."],
+  ["A control ID on every result", "a row per control per build, in summary.json and in the CP 360 metadata. Everything below reads from it: the score, the dashboards, the exceptions."],
   ["Connect the DevSecOps shared library", "pin it in the Jenkinsfile, take stage order, severity thresholds, the coverage rule and the promotion block from it, and retire the local thresholds. Until then no team is held to the same gate."],
   ["Secrets scan as a gate", "gitleaks on the pull request, full history on main. The cheapest blocking control still missing."],
   ["Policy stages", "cp.dbt after compile, cp.airflow after a DagBag import in the runtime image, cp.deploy before any promotion."],
   ["Gate 3 at scale", "dbt build into an ephemeral CI schema with state-based selection and source freshness, so the gate survives the first hundred models."],
   ["Deployment inside the job", "deploy gate, approval gate with the approver recorded, signed artefact promotion, post-deploy smoke tests with rollback. Today the job stops at the report, and the deploy stage has no database tag to check against."],
   ["Secrets from Vault", "a short-lived token per stage replacing the OpenShift secret."],
-  ["Dashboards on the Silver rows", "Grafana for engineers, Power BI for governance, and the immutable seven-year store behind both."],
+  ["Dashboards on the CP 360 metadata rows", "Grafana for engineers, Power BI for governance, and the immutable seven-year store behind both."],
   ["Exceptions as records", "scoped to one control and one asset, two approvers, expiry enforced by the deploy policy rather than a calendar."],
 ];
 
@@ -229,7 +229,7 @@ export const GATE_FLOW = {
   after: [
     ["Aggregate", "scripts/report_aggregator.py reads every gate's output and writes summary.json and summary.html: build metadata, overall status, per-gate status, per-gate files.", "built"],
     ["Archive", "reports/** archived on the build; the workspace is cleaned.", "built"],
-    ["Distribute", "The bridge collects summary.json and summary.html, uploads the run to the Silver schema — CP 360's own, where Integration 360 and the guardrail screens read it — and e-mails the HTML to the pull request's developers and reviewers.", "built"],
+    ["Distribute", "The bridge collects summary.json and summary.html, uploads the run to the CP 360 metadata, where Integration 360 and the guardrail screens read it, and e-mails the HTML to the pull request's developers and reviewers.", "built"],
   ],
   semantics: [
     ["pass", "every blocking check in the gate passed"],

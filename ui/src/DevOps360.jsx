@@ -191,7 +191,7 @@ function ContainerFig({ t }) {
       <SBox C={C} s="built" x={438} y={150} w={200} h={46} />
       <text x={449} y={167} fontSize={11.5} fontWeight={600} fill={C.fast}>sie-webhook-bridge</text>
       <text x={449} y={181} fontSize={9.5} fill={C.mut}>PR webhooks in · job start</text>
-      <text x={449} y={193} fontSize={9.5} fill={C.mut}>summary out → Silver + email</text>
+      <text x={449} y={193} fontSize={9.5} fill={C.mut}>summary out → CP 360 metadata + email</text>
       <SBox C={C} s="built" x={650} y={150} w={158} h={46} />
       <text x={661} y={167} fontSize={11.5} fontWeight={600} fill={C.ink}>cp-airflow-agent</text>
       <text x={661} y={181} fontSize={9.5} fill={C.mut}>pod on OpenShift</text>
@@ -223,7 +223,7 @@ function ContainerFig({ t }) {
       <text x={449} y={355} fontSize={9.5} fill={C.mut}>referenced by all four</text>
       <SBox C={C} s="partial" x={650} y={312} w={158} h={58} />
       <text x={661} y={329} fontSize={11.5} fontWeight={600} fill={C.pin}>Release store</text>
-      <text x={661} y={343} fontSize={9.5} fill={C.mut}>summary → Silver today</text>
+      <text x={661} y={343} fontSize={9.5} fill={C.mut}>summary → CP 360 metadata today</text>
       <text x={661} y={355} fontSize={9.5} fill={C.mut}>guardrail_* rows: not yet</text>
       <path d="M114,114 L114,146" fill="none" stroke={C.fast} strokeWidth={1.4} markerEnd="url(#d360b)" />
       <path d="M114,200 L114,210" fill="none" stroke={C.fast} strokeWidth={1.4} markerEnd="url(#d360b)" />
@@ -280,7 +280,7 @@ function ComponentFig({ t }) {
       <path d="M488,288.0 L508,288.0" fill="none" stroke={C.pin} strokeWidth={1} strokeDasharray="3 2" markerEnd="url(#d360r)" />
       <SBox C={C} s="partial" x={14} y={330} w={470} h={44} />
       <text x={25} y={347} fontSize={11.5} fontWeight={600} fill={C.pin}>Report publisher</text>
-      <text x={25} y={361} fontSize={9.5} fill={C.mut}>summary.json + .html → bridge → Silver + email · no required check yet</text>
+      <text x={25} y={361} fontSize={9.5} fill={C.mut}>summary.json + .html → bridge → CP 360 metadata + email · no required check yet</text>
       <rect x={512} y={337} width={296} height={30} rx={3} fill="none" stroke={C.pin} strokeWidth={1} strokeDasharray="3 2" />
       <text x={523} y={354} fontSize={9.5} fill={C.mut}>guardrail_release + gate_run rows</text>
       <path d="M488,352.0 L508,352.0" fill="none" stroke={C.pin} strokeWidth={1} strokeDasharray="3 2" markerEnd="url(#d360r)" />
@@ -993,7 +993,7 @@ function BuiltFig({ t }) {
         runs five gates in order: code quality, schema validation against Oracle,
         transformation quality, performance benchmark which can be skipped, and
         security scan; an aggregator writes summary.json and summary.html. The
-        bridge collects both, uploads them to the Silver schema and emails the
+        bridge collects both, uploads them to the CP 360 metadata and emails the
         HTML report to the pull request's developers and reviewers. A DevSecOps
         shared library, pinned by the job, supplies stage order, thresholds and
         release rules.">
@@ -1075,7 +1075,7 @@ function BuiltFig({ t }) {
       <path d="M580,308 L636,328" fill="none" stroke={C.fast} strokeWidth={1.4}
         markerEnd="url(#b360a)" />
       <SBox C={C} s="built" x={640} y={262} w={326} h={36} />
-      <text x={651} y={278} fontSize={11} fontWeight={600} fill={C.pin}>Silver schema</text>
+      <text x={651} y={278} fontSize={11} fontWeight={600} fill={C.pin}>CP 360 metadata</text>
       <text x={651} y={291} fontSize={9.5} fill={C.mut}>run outputs, one upload per build — per gate, not per control</text>
       <SBox C={C} s="built" x={640} y={310} w={326} h={36} />
       <text x={651} y={326} fontSize={11} fontWeight={600} fill={C.pin}>Email to the PR's developers and reviewers</text>
@@ -1106,7 +1106,7 @@ export function Built({ t }) {
       a report at the end, and a bridge on both sides.</b> The bridge is the
       part the design did not draw: one intake for every repository's pull
       request webhooks, and one custody path for the evidence afterwards —
-      the summary lands in the Silver schema and in the inbox of everyone on
+      the summary lands in the CP 360 metadata and in the inbox of everyone on
       the pull request. The gates decide pass or fail; the bridge only
       delivers that decision. Read against the application job above,
       Governance is Gates 1 and 2, Performance is Gate 4, Testing is Gate 3
@@ -1251,7 +1251,7 @@ export function FlowFig({ t, envs, open, onOpen }) {
         <text x={32} y={302} fontSize={11.5} fontWeight={600} fill={C.pin}>
           Release store</text>
         <text x={32} y={317} fontSize={9.5} fill={C.mut}>
-          summary.json lands in Silver today · guardrail_release · gate_run · deployment · changeset: not yet</text>
+          summary.json lands in the CP 360 metadata today · guardrail_release · gate_run · deployment · changeset: not yet</text>
         <text x={32} y={330} fontSize={9} fill={C.fast}>▾ what writes what</text>
       </g>
       <g onClick={() => onOpen(node("lib") ? null : "lib")} style={{ cursor: "pointer" }}>
