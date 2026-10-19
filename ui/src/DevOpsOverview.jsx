@@ -194,7 +194,7 @@ export function C4WholeFig({ t }) {
             <text x={750} y={y + 14} fontSize={10.5} fontWeight={800} fill={C.ink}>{e}</text>
             <text x={1156} y={y + 14} fontSize={9} textAnchor="end" fill={C.mut}>{when}</text>
             {box("built", 750, y + 20, 196, 54, "Airflow", ["scheduler · webserver on the base digest", "task pods: dbt on the workbench"], "DEPLOYMENT")}
-            {box("built", 956, y + 20, 200, 54, "IMDS · PBDW", [`schema tag ${tag}`, "DATABASECHANGELOG_<APP> per app"], "ORACLE")}
+            {box("built", 956, y + 20, 200, 54, "IMDS · PBDW", [`schema tag ${tag}`, "DATABASECHANGELOG_{APP} per app"], "ORACLE")}
           </g>); })}
         {/* record */}
         <text x={250} y={434} fontSize={8.5} fontWeight={800} letterSpacing=".6" fill={C.mut}>RECORD · CP 360</text>
