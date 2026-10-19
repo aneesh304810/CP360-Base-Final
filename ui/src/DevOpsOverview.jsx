@@ -181,7 +181,7 @@ export function C4WholeFig({ t }) {
         {box("pending", 250, 176, 210, 46, "DevSecOps shared library", ["stage order, thresholds — not connected"], "LIBRARY")}
         {/* build */}
         <text x={500} y={44} fontSize={8.5} fontWeight={800} letterSpacing=".6" fill={C.mut}>BUILD · JENKINS ON OPENSHIFT</text>
-        {box("built", 500, 52, 200, 46, "Webhook bridge", ["PR webhooks in · job start · results out"], "SERVICE")}
+        {box("built", 500, 52, 200, 46, "Webhook bridge", ["BBH-internal · PR webhooks in · results out"], "SERVICE")}
         {box("built", 500, 108, 200, 72, "Guardrails job · on the agent", ["schema stage · Liquibase on DEV", "Gates 1–5 · summary.json + .html", "config/guardrails.yaml"], "JOB")}
         {box("pending", 500, 190, 200, 46, "Merge build · thin artefact", ["dbt project + DAG bundle on the digest"], "JOB")}
         {box("built", 500, 246, 200, 46, "Image job", ["build · scan · sign · push by digest"], "JOB")}
@@ -443,7 +443,7 @@ export function GateFlow({ t }) {
 export default function Overview({ t, onGo }) {
   const n = (s) => BUILT.filter((r) => r.status === s).length;
   const PIPE_TEXT = {
-    intake: "A Bitbucket pull request webhook reaches the bridge, which starts the Guardrails job with repository, branch and commit. Five gates run in order, fail-fast aware. The aggregator writes a JSON and an HTML summary; the bridge stores the run in the CP 360 metadata, and e-mails the report to the developers and reviewers on the pull request. Release Delivery and Quality Guardrails read those rows here.",
+    intake: "A Bitbucket pull request webhook reaches the bridge, which starts the Guardrails job with repository, branch and commit. Five gates run in order, fail-fast aware. The aggregator writes a JSON and an HTML summary; the bridge stores the run in the CP 360 metadata, and e-mails the report to the developers and reviewers on the pull request. Release Delivery and Quality Guardrails read those rows here. The bridge is a BBH-internal endpoint behind the internal network: Bitbucket reaches it without any external exposure, so no firewall or security exception is needed.",
     db: "Each application repository carries its own db/changelog. The schema stage validates it, applies it under the application's own changelog table and tags the instance env-build. Gate 2 then checks the dbt contracts against what Oracle now holds.",
     img: "Base, workbench and agent images are built together, scanned, signed with an SBOM and pushed as one digest. A bump pull request is raised into every repository that pins it.",
     app: "The gates and the schema stage run. The thin artefact, the deploy stage, the approval gate and post-deploy validation are designed and not yet in the job, which today ends at the report.",

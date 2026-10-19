@@ -153,7 +153,7 @@ export const GATE_DOMAINS = [
   ["Gate 5", "application security", "SAST findings normalised, blocked by severity"],
 ];
 export const BRIDGE_CONTROLS = [
-  ["Webhook intake", "one controlled entry point for PR events from many repositories", "request validation and routing"],
+  ["Webhook intake", "one controlled entry point for PR events from many repositories; BBH-internal, behind the internal network, so no external exposure and no security exception", "request validation and routing"],
   ["Execution orchestration", "Guardrails is called with the right repository, branch and commit", "bridge to Jenkins invocation"],
   ["Artifact custody", "summary.json and summary.html collected for every completed run", "post-run retrieval"],
   ["Compliance persistence", "a standard run record in the analytical store", "upload to the CP 360 metadata"],
