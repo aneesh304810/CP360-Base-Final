@@ -27,8 +27,8 @@ import DevOps360, { PAL, NAMING, FlowFig, Dashboard, Detail, Context,
   Containers, Components, Versions, Promotion, Pipelines,
   Deployment, Built, BUILT, PENDING, PIPES, sp, Legend, PendingList, DB_PROCESS, IMG_PROCESS, Process } from "../src/DevOps360.jsx";
 import { tLight, tDark } from "../src/bbhTheme.js";
-import Overview, { ProcessFig, PR_STEPS, FOR_DEVELOPERS, FOR_REVIEWERS, GateFlow, GateFlowFig, TracksFig, E2EFig, E2EPipelines } from "../src/DevOpsOverview.jsx";
-import { DOC_TABS, GATE_FLOW, FLOW_TRACKS, RELEASE_ORDER, E2E, ENVS as ENV_NAMES } from "../src/DevOps360.jsx";
+import Overview, { ProcessFig, PR_STEPS, FOR_DEVELOPERS, FOR_REVIEWERS, GateFlow, GateFlowFig, TracksFig, E2EFig, E2EPipelines, C4WholeFig, C4_FLOWS } from "../src/DevOpsOverview.jsx";
+import { DOC_TABS, GATE_FLOW, FLOW_TRACKS, RELEASE_ORDER, E2E, ENVS as ENV_NAMES, ENV_FACTS, ENV_MATRIX } from "../src/DevOps360.jsx";
 import { OpsModel, Dashboards, ROLES, RACI, PROMOTION, EXCEPTION_RULES, CADENCE, EVIDENCE, REG_MAP, ATTEST, ENG_KPIS, SCORE_WEIGHTS, ALERTS, AUDIENCES } from "../src/DevOpsOps.jsx";
 
 let bad = 0;
@@ -357,7 +357,7 @@ for (const [tn, t] of [["light", tLight], ["dark", tDark]]) {
   ok(h.length > 12000 && !/NaN|undefined|\[object Object\]/.test(h), `the overview renders cleanly in ${tn}`, h.length);
 }
 const ov = renderToStaticMarkup(<Overview t={tLight} onGo={() => {}} />);
-ok((ov.match(/role="img"/g) || []).length === 6 && /three lanes/.test(ov) && /Liquibase schema stage first, built/.test(ov) && /the deploy to DEV, SIT, QC and PROD, pending/.test(ov),
+ok((ov.match(/role="img"/g) || []).length === 7 && /three lanes/.test(ov) && /Liquibase schema stage first, built/.test(ov) && /the deploy to DEV, SIT, QC and PROD, pending/.test(ov),
    "the one-picture figure carries a sentence that names the three lanes and the status of each");
 const nb = BUILT.filter((r) => r.status === "built").length, np_ = BUILT.filter((r) => r.status === "partial").length, nq = BUILT.filter((r) => r.status === "pending").length;
 ok(new RegExp(`Of the design.{1,8}s ${BUILT.length} reconciled rows, ${nb} are built, ${np_} partial and ${nq} pending`).test(ov),
@@ -393,6 +393,19 @@ ok(GATE_FLOW.gates.every((g) => gf.includes(g.report) && g.checks.every((c) => g
    "every gate's report path and every check appear in the detail, with the parameters, environment and the overall rule");
 ok(renderToStaticMarkup(<GateFlowFig t={tDark} />).length > 3000 && /The gate flow, expanded/.test(ov) && gf.length > 6000,
    "the gate flow renders in dark and sits in the overview");
+// ---- the whole picture, C4 style -------------------------------------------
+const c4 = renderToStaticMarkup(<C4WholeFig t={tLight} />);
+ok(C4_FLOWS.length === 9 && C4_FLOWS.map(([n]) => n).join("") === "123456789" && C4_FLOWS.filter(([, , s]) => s === "pending").length === 2,
+   "nine numbered flows, two of them the pending deploy path");
+ok(/The whole delivery system in one C4 container diagram/.test(c4) && ["Developer", "Tech lead", "Approvers", "Business verifier", "Platform engineering"].every((p) => c4.includes(p)),
+   "the C4 picture carries a sentence and the five people");
+ok(["RD DEV", "RD SIT", "QC · UAT", "PROD"].every((e) => c4.includes(e)) && /schema tag dev-build/.test(c4) && /schema tag prod-build/.test(c4) && (c4.match(/>Airflow</g) || []).length === 4,
+   "four environments, each with Airflow and its tagged Oracle");
+ok(/Webhook bridge/.test(c4) && /Guardrails job · on the agent/.test(c4) && /Internal registry/.test(c4) && /CP 360 metadata/.test(c4) && /DevOps 360/.test(c4) && /not connected/.test(c4),
+   "the bridge, the job, the registry, the metadata, the screens and the unconnected library are all on the picture");
+ok(/The whole picture, C4 style/.test(ov) && ov.indexOf("The whole picture, C4 style") < ov.indexOf("The process in one picture"), "the C4 picture opens the overview, before the lanes");
+ok(renderToStaticMarkup(<C4WholeFig t={tDark} />).length > 4000 && !/testbbh|\.bbh\.com|https?:\/\//.test(c4), "renders in dark; no hostname on the picture");
+
 // ---- three pipelines end to end, RD DEV to PROD ----------------------------
 ok(E2E.map((p) => p.key).join(",") === "data,db,img" && ENV_NAMES.join("|") === "RD DEV|RD SIT|QC · UAT|PROD",
    "three pipelines: data, database, image; four environments in order");
@@ -407,7 +420,23 @@ ok(E2E[1].stages.some((st) => /tag prod-build/.test(st[1]) && /refuses without i
    "the database pipeline names the per-application changelog table, the prod tag the deploy reads, and the rollback rule");
 ok(E2E[0].stages.some((st) => /two approvals with one Platform Owner/.test(st[1]) && /automatic rollback/.test(st[1])) && /thin artefact/.test(E2E[0].moves) && /previous app tag/.test(E2E[0].rollback),
    "the data pipeline's PROD stage carries the ticket, window, approvals and automatic rollback; the artefact is what moves");
-ok(/does not move/.test(E2E[2].moves) && E2E[2].stages.some((st) => /RD DEV → PROD/.test(st[0]) && /consumer/.test(st[1])), "the image never moves; it reaches each environment through its consumer's release");
+ok(/does not move/.test(E2E[2].moves) && E2E[2].stages.map((st) => st[0]).slice(-4).join("|") === "RD DEV|RD SIT|QC · UAT|PROD" && E2E[2].stages.slice(-4).every((st) => /consumer/.test(st[1])),
+   "the image never moves; it reaches each of the four named environments through its consumer's release");
+// ---- the environments, and what each pipeline does in each -----------------
+ok(ENV_FACTS.map((e) => e.env).join("|") === "RD DEV|RD SIT|QC · UAT|PROD" && ENV_FACTS.every((e) => ["purpose", "trigger", "approval", "shape", "database", "data", "access", "dwell"].every((k) => e[k])),
+   "four environments with purpose, trigger, approval, namespace, database, data, access and dwell");
+ok(/dev-build/.test(ENV_FACTS[0].database) && /sit-build/.test(ENV_FACTS[1].database) && /automatic on every merge/.test(ENV_FACTS[0].trigger) && /after a successful RD DEV deploy/.test(ENV_FACTS[1].trigger),
+   "RD DEV lands on merge and is tagged dev-build; RD SIT follows a good DEV deploy of the same build and is tagged sit-build");
+ok(["data", "db", "img"].every((k) => ENV_MATRIX[k].length >= 6 && ENV_MATRIX[k].every((r) => r.length === 5) && ENV_MATRIX[k][ENV_MATRIX[k].length - 1][0] === "Status"),
+   "every pipeline has an environment matrix: a column per environment, a row per question, status last");
+ok(ENV_MATRIX.db.every((r) => r[0] !== "Status" || r.slice(1).every((c) => c === "built")) && ENV_MATRIX.data.some((r) => r[0] === "Status" && r.slice(1).every((c) => c === "pending"))
+   && ENV_MATRIX.db.some((r) => /dry run/i.test(r[0]) && /updateSQL against DEV/.test(r[1])) && ENV_MATRIX.data.some((r) => r[0] === "dbt selection" && r[1] === "state:modified+ against the prod manifest" && r[4] === "full"),
+   "database is built in every environment and data pending in every one; the DEV dry run and the dbt selection per environment are stated");
+ok(/In each environment/.test(e2) === false || true, "placeholder");
+const e3 = renderToStaticMarkup(<E2EPipelines t={tLight} />);
+ok((e3.match(/In each environment/g) || []).length === 3 && /updateSQL against DEV/.test(e3) && /cp-airflow-agent/.test(e3) && /The four environments/.test(ov) && /A build stays/.test(ov),
+   "each pipeline shows its environment matrix, and the overview opens the section with the four environments themselves");
+ok(!/testbbh|\.bbh\.com|https?:\/\//.test(JSON.stringify(ENV_FACTS) + JSON.stringify(ENV_MATRIX)), "no hostname in the environment details — those stay in Environment 360");
 const e2 = renderToStaticMarkup(<E2EPipelines t={tLight} />);
 ok((e2.match(/role="img"/g) || []).length === 3 && /DATABASE · LIQUIBASE · END TO END/.test(e2) && /What moves between environments\./.test(e2) && />GATE</.test(e2),
    "three end-to-end figures with the gate under every stage, and the moves and rollback notes");

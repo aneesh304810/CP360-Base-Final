@@ -7,7 +7,7 @@
 // something the rest of the page does not.
 import React from "react";
 import { PAL, sp, Legend } from "./devopsStatus.jsx";
-import { NAMING, PIPES, DB_PROCESS, IMG_PROCESS, BUILT, PENDING, GATE_FLOW, FLOW_TRACKS, RELEASE_ORDER, E2E } from "./devopsData.js";
+import { NAMING, PIPES, DB_PROCESS, IMG_PROCESS, BUILT, PENDING, GATE_FLOW, FLOW_TRACKS, RELEASE_ORDER, E2E, ENVS, ENV_FACTS, ENV_MATRIX } from "./devopsData.js";
 
 const mono = { fontFamily: "monospace" };
 function H2({ t, children }) {
@@ -121,6 +121,119 @@ export function ProcessFig({ t }) {
     </div>);
 }
 
+// The whole picture, C4 style: people on the left, the systems they touch,
+// and the numbered flows between them from a pull request to a production
+// run. One container-level diagram so the three pipelines, the four
+// environments and the CP 360 metadata are seen as one system. Coloured by
+// status like every other figure.
+export const C4_FLOWS = [
+  ["1", "Developer opens a pull request", "built"],
+  ["2", "The bridge starts the Guardrails job on the agent", "built"],
+  ["3", "Schema stage on DEV, then Gates 1–5", "built"],
+  ["4", "Report to the CP 360 metadata and by e-mail", "built"],
+  ["5", "Tech lead approves; merge builds the thin artefact", "pending"],
+  ["6", "Deploy DEV → SIT → QC → PROD, tag read first", "pending"],
+  ["7", "Scheduler runs the DAG; task pods run dbt on Oracle", "partial"],
+  ["8", "Recon gates record the run; the screens read it back", "built"],
+  ["9", "Image job pushes one digest; every consumer pins it", "built"],
+];
+export function C4WholeFig({ t }) {
+  const C = PAL(t);
+  const W = 1180, H = 740;
+  const box = (s, x, y, w, h, title, sub, kind) => { const p = sp(C, s); return (
+    <g key={`${title}${x}${y}`}>
+      <rect x={x} y={y} width={w} height={h} rx={5} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} strokeDasharray={p.strokeDasharray} />
+      {kind && <text x={x + 8} y={y + 11} fontSize={7.5} fontWeight={800} letterSpacing=".6" fill={C.mut}>{kind}</text>}
+      <text x={x + w - 6} y={y + 11} textAnchor="end" fontSize={7.5} fontWeight={800} letterSpacing=".4" fill={p.stroke}>{s.toUpperCase()}</text>
+      <text x={x + 8} y={y + 26} fontSize={11} fontWeight={700} fill={C.ink}>{title}</text>
+      {(sub || []).map((l, i) => <text key={i} x={x + 8} y={y + 39 + i * 12} fontSize={9} fill={C.mut}>{l}</text>)}
+    </g>); };
+  const person = (x, y, name, role) => (
+    <g key={name}>
+      <circle cx={x + 16} cy={y + 12} r={9} fill="none" stroke={C.ink} strokeWidth={1.4} />
+      <path d={`M${x + 2} ${y + 38} Q${x + 16} ${y + 20} ${x + 30} ${y + 38}`} fill="none" stroke={C.ink} strokeWidth={1.4} />
+      <text x={x + 40} y={y + 16} fontSize={11} fontWeight={700} fill={C.ink}>{name}</text>
+      <text x={x + 40} y={y + 29} fontSize={9} fill={C.mut}>{role}</text>
+    </g>);
+  const flow = (d, n, lx, ly, dashed) => (
+    <g key={n + d}>
+      <path d={d} fill="none" stroke={dashed ? C.mut : C.fast} strokeWidth={1.4} strokeDasharray={dashed ? "4 3" : undefined} markerEnd="url(#c4w-arr)" />
+      <circle cx={lx} cy={ly} r={8} fill={C.fast} /><text x={lx} y={ly + 3.5} fontSize={9} fontWeight={800} fill="#fff" textAnchor="middle">{n}</text>
+    </g>);
+  const envs = [["RD DEV", "dev-build", "on merge"], ["RD SIT", "sit-build", "after DEV"], ["QC · UAT", "qc-build", "on promotion"], ["PROD", "prod-build", "on approval"]];
+  return (
+    <div style={{ overflowX: "auto", border: `1px solid ${t.border}`, borderRadius: t.radius.md, background: t.panel, padding: "14px 14px 8px", marginBottom: 6 }}>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" style={{ display: "block", minWidth: 960, width: "100%", height: "auto" }}
+        aria-label={`The whole delivery system in one C4 container diagram. People on the left: developer, tech lead, approvers, business verifier, platform engineering. Source: one Bitbucket repository per application holding dbt models, DAGs and db/changelog, three image repositories, and the shared guardrail library, not yet connected. Build: the webhook bridge, the Jenkins controller and its agent running the Guardrails job, and the image job pushing to the internal registry. Run: four OpenShift namespaces, RD DEV, RD SIT, QC UAT and PROD, each with the Airflow scheduler and webserver, task pods running dbt, and its own IMDS and PBDW instances tagged by the schema stage. Record: the CP 360 metadata, read by Release Delivery, Quality Guardrails and DevOps 360, and the e-mailed report. Nine numbered flows: ${C4_FLOWS.map(([n, f, s]) => `${n} ${f} (${s})`).join("; ")}.`}>
+        <defs><marker id="c4w-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={C.fast} /></marker></defs>
+        <text x={14} y={18} fontSize={11} fontWeight={800} letterSpacing=".6" fill={C.ink}>C4 · CONTAINERS · THE WHOLE PICTURE, FROM A PULL REQUEST TO A PRODUCTION RUN</text>
+        {/* people */}
+        <text x={14} y={44} fontSize={8.5} fontWeight={800} letterSpacing=".6" fill={C.mut}>PEOPLE</text>
+        {person(14, 54, "Developer", "models · DAGs · changesets")}
+        {person(14, 104, "Tech lead", "reviews logic, grain, placement")}
+        {person(14, 154, "Approvers", "Platform Owner · Release Manager")}
+        {person(14, 204, "Business verifier", "UAT on the SHA that ships")}
+        {person(14, 254, "Platform engineering", "images · bumps · the platform")}
+        {/* source */}
+        <text x={250} y={44} fontSize={8.5} fontWeight={800} letterSpacing=".6" fill={C.mut}>SOURCE · BITBUCKET</text>
+        {box("built", 250, 52, 210, 58, "Application repositories", ["one per application: dbt models, DAGs,", "db/changelog, pinned image digest"], "REPO")}
+        {box("built", 250, 120, 210, 46, "Image repositories", ["base · workbench · agent"], "REPO")}
+        {box("pending", 250, 176, 210, 46, "DevSecOps shared library", ["stage order, thresholds — not connected"], "LIBRARY")}
+        {/* build */}
+        <text x={500} y={44} fontSize={8.5} fontWeight={800} letterSpacing=".6" fill={C.mut}>BUILD · JENKINS ON OPENSHIFT</text>
+        {box("built", 500, 52, 200, 46, "Webhook bridge", ["PR webhooks in · job start · results out"], "SERVICE")}
+        {box("built", 500, 108, 200, 72, "Guardrails job · on the agent", ["schema stage · Liquibase on DEV", "Gates 1–5 · summary.json + .html", "config/guardrails.yaml"], "JOB")}
+        {box("pending", 500, 190, 200, 46, "Merge build · thin artefact", ["dbt project + DAG bundle on the digest"], "JOB")}
+        {box("built", 500, 246, 200, 46, "Image job", ["build · scan · sign · push by digest"], "JOB")}
+        {box("built", 500, 302, 200, 40, "Internal registry", ["signed digests only"], "STORE")}
+        {/* run: four environments */}
+        <text x={740} y={44} fontSize={8.5} fontWeight={800} letterSpacing=".6" fill={C.mut}>RUN · FOUR OPENSHIFT NAMESPACES, ONE SHAPE</text>
+        {envs.map(([e, tag, when], i) => { const y = 52 + i * 92; return (
+          <g key={e}>
+            <rect x={740} y={y} width={426} height={82} rx={6} fill="none" stroke={C.line} strokeWidth={1} />
+            <text x={750} y={y + 14} fontSize={10.5} fontWeight={800} fill={C.ink}>{e}</text>
+            <text x={1156} y={y + 14} fontSize={9} textAnchor="end" fill={C.mut}>{when}</text>
+            {box("built", 750, y + 20, 196, 54, "Airflow", ["scheduler · webserver on the base digest", "task pods: dbt on the workbench"], "DEPLOYMENT")}
+            {box("built", 956, y + 20, 200, 54, "IMDS · PBDW", [`schema tag ${tag}`, "DATABASECHANGELOG_<APP> per app"], "ORACLE")}
+          </g>); })}
+        {/* record */}
+        <text x={250} y={434} fontSize={8.5} fontWeight={800} letterSpacing=".6" fill={C.mut}>RECORD · CP 360</text>
+        {box("built", 250, 442, 450, 62, "CP 360 metadata", ["the run record per pull request (per gate today, per control in the design)", "guardrail_changeset · changeset_applied · deployment · events"], "ORACLE SCHEMA")}
+        {box("built", 250, 514, 220, 46, "Release Delivery · Quality Guardrails", ["what is deployed where · gate outcomes"], "CP 360 SCREENS")}
+        {box("built", 480, 514, 220, 46, "DevOps 360", ["this documentation, coloured by status"], "CP 360 SCREEN")}
+        {box("built", 740, 442, 200, 46, "E-mail", ["summary.html to the PR's people"], "NOTIFICATION")}
+        {box("pending", 740, 498, 426, 62, "Engineering and executive dashboards", ["Grafana per build and control · Power BI per team and month", "the immutable seven-year audit store — none built"], "DESIGN")}
+        {/* flows */}
+        {flow("M200 70 L248 78", "1", 224, 62)}
+        {flow("M460 78 L498 76", "2", 480, 66)}
+        {flow("M600 98 L600 106", "3", 614, 102)}
+        {flow("M600 180 L600 188", "", 0, -20)}
+        {flow("M500 160 L488 160 L488 440", "4", 488, 300)}
+        {flow("M700 468 L740 468", "4", 720, 458)}
+        {flow("M200 118 L244 118 L244 240 L498 228", "5", 330, 232, true)}
+        {flow("M700 212 L724 212 L724 98 L748 98", "6", 712, 150, true)}
+        {flow("M724 212 L724 374 L748 374", "", 0, -20, true)}
+        {flow("M946 99 L954 99", "7", 950, 88, true)}
+        {flow("M1056 402 L1056 424 L690 424 L690 440", "8", 880, 416)}
+        {flow("M700 322 L734 322", "9", 718, 312)}
+        <line x1={734} y1={62} x2={734} y2={404} stroke={C.fast} strokeWidth={1.4} strokeOpacity={.5} />
+        {[76, 168, 260, 352].map((y) => <path key={y} d={`M734 ${y} L748 ${y}`} stroke={C.fast} strokeWidth={1.2} strokeOpacity={.7} markerEnd="url(#c4w-arr)" />)}
+        {flow("M460 143 L480 143 L480 269 L498 269", "", 0, -20)}
+        {flow("M200 270 L236 270 L236 150 L248 150", "", 0, -20)}
+        <text x={14} y={586} fontSize={9.5} fill={C.mut}>Solid arrows run today; dashed arrows are the design's deploy path, which the job does not do yet. Flow 9 is the one digest every namespace and the agent pull.</text>
+        <text x={14} y={600} fontSize={9.5} fill={C.mut}>Every namespace pulls the same image digest; what differs per environment is the schema tag, the secret and the replica counts.</text>
+        <text x={14} y={614} fontSize={9.5} fill={C.mut}>The schema is never deployed: it is applied by the job's first stage and recorded as a tag the deploy must find. Hostnames, addresses and credentials are in Environment 360 and the runbook.</text>
+        <text x={14} y={640} fontSize={8.5} fontWeight={800} letterSpacing=".6" fill={C.mut}>THE FLOWS</text>
+        {C4_FLOWS.map(([n, f, s], i) => { const col = i < 5 ? 0 : 1; const row = i < 5 ? i : i - 5; const x = 14 + col * 590; const y = 656 + row * 15; return (
+          <g key={n}>
+            <circle cx={x + 8} cy={y} r={6.5} fill={C.fast} /><text x={x + 8} y={y + 3} fontSize={8} fontWeight={800} fill="#fff" textAnchor="middle">{n}</text>
+            <text x={x + 20} y={y + 3.5} fontSize={9.5} fill={C.ink}>{f}</text>
+            <text x={x + 560} y={y + 3.5} fontSize={7.5} fontWeight={800} textAnchor="end" fill={sp(C, s).stroke}>{s.toUpperCase()}</text>
+          </g>); })}
+      </svg>
+    </div>);
+}
+
 // One pipeline end to end: its stages left to right, from author to PROD,
 // each box coloured by status, the gate to pass under it, and the "moves"
 // and "rollback" lines beneath. Three of these, one per pipeline.
@@ -152,6 +265,23 @@ export function E2EFig({ t, p }) {
     </div>);
 }
 
+// One pipeline's behaviour in each environment: a column per environment,
+// a row per question; the last row is the status, drawn as a chip.
+export function EnvMatrix({ t, rows }) {
+  return (
+    <Tbl t={t} head={["", ...ENVS]} rows={rows.map(([q, ...cells]) => [q, ...cells.map((c, i) =>
+      q === "Status" ? <Status key={i} t={t} s={c} /> : <span key={i} style={{ fontSize: 12.5 }}>{c}</span>)])} />);
+}
+
+// The four environments themselves, before any pipeline: purpose, trigger,
+// approval, shape, database, data, access, dwell.
+export function EnvFacts({ t }) {
+  const rows = [["Purpose", "purpose"], ["A change gets there", "trigger"], ["Approval", "approval"], ["Namespace", "shape"], ["Database", "database"],
+    ["Data", "data"], ["Who uses it", "access"], ["A build stays", "dwell"]];
+  return (
+    <Tbl t={t} head={["", ...ENV_FACTS.map((e) => e.env)]} rows={rows.map(([label, k]) => [label, ...ENV_FACTS.map((e) => <span key={e.env} style={{ fontSize: 12.5 }}>{e[k]}</span>)])} />);
+}
+
 export function E2EPipelines({ t }) {
   return (<>
     {E2E.map((p) => (
@@ -161,6 +291,8 @@ export function E2EPipelines({ t }) {
         </div>
         <E2EFig t={t} p={p} />
         <Tbl t={t} head={["Stage", "What happens", "Gate to pass", "Evidence written", ""]} rows={p.stages.map(([a, b, c, d, s]) => [a, b, c, <span style={{ fontSize: 11.5 }}>{d}</span>, <Status t={t} s={s} />])} />
+        <H3 t={t}>In each environment</H3>
+        <EnvMatrix t={t} rows={ENV_MATRIX[p.key]} />
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "0 24px" }}>
           <Note t={t}><b style={{ color: t.text }}>What moves between environments.</b> {p.moves}</Note>
           <Note t={t}><b style={{ color: t.text }}>Rollback.</b> {p.rollback}</Note>
@@ -324,6 +456,10 @@ export default function Overview({ t, onGo }) {
         the {go("reference", "design reference")}, the {go("ops", "operating model")} and the {go("dash", "compliance dashboard")}.</P>
       <Legend t={t} />
 
+      <H2 t={t}>The whole picture, C4 style</H2>
+      <P t={t}>One container diagram of the whole delivery system: the people, the repositories, the build on Jenkins, the four environments with their Airflow and Oracle, and the CP 360 metadata that records every run. Nine numbered flows take a change from a pull request to a production run. Solid arrows run today; dashed ones are the deploy path still to be built.</P>
+      <C4WholeFig t={t} />
+
       <H2 t={t}>The process in one picture</H2>
       <P t={t}>Three pipelines, on three different clocks. The application job runs on every pull request and carries the schema with it. The image job runs when a vulnerability or a version bump needs it.
         Nothing is built twice: the same artefact SHA and the same image digest move from development to production unchanged.</P>
@@ -332,6 +468,9 @@ export default function Overview({ t, onGo }) {
       <H2 t={t}>Three pipelines, end to end: RD DEV to PROD</H2>
       <P t={t}>Each pipeline on its own, from the author's change to production: what happens at each stage, the gate that lets it through, the evidence it writes to the CP 360 metadata, and its status today. Under each, what actually moves between environments and how it is rolled back.
         The database and image pipelines are built end to end. The data pipeline is built up to the report and pending from the merge build onward.</P>
+      <H3 t={t}>The four environments</H3>
+      <P t={t}>Four namespaces of the same shape, each pointed at its own IMDS and PBDW instances and tagged by the schema stage. They differ in who gets a change there and how, in size, and in the data. Hostnames and addresses live in Environment 360, not here.</P>
+      <EnvFacts t={t} />
       <E2EPipelines t={t} />
 
       <H2 t={t}>How Airflow, dbt, the schema and the images flow together</H2>

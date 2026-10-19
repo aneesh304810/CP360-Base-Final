@@ -327,6 +327,57 @@ export const E2E = [
       ["Build · scan · sign", "base first, then workbench and agent on the new base digest; scan the image and its dependencies; sign and attach SBOM and provenance", "CRITICAL fails the job; HIGH fails an image bound for production; an unsigned image never reaches the registry", "the scan report on the build; signature and SBOM in the registry", "built"],
       ["Push by digest", "one immutable sha256; the date-build tag is a label, the digest the identity", "the push succeeds; admission runs only signed digests from the internal registry", "the image record: date + build → digest", "built"],
       ["Bump PR", "a pull request into every repository that pins the digest: application repositories for the base and workbench, the Jenkinsfile for the agent", "each consumer merges; this step needs an owner and a service level", "the consumer's pull request", "built"],
-      ["RD DEV → PROD", "no stage of its own: the new digest reaches each environment when the consumer's release does, DEV and SIT on merge, QC on promotion, PROD on approval", "the consumer's own gates and approvals", "guardrail_deployment of the consumer", "built"],
+      ["RD DEV", "no stage of its own: the digest arrives when a consumer merges its bump and its merge build deploys to RD DEV; the Guardrails agent and the scheduler there already run on it", "the consumer's merge build", "guardrail_deployment of the consumer", "built"],
+      ["RD SIT", "the same digest, with the consumer's SIT deploy; the daily DAG's task pods run on the new workbench", "the consumer's SIT run", "guardrail_deployment of the consumer", "built"],
+      ["QC · UAT", "the same digest, when the consumer is promoted; admission runs only signed digests from the internal registry", "the consumer's promotion and approval", "guardrail_deployment of the consumer", "built"],
+      ["PROD", "the same digest, with the consumer's approved release; a CVE fix is live in production only when the last consumer has merged its bump and deployed", "the consumer's PROD approval", "guardrail_deployment of the consumer", "built"],
     ] },
 ];
+
+// The four environments, and what each pipeline does in each. ENV_FACTS is
+// the environment itself: what it is for, who gets a change there and how,
+// what it is pointed at. ENV_MATRIX is per pipeline: one column per
+// environment, one row per question. The names are the ones the delivery
+// map uses (RD DEV, RD SIT, QC · UAT, PROD); hostnames stay in Environment 360.
+export const ENV_FACTS = [
+  { env: "RD DEV", purpose: "the first place a merge lands; where a developer sees their change run against shared data", trigger: "automatic on every merge to the application's main branch",
+    approval: "none beyond the pull request's", shape: "one Hub namespace: Airflow webserver and scheduler, the event listener, task pods on demand, at the smallest size", database: "its own IMDS and PBDW instances, tagged dev-build",
+    data: "a reduced, refreshed copy; no production records", access: "every engineer", dwell: "hours: the next merge replaces it", status: "partial" },
+  { env: "RD SIT", purpose: "system integration: the whole daily run, end to end, on the merge build DEV just took", trigger: "automatic after a successful RD DEV deploy of the same build",
+    approval: "none; the SIT run is the gate", shape: "the same namespace shape as DEV, sized for a full daily run", database: "its own IMDS and PBDW instances, tagged sit-build",
+    data: "a fuller copy with the interfaces that feed the daily DAG", access: "engineers and the test team", dwell: "a day or two: until the next merge build passes DEV", status: "partial" },
+  { env: "QC · UAT", purpose: "acceptance: business users verify the release that will go to production, on the SHA they will get", trigger: "on promotion of a build that passed SIT",
+    approval: "one approver, the Tech Lead, plus the UAT verification on record", shape: "production-like sizing; the same objects", database: "its own IMDS and PBDW instances, tagged qc-build",
+    data: "masked production-shaped data", access: "engineers, the test team, business verifiers", dwell: "until the release is approved or withdrawn; normally a release or two ahead of PROD", status: "partial" },
+  { env: "PROD", purpose: "the warehouse the business reads", trigger: "on approval: a change ticket, inside the change window",
+    approval: "two approvals with one Platform Owner; the Release Manager owns the window and the rollback decision", shape: "production replica counts; the same image digest as every other environment", database: "the production IMDS and PBDW, tagged prod-build",
+    data: "production", access: "the platform team for deploys; business users through the applications", dwell: "until the next approved release", status: "partial" },
+];
+export const ENV_MATRIX = {
+  data: [
+    ["Trigger", "automatic on merge", "automatic after DEV, same SHA", "on promotion, same SHA", "on approval: ticket, window, two approvals, same SHA"],
+    ["What is deployed", "the thin artefact: dbt project + DAG bundle on the pinned digest", "the same artefact", "the same artefact", "the same artefact; nothing rebuilt"],
+    ["Before it counts", "the deploy stage reads the dev- tag; the scheduler parses the DAGs; a smoke dbt test", "the daily DAG runs end to end; the recon gates pass", "full dbt selection; UAT verification recorded", "post-deploy smoke tests; automatic rollback to the last good commit on failure"],
+    ["dbt selection", "state:modified+ against the prod manifest", "state:modified+", "full", "full"],
+    ["DAGs", "unpaused; the daily schedule runs on DEV data", "unpaused; the full daily run", "unpaused; business-date runs the verifiers watch", "unpaused; the production schedule"],
+    ["Who decides", "the merge", "the SIT run", "the Tech Lead and the verifier", "two approvers; the Release Manager for the window"],
+    ["Status", "pending", "pending", "pending", "pending"],
+  ],
+  db: [
+    ["Trigger", "on merge, as the first stage of the application job", "on merge, after DEV, the same commit", "on promotion", "on approval, inside the change window"],
+    ["What runs", "validate, status and checksum compare; update under DATABASECHANGELOG_<APP>; tag dev-build", "the same changelog; tag sit-build", "the same changelog; tag qc-build", "the same changelog; tag prod-build"],
+    ["Before it counts", "every changeset applied; a changed checksum stops the job", "every changeset applied", "every changeset applied; Gate 2 of the next pull request checks the contracts against QC", "every changeset applied; the deploy stage reads the tag and refuses without it"],
+    ["Pull request dry run", "updateSQL against DEV shows what would apply, before merge", "—", "—", "—"],
+    ["Rollback", "liquibase rollback to the previous dev- tag; data-safe changesets only", "to the previous sit- tag", "to the previous qc- tag", "to the previous prod- tag, under the Release Manager; a destructive change rolls forward"],
+    ["Evidence", "guardrail_changeset · guardrail_changeset_applied (dev)", "guardrail_changeset_applied (sit)", "guardrail_changeset_applied (qc)", "guardrail_changeset_applied (prod)"],
+    ["Status", "built", "built", "built", "built"],
+  ],
+  img: [
+    ["How the digest arrives", "with the consumer's merge build, after the bump pull request merges", "with the consumer's SIT deploy", "with the consumer's promotion", "with the consumer's approved release"],
+    ["What runs on it", "the Guardrails agent (cp-airflow-agent) for every pull request; the scheduler and webserver on the base; task pods on the workbench", "the scheduler and the daily run's task pods", "the same", "the same, at production replica counts"],
+    ["Admission", "signed digests from the internal registry only", "the same", "the same", "the same"],
+    ["Before it counts", "the consumer's DEV smoke test on the new image", "the daily DAG completes on the new workbench", "UAT on the new image", "the last consumer merged and deployed: only then is a CVE fix live"],
+    ["Rollback", "re-pin the previous digest by pull request", "the same", "the same", "the same; the old image is still signed in the registry"],
+    ["Status", "built", "built", "built", "built"],
+  ],
+};
