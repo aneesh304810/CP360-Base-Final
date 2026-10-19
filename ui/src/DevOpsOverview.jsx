@@ -7,7 +7,7 @@
 // something the rest of the page does not.
 import React from "react";
 import { PAL, sp, Legend } from "./devopsStatus.jsx";
-import { NAMING, PIPES, DB_PROCESS, IMG_PROCESS, BUILT, PENDING, GATE_FLOW } from "./devopsData.js";
+import { NAMING, PIPES, DB_PROCESS, IMG_PROCESS, BUILT, PENDING, GATE_FLOW, FLOW_TRACKS, RELEASE_ORDER, E2E } from "./devopsData.js";
 
 const mono = { fontFamily: "monospace" };
 function H2({ t, children }) {
@@ -117,6 +117,96 @@ export function ProcessFig({ t }) {
         <path d="M632 308 L632 328 L545 328 L545 206" stroke={C.mut} strokeWidth={1.3} fill="none" markerEnd="url(#dvo-arr)" />
         <text x={560} y={342} fontSize={9.5} fill={C.mut}>the application pins the digest; a new image reaches it through the bump pull request</text>
         <text x={14} y={364} fontSize={9.5} fill={C.mut}>The schema is applied before the application and may run ahead of it by design. It is never behind: the deploy refuses a target without this release's database tag.</text>
+      </svg>
+    </div>);
+}
+
+// One pipeline end to end: its stages left to right, from author to PROD,
+// each box coloured by status, the gate to pass under it, and the "moves"
+// and "rollback" lines beneath. Three of these, one per pipeline.
+export function E2EFig({ t, p }) {
+  const C = PAL(t);
+  const n = p.stages.length, W = 1180, x0 = 14, gap = 10, bw = Math.floor((W - 2 * x0 - (n - 1) * gap) / n), y0 = 48, bh = 92;
+  const wrap = (s, max) => { const out = []; let line = ""; for (const w of String(s).split(" ")) { if ((line + " " + w).trim().length > max) { out.push(line.trim()); line = w; } else line = (line + " " + w).trim(); } if (line) out.push(line); return out; };
+  const maxPer = Math.max(14, Math.floor(bw / 5.6));
+  return (
+    <div style={{ overflowX: "auto", border: `1px solid ${t.border}`, borderRadius: t.radius.md, background: t.panel, padding: "14px 14px 8px", marginBottom: 6 }}>
+      <svg viewBox={`0 0 ${W} ${y0 + bh + 92}`} role="img" style={{ display: "block", minWidth: 920, width: "100%", height: "auto" }}
+        aria-label={`${p.name}, end to end: ${p.stages.map(([s, , , , st]) => `${s} (${st})`).join(" → ")}. What moves: ${p.moves}. Rollback: ${p.rollback}`}>
+        <defs><marker id={`e2e-${p.key}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={C.mut} /></marker></defs>
+        <text x={x0} y={18} fontSize={11} fontWeight={800} letterSpacing=".6" fill={C.ink}>{p.name.toUpperCase()} · END TO END</text>
+        <text x={x0} y={34} fontSize={9.5} fill={C.mut}>{p.cadence}</text>
+        {p.stages.map(([name, what, gate, , st], i) => { const x = x0 + i * (bw + gap); const pat = sp(C, st); const lines = wrap(what, maxPer).slice(0, 4); return (
+          <g key={name}>
+            <rect x={x} y={y0} width={bw} height={bh} rx={4} fill={pat.fill} stroke={pat.stroke} strokeWidth={pat.strokeWidth} strokeDasharray={pat.strokeDasharray} />
+            <text x={x + bw - 6} y={y0 + 11} textAnchor="end" fontSize={7.5} fontWeight={800} letterSpacing=".4" fill={pat.stroke}>{st.toUpperCase()}</text>
+            <text x={x + 8} y={y0 + 22} fontSize={11} fontWeight={700} fill={C.ink}>{name}</text>
+            {lines.map((l, j) => <text key={j} x={x + 8} y={y0 + 36 + j * 12} fontSize={8.5} fill={C.mut}>{l}{j === 3 && wrap(what, maxPer).length > 4 ? "…" : ""}</text>)}
+            {i < n - 1 && <path d={`M${x + bw + 1} ${y0 + bh / 2} L${x + bw + gap - 1} ${y0 + bh / 2}`} stroke={C.mut} strokeWidth={1.2} markerEnd={`url(#e2e-${p.key})`} />}
+            <text x={x + 8} y={y0 + bh + 16} fontSize={8} fontWeight={800} letterSpacing=".5" fill={C.mut}>GATE</text>
+            {wrap(gate, maxPer).slice(0, 2).map((l, j) => <text key={j} x={x + 8} y={y0 + bh + 28 + j * 11} fontSize={8.5} fill={C.sub || C.mut}>{l}</text>)}
+          </g>); })}
+        <text x={x0} y={y0 + bh + 62} fontSize={9.5} fill={C.ink}><tspan fontWeight={800}>MOVES </tspan>{p.moves.length > 150 ? p.moves.slice(0, 148) + "…" : p.moves}</text>
+        <text x={x0} y={y0 + bh + 78} fontSize={9.5} fill={C.ink}><tspan fontWeight={800}>ROLLBACK </tspan>{p.rollback.length > 150 ? p.rollback.slice(0, 148) + "…" : p.rollback}</text>
+      </svg>
+    </div>);
+}
+
+export function E2EPipelines({ t }) {
+  return (<>
+    {E2E.map((p) => (
+      <div key={p.key} style={{ marginBottom: 26 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap", margin: "16px 0 6px" }}>
+          <b style={{ color: t.text, fontSize: 14.5 }}>{p.name}</b><Status t={t} s={p.status} /><span style={{ fontSize: 11.5, color: t.textMuted }}>{p.cadence}</span>
+        </div>
+        <E2EFig t={t} p={p} />
+        <Tbl t={t} head={["Stage", "What happens", "Gate to pass", "Evidence written", ""]} rows={p.stages.map(([a, b, c, d, s]) => [a, b, c, <span style={{ fontSize: 11.5 }}>{d}</span>, <Status t={t} s={s} />])} />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "0 24px" }}>
+          <Note t={t}><b style={{ color: t.text }}>What moves between environments.</b> {p.moves}</Note>
+          <Note t={t}><b style={{ color: t.text }}>Rollback.</b> {p.rollback}</Note>
+        </div>
+      </div>))}
+  </>);
+}
+
+// Four tracks through one release: schema, dbt, Airflow, images. Each track
+// is four stages left to right (author, checked, moves, runs), coloured by
+// status; the arrows between tracks are the dependencies that fix the order.
+export function TracksFig({ t }) {
+  const C = PAL(t);
+  const W = 1000, x0 = 150, colW = 196, gap = 12, rowH = 78, y0 = 56;
+  const cols = ["AUTHORED", "CHECKED ON THE PULL REQUEST", "MOVES AS", "RUNS AS"];
+  const box = (s, x, y, w, h, title) => { const p = sp(C, s); const lines = title.length > 30 ? [title.slice(0, title.lastIndexOf(" ", 30)), title.slice(title.lastIndexOf(" ", 30) + 1)] : [title]; return (
+    <g key={`${x}${y}`}>
+      <rect x={x} y={y} width={w} height={h} rx={4} fill={p.fill} stroke={p.stroke} strokeWidth={p.strokeWidth} strokeDasharray={p.strokeDasharray} />
+      <text x={x + w - 6} y={y + 11} textAnchor="end" fontSize={7.5} fontWeight={800} letterSpacing=".4" fill={p.stroke}>{s.toUpperCase()}</text>
+      {lines.map((l, i) => <text key={i} x={x + 8} y={y + 24 + i * 13} fontSize={10} fontWeight={700} fill={C.ink}>{l}</text>)}
+    </g>); };
+  const H = y0 + FLOW_TRACKS.length * rowH + 44;
+  const cx = (i) => x0 + i * (colW + gap);
+  const cy = (r) => y0 + r * rowH + 24;
+  return (
+    <div style={{ overflowX: "auto", border: `1px solid ${t.border}`, borderRadius: t.radius.md, background: t.panel, padding: "14px 14px 8px", marginBottom: 6 }}>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" style={{ display: "block", minWidth: 820, width: "100%", height: "auto" }}
+        aria-label={`Four tracks through one release, each in four stages: authored, checked on the pull request, moves as, runs as. ${FLOW_TRACKS.map((tr) => `${tr.name}: ${tr.stages.map(([s, st]) => `${s} (${st})`).join(", ")}`).join(". ")}. Dependencies: the image digest underneath every job and pod; the schema applied and tagged before dbt compiles against it; the DAG orchestrating the dbt run.`}>
+        <defs><marker id="dvt-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={C.mut} /></marker></defs>
+        <text x={14} y={18} fontSize={11} fontWeight={800} letterSpacing=".6" fill={C.ink}>FOUR TRACKS THROUGH ONE RELEASE</text>
+        {cols.map((c, i) => <text key={c} x={cx(i)} y={44} fontSize={8.5} fontWeight={800} letterSpacing=".6" fill={C.mut}>{c}</text>)}
+        {FLOW_TRACKS.map((tr, r) => (<g key={tr.key}>
+          <text x={14} y={cy(r) + 4} fontSize={11} fontWeight={700} fill={C.ink}>{tr.name.split(" · ")[0]}</text>
+          {tr.name.includes(" · ") && <text x={14} y={cy(r) + 17} fontSize={9} fill={C.mut}>{tr.name.split(" · ")[1]}</text>}
+          {tr.stages.map(([s, st], i) => box(st, cx(i), y0 + r * rowH, colW, 48, s))}
+          {tr.stages.slice(0, -1).map((_, i) => <path key={i} d={`M${cx(i) + colW + 1} ${cy(r)} L${cx(i + 1) - 1} ${cy(r)}`} stroke={C.mut} strokeWidth={1.2} markerEnd="url(#dvt-arr)" />)}
+        </g>))}
+        {/* dependencies between tracks */}
+        <path d={`M${cx(1) + colW / 2} ${y0 + 48} L${cx(1) + colW / 2} ${y0 + rowH}`} stroke={C.mut} strokeWidth={1.2} strokeDasharray="3 3" markerEnd="url(#dvt-arr)" />
+        <text x={cx(1) + colW / 2 + 6} y={y0 + rowH - 12} fontSize={8.5} fill={C.mut}>tables exist before dbt compiles</text>
+        <path d={`M${cx(3) + colW / 2} ${y0 + 2 * rowH + 48} L${cx(3) + colW / 2} ${y0 + rowH + 48 + 4}`} stroke={C.mut} strokeWidth={1.2} strokeDasharray="3 3" markerEnd="url(#dvt-arr)" />
+        <text x={cx(3) + 8} y={y0 + 2 * rowH - 12} fontSize={8.5} fill={C.mut}>the DAG task runs dbt</text>
+        <path d={`M${cx(2) + colW / 2} ${y0 + 3 * rowH} L${cx(2) + colW / 2} ${y0 + 2 * rowH + 48 + 4}`} stroke={C.mut} strokeWidth={1.2} strokeDasharray="3 3" markerEnd="url(#dvt-arr)" />
+        <path d={`M${cx(2) + colW / 2 - 30} ${y0 + 3 * rowH} L${cx(2) + colW / 2 - 30} ${y0 + rowH + 48 + 4}`} stroke={C.mut} strokeWidth={1.2} strokeDasharray="3 3" markerEnd="url(#dvt-arr)" />
+        <text x={cx(2) + 8} y={y0 + 3 * rowH - 12} fontSize={8.5} fill={C.mut}>the digest every pod and job runs on</text>
+        <text x={14} y={H - 10} fontSize={9.5} fill={C.mut}>Left to right is one release. Top to bottom is the order of dependence: images under everything, the schema before dbt, the DAG calling dbt at run time.</text>
       </svg>
     </div>);
 }
@@ -238,6 +328,19 @@ export default function Overview({ t, onGo }) {
       <P t={t}>Three pipelines, on three different clocks. The application job runs on every pull request and carries the schema with it. The image job runs when a vulnerability or a version bump needs it.
         Nothing is built twice: the same artefact SHA and the same image digest move from development to production unchanged.</P>
       <ProcessFig t={t} />
+
+      <H2 t={t}>Three pipelines, end to end: RD DEV to PROD</H2>
+      <P t={t}>Each pipeline on its own, from the author's change to production: what happens at each stage, the gate that lets it through, the evidence it writes to the CP 360 metadata, and its status today. Under each, what actually moves between environments and how it is rolled back.
+        The database and image pipelines are built end to end. The data pipeline is built up to the report and pending from the merge build onward.</P>
+      <E2EPipelines t={t} />
+
+      <H2 t={t}>How Airflow, dbt, the schema and the images flow together</H2>
+      <P t={t}>Four things change, in one repository per application and three image repositories, and they travel through one release on different tracks. The figure reads left to right as the release and top to bottom as dependence: the images underneath everything, the schema applied and tagged before a model compiles against it, the DAG calling dbt at run time.</P>
+      <TracksFig t={t} />
+      <Tbl t={t} head={["Track", "Lives in", "Checked on the pull request by", "Moves as", "Runs as", "Owns", ""]} rows={FLOW_TRACKS.map((tr) => [tr.name, tr.lives, tr.checked, tr.moves, tr.runs, tr.owns, <Status t={t} s={tr.status} />])} />
+      <H3 t={t}>The order inside one release</H3>
+      <Steps t={t} items={RELEASE_ORDER.map(([a, b]) => [a, b])} />
+      <Note t={t}><b style={{ color: t.text }}>Three ownership rules keep the tracks apart.</b> dbt owns what it builds; Liquibase owns everything dbt does not create. Airflow owns the order and timing of work and never builds anything itself. The image job owns the runtime and hands over one digest; a consumer adopts it only by merging the bump.</Note>
 
       <H2 t={t}>What is built today</H2>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 12, margin: "10px 0" }}>

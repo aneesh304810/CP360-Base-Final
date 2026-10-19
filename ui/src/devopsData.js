@@ -240,3 +240,93 @@ export const GATE_FLOW = {
   aggregate: "fail if any gate failed; else pass if at least one gate passed; else skip",
   fastFail: "With FAST_FAIL on, the default, a failed gate marks the build failed and the remaining gates are skipped. Off, every gate runs and the report shows all failures in one pass, at the cost of the run time.",
 };
+
+// How the four moving parts travel through one release: the schema
+// (Liquibase), the dbt project, the Airflow DAGs and the images. One row per
+// part: where it lives, what checks it on a pull request, how it moves, what
+// it runs as, who owns it, and the status of the moving part today. Read by
+// the Overview's four-track figure and table.
+export const FLOW_TRACKS = [
+  { key: "schema", name: "Schema · Liquibase", status: "built",
+    lives: "db/changelog in the application repo, beside the models and DAGs",
+    checked: "the schema stage of the job: validate, status and a checksum compare, then update on the target and tag env-build; Gate 2 then checks the dbt contracts against what Oracle now holds",
+    moves: "the same changelog applied per environment; only the tag differs (dev-, sit-, qc-, prod-build)",
+    runs: "not deployed at all: it is applied, and the deploy stage reads the tag before it touches the application",
+    owns: "everything dbt does not create: landing and stage tables, sequences, grants, control and reference tables, partitions",
+    stages: [["Author changeset", "built"], ["Schema stage · validate + update + tag", "built"], ["Gate 2 · contracts vs Oracle", "built"], ["Tag read before deploy", "pending"]] },
+  { key: "dbt", name: "dbt project", status: "partial",
+    lives: "models, tests, seeds and contracts in the application repo",
+    checked: "Gate 1 lints the SQL; Gate 2 checks the YAML contracts against Oracle after the schema stage; Gate 3 runs dbt compile and dbt test with the custom assertions; Gate 4 benchmarks the compiled models",
+    moves: "as part of the thin artefact: the dbt project on the pinned workbench digest, the same SHA from DEV to PROD",
+    runs: "dbt run and dbt test inside KubernetesPodOperator pods, one per task, on the workbench image, against the tagged schema",
+    owns: "what it builds: models, tests, seeds and their contracts",
+    stages: [["Author model + contract", "built"], ["Gates 1 · 2 · 3 · 4", "built"], ["Thin artefact on the digest", "pending"], ["dbt run in a task pod", "pending"]] },
+  { key: "airflow", name: "Airflow DAGs", status: "partial",
+    lives: "DAG files and plugins in the application repo",
+    checked: "Gate 1 reads the DAGs statically (naming, schedule, retries, callbacks, no credentials); Gate 5 runs Bandit over the Python. The design adds a DagBag import in the scheduler's own image, which is not in the job yet",
+    moves: "as a DAG bundle or a thin image layer, with the dbt project, under the same release tag",
+    runs: "the scheduler and webserver as Deployments on the pinned base digest; each task spawns a pod; the daily DAG orchestrates the dbt runs and the Python loaders",
+    owns: "the order and timing of work; it never builds anything itself",
+    stages: [["Author DAG", "built"], ["Gate 1 static · Gate 5 Bandit", "built"], ["DagBag import in the runtime image", "pending"], ["Scheduler picks up the bundle", "pending"]] },
+  { key: "image", name: "Images · base, workbench, agent", status: "built",
+    lives: "three image repositories: Dockerfiles and SBOM configuration, the base pinned by digest",
+    checked: "the image job: build base then workbench and agent, scan (CRITICAL fails), sign with SBOM and provenance, push one digest",
+    moves: "it does not: the digest is identical in every environment. A bump pull request carries it into every repository that pins it",
+    runs: "the agent runs the Guardrails job on OpenShift; the base runs the Airflow scheduler and webserver; the workbench runs every dbt task pod",
+    owns: "the runtime everything else runs on; platform engineering owns the bump",
+    stages: [["Bump + build", "built"], ["Scan · sign · SBOM", "built"], ["Push by digest", "built"], ["Bump PR into every consumer", "built"]] },
+];
+export const RELEASE_ORDER = [
+  ["The digest is already there.", "Every repository pins the image digest the image job last pushed; the Guardrails agent, the scheduler and the dbt task pods all run on it. Nothing in the release builds an image."],
+  ["The schema stage runs first.", "The job validates db/changelog, applies it to the target under the application's own changelog table and tags the instance env-build. Tables exist before any model is compiled against them."],
+  ["The gates run on the code.", "Gate 1 lints SQL and reads the DAGs; Gate 2 checks the dbt contracts against the schema just applied; Gate 3 compiles and tests the models; Gate 4 benchmarks; Gate 5 scans the Python. The report goes to the CP 360 metadata and the pull request."],
+  ["Merge builds the thin artefact.", "The dbt project and the DAG bundle on the pinned digest, under one app tag, build number and commit. Pending: the job ends at the report today."],
+  ["Deploy reads the tag, then applies the artefact.", "DEV and SIT on merge, QC on promotion, PROD on approval. The deploy refuses a target without this release's database tag. Pending."],
+  ["The scheduler picks up the DAGs.", "The Airflow scheduler on the base digest parses the bundle; the daily DAG runs on its schedule."],
+  ["Each task runs dbt in a pod.", "A KubernetesPodOperator pod on the workbench digest runs dbt against the tagged schema and writes Oracle; Python loaders run the same way."],
+  ["The recon gates record the run.", "CronJobs write the guardrail events per run and dataset, which is what the dashboards read back."],
+];
+
+// Three pipelines, end to end, from RD DEV to PROD. One entry per pipeline:
+// the stages a change passes through, left to right, each with what
+// happens, the gate to pass, the evidence written and its status today;
+// then what moves between environments and how a rollback works. Read by
+// the Overview's end-to-end figures and tables.
+export const ENVS = ["RD DEV", "RD SIT", "QC · UAT", "PROD"];
+export const E2E = [
+  { key: "data", name: "Data pipeline · dbt + Airflow", cadence: "every pull request; a release per merge", status: "partial",
+    moves: "the thin artefact: the dbt project and the DAG bundle on the pinned image digest, one app tag, build number and commit SHA, promoted unchanged",
+    rollback: "redeploy the previous app tag; the schema is not rolled back by this pipeline, and a model that needs a table change rolls forward with its changeset",
+    stages: [
+      ["Author", "a model, test, contract or DAG on a branch named type/TICKET-slug", "the branch name", "—", "built"],
+      ["Pull request", "the webhook bridge starts the Guardrails job: schema stage on DEV, then Gates 1 to 5; summary.json and summary.html; report to CP 360 metadata and e-mail", "every gate pass or skip; tech lead approval", "the run record in the CP 360 metadata; the e-mailed report", "built"],
+      ["Merge", "the merge build makes the thin artefact: dbt project + DAG bundle on the pinned digest, app tag vYYYY.MM.DD", "a green merge build", "guardrail_release", "pending"],
+      ["RD DEV", "automatic on merge: the deploy stage reads the dev- tag, applies the artefact, the scheduler parses the DAGs, a smoke dbt test runs", "the database tag present; smoke tests pass", "guardrail_deployment · app lane", "pending"],
+      ["RD SIT", "automatic after DEV, the same SHA: the daily DAG runs end to end against SIT data", "the DAG run completes; the recon gates pass", "guardrail_deployment · guardrail_events", "pending"],
+      ["QC · UAT", "on promotion, the same SHA: full dbt selection, UAT verification recorded, manual approval", "approval; UAT verification on record", "guardrail_deployment · the approval record", "pending"],
+      ["PROD", "on approval: change ticket and window, two approvals with one Platform Owner, the same SHA; post-deploy smoke tests; automatic rollback to the last good commit on failure", "the deployment policy: ticket, window, signatures, no self-approval", "guardrail_deployment · the audit record", "pending"],
+    ] },
+  { key: "db", name: "Database · Liquibase", cadence: "per release, as the first stage of the application job", status: "built",
+    moves: "nothing is promoted: the same changelog is applied in each environment from the same commit, and each instance is tagged env-build",
+    rollback: "liquibase rollback to the previous tag for data-safe changesets; a destructive change rolls forward with a new changeset, never back",
+    stages: [
+      ["Author", "a changeset in db/changelog: one logical change, a rollback block, labels and contexts; additive now, a drop in a later release", "the standards check: a rollback block, no destructive change without a prior expand release", "—", "built"],
+      ["Pull request", "validate, status and a checksum compare, and a dry run against DEV showing what would apply; the tech lead reviews expand-and-contract and whether the rollback is data-safe", "clean validate and status; approval", "the PR run's output", "built"],
+      ["Merge", "nothing is built: the changelog travels with the application commit", "a green merge build", "—", "built"],
+      ["RD DEV", "on merge: validate, update under DATABASECHANGELOG_<APP> and the application's lock, tag dev-build", "every changeset applied; a changed checksum stops the job", "guardrail_changeset · guardrail_changeset_applied · the dev- tag", "built"],
+      ["RD SIT", "on merge, after DEV: the same changelog, tag sit-build", "every changeset applied", "guardrail_changeset_applied · the sit- tag", "built"],
+      ["QC · UAT", "on promotion: the same changelog, tag qc-build; Gate 2 of the next pull request checks the contracts against what QC now holds", "every changeset applied", "guardrail_changeset_applied · the qc- tag", "built"],
+      ["PROD", "on approval, inside the change window: the same changelog, tag prod-build; the deploy stage of the application job reads this tag and refuses without it", "every changeset applied; the approval", "guardrail_changeset_applied · the prod- tag", "built"],
+    ] },
+  { key: "img", name: "Infrastructure image & security", cadence: "on a vulnerability or a version bump, on its own clock", status: "built",
+    moves: "the digest does not move: it is identical in every environment. A bump pull request carries it into every repository that pins it, and each consumer's own release takes it from RD DEV to PROD",
+    rollback: "re-pin the previous digest by pull request; the old image is still in the registry, signed",
+    stages: [
+      ["Bump", "a CVE patch or a base version bump in one of the three image repositories; the base pinned by digest, never a floating tag", "a reason for the bump; the Dockerfile checks: no root, no privileged, resource limits", "—", "built"],
+      ["Pull request", "Dockerfile and SBOM configuration reviewed", "review", "—", "built"],
+      ["Build · scan · sign", "base first, then workbench and agent on the new base digest; scan the image and its dependencies; sign and attach SBOM and provenance", "CRITICAL fails the job; HIGH fails an image bound for production; an unsigned image never reaches the registry", "the scan report on the build; signature and SBOM in the registry", "built"],
+      ["Push by digest", "one immutable sha256; the date-build tag is a label, the digest the identity", "the push succeeds; admission runs only signed digests from the internal registry", "the image record: date + build → digest", "built"],
+      ["Bump PR", "a pull request into every repository that pins the digest: application repositories for the base and workbench, the Jenkinsfile for the agent", "each consumer merges; this step needs an owner and a service level", "the consumer's pull request", "built"],
+      ["RD DEV → PROD", "no stage of its own: the new digest reaches each environment when the consumer's release does, DEV and SIT on merge, QC on promotion, PROD on approval", "the consumer's own gates and approvals", "guardrail_deployment of the consumer", "built"],
+    ] },
+];

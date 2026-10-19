@@ -27,8 +27,8 @@ import DevOps360, { PAL, NAMING, FlowFig, Dashboard, Detail, Context,
   Containers, Components, Versions, Promotion, Pipelines,
   Deployment, Built, BUILT, PENDING, PIPES, sp, Legend, PendingList, DB_PROCESS, IMG_PROCESS, Process } from "../src/DevOps360.jsx";
 import { tLight, tDark } from "../src/bbhTheme.js";
-import Overview, { ProcessFig, PR_STEPS, FOR_DEVELOPERS, FOR_REVIEWERS, GateFlow, GateFlowFig } from "../src/DevOpsOverview.jsx";
-import { DOC_TABS, GATE_FLOW } from "../src/DevOps360.jsx";
+import Overview, { ProcessFig, PR_STEPS, FOR_DEVELOPERS, FOR_REVIEWERS, GateFlow, GateFlowFig, TracksFig, E2EFig, E2EPipelines } from "../src/DevOpsOverview.jsx";
+import { DOC_TABS, GATE_FLOW, FLOW_TRACKS, RELEASE_ORDER, E2E, ENVS as ENV_NAMES } from "../src/DevOps360.jsx";
 import { OpsModel, Dashboards, ROLES, RACI, PROMOTION, EXCEPTION_RULES, CADENCE, EVIDENCE, REG_MAP, ATTEST, ENG_KPIS, SCORE_WEIGHTS, ALERTS, AUDIENCES } from "../src/DevOpsOps.jsx";
 
 let bad = 0;
@@ -357,7 +357,7 @@ for (const [tn, t] of [["light", tLight], ["dark", tDark]]) {
   ok(h.length > 12000 && !/NaN|undefined|\[object Object\]/.test(h), `the overview renders cleanly in ${tn}`, h.length);
 }
 const ov = renderToStaticMarkup(<Overview t={tLight} onGo={() => {}} />);
-ok((ov.match(/role="img"/g) || []).length === 2 && /three lanes/.test(ov) && /Liquibase schema stage first, built/.test(ov) && /the deploy to DEV, SIT, QC and PROD, pending/.test(ov),
+ok((ov.match(/role="img"/g) || []).length === 6 && /three lanes/.test(ov) && /Liquibase schema stage first, built/.test(ov) && /the deploy to DEV, SIT, QC and PROD, pending/.test(ov),
    "the one-picture figure carries a sentence that names the three lanes and the status of each");
 const nb = BUILT.filter((r) => r.status === "built").length, np_ = BUILT.filter((r) => r.status === "partial").length, nq = BUILT.filter((r) => r.status === "pending").length;
 ok(new RegExp(`Of the design.{1,8}s ${BUILT.length} reconciled rows, ${nb} are built, ${np_} partial and ${nq} pending`).test(ov),
@@ -393,6 +393,41 @@ ok(GATE_FLOW.gates.every((g) => gf.includes(g.report) && g.checks.every((c) => g
    "every gate's report path and every check appear in the detail, with the parameters, environment and the overall rule");
 ok(renderToStaticMarkup(<GateFlowFig t={tDark} />).length > 3000 && /The gate flow, expanded/.test(ov) && gf.length > 6000,
    "the gate flow renders in dark and sits in the overview");
+// ---- three pipelines end to end, RD DEV to PROD ----------------------------
+ok(E2E.map((p) => p.key).join(",") === "data,db,img" && ENV_NAMES.join("|") === "RD DEV|RD SIT|QC · UAT|PROD",
+   "three pipelines: data, database, image; four environments in order");
+ok(E2E.every((p) => p.stages.length >= 6 && p.stages.every((st) => st.length === 5 && ["built", "partial", "pending"].includes(st[4])) && p.moves && p.rollback),
+   "every pipeline has its stages with what happens, the gate, the evidence and a status, plus what moves and how to roll back");
+ok(E2E[0].stages.map((st) => st[0]).slice(3).join("|") === "RD DEV|RD SIT|QC · UAT|PROD" && E2E[1].stages.map((st) => st[0]).slice(3).join("|") === "RD DEV|RD SIT|QC · UAT|PROD",
+   "the data and database pipelines run through all four environments by name");
+ok(E2E[1].stages.every((st) => st[4] === "built") && E2E[2].stages.every((st) => st[4] === "built") && E2E[0].stages.slice(2).every((st) => st[4] === "pending") && E2E[0].stages.slice(0, 2).every((st) => st[4] === "built"),
+   "database and image are built end to end; the data pipeline is built to the report and pending from the merge build");
+ok(E2E[1].stages.some((st) => /tag prod-build/.test(st[1]) && /refuses without it/.test(st[1])) && E2E[1].stages.some((st) => /DATABASECHANGELOG_<APP>/.test(st[1]))
+   && /liquibase rollback to the previous tag/.test(E2E[1].rollback) && /rolls forward/.test(E2E[1].rollback),
+   "the database pipeline names the per-application changelog table, the prod tag the deploy reads, and the rollback rule");
+ok(E2E[0].stages.some((st) => /two approvals with one Platform Owner/.test(st[1]) && /automatic rollback/.test(st[1])) && /thin artefact/.test(E2E[0].moves) && /previous app tag/.test(E2E[0].rollback),
+   "the data pipeline's PROD stage carries the ticket, window, approvals and automatic rollback; the artefact is what moves");
+ok(/does not move/.test(E2E[2].moves) && E2E[2].stages.some((st) => /RD DEV → PROD/.test(st[0]) && /consumer/.test(st[1])), "the image never moves; it reaches each environment through its consumer's release");
+const e2 = renderToStaticMarkup(<E2EPipelines t={tLight} />);
+ok((e2.match(/role="img"/g) || []).length === 3 && /DATABASE · LIQUIBASE · END TO END/.test(e2) && /What moves between environments\./.test(e2) && />GATE</.test(e2),
+   "three end-to-end figures with the gate under every stage, and the moves and rollback notes");
+ok(E2E.every((p) => p.stages.every(([, what, gate, ev]) => e2.includes(what.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/'/g, "&#x27;")) && e2.includes(gate.replace(/'/g, "&#x27;").replace(/</g, "&lt;").replace(/>/g, "&gt;")))),
+   "every stage's full text is in the table under the figure");
+ok(renderToStaticMarkup(<E2EFig t={tDark} p={E2E[0]} />).length > 2000 && /Three pipelines, end to end: RD DEV to PROD/.test(ov), "the figures render in dark and the section is on the overview");
+
+// ---- the four tracks: schema, dbt, Airflow, images ----------------------
+ok(FLOW_TRACKS.map((x) => x.key).join(",") === "schema,dbt,airflow,image" && FLOW_TRACKS.every((x) => x.stages.length === 4 && x.lives && x.checked && x.moves && x.runs && x.owns),
+   "four tracks in dependence order, each with four stages and the six facts");
+ok(FLOW_TRACKS[0].status === "built" && FLOW_TRACKS[3].status === "built" && FLOW_TRACKS[1].status === "partial" && FLOW_TRACKS[2].status === "partial"
+   && FLOW_TRACKS[1].stages.some(([s, st]) => /Thin artefact/.test(s) && st === "pending") && FLOW_TRACKS[2].stages.some(([s, st]) => /DagBag/.test(s) && st === "pending"),
+   "schema and images are built; dbt and Airflow are partial, pending at the artefact and the runtime import");
+ok(RELEASE_ORDER.length === 8 && /schema stage runs first/.test(RELEASE_ORDER[1][0]) && /digest is already there/.test(RELEASE_ORDER[0][0]) && /runs dbt in a pod/.test(RELEASE_ORDER[6][0]),
+   "the release order: digest present, schema first, gates, artefact, deploy, scheduler, dbt in a pod, recon gates");
+const tf = renderToStaticMarkup(<TracksFig t={tLight} />);
+ok(/Four tracks through one release/.test(tf) && /tables exist before dbt compiles/.test(tf) && /the DAG task runs dbt/.test(tf) && /the digest every pod and job runs on/.test(tf),
+   "the tracks figure draws the three dependencies between tracks");
+ok(/How Airflow, dbt, the schema and the images flow together/.test(ov) && /KubernetesPodOperator/.test(ov) && /Liquibase owns everything dbt does not create/.test(ov) && /never builds anything itself/.test(ov),
+   "the overview section names where each runs and the three ownership rules");
 ok(!/testbbh|apps\.ocp|https?:\/\/|:7990|#cp-/.test(devSrc), "no hostname, URL, port or channel on the overview or in the data module");
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\ndevops360 assertions pass");
