@@ -6,7 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { tLight, tDark } from "../src/bbhTheme.js";
-import PbNotifications, { TABS, MARK, REQUIREMENTS, TYPES, GRID, TRACKING_FIELDS, STATUSES, FLOW, MODES, MODEL, ORCHESTRATION, SOURCES, CONTENT, GAPS, EXCEPTIONS,
+import PbNotifications, { TABS, MARK, REQUIREMENTS, TYPES, GRID, TRACKING_FIELDS, STATUSES, FLOW, MODES, MODEL, ORCHESTRATION, BOUNCE, HLD_FLOWS, SOURCES, CONTENT, GAPS, EXCEPTIONS,
   OverviewTab, RequirementsTab, DesignTab, ModelTab, SourcesTab, ContentTab, GapsTab, ExceptionsTab } from "../src/PbNotifications.jsx";
 
 let bad = 0;
@@ -16,7 +16,7 @@ const src = fs.readFileSync(path.join(SRC, "PbNotifications.jsx"), "utf8");
 
 console.log("-- the data");
 ok(TABS.length === 8 && TABS[0][0] === "overview" && Object.keys(MARK).join(",") === "REQUIRED,PROPOSED,OPEN", "eight tabs and three marks");
-ok(REQUIREMENTS.length === 9 && REQUIREMENTS.every((r) => MARK[r[2]]) && REQUIREMENTS.find((r) => r[0] === "R6")[2] === "OPEN", "nine requirements, the send time open");
+ok(REQUIREMENTS.length === 10 && REQUIREMENTS.every((r) => MARK[r[2]]) && REQUIREMENTS.find((r) => r[0] === "R6")[2] === "OPEN" && /Microsoft 365/.test(REQUIREMENTS[9][1]), "ten requirements, the send time open, bounce detection through the mail broker last");
 ok(TYPES.map((x) => x.key).join(",") === "STATEMENT_CONFIRM,1099,K1" && TYPES.filter((x) => x.always).length === 2 && /ESTIMATE_IND = N/.test(TYPES[1].posted) && /prior calendar year/.test(TYPES[2].posted),
    "three notification types; the tax types always send, final documents only, K-1 prior year");
 ok(GRID.length === 5 && GRID.every((r) => r.length === 5) && TRACKING_FIELDS.length === 8 && STATUSES.map(([s]) => s).join(",") === "Processing,Sent,Failed",
@@ -29,10 +29,10 @@ ok(SOURCES.length === 4 && SOURCES.map((s) => s.rows).join(",") === "1226,3372,6
    "the four extracts with their row counts and 89 unmatched ids in total");
 ok(CONTENT.length === 5 && CONTENT.map((c) => c.key).join(",") === "STATEMENT,CONFIRM,BOTH,1099,K1" && CONTENT.every((c) => /BBH Client Portal/.test(c.body) && /\[link to/.test(c.body)),
    "five e-mails, each with a bracketed link placeholder");
-ok(GAPS.length === 14 && GAPS.filter((g) => g[1] === "critical").length === 5 && GAPS.filter((g) => g[4] === "OPEN").length === 8 && /suppression flag N/.test(GAPS[5][2]),
-   "fourteen gaps: five critical, eight open to the business, the suppression-flag contradiction among them");
-ok(EXCEPTIONS.length === 10 && EXCEPTIONS.some(([s, , , o]) => /Rerun/.test(s) && o === "SKIP") && EXCEPTIONS.some(([s, , , o]) => /no e-mail address/.test(s) && o === "REJECT"),
-   "ten exception scenarios; a rerun sends nothing twice; a missing address is a rejection");
+ok(GAPS.length === 16 && GAPS.filter((g) => g[1] === "critical").length === 5 && GAPS.filter((g) => g[4] === "OPEN").length === 10 && /suppression flag N/.test(GAPS[5][2]),
+   "sixteen gaps: five critical, ten open, the suppression-flag contradiction among them");
+ok(EXCEPTIONS.length === 12 && EXCEPTIONS.some(([s, , , o]) => /Hard bounce/.test(s) && o === "FLAG") && EXCEPTIONS.some(([s, , , o]) => /Soft bounce/.test(s) && o === "RETRY") && EXCEPTIONS.some(([s, , , o]) => /Rerun/.test(s) && o === "SKIP") && EXCEPTIONS.some(([s, , , o]) => /no e-mail address/.test(s) && o === "REJECT"),
+   "twelve exception scenarios including hard and soft bounces; a rerun sends nothing twice; a missing address is a rejection");
 
 console.log("-- the screen");
 for (const [tn, t] of [["light", tLight], ["dark", tDark]]) {
@@ -45,8 +45,16 @@ ok(ORCHESTRATION.tasks.length === 10 && ORCHESTRATION.tasks[0][0] === "wait_post
    && /all_done/.test(ORCHESTRATION.deps) && ORCHESTRATION.rules.length === 5,
    "the DAG: ten tasks, three eligibility reads in parallel, a named dag_id, no personal data in XCom, the event published whatever happened");
 ok(/DAG · pb_notification_daily/.test(all) && /pool pb_notify_relay/.test(all) && /catchup off/.test(all) && /max_active_runs/.test(all), "the DAG figure and settings are on the design tab");
-ok((all.match(/role="img"/g) || []).length === 4 && /ONE DAILY DAG · EIGHT TASKS/.test(all) && /How one STATEMENT_CONFIRM record becomes an e-mail/.test(all) && /A candidate opens exactly one tracking record/.test(all),
-   "four figures: the run, the DAG graph, the statements-and-confirms decision, the data model, each with a sentence");
+ok(BOUNCE.how.length === 6 && BOUNCE.alerts.length === 3 && BOUNCE.columns.map(([c]) => c).join(",") === "MESSAGE_ID,BOUNCE_TS,BOUNCE_CLASS,BOUNCE_REASON,ALERTED_TS"
+   && ORCHESTRATION.bounce.tasks.length === 5 && ORCHESTRATION.bounce.tasks[0][0] === "read_ndr_mailbox" && ORCHESTRATION.bounce.tasks.some(([n]) => n === "alert_system_dev")
+   && BOUNCE.how.some(([a, b]) => /Correlation/.test(a) && /X-PB-Notification-Id/.test(b)) && BOUNCE.alerts[0][2].includes("no client address"),
+   "bounce detection: correlation by header and Message-Id, five tasks reading the Microsoft 365 mailbox through Graph, the alert to system development without client data");
+ok(/BOUNCE DETECTION · THE RELAY ACCEPTING A MESSAGE IS NOT DELIVERY/.test(all) && /pb_notification_bounce_check/.test(all) && /HARD or SOFT/.test(all), "the bounce figure and DAG are on the design tab");
+ok(HLD_FLOWS.length === 8 && /HIGH-LEVEL DESIGN · PB NOTIFICATIONS ON THE INTEGRATION HUB/.test(all) && /High-level design of the PB notification utility/.test(all)
+   && /INTEGRATION HUB · ONE NAMESPACE PER ENVIRONMENT/.test(all) && /Sending mailbox · Microsoft 365/.test(all) && /System development team/.test(all),
+   "the high-level design opens the overview: Portal schema, the Hub, the mail path and the people, with eight numbered flows");
+ok((all.match(/role="img"/g) || []).length === 6 && /ONE DAILY DAG · EIGHT TASKS/.test(all) && /How one STATEMENT_CONFIRM record becomes an e-mail/.test(all) && /A candidate opens exactly one tracking record/.test(all),
+   "six figures: the high-level design, the run, the DAG graph, the bounce path, the statements-and-confirms decision, the data model, each with a sentence");
 ok(/Proof of concept now, Oracle when built/.test(all) && /TPW049|TWM049/.test(all) && /PB_NOTIFICATION_TRACKING/.test(all) && /EMAIL_ADDRESS_NOT_FOUND/.test(all) && /1-800-285-5093/.test(all),
    "the two modes, the suppression table, the tracking table, the exception reason and the support line from the requirement");
 ok(/OPEN G6/.test(all) && /N as permitted/.test(all), "the decision figure carries the open suppression-flag question");

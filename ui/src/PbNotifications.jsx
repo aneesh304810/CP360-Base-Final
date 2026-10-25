@@ -44,6 +44,7 @@ export const REQUIREMENTS = [
   ["R7", "One notification per user per day per notification type (RPT_ID family). Statements and Trade Confirms posted the same day produce one combined e-mail.", "REQUIRED"],
   ["R8", "Keep one tracking table: a record per eligible user, notification type and processing date, with status Processing, Sent or Failed. No separate STATEMENT and CONFIRM records.", "REQUIRED"],
   ["R9", "Track undeliverable 1099 and K-1 e-mails and make them available to the user's Relationship Manager and Relationship Associate.", "REQUIRED"],
+  ["R10", "Detect a bounce after the relay accepted the message: connect to the Microsoft 365 mail broker, read the non-delivery reports returned to the sending mailbox, match them to the notification, mark it Failed, and alert the system development team by e-mail.", "REQUIRED"],
 ];
 
 // The per-type rule, as the requirement states it and as we read it.
@@ -109,6 +110,34 @@ export const HUB_FIT = [
   ["Secrets", "the relay and the read-only Portal account from the namespace secret, Vault later, as for every Hub job", "no credential in the repository"],
 ];
 
+// Bounce detection. The relay accepting a message is not delivery: a bounce
+// comes back minutes or hours later as a non-delivery report to the sending
+// mailbox. A second, short DAG reads that mailbox through the Microsoft 365
+// broker, matches each report to its notification and alerts the people who
+// have to act.
+export const BOUNCE = {
+  how: [
+    ["Correlation", "every message carries a header X-PB-Notification-Id with the NOTIFICATION_ID, and the Message-Id the relay assigns is stored on the tracking row", "a non-delivery report quotes the original headers or Message-Id, so the match is exact, never by address alone"],
+    ["Where bounces land", "the sending mailbox (the Client Portal sender) in Microsoft 365; non-delivery reports arrive there from the recipient's mail system", "one mailbox to read; nothing on the relay to poll"],
+    ["How they are read", "a Microsoft Graph application registration with read access to that one mailbox only, client credentials from the namespace Secret; the task lists messages in the mailbox since the last check and keeps the non-delivery reports", "least privilege: one mailbox, read; the secret never in the repository"],
+    ["Classification", "hard bounce (address unknown, domain not found, rejected) marks the notification Failed with BOUNCE_CLASS = HARD; soft bounce (mailbox full, deferred) is recorded and re-checked, Failed after the window", "the same words the broker uses, kept on the row"],
+    ["Window", "a notification is watched for 48 hours after SENT_TS; a bounce after that is still recorded if it arrives", "most reports arrive within minutes; the window bounds the re-check"],
+    ["Processed reports", "each report's id is stored so it is never matched twice; a report with no matching notification is logged as unmatched and left in the mailbox", "a rerun of the check is idempotent"],
+  ],
+  alerts: [
+    ["System development team", "every hard bounce, batched per check into one e-mail: notification id, type, processing date, bounce class and the broker's reason; counts in the subject", "no client address or name in the body; the id is enough to look the row up in CP 360", "PROPOSED"],
+    ["Relationship Manager and Associate", "hard bounces on 1099 and K1 only, as the requirement asks, through the Hub's relationship-team source", "the client-facing follow-up", "REQUIRED"],
+    ["Quality Guardrails", "the check publishes a guardrail event with sent, bounced-hard, bounced-soft and unmatched counts", "the trend, not the individual", "PROPOSED"],
+  ],
+  columns: [
+    ["MESSAGE_ID", "VARCHAR2(400)", "the Message-Id the relay assigned; the correlation key"],
+    ["BOUNCE_TS", "TIMESTAMP", "when the non-delivery report was read"],
+    ["BOUNCE_CLASS", "VARCHAR2(10)", "HARD or SOFT"],
+    ["BOUNCE_REASON", "VARCHAR2(1000)", "the broker's status code and text"],
+    ["ALERTED_TS", "TIMESTAMP", "when the system development team was told"],
+  ],
+};
+
 // The Airflow implementation: one DAG, its settings, its tasks and how they
 // depend on each other. Written to the Hub's DAG standards (naming,
 // schedule, retries, callbacks, no credentials, small XComs), which Gate 1
@@ -138,6 +167,17 @@ export const ORCHESTRATION = {
     ["notify_rm_ra", "the Hub's relationship-team task", "lists Failed 1099 and K1 rows for the date and makes them available to the user's RM and RA", "the undeliverable view", "depends on the G13 source; until then the task logs the count and the screen shows the rows"],
   ],
   deps: "wait_posting_complete >> [eligibility_stmt_confirm, eligibility_1099, eligibility_k1] >> resolve_address >> write_candidates >> open_tracking >> render_and_send >> [publish_run_event, notify_rm_ra]; publish_run_event has trigger_rule all_done.",
+  bounce: {
+    dag: [["dag_id", "pb_notification_bounce_check"], ["schedule", "every 2 hours between 08:00 and 20:00 ET, and once at 06:00 ET for the overnight reports"], ["scope", "tracking rows Sent in the last 48 hours plus any SOFT bounce still open"], ["max_active_runs", "1"]],
+    tasks: [
+      ["read_ndr_mailbox", "KubernetesPodOperator · Microsoft Graph, client credentials from the Secret", "lists messages in the sending mailbox since the last watermark; keeps the non-delivery reports; stores each report id once", "the reports to match, and the new watermark", "a Graph error fails the task and the next run resumes from the old watermark"],
+      ["match_to_tracking", "KubernetesPodOperator", "matches each report by X-PB-Notification-Id or Message-Id to a tracking row; classifies HARD or SOFT", "EMAIL_STATUS Failed with BOUNCE_TS, BOUNCE_CLASS and BOUNCE_REASON for hard bounces; SOFT recorded and re-checked", "an unmatched report is logged and left in the mailbox"],
+      ["alert_system_dev", "the Hub's notification task · the relay", "one e-mail to the system development distribution list per run with the hard bounces since the last alert; ALERTED_TS stamped", "the alert, and the stamp so a bounce is reported once", "if the alert itself fails the stamp is not set and the next run retries"],
+      ["notify_rm_ra", "the Hub's relationship-team task", "hard bounces on 1099 and K1 to the user's RM and RA", "the undeliverable view", "depends on the G13 source"],
+      ["publish_check_event", "the Hub's guardrail event task · all_done", "sent, bounced-hard, bounced-soft and unmatched counts for the window", "the run's evidence", "always runs"],
+    ],
+    deps: "read_ndr_mailbox >> match_to_tracking >> [alert_system_dev, notify_rm_ra] >> publish_check_event",
+  },
   rules: [
     "Idempotent by construction: every task writes by the date's key and the tracking key, so re-running any task or the whole date sends nothing twice and loses nothing.",
     "The three eligibility tasks run in parallel; nothing downstream starts until all three have finished, because a user can be in more than one type and the candidate write is one merge.",
@@ -174,6 +214,7 @@ export const MODEL = {
     ["ATTEMPT_COUNT · LAST_ATTEMPT_TS", "NUMBER(5) · TIMESTAMP", "retries, so a Failed row says how many times"],
     ["CREATED_TS · SENT_TS", "TIMESTAMP", "created, and sent when it was"],
     ["ERROR_MESSAGE", "VARCHAR2(4000)", "the most recent delivery error"],
+    ["MESSAGE_ID · BOUNCE_TS · BOUNCE_CLASS · BOUNCE_REASON · ALERTED_TS", "see the bounce design", "the correlation key and what the broker said, when a bounce comes back"],
   ], keys: "UNIQUE (USER_ID, NOTIFICATION_TYPE, PROCESS_DATE); CHECK on type and status" },
 };
 
@@ -239,6 +280,8 @@ export const GAPS = [
   ["G12", "rule", "The K-1 query left-joins the report name, so a row with no RPT_DESCRIPTION is possible even though the extract has none.", "decide: fail the run, fall back to RPT_ID, or exclude and report as a data-quality exception", "OPEN"],
   ["G13", "data", "No source carries the Relationship Manager or Relationship Associate, yet failed tax notifications must reach them.", "a relationship-team source keyed by user id; the Hub's interested-party data is the candidate", "OPEN"],
   ["G14", "data", "The statements and confirms extract is split into three sheets, which can place a user in two sheets on the same cycle.", "one consolidated daily set; the two flags choose the template", "PROPOSED"],
+  ["G15", "data", "Bounce detection needs read access to the sending mailbox in Microsoft 365 through a Graph application registration, and the system development distribution list to alert.", "PB Systems to request the registration scoped to that one mailbox, read only, and to name the distribution list", "OPEN"],
+  ["G16", "rule", "Whether a soft bounce (mailbox full, deferred) should ever count as Failed, and after how long.", "proposed: re-check within the 48-hour window, Failed after it; the business to confirm", "OPEN"],
 ];
 
 // What can go wrong on a run, and what the utility does.
@@ -248,7 +291,9 @@ export const EXCEPTIONS = [
   ["User with no e-mail address", "the interested-party join finds nothing", "exception row EMAIL_ADDRESS_NOT_FOUND; counted on the run; not a tracking record", "REJECT"],
   ["User present in two statement sheets", "a consolidated set should make this impossible", "the unique key refuses the second; logged as a source defect", "REJECT"],
   ["Relay refuses the message", "SMTP error", "Failed with the error; retried up to the attempt limit; 1099 and K1 failures exposed to the RM and RA", "RETRY"],
-  ["Bounce after acceptance", "a delivery status notification arrives later", "the tracking row moves from Sent to Failed with the bounce reason; 1099 and K1 to the RM and RA", "FLAG"],
+  ["Hard bounce after acceptance", "the bounce check reads a non-delivery report from the sending mailbox and matches it by notification id", "the tracking row moves from Sent to Failed with the class and reason; the system development team is alerted; 1099 and K1 to the RM and RA", "FLAG"],
+  ["Soft bounce after acceptance", "a deferred or mailbox-full report", "recorded as SOFT and re-checked within the window; Failed and alerted only if it does not clear", "RETRY"],
+  ["Non-delivery report that matches nothing", "no notification id or message id matches a tracking row", "logged as unmatched with its report id; left in the mailbox; counted on the check's event", "FLAG"],
   ["K-1 row with no report description", "left join to TPW005_MOBIUS_MAP found nothing", "per the open decision: fail, fall back to RPT_ID, or exclude and report", "OPEN"],
   ["Estimated tax document on the posting date", "ESTIMATE_IND = Y", "excluded from 1099 and K1 eligibility; not a notification", "SKIP"],
   ["Suppression row with both flags Y on every account", "the user opted out everywhere", "no STATEMENT_CONFIRM candidate; nothing tracked, by design", "SKIP"],
@@ -343,6 +388,37 @@ function DagFig({ t }) {
       </svg>
     </div>);
 }
+function BounceFig({ t }) {
+  const W = 1120;
+  const node = (x, y, w, title, sub, c) => (<g key={title}>
+    <rect x={x} y={y} width={w} height={46} rx={4} fill={t.panel} stroke={c || MARK.PROPOSED.c} strokeWidth={1.5} />
+    <text x={x + 8} y={y + 18} fontSize={10} fontWeight={700} fill={ink(t)}>{title}</text>
+    <text x={x + 8} y={y + 32} fontSize={8.5} fill={mut(t)}>{sub}</text>
+  </g>);
+  const a = (d, dashed) => <path d={d} stroke={mut(t)} strokeWidth={1.2} fill="none" strokeDasharray={dashed ? "4 3" : undefined} markerEnd="url(#pbn-arr5)" />;
+  return (
+    <div style={{ overflowX: "auto", border: `1px solid ${t.border}`, borderRadius: t.radius.md, background: t.panel, padding: "14px 14px 8px", marginBottom: 8 }}>
+      <svg viewBox={`0 0 ${W} 214`} role="img" style={{ display: "block", minWidth: 860, width: "100%", height: "auto" }}
+        aria-label="How a bounce is detected. The send task hands the message to the internal relay with an X-PB-Notification-Id header and stores the Message-Id on the tracking row. The relay delivers to the client's mail system. If it bounces, a non-delivery report comes back to the sending mailbox in Microsoft 365. The bounce-check DAG reads that mailbox through Microsoft Graph, matches the report to the tracking row, marks it Failed with the class and reason, alerts the system development team, sends 1099 and K-1 failures to the Relationship Manager and Associate, and publishes a guardrail event.">
+        <defs><marker id="pbn-arr5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={mut(t)} /></marker></defs>
+        <text x={12} y={16} fontSize={11} fontWeight={800} letterSpacing=".6" fill={ink(t)}>BOUNCE DETECTION · THE RELAY ACCEPTING A MESSAGE IS NOT DELIVERY</text>
+        {node(12, 30, 170, "render_and_send", "header X-PB-Notification-Id · Message-Id stored")}
+        {node(222, 30, 150, "Internal relay", "accepts · Sent + SENT_TS")}
+        {node(412, 30, 170, "Client's mail system", "delivers, or refuses", t.border)}
+        {node(622, 30, 200, "Sending mailbox · Microsoft 365", "non-delivery reports arrive here", t.border)}
+        {node(862, 30, 240, "pb_notification_bounce_check", "every 2 hours · Graph · read that mailbox only")}
+        {node(862, 110, 240, "match_to_tracking", "by notification id or Message-Id · HARD / SOFT")}
+        {node(622, 110, 200, "Tracking row", "Sent → Failed · BOUNCE_CLASS · REASON")}
+        {node(412, 110, 170, "System development team", "one e-mail per check · hard bounces", MARK.REQUIRED.c)}
+        {node(222, 110, 150, "RM and RA", "1099 and K1 only", MARK.REQUIRED.c)}
+        {node(12, 110, 170, "Guardrail event", "sent · hard · soft · unmatched")}
+        {a("M182 53 L220 53")}{a("M372 53 L410 53")}{a("M582 53 L620 53", true)}{a("M822 53 L860 53")}
+        {a("M982 76 L982 108")}{a("M862 133 L824 133")}{a("M622 133 L584 133")}{a("M412 133 L374 133")}{a("M222 133 L184 133")}
+        <text x={12} y={184} fontSize={9.5} fill={mut(t)}>Dashed: the bounce path, which happens minutes to hours after the send. The check watches each notification for 48 hours after SENT_TS; a soft bounce is re-checked, a hard bounce is Failed at once.</text>
+        <text x={12} y={200} fontSize={9.5} fill={MARK.OPEN.c}>OPEN G15: the Graph application registration, read-only on that one mailbox, and the system development distribution list are PB Systems' to provide.</text>
+      </svg>
+    </div>);
+}
 function ModelFig({ t }) {
   const box = (x, y, w, h, m) => (<g key={m.name}>
     <rect x={x} y={y} width={w} height={h} rx={4} fill={t.panel} stroke={MARK.PROPOSED.c} strokeWidth={1.6} />
@@ -361,6 +437,93 @@ function ModelFig({ t }) {
         <path d="M302 40 L328 40" stroke={mut(t)} strokeWidth={1.2} markerEnd="url(#pbn-arr3)" /><text x={304} y={34} fontSize={8} fill={mut(t)}>1 · n (K1)</text>
         <path d="M302 110 L316 110 L316 160 L585 160 L585 110 L598 110" stroke={mut(t)} strokeWidth={1.2} fill="none" markerEnd="url(#pbn-arr3)" /><text x={330} y={156} fontSize={8} fill={mut(t)}>1 · 1 — a candidate opens exactly one tracking record; the unique key refuses a second</text>
         <text x={12} y={182} fontSize={9.5} fill={mut(t)}>Created by a Liquibase changeset in this application's db/changelog, so the Hub's schema stage applies and tags it like every other table.</text>
+      </svg>
+    </div>);
+}
+
+// The high-level design: who and what is involved, and the numbered flows
+// between them, on one picture. Context level: the Portal's Oracle schema
+// on the left, the Hub in the middle, mail on the right, people around.
+export const HLD_FLOWS = [
+  ["1", "Posting process completes the day; the sensor sees the completion record"],
+  ["2", "Three eligibility queries read the Portal schema (the Excel extracts in the proof of concept)"],
+  ["3", "Candidates, K-1 lines and tracking rows written to the Hub schema"],
+  ["4", "One message per tracking row through the internal relay to the client"],
+  ["5", "A bounce returns as a non-delivery report to the sending mailbox in Microsoft 365"],
+  ["6", "The bounce check reads that mailbox through Graph and marks the row Failed"],
+  ["7", "Alerts: hard bounces to system development; 1099 and K-1 failures to the RM and RA"],
+  ["8", "A guardrail event per run; Quality Guardrails and the RM/RA view read the rows"],
+];
+function HldFig({ t }) {
+  const W = 1180, H = 470;
+  const box = (x, y, w, h, title, lines, c, kind) => (<g key={title}>
+    <rect x={x} y={y} width={w} height={h} rx={5} fill={t.panel} stroke={c || t.border} strokeWidth={1.6} />
+    {kind && <text x={x + 8} y={y + 11} fontSize={7.5} fontWeight={800} letterSpacing=".6" fill={mut(t)}>{kind}</text>}
+    <text x={x + 8} y={y + 26} fontSize={11} fontWeight={700} fill={ink(t)}>{title}</text>
+    {lines.map((l, i) => <text key={i} x={x + 8} y={y + 40 + i * 12} fontSize={9} fill={mut(t)}>{l}</text>)}
+  </g>);
+  const person = (x, y, name, role) => (<g key={name}>
+    <circle cx={x + 14} cy={y + 10} r={8} fill="none" stroke={ink(t)} strokeWidth={1.3} />
+    <path d={`M${x + 2} ${y + 34} Q${x + 14} ${y + 18} ${x + 26} ${y + 34}`} fill="none" stroke={ink(t)} strokeWidth={1.3} />
+    <text x={x + 36} y={y + 14} fontSize={10.5} fontWeight={700} fill={ink(t)}>{name}</text>
+    <text x={x + 36} y={y + 27} fontSize={8.5} fill={mut(t)}>{role}</text>
+  </g>);
+  const flow = (d, n, lx, ly, dashed) => (<g key={n + d}>
+    <path d={d} fill="none" stroke={dashed ? mut(t) : t.accent} strokeWidth={1.4} strokeDasharray={dashed ? "4 3" : undefined} markerEnd="url(#pbn-hld)" />
+    {n && <><circle cx={lx} cy={ly} r={8} fill={t.accent} /><text x={lx} y={ly + 3.5} fontSize={9} fontWeight={800} fill="#fff" textAnchor="middle">{n}</text></>}
+  </g>);
+  const P = MARK.PROPOSED.c, R = MARK.REQUIRED.c;
+  return (
+    <div style={{ overflowX: "auto", border: `1px solid ${t.border}`, borderRadius: t.radius.md, background: t.panel, padding: "14px 14px 8px", marginBottom: 8 }}>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" style={{ display: "block", minWidth: 960, width: "100%", height: "auto" }}
+        aria-label={`High-level design of the PB notification utility. Left: the Client Portal's Oracle schema with the posting tables, the user and account map and the suppression table, and the Excel extracts used by the proof of concept. Middle: the Integration Hub with two Airflow DAGs, the daily run and the bounce check, task pods, the Hub schema holding the candidate, K-1 detail and tracking tables, the guardrail events in the CP 360 metadata and the screens. Right: the internal mail relay, the client's mailbox, and the sending mailbox in Microsoft 365 read through Graph. People: the client, PB Systems as operator, the system development team, the Relationship Manager and Associate. Eight numbered flows: ${HLD_FLOWS.map(([n, f]) => `${n} ${f}`).join("; ")}.`}>
+        <defs><marker id="pbn-hld" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={t.accent} /></marker></defs>
+        <text x={12} y={16} fontSize={11} fontWeight={800} letterSpacing=".6" fill={ink(t)}>HIGH-LEVEL DESIGN · PB NOTIFICATIONS ON THE INTEGRATION HUB</text>
+        {/* left: sources */}
+        <text x={12} y={40} fontSize={8.5} fontWeight={800} letterSpacing=".6" fill={mut(t)}>CLIENT PORTAL · ORACLE</text>
+        {box(12, 48, 230, 96, "Portal schema", ["TPW101_STMT_RPT · TPW102_CNF_RPT", "TPW103_TAX_DOC_RPT · TPW005_MOBIUS_MAP", "TWM001_USER_REF · TWM002_USER_ACCOUNT_MAP", "TWM049_SUPPRESS_EMAIL · read only"], R, "SOURCE")}
+        {box(12, 156, 230, 46, "Posting process", ["writes the completion record per day"], MARK.OPEN.c, "SOURCE")}
+        {box(12, 214, 230, 58, "Interested-party record", ["the client's e-mail on file in the warehouse", "END_DATE IS NULL"], R, "SOURCE")}
+        {box(12, 284, 230, 46, "Excel extracts · proof of concept", ["the same four queries, as workbooks"], t.border, "POC ONLY")}
+        {/* middle: the hub */}
+        <rect x={290} y={34} width={520} height={330} rx={8} fill="none" stroke={P} strokeWidth={1.2} strokeDasharray="6 4" />
+        <text x={300} y={50} fontSize={8.5} fontWeight={800} letterSpacing=".6" fill={P}>INTEGRATION HUB · ONE NAMESPACE PER ENVIRONMENT</text>
+        {box(300, 60, 240, 66, "DAG · pb_notification_daily", ["weekdays 07:30 ET · sensor to 08:00", "eligibility ×3 → candidates → tracking → send", "task pods on the workbench image"], P, "AIRFLOW")}
+        {box(560, 60, 240, 66, "DAG · pb_notification_bounce_check", ["every 2 hours · Graph · read one mailbox", "match → Failed → alert → event"], P, "AIRFLOW")}
+        {box(300, 142, 500, 70, "Hub schema", ["PB_NOTIFICATION_CANDIDATE · one row per user, type, date", "PB_NOTIFICATION_K1_DETAIL · one row per date, user, report", "PB_NOTIFICATION_TRACKING · the daily unique key · Processing / Sent / Failed · bounce columns"], P, "ORACLE · LIQUIBASE")}
+        {box(300, 228, 240, 56, "Guardrail events · CP 360 metadata", ["candidates · exceptions · sent · failed", "bounced hard / soft · unmatched, per run"], P, "EVIDENCE")}
+        {box(560, 228, 240, 56, "CP 360 screens", ["Quality Guardrails · the RM/RA undeliverable view", "this design page"], P, "SCREENS")}
+        {box(300, 300, 240, 50, "Namespace Secret", ["read-only Portal account · relay · Graph", "credentials; nothing in the repository"], t.border, "SECRETS")}
+        {/* right: mail */}
+        <text x={850} y={40} fontSize={8.5} fontWeight={800} letterSpacing=".6" fill={mut(t)}>MAIL</text>
+        {box(850, 48, 318, 56, "Internal relay", ["one message per tracking row", "X-PB-Notification-Id header · Message-Id stored"], R, "SMTP")}
+        {box(850, 118, 318, 46, "Client's mailbox", ["delivers, or refuses"], t.border, "EXTERNAL")}
+        {box(850, 178, 318, 58, "Sending mailbox · Microsoft 365", ["the Client Portal sender", "non-delivery reports arrive here · read through Graph"], R, "BROKER")}
+        {/* people */}
+        <text x={12} y={366} fontSize={8.5} fontWeight={800} letterSpacing=".6" fill={mut(t)}>PEOPLE</text>
+        {person(12, 376, "Client", "receives the notification")}
+        {person(222, 376, "PB Systems", "operates the run · owns the reference data")}
+        {person(482, 376, "System development team", "alerted on every hard bounce")}
+        {person(772, 376, "RM and RA", "told of failed 1099 and K-1 e-mails")}
+        {person(992, 376, "PB business", "owns the rules and the open questions")}
+        {/* flows */}
+        {flow("M242 179 L270 179 L270 93 L298 93", "1", 270, 136)}
+        {flow("M242 96 L298 96", "2", 266, 86)}
+        {flow("M242 243 L286 243 L286 110 L298 110", "", 0, 0)}
+        {flow("M242 307 L270 307 L270 120 L298 120", "", 0, 0, true)}
+        {flow("M420 126 L420 140", "3", 434, 134)}
+        {flow("M540 80 L848 80", "4", 700, 70)}
+        {flow("M1009 104 L1009 116", "", 0, 0)}
+        {flow("M1009 164 L1009 176", "5", 1030, 170, true)}
+        {flow("M850 207 L830 207 L830 100 L800 100", "6", 830, 150, true)}
+        {flow("M680 126 L680 140", "", 0, 0)}
+        {flow("M680 212 L680 226", "8", 700, 222)}
+        {flow("M420 212 L420 226", "", 0, 0)}
+        {flow("M620 284 L620 376", "7", 634, 330)}
+        {flow("M800 256 L830 256 L830 376 L812 376", "7", 830, 320)}
+        <text x={12} y={428} fontSize={9.5} fill={mut(t)}>Solid: the daily path. Dashed: the proof-of-concept input and the bounce path, which happens minutes to hours after the send. Flow 7 is the alert: hard bounces to system development, tax failures to the RM and RA.</text>
+        <text x={12} y={444} fontSize={9.5} fill={mut(t)}>The Portal schema is only read. Everything the utility writes is in the Hub schema, created by Liquibase. Hostnames, mailboxes and credentials live in Environment 360 and the namespace Secret.</text>
+        <text x={12} y={460} fontSize={9.5} fill={MARK.OPEN.c}>Open before build: the completion record from the posting process (G8), the Graph registration and the system development list (G15), the relationship-team source (G13).</text>
       </svg>
     </div>);
 }
@@ -394,6 +557,9 @@ function Legend({ t }) {
 // ----------------------------------------------------------------- tabs ----
 export function OverviewTab({ t }) {
   return (<>
+    <H2 t={t} sub="The whole utility on one picture: the Portal schema it reads, the Hub it runs on, the mail it sends and the bounce it watches for, and the people around it.">High-level design</H2>
+    <HldFig t={t} />
+    <Tbl t={t} head={["#", "Flow"]} rows={HLD_FLOWS.map(([n, f]) => [n, f])} />
     <H2 t={t}>Background</H2>
     {BACKGROUND.map((p) => <P key={p.slice(0, 30)} t={t}>{p}</P>)}
     <H2 t={t}>The enhancement</H2>
@@ -446,6 +612,15 @@ export function DesignTab({ t }) {
     <Tbl t={t} head={["Task", "Operator · where it runs", "What it does", "Writes", "On failure"]} rows={ORCHESTRATION.tasks.map(([a, b, c, d, e]) => [<span style={mono}>{a}</span>, b, c, d, e])} />
     <div style={{ fontSize: 12.5, color: t.sub, lineHeight: 1.6, margin: "6px 0 10px" }}><b style={{ color: t.text }}>Dependencies</b> <span style={{ ...mono, fontSize: 11.5 }}>{ORCHESTRATION.deps}</span></div>
     {ORCHESTRATION.rules.map((r) => <Note key={r.slice(0, 24)} t={t} c={MARK.PROPOSED.c}>{r}</Note>)}
+    <H2 t={t} sub="The relay accepting a message is not delivery. A bounce comes back later, to the sending mailbox, and only the mail broker can tell us. A second short DAG reads it and alerts the people who have to act.">Bounce detection and the alert to system development</H2>
+    <BounceFig t={t} />
+    <Tbl t={t} head={["Concern", "How", "Why this way"]} rows={BOUNCE.how.map(([a, b, c]) => [a, b, c])} />
+    <Tbl t={t} head={["Who is told", "What", "What is left out", ""]} rows={BOUNCE.alerts.map(([a, b, c, m]) => [a, b, c, <Chip m={m} />])} />
+    <Tbl t={t} head={["Setting", "Value"]} rows={ORCHESTRATION.bounce.dag.map(([a, b]) => [<span style={mono}>{a}</span>, b])} />
+    <Tbl t={t} head={["Task", "Operator · where it runs", "What it does", "Writes", "On failure"]} rows={ORCHESTRATION.bounce.tasks.map(([a, b, c, d, e]) => [<span style={mono}>{a}</span>, b, c, d, e])} />
+    <div style={{ fontSize: 12.5, color: t.sub, lineHeight: 1.6, margin: "6px 0 10px" }}><b style={{ color: t.text }}>Dependencies</b> <span style={{ ...mono, fontSize: 11.5 }}>{ORCHESTRATION.bounce.deps}</span></div>
+    <Tbl t={t} head={["Column added to PB_NOTIFICATION_TRACKING", "Type", "Meaning"]} rows={BOUNCE.columns.map(([a, b, c]) => [<span style={mono}>{a}</span>, <span style={mono}>{b}</span>, c])} />
+    <Note t={t} c={MARK.PROPOSED.c}><b style={{ color: t.text }}>The alert to system development carries the id, not the client.</b> Notification id, type, processing date, bounce class and the broker's reason, batched into one e-mail per check with the counts in the subject. The row in CP 360 has the rest. Nobody's address or name travels in an alert.</Note>
     <H2 t={t}>Design rules</H2>
     <Note t={t} c={MARK.PROPOSED.c}><b style={{ color: t.text }}>The tracking key is the only duplicate guard.</b> USER_ID, NOTIFICATION_TYPE and PROCESS_DATE are unique. A rerun on the same date leaves Sent rows alone and retries the rest; no counter, flag or memory outside the table decides whether an e-mail goes.</Note>
     <Note t={t} c={MARK.PROPOSED.c}><b style={{ color: t.text }}>A missing address is a rejection, never a drop.</b> The eligibility row still exists as an exception with its reason, the count is on the run's guardrail event, and someone can act on it.</Note>
