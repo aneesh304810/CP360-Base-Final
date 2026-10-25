@@ -7,7 +7,8 @@ import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { tLight, tDark } from "../src/bbhTheme.js";
 import PbNotifications, { TABS, MARK, REQUIREMENTS, TYPES, GRID, TRACKING_FIELDS, STATUSES, FLOW, MODES, MODEL, ORCHESTRATION, BOUNCE, HLD_FLOWS, REPO_LAYOUT, DAG_CODE, BOUNCE_DAG_CODE, POD_HELPER, SOURCES, CONTENT, GAPS, EXCEPTIONS,
-  OverviewTab, RequirementsTab, DesignTab, ModelTab, SourcesTab, ContentTab, GapsTab, ExceptionsTab } from "../src/PbNotifications.jsx";
+  ACTORS, BR_TRACE, SOURCE_TABLES, STEPS, LIFECYCLE, TESTS, OPEN_ITEMS,
+  OverviewTab, WorkflowTab, RequirementsTab, DesignTab, ModelTab, SourcesTab, ContentTab, TestsTab, GapsTab, ExceptionsTab } from "../src/PbNotifications.jsx";
 
 let bad = 0;
 const ok = (c, m, got) => { console.log(`${c ? "ok  " : "FAIL"} ${m}${c ? "" : `  -> ${String(got).slice(0, 220)}`}`); if (!c) bad++; };
@@ -15,7 +16,7 @@ const SRC = fs.existsSync("src/PbNotifications.jsx") ? "src" : path.join("ui", "
 const src = fs.readFileSync(path.join(SRC, "PbNotifications.jsx"), "utf8");
 
 console.log("-- the data");
-ok(TABS.length === 8 && TABS[0][0] === "overview" && Object.keys(MARK).join(",") === "REQUIRED,PROPOSED,OPEN", "eight tabs and three marks");
+ok(TABS.length === 10 && TABS[0][0] === "overview" && TABS[1][0] === "flow" && TABS[7][0] === "tests" && Object.keys(MARK).join(",") === "REQUIRED,PROPOSED,OPEN", "ten tabs, the end-to-end flow second and the test scenarios before the gaps, three marks");
 ok(REQUIREMENTS.length === 10 && REQUIREMENTS.every((r) => MARK[r[2]]) && REQUIREMENTS.find((r) => r[0] === "R6")[2] === "OPEN" && /Microsoft 365/.test(REQUIREMENTS[9][1]), "ten requirements, the send time open, bounce detection through the mail broker last");
 ok(TYPES.map((x) => x.key).join(",") === "STATEMENT_CONFIRM,1099,K1" && TYPES.filter((x) => x.always).length === 2 && /ESTIMATE_IND = N/.test(TYPES[1].posted) && /prior calendar year/.test(TYPES[2].posted),
    "three notification types; the tax types always send, final documents only, K-1 prior year");
@@ -29,17 +30,35 @@ ok(SOURCES.length === 4 && SOURCES.map((s) => s.rows).join(",") === "1226,3372,6
    "the four extracts with their row counts and 89 unmatched ids in total");
 ok(CONTENT.length === 5 && CONTENT.map((c) => c.key).join(",") === "STATEMENT,CONFIRM,BOTH,1099,K1" && CONTENT.every((c) => /BBH Client Portal/.test(c.body) && /\[link to/.test(c.body)),
    "five e-mails, each with a bracketed link placeholder");
-ok(GAPS.length === 16 && GAPS.filter((g) => g[1] === "critical").length === 5 && GAPS.filter((g) => g[4] === "OPEN").length === 10 && /suppression flag N/.test(GAPS[5][2]),
-   "sixteen gaps: five critical, ten open, the suppression-flag contradiction among them");
-ok(EXCEPTIONS.length === 12 && EXCEPTIONS.some(([s, , , o]) => /Hard bounce/.test(s) && o === "FLAG") && EXCEPTIONS.some(([s, , , o]) => /Soft bounce/.test(s) && o === "RETRY") && EXCEPTIONS.some(([s, , , o]) => /Rerun/.test(s) && o === "SKIP") && EXCEPTIONS.some(([s, , , o]) => /no e-mail address/.test(s) && o === "REJECT"),
-   "twelve exception scenarios including hard and soft bounces; a rerun sends nothing twice; a missing address is a rejection");
+ok(GAPS.length === 20 && GAPS.filter((g) => g[1] === "critical").length === 5 && GAPS.filter((g) => g[4] === "OPEN").length === 14 && /suppression flag N/.test(GAPS[5][2])
+   && /Loan Statements/.test(GAPS[16][2]) && /ATTEMPT_COUNT/.test(GAPS[17][3]) && /deep links/.test(GAPS[18][2]) && /PBCPAPP schema/.test(GAPS[19][2]),
+   "twenty gaps: five critical, fourteen open; the Loan Statement ids, the retry limit, the deep links and the owner of the tables from the end-to-end document");
+ok(EXCEPTIONS.length === 14 && EXCEPTIONS.some(([s, , , o]) => /deleted between/.test(s) && o === "REJECT") && EXCEPTIONS.some(([s, , c, o]) => /gateway unavailable/.test(s) && /stay Processing/.test(c) && o === "RETRY")
+   && EXCEPTIONS.some(([s, , , o]) => /Hard bounce/.test(s) && o === "FLAG") && EXCEPTIONS.some(([s, , , o]) => /Soft bounce/.test(s) && o === "RETRY") && EXCEPTIONS.some(([s, , , o]) => /Rerun/.test(s) && o === "SKIP") && EXCEPTIONS.some(([s, , , o]) => /no e-mail address/.test(s) && o === "REJECT"),
+   "fourteen exception scenarios: a user deleted before the send, the gateway unavailable, hard and soft bounces; a rerun sends nothing twice; a missing address is a rejection");
+ok(ACTORS.length === 8 && ACTORS.every((a) => MARK[a[2]]) && ACTORS.some(([a, b]) => /PBDWAPP/.test(a) && /DIM_INTERESTED_PARTY/.test(b)) && ACTORS.some(([a]) => /RM and RA/.test(a)),
+   "eight actors and systems, the warehouse address tables and the relationship team among them");
+ok(BR_TRACE.length === 15 && BR_TRACE[0][0] === "BR-01" && BR_TRACE[14][0] === "BR-15" && BR_TRACE.every((r) => r[2].length > 8) && /G17/.test(BR_TRACE[8][2]) && /unique key/.test(BR_TRACE[6][2]),
+   "BR-01 to BR-15 each traced to a place on the page; the Loan Statement gap on BR-09, the unique key on BR-07");
+ok(SOURCE_TABLES.length === 9 && SOURCE_TABLES.filter((r) => r[1] === "PBCPAPP").length === 7 && SOURCE_TABLES.filter((r) => r[1] === "PBDWAPP").length === 2
+   && SOURCE_TABLES.some(([n, , , k]) => n === "DIM_INTERESTED_PARTY" && /E_MAIL_ADDRESS/.test(k) && /END_DATE/.test(k)),
+   "nine source tables: seven in the Portal schema, two in the warehouse for the e-mail of record");
+ok(STEPS.length === 12 && STEPS[0][3] === "wait_posting_complete" && /eligibility_stmt_confirm/.test(STEPS[1][3]) && /unique-key violation/.test(STEPS[4][1]) && /publish_run_event/.test(STEPS[11][3])
+   && STEPS.every(([, , , k]) => ORCHESTRATION.tasks.some(([n]) => k.includes(n)) || ORCHESTRATION.bounce.tasks.some(([n]) => k.includes(n))),
+   "the twelve processing steps, each tied to a task that exists on one of the two DAGs");
+ok(LIFECYCLE.length === 6 && LIFECYCLE.some(([a, b, , d]) => a === "Sent" && b === "Failed" && d === "match_to_tracking") && LIFECYCLE.some(([a, b]) => a === "Processing" && b === "Processing"),
+   "the status lifecycle: Sent to Failed on a bounce, and a gateway outage leaves Processing");
+ok(TESTS.length === 18 && TESTS[0][0] === "T01" && TESTS[17][0] === "T18" && TESTS.every((r) => r.length === 4) && /no RM or RA/.test(TESTS[16][2]) && /unique key/.test(TESTS[14][3]),
+   "eighteen test scenarios T01 to T18 with the rule that decides each; a statement bounce is not escalated; two runs send once");
+ok(OPEN_ITEMS.length === 13 && /G17/.test(OPEN_ITEMS[6][2]) && /G18/.test(OPEN_ITEMS[10][2]) && /G19/.test(OPEN_ITEMS[12][2]) && /designed/.test(OPEN_ITEMS[8][2]) && /designed/.test(OPEN_ITEMS[9][2]),
+   "the document's thirteen open items each land on a gap or on a part of the design that answers it");
 
 console.log("-- the screen");
 for (const [tn, t] of [["light", tLight], ["dark", tDark]]) {
-  const parts = [OverviewTab, RequirementsTab, DesignTab, ModelTab, SourcesTab, ContentTab, GapsTab, ExceptionsTab].map((C) => renderToStaticMarkup(<C t={t} />));
-  ok(parts.every((p) => p.length > 1500 && !/NaN|undefined|\[object Object\]/.test(p)), `all eight tabs render cleanly in ${tn}`, parts.map((p) => p.length).join(","));
+  const parts = [OverviewTab, WorkflowTab, RequirementsTab, DesignTab, ModelTab, SourcesTab, ContentTab, TestsTab, GapsTab, ExceptionsTab].map((C) => renderToStaticMarkup(<C t={t} />));
+  ok(parts.every((p) => p.length > 1500 && !/NaN|undefined|\[object Object\]/.test(p)), `all ten tabs render cleanly in ${tn}`, parts.map((p) => p.length).join(","));
 }
-const all = [OverviewTab, RequirementsTab, DesignTab, ModelTab, SourcesTab, ContentTab, GapsTab, ExceptionsTab].map((C) => renderToStaticMarkup(<C t={tLight} />)).join("\n");
+const all = [OverviewTab, WorkflowTab, RequirementsTab, DesignTab, ModelTab, SourcesTab, ContentTab, TestsTab, GapsTab, ExceptionsTab].map((C) => renderToStaticMarkup(<C t={tLight} />)).join("\n");
 ok(ORCHESTRATION.tasks.length === 10 && ORCHESTRATION.tasks[0][0] === "wait_posting_complete" && ORCHESTRATION.tasks.filter((x) => /^eligibility_/.test(x[0])).length === 3
    && ORCHESTRATION.dag.some(([k, v]) => k === "dag_id" && v === "pb_notification_daily") && ORCHESTRATION.dag.some(([k, v]) => k === "XCom" && /never a user id/.test(v))
    && /all_done/.test(ORCHESTRATION.deps) && ORCHESTRATION.rules.length === 5,
@@ -59,8 +78,16 @@ ok(/BOUNCE DETECTION · THE RELAY ACCEPTING A MESSAGE IS NOT DELIVERY/.test(all)
 ok(HLD_FLOWS.length === 8 && /HIGH-LEVEL DESIGN · PB NOTIFICATIONS ON THE INTEGRATION HUB/.test(all) && /High-level design of the PB notification utility/.test(all)
    && /INTEGRATION HUB · ONE NAMESPACE PER ENVIRONMENT/.test(all) && /Sending mailbox · Microsoft 365/.test(all) && /System development team/.test(all),
    "the high-level design opens the overview: Portal schema, the Hub, the mail path and the people, with eight numbered flows");
-ok((all.match(/role="img"/g) || []).length === 6 && /ONE DAILY DAG · EIGHT TASKS/.test(all) && /How one STATEMENT_CONFIRM record becomes an e-mail/.test(all) && /A candidate opens exactly one tracking record/.test(all),
-   "six figures: the high-level design, the run, the DAG graph, the bounce path, the statements-and-confirms decision, the data model, each with a sentence");
+ok((all.match(/role="img"/g) || []).length === 8 && /ONE DAILY DAG · EIGHT TASKS/.test(all) && /How one STATEMENT_CONFIRM record becomes an e-mail/.test(all) && /A candidate opens exactly one tracking record/.test(all),
+   "eight figures: the high-level design, the business flow, the technical flow, the run, the DAG graph, the bounce path, the statements-and-confirms decision, the data model, each with a sentence");
+const flowTab = renderToStaticMarkup(<WorkflowTab t={tLight} />);
+ok(/END-TO-END BUSINESS FLOW/.test(flowTab) && /The end-to-end business flow on four lanes/.test(flowTab) && /TRACK AND SEND/.test(flowTab) && /Tracking row exists/.test(flowTab) && /RM and RA told/.test(flowTab),
+   "the business flow figure: four lanes, the duplicate decision, the delivered decision and the RM and RA outcome");
+ok(/TECHNICAL FLOW · TWO AIRFLOW DAGS/.test(flowTab) && /DASHED = READ/.test(flowTab) && /DAG pb_notification_daily/.test(flowTab) && /DAG pb_notification_bounce_check/.test(flowTab)
+   && /Hub schema · PB_NOTIFICATION_\*/.test(flowTab) && /Warehouse · PBDWAPP/.test(flowTab) && /Sending mailbox · M365/.test(flowTab) && (flowTab.match(/stroke-dasharray="4 3"/g) || []).length === 3,
+   "the technical flow figure: both DAGs, the five stores between them, reads dashed and writes solid");
+ok(/Traceability to BR-01 to BR-15/.test(all) && /Source data model/.test(all) && /Where the tables live \(G20\)/.test(all) && /The document(&#x27;|')s open items/.test(all) && /Processing steps/.test(all) && /Status lifecycle/.test(all) && /Test scenarios/.test(all),
+   "the document's sections are on the page: the BR trace, the source model and the table owner, the open items, the steps, the lifecycle and the tests");
 ok(/Proof of concept now, Oracle when built/.test(all) && /TPW049|TWM049/.test(all) && /PB_NOTIFICATION_TRACKING/.test(all) && /EMAIL_ADDRESS_NOT_FOUND/.test(all) && /1-800-285-5093/.test(all),
    "the two modes, the suppression table, the tracking table, the exception reason and the support line from the requirement");
 ok(/OPEN G6/.test(all) && /N as permitted/.test(all), "the decision figure carries the open suppression-flag question");

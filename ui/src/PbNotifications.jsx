@@ -24,7 +24,7 @@ export const MARK = {
 };
 const mono = { fontFamily: "monospace" };
 
-export const TABS = [["overview", "Overview"], ["req", "Requirements"], ["design", "Design on the Hub"], ["model", "Data model"], ["sources", "Source review"], ["content", "E-mail content"], ["gaps", "Open gaps"], ["exc", "Exceptions"]];
+export const TABS = [["overview", "Overview"], ["flow", "End-to-end flow"], ["req", "Requirements"], ["design", "Design on the Hub"], ["model", "Data model"], ["sources", "Source review"], ["content", "E-mail content"], ["tests", "Test scenarios"], ["gaps", "Open gaps"], ["exc", "Exceptions"]];
 
 // ---------------------------------------------------------------- data ----
 export const BACKGROUND = [
@@ -398,6 +398,10 @@ export const GAPS = [
   ["G14", "data", "The statements and confirms extract is split into three sheets, which can place a user in two sheets on the same cycle.", "one consolidated daily set; the two flags choose the template", "PROPOSED"],
   ["G15", "data", "Bounce detection needs read access to the sending mailbox in Microsoft 365 through a Graph application registration, and the system development distribution list to alert.", "PB Systems to request the registration scoped to that one mailbox, read only, and to name the distribution list", "OPEN"],
   ["G16", "rule", "Whether a soft bounce (mailbox full, deferred) should ever count as Failed, and after how long.", "proposed: re-check within the 48-hour window, Failed after it; the business to confirm", "OPEN"],
+  ["G17", "rule", "The type grid includes Loan Statements, but the statements SQL takes RPT_ID SUNGARD1 only.", "PB Systems to confirm the Loan Statement report ids; held in the same reference table as the 1099 family", "OPEN"],
+  ["G18", "rule", "No retry policy for Failed rows: how many attempts, how far apart, and when a row is finally Failed.", "ATTEMPT_COUNT and LAST_ATTEMPT_TS on the tracking row with the limit in config, proposed three within the run day; the business to confirm the limit", "OPEN"],
+  ["G19", "data", "The Portal deep links for the Statement, Confirms, All Types and Tax Reports views are not specified.", "PB Systems to provide the four links per environment; held in Environment 360 and the namespace config, never in the template", "OPEN"],
+  ["G20", "data", "The document places the tracking and K-1 detail tables in the Portal's PBCPAPP schema with the detail keyed by NOTIFICATION_ID; the design keeps them in the Hub schema with the detail keyed by date, user and report.", "agree the owner: the Hub schema keeps the Portal schema read-only and the Liquibase stage applies the changeset; the detail key can follow the document if preferred", "OPEN"],
 ];
 
 // What can go wrong on a run, and what the utility does.
@@ -414,8 +418,117 @@ export const EXCEPTIONS = [
   ["Estimated tax document on the posting date", "ESTIMATE_IND = Y", "excluded from 1099 and K1 eligibility; not a notification", "SKIP"],
   ["Suppression row with both flags Y on every account", "the user opted out everywhere", "no STATEMENT_CONFIRM candidate; nothing tracked, by design", "SKIP"],
   ["Test extract in production", "every address identical, or the environment safeguard tripped", "the run refuses to send; alert", "HOLD"],
+  ["User deleted between the extract and the send", "DELETED_IND re-checked on the tracking row just before the send", "the row becomes Failed with reason USER_DELETED; nothing sent; counted on the run", "REJECT"],
+  ["E-mail gateway unavailable", "the relay cannot be reached at all", "rows stay Processing; the send task fails and retries on the DAG's retry schedule; support is alerted through the failure callback", "RETRY"],
 ];
 export const OUTCOME = { HOLD: "#c96a12", SKIP: "#6b7884", REJECT: "#b42318", RETRY: "#0f4775", FLAG: "#7c3aed", OPEN: "#c96a12" };
+
+// ---------------------------------------------- the end-to-end document ----
+// The "PB Notifications – End-to-End Workflow Requirements" document, folded
+// in: who is involved, the business requirement ids it uses, the source
+// tables it names, the twelve processing steps, the status lifecycle, the
+// test scenarios and where each of its open items lands on this page.
+export const ACTORS = [
+  ["External Client Portal user", "the recipient: USER_TYPE = EXTERNAL and DELETED_IND = N", "REQUIRED"],
+  ["PB Client Portal · PBCPAPP schema", "the document posting tables, the user and account map and the suppression preferences; read only", "REQUIRED"],
+  ["Data warehouse · PBDWAPP schema", "the e-mail of record: DIM_IP_RELATIONSHIP joins the Portal id to the interested party, DIM_INTERESTED_PARTY holds E_MAIL_ADDRESS with END_DATE IS NULL", "REQUIRED"],
+  ["Notification utility · the two Hub DAGs", "extract, evaluate, consolidate, send and track, on the Integration Hub's Airflow", "PROPOSED"],
+  ["E-mail gateway · the internal relay and Microsoft 365", "delivery through the relay; non-delivery reports come back to the sending mailbox", "REQUIRED"],
+  ["Relationship team · RM and RA", "told of failed 1099 and K-1 deliveries, resolved by USER_ID", "REQUIRED"],
+  ["System development team", "alerted on every hard bounce", "PROPOSED"],
+  ["PB Systems · PB business", "operate the run and own the reference data; own the rules and the open items", "REQUIRED"],
+];
+// BR-01 to BR-15 as the document numbers them, and where each one lands here.
+export const BR_TRACE = [
+  ["BR-01", "Send to active external clients (DELETED_IND = N) when a document is posted.", "R1 · the eligibility queries · re-validated on the row just before the send"],
+  ["BR-02", "Eligibility by document type and the user's e-mail notification preferences.", "R2 · the statements-and-confirms decision"],
+  ["BR-03", "1099 and K-1: active clients always receive the notification.", "R3 · the two types marked ALWAYS SENT"],
+  ["BR-04", "Every active external user associated with the account is notified.", "R4 · TWM002_USER_ACCOUNT_MAP joined to TWM001_USER_REF"],
+  ["BR-05", "Send to the user's e-mail on file in the data warehouse.", "R5 · resolve_address · DIM_INTERESTED_PARTY"],
+  ["BR-06", "Send after the day's posting completes; 8:00 a.m. ET proposed.", "R6, open · the posting sensor with 08:00 ET as the latest start · G8"],
+  ["BR-07", "At most one notification per user, per type, per day.", "R7 · the tracking table's unique key"],
+  ["BR-08", "Statements and at least one confirm on the same day: one combined e-mail.", "R7 · the BOTH template from the two received flags"],
+  ["BR-09", "Statements: RPT_ID SUNGARD1, posting date from RPT_VRSN_NAM on TPW101_STMT_RPT.", "the STATEMENT_CONFIRM type · Loan Statement ids open, G17"],
+  ["BR-10", "Trade Confirms: RPT_ID SUNGARD2, posting date from RPT_VRSN_NAM on TPW102_CNF_RPT.", "the STATEMENT_CONFIRM type"],
+  ["BR-11", "1099: RPT_ID in TX1099, TX1099R; posting date from RPT_VRSN_NAM; ESTIMATE_IND = N.", "the 1099 type · the family and the predicate open, G9 and G10"],
+  ["BR-12", "K-1: RPT_ID per TPW005_MOBIUS_MAP; ESTIMATE_IND = N; the prior tax year only.", "the K1 type · positive classification open, G11"],
+  ["BR-13", "The K-1 e-mail lists every distinct fund or report once.", "the K1 template · PB_NOTIFICATION_K1_DETAIL"],
+  ["BR-14", "One notification tracking table.", "R8 · PB_NOTIFICATION_TRACKING"],
+  ["BR-15", "Track bounced 1099 and K-1 e-mails and notify the RM and RA.", "R9 and R10 · the bounce-check DAG · notify_rm_ra"],
+];
+// The source data model the document names. Table and column names only.
+export const SOURCE_TABLES = [
+  ["TPW101_STMT_RPT", "PBCPAPP", "posted statements", "SUNGARD_ACCT_ID · RPT_ID · RPT_VRSN_NAM · LOAD_DTE_TXT"],
+  ["TPW102_CNF_RPT", "PBCPAPP", "posted trade confirms", "SUNGARD_ACCT_ID · RPT_ID · RPT_VRSN_NAM · LOAD_DTE_TXT"],
+  ["TPW103_TAX_DOC_RPT", "PBCPAPP", "posted tax documents", "SUNGARD_ACCT_ID · RPT_ID · RPT_VRSN_NAM · LOAD_DTE_TXT · TAX_YR_NUM · ESTIMATE_IND"],
+  ["TPW005_MOBIUS_MAP", "PBCPAPP", "report id to description", "RPT_ID · RPT_DES"],
+  ["TWM001_USER_REF", "PBCPAPP", "Portal users", "USER_ID · USER_TYPE · DELETED_IND"],
+  ["TWM002_USER_ACCOUNT_MAP", "PBCPAPP", "user to account", "USER_ID · ACCOUNT_NUMBER (= SUNGARD_ACCT_ID)"],
+  ["TWM049_SUPPRESS_EMAIL", "PBCPAPP", "opt-out preferences", "USER_ID · ACCOUNT_NUMBER · IS_STMNT_SUPPRESSED · IS_CNFRM_SUPPRESSED"],
+  ["DIM_IP_RELATIONSHIP", "PBDWAPP", "interested party to Portal id", "INTERESTED_PARTY_NUMBER · BBH_WEB_PORTAL_ID (= USER_ID)"],
+  ["DIM_INTERESTED_PARTY", "PBDWAPP", "the e-mail of record", "INTERESTED_PARTY_NUMBER · E_MAIL_ADDRESS · END_DATE (current row: NULL)"],
+];
+// The twelve processing steps the document lists, and the DAG task that does each.
+export const STEPS = [
+  ["1", "Wait for the posting cycle to complete (target 8:00 a.m. ET).", "PROCESS_DATE fixed", "wait_posting_complete"],
+  ["2", "Run the three extracts for PROCESS_DATE.", "candidate sets per type", "eligibility_stmt_confirm · eligibility_1099 · eligibility_k1"],
+  ["3", "Join each candidate to the e-mail of record.", "candidate with e-mail", "resolve_address"],
+  ["4", "Route users with no e-mail to the exception log.", "exceptions, counted", "resolve_address"],
+  ["5", "For each (USER_ID, NOTIFICATION_TYPE, PROCESS_DATE) insert a tracking row as Processing; skip on a unique-key violation.", "idempotent tracking", "write_candidates · open_tracking"],
+  ["6", "For K-1, insert the detail rows (distinct RPT_ID and RPT_DESCRIPTION).", "the K-1 body content", "write_candidates"],
+  ["7", "Select the template and render it with the Portal deep link.", "the e-mail payload", "render_and_send"],
+  ["8", "Send.", "the gateway response", "render_and_send · pool pb_notify_relay"],
+  ["9", "On success: EMAIL_STATUS = Sent, SENT_TS stamped.", "Sent", "render_and_send"],
+  ["10", "On failure or bounce: EMAIL_STATUS = Failed, ERROR_MESSAGE.", "Failed", "render_and_send · match_to_tracking in the bounce DAG"],
+  ["11", "If Failed and the type is 1099 or K1: notify the RM and RA.", "escalation", "notify_rm_ra, in both DAGs"],
+  ["12", "Produce the daily run summary: counts by type and status, exceptions.", "the operations report", "publish_run_event · publish_check_event"],
+];
+// The status lifecycle, including the transition the bounce check adds.
+export const LIFECYCLE = [
+  ["new", "Processing", "the tracking row is created for the day's candidate", "open_tracking"],
+  ["Processing", "Sent", "the relay accepted the message; SENT_TS stamped", "render_and_send"],
+  ["Processing", "Failed", "the relay refused it and the attempt limit is reached; ERROR_MESSAGE holds the last error", "render_and_send"],
+  ["Processing", "Processing", "the gateway was unavailable: the row is left as it is and the next attempt retries it", "render_and_send"],
+  ["Sent", "Failed", "a non-delivery report matched the row; BOUNCE_CLASS and BOUNCE_REASON recorded", "match_to_tracking"],
+  ["Failed", "Failed, RM and RA told", "the type is 1099 or K1", "notify_rm_ra"],
+];
+// The document's test scenarios, and the rule on this page that decides each.
+export const TESTS = [
+  ["T01", "Statements posted; the user is not in the suppress table", "statements-only e-mail", "no suppression row permits · Y / N"],
+  ["T02", "Statements on two accounts; one permitted, one suppressed", "statements-only e-mail", "at least one account permits"],
+  ["T03", "Statements posted; every account suppressed", "no record, no e-mail", "N / N: nothing tracked"],
+  ["T04", "Confirms only, permitted", "confirms-only e-mail", "N / Y"],
+  ["T05", "Statements and confirms both eligible", "one combined e-mail, one STATEMENT_CONFIRM record", "Y / Y · one record whichever e-mail"],
+  ["T06", "Statements eligible; confirms suppressed on every account", "statements-only e-mail", "evaluated per document type"],
+  ["T07", "Statement on account A (permitted), confirm on account B (permitted), each suppressed on the other", "combined e-mail", "an opt-out on one account does not suppress another"],
+  ["T08", "1099 on two of five accounts; the user suppressed for statements", "1099 e-mail sent", "preferences do not apply to tax types"],
+  ["T09", "1099 on the remaining three accounts the next day", "a new 1099 e-mail for the new date", "the key includes PROCESS_DATE"],
+  ["T10", "K-1 for three funds across accounts", "one K-1 e-mail listing the three funds once each", "the K1 detail grouped per user"],
+  ["T11", "K-1 with ESTIMATE_IND = Y", "excluded", "final documents only"],
+  ["T12", "K-1 for a tax year other than the prior year", "excluded", "TAX_YR_NUM = the prior calendar year"],
+  ["T13", "Deleted user (DELETED_IND = Y)", "excluded", "the eligibility queries, and the re-check before the send"],
+  ["T14", "Internal user", "excluded", "USER_TYPE = EXTERNAL"],
+  ["T15", "The job runs twice on the same day", "no duplicate e-mails", "the unique key; Sent rows left alone"],
+  ["T16", "A 1099 e-mail bounces", "Failed; the RM and RA notified", "the bounce check · notify_rm_ra"],
+  ["T17", "A statement e-mail bounces", "Failed; no RM or RA alert", "tax types only go to the RM and RA; system development is still alerted"],
+  ["T18", "The user has no warehouse e-mail", "exception logged; nothing sent", "EMAIL_ADDRESS_NOT_FOUND, never a silent drop"],
+];
+// The document's thirteen open items and where each one lands on this page.
+export const OPEN_ITEMS = [
+  ["1", "Send time: can it be 8:00 a.m. ET?", "G8 and R6: the posting sensor with 08:00 ET as the latest start"],
+  ["2", "The day-two example says every account = N gives no e-mail, contradicting N = permitted", "G6"],
+  ["3", "1099 family: the narrative says TX1099 and TX1099R, the SQL adds three more", "G9"],
+  ["4", "The 1099 SQL lacks ESTIMATE_IND = N", "G10"],
+  ["5", "K-1 identified by an exclusion list", "G11"],
+  ["6", "The K-1 left join can yield a null description", "G12"],
+  ["7", "Loan Statements are in the grid but the SQL takes SUNGARD1 only", "G17"],
+  ["8", "No RM and RA source", "G13"],
+  ["9", "Bounce capture not defined", "designed: the bounce-check DAG reads the sending mailbox through Microsoft 365 (R10); the registration is G15"],
+  ["10", "SYSDATE hard-coded in the extracts", "designed: PROCESS_DATE is bound into every query and written on every row"],
+  ["11", "Retry policy for Failed", "G18"],
+  ["12", "The test e-mail file uses one QA address for every user", "G3: the environment safeguard"],
+  ["13", "Portal deep links not specified", "G19"],
+];
 
 // ------------------------------------------------------------- figures ----
 const ink = (t) => t.text, mut = (t) => t.textMuted;
@@ -652,6 +765,166 @@ function HldFig({ t }) {
     </div>);
 }
 
+// The end-to-end business flow, as the document draws it, on four swimlanes:
+// posting, eligibility, track-and-send, and the outcome for the people. The
+// flow leaves each lane at its right end and re-enters the next at its left
+// along the gap between the lanes, so no line crosses a box.
+function BusinessFlowFig({ t }) {
+  const W = 1180, H = 486, P = MARK.PROPOSED.c, R = MARK.REQUIRED.c;
+  const lane = (y, h, l1, l2) => (<g key={l1 + y}>
+    <rect x={12} y={y} width={W - 24} height={h} rx={4} fill={t.bg} />
+    <text x={22} y={y + h / 2 - 3} fontSize={8} fontWeight={800} letterSpacing=".5" fill={mut(t)}>{l1}</text>
+    <text x={22} y={y + h / 2 + 9} fontSize={8} fontWeight={800} letterSpacing=".5" fill={mut(t)}>{l2}</text>
+  </g>);
+  const box = (x, y, w, h, title, sub, c) => { const lines = Array.isArray(title) ? title : [title]; return (<g key={`${x}-${y}`}>
+    <rect x={x} y={y} width={w} height={h} rx={4} fill={t.panel} stroke={c || t.border} strokeWidth={1.5} />
+    {lines.map((l, i) => <text key={i} x={x + 8} y={y + 16 + i * 12} fontSize={10} fontWeight={700} fill={ink(t)}>{l}</text>)}
+    {sub && <text x={x + 8} y={y + h - 8} fontSize={8.5} fill={mut(t)}>{sub}</text>}
+  </g>); };
+  const dia = (cx, cy, w, h, l1, l2) => (<g key={`d${cx}-${cy}`}>
+    <path d={`M${cx - w / 2} ${cy} L${cx} ${cy - h / 2} L${cx + w / 2} ${cy} L${cx} ${cy + h / 2} Z`} fill={t.panel} stroke={MARK.OPEN.c} strokeWidth={1.5} />
+    <text x={cx} y={cy + (l2 ? -1 : 3.5)} fontSize={8.5} fontWeight={700} fill={ink(t)} textAnchor="middle">{l1}</text>
+    {l2 && <text x={cx} y={cy + 10} fontSize={8.5} fontWeight={700} fill={ink(t)} textAnchor="middle">{l2}</text>}
+  </g>);
+  const a = (d, dashed) => <path key={d} d={d} fill="none" stroke={mut(t)} strokeWidth={1.3} strokeDasharray={dashed ? "4 3" : undefined} markerEnd="url(#pbn-biz)" />;
+  const lbl = (x, y, s, c) => <text key={`${x}-${y}-${s}`} x={x} y={y} fontSize={8} fontWeight={700} fill={c || mut(t)}>{s}</text>;
+  const stack = ["Statements · TPW101_STMT_RPT", "Trade Confirms · TPW102_CNF_RPT", "1099 · TPW103_TAX_DOC_RPT", "K-1 · TPW103 + TPW005_MOBIUS_MAP"];
+  return (
+    <div style={{ overflowX: "auto", border: `1px solid ${t.border}`, borderRadius: t.radius.md, background: t.panel, padding: "14px 14px 8px", marginBottom: 8 }}>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" style={{ display: "block", minWidth: 960, width: "100%", height: "auto" }}
+        aria-label="The end-to-end business flow on four lanes. Posting: daily documents are posted to the Client Portal; when the posting cycle is complete, by 08:00 ET at the latest, the processing date is fixed. Eligibility: the posted statements, trade confirms, 1099s and K-1s are extracted for the processing date, accounts are mapped to active external users, suppression is applied to statements and confirms only, one candidate per user and notification type is consolidated, and the e-mail of record is looked up in the warehouse. Track and send: if a tracking row already exists for the user, type and date the candidate is skipped; otherwise a row is inserted as Processing, the template is selected and rendered with the Portal deep link, and the e-mail is sent. Delivered: Sent with the timestamp and the client receives it. Not delivered or bounced: Failed with the error; for 1099 and K-1 the Relationship Manager and Associate are notified, otherwise it is logged. A daily run summary closes the run.">
+        <defs><marker id="pbn-biz" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={mut(t)} /></marker></defs>
+        <text x={12} y={16} fontSize={11} fontWeight={800} letterSpacing=".6" fill={ink(t)}>END-TO-END BUSINESS FLOW · FROM THE DAY'S POSTING TO THE CLIENT'S INBOX</text>
+        {lane(30, 72, "CLIENT PORTAL", "POSTING")}
+        {lane(120, 126, "NOTIFICATION UTILITY", "ELIGIBILITY")}
+        {lane(264, 98, "NOTIFICATION UTILITY", "TRACK AND SEND")}
+        {lane(380, 74, "OUTCOME", "PEOPLE")}
+        {/* lane 1 */}
+        {box(166, 44, 190, 44, "Daily document posting", "statements · confirms · 1099 · K-1", R)}
+        {a("M356 66 L380 66")}
+        {dia(456, 66, 150, 48, "Posting cycle", "complete?")}
+        {lbl(394, 99, "No · the sensor keeps polling", MARK.OPEN.c)}
+        {a("M531 66 L556 66")}{lbl(534, 58, "Yes")}
+        {box(558, 44, 170, 44, "PROCESS_DATE fixed", "by 08:00 ET at the latest", P)}
+        {a("M643 88 L643 110 L236 110 L236 156")}
+        {/* lane 2 */}
+        {box(166, 158, 140, 52, "Extract posted", "for PROCESS_DATE · 3 queries", P)}
+        {stack.map((s, i) => box(326, 130 + i * 28, 174, 22, [], null, R))}
+        {stack.map((s, i) => <text key={s} x={334} y={130 + i * 28 + 15} fontSize={8} fontWeight={700} fill={ink(t)}>{s}</text>)}
+        {[141, 169, 197, 225].map((y) => a(`M306 184 L316 184 L316 ${y} L324 ${y}`))}
+        {[141, 169, 197, 225].map((y) => a(`M500 ${y} L510 ${y} L510 184 L518 184`))}
+        {box(520, 158, 150, 52, ["Map accounts to", "active external users"], "TWM002 · TWM001 · active only", R)}
+        {a("M670 184 L688 184")}
+        {box(690, 158, 150, 52, "Apply suppression", "TWM049 · not for the tax types", R)}
+        {a("M840 184 L858 184")}
+        {box(860, 158, 150, 52, "Consolidate", "per user and notification type", P)}
+        {a("M1010 184 L1028 184")}
+        {box(1030, 158, 138, 52, "Look up the e-mail", "warehouse · none → exception", R)}
+        {a("M1099 210 L1099 254 L236 254 L236 294")}
+        {/* lane 3 */}
+        {dia(236, 322, 140, 56, "Tracking row exists", "for user · type · date?")}
+        {a("M306 322 L328 322")}{lbl(309, 314, "No")}
+        {box(330, 298, 150, 48, "Insert tracking row", "EMAIL_STATUS = Processing", P)}
+        {a("M480 322 L498 322")}
+        {box(500, 298, 160, 48, "Select template · render", "with the Portal deep link", P)}
+        {a("M660 322 L678 322")}
+        {box(680, 298, 110, 48, "Send", "the internal relay", R)}
+        {a("M790 322 L808 322")}
+        {dia(870, 322, 120, 52, "Delivered?")}
+        {a("M930 322 L948 322")}{lbl(931, 314, "Yes")}
+        {box(950, 298, 108, 48, "Sent · SENT_TS", "the row is done", P)}
+        {a("M1058 322 L1066 322")}
+        {box(1068, 298, 100, 48, ["Client reads", "the e-mail"], null, t.border)}
+        {/* lane 4 */}
+        {a("M236 350 L236 388")}{lbl(242, 372, "Yes · duplicate")}
+        {box(176, 390, 130, 36, "Skipped", "nothing is sent twice", t.border)}
+        {box(330, 390, 180, 36, "Daily run summary", "counts by type and status · exceptions", P)}
+        {box(530, 390, 150, 36, "Exception log", "EMAIL_ADDRESS_NOT_FOUND", P)}
+        {a("M870 348 L870 388")}{lbl(876, 372, "No · bounce", "#b42318")}
+        {box(815, 390, 110, 36, "Failed", "ERROR_MESSAGE", "#b42318")}
+        {a("M925 408 L938 408")}
+        {dia(995, 408, 110, 42, "1099 or K1?")}
+        {a("M1050 408 L1066 408")}{lbl(1051, 400, "Yes")}
+        {box(1068, 390, 100, 36, "RM and RA told", "the follow-up", R)}
+        {lbl(960, 446, "No · logged only")}
+        <text x={12} y={470} fontSize={9.5} fill={mut(t)}>Diamonds are decisions. A bounce after acceptance also moves a Sent row to Failed, found by the bounce check; the technical flow below shows how. Statement and confirm failures are logged and not escalated.</text>
+        <text x={12} y={484} fontSize={9.5} fill={MARK.OPEN.c}>Open: the 08:00 ET send time (G8), the Portal deep links (G19) and the retry policy for Failed rows (G18).</text>
+      </svg>
+    </div>);
+}
+
+// The technical flow: the two Airflow DAGs with every task, and the data
+// each task reads (dashed) or writes (solid). The daily DAG on top, the
+// stores in the middle, the bounce check underneath, each task directly
+// above or below the store it touches so the lines stay vertical.
+function TechDagFig({ t }) {
+  const W = 1180, H = 500, P = MARK.PROPOSED.c, R = MARK.REQUIRED.c;
+  const X = (i) => 14 + i * 168, CW = 148;
+  const task = (i, y, name, sub, c) => (<g key={name + y}>
+    <rect x={X(i)} y={y} width={CW} height={40} rx={4} fill={t.panel} stroke={c || P} strokeWidth={1.5} />
+    <text x={X(i) + 8} y={y + 16} fontSize={9} fontWeight={700} fill={ink(t)} style={mono}>{name}</text>
+    <text x={X(i) + 8} y={y + 30} fontSize={7.8} fill={mut(t)}>{sub}</text>
+  </g>);
+  const store = (x, w, title, l1, l2, c) => (<g key={title}>
+    <rect x={x} y={244} width={w} height={64} rx={4} fill={t.bg} stroke={c} strokeWidth={1.6} />
+    <text x={x + 8} y={244 + 17} fontSize={10} fontWeight={700} fill={ink(t)}>{title}</text>
+    <text x={x + 8} y={244 + 33} fontSize={8.5} fill={mut(t)} style={mono}>{l1}</text>
+    <text x={x + 8} y={244 + 47} fontSize={8.5} fill={mut(t)}>{l2}</text>
+  </g>);
+  const a = (d, dashed) => <path key={d} d={d} fill="none" stroke={dashed ? mut(t) : t.accent} strokeWidth={1.3} strokeDasharray={dashed ? "4 3" : undefined} markerEnd={dashed ? "url(#pbn-tr)" : "url(#pbn-tw)"} />;
+  const chain = (d) => <path key={d} d={d} fill="none" stroke={mut(t)} strokeWidth={1.2} markerEnd="url(#pbn-tr)" />;
+  return (
+    <div style={{ overflowX: "auto", border: `1px solid ${t.border}`, borderRadius: t.radius.md, background: t.panel, padding: "14px 14px 8px", marginBottom: 8 }}>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" style={{ display: "block", minWidth: 960, width: "100%", height: "auto" }}
+        aria-label="The technical Airflow flow. The daily DAG pb_notification_daily: wait_posting_complete reads the posting completion record; three eligibility pods read the Portal schema in parallel; resolve_address reads the warehouse; write_candidates and open_tracking write the Hub schema tables; render_and_send sends through the internal relay and updates the tracking status; publish_run_event writes the guardrail event and notify_rm_ra hands failed tax notifications to the RM and RA view. The bounce DAG pb_notification_bounce_check: read_ndr_mailbox reads the sending mailbox in Microsoft 365 through Graph; match_to_tracking moves matched rows to Failed in the Hub schema; alert_system_dev e-mails the system development team through the relay; notify_rm_ra hands 1099 and K-1 hard bounces to the RM and RA; publish_check_event writes the guardrail event. Dashed lines are reads, solid lines are writes.">
+        <defs>
+          <marker id="pbn-tr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={mut(t)} /></marker>
+          <marker id="pbn-tw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={t.accent} /></marker>
+        </defs>
+        <text x={12} y={16} fontSize={11} fontWeight={800} letterSpacing=".6" fill={ink(t)}>TECHNICAL FLOW · TWO AIRFLOW DAGS AND WHAT EACH TASK READS AND WRITES</text>
+        <text x={14} y={38} fontSize={8.5} fontWeight={800} letterSpacing=".6" fill={P}>DAG pb_notification_daily · weekdays 07:30 ET · catchup off · max_active_runs 1 · retries 2</text>
+        {task(0, 98, "wait_posting_complete", "sensor · reschedule · to 08:00 ET", MARK.OPEN.c)}
+        {task(1, 50, "eligibility_stmt_confirm", "pod · the suppression rule")}
+        {task(1, 98, "eligibility_1099", "pod · family from reference data")}
+        {task(1, 146, "eligibility_k1", "pod · prior year · Mobius name")}
+        {task(2, 98, "resolve_address", "pod · left join · exception rows")}
+        {task(3, 98, "write_candidates", "pod · merge by the date key")}
+        {task(4, 98, "open_tracking", "pod · insert Processing rows")}
+        {task(5, 98, "render_and_send", "pod · pool pb_notify_relay")}
+        {task(6, 74, "notify_rm_ra", "failed 1099 / K1 → RM/RA view")}
+        {task(6, 122, "publish_run_event", "guardrail event · all_done")}
+        {chain("M162 118 L172 118 L172 70 L180 70")}{chain("M162 118 L180 118")}{chain("M162 118 L172 118 L172 166 L180 166")}
+        {chain("M330 70 L340 70 L340 118 L348 118")}{chain("M330 118 L348 118")}{chain("M330 166 L340 166 L340 118 L348 118")}
+        {chain("M498 118 L516 118")}{chain("M666 118 L684 118")}{chain("M834 118 L852 118")}
+        {chain("M1002 118 L1012 118 L1012 94 L1020 94")}{chain("M1002 118 L1012 118 L1012 142 L1020 142")}
+        <text x={100} y={236} fontSize={8} fontWeight={800} letterSpacing=".4" fill={mut(t)}>DASHED = READ · SOLID = WRITE</text>
+        {store(14, 148, "Completion record", "per PROCESS_DATE", "written by the posting process", MARK.OPEN.c)}
+        {store(182, 148, "Portal schema · PBCPAPP", "TPW101 · 102 · 103 · 005", "TWM001 · 002 · 049 · read only", R)}
+        {store(350, 160, "Warehouse · PBDWAPP", "DIM_IP_RELATIONSHIP", "DIM_INTERESTED_PARTY · current", R)}
+        {store(518, 316, "Hub schema · PB_NOTIFICATION_*", "CANDIDATE · K1_DETAIL · TRACKING", "unique key per user, type, date · Liquibase changeset", P)}
+        {store(854, 148, "Internal relay · SMTP", "X-PB-Notification-Id", "Message-Id stored on the row", R)}
+        {store(1022, 148, "CP 360 metadata", "guardrail_events", "per run and type · the RM/RA view", P)}
+        {a("M88 138 L88 242", true)}{a("M256 186 L256 242", true)}{a("M424 138 L424 242", true)}
+        {a("M592 138 L592 242")}{a("M760 138 L760 242")}{a("M928 138 L928 242")}{a("M870 138 L870 222 L820 222 L820 242")}{a("M1096 162 L1096 242")}
+        <text x={14} y={346} fontSize={8.5} fontWeight={800} letterSpacing=".6" fill={P}>DAG pb_notification_bounce_check · every 2 hours 08:00–20:00 ET and once at 06:00 ET · max_active_runs 1</text>
+        <g><rect x={X(0)} y={378} width={CW} height={40} rx={4} fill={t.bg} stroke={R} strokeWidth={1.6} />
+          <text x={X(0) + 8} y={394} fontSize={9.5} fontWeight={700} fill={ink(t)}>Sending mailbox · M365</text>
+          <text x={X(0) + 8} y={408} fontSize={8} fill={mut(t)}>non-delivery reports · Graph</text></g>
+        {task(1, 378, "read_ndr_mailbox", "pod · Graph · watermark")}
+        {task(3, 378, "match_to_tracking", "pod · match by id · HARD / SOFT")}
+        {task(5, 354, "alert_system_dev", "Hub task · one e-mail per run")}
+        {task(5, 402, "notify_rm_ra", "1099 / K1 hard bounces → RM/RA")}
+        {task(6, 378, "publish_check_event", "guardrail event · all_done")}
+        {chain("M162 398 L180 398")}{chain("M330 398 L516 398")}
+        {chain("M666 398 L844 398 L844 374 L852 374")}{chain("M666 398 L844 398 L844 422 L852 422")}
+        {chain("M1002 374 L1012 374 L1012 398 L1020 398")}{chain("M1002 422 L1012 422 L1012 398 L1020 398")}
+        {a("M592 378 L592 310")}{a("M928 354 L928 310")}{a("M1096 378 L1096 310")}
+        <text x={12} y={466} fontSize={9.5} fill={mut(t)}>Every task is a pod on the workbench image except the sensor and the Hub's shared event and notification tasks. XCom carries counts and the processing date only. Only the send task is in the relay pool.</text>
+        <text x={12} y={482} fontSize={9.5} fill={mut(t)}>Reads bind :process_date, never SYSDATE. Writes go by the date key and the tracking key, so a rerun sends nothing twice. Secrets come from the namespace Secret; nothing is in the DAG file.</text>
+      </svg>
+    </div>);
+}
+
 // --------------------------------------------------------------- pieces ----
 function Chip({ m, children }) {
   const k = MARK[m] || MARK.OPEN;
@@ -701,6 +974,8 @@ export function RequirementsTab({ t }) {
     <Legend t={t} />
     <H2 t={t}>The requirements</H2>
     <Tbl t={t} head={["#", "Requirement", ""]} rows={REQUIREMENTS.map(([id, text, m]) => [id, text, <Chip m={m} />])} />
+    <H2 t={t} sub="The end-to-end requirements document numbers the business requirements BR-01 to BR-15. Each one, and where it lands on this page.">Traceability to BR-01 to BR-15</H2>
+    <Tbl t={t} head={["BR", "Requirement", "Where it lands"]} rows={BR_TRACE.map(([id, text, where]) => [id, text, where])} />
     <H2 t={t} sub="How each notification type decides who is eligible, where it reads, and what one record produces.">Per notification type</H2>
     {TYPES.map((x) => (
       <div key={x.key} style={{ border: `1px solid ${t.border}`, borderLeft: `4px solid ${MARK.REQUIRED.c}`, borderRadius: t.radius.md, background: t.panel, padding: "12px 16px", margin: "8px 0" }}>
@@ -770,6 +1045,10 @@ export function ModelTab({ t }) {
         <Tbl t={t} head={["Column", "Type", "Meaning"]} rows={m.cols.map(([a, b, c]) => [<span style={mono}>{a}</span>, <span style={mono}>{b}</span>, c])} />
         <div style={{ fontSize: 12, color: t.sub }}><b style={{ color: t.text }}>Keys</b> <span style={mono}>{m.keys}</span></div>
       </div>))}
+    <H2 t={t} sub="The nine tables the utility reads, as the requirements document names them. Seven in the Portal schema, two in the warehouse for the e-mail of record. None is modified.">Source data model</H2>
+    <Tbl t={t} head={["Table", "Schema", "Purpose", "Key fields"]} rows={SOURCE_TABLES.map(([a, b, c, d]) => [<span style={mono}>{a}</span>, <span style={mono}>{b}</span>, c, <span style={{ ...mono, fontSize: 11.5 }}>{d}</span>])} />
+    <P t={t}>The address path is USER_ID = DIM_IP_RELATIONSHIP.BBH_WEB_PORTAL_ID, then INTERESTED_PARTY_NUMBER to DIM_INTERESTED_PARTY where END_DATE IS NULL and E_MAIL_ADDRESS is present. A Portal user with no current interested-party row has no address, which is the exception the run counts.</P>
+    <Note t={t} c={MARK.OPEN.c}><b style={{ color: t.text }}>Where the tables live (G20).</b> The requirements document proposes the tracking and K-1 detail tables in the Portal's PBCPAPP schema, with the detail keyed by NOTIFICATION_ID and RPT_ID. This design keeps all three tables in the Hub schema, so the Portal schema stays read-only and the Liquibase stage applies the changeset like every other Hub table, and keys the detail by date, user and report so it can be written before the tracking row exists. Either placement works; the owner has to be agreed.</Note>
     <H2 t={t}>Mapping from the sources</H2>
     <Tbl t={t} head={["Notification type", "Target", "From", "Rule"]} rows={[
       ["STATEMENT_CONFIRM", "USER_ID", "TWM002_USER_ACCOUNT_MAP.USER_ID", "the Portal user associated with the account"],
@@ -820,7 +1099,9 @@ export function GapsTab({ t }) {
     <Legend t={t} />
     <H2 t={t} sub="Everything found reviewing the requirement and the four extracts that must be closed before a production run. Critical items block the interface; rule items change what the queries do; data items need a new source.">Open gaps</H2>
     <Tbl t={t} head={["#", "Class", "Finding", "Proposed resolution", ""]} rows={GAPS.map(([id, cls, finding, fix, m]) => [id, <span style={{ color: cls === "critical" ? "#b42318" : t.sub, fontWeight: 700 }}>{cls}</span>, finding, fix, <Chip m={m} />])} />
-    <Note t={t} c={MARK.OPEN.c}><b style={{ color: t.text }}>To put to PB business and PB Systems, in this order.</b> The suppression flag reading (G6), the posting-complete trigger (G8), the 1099 family (G9, G10), the K-1 classification and the missing description (G11, G12), and the relationship-team source (G13). The critical items G1 to G5 are ours to build and are in the design.</Note>
+    <H2 t={t} sub="The end-to-end requirements document closes with thirteen open items. Where each one lands: a gap above, or a part of the design that already answers it.">The document's open items</H2>
+    <Tbl t={t} head={["#", "Item", "Where it lands"]} rows={OPEN_ITEMS.map(([n, item, where]) => [n, item, where])} />
+    <Note t={t} c={MARK.OPEN.c}><b style={{ color: t.text }}>To put to PB business and PB Systems, in this order.</b> The suppression flag reading (G6), the posting-complete trigger (G8), the 1099 family (G9, G10), the K-1 classification and the missing description (G11, G12), the relationship-team source (G13), the Loan Statement ids (G17), the retry limit (G18), the deep links (G19) and the owner of the tables (G20). The critical items G1 to G5 are ours to build and are in the design.</Note>
   </>);
 }
 export function ExceptionsTab({ t }) {
@@ -828,6 +1109,30 @@ export function ExceptionsTab({ t }) {
     <H2 t={t} sub="What can go wrong on a run and what the utility does about it. Outcomes: HOLD waits, SKIP does nothing by design, REJECT records an exception, RETRY tries again, FLAG changes a status after the fact.">Exceptions</H2>
     <Tbl t={t} head={["Scenario", "Detected by", "What the utility does", "Outcome"]} rows={EXCEPTIONS.map(([a, b, c, o]) => [a, b, c,
       <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: .4, color: OUTCOME[o] || t.sub, border: `1px solid ${OUTCOME[o] || t.sub}`, borderRadius: 3, padding: "1px 6px", whiteSpace: "nowrap" }}>{o}</span>])} />
+  </>);
+}
+
+export function WorkflowTab({ t }) {
+  return (<>
+    <Legend t={t} />
+    <H2 t={t} sub="The whole process as the business reads it: what happens from the day's posting to the client's inbox, who does what, and what happens when a delivery fails.">End-to-end business flow</H2>
+    <BusinessFlowFig t={t} />
+    <H2 t={t}>Actors and systems</H2>
+    <Tbl t={t} head={["Actor · system", "Role", ""]} rows={ACTORS.map(([a, b, m]) => [a, b, <Chip m={m} />])} />
+    <H2 t={t} sub="The twelve steps the requirements document lists, and the Airflow task that performs each one.">Processing steps</H2>
+    <Tbl t={t} head={["Step", "Action", "Output", "DAG task"]} rows={STEPS.map(([n, a, o, k]) => [n, a, o, <span style={{ ...mono, fontSize: 11.5 }}>{k}</span>])} />
+    <H2 t={t} sub="Processing, Sent, Failed. The bounce check adds the one transition the document draws from Sent to Failed.">Status lifecycle</H2>
+    <Tbl t={t} head={["From", "To", "When", "Task"]} rows={LIFECYCLE.map(([a, b, c, d]) => [a, b, c, <span style={{ ...mono, fontSize: 11.5 }}>{d}</span>])} />
+    <H2 t={t} sub="The same flow as Airflow sees it: two DAGs, every task, and the table, relay or mailbox each task reads or writes. The Design tab has the settings, the dependencies and the code.">Technical flow · the Airflow DAGs</H2>
+    <TechDagFig t={t} />
+    <Note t={t} c={MARK.PROPOSED.c}><b style={{ color: t.text }}>How the two pictures line up.</b> Lane one of the business flow is the sensor. Lane two is the three eligibility pods, resolve_address and write_candidates. Lane three is open_tracking and render_and_send. Lane four is publish_run_event, notify_rm_ra and, for a bounce found later, the bounce-check DAG. Nothing in the business flow happens outside a task on one of the two DAGs.</Note>
+  </>);
+}
+export function TestsTab({ t }) {
+  return (<>
+    <H2 t={t} sub="The eighteen scenarios from the requirements document, with the rule on this page that decides each. They run as unit tests on the package for the rules, on the four workbooks in the proof of concept, and against the Oracle reads in SIT before any production date.">Test scenarios</H2>
+    <Tbl t={t} head={["#", "Scenario", "Expected", "Decided by"]} rows={TESTS.map(([id, sc, ex, by]) => [id, sc, ex, by])} />
+    <Note t={t} c={MARK.PROPOSED.c}><b style={{ color: t.text }}>Three more the design adds.</b> A soft bounce that clears within the window stays Sent; a soft bounce that does not clear becomes Failed after it (G16). A non-delivery report matching no row is logged as unmatched and left in the mailbox. A run in a lower environment never reaches a real address because every recipient is rewritten.</Note>
   </>);
 }
 
@@ -841,7 +1146,7 @@ export default function PbNotifications({ t = tLight }) {
       </div>
       <div style={{ fontSize: 13, color: t.sub, maxWidth: "80ch", lineHeight: 1.6, margin: "4px 0 14px" }}>
         The Client Portal e-mail notification utility for Statements, Trade Confirms, 1099s and K-1s, designed as the first BBH pipeline on the Integration Hub framework.
-        Not an SEI interface. The requirement as the business wrote it, the four source extracts reviewed against it, the design, the data model, the e-mail content, and every gap still open.
+        Not an SEI interface. The requirement as the business wrote it, the four source extracts reviewed against it, the end-to-end flow, the design, the data model, the e-mail content, the test scenarios and every gap still open.
       </div>
       <div style={{ display: "flex", gap: 0, marginBottom: 16, flexWrap: "wrap" }}>
         {TABS.map(([k, l], i) => (
@@ -850,11 +1155,13 @@ export default function PbNotifications({ t = tLight }) {
             background: tab === k ? t.accent : t.panel, color: tab === k ? "#fff" : t.text }}>{l}</button>))}
       </div>
       {tab === "overview" && <OverviewTab t={t} />}
+      {tab === "flow" && <WorkflowTab t={t} />}
       {tab === "req" && <RequirementsTab t={t} />}
       {tab === "design" && <DesignTab t={t} />}
       {tab === "model" && <ModelTab t={t} />}
       {tab === "sources" && <SourcesTab t={t} />}
       {tab === "content" && <ContentTab t={t} />}
+      {tab === "tests" && <TestsTab t={t} />}
       {tab === "gaps" && <GapsTab t={t} />}
       {tab === "exc" && <ExceptionsTab t={t} />}
     </div>);
