@@ -146,6 +146,7 @@ MERGE INTO sec_module t USING (SELECT 'home' k, 'Home' n, NULL g,
   -- unreachable rather than merely ungranted, which is not what anybody
   -- decided; it is registered here so a grant becomes possible.
   UNION ALL SELECT 'devops360','DevOps 360','Architecture','The delivery system: pipelines, versions and promotion','N',72 FROM dual
+  UNION ALL SELECT 'pbnotify','PB Notifications','Architecture','Design of the Client Portal e-mail notification utility (PBCP-5587) on the Hub framework','N',73 FROM dual
 ) s ON (t.module_key = s.k)
 WHEN MATCHED THEN UPDATE SET module_name = s.n, nav_group = s.g,
   description = s.d, open_to_all = s.o, sort_order = s.s

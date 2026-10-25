@@ -55,6 +55,7 @@ const NAV_GROUPS = [
  items: [
  ['system', 'System Design', '⛬'],
  ['devops360', 'DevOps 360', '⚙'],
+ ['pbnotify', 'PB Notifications', '\u2709'],
  ]
 },
 ];
