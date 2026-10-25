@@ -187,6 +187,122 @@ export const ORCHESTRATION = {
   ],
 };
 
+// The implementation: where the files live in the application repository
+// and what the two DAG files look like. Skeletons, written to the Hub's
+// DAG standards; the task bodies are small Python modules the pods run.
+// No host, credential or mailbox name appears: everything comes from the
+// namespace Secret and Airflow Variables at run time.
+export const REPO_LAYOUT = [
+  ["dags/pb_notification_daily.py", "the daily DAG: sensor, three eligibility pods, address, candidates, tracking, send, event, RM/RA"],
+  ["dags/pb_notification_bounce_check.py", "the bounce DAG: read the sending mailbox, match, alert, RM/RA, event"],
+  ["src/pb_notify/eligibility.py", "runs one of the three queries with PROCESS_DATE bound; writes the staged rows; --source oracle or excel"],
+  ["src/pb_notify/addresses.py · candidates.py · tracking.py", "the left join, the merge by date key, the Processing rows"],
+  ["src/pb_notify/send.py", "template selection from the flags, rendering, the relay, per-row status; send_mode test rewrites every recipient"],
+  ["src/pb_notify/bounces.py", "Graph client, the watermark, non-delivery report parsing, HARD/SOFT, the match by header or Message-Id"],
+  ["src/pb_notify/alerts.py", "the system development e-mail and the RM/RA hand-off"],
+  ["sql/eligibility_stmt_confirm.sql · eligibility_1099.sql · eligibility_k1.sql", "the three queries from the workbooks' SQL sheets, with :process_date in place of SYSDATE"],
+  ["templates/*.html", "the five e-mails, placeholders for the link and the K-1 list"],
+  ["db/changelog/pb_notification.xml", "the three tables and the bounce columns, with rollback blocks; applied by the schema stage"],
+  ["config/pb_notify.yaml", "the 1099 family and the K-1 classification as reference data, the attempt limit, the bounce window"],
+  ["tests/", "unit tests on the flags-to-template rule, the K-1 grouping, the bounce parser and the idempotent merge; Gate 1 and Gate 5 on the DAG files"],
+];
+export const DAG_CODE = `# dags/pb_notification_daily.py
+from airflow import DAG
+from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
+from airflow.sensors.sql import SqlSensor
+from airflow.utils.trigger_rule import TriggerRule
+from hub.business_date import process_date          # the Hub helper: logical date -> business date
+from hub.callbacks import on_failure, on_sla_miss    # e-mail + chat, as the DAG standards require
+from hub.pods import pb_pod                          # workbench image by digest, Secret mounted, resources set
+import pendulum
+
+default_args = {
+    "owner": "pb-systems",
+    "retries": 2,
+    "retry_delay": pendulum.duration(minutes=5),
+    "on_failure_callback": on_failure,
+    "sla_miss_callback": on_sla_miss,
+}
+
+with DAG(
+    dag_id="pb_notification_daily",
+    schedule="30 7 * * 1-5",                      # weekdays 07:30 ET; the sensor has until 08:00
+    start_date=pendulum.datetime(2026, 11, 1, tz="America/New_York"),
+    catchup=False,
+    max_active_runs=1,
+    default_args=default_args,
+    params={"process_date": None, "source": "oracle", "send_mode": "test"},
+    tags=["pb", "notifications", "client-portal"],
+) as dag:
+
+    pd = "{{ params.process_date or ti.xcom_pull(task_ids='business_date') }}"
+
+    business_date = pb_pod("business_date", cmd=["pb-notify", "business-date"])   # pushes the date only
+
+    wait_posting_complete = SqlSensor(
+        task_id="wait_posting_complete",
+        conn_id="portal_ro",                          # the read-only Portal account, from the Secret
+        sql="sql/posting_complete.sql",               # one row when the cycle's completion record exists
+        parameters={"process_date": pd},
+        mode="reschedule", poke_interval=300, timeout=30 * 60,
+    )
+
+    eligibility = [
+        pb_pod(f"eligibility_{k}", cmd=["pb-notify", "eligibility", k, "--date", pd, "--source", "{{ params.source }}"])
+        for k in ("stmt_confirm", "1099", "k1")
+    ]
+    resolve_address  = pb_pod("resolve_address",  cmd=["pb-notify", "addresses",  "--date", pd])
+    write_candidates = pb_pod("write_candidates", cmd=["pb-notify", "candidates", "--date", pd])
+    open_tracking    = pb_pod("open_tracking",    cmd=["pb-notify", "tracking",   "--date", pd])
+    render_and_send  = pb_pod("render_and_send",  cmd=["pb-notify", "send", "--date", pd, "--mode", "{{ params.send_mode }}"],
+                              pool="pb_notify_relay")
+    publish_run_event = pb_pod("publish_run_event", cmd=["pb-notify", "event", "daily", "--date", pd],
+                               trigger_rule=TriggerRule.ALL_DONE)
+    notify_rm_ra = pb_pod("notify_rm_ra", cmd=["pb-notify", "rm-ra", "--date", pd])
+
+    business_date >> wait_posting_complete >> eligibility >> resolve_address >> write_candidates
+    write_candidates >> open_tracking >> render_and_send >> [publish_run_event, notify_rm_ra]
+`;
+export const BOUNCE_DAG_CODE = `# dags/pb_notification_bounce_check.py
+from airflow import DAG
+from airflow.utils.trigger_rule import TriggerRule
+from hub.callbacks import on_failure
+from hub.pods import pb_pod
+import pendulum
+
+with DAG(
+    dag_id="pb_notification_bounce_check",
+    schedule="0 6,8,10,12,14,16,18,20 * * 1-5",      # 06:00 for the overnight reports, then every 2 hours
+    start_date=pendulum.datetime(2026, 11, 1, tz="America/New_York"),
+    catchup=False,
+    max_active_runs=1,
+    default_args={"owner": "pb-systems", "retries": 2, "retry_delay": pendulum.duration(minutes=5), "on_failure_callback": on_failure},
+    tags=["pb", "notifications", "bounces"],
+) as dag:
+
+    read_ndr_mailbox    = pb_pod("read_ndr_mailbox",    cmd=["pb-notify", "bounces", "read"])     # Graph, one mailbox, from the watermark
+    match_to_tracking   = pb_pod("match_to_tracking",   cmd=["pb-notify", "bounces", "match"])    # header or Message-Id; HARD / SOFT
+    alert_system_dev    = pb_pod("alert_system_dev",    cmd=["pb-notify", "alerts", "system-dev"], pool="pb_notify_relay")
+    notify_rm_ra        = pb_pod("notify_rm_ra",        cmd=["pb-notify", "rm-ra", "--bounces"])
+    publish_check_event = pb_pod("publish_check_event", cmd=["pb-notify", "event", "bounce"], trigger_rule=TriggerRule.ALL_DONE)
+
+    read_ndr_mailbox >> match_to_tracking >> [alert_system_dev, notify_rm_ra] >> publish_check_event
+`;
+export const POD_HELPER = `# hub/pods.py (the Hub's shared helper, used by every Hub DAG)
+def pb_pod(task_id, cmd, pool=None, trigger_rule=None):
+    return KubernetesPodOperator(
+        task_id=task_id,
+        name=f"pb-notify-{task_id}",
+        image=WORKBENCH_IMAGE,                     # the pinned digest the bump PR updates
+        cmds=cmd,
+        env_from=[secret_env("pb-notify")],         # portal_ro, relay, graph client credentials
+        container_resources=STANDARD_RESOURCES,
+        get_logs=True, is_delete_operator_pod=True,
+        pool=pool or "default_pool",
+        trigger_rule=trigger_rule or TriggerRule.ALL_SUCCESS,
+    )
+`;
+
 export const MODEL = {
   candidate: { name: "PB_NOTIFICATION_CANDIDATE", grain: "one row per USER_ID, NOTIFICATION_TYPE, PROCESS_DATE", cols: [
     ["PROCESS_DATE", "DATE", "the posting cycle's business date, from the completion record"],
@@ -419,6 +535,14 @@ function BounceFig({ t }) {
       </svg>
     </div>);
 }
+function Code({ t, title, code }) {
+  return (
+    <div style={{ margin: "8px 0 14px" }}>
+      <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: .5, textTransform: "uppercase", color: t.textMuted, marginBottom: 4 }}>{title}</div>
+      <pre style={{ fontFamily: "monospace", fontSize: 11, lineHeight: 1.5, whiteSpace: "pre", overflowX: "auto", background: t.bg, border: `1px solid ${t.border}`,
+        borderRadius: t.radius.md, padding: "10px 12px", margin: 0, color: t.text, maxHeight: 560 }}>{code}</pre>
+    </div>);
+}
 function ModelFig({ t }) {
   const box = (x, y, w, h, m) => (<g key={m.name}>
     <rect x={x} y={y} width={w} height={h} rx={4} fill={t.panel} stroke={MARK.PROPOSED.c} strokeWidth={1.6} />
@@ -485,15 +609,16 @@ function HldFig({ t }) {
         {box(12, 156, 230, 46, "Posting process", ["writes the completion record per day"], MARK.OPEN.c, "SOURCE")}
         {box(12, 214, 230, 58, "Interested-party record", ["the client's e-mail on file in the warehouse", "END_DATE IS NULL"], R, "SOURCE")}
         {box(12, 284, 230, 46, "Excel extracts · proof of concept", ["the same four queries, as workbooks"], t.border, "POC ONLY")}
-        {/* middle: the hub */}
+        {/* middle: the hub — the daily DAG alone on the first row so its send
+            path leaves the frame without crossing anything */}
         <rect x={290} y={34} width={520} height={330} rx={8} fill="none" stroke={P} strokeWidth={1.2} strokeDasharray="6 4" />
         <text x={300} y={50} fontSize={8.5} fontWeight={800} letterSpacing=".6" fill={P}>INTEGRATION HUB · ONE NAMESPACE PER ENVIRONMENT</text>
         {box(300, 60, 240, 66, "DAG · pb_notification_daily", ["weekdays 07:30 ET · sensor to 08:00", "eligibility ×3 → candidates → tracking → send", "task pods on the workbench image"], P, "AIRFLOW")}
-        {box(560, 60, 240, 66, "DAG · pb_notification_bounce_check", ["every 2 hours · Graph · read one mailbox", "match → Failed → alert → event"], P, "AIRFLOW")}
         {box(300, 142, 500, 70, "Hub schema", ["PB_NOTIFICATION_CANDIDATE · one row per user, type, date", "PB_NOTIFICATION_K1_DETAIL · one row per date, user, report", "PB_NOTIFICATION_TRACKING · the daily unique key · Processing / Sent / Failed · bounce columns"], P, "ORACLE · LIQUIBASE")}
         {box(300, 228, 240, 56, "Guardrail events · CP 360 metadata", ["candidates · exceptions · sent · failed", "bounced hard / soft · unmatched, per run"], P, "EVIDENCE")}
-        {box(560, 228, 240, 56, "CP 360 screens", ["Quality Guardrails · the RM/RA undeliverable view", "this design page"], P, "SCREENS")}
+        {box(560, 228, 240, 56, "DAG · pb_notification_bounce_check", ["every 2 hours · Graph · read one mailbox", "match → Failed → alert → event"], P, "AIRFLOW")}
         {box(300, 300, 240, 50, "Namespace Secret", ["read-only Portal account · relay · Graph", "credentials; nothing in the repository"], t.border, "SECRETS")}
+        {box(560, 300, 200, 50, "CP 360 screens", ["Quality Guardrails · the RM/RA view", "this design page"], P, "SCREENS")}
         {/* right: mail */}
         <text x={850} y={40} fontSize={8.5} fontWeight={800} letterSpacing=".6" fill={mut(t)}>MAIL</text>
         {box(850, 48, 318, 56, "Internal relay", ["one message per tracking row", "X-PB-Notification-Id header · Message-Id stored"], R, "SMTP")}
@@ -503,10 +628,10 @@ function HldFig({ t }) {
         <text x={12} y={366} fontSize={8.5} fontWeight={800} letterSpacing=".6" fill={mut(t)}>PEOPLE</text>
         {person(12, 376, "Client", "receives the notification")}
         {person(222, 376, "PB Systems", "operates the run · owns the reference data")}
-        {person(482, 376, "System development team", "alerted on every hard bounce")}
-        {person(772, 376, "RM and RA", "told of failed 1099 and K-1 e-mails")}
+        {person(482, 376, "RM and RA", "told of failed 1099 and K-1 e-mails")}
+        {person(752, 376, "System development team", "alerted on every hard bounce")}
         {person(992, 376, "PB business", "owns the rules and the open questions")}
-        {/* flows */}
+        {/* flows: each in its own lane, none through a box */}
         {flow("M242 179 L270 179 L270 93 L298 93", "1", 270, 136)}
         {flow("M242 96 L298 96", "2", 266, 86)}
         {flow("M242 243 L286 243 L286 110 L298 110", "", 0, 0)}
@@ -515,12 +640,11 @@ function HldFig({ t }) {
         {flow("M540 80 L848 80", "4", 700, 70)}
         {flow("M1009 104 L1009 116", "", 0, 0)}
         {flow("M1009 164 L1009 176", "5", 1030, 170, true)}
-        {flow("M850 207 L830 207 L830 100 L800 100", "6", 830, 150, true)}
-        {flow("M680 126 L680 140", "", 0, 0)}
-        {flow("M680 212 L680 226", "8", 700, 222)}
-        {flow("M420 212 L420 226", "", 0, 0)}
-        {flow("M620 284 L620 376", "7", 634, 330)}
-        {flow("M800 256 L830 256 L830 376 L812 376", "7", 830, 320)}
+        {flow("M850 195 L838 195 L838 242 L800 242", "6", 838, 220, true)}
+        {flow("M680 228 L680 214", "", 0, 0)}
+        {flow("M420 212 L420 226", "8", 434, 220)}
+        {flow("M560 270 L548 270 L548 376", "7", 548, 330)}
+        {flow("M790 284 L790 376", "7", 804, 330)}
         <text x={12} y={428} fontSize={9.5} fill={mut(t)}>Solid: the daily path. Dashed: the proof-of-concept input and the bounce path, which happens minutes to hours after the send. Flow 7 is the alert: hard bounces to system development, tax failures to the RM and RA.</text>
         <text x={12} y={444} fontSize={9.5} fill={mut(t)}>The Portal schema is only read. Everything the utility writes is in the Hub schema, created by Liquibase. Hostnames, mailboxes and credentials live in Environment 360 and the namespace Secret.</text>
         <text x={12} y={460} fontSize={9.5} fill={MARK.OPEN.c}>Open before build: the completion record from the posting process (G8), the Graph registration and the system development list (G15), the relationship-team source (G13).</text>
@@ -612,6 +736,12 @@ export function DesignTab({ t }) {
     <Tbl t={t} head={["Task", "Operator · where it runs", "What it does", "Writes", "On failure"]} rows={ORCHESTRATION.tasks.map(([a, b, c, d, e]) => [<span style={mono}>{a}</span>, b, c, d, e])} />
     <div style={{ fontSize: 12.5, color: t.sub, lineHeight: 1.6, margin: "6px 0 10px" }}><b style={{ color: t.text }}>Dependencies</b> <span style={{ ...mono, fontSize: 11.5 }}>{ORCHESTRATION.deps}</span></div>
     {ORCHESTRATION.rules.map((r) => <Note key={r.slice(0, 24)} t={t} c={MARK.PROPOSED.c}>{r}</Note>)}
+    <H2 t={t} sub="What the repository holds and what the two DAG files look like. Skeletons to the Hub's DAG standards: every task is a pod on the workbench image, every secret comes from the namespace, every run is keyed by the processing date.">Implementation</H2>
+    <Tbl t={t} head={["Path in the application repository", "Holds"]} rows={REPO_LAYOUT.map(([a, b]) => [<span style={mono}>{a}</span>, b])} />
+    <Code t={t} title="the daily DAG" code={DAG_CODE} />
+    <Code t={t} title="the bounce-check DAG" code={BOUNCE_DAG_CODE} />
+    <Code t={t} title="the shared pod helper every Hub DAG uses" code={POD_HELPER} />
+    <Note t={t} c={MARK.PROPOSED.c}><b style={{ color: t.text }}>Why the DAG files are this short.</b> The DAG declares order, timing, retries and callbacks and nothing else. Every task body is a command in a small Python package the pod runs, which is what the unit tests cover and what Gate 5 scans; the DAG file is what Gate 1 reads statically. A rule change is a change in the package or the reference data, never in the DAG.</Note>
     <H2 t={t} sub="The relay accepting a message is not delivery. A bounce comes back later, to the sending mailbox, and only the mail broker can tell us. A second short DAG reads it and alerts the people who have to act.">Bounce detection and the alert to system development</H2>
     <BounceFig t={t} />
     <Tbl t={t} head={["Concern", "How", "Why this way"]} rows={BOUNCE.how.map(([a, b, c]) => [a, b, c])} />

@@ -6,7 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { tLight, tDark } from "../src/bbhTheme.js";
-import PbNotifications, { TABS, MARK, REQUIREMENTS, TYPES, GRID, TRACKING_FIELDS, STATUSES, FLOW, MODES, MODEL, ORCHESTRATION, BOUNCE, HLD_FLOWS, SOURCES, CONTENT, GAPS, EXCEPTIONS,
+import PbNotifications, { TABS, MARK, REQUIREMENTS, TYPES, GRID, TRACKING_FIELDS, STATUSES, FLOW, MODES, MODEL, ORCHESTRATION, BOUNCE, HLD_FLOWS, REPO_LAYOUT, DAG_CODE, BOUNCE_DAG_CODE, POD_HELPER, SOURCES, CONTENT, GAPS, EXCEPTIONS,
   OverviewTab, RequirementsTab, DesignTab, ModelTab, SourcesTab, ContentTab, GapsTab, ExceptionsTab } from "../src/PbNotifications.jsx";
 
 let bad = 0;
@@ -49,6 +49,12 @@ ok(BOUNCE.how.length === 6 && BOUNCE.alerts.length === 3 && BOUNCE.columns.map((
    && ORCHESTRATION.bounce.tasks.length === 5 && ORCHESTRATION.bounce.tasks[0][0] === "read_ndr_mailbox" && ORCHESTRATION.bounce.tasks.some(([n]) => n === "alert_system_dev")
    && BOUNCE.how.some(([a, b]) => /Correlation/.test(a) && /X-PB-Notification-Id/.test(b)) && BOUNCE.alerts[0][2].includes("no client address"),
    "bounce detection: correlation by header and Message-Id, five tasks reading the Microsoft 365 mailbox through Graph, the alert to system development without client data");
+ok(REPO_LAYOUT.length === 12 && /dag_id="pb_notification_daily"/.test(DAG_CODE) && /catchup=False/.test(DAG_CODE) && /max_active_runs=1/.test(DAG_CODE) && /pool="pb_notify_relay"/.test(DAG_CODE)
+   && /TriggerRule.ALL_DONE/.test(DAG_CODE) && /mode="reschedule"/.test(DAG_CODE) && /for k in \("stmt_confirm", "1099", "k1"\)/.test(DAG_CODE)
+   && /dag_id="pb_notification_bounce_check"/.test(BOUNCE_DAG_CODE) && /read_ndr_mailbox >> match_to_tracking/.test(BOUNCE_DAG_CODE) && /secret_env/.test(POD_HELPER),
+   "the implementation: the repository layout and two DAG skeletons with the sensor, the three eligibility pods, the relay pool, all_done on the event, and secrets from the namespace");
+ok(!/@|https?:|password|passwd|\.com/i.test(DAG_CODE + BOUNCE_DAG_CODE + POD_HELPER), "no address, host or credential in the code skeletons");
+ok(/Implementation/.test(all) && /dags\/pb_notification_daily\.py/.test(all) && /Why the DAG files are this short/.test(all), "the implementation section is on the design tab");
 ok(/BOUNCE DETECTION · THE RELAY ACCEPTING A MESSAGE IS NOT DELIVERY/.test(all) && /pb_notification_bounce_check/.test(all) && /HARD or SOFT/.test(all), "the bounce figure and DAG are on the design tab");
 ok(HLD_FLOWS.length === 8 && /HIGH-LEVEL DESIGN · PB NOTIFICATIONS ON THE INTEGRATION HUB/.test(all) && /High-level design of the PB notification utility/.test(all)
    && /INTEGRATION HUB · ONE NAMESPACE PER ENVIRONMENT/.test(all) && /Sending mailbox · Microsoft 365/.test(all) && /System development team/.test(all),
