@@ -6,11 +6,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { tLight, tDark } from "../src/bbhTheme.js";
-import PbNotifications, { TABS, MARK, REQUIREMENTS, TYPES, GRID, TRACKING_FIELDS, STATUSES, FLOW, MODES, MODEL, ORCHESTRATION, BOUNCE, HLD_FLOWS, REPO_LAYOUT, DAG_CODE, BOUNCE_DAG_CODE, POD_HELPER, SOURCES, CONTENT, GAPS, EXCEPTIONS,
+import PbNotifications, { DEFAULT_DESIGN, DesignCtx, TABS, MARK, REQUIREMENTS, TYPES, GRID, TRACKING_FIELDS, STATUSES, FLOW, MODES, MODEL, ORCHESTRATION, BOUNCE, HLD_FLOWS, REPO_LAYOUT, DAG_CODE, BOUNCE_DAG_CODE, POD_HELPER, SOURCES, CONTENT, GAPS, EXCEPTIONS,
   ACTORS, BR_TRACE, SOURCE_TABLES, STEPS, LIFECYCLE, TESTS, OPEN_ITEMS,
   OverviewTab, WorkflowTab, RequirementsTab, DesignTab, ModelTab, SourcesTab, ContentTab, TestsTab, GapsTab, ExceptionsTab } from "../src/PbNotifications.jsx";
 import { ReviewCtx, ReviewTab, ReviewMark, ReviewPanel, sectionOf, idOf } from "../src/PbReview.jsx";
 import { applyLocal, emptyReview, textFor, notesFor, openQuestions, keyFor } from "../src/pbnotifyReviewApi.js";
+import { toMarkdown, fromMarkdown, mergeDesign, applyEdits, SECTIONS, designFileName } from "../src/pbnotifyDoc.js";
+import { DesignStateCtx, DocumentTab, buildMarkdown } from "../src/PbDesignDoc.jsx";
 
 let bad = 0;
 const ok = (c, m, got) => { console.log(`${c ? "ok  " : "FAIL"} ${m}${c ? "" : `  -> ${String(got).slice(0, 220)}`}`); if (!c) bad++; };
@@ -18,7 +20,7 @@ const SRC = fs.existsSync("src/PbNotifications.jsx") ? "src" : path.join("ui", "
 const src = fs.readFileSync(path.join(SRC, "PbNotifications.jsx"), "utf8");
 
 console.log("-- the data");
-ok(TABS.length === 11 && TABS[0][0] === "overview" && TABS[1][0] === "flow" && TABS[7][0] === "tests" && TABS[10][0] === "review" && Object.keys(MARK).join(",") === "REQUIRED,PROPOSED,OPEN", "eleven tabs, the end-to-end flow second, the test scenarios before the gaps, the review last, three marks");
+ok(TABS.length === 12 && TABS[0][0] === "overview" && TABS[1][0] === "flow" && TABS[7][0] === "tests" && TABS[10][0] === "review" && TABS[11][0] === "doc" && Object.keys(MARK).join(",") === "REQUIRED,PROPOSED,OPEN", "twelve tabs: the end-to-end flow second, the test scenarios before the gaps, the review and the document last, three marks");
 ok(REQUIREMENTS.length === 10 && REQUIREMENTS.every((r) => MARK[r[2]]) && REQUIREMENTS.find((r) => r[0] === "R6")[2] === "OPEN" && /Microsoft 365/.test(REQUIREMENTS[9][1]), "ten requirements, the send time open, bounce detection through the mail broker last");
 ok(TYPES.map((x) => x.key).join(",") === "STATEMENT_CONFIRM,1099,K1" && TYPES.filter((x) => x.always).length === 2 && /ESTIMATE_IND = N/.test(TYPES[1].posted) && /prior calendar year/.test(TYPES[2].posted),
    "three notification types; the tax types always send, final documents only, K-1 prior year");
@@ -140,6 +142,55 @@ const shellRv = renderToStaticMarkup(<PbNotifications t={tLight} reviewSeed={{ r
 ok(/REVIEW · SHARED/.test(shellRv) && /1 open question</.test(shellRv) && /1 edited item</.test(shellRv) && /Review · 1</.test(shellRv) && /aria-label="review hld:1"/.test(shellRv), "the shell: shared, the open-question and edit counts in the header and on the tab, pencils on the overview's flows");
 ok(!/@[a-z0-9-]+\.[a-z]{2,}/i.test(reviewTab + gapsOpen) && !/<[a-z]/.test(rv.notes.map((n) => n.body).join("")), "nothing in the review markup is an address, and bodies render as text");
 
+console.log("-- the design document");
+ok(Object.keys(DEFAULT_DESIGN).length === 31 && DEFAULT_DESIGN.requirements === REQUIREMENTS && DEFAULT_DESIGN.gaps === GAPS && DEFAULT_DESIGN.hldFlows === HLD_FLOWS && DEFAULT_DESIGN.model === MODEL, "the shipped design is the constants, as one object");
+const md = toMarkdown(DEFAULT_DESIGN, { exportedAt: "2026-10-25 10:00", version: 0 });
+ok(md.startsWith("# PB Notifications · design document") && (md.match(/<!-- pbn: [A-Za-z.]+ -->/g) || []).length === SECTIONS.length && SECTIONS.length === 41 && /## 13\. Open gaps/.test(md) && /```python\n# dags\/pb_notification_daily\.py/.test(md) && /\| G17 \| rule \| The type grid includes Loan Statements/.test(md),
+   "the export: a title, one marker per section (41), the headings, the DAG code fenced, the gaps as a table");
+ok(!/@[a-z0-9-]+\.[a-z]{2,}/i.test(md) && !/testbbh|\.bbh\.com|https?:\/\//.test(md) && !/\b\d{7,}\b/.test(md.replace(/1-800-285-5093/g, "")), "no e-mail address, hostname, URL or long identifier in the document");
+const rt = fromMarkdown(md, { ...DEFAULT_DESIGN, requirements: [], gaps: [], dagCode: "", model: { ...MODEL, tracking: { ...MODEL.tracking, cols: [] } } });
+ok(rt.errors.length === 0 && rt.found === 41 && JSON.stringify(rt.design) === JSON.stringify(DEFAULT_DESIGN), "the round trip is exact: every section, code block and model table reads back to the shipped design", rt.errors);
+ok(rt.report.filter((r) => r.status === "updated").length === 4 && rt.report.filter((r) => r.status === "unchanged").length === 37, "the report says which sections differ from the base", rt.report.filter((r) => r.status === "updated").map((r) => r.key));
+const edited = md.replace("| G17 | rule | The type grid includes Loan Statements, but the statements SQL takes RPT_ID SUNGARD1 only. |", "| G17 | rule | Loan Statements post with their own report ids, to be confirmed by PB Systems. |")
+  .replace("| T18 | The user has no warehouse e-mail | exception logged; nothing sent |", "| T18 | The user has no warehouse e-mail | exception logged; nothing sent; counted on the run |\n| T19 | Two statements accounts, both permitted | one statements-only e-mail |");
+const r2 = fromMarkdown(edited, DEFAULT_DESIGN);
+ok(r2.errors.length === 0 && r2.design.gaps[16][2].startsWith("Loan Statements post with their own") && r2.design.tests.length === 19 && r2.design.tests[18][0] === "T19"
+   && r2.report.filter((r) => r.status === "updated").map((r) => r.key).join(",") === "tests,gaps" && r2.report.find((r) => r.key === "tests").after === 19,
+   "an edited cell and an added row come through, and only those sections are reported as updated");
+const noMarkers = md.replace(/<!-- pbn: [A-Za-z.]+ -->\n/g, "");
+const r3 = fromMarkdown(noMarkers, { ...DEFAULT_DESIGN, gaps: [] });
+ok(r3.errors.length === 0 && JSON.stringify(r3.design) === JSON.stringify(DEFAULT_DESIGN) && r3.report.every((r) => /heading/.test(r.message)), "with every marker lost the sections are found by their headings", r3.errors);
+const reordered = md.replace("| # | Class | Finding | Proposed resolution | Mark |", "| Mark | # | Finding | Class | Proposed resolution |").replace(/\| (G\d+) \| (critical|rule|data) \| ([^|]+) \| ([^|]+) \| (REQUIRED|PROPOSED|OPEN) \|/g, "| $5 | $1 | $3 | $2 | $4 |");
+const r4 = fromMarkdown(reordered, { ...DEFAULT_DESIGN, gaps: [] });
+ok(r4.errors.length === 0 && JSON.stringify(r4.design.gaps) === JSON.stringify(GAPS), "columns are matched by name, so a reordered table reads the same", r4.errors);
+const r5 = fromMarkdown(md.replace("| # | Requirement | Mark |", "| # | Requirement |"), DEFAULT_DESIGN);
+ok(r5.errors.length === 1 && /Requirements: missing column\(s\): Mark/.test(r5.errors[0]) && r5.design === DEFAULT_DESIGN, "a missing column is an error naming the section and the column, and nothing is applied", r5.errors);
+const r6 = fromMarkdown(md.replace("| G6 | rule |", "| G6 | rule |").replace(/\| R3 \| ([^|]+) \| REQUIRED \|/, "| R3 | $1 | MAYBE |"), DEFAULT_DESIGN);
+ok(r6.errors.length === 1 && /Requirements: row 3: mark "MAYBE"/.test(r6.errors[0]), "a mark outside REQUIRED, PROPOSED, OPEN is refused with the row named", r6.errors);
+const r7 = fromMarkdown("# nothing here\n\nsome text", DEFAULT_DESIGN);
+ok(r7.errors.length === 1 && /no PB Notifications sections found/.test(r7.errors[0]), "a file that is not the design is refused plainly");
+const partial = md.split("\n## 12. Test scenarios")[0];
+const r8 = fromMarkdown(partial, DEFAULT_DESIGN);
+ok(r8.errors.length === 0 && r8.report.filter((r) => r.status === "missing").map((r) => r.key).join(",") === "tests,gaps,openItems,exceptions" && r8.design.tests.length === 18, "sections left out of the file keep the current text and are reported as missing");
+const merged = mergeDesign(DEFAULT_DESIGN, { requirements: [["R1", "x", "OPEN"]], orchestration: { deps: "a >> b" } });
+ok(merged.requirements.length === 1 && merged.orchestration.deps === "a >> b" && merged.orchestration.tasks.length === 10 && merged.orchestration.bounce.tasks.length === 5 && merged.gaps.length === 20, "a stored design is laid over the shipped one, nested sections included");
+const folded = applyEdits(DEFAULT_DESIGN, rv);
+ok(folded.requirements[5][1] === "Send at 08:30 a.m. ET after posting." && DEFAULT_DESIGN.requirements[5][1] !== folded.requirements[5][1] && folded.gaps === undefined === false, "a reviewer's edit is folded into the exported design without touching the shipped one");
+const withReview = toMarkdown(folded, { review: rv, exportedAt: "2026-10-25 10:00" });
+ok(/## 15\. Review notes/.test(withReview) && /Which Loan Statement ids\?/.test(withReview) && /\| R6 \| Send at 08:30 a.m. ET after posting\. \| OPEN \|/.test(withReview) && fromMarkdown(withReview, DEFAULT_DESIGN).errors.length === 0, "the download carries the edits in place and the review notes as a last section that reads back cleanly");
+const ingested = { ...r2.design };
+const shellDs = renderToStaticMarkup(<PbNotifications t={tLight} designSeed={{ doc: { version: 3, design: ingested, author: "Jigar T", idSource: "none", at: "2026-10-25 11:00", fileName: "pb-notifications-design-v2.md", shipped: false }, live: true, history: [] }} />);
+ok(/design v3 · ingested by Jigar T on 2026-10-25 11:00/.test(shellDs) && /Download \.md/.test(shellDs), "the shell says which version it renders and offers the download");
+const gapsDs = renderToStaticMarkup(<DesignCtx.Provider value={ingested}><GapsTab t={tLight} /></DesignCtx.Provider>);
+const testsDs = renderToStaticMarkup(<DesignCtx.Provider value={ingested}><TestsTab t={tLight} /></DesignCtx.Provider>);
+ok(/Loan Statements post with their own report ids/.test(gapsDs) && !/Loan Statements post/.test(renderToStaticMarkup(<GapsTab t={tLight} />)) && /T19/.test(testsDs) && (testsDs.match(/<tr>/g) || []).length === 20,
+   "the tabs render from the ingested design: the edited gap and the added test scenario appear; without it the shipped text stands");
+const dsCtx = { base: DEFAULT_DESIGN, design: ingested, doc: { version: 3, author: "Jigar T", idSource: "none", at: "2026-10-25 11:00", fileName: "x.md", shipped: false }, live: true, loaded: true, history: [{ id: "d1", version: 3, author: "Jigar T", idSource: "none", at: "2026-10-25 11:00", fileName: "x.md", note: "loan ids", bytes: 56000 }], refreshHistory: async () => [], check: (m) => fromMarkdown(m, ingested), apply: async () => true, reset: async () => true, error: null, setError: () => {} };
+const docTab = renderToStaticMarkup(<ReviewCtx.Provider value={ctx()}><DesignStateCtx.Provider value={dsCtx}><DocumentTab /></DesignStateCtx.Provider></ReviewCtx.Provider>);
+ok(/Design version 3/.test(docTab) && /ingested by Jigar T \(self-declared\)/.test(docTab) && /Ingest an edited document/.test(docTab) && /Apply as version 4/.test(docTab) && /loan ids/.test(docTab) && /55 KB/.test(docTab) && /Restore the shipped design/.test(docTab) && /41 sections/.test(docTab),
+   "the Document tab: the current version, the ingest form, the next version number, the history and the restore");
+ok(designFileName(3) === "pb-notifications-design-v3.md" && buildMarkdown(dsCtx, ctx()).includes("from design version 3"), "the file name and the header carry the version");
+
 console.log("-- wiring");
 const APP = fs.readFileSync(path.join(SRC, "App.jsx"), "utf8"), NAV = fs.readFileSync(path.join(SRC, "AppShell.jsx"), "utf8");
 const SEC = fs.readFileSync(path.join(SRC, "..", "..", "sql", "64_security.sql"), "utf8");
@@ -148,7 +199,7 @@ const groupOf = (key) => { const i = NAV.indexOf(`['${key}'`); const m = [...NAV
 ok(groupOf("pbnotify") === "Architecture", "it sits under Architecture with System Design and DevOps 360", groupOf("pbnotify"));
 ok(/'pbnotify','PB Notifications','Architecture'/.test(SEC), "the security module is seeded under Architecture");
 const MAIN = fs.readFileSync(path.join(SRC, "..", "..", "api", "app", "main.py"), "utf8");
-ok(/"routers_pbnotify_review"/.test(MAIN) && fs.existsSync(path.join(SRC, "..", "..", "sql", "84_pbnotify_review.sql")), "the review router is mounted and its tables have a SQL file");
+ok(/"routers_pbnotify_review"/.test(MAIN) && fs.existsSync(path.join(SRC, "..", "..", "sql", "84_pbnotify_review.sql")) && fs.existsSync(path.join(SRC, "..", "..", "sql", "85_pbnotify_design_doc.sql")), "the review router is mounted and its tables have SQL files");
 const RAPI = fs.readFileSync(path.join(SRC, "pbnotifyReviewApi.js"), "utf8");
 ok(/\/pbnotify\/review/.test(RAPI) && !/from ["']\.\/api\.js["']/.test(RAPI) && !/api\.js/.test(fs.readFileSync(path.join(SRC, "PbReview.jsx"), "utf8")), "the review client is self-contained: api.js untouched");
 

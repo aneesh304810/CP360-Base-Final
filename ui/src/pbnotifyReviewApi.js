@@ -67,6 +67,43 @@ export async function whoami() {
   } catch { return { lanId: null, source: "none", host: null, ip: null, verified: false }; }
 }
 
+// ---- the design document ----
+const DESIGN_KEY = "cp360-pbnotify-design";
+export function loadDesignLocal() {
+  try { const raw = localStorage.getItem(DESIGN_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
+}
+export function saveDesignLocal(doc) {
+  try { if (doc) localStorage.setItem(DESIGN_KEY, JSON.stringify(doc)); else localStorage.removeItem(DESIGN_KEY); } catch { /* quota */ }
+}
+// {doc, live}. doc null means the shipped design.
+export async function loadDesign() {
+  try {
+    const r = await fetch(`${API_BASE}${PATH}/design`, { signal: AbortSignal.timeout(T) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const j = await r.json();
+    return { doc: j.doc || null, live: true };
+  } catch { return { doc: loadDesignLocal(), live: false }; }
+}
+export async function designHistory() {
+  try {
+    const r = await fetch(`${API_BASE}${PATH}/design/history`, { signal: AbortSignal.timeout(T) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return (await r.json()).docs || [];
+  } catch { return null; }
+}
+// {doc} on success, {error} otherwise; offline true when the API is unreachable.
+export async function saveDesign(payload) {
+  try {
+    const r = await fetch(`${API_BASE}${PATH}/design`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload), signal: AbortSignal.timeout(30000),
+    });
+    if (!r.ok) { const j = await r.json().catch(() => ({})); return { error: j.detail || `HTTP ${r.status}` }; }
+    const j = await r.json();
+    return { doc: j.doc || null, version: j.version };
+  } catch (e) { return { error: String(e && e.message || e), offline: true }; }
+}
+
 const nid = (p) => `${p}${Date.now()}${Math.random().toString(16).slice(2, 8)}`;
 const stamp = (now) => (now || new Date()).toISOString().slice(0, 16).replace("T", " ");
 const clip = (s) => String(s || "").trim().slice(0, MAX_BODY);
@@ -132,4 +169,4 @@ export function keyFor(label) {
   return `general:${s.slice(0, 60)}`;
 }
 
-export default { load, applyOp, whoami, loadLocal, saveLocal, emptyReview, applyLocal, textFor, notesFor, openQuestions, keyFor, reviewerName, setReviewerName };
+export default { load, applyOp, whoami, loadLocal, saveLocal, emptyReview, applyLocal, textFor, notesFor, openQuestions, keyFor, reviewerName, setReviewerName, loadDesign, saveDesign, designHistory, loadDesignLocal, saveDesignLocal };

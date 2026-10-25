@@ -119,11 +119,50 @@ ok("gap:G7" not in st["edits"] and len(st["editLog"]) == 4, "a revert drops the 
 ok(len(st["notes"]) == 2 and st["notes"][1]["parentId"] == "n1" and st["notes"][0]["status"] == "answered", "notes come back with their parent and status", st["notes"])
 ok(all(k == k.lower() or k in ("idSource", "itemKey", "parentId", "statusBy", "statusAt", "editedBy", "editedAt", "editLog") for k in list(st) + list(st["notes"][0])), "camelCase on the wire, as the client reads it")
 
+# ---- the design document ---------------------------------------------
+ROWS.clear()
+sql, par, out = (lambda: (SENT.clear(), R.post_design(R.DocIn(markdown="# PB Notifications · design document\n| a |", design={"gaps": [["G1", "x", "y", "z", "OPEN"]]}, fileName="v1.md", note="first", actor="Jigar T"), Req())))()[1:] and ([" ".join(s.split()) for s, _ in SENT], [p for _, p in SENT], None)
+ok(len(sql) == 1 and sql[0].startswith("INSERT INTO pbn_design_doc") and par[0]["v"] == 1 and par[0]["s"] == "N" and par[0]["f"] == "v1.md" and '"gaps"' in par[0]["j"] and par[0]["b"] > 0 and par[0]["u"] == "Jigar T",
+   "an ingest is one INSERT as version 1 with the markdown, the parsed design as JSON, the file name and the author", (sql, par))
+ROWS["MAX(version)"] = [{"v": 4}]
+SENT.clear(); R.post_design(R.DocIn(reset=True, note="back to shipped", actor="Jay S"), Req())
+ok(SENT and SENT[0][1]["v"] == 5 and SENT[0][1]["s"] == "Y" and SENT[0][1]["j"] is None and SENT[0][1]["m"] is None, "a restore is version max + 1 flagged shipped with no bodies", SENT)
+
+
+def fails_doc(code, **kw):
+    try:
+        R.post_design(R.DocIn(**kw), Req())
+    except HTTPException as e:
+        return e.status_code == code
+    return False
+
+
+ok(fails_doc(400, markdown="x", design=None, actor="x"), "an ingest without the parsed design is a 400")
+ok(fails_doc(400, markdown="  ", design={"a": 1}, actor="x"), "an empty document is a 400")
+ok(fails_doc(400, markdown="x", design={"a": 1}), "no name with sign-in off is a 400")
+ok(fails_doc(413, markdown="x" * (R.MAX_DOC + 1), design={"a": 1}, actor="x"), "a document over the limit is a 413")
+ROWS.clear()
+ROWS["FROM pbn_design_doc ORDER BY version DESC FETCH FIRST"] = [{"doc_id": "d2", "version": 2, "markdown": "# md", "design_json": '{"gaps": []}', "file_name": "v2.md", "note": None, "is_shipped": "N", "author": "A", "id_source": "proxy", "byte_size": 10, "created_at": "2026-10-25 11:00"}]
+d = R.get_design()["doc"]
+ok(d["version"] == 2 and d["design"] == {"gaps": []} and d["markdown"] == "# md" and not d["shipped"], "the current document comes back parsed, with its markdown", d)
+ROWS["FROM pbn_design_doc ORDER BY version DESC FETCH FIRST"] = [{"doc_id": "d3", "version": 3, "markdown": None, "design_json": None, "file_name": None, "note": "restored", "is_shipped": "Y", "author": "B", "id_source": "none", "byte_size": 0, "created_at": "2026-10-25 12:00"}]
+d = R.get_design()["doc"]
+ok(d["shipped"] and d["design"] is None, "a restore row means the shipped design")
+ROWS["FROM pbn_design_doc ORDER BY version DESC FETCH FIRST"] = [{"doc_id": "d4", "version": 4, "markdown": "x", "design_json": "{not json", "file_name": None, "note": None, "is_shipped": "N", "author": "B", "id_source": "none", "byte_size": 1, "created_at": "2026-10-25 12:00"}]
+d = R.get_design()["doc"]
+ok(d["design"] is None and not d["shipped"], "unparseable JSON on a row is no design rather than a 500", d)
+ROWS["FROM pbn_design_doc ORDER BY version DESC"] = [{"doc_id": "d4", "version": 4, "file_name": None, "note": None, "is_shipped": "N", "author": "B", "id_source": "none", "byte_size": 1, "created_at": "2026-10-25 12:00"}]
+h = R.design_history()["docs"]
+ok(len(h) == 1 and h[0]["design"] is None and h[0]["markdown"] is None and h[0]["version"] == 4, "the history carries no bodies")
+ROWS.clear()
+
 # ---- mounted ----------------------------------------------------------
 main = open(os.path.join(os.path.dirname(__file__), "..", "app", "main.py")).read()
 ok('"routers_pbnotify_review"' in main, "the router is in main.py's mount list")
 sqlf = open(os.path.join(os.path.dirname(__file__), "..", "..", "sql", "84_pbnotify_review.sql")).read()
 ok("pbn_review_edit" in sqlf and "pbn_review_note" in sqlf and "ck_pbn_review_kind" in sqlf and "-955" in sqlf, "the two tables with their checks, idempotent")
+sqld = open(os.path.join(os.path.dirname(__file__), "..", "..", "sql", "85_pbnotify_design_doc.sql")).read()
+ok("pbn_design_doc" in sqld and "uk_pbn_design_doc_ver" in sqld and "design_json" in sqld and "-955" in sqld, "the design document table, one row per version, idempotent")
 
 print(("\n%d assertion(s) failed" % BAD) if BAD else "\npbnotify review assertions pass")
 if BAD:
