@@ -14,8 +14,10 @@
 // NO CLIENT DATA. Table and column names, counts and rules only. The
 // address on the test extract is not reproduced; no user id, account
 // number or e-mail address appears here.
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
 import { tLight } from "./bbhTheme.js";
+import { ReviewCtx, ReviewMark, ReviewPanel, CardReview, ReviewTab, useReviewState } from "./PbReview.jsx";
+import { openQuestions } from "./pbnotifyReviewApi.js";
 
 export const MARK = {
   REQUIRED: { label: "REQUIRED", c: "#0f4775", t: "the business requirement, as written in PBCP-5587" },
@@ -24,7 +26,7 @@ export const MARK = {
 };
 const mono = { fontFamily: "monospace" };
 
-export const TABS = [["overview", "Overview"], ["flow", "End-to-end flow"], ["req", "Requirements"], ["design", "Design on the Hub"], ["model", "Data model"], ["sources", "Source review"], ["content", "E-mail content"], ["tests", "Test scenarios"], ["gaps", "Open gaps"], ["exc", "Exceptions"]];
+export const TABS = [["overview", "Overview"], ["flow", "End-to-end flow"], ["req", "Requirements"], ["design", "Design on the Hub"], ["model", "Data model"], ["sources", "Source review"], ["content", "E-mail content"], ["tests", "Test scenarios"], ["gaps", "Open gaps"], ["exc", "Exceptions"], ["review", "Review"]];
 
 // ---------------------------------------------------------------- data ----
 export const BACKGROUND = [
@@ -937,12 +939,31 @@ function P({ t, children }) { return <p style={{ fontSize: 13, color: t.sub, lin
 function Note({ t, children, c }) {
   return <div style={{ borderLeft: `3px solid ${c || t.accent}`, background: t.bg, padding: "10px 14px", borderRadius: "0 6px 6px 0", margin: "10px 0", fontSize: 13, color: t.sub, lineHeight: 1.6, maxWidth: "80ch" }}>{children}</div>;
 }
-function Tbl({ t, head, rows }) {
+function Tbl({ t, head, rows, keys, editCol = 1 }) {
+  // With a review context and a key per row, each row carries a pencil and
+  // an edited text replaces the shipped one; without them this is a table.
+  const rv = useContext(ReviewCtx);
+  const withRv = !!(rv && keys);
+  const th = { textAlign: "left", fontSize: 9.5, fontWeight: 800, letterSpacing: .5, textTransform: "uppercase", color: t.textMuted, padding: "0 12px 6px 0", borderBottom: `1px solid ${t.border}`, verticalAlign: "bottom" };
   return (
     <div style={{ overflowX: "auto", margin: "8px 0 14px" }}>
       <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12.5, minWidth: 560 }}>
-        <thead><tr>{head.map((h, i) => <th key={i} style={{ textAlign: "left", fontSize: 9.5, fontWeight: 800, letterSpacing: .5, textTransform: "uppercase", color: t.textMuted, padding: "0 12px 6px 0", borderBottom: `1px solid ${t.border}`, verticalAlign: "bottom" }}>{h}</th>)}</tr></thead>
-        <tbody>{rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j} style={{ padding: "8px 12px 8px 0", verticalAlign: "top", borderBottom: `1px solid ${t.bg}`, color: j === 0 ? t.text : t.sub, fontWeight: j === 0 ? 600 : 400, lineHeight: 1.5 }}>{c}</td>)}</tr>)}</tbody>
+        <thead><tr>{head.map((h, i) => <th key={i} style={th}>{h}</th>)}{withRv && <th style={{ ...th, width: 1 }}>Review</th>}</tr></thead>
+        <tbody>{rows.map((r, i) => {
+          const k = withRv ? keys[i] : null;
+          const original = typeof r[editCol] === "string" ? r[editCol] : "";
+          let cells = r;
+          const e = k && rv.review.edits ? rv.review.edits[k] : null;
+          if (e && e.body && original) {
+            cells = [...r];
+            cells[editCol] = <span><span>{e.body}</span> <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: .4, color: "#159943", border: "1px solid #159943", borderRadius: 3, padding: "0 5px", marginLeft: 6, whiteSpace: "nowrap" }} title={`edited by ${e.author} on ${e.at}. Shipped text: ${original}`}>edited</span></span>;
+          }
+          return (<React.Fragment key={i}>
+            <tr>{cells.map((c, j) => <td key={j} style={{ padding: "8px 12px 8px 0", verticalAlign: "top", borderBottom: `1px solid ${t.bg}`, color: j === 0 ? t.text : t.sub, fontWeight: j === 0 ? 600 : 400, lineHeight: 1.5 }}>{c}</td>)}
+              {k && <td style={{ padding: "6px 0", verticalAlign: "top", borderBottom: `1px solid ${t.bg}` }}><ReviewMark k={k} /></td>}</tr>
+            {k && rv.openKey === k && <tr><td colSpan={head.length + 1} style={{ padding: "0 0 4px" }}><ReviewPanel k={k} text={original} /></td></tr>}
+          </React.Fragment>);
+        })}</tbody>
       </table>
     </div>);
 }
@@ -956,16 +977,16 @@ export function OverviewTab({ t }) {
   return (<>
     <H2 t={t} sub="The whole utility on one picture: the Portal schema it reads, the Hub it runs on, the mail it sends and the bounce it watches for, and the people around it.">High-level design</H2>
     <HldFig t={t} />
-    <Tbl t={t} head={["#", "Flow"]} rows={HLD_FLOWS.map(([n, f]) => [n, f])} />
+    <Tbl t={t} head={["#", "Flow"]} rows={HLD_FLOWS.map(([n, f]) => [n, f])} keys={HLD_FLOWS.map(([n]) => `hld:${n}`)} />
     <H2 t={t}>Background</H2>
     {BACKGROUND.map((p) => <P key={p.slice(0, 30)} t={t}>{p}</P>)}
     <H2 t={t}>The enhancement</H2>
     <P t={t}>{ENHANCEMENT}</P>
     <H2 t={t} sub="The proof of concept runs on the four Excel extracts. The built utility connects to the Portal's Oracle schema and runs the same queries; from the candidate table onward nothing changes.">Proof of concept now, Oracle when built</H2>
-    <Tbl t={t} head={["", "Proof of concept · Excel", "Built · Oracle"]} rows={MODES.map(([a, b, c]) => [a, b, c])} />
+    <Tbl t={t} head={["", "Proof of concept · Excel", "Built · Oracle"]} rows={MODES.map(([a, b, c]) => [a, b, c])} keys={MODES.map(([a]) => `mode:${a}`)} />
     <H2 t={t}>Why it is built on the Integration Hub</H2>
     <P t={t}>It is the first BBH pipeline on the Hub framework that is not an SEI interface: a daily, business-date-aware job that reads a BBH schema, writes its own tables, sends through the internal relay and leaves evidence in the CP 360 metadata. Everything it needs the Hub already has: the scheduler, the schema stage, the guardrail events, the screens and the secrets. Building it here means PB Systems can close the InServ process without standing up anything new.</P>
-    <Tbl t={t} head={["Concern", "On the Hub", "Component"]} rows={HUB_FIT.map(([a, b, c]) => [a, b, c])} />
+    <Tbl t={t} head={["Concern", "On the Hub", "Component"]} rows={HUB_FIT.map(([a, b, c]) => [a, b, c])} keys={HUB_FIT.map(([a]) => `fit:${a}`)} />
     <Note t={t} c={MARK.OPEN.c}><b style={{ color: t.text }}>Not agreed yet.</b> {GAPS.filter((g) => g[4] === "OPEN").length} items on the Open gaps tab need an answer from PB business or PB Systems before the build starts; the first four are critical and the rest change the rules the queries implement.</Note>
   </>);
 }
@@ -973,13 +994,13 @@ export function RequirementsTab({ t }) {
   return (<>
     <Legend t={t} />
     <H2 t={t}>The requirements</H2>
-    <Tbl t={t} head={["#", "Requirement", ""]} rows={REQUIREMENTS.map(([id, text, m]) => [id, text, <Chip m={m} />])} />
+    <Tbl t={t} head={["#", "Requirement", ""]} rows={REQUIREMENTS.map(([id, text, m]) => [id, text, <Chip m={m} />])} keys={REQUIREMENTS.map(([id]) => `req:${id}`)} />
     <H2 t={t} sub="The end-to-end requirements document numbers the business requirements BR-01 to BR-15. Each one, and where it lands on this page.">Traceability to BR-01 to BR-15</H2>
-    <Tbl t={t} head={["BR", "Requirement", "Where it lands"]} rows={BR_TRACE.map(([id, text, where]) => [id, text, where])} />
+    <Tbl t={t} head={["BR", "Requirement", "Where it lands"]} rows={BR_TRACE.map(([id, text, where]) => [id, text, where])} keys={BR_TRACE.map(([id]) => `br:${id}`)} />
     <H2 t={t} sub="How each notification type decides who is eligible, where it reads, and what one record produces.">Per notification type</H2>
     {TYPES.map((x) => (
       <div key={x.key} style={{ border: `1px solid ${t.border}`, borderLeft: `4px solid ${MARK.REQUIRED.c}`, borderRadius: t.radius.md, background: t.panel, padding: "12px 16px", margin: "8px 0" }}>
-        <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}><b style={{ color: t.text, fontSize: 14 }}>{x.title}</b><span style={{ ...mono, fontSize: 11.5, color: t.textMuted }}>NOTIFICATION_TYPE = {x.key}</span>{x.always && <Chip m="REQUIRED">ALWAYS SENT</Chip>}</div>
+        <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}><b style={{ color: t.text, fontSize: 14 }}>{x.title}</b><span style={{ ...mono, fontSize: 11.5, color: t.textMuted }}>NOTIFICATION_TYPE = {x.key}</span>{x.always && <Chip m="REQUIRED">ALWAYS SENT</Chip>}<CardReview k={`type:${x.key}`} text={x.preference} /></div>
         <div style={{ fontSize: 12.5, color: t.sub, lineHeight: 1.6, marginTop: 6 }}>
           <div><b style={{ color: t.text }}>Reads</b> <span style={mono}>{x.source}</span></div>
           <div><b style={{ color: t.text }}>Posted today when</b> <span style={mono}>{x.posted}</span></div>
@@ -988,10 +1009,10 @@ export function RequirementsTab({ t }) {
         </div>
       </div>))}
     <H2 t={t}>Notification type grid</H2>
-    <Tbl t={t} head={["Type", "Frequency · send time", "Business trigger", "Preference and consolidation", "E-mail outcome"]} rows={GRID.map((r) => [...r])} />
+    <Tbl t={t} head={["Type", "Frequency · send time", "Business trigger", "Preference and consolidation", "E-mail outcome"]} rows={GRID.map((r) => [...r])} keys={GRID.map((r) => `grid:${r[0]}`)} />
     <H2 t={t}>Notification tracking</H2>
     <P t={t}>One tracking table. A record per eligible user, notification type and processing date, created only when the user has at least one qualifying document for that type. STATEMENT_CONFIRM is one record whether the e-mail ends up statements-only, confirms-only or combined.</P>
-    <Tbl t={t} head={["Field", "Meaning"]} rows={TRACKING_FIELDS.map(([a, b]) => [<span style={mono}>{a}</span>, b])} />
+    <Tbl t={t} head={["Field", "Meaning"]} rows={TRACKING_FIELDS.map(([a, b]) => [<span style={mono}>{a}</span>, b])} keys={TRACKING_FIELDS.map(([a]) => `field:${a}`)} />
     <Tbl t={t} head={["Status", "Meaning"]} rows={STATUSES.map(([a, b]) => [a, b])} />
     <H2 t={t}>Undeliverable notifications</H2>
     <P t={t}>Every bounced or refused 1099 and K-1 e-mail (NOTIFICATION_TYPE in 1099, K1 and EMAIL_STATUS = Failed) is tracked and made available to the user's Relationship Manager and Relationship Associate, and to no one else.</P>
@@ -1002,29 +1023,29 @@ export function DesignTab({ t }) {
     <Legend t={t} />
     <H2 t={t} sub="One Airflow DAG on the Hub scheduler, once a day, triggered by the posting cycle rather than by the clock.">The run</H2>
     <FlowFig t={t} />
-    <Tbl t={t} head={["#", "Task", "What it does", ""]} rows={FLOW.map(([a, b, m], i) => [i + 1, a, b, <Chip m={m} />])} />
+    <Tbl t={t} head={["#", "Task", "What it does", ""]} rows={FLOW.map(([a, b, m], i) => [i + 1, a, b, <Chip m={m} />])} keys={FLOW.map((_, i) => `flow:${i + 1}`)} editCol={2} />
     <H2 t={t} sub="The one decision that is easy to get wrong: a user's accounts and their preferences, per document type, to one record and one e-mail.">Statements and confirms, decided</H2>
     <DecisionFig t={t} />
     <H2 t={t} sub="One DAG file in this application's repository, written to the Hub's DAG standards. The settings, the tasks and the dependencies.">Airflow DAG and orchestration</H2>
     <DagFig t={t} />
-    <Tbl t={t} head={["Setting", "Value", "Why"]} rows={ORCHESTRATION.dag.map(([a, b, c]) => [<span style={mono}>{a}</span>, b, c])} />
-    <Tbl t={t} head={["Task", "Operator · where it runs", "What it does", "Writes", "On failure"]} rows={ORCHESTRATION.tasks.map(([a, b, c, d, e]) => [<span style={mono}>{a}</span>, b, c, d, e])} />
+    <Tbl t={t} head={["Setting", "Value", "Why"]} rows={ORCHESTRATION.dag.map(([a, b, c]) => [<span style={mono}>{a}</span>, b, c])} keys={ORCHESTRATION.dag.map(([a]) => `dag:${a}`)} />
+    <Tbl t={t} head={["Task", "Operator · where it runs", "What it does", "Writes", "On failure"]} rows={ORCHESTRATION.tasks.map(([a, b, c, d, e]) => [<span style={mono}>{a}</span>, b, c, d, e])} keys={ORCHESTRATION.tasks.map(([a]) => `task:${a}`)} editCol={2} />
     <div style={{ fontSize: 12.5, color: t.sub, lineHeight: 1.6, margin: "6px 0 10px" }}><b style={{ color: t.text }}>Dependencies</b> <span style={{ ...mono, fontSize: 11.5 }}>{ORCHESTRATION.deps}</span></div>
     {ORCHESTRATION.rules.map((r) => <Note key={r.slice(0, 24)} t={t} c={MARK.PROPOSED.c}>{r}</Note>)}
     <H2 t={t} sub="What the repository holds and what the two DAG files look like. Skeletons to the Hub's DAG standards: every task is a pod on the workbench image, every secret comes from the namespace, every run is keyed by the processing date.">Implementation</H2>
-    <Tbl t={t} head={["Path in the application repository", "Holds"]} rows={REPO_LAYOUT.map(([a, b]) => [<span style={mono}>{a}</span>, b])} />
+    <Tbl t={t} head={["Path in the application repository", "Holds"]} rows={REPO_LAYOUT.map(([a, b]) => [<span style={mono}>{a}</span>, b])} keys={REPO_LAYOUT.map(([a]) => `repo:${a}`)} />
     <Code t={t} title="the daily DAG" code={DAG_CODE} />
     <Code t={t} title="the bounce-check DAG" code={BOUNCE_DAG_CODE} />
     <Code t={t} title="the shared pod helper every Hub DAG uses" code={POD_HELPER} />
     <Note t={t} c={MARK.PROPOSED.c}><b style={{ color: t.text }}>Why the DAG files are this short.</b> The DAG declares order, timing, retries and callbacks and nothing else. Every task body is a command in a small Python package the pod runs, which is what the unit tests cover and what Gate 5 scans; the DAG file is what Gate 1 reads statically. A rule change is a change in the package or the reference data, never in the DAG.</Note>
     <H2 t={t} sub="The relay accepting a message is not delivery. A bounce comes back later, to the sending mailbox, and only the mail broker can tell us. A second short DAG reads it and alerts the people who have to act.">Bounce detection and the alert to system development</H2>
     <BounceFig t={t} />
-    <Tbl t={t} head={["Concern", "How", "Why this way"]} rows={BOUNCE.how.map(([a, b, c]) => [a, b, c])} />
-    <Tbl t={t} head={["Who is told", "What", "What is left out", ""]} rows={BOUNCE.alerts.map(([a, b, c, m]) => [a, b, c, <Chip m={m} />])} />
-    <Tbl t={t} head={["Setting", "Value"]} rows={ORCHESTRATION.bounce.dag.map(([a, b]) => [<span style={mono}>{a}</span>, b])} />
-    <Tbl t={t} head={["Task", "Operator · where it runs", "What it does", "Writes", "On failure"]} rows={ORCHESTRATION.bounce.tasks.map(([a, b, c, d, e]) => [<span style={mono}>{a}</span>, b, c, d, e])} />
+    <Tbl t={t} head={["Concern", "How", "Why this way"]} rows={BOUNCE.how.map(([a, b, c]) => [a, b, c])} keys={BOUNCE.how.map(([a]) => `bounce:${a}`)} />
+    <Tbl t={t} head={["Who is told", "What", "What is left out", ""]} rows={BOUNCE.alerts.map(([a, b, c, m]) => [a, b, c, <Chip m={m} />])} keys={BOUNCE.alerts.map(([a]) => `alert:${a}`)} />
+    <Tbl t={t} head={["Setting", "Value"]} rows={ORCHESTRATION.bounce.dag.map(([a, b]) => [<span style={mono}>{a}</span>, b])} keys={ORCHESTRATION.bounce.dag.map(([a]) => `bdag:${a}`)} />
+    <Tbl t={t} head={["Task", "Operator · where it runs", "What it does", "Writes", "On failure"]} rows={ORCHESTRATION.bounce.tasks.map(([a, b, c, d, e]) => [<span style={mono}>{a}</span>, b, c, d, e])} keys={ORCHESTRATION.bounce.tasks.map(([a]) => `btask:${a}`)} editCol={2} />
     <div style={{ fontSize: 12.5, color: t.sub, lineHeight: 1.6, margin: "6px 0 10px" }}><b style={{ color: t.text }}>Dependencies</b> <span style={{ ...mono, fontSize: 11.5 }}>{ORCHESTRATION.bounce.deps}</span></div>
-    <Tbl t={t} head={["Column added to PB_NOTIFICATION_TRACKING", "Type", "Meaning"]} rows={BOUNCE.columns.map(([a, b, c]) => [<span style={mono}>{a}</span>, <span style={mono}>{b}</span>, c])} />
+    <Tbl t={t} head={["Column added to PB_NOTIFICATION_TRACKING", "Type", "Meaning"]} rows={BOUNCE.columns.map(([a, b, c]) => [<span style={mono}>{a}</span>, <span style={mono}>{b}</span>, c])} keys={BOUNCE.columns.map(([a]) => `bcol:${a}`)} editCol={2} />
     <Note t={t} c={MARK.PROPOSED.c}><b style={{ color: t.text }}>The alert to system development carries the id, not the client.</b> Notification id, type, processing date, bounce class and the broker's reason, batched into one e-mail per check with the counts in the subject. The row in CP 360 has the rest. Nobody's address or name travels in an alert.</Note>
     <H2 t={t}>Design rules</H2>
     <Note t={t} c={MARK.PROPOSED.c}><b style={{ color: t.text }}>The tracking key is the only duplicate guard.</b> USER_ID, NOTIFICATION_TYPE and PROCESS_DATE are unique. A rerun on the same date leaves Sent rows alone and retries the rest; no counter, flag or memory outside the table decides whether an e-mail goes.</Note>
@@ -1041,12 +1062,12 @@ export function ModelTab({ t }) {
     <ModelFig t={t} />
     {Object.values(MODEL).map((m) => (
       <div key={m.name} style={{ margin: "14px 0" }}>
-        <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}><b style={{ ...mono, color: t.text, fontSize: 13.5 }}>{m.name}</b><span style={{ fontSize: 11.5, color: t.textMuted }}>{m.grain}</span><Chip m="PROPOSED" /></div>
+        <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}><b style={{ ...mono, color: t.text, fontSize: 13.5 }}>{m.name}</b><span style={{ fontSize: 11.5, color: t.textMuted }}>{m.grain}</span><Chip m="PROPOSED" /><CardReview k={`model:${m.name}`} text={m.grain} /></div>
         <Tbl t={t} head={["Column", "Type", "Meaning"]} rows={m.cols.map(([a, b, c]) => [<span style={mono}>{a}</span>, <span style={mono}>{b}</span>, c])} />
         <div style={{ fontSize: 12, color: t.sub }}><b style={{ color: t.text }}>Keys</b> <span style={mono}>{m.keys}</span></div>
       </div>))}
     <H2 t={t} sub="The nine tables the utility reads, as the requirements document names them. Seven in the Portal schema, two in the warehouse for the e-mail of record. None is modified.">Source data model</H2>
-    <Tbl t={t} head={["Table", "Schema", "Purpose", "Key fields"]} rows={SOURCE_TABLES.map(([a, b, c, d]) => [<span style={mono}>{a}</span>, <span style={mono}>{b}</span>, c, <span style={{ ...mono, fontSize: 11.5 }}>{d}</span>])} />
+    <Tbl t={t} head={["Table", "Schema", "Purpose", "Key fields"]} rows={SOURCE_TABLES.map(([a, b, c, d]) => [<span style={mono}>{a}</span>, <span style={mono}>{b}</span>, c, <span style={{ ...mono, fontSize: 11.5 }}>{d}</span>])} keys={SOURCE_TABLES.map(([a]) => `tbl:${a}`)} editCol={2} />
     <P t={t}>The address path is USER_ID = DIM_IP_RELATIONSHIP.BBH_WEB_PORTAL_ID, then INTERESTED_PARTY_NUMBER to DIM_INTERESTED_PARTY where END_DATE IS NULL and E_MAIL_ADDRESS is present. A Portal user with no current interested-party row has no address, which is the exception the run counts.</P>
     <Note t={t} c={MARK.OPEN.c}><b style={{ color: t.text }}>Where the tables live (G20).</b> The requirements document proposes the tracking and K-1 detail tables in the Portal's PBCPAPP schema, with the detail keyed by NOTIFICATION_ID and RPT_ID. This design keeps all three tables in the Hub schema, so the Portal schema stays read-only and the Liquibase stage applies the changeset like every other Hub table, and keys the detail by date, user and report so it can be written before the tracking row exists. Either placement works; the owner has to be agreed.</Note>
     <H2 t={t}>Mapping from the sources</H2>
@@ -1069,7 +1090,7 @@ export function SourcesTab({ t }) {
     <Tbl t={t} head={["File", "Purpose", "Grain", "Rows", "Unmatched ids"]} rows={SOURCES.map((s) => [<span style={mono}>{s.file}</span>, s.purpose, s.grain, s.rows.toLocaleString(), s.unmatched ? <span style={{ color: MARK.OPEN.c, fontWeight: 700 }}>{s.unmatched}</span> : "—"])} />
     {SOURCES.map((s) => (
       <div key={s.file} style={{ border: `1px solid ${t.border}`, borderRadius: t.radius.md, background: t.panel, padding: "12px 16px", margin: "8px 0" }}>
-        <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}><b style={{ ...mono, color: t.text }}>{s.file}</b><span style={{ fontSize: 11.5, color: t.textMuted }}>{s.grain} · {s.rows.toLocaleString()} rows · a SQL sheet with the extraction query</span></div>
+        <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}><b style={{ ...mono, color: t.text }}>{s.file}</b><span style={{ fontSize: 11.5, color: t.textMuted }}>{s.grain} · {s.rows.toLocaleString()} rows · a SQL sheet with the extraction query</span><CardReview k={`src:${s.file}`} text={s.fit} /></div>
         <div style={{ fontSize: 12.5, color: t.sub, lineHeight: 1.6, marginTop: 6 }}>
           <div><b style={{ color: t.text }}>Columns</b> <span style={mono}>{s.cols.join(" · ")}</span></div>
           <div><b style={{ color: t.text }}>Profile</b> {s.profile}</div>
@@ -1087,7 +1108,7 @@ export function ContentTab({ t }) {
     <Tbl t={t} head={["Template", "Sent when", "Subject", "Fields it needs"]} rows={CONTENT.map((c) => [c.key, <span style={mono}>{c.when}</span>, c.subject, <span style={{ fontSize: 11.5 }}>{c.fields}</span>])} />
     {CONTENT.map((c) => (
       <div key={c.key} style={{ border: `1px solid ${t.border}`, borderRadius: t.radius.md, background: t.panel, padding: "12px 16px", margin: "8px 0" }}>
-        <div style={{ fontSize: 11, color: t.textMuted }}>From {SENDER} · subject</div>
+        <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}><span style={{ fontSize: 11, color: t.textMuted }}>From {SENDER} · subject</span><CardReview k={`tpl:${c.key}`} text={c.body} /></div>
         <div style={{ fontSize: 13.5, fontWeight: 700, color: t.text, margin: "2px 0 8px" }}>{c.subject}</div>
         <div style={{ fontSize: 12.5, color: t.sub, lineHeight: 1.65, maxWidth: "80ch" }}>{c.body}</div>
       </div>))}
@@ -1098,9 +1119,9 @@ export function GapsTab({ t }) {
   return (<>
     <Legend t={t} />
     <H2 t={t} sub="Everything found reviewing the requirement and the four extracts that must be closed before a production run. Critical items block the interface; rule items change what the queries do; data items need a new source.">Open gaps</H2>
-    <Tbl t={t} head={["#", "Class", "Finding", "Proposed resolution", ""]} rows={GAPS.map(([id, cls, finding, fix, m]) => [id, <span style={{ color: cls === "critical" ? "#b42318" : t.sub, fontWeight: 700 }}>{cls}</span>, finding, fix, <Chip m={m} />])} />
+    <Tbl t={t} head={["#", "Class", "Finding", "Proposed resolution", ""]} rows={GAPS.map(([id, cls, finding, fix, m]) => [id, <span style={{ color: cls === "critical" ? "#b42318" : t.sub, fontWeight: 700 }}>{cls}</span>, finding, fix, <Chip m={m} />])} keys={GAPS.map(([id]) => `gap:${id}`)} editCol={2} />
     <H2 t={t} sub="The end-to-end requirements document closes with thirteen open items. Where each one lands: a gap above, or a part of the design that already answers it.">The document's open items</H2>
-    <Tbl t={t} head={["#", "Item", "Where it lands"]} rows={OPEN_ITEMS.map(([n, item, where]) => [n, item, where])} />
+    <Tbl t={t} head={["#", "Item", "Where it lands"]} rows={OPEN_ITEMS.map(([n, item, where]) => [n, item, where])} keys={OPEN_ITEMS.map(([n]) => `openitem:${n}`)} />
     <Note t={t} c={MARK.OPEN.c}><b style={{ color: t.text }}>To put to PB business and PB Systems, in this order.</b> The suppression flag reading (G6), the posting-complete trigger (G8), the 1099 family (G9, G10), the K-1 classification and the missing description (G11, G12), the relationship-team source (G13), the Loan Statement ids (G17), the retry limit (G18), the deep links (G19) and the owner of the tables (G20). The critical items G1 to G5 are ours to build and are in the design.</Note>
   </>);
 }
@@ -1108,7 +1129,7 @@ export function ExceptionsTab({ t }) {
   return (<>
     <H2 t={t} sub="What can go wrong on a run and what the utility does about it. Outcomes: HOLD waits, SKIP does nothing by design, REJECT records an exception, RETRY tries again, FLAG changes a status after the fact.">Exceptions</H2>
     <Tbl t={t} head={["Scenario", "Detected by", "What the utility does", "Outcome"]} rows={EXCEPTIONS.map(([a, b, c, o]) => [a, b, c,
-      <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: .4, color: OUTCOME[o] || t.sub, border: `1px solid ${OUTCOME[o] || t.sub}`, borderRadius: 3, padding: "1px 6px", whiteSpace: "nowrap" }}>{o}</span>])} />
+      <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: .4, color: OUTCOME[o] || t.sub, border: `1px solid ${OUTCOME[o] || t.sub}`, borderRadius: 3, padding: "1px 6px", whiteSpace: "nowrap" }}>{o}</span>])} keys={EXCEPTIONS.map(([a]) => `exc:${a}`)} editCol={2} />
   </>);
 }
 
@@ -1118,11 +1139,11 @@ export function WorkflowTab({ t }) {
     <H2 t={t} sub="The whole process as the business reads it: what happens from the day's posting to the client's inbox, who does what, and what happens when a delivery fails.">End-to-end business flow</H2>
     <BusinessFlowFig t={t} />
     <H2 t={t}>Actors and systems</H2>
-    <Tbl t={t} head={["Actor · system", "Role", ""]} rows={ACTORS.map(([a, b, m]) => [a, b, <Chip m={m} />])} />
+    <Tbl t={t} head={["Actor · system", "Role", ""]} rows={ACTORS.map(([a, b, m]) => [a, b, <Chip m={m} />])} keys={ACTORS.map(([a]) => `actor:${a}`)} />
     <H2 t={t} sub="The twelve steps the requirements document lists, and the Airflow task that performs each one.">Processing steps</H2>
-    <Tbl t={t} head={["Step", "Action", "Output", "DAG task"]} rows={STEPS.map(([n, a, o, k]) => [n, a, o, <span style={{ ...mono, fontSize: 11.5 }}>{k}</span>])} />
+    <Tbl t={t} head={["Step", "Action", "Output", "DAG task"]} rows={STEPS.map(([n, a, o, k]) => [n, a, o, <span style={{ ...mono, fontSize: 11.5 }}>{k}</span>])} keys={STEPS.map(([n]) => `step:${n}`)} />
     <H2 t={t} sub="Processing, Sent, Failed. The bounce check adds the one transition the document draws from Sent to Failed.">Status lifecycle</H2>
-    <Tbl t={t} head={["From", "To", "When", "Task"]} rows={LIFECYCLE.map(([a, b, c, d]) => [a, b, c, <span style={{ ...mono, fontSize: 11.5 }}>{d}</span>])} />
+    <Tbl t={t} head={["From", "To", "When", "Task"]} rows={LIFECYCLE.map(([a, b, c, d]) => [a, b, c, <span style={{ ...mono, fontSize: 11.5 }}>{d}</span>])} keys={LIFECYCLE.map((_, i) => `life:${i + 1}`)} editCol={2} />
     <H2 t={t} sub="The same flow as Airflow sees it: two DAGs, every task, and the table, relay or mailbox each task reads or writes. The Design tab has the settings, the dependencies and the code.">Technical flow · the Airflow DAGs</H2>
     <TechDagFig t={t} />
     <Note t={t} c={MARK.PROPOSED.c}><b style={{ color: t.text }}>How the two pictures line up.</b> Lane one of the business flow is the sensor. Lane two is the three eligibility pods, resolve_address and write_candidates. Lane three is open_tracking and render_and_send. Lane four is publish_run_event, notify_rm_ra and, for a bounce found later, the bounce-check DAG. Nothing in the business flow happens outside a task on one of the two DAGs.</Note>
@@ -1131,14 +1152,20 @@ export function WorkflowTab({ t }) {
 export function TestsTab({ t }) {
   return (<>
     <H2 t={t} sub="The eighteen scenarios from the requirements document, with the rule on this page that decides each. They run as unit tests on the package for the rules, on the four workbooks in the proof of concept, and against the Oracle reads in SIT before any production date.">Test scenarios</H2>
-    <Tbl t={t} head={["#", "Scenario", "Expected", "Decided by"]} rows={TESTS.map(([id, sc, ex, by]) => [id, sc, ex, by])} />
+    <Tbl t={t} head={["#", "Scenario", "Expected", "Decided by"]} rows={TESTS.map(([id, sc, ex, by]) => [id, sc, ex, by])} keys={TESTS.map(([id]) => `test:${id}`)} editCol={2} />
     <Note t={t} c={MARK.PROPOSED.c}><b style={{ color: t.text }}>Three more the design adds.</b> A soft bounce that clears within the window stays Sent; a soft bounce that does not clear becomes Failed after it (G16). A non-delivery report matching no row is logged as unmatched and left in the mailbox. A run in a lower environment never reaches a real address because every recipient is rewritten.</Note>
   </>);
 }
 
-export default function PbNotifications({ t = tLight }) {
+export default function PbNotifications({ t = tLight, reviewSeed = null }) {
   const [tab, setTab] = useState("overview");
+  // The review layer: every tab's tables and cards read it through the
+  // context; the Review tab lists it. reviewSeed lets a test or a parent
+  // hand in a state instead of loading one.
+  const rv = useReviewState(reviewSeed);
+  const nOpen = openQuestions(rv.review).length, nEdits = Object.keys(rv.review.edits || {}).length;
   return (
+    <ReviewCtx.Provider value={{ ...rv, t }}>
     <div style={{ padding: "20px 24px 60px", maxWidth: 1260 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
         <div style={{ fontSize: 22, fontWeight: 500, color: t.text }}>PB Notifications</div>
@@ -1148,11 +1175,17 @@ export default function PbNotifications({ t = tLight }) {
         The Client Portal e-mail notification utility for Statements, Trade Confirms, 1099s and K-1s, designed as the first BBH pipeline on the Integration Hub framework.
         Not an SEI interface. The requirement as the business wrote it, the four source extracts reviewed against it, the end-to-end flow, the design, the data model, the e-mail content, the test scenarios and every gap still open.
       </div>
+      <div style={{ fontSize: 12, color: t.sub, margin: "-6px 0 12px", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: .5, borderRadius: 999, padding: "2px 9px", background: rv.live ? "#e6f4ea" : "#fdf2e3", color: rv.live ? "#159943" : "#8c6a1f" }}>{rv.live ? "REVIEW · SHARED" : rv.loaded ? "REVIEW · LOCAL ONLY" : "REVIEW · LOADING"}</span>
+        <span>Open any item's pencil to propose an edit, ask a question or leave a comment.</span>
+        <span style={{ color: nOpen ? "#c96a12" : t.textMuted, fontWeight: nOpen ? 700 : 400 }}>{nOpen} open question{nOpen === 1 ? "" : "s"}</span>
+        <span style={{ color: t.textMuted }}>· {nEdits} edited item{nEdits === 1 ? "" : "s"}</span>
+      </div>
       <div style={{ display: "flex", gap: 0, marginBottom: 16, flexWrap: "wrap" }}>
         {TABS.map(([k, l], i) => (
           <button key={k} onClick={() => setTab(k)} aria-pressed={tab === k} style={{ font: "inherit", fontSize: 11.5, fontWeight: 600, padding: "6px 13px", cursor: "pointer",
             border: `1px solid ${tab === k ? t.accent : t.border}`, borderRadius: i === 0 ? "4px 0 0 4px" : i === TABS.length - 1 ? "0 4px 4px 0" : 0,
-            background: tab === k ? t.accent : t.panel, color: tab === k ? "#fff" : t.text }}>{l}</button>))}
+            background: tab === k ? t.accent : t.panel, color: tab === k ? "#fff" : t.text }}>{l}{k === "review" && nOpen ? ` · ${nOpen}` : ""}</button>))}
       </div>
       {tab === "overview" && <OverviewTab t={t} />}
       {tab === "flow" && <WorkflowTab t={t} />}
@@ -1164,5 +1197,7 @@ export default function PbNotifications({ t = tLight }) {
       {tab === "tests" && <TestsTab t={t} />}
       {tab === "gaps" && <GapsTab t={t} />}
       {tab === "exc" && <ExceptionsTab t={t} />}
-    </div>);
+      {tab === "review" && <ReviewTab />}
+    </div>
+    </ReviewCtx.Provider>);
 }

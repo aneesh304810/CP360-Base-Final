@@ -9,6 +9,8 @@ import { tLight, tDark } from "../src/bbhTheme.js";
 import PbNotifications, { TABS, MARK, REQUIREMENTS, TYPES, GRID, TRACKING_FIELDS, STATUSES, FLOW, MODES, MODEL, ORCHESTRATION, BOUNCE, HLD_FLOWS, REPO_LAYOUT, DAG_CODE, BOUNCE_DAG_CODE, POD_HELPER, SOURCES, CONTENT, GAPS, EXCEPTIONS,
   ACTORS, BR_TRACE, SOURCE_TABLES, STEPS, LIFECYCLE, TESTS, OPEN_ITEMS,
   OverviewTab, WorkflowTab, RequirementsTab, DesignTab, ModelTab, SourcesTab, ContentTab, TestsTab, GapsTab, ExceptionsTab } from "../src/PbNotifications.jsx";
+import { ReviewCtx, ReviewTab, ReviewMark, ReviewPanel, sectionOf, idOf } from "../src/PbReview.jsx";
+import { applyLocal, emptyReview, textFor, notesFor, openQuestions, keyFor } from "../src/pbnotifyReviewApi.js";
 
 let bad = 0;
 const ok = (c, m, got) => { console.log(`${c ? "ok  " : "FAIL"} ${m}${c ? "" : `  -> ${String(got).slice(0, 220)}`}`); if (!c) bad++; };
@@ -16,7 +18,7 @@ const SRC = fs.existsSync("src/PbNotifications.jsx") ? "src" : path.join("ui", "
 const src = fs.readFileSync(path.join(SRC, "PbNotifications.jsx"), "utf8");
 
 console.log("-- the data");
-ok(TABS.length === 10 && TABS[0][0] === "overview" && TABS[1][0] === "flow" && TABS[7][0] === "tests" && Object.keys(MARK).join(",") === "REQUIRED,PROPOSED,OPEN", "ten tabs, the end-to-end flow second and the test scenarios before the gaps, three marks");
+ok(TABS.length === 11 && TABS[0][0] === "overview" && TABS[1][0] === "flow" && TABS[7][0] === "tests" && TABS[10][0] === "review" && Object.keys(MARK).join(",") === "REQUIRED,PROPOSED,OPEN", "eleven tabs, the end-to-end flow second, the test scenarios before the gaps, the review last, three marks");
 ok(REQUIREMENTS.length === 10 && REQUIREMENTS.every((r) => MARK[r[2]]) && REQUIREMENTS.find((r) => r[0] === "R6")[2] === "OPEN" && /Microsoft 365/.test(REQUIREMENTS[9][1]), "ten requirements, the send time open, bounce detection through the mail broker last");
 ok(TYPES.map((x) => x.key).join(",") === "STATEMENT_CONFIRM,1099,K1" && TYPES.filter((x) => x.always).length === 2 && /ESTIMATE_IND = N/.test(TYPES[1].posted) && /prior calendar year/.test(TYPES[2].posted),
    "three notification types; the tax types always send, final documents only, K-1 prior year");
@@ -96,6 +98,48 @@ ok(/PB Notifications/.test(shell) && /PBCP-5587/.test(shell) && /Not an SEI inte
 ok(!/@[a-z0-9-]+\.[a-z]{2,}/i.test(all) && !/testbbh|\.bbh\.com|https?:\/\//.test(src) && !/\b\d{7,}\b/.test(all.replace(/1-800-285-5093/g, "")),
    "no e-mail address, hostname, URL or long identifier on the page — the QA address and every user id stay out");
 
+console.log("-- the review layer");
+const NOW = new Date("2026-10-25T10:00:00Z");
+let rv = emptyReview();
+let threw = null; try { applyLocal(rv, { op: "note.add", itemKey: "gap:G7", kind: "question", body: "Which ids?" }, NOW); } catch (e) { threw = String(e.message); }
+ok(/name required/.test(threw || ""), "a note with no name is refused locally, as the server refuses it", threw);
+rv = applyLocal(rv, { op: "note.add", itemKey: "gap:G7", section: "gap", kind: "question", body: "Which Loan Statement ids?", actor: "Jigar T" }, NOW);
+rv = applyLocal(rv, { op: "note.add", itemKey: "test:T05", section: "test", kind: "comment", body: "Add a case with two statements accounts", actor: "Olimpio D" }, NOW);
+rv = applyLocal(rv, { op: "edit", itemKey: "req:R6", section: "req", body: "Send at 08:30 a.m. ET after posting.", seen: REQUIREMENTS[5][1], actor: "John G" }, NOW);
+const q = rv.notes[0];
+rv = applyLocal(rv, { op: "note.add", itemKey: "gap:G7", section: "gap", kind: "answer", body: "SUNGARD1 and the loan ids to come", parentId: q.id, actor: "Jay S" }, NOW);
+ok(rv.notes.length === 3 && rv.notes[0].status === "answered" && rv.notes[0].statusBy === "Jay S" && rv.notes[2].parentId === q.id, "an answer moves the question to answered and hangs under it", rv.notes);
+ok(openQuestions(rv).length === 0 && notesFor(rv, "gap:G7").length === 2 && textFor(rv, "req:R6", "orig").text.startsWith("Send at 08:30") && textFor(rv, "gap:G1", "orig").text === "orig",
+   "open questions, the notes of one item and the edited text come from the state; an untouched item keeps the shipped text");
+rv = applyLocal(rv, { op: "note.status", noteId: q.id, status: "open", actor: "Jigar T" }, NOW);
+const reverted = applyLocal(rv, { op: "edit.revert", itemKey: "req:R6", seen: "Send at 08:30 a.m. ET after posting.", actor: "John G" }, NOW);
+ok(openQuestions(rv).length === 1 && !reverted.edits["req:R6"] && reverted.editLog.length === 2 && rv.editLog.length === 1, "reopened; a revert restores the shipped text and keeps the history; the state is never mutated in place");
+threw = null; try { applyLocal(rv, { op: "note.status", noteId: q.id, status: "done", actor: "x" }, NOW); } catch (e) { threw = String(e.message); }
+ok(/status must be one of/.test(threw || "") && rv.notes[0].at === "2026-10-25 10:00", "an unknown status is refused; the stamp is the minute", threw);
+ok(keyFor("G7") === "gap:G7" && keyFor("t05") === "test:T05" && keyFor("R3") === "req:R3" && keyFor("BR-02") === "br:BR-02" && keyFor("step 5") === "step:5" && keyFor("") === "general" && keyFor("the whole thing") === "general:the whole thing" && keyFor("task:render_and_send") === "task:render_and_send",
+   "an item id typed on the Review tab becomes the item key");
+ok(sectionOf("gap:G7") === "Gap" && idOf("gap:G7") === "G7" && sectionOf("tbl:X") === "Source table" && sectionOf("general") === "General", "keys read back as a section and an id");
+const ctx = (over) => ({ review: rv, live: false, loaded: true, who: { verified: false, source: "none" }, name: "Mohammed Khan", actor: "Mohammed Khan", act: async () => true, openKey: null, setOpenKey: () => {}, error: null, setError: () => {}, t: tLight, ...over });
+const reqWith = renderToStaticMarkup(<ReviewCtx.Provider value={ctx()}><RequirementsTab t={tLight} /></ReviewCtx.Provider>);
+const reqWithout = renderToStaticMarkup(<RequirementsTab t={tLight} />);
+ok(/Send at 08:30 a.m. ET after posting\./.test(reqWith) && />edited</.test(reqWith) && !/Send at 08:30/.test(reqWithout) && !/aria-label="review /.test(reqWithout),
+   "with a review state the edited requirement replaces the shipped text and is marked; without one the tab is the plain design");
+ok((reqWith.match(/aria-label="review req:R/g) || []).length === 10 && (reqWith.match(/aria-label="review br:BR-/g) || []).length === 15 && /<th[^>]*>Review<\/th>/.test(reqWith), "every requirement and every BR row carries its pencil under a Review column");
+const gapsOpen = renderToStaticMarkup(<ReviewCtx.Provider value={ctx({ openKey: "gap:G7" })}><GapsTab t={tLight} /></ReviewCtx.Provider>);
+ok(/aria-label="review gap:G7"[^>]*>✎ 1 open</.test(gapsOpen) && /aria-label="review of gap:G7"/.test(gapsOpen) && /Which Loan Statement ids\?/.test(gapsOpen) && /SUNGARD1 and the loan ids to come/.test(gapsOpen) && /Propose an edit/.test(gapsOpen) && /Ask a question/.test(gapsOpen) && /self-declared/.test(gapsOpen),
+   "the open panel under G7: its open question, the answer under it, the edit and ask controls, and the self-declared notice");
+const testsTab = renderToStaticMarkup(<ReviewCtx.Provider value={ctx()}><TestsTab t={tLight} /></ReviewCtx.Provider>);
+ok(/aria-label="review test:T05"[^>]*>✎ 1</.test(testsTab) && (testsTab.match(/aria-label="review test:T/g) || []).length === 18, "a comment shows as a count on T05; all eighteen scenarios carry a pencil");
+const cards = [ModelTab, SourcesTab, ContentTab].map((C) => renderToStaticMarkup(<ReviewCtx.Provider value={ctx()}><C t={tLight} /></ReviewCtx.Provider>)).join("");
+ok((cards.match(/aria-label="review model:PB_NOTIFICATION_/g) || []).length === 3 && (cards.match(/aria-label="review src:/g) || []).length === 4 && (cards.match(/aria-label="review tpl:/g) || []).length === 5 && (cards.match(/aria-label="review tbl:/g) || []).length === 9,
+   "the three tables, the four extracts, the five templates and the nine source tables carry pencils on their cards and rows");
+const reviewTab = renderToStaticMarkup(<ReviewCtx.Provider value={ctx()}><ReviewTab /></ReviewCtx.Provider>);
+ok(/open questions/.test(reviewTab) && /Which Loan Statement ids\?/.test(reviewTab) && /Local only/.test(reviewTab) && /Edited items/.test(reviewTab) && /Send at 08:30/.test(reviewTab) && /line-through/.test(reviewTab) && /Mohammed Khan/.test(reviewTab),
+   "the Review tab: the counts, the open question, local-only said out loud, the edited item with the shipped text struck through, the reviewer's name");
+const shellRv = renderToStaticMarkup(<PbNotifications t={tLight} reviewSeed={{ review: rv, live: true, who: { verified: true, lanId: "lan.user", source: "proxy" }, name: "" }} />);
+ok(/REVIEW · SHARED/.test(shellRv) && /1 open question</.test(shellRv) && /1 edited item</.test(shellRv) && /Review · 1</.test(shellRv) && /aria-label="review hld:1"/.test(shellRv), "the shell: shared, the open-question and edit counts in the header and on the tab, pencils on the overview's flows");
+ok(!/@[a-z0-9-]+\.[a-z]{2,}/i.test(reviewTab + gapsOpen) && !/<[a-z]/.test(rv.notes.map((n) => n.body).join("")), "nothing in the review markup is an address, and bodies render as text");
+
 console.log("-- wiring");
 const APP = fs.readFileSync(path.join(SRC, "App.jsx"), "utf8"), NAV = fs.readFileSync(path.join(SRC, "AppShell.jsx"), "utf8");
 const SEC = fs.readFileSync(path.join(SRC, "..", "..", "sql", "64_security.sql"), "utf8");
@@ -103,6 +147,10 @@ ok(/import PbNotifications from "\.\/PbNotifications\.jsx"/.test(APP) && /pbnoti
 const groupOf = (key) => { const i = NAV.indexOf(`['${key}'`); const m = [...NAV.slice(0, i).matchAll(/group: '([^']+)'/g)]; return m.length ? m[m.length - 1][1] : null; };
 ok(groupOf("pbnotify") === "Architecture", "it sits under Architecture with System Design and DevOps 360", groupOf("pbnotify"));
 ok(/'pbnotify','PB Notifications','Architecture'/.test(SEC), "the security module is seeded under Architecture");
+const MAIN = fs.readFileSync(path.join(SRC, "..", "..", "api", "app", "main.py"), "utf8");
+ok(/"routers_pbnotify_review"/.test(MAIN) && fs.existsSync(path.join(SRC, "..", "..", "sql", "84_pbnotify_review.sql")), "the review router is mounted and its tables have a SQL file");
+const RAPI = fs.readFileSync(path.join(SRC, "pbnotifyReviewApi.js"), "utf8");
+ok(/\/pbnotify\/review/.test(RAPI) && !/from ["']\.\/api\.js["']/.test(RAPI) && !/api\.js/.test(fs.readFileSync(path.join(SRC, "PbReview.jsx"), "utf8")), "the review client is self-contained: api.js untouched");
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\npbnotify assertions pass");
 if (bad) process.exit(1);
