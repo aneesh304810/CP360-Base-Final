@@ -160,7 +160,7 @@ def fake_query(sql, params=None):
 
 R.query = fake_query
 sm = R.summary()
-ok(sm["loaded"] and sm["totals"]["evidence"] == 5 and sm["totals"]["sourceRows"] == 3 and sm["totals"]["unresolvedLanes"] == 1 and sm["latest"]["batchId"] == batch["batch_id"] and len(sm["latest"]["checks"]) > 5,
+ok(sm["loaded"] and sm["reason"] is None and sm["totals"]["evidence"] == 5 and sm["totals"]["sourceRows"] == 3 and sm["totals"]["unresolvedLanes"] == 1 and sm["latest"]["batchId"] == batch["batch_id"] and len(sm["latest"]["checks"]) > 5,
    "summary: the totals, the source rows, the unresolved count and the latest batch with its checks", sm["totals"])
 ok(any(x["key"] == "AddVantage / PB to SEI" and x["n"] == 3 for x in sm["byLane"]) and any(x["key"] == "Historical source to SEI" and x["unresolved"] == 1 for x in sm["byLane"]), "by lane, with the unresolved count on the broader lane", sm["byLane"])
 e = R.evidence(lane="AddVantage / PB to SEI")
@@ -174,7 +174,7 @@ ok(len(rw["cells"]) == 3 and [c["original_source_column_number"] for c in rw["ce
    "the row route reassembles every cell of the source row in column order, values whole", len(rw["cells"]))
 ok(len(R.lanes()["lanes"]) == 3 and len(R.artifacts()["artifacts"]) == 4 and len(R.dictionary()["columns"]) == 2 and len(R.batches()["batches"]) == 1, "lanes, artifacts, dictionary and batches read back")
 R.query = lambda sql, params=None: (_ for _ in ()).throw(Exception("ORA-00942"))
-ok(R.summary()["loaded"] is False and R.evidence()["total"] == 0 and R.row(workbook="x", sheet="y", row=1)["cells"] == [], "a warehouse without sql/86 gets empty shapes, never a 500")
+ok(R.summary()["loaded"] is False and R.summary()["reason"] == "no_table" and R.evidence()["total"] == 0 and R.row(workbook="x", sheet="y", row=1)["cells"] == [], "a warehouse without sql/86 gets empty shapes, never a 500")
 
 print("-- wiring")
 main = open(os.path.join(os.path.dirname(__file__), "..", "app", "main.py")).read()

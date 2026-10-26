@@ -170,6 +170,8 @@ class HistMigrationConnector(BaseConnector):
                 rows = [list(r) for r in ws.iter_rows(values_only=True)]
                 n = self._take(b, kind, rows)
                 b["sheets"].append({"workbook": os.path.basename(path), "sheet": ws.title, "kind": kind, "rows": n})
+            if not hit:
+                log.warning("hist_migration: %s has no HIST_* sheet; its sheets are: %s", os.path.basename(path), ", ".join(wb.sheetnames))
             if hit:
                 b["files"].append(os.path.basename(path))
                 if b["source_file"] is None:

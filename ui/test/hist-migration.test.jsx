@@ -40,7 +40,10 @@ ok(/214,622/.test(ov) && /15,880/.test(ov) && /unresolved lanes/.test(ov) && /AD
 const ev = renderToStaticMarkup(<HistMigration t={tLight} initial={{ sub: "Evidence", summary, lanes, artifacts, dictionary, evidence, batches }} />);
 ok(/Subfirm Logic/.test(ev) && /unresolved/.test(ev) && /6200 characters; open the row/.test(ev) && /2 rows · page 1 of 1/.test(ev) && /search evidence/.test(ev), "evidence: the rows, the unresolved chip, the truncation note, the paging and the search");
 const empty = renderToStaticMarkup(<HistMigration t={tLight} initial={{ sub: "Overview", summary: emptySummary(), lanes: [], artifacts: [], dictionary: [], evidence: { evidence: [], total: 0 }, batches: [] }} />);
-ok(/Nothing loaded yet/.test(empty) && /ingestion\.run sei_crosswalk/.test(empty) && /sql\/86/.test(empty) && !/NaN/.test(empty), "the empty state says which step to run");
+ok(/Nothing loaded yet/.test(empty) && /API did not answer/.test(empty) && /sql\/86/.test(empty) && !/NaN/.test(empty), "the empty state with no answer says to restart the API");
+const noTable = renderToStaticMarkup(<HistMigration t={tLight} initial={{ sub: "Overview", summary: { ...emptySummary(), reason: "no_table" }, lanes: [], artifacts: [], dictionary: [], evidence: { evidence: [], total: 0 }, batches: [] }} />);
+const noRows = renderToStaticMarkup(<HistMigration t={tLight} initial={{ sub: "Overview", summary: { ...emptySummary(), reason: "no_rows" }, lanes: [], artifacts: [], dictionary: [], evidence: { evidence: [], total: 0 }, batches: [] }} />);
+ok(/apply <span[^>]*>sql\/86_hist_migration\.sql/.test(noTable) && /tables exist and are empty/.test(noRows) && /has no HIST_\* sheet/.test(noRows), "the empty state names the cause: tables missing, or tables empty with the sheet-name hint");
 const dict = renderToStaticMarkup(<HistMigration t={tLight} initial={{ sub: "Dictionary", summary, lanes, artifacts, dictionary, evidence, batches }} />);
 ok(HM_RULES.length === 11 && HM_RULES[0][0] === "CP360-HM-001" && HM_RULES[10][0] === "CP360-HM-011" && /CP360-HM-010/.test(dict) && /Evidence Value/.test(dict), "the eleven rules and the dictionary are on the Dictionary sub-tab");
 const scrubbed = (ov + ev + dict).replace(/DCONCUS10_20210727\.docx/g, "");

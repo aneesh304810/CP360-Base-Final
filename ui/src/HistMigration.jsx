@@ -61,8 +61,13 @@ function Overview({ t, sum, lanes, artifacts, onFilter }) {
       <Tile t={t} n={tot.dictionary || 0} label="dictionary columns" />
       <Tile t={t} n={tot.unresolvedLanes || 0} label="unresolved lanes" sub="CP360-HM-007" color={tot.unresolvedLanes ? "#c96a12" : undefined} />
     </div>
-    {!sum.loaded && <div style={{ fontSize: 12.5, color: t.sub, margin: "12px 0", maxWidth: "80ch", lineHeight: 1.6 }}>
-      Nothing loaded yet. The four HIST_* sheets ride the SEI crosswalk workbook named by CP_SEI_XLSX: run <span style={mono}>python -m ingestion.run sei_crosswalk</span> (the catalog, then these sheets) or <span style={mono}>python -m ingestion.run hist_migration</span> (these sheets alone), after applying sql/86.</div>}
+    {!sum.loaded && <div style={{ fontSize: 12.5, color: t.sub, margin: "12px 0", maxWidth: "80ch", lineHeight: 1.6, border: `1px solid ${t.border}`, borderLeft: "3px solid #c96a12", borderRadius: 6, padding: "10px 14px", background: t.panel }}>
+      <b style={{ color: t.text }}>Nothing loaded yet.</b>{" "}
+      {sum.reason === "no_table" ? <>The tables are not in the warehouse: apply <span style={mono}>sql/86_hist_migration.sql</span>, then run the step.</>
+        : sum.reason === "no_rows" ? <>The tables exist and are empty: run <span style={mono}>python -m ingestion.run sei_crosswalk</span> (the catalog, then the HIST_* sheets of the same CP_SEI_XLSX workbook) or <span style={mono}>python -m ingestion.run hist_migration</span>. If the log says "has no HIST_* sheet", the sheet names in the workbook do not match HIST_MIGRATION_LANES, HIST_SOURCE_REGISTER, HIST_MAPPING_EVIDENCE and HIST_HEADER_DICTIONARY; the log lists the names it found.</>
+        : sum.reason && sum.reason.startsWith("error") ? <>The warehouse answered with an error: <span style={mono}>{sum.reason.slice(7)}</span>.</>
+        : <>The API did not answer: restart it so the new route is mounted, then reload. The four HIST_* sheets ride the SEI crosswalk workbook named by CP_SEI_XLSX; run <span style={mono}>python -m ingestion.run sei_crosswalk</span> after applying sql/86.</>}
+    </div>}
     <H t={t} sub="The historical migration lanes into SEI: the legacy source, what the lane is for, the evidence it rests on, and how it sits against the operational STAR to IMDS lineage.">Lanes</H>
     <Tbl t={t} head={["Lane", "Source system", "Target", "Purpose", "Primary evidence", "Reference artifacts", "Domain", "Relationship to operational lineage", "Status"]}
       rows={(lanes || []).map((l) => [<span style={mono}>{l.historical_lane_id}</span>, l.historical_source_system, l.target_system, l.migration_purpose, l.primary_mapping_evidence, l.reference_artifacts, l.data_domain, l.relationship_to_operational_lineage, l.status])} />
@@ -134,7 +139,7 @@ function Evidence({ t, sum, filter, setFilter, initial }) {
               <td style={{ padding: "5px 10px 5px 0", verticalAlign: "top", borderBottom: `1px solid ${t.bg}`, color: t.sub }}>{r.historical_migration_domain}</td>
               <td style={{ padding: "5px 10px 5px 0", verticalAlign: "top", borderBottom: `1px solid ${t.bg}`, color: t.sub }}>{r.evidence_category}</td>
               <td style={{ padding: "5px 10px 5px 0", verticalAlign: "top", borderBottom: `1px solid ${t.bg}`, color: t.text, fontWeight: 600 }}>{r.evidence_attribute}</td>
-              <td style={{ padding: "5px 10px 5px 0", verticalAlign: "top", borderBottom: `1px solid ${t.bg}`, color: t.text, whiteSpace: "pre-wrap", maxWidth: 520, ...mono, fontSize: 11 }}>{r.evidence_value}{r.truncated && <span style={{ color: t.textMuted }}> … ({r.evidence_length} characters; open the row)</span>}</td>
+              <td style={{ padding: "5px 10px 5px 0", verticalAlign: "top", borderBottom: `1px solid ${t.bg}`, color: t.text, whiteSpace: "pre-wrap", overflowWrap: "anywhere", maxWidth: 520, ...mono, fontSize: 11 }}>{r.evidence_value}{r.truncated && <span style={{ color: t.textMuted }}> … ({r.evidence_length} characters; open the row)</span>}</td>
               <td style={{ padding: "5px 10px 5px 0", verticalAlign: "top", borderBottom: `1px solid ${t.bg}`, color: t.textMuted, ...mono, fontSize: 10.5 }}>{r.original_source_column} · {r.original_source_column_number}</td>
               <td style={{ padding: "5px 0", verticalAlign: "top", borderBottom: `1px solid ${t.bg}`, color: t.textMuted, fontSize: 10.5 }}>{r.evidence_length}</td>
             </tr>
@@ -143,7 +148,7 @@ function Evidence({ t, sum, filter, setFilter, initial }) {
                 <div role="region" aria-label={`source row ${key}`} style={{ border: `1px solid ${t.border}`, borderLeft: `3px solid ${t.accent}`, borderRadius: 6, background: t.bg, padding: "10px 14px" }}>
                   <div style={{ fontSize: 12, color: t.text, fontWeight: 700 }}>Source row {r.source_mapping_row} of {r.source_mapping_sheet} in {r.source_mapping_workbook}</div>
                   <div style={{ fontSize: 11.5, color: t.sub, marginBottom: 6 }}>{rowData.lane} · {rowData.domain} · {rowData.system}{rowData.group ? ` · ${rowData.group}` : ""} · {(rowData.cells || []).length} populated cells, in the workbook's column order</div>
-                  <Tbl t={t} small head={["#", "Original column", "Attribute", "Category", "Value"]} rows={(rowData.cells || []).map((c) => [c.original_source_column_number, <span style={mono}>{c.original_source_column}</span>, c.evidence_attribute, c.evidence_category, <span style={{ whiteSpace: "pre-wrap", ...mono, fontSize: 11 }}>{c.evidence_value}</span>])} />
+                  <Tbl t={t} small head={["#", "Original column", "Attribute", "Category", "Value"]} rows={(rowData.cells || []).map((c) => [c.original_source_column_number, <span style={mono}>{c.original_source_column}</span>, c.evidence_attribute, c.evidence_category, <span style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", ...mono, fontSize: 11 }}>{c.evidence_value}</span>])} />
                 </div>
               </td></tr>)}
           </React.Fragment>); })}</tbody>

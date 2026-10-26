@@ -63,6 +63,13 @@ def summary():
     def n(sql):
         r = _safe(sql)
         return int((r[0] or {}).get("n", 0) or 0) if r else 0
+    # Why the tab is empty, when it is: the tables are not there (sql/86 not
+    # applied), or they are there and nothing has been loaded.
+    reason = None
+    try:
+        query("SELECT COUNT(*) AS n FROM cp_hist_ingest_batch")
+    except Exception as e:                                   # noqa: BLE001
+        reason = "no_table" if "ORA-00942" in str(e) else f"error: {str(e)[:120]}"
     latest = _safe("SELECT batch_id, source_file, source_hash, lanes_n, artifacts_n, evidence_n, dictionary_n, skipped_n, checks, loaded_at "
                    "FROM cp_hist_ingest_batch ORDER BY loaded_at DESC FETCH FIRST 1 ROWS ONLY")
     by = lambda col, lim=50: [{"key": r.get("k") or "(blank)", "n": int(r.get("n") or 0), "unresolved": int(r.get("u") or 0)}   # noqa: E731
@@ -71,7 +78,10 @@ def summary():
     sheets = [{"workbook": r.get("w"), "sheet": r.get("s"), "n": int(r.get("n") or 0), "rows": int(r.get("r") or 0)}
               for r in _safe("SELECT source_mapping_workbook AS w, source_mapping_sheet AS s, COUNT(*) AS n, COUNT(DISTINCT source_mapping_row) AS r "
                              "FROM cp_hist_mapping_evidence GROUP BY source_mapping_workbook, source_mapping_sheet ORDER BY COUNT(*) DESC")]
-    return {"loaded": n("SELECT COUNT(*) AS n FROM cp_hist_mapping_evidence") > 0,
+    loaded = n("SELECT COUNT(*) AS n FROM cp_hist_mapping_evidence") > 0
+    if reason is None and not loaded:
+        reason = "no_rows"
+    return {"loaded": loaded, "reason": None if loaded else reason,
             "totals": {"lanes": n("SELECT COUNT(*) AS n FROM cp_hist_migration_lane"),
                        "artifacts": n("SELECT COUNT(*) AS n FROM cp_hist_source_artifact"),
                        "evidence": n("SELECT COUNT(*) AS n FROM cp_hist_mapping_evidence"),
