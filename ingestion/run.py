@@ -302,6 +302,12 @@ def _run_step(step, conn, loader, resolver) -> None:
         log.info("sei_crosswalk: merged %s rows", n)
         # The same workbook carries the HIST_* historical migration sheets
         # (sql/86); load them in the same run so one step keeps both current.
+        # CP_HIST_WITH_CROSSWALK=0 keeps them to their own step, hist_migration
+        # (local/load-hist.ps1), when the 214k-row evidence load should not
+        # ride every crosswalk run.
+        if os.environ.get("CP_HIST_WITH_CROSSWALK", "1").strip() in ("0", "false", "no"):
+            log.info("hist_migration: skipped here (CP_HIST_WITH_CROSSWALK=0); run the hist_migration step")
+            return
         from .hist_migration_conn import HistMigrationConnector
         h = HistMigrationConnector.from_env()
         hb = h.parse()

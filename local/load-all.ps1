@@ -122,6 +122,7 @@ $env:CP_SEI_LINEAGE_MODE = "load"
 # The same workbook carries the HIST_* historical migration sheets (sql/86);
 # `sei_crosswalk` loads them after the catalog, `hist_migration` loads them alone.
 # $env:CP_HIST_MIGRATION_FORCE = "1"   # reload the sheets even when the file is unchanged
+# $env:CP_HIST_WITH_CROSSWALK  = "0"   # keep them out of sei_crosswalk; load with .\local\load-hist.ps1
 
 # ---- ENVIRONMENT 360 -------------------------------------------------
 $env:CP_ENV_WORKBOOK = "$Artifacts\INFRAINVENTORY\cp_env_infrastructure_v3.csv"

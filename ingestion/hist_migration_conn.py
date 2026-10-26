@@ -33,6 +33,14 @@ hash equals the last batch's is skipped unless CP_HIST_MIGRATION_FORCE=1.
 Run it:
     python -m ingestion.run sei_crosswalk      # the catalog, then these sheets
     python -m ingestion.run hist_migration     # these sheets only
+    .\local\load-hist.ps1 [-Force] [-Xlsx path] # the same, with the environment set up
+
+Env:
+    CP_SEI_XLSX                the crosswalk workbook (load-all.ps1 sets it)
+    CP_HIST_MIGRATION_XLSX     a different workbook for these sheets
+    CP_HIST_MIGRATION_DIR      a folder to scan instead of one file
+    CP_HIST_MIGRATION_FORCE    "1" to reload an unchanged workbook
+    CP_HIST_WITH_CROSSWALK     "0" to keep the sheets out of the sei_crosswalk step
 """
 from __future__ import annotations
 
