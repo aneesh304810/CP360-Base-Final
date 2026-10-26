@@ -47,8 +47,8 @@ const scrubbed = (ov + ev + dict).replace(/DCONCUS10_20210727\.docx/g, "");
 ok(!/@[a-z0-9-]+\.[a-z]{2,}/i.test(scrubbed) && !/\b\d{7,}\b/.test(scrubbed), "no address or long identifier on the tab (the deconversion spec's dated file name aside)");
 
 console.log("-- wiring");
-const page = renderToStaticMarkup(<DataAnalysis t={tLight} initial={{ tab: "Historical migration", overview: { totals: { fields: 0 }, by_file: [] }, status: { fields: 0 }, hist: { sub: "Overview", summary, lanes, artifacts, dictionary, evidence, batches } }} />);
-ok(/Historical migration/.test(page) && /aria-selected="true"/.test(page) && /214,622/.test(page), "Data Analysis carries the tab and renders it");
+const page = renderToStaticMarkup(<DataAnalysis t={tLight} initial={{ tab: "Historical data migration", overview: { totals: { fields: 0 }, by_file: [] }, status: { fields: 0 }, hist: { sub: "Overview", summary, lanes, artifacts, dictionary, evidence, batches } }} />);
+ok(/Historical data migration/.test(page) && /aria-selected="true"/.test(page) && /214,622/.test(page), "Data Analysis carries the tab and renders it");
 const SRC = fs.existsSync("src/HistMigration.jsx") ? "src" : path.join("ui", "src");
 const api = fs.readFileSync(path.join(SRC, "histMigrationApi.js"), "utf8");
 ok(/\/hist-migration/.test(api) && !/from ["']\.\/api\.js["']/.test(api) && !/api\.js/.test(fs.readFileSync(path.join(SRC, "HistMigration.jsx"), "utf8")), "the client is self-contained: api.js untouched");
