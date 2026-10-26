@@ -74,6 +74,7 @@ for _mod in (
         "routers_reference_legacy",
         "routers_advantage_ud",
         "routers_sei_migration",
+        "routers_hist_migration",
 
         # Additional routers
         "routers_recon360",

@@ -119,6 +119,9 @@ $env:CP_SEI_XLSX         = "$Artifacts\LEGACY_LINEAGE\STAR_IMDS_SEI_Lineage_Cata
 $env:CP_SEI_DATA_SOURCE  = "IMDS"
 $env:CP_SEI_LINEAGE_MODE = "load"
 # $env:CP_SEI_RELOAD     = "1"   # replace the lane instead of merging into it
+# The same workbook carries the HIST_* historical migration sheets (sql/86);
+# `sei_crosswalk` loads them after the catalog, `hist_migration` loads them alone.
+# $env:CP_HIST_MIGRATION_FORCE = "1"   # reload the sheets even when the file is unchanged
 
 # ---- ENVIRONMENT 360 -------------------------------------------------
 $env:CP_ENV_WORKBOOK = "$Artifacts\INFRAINVENTORY\cp_env_infrastructure_v3.csv"

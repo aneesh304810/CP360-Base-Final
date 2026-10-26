@@ -41,6 +41,7 @@ STEPS = [
                                # _workbook / _trp run by name only, so a full run loads each once.
     "sei_crosswalk",     # IMDS/STAR/UAF/SEI crosswalk workbook — lanes, mapping, verdicts
     "sei_migration",     # Data Analysis: SEI's merged source-file catalog in CP_SEI_MIGRATION_DIR (sql/78)
+    "hist_migration",    # Data Analysis: the HIST_* historical migration sheets of the same workbook (sql/86)
     "event360",          # Event 360: the SEI event specification workbook
     "sdc_compute",       # SDC client compute sizing: the read-back bill, per view
     "odi_repo",          # ODI 360: the ODI repository export in CP_ODI_DIR as tables — scenarios, tasks, variables, edges; sql/83
@@ -299,6 +300,16 @@ def _run_step(step, conn, loader, resolver) -> None:
         c = SeiCrosswalkConnector.from_env()
         n = c.load(loader, c.parse())
         log.info("sei_crosswalk: merged %s rows", n)
+        # The same workbook carries the HIST_* historical migration sheets
+        # (sql/86); load them in the same run so one step keeps both current.
+        from .hist_migration_conn import HistMigrationConnector
+        h = HistMigrationConnector.from_env()
+        hb = h.parse()
+        if hb["files"]:
+            m = h.load(loader, hb)
+            log.info("hist_migration: %s rows from the HIST_* sheets of %s", m, hb["source_file"])
+        else:
+            log.info("hist_migration: no HIST_* sheets in %s; nothing to load", h.where)
         return
     if step == "sei_migration":
         from .sei_migration_conn import SeiMigrationConnector
@@ -311,6 +322,21 @@ def _run_step(step, conn, loader, resolver) -> None:
             log.info("sei_migration: %s / %s: %s rows", sh["workbook"], sh["sheet"], sh["rows"])
         n = c.load(loader, b)
         log.info("sei_migration: merged %s fields", n)
+        return
+    if step == "hist_migration":
+        from .hist_migration_conn import HistMigrationConnector
+        c = HistMigrationConnector.from_env()
+        b = c.parse()
+        if not b["files"]:
+            log.warning("hist_migration: no HIST_* sheets in %s (set CP_SEI_XLSX or CP_HIST_MIGRATION_XLSX); skipped", c.where)
+            return
+        for sh in b["sheets"]:
+            log.info("hist_migration: %s / %s: %s rows", sh["workbook"], sh["sheet"], sh["rows"])
+        for ck in b["checks"]:
+            if ck["level"] != "Pass":
+                log.warning("hist_migration: %s %s: %s", ck["rule"], ck["level"], ck["detail"])
+        n = c.load(loader, b)
+        log.info("hist_migration: %s rows loaded", n)
         return
     if step == "legacy_source_file":
         from .legacy_source_file_conn import LegacySourceFileConnector

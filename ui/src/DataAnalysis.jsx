@@ -19,7 +19,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import { seiMigrationApi as api, RULE_CLASSES, STATUS_CLASSES, MANDATORY_CLASSES, SYSTEMS, TARGET_KINDS,
          ruleColor, statusColor, systemColor, buildLineage, describeRule } from "./seiMigrationApi.js";
 
-const TABS = ["Overview", "Fields", "Lineage", "Sources", "Findings", "Lookups"];
+import HistMigration from "./HistMigration.jsx";
+
+const TABS = ["Overview", "Fields", "Lineage", "Sources", "Findings", "Lookups", "Historical migration"];
 
 // ----------------------------------------------------------- small parts
 const Tile = ({ t, n, label, sub, color }) => (
@@ -519,5 +521,6 @@ export default function DataAnalysis({ t, initial }) {
       {tab === "Sources" && <Sources t={t} files={files} onSystem={(s) => toFields({ system: s })} />}
       {tab === "Findings" && <Findings t={t} files={files} onOpen={openLineage} />}
       {tab === "Lookups" && <Lookups t={t} />}
+      {tab === "Historical migration" && <HistMigration t={t} initial={initial?.hist} />}
     </div>);
 }
