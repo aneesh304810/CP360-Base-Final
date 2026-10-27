@@ -8,6 +8,7 @@
 // `initial` lets a test hand in the payloads and skip the network.
 import React, { useEffect, useState } from "react";
 import { histMigrationApi as api, emptyLineageSummary, STATUS_KINDS, STATUS_COLOR, LANE_LABEL, HL_RULES, LEVEL_COLOR } from "./histMigrationApi.js";
+import { HistLineageDiagram, HistHopChain, MappingTable } from "./HistLineageFigs.jsx";
 
 const mono = { fontFamily: "ui-monospace, monospace" };
 const Pill = ({ c, children, title }) => <span title={title} style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: .4, color: c, border: `1px solid ${c}`, borderRadius: 3, padding: "0 6px", whiteSpace: "nowrap" }}>{children}</span>;
@@ -70,6 +71,8 @@ export function HistChainFig({ t, d }) {
 function Record({ t, d }) {
   const r = d.record;
   return (<>
+    <HistLineageDiagram t={t} d={d} />
+    <HistHopChain t={t} d={d} />
     <HistChainFig t={t} d={d} />
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
       <div>
@@ -273,5 +276,32 @@ export function QcTab({ t, initial }) {
     {controls.length > 0 && <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 11.5 }}><thead><tr>{["Control", "Applies to", "Expected", "Actual", "Result", ...keys.filter((k) => !/control|applies|expected|actual|result|status/i.test(k))].map((h) => <th key={h} style={th(t)}>{h}</th>)}</tr></thead>
       <tbody>{controls.map((c) => <tr key={c.qc_id}><td style={td(t, true)}>{c.control_name}</td><td style={td(t)}>{c.applies_to}</td><td style={td(t)}>{c.expected}</td><td style={td(t)}>{c.actual}</td><td style={td(t)}><Pill c={STATUS_COLOR(c.result)}>{c.result || "—"}</Pill></td>
         {keys.filter((k) => !/control|applies|expected|actual|result|status/i.test(k)).map((k) => <td key={k} style={{ ...td(t), fontSize: 11 }}>{(c.row || {})[k]}</td>)}</tr>)}</tbody></table>}
+  </>);
+}
+
+export function MappingTab({ t, initial }) {
+  const [data, setData] = useState(initial || null);
+  const [file, setFile] = useState(initial?.file || "");
+  const [lane, setLane] = useState("");
+  const [q, setQ] = useState("");
+  const [qq, setQq] = useState("");
+  useEffect(() => { if (initial) return undefined; let on = true; api.lineageMapping({ file, lane, q: qq, limit: 500 }).then((d) => { if (on) setData(d); }); return () => { on = false; }; }, [file, lane, qq]); // eslint-disable-line react-hooks/exhaustive-deps
+  const d = data || { mapping: [], files: [] };
+  const rows = d.mapping || [];
+  const matched = rows.filter((r) => r.dwh_target_column).length, noRule = rows.filter((r) => !r.transformation_rule).length;
+  return (<>
+    <H t={t} sub="Column-level lineage mapping, one row per path: the historical source column, the transformation, the SEI target field, and the operational STAR contract field, landing and conformed columns and IMDS column that field reaches today. Pick a dat file to keep it readable; the first 500 paths are shown.">Lineage mapping</H>
+    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", margin: "6px 0 10px" }}>
+      <label style={{ fontSize: 11.5, color: t.sub, display: "inline-flex", gap: 4, alignItems: "center" }}>dat file
+        <select value={file} onChange={(e) => setFile(e.target.value)} style={{ font: "inherit", fontSize: 11.5, padding: "3px 6px", border: `1px solid ${t.border}`, borderRadius: 4, background: t.panel, color: t.text, maxWidth: 260 }}>
+          <option value="">all (first 500 paths)</option>{(d.files || []).map((f) => <option key={f.key} value={f.key}>{f.key} ({f.n})</option>)}</select></label>
+      <label style={{ fontSize: 11.5, color: t.sub, display: "inline-flex", gap: 4, alignItems: "center" }}>lane
+        <select value={lane} onChange={(e) => setLane(e.target.value)} style={{ font: "inherit", fontSize: 11.5, padding: "3px 6px", border: `1px solid ${t.border}`, borderRadius: 4, background: t.panel, color: t.text }}>
+          <option value="">all</option>{Object.entries(LANE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+      <input aria-label="search mapping" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") setQq(q); }} placeholder="target field or source column, Enter" style={{ font: "inherit", fontSize: 11.5, padding: "3px 8px", border: `1px solid ${t.border}`, borderRadius: 4, background: t.panel, color: t.text, minWidth: 240 }} />
+      <span style={{ flex: 1 }} />
+      <span style={{ fontSize: 11.5, color: t.textMuted }}>{rows.length.toLocaleString()} paths · {matched.toLocaleString()} reach an IMDS column · {noRule.toLocaleString()} with no rule written</span>
+    </div>
+    <MappingTable t={t} rows={rows} />
   </>);
 }

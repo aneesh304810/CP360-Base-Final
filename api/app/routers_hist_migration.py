@@ -295,14 +295,20 @@ def lineage_record(id: str):
     for m in star[:20]:
         if not m.get("src_source_column"):
             continue
-        for x in _safe("SELECT l.lineage_id, l.src_source_table, l.src_source_column, l.stg1_source_table, l.stg2_source_table, l.dwh_target_table, l.dwh_target_column, "
-                       "l.lineage_status, n.source_system FROM legacy_lineage l LEFT JOIN legacy_lineage_lane n ON n.lineage_id = l.lineage_id "
+        for x in _safe("SELECT l.lineage_id, l.src_source_table, l.src_source_column, l.src_type, l.src_length, l.src_to_stg1_transform, "
+                       "l.stg1_source_table, l.stg1_source_column, l.stg1_type, l.stg1_to_stg2_transform, l.stg2_source_table, l.stg2_source_column, l.stg2_type, "
+                       "l.stg2_to_dwh_transform, l.dwh_target_table, l.dwh_target_column, l.dwh_type, l.dwh_length, l.lineage_status, n.source_system "
+                       "FROM legacy_lineage l LEFT JOIN legacy_lineage_lane n ON n.lineage_id = l.lineage_id "
                        f"WHERE {_canon('l.src_source_column')} = {_canon(':c')} AND (UPPER(l.src_source_table) LIKE :t OR :t = '%') FETCH FIRST 20 ROWS ONLY",
                        {"c": m["src_source_column"], "t": f"%{(m.get('src_file_key') or '').upper()}%" if m.get("src_file_key") else "%"}):
             if x["lineage_id"] in seen:
                 continue
             seen.add(x["lineage_id"])
-            imds.append(dict(x))
+            d = dict(x)
+            for c in ("src_to_stg1_transform", "stg1_to_stg2_transform", "stg2_to_dwh_transform"):
+                d[c] = _clob(x.get(c)) or ""
+            d["star_map"] = m["map_id"]
+            imds.append(d)
     chain = {
         "lane": r.get("lane_id"), "sourceObjects": sorted(set(objs))[:30], "rule": rules[0]["rule_id"] if rules else None, "datFile": r.get("target_dat_file"),
         "targetField": r.get("target_field"), "targetKey": key, "seiInput": len(sei_in), "star": len(star), "imds": len(imds),
@@ -365,3 +371,41 @@ def qc():
         d.pop("row_json", None)
         out.append(d)
     return {"controls": out}
+
+
+@router.get("/lineage/mapping")
+def lineage_mapping(file: str = "", lane: str = "", q: str = "", limit: int = 500):
+    """Column-level lineage mapping: every historical source column to its
+    SEI target field with the transformation, then the operational hops the
+    target field joins by name: the STAR contract field and the IMDS column.
+    One row per historical mapping and operational path; a target with no
+    operational match keeps its row with the right side empty."""
+    limit = min(5000, max(1, int(limit or 500)))
+    where, p = [], {}
+    if file:
+        where.append("l.target_dat_file = :f"); p["f"] = file
+    if lane:
+        where.append("l.lane_id = :l"); p["l"] = lane
+    if q.strip():
+        where.append("(UPPER(l.target_field) LIKE :q OR UPPER(l.source_object_field) LIKE :q)"); p["q"] = f"%{q.strip().upper()}%"
+    w = (" WHERE " + " AND ".join(where)) if where else ""
+    rows = _safe(f"""
+        SELECT l.lineage_id, l.lane_id, l.source_system, l.source_object_field, l.transformation_rule, l.rule_status, l.approval_status,
+               l.decon_dictionary_status, l.target_dat_file, l.target_field, l.target_data_type, l.target_max_length, l.match_status,
+               m.map_id, m.src_file_key, m.src_source_column, m.map_kind,
+               g.lineage_id AS legacy_id, g.src_source_table, g.stg1_source_table, g.stg1_source_column, g.stg2_source_table, g.stg2_source_column,
+               g.dwh_target_table, g.dwh_target_column, g.dwh_type, g.lineage_status
+        FROM   cp_hist_lineage l
+        LEFT   JOIN sei_source_map m ON {_canon('m.sei_datapoint')} = l.target_field_norm
+        LEFT   JOIN legacy_lineage g ON {_canon('g.src_source_column')} = {_canon('m.src_source_column')}
+                                     AND (m.src_file_key IS NULL OR UPPER(g.src_source_table) LIKE '%' || UPPER(m.src_file_key) || '%')
+        {w}
+        ORDER BY l.target_dat_file, l.target_field, l.lane_id, l.lineage_id, g.dwh_target_table
+        FETCH FIRST {limit} ROWS ONLY""", p)
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["transformation_rule"] = (_clob(r.get("transformation_rule")) or "")[:600]
+        out.append(d)
+    files = [{"key": r.get("k"), "n": int(r.get("n") or 0)} for r in _safe("SELECT target_dat_file AS k, COUNT(*) AS n FROM cp_hist_lineage GROUP BY target_dat_file ORDER BY target_dat_file")]
+    return {"mapping": out, "files": files, "limit": limit}

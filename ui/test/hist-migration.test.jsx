@@ -9,7 +9,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { tLight, tDark } from "../src/bbhTheme.js";
 import HistMigration from "../src/HistMigration.jsx";
 import { HM_RULES, HL_RULES, STATUS_COLOR, STATUS_KINDS, emptySummary, emptyLineageSummary } from "../src/histMigrationApi.js";
-import { HistChainFig, LineageTab, RulesTab, DeconTab, QcTab } from "../src/HistLineage.jsx";
+import { HistChainFig, LineageTab, MappingTab, RulesTab, DeconTab, QcTab } from "../src/HistLineage.jsx";
+import { HistLineageDiagram, HistHopChain, MappingTable, histSources } from "../src/HistLineageFigs.jsx";
 import DataAnalysis from "../src/DataAnalysis.jsx";
 
 let bad = 0;
@@ -45,13 +46,33 @@ const record = { record: rec, rules: [{ rule_id: "R-0001", rule_type: "DIRECT", 
   qc: [{ qc_id: "QC-0002", control_name: "ACCOUNT_NUMBER present in SEI catalog", expected: "1", actual: "1", result: "PASS" }],
   seiInput: [{ input_id: "i1", sei_target_file: "account-basic.dat", sei_field: "Account Number", published_type: "CHAR", mapping_status: "Mapped", upstream_object: "STAR_ACCT", upstream_field: "ACCT_NO" }],
   star: [{ map_id: "m1", src_file_key: "ACDDIFI1", src_source_column: "ACCT_NO", sei_feed: "account", sei_entity: "basic", map_kind: "DIRECT" }],
-  imds: [{ lineage_id: "l1", dwh_target_table: "DIM_ACCOUNT", dwh_target_column: "ACCOUNT_NUMBER", lineage_status: "VERIFIED", source_system: "STAR" }],
+  imds: [{ lineage_id: "l1", star_map: "m1", src_source_table: "ACDDIFI1", src_source_column: "ACCT_NO", src_to_stg1_transform: "TRIM(ACCT_NO)", stg1_source_table: "STG1_ACCT", stg1_source_column: "ACCT_NO", stg1_to_stg2_transform: "LPAD(ACCT_NO, 12, '0')", stg2_source_table: "STG2_ACCT", stg2_source_column: "ACCOUNT_NUMBER", stg2_to_dwh_transform: "", dwh_target_table: "DIM_ACCOUNT", dwh_target_column: "ACCOUNT_NUMBER", dwh_type: "VARCHAR2", dwh_length: "12", lineage_status: "VERIFIED", source_system: "STAR" }],
   chain: { lane: "ADDVANTAGE_SEI_HIST", sourceObjects: ["SGA_DCON_ACCT"], rule: "R-0001", datFile: "account-basic.dat", targetField: "ACCOUNT_NUMBER", targetKey: "SEI::account-basic.dat::ACCOUNT_NUMBER", seiInput: 1, star: 1, imds: 1,
     statuses: { rule: "Complete", approval: "DRAFT_REVIEW_REQUIRED", dictionary: "CURATED", match: "MATCHED" } } };
 const lineage = { summary: lineageSummary, list: { lineage: [rec, { ...rec, lineage_id: "HL-0002", lane_id: "STAR_SEI_HIST", source_object_field: "IM_ACCOUNT.ACCOUNT_ID", decon_dictionary_status: "REVIEW_REQUIRED", common_target_indicator: "Y" }], total: 2 }, record };
 const rules = { rules: record.rules.map((r) => ({ ...r, sei_target_file: "account-basic.dat", sei_target_field: "ACCOUNT_NUMBER", rule_source_column: "Other Mapping Logic" })), total: 1507, byType: [{ key: "DIRECT", n: 900 }], byStatus: [], byApproval: [], byFile: [] };
 const decon = { objects: record.decon.map((d) => ({ ...d, source_prefix: "SGA_DCON", source_type: "table", migration_function: "account conversion", definition_basis: "Curated", example_target_fields: "ACCOUNT_NUMBER" })), byStatus: [{ key: "CURATED", n: 150 }], byBasis: [{ key: "NAME_DERIVED", n: 62 }], byDomain: [], byPrefix: [{ key: "SGA_DCON", n: 80 }] };
 const qc = { controls: [{ qc_id: "QC-0001", control_name: "No blank TARGET_FIELD", applies_to: "FINAL_HIST_MIGRATION_LINEAGE", expected: "0", actual: "0", result: "PASS", detail: "", row: { CONTROL: "No blank TARGET_FIELD", NOTE: "checked on export" } }] };
+
+console.log("-- the lineage diagram and the column chain");
+const srcs = histSources(record);
+ok(srcs.length === 1 && srcs[0].object === "SGA_DCON_ACCT" && srcs[0].fields.join() === "ACCT_NO" && srcs[0].meaning && srcs[0].meaning.basis_class === "CURATED", "the source objects and fields are read off the row and matched to the decon dictionary", srcs);
+const dia = renderToStaticMarkup(<HistLineageDiagram t={tLight} d={record} />);
+ok(/HISTORICAL SOURCES/.test(dia) && /TRANSFORMATION RULE/.test(dia) && /SEI TARGET FIELD/.test(dia) && /WHERE IT GOES TODAY/.test(dia) && /SGA_DCON_ACCT/.test(dia) && /· ACCT_NO/.test(dia) && /curated/.test(dia)
+   && /TRIM\(ACCT_NO\)/.test(dia) && /ACCOUNT-BASIC\.DAT/.test(dia) && /SEI INPUT LINEAGE/.test(dia) && /STAR CONTRACT FIELD/.test(dia) && /IMDS COLUMN/.test(dia) && /DIM_ACCOUNT\.ACCOUNT_NUMBER/.test(dia) && (dia.match(/<path /g) || []).length >= 5,
+   "the lineage diagram in the Data Analysis style: sources, rule, SEI field, downstream, with curved edges");
+const hop = renderToStaticMarkup(<HistHopChain t={tLight} d={record} />);
+ok(/Column-level transformation chain/.test(hop) && /Historical source/.test(hop) && /SEI target/.test(hop) && /STAR contract/.test(hop) && /Landing/.test(hop) && /Conformed/.test(hop) && /IMDS warehouse/.test(hop)
+   && /TRIM\(ACCT_NO\)/.test(hop) && /LPAD\(ACCT_NO, 12, &#x27;0&#x27;\)/.test(hop) && /no rule written/.test(hop) && /src → stg1/.test(hop) && /stg2 → dwh/.test(hop) && /EXACT_NORMALIZED_FIELD_MATCH/.test(hop),
+   "the column chain with the rule on every hop: the historical rule, the name match, the three operational transforms, and an empty hop called out");
+const hopNone = renderToStaticMarkup(<HistHopChain t={tLight} d={{ ...record, star: [], imds: [] }} />);
+ok(/no operational STAR field or IMDS column/.test(hopNone) && !/Landing/.test(hopNone), "a field with no operational path stops at the SEI target and says so");
+const mapping = { mapping: [{ lineage_id: "HL-0001", lane_id: "ADDVANTAGE_SEI_HIST", source_object_field: "SGA_DCON_ACCT.ACCT_NO", transformation_rule: "TRIM(ACCT_NO)", rule_status: "Complete", approval_status: "DRAFT_REVIEW_REQUIRED", decon_dictionary_status: "CURATED", target_dat_file: "account-basic.dat", target_field: "ACCOUNT_NUMBER", target_data_type: "CHAR", target_max_length: "20", match_status: "MATCHED", map_id: "m1", src_file_key: "ACDDIFI1", src_source_column: "ACCT_NO", map_kind: "DIRECT", legacy_id: "l1", stg1_source_column: "ACCT_NO", stg2_source_column: "ACCOUNT_NUMBER", dwh_target_table: "DIM_ACCOUNT", dwh_target_column: "ACCOUNT_NUMBER", dwh_type: "VARCHAR2", lineage_status: "VERIFIED" },
+  { lineage_id: "HL-0003", lane_id: "UAF_SEI_HIST", source_object_field: "XOS_PARTY.SUB_FIRM_CD", transformation_rule: "", rule_status: "Open", approval_status: "DRAFT_REVIEW_REQUIRED", decon_dictionary_status: null, target_dat_file: "party-basic.dat", target_field: "Sub-Firm", target_data_type: "CHAR", target_max_length: "10", match_status: "UNMATCHED" }], files: [{ key: "account-basic.dat", n: 2 }, { key: "party-basic.dat", n: 1 }] };
+const mt = renderToStaticMarkup(<MappingTab t={tLight} initial={mapping} />);
+ok(/Lineage mapping/.test(mt) && /2 paths · 1 reach an IMDS column · 1 with no rule written/.test(mt) && /SGA_DCON_ACCT\.ACCT_NO/.test(mt) && /DIM_ACCOUNT/.test(mt) && /XOS_PARTY\.SUB_FIRM_CD/.test(mt) && /no rule written/.test(mt) && /UNMATCHED/.test(mt) && /party-basic\.dat \(1\)/.test(mt),
+   "the mapping sub-tab: one row per path with the source column, the rule, the SEI field, the STAR field and the IMDS column, and the counts");
+ok(!/NaN|undefined|\[object Object\]/.test(dia + hop + mt) && !/NaN|undefined/.test(renderToStaticMarkup(<MappingTable t={tDark} rows={mapping.mapping} />)), "nothing undefined in the new figures, light or dark");
 
 console.log("-- the lineage package");
 const chain = renderToStaticMarkup(<HistChainFig t={tLight} d={record} />);
@@ -75,8 +96,8 @@ ok(/No lineage loaded/.test(emptyLin) && /sql\/87_hist_lineage\.sql/.test(emptyL
 
 console.log("-- the tab");
 for (const [tn, t] of [["light", tLight], ["dark", tDark]]) {
-  const parts = ["Overview", "Lineage", "Rules", "Decon dictionary", "QC", "Evidence", "Dictionary", "Loads"].map((sub) => renderToStaticMarkup(<HistMigration t={t} initial={{ sub, summary, lanes, artifacts, dictionary, evidence, batches, lineage, rules, decon, qc }} />));
-  ok(parts.every((p) => p.length > 1200 && !/NaN|undefined|\[object Object\]/.test(p)), `all eight sub-tabs render cleanly in ${tn}`, parts.map((p) => p.length).join(","));
+  const parts = ["Overview", "Lineage", "Lineage mapping", "Rules", "Decon dictionary", "QC", "Evidence", "Dictionary", "Loads"].map((sub) => renderToStaticMarkup(<HistMigration t={t} initial={{ sub, summary, lanes, artifacts, dictionary, evidence, batches, lineage, mapping, rules, decon, qc }} />));
+  ok(parts.every((p) => p.length > 1200 && !/NaN|undefined|\[object Object\]/.test(p)), `all nine sub-tabs render cleanly in ${tn}`, parts.map((p) => p.length).join(","));
 }
 const ov = renderToStaticMarkup(<HistMigration t={tLight} initial={{ sub: "Overview", summary, lanes, artifacts, dictionary, evidence, batches }} />);
 ok(/214,622/.test(ov) && /15,880/.test(ov) && /unresolved lanes/.test(ov) && /ADDVANTAGE_SEI_HIST/.test(ov) && /DCONCUS10_20210727\.docx/.test(ov) && /REFERENCE/.test(ov) && /CP360-HM-007/.test(ov) && /Warning/.test(ov),

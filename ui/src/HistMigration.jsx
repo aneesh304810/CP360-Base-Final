@@ -8,9 +8,9 @@
 // `initial` lets a test hand in the payloads and skip the network.
 import React, { useEffect, useState } from "react";
 import { histMigrationApi as api, emptySummary, HM_RULES, LEVEL_COLOR } from "./histMigrationApi.js";
-import { LineageTab, RulesTab, DeconTab, QcTab } from "./HistLineage.jsx";
+import { LineageTab, MappingTab, RulesTab, DeconTab, QcTab } from "./HistLineage.jsx";
 
-const SUB = ["Overview", "Lineage", "Rules", "Decon dictionary", "QC", "Evidence", "Dictionary", "Loads"];
+const SUB = ["Overview", "Lineage", "Lineage mapping", "Rules", "Decon dictionary", "QC", "Evidence", "Dictionary", "Loads"];
 const mono = { fontFamily: "ui-monospace, monospace" };
 
 const Tile = ({ t, n, label, sub, color }) => (
@@ -211,6 +211,7 @@ export default function HistMigration({ t, initial }) {
       </div>
       {sub === "Overview" && <Overview t={t} sum={s} lanes={lanes} artifacts={artifacts} onFilter={(f) => { setFilter(f); setSub("Evidence"); }} />}
       {sub === "Lineage" && <LineageTab t={t} initial={initial?.lineage} />}
+      {sub === "Lineage mapping" && <MappingTab t={t} initial={initial?.mapping} />}
       {sub === "Rules" && <RulesTab t={t} initial={initial?.rules} />}
       {sub === "Decon dictionary" && <DeconTab t={t} initial={initial?.decon} />}
       {sub === "QC" && <QcTab t={t} initial={initial?.qc} />}

@@ -182,7 +182,9 @@ MAN = [dict(v) for v in L.rows["cp_hist_manifest"].values()]
 SEI_IN = [{"input_id": "i1", "data_source": "IMDS", "functional_group": "Account", "sei_target_file": "account-basic.dat", "sei_field": "Account Number", "sei_field_norm": "ACCOUNT_NUMBER",
            "published_type": "CHAR", "published_length": "20", "mapping_status": "Mapped", "upstream_object": "STAR_ACCT", "upstream_field": "ACCT_NO", "evidence": "SPEC"}]
 SRC_MAP = [{"map_id": "m1", "lane_id": "IMDS", "data_source": "IMDS", "src_file_key": "ACDDIFI1", "src_source_column": "ACCT_NO", "sei_feed": "account", "sei_entity": "basic", "sei_datapoint": "Account Number", "map_kind": "DIRECT", "evidence": "SPEC"}]
-LEG = [{"lineage_id": "l1", "src_source_table": "ACDDIFI1", "src_source_column": "ACCT_NO", "stg1_source_table": "STG1_ACCT", "stg2_source_table": "STG2_ACCT", "dwh_target_table": "DIM_ACCOUNT", "dwh_target_column": "ACCOUNT_NUMBER", "lineage_status": "VERIFIED", "source_system": "STAR"}]
+LEG = [{"lineage_id": "l1", "src_source_table": "ACDDIFI1", "src_source_column": "ACCT_NO", "src_type": "CHAR", "src_length": "20", "src_to_stg1_transform": "TRIM(ACCT_NO)", "stg1_source_table": "STG1_ACCT", "stg1_source_column": "ACCT_NO", "stg1_type": "VARCHAR2",
+        "stg1_to_stg2_transform": "LPAD(ACCT_NO, 12, '0')", "stg2_source_table": "STG2_ACCT", "stg2_source_column": "ACCOUNT_NUMBER", "stg2_type": "VARCHAR2", "stg2_to_dwh_transform": None, "dwh_target_table": "DIM_ACCOUNT", "dwh_target_column": "ACCOUNT_NUMBER",
+        "dwh_type": "VARCHAR2", "dwh_length": "12", "lineage_status": "VERIFIED", "source_system": "STAR"}]
 
 
 def _grp(s, rows, extra=None):
@@ -225,6 +227,22 @@ def fake_query(sql, params=None):
         if "catalog_id = :c" in s:
             rows = [r for r in rows if r["catalog_id"] == params["c"] or r["target_key"] == params["k"]]
         return [dict(r) for r in rows]
+    if "FROM cp_hist_lineage l" in s and "LEFT JOIN sei_source_map m" in s:
+        out = []
+        rows = LIN
+        if "l.target_dat_file = :f" in s:
+            rows = [r for r in rows if r["target_dat_file"] == params["f"]]
+        if "l.lane_id = :l" in s:
+            rows = [r for r in rows if r["lane_id"] == params["l"]]
+        for r in rows:
+            ms = [m for m in SRC_MAP if m["sei_datapoint"].upper().replace(" ", "_") == r["target_field_norm"]] or [None]
+            for m in ms:
+                gs = [g for g in LEG if m and g["src_source_column"] == m["src_source_column"]] or [None]
+                for g in gs:
+                    out.append({**{k: r[k] for k in ("lineage_id", "lane_id", "source_system", "source_object_field", "transformation_rule", "rule_status", "approval_status", "decon_dictionary_status", "target_dat_file", "target_field", "target_data_type", "target_max_length", "match_status")},
+                                **({"map_id": m["map_id"], "src_file_key": m["src_file_key"], "src_source_column": m["src_source_column"], "map_kind": m["map_kind"]} if m else {"map_id": None, "src_file_key": None, "src_source_column": None, "map_kind": None}),
+                                **({"legacy_id": g["lineage_id"], "src_source_table": g["src_source_table"], "stg1_source_table": g["stg1_source_table"], "stg1_source_column": g["stg1_source_column"], "stg2_source_table": g["stg2_source_table"], "stg2_source_column": g["stg2_source_column"], "dwh_target_table": g["dwh_target_table"], "dwh_target_column": g["dwh_target_column"], "dwh_type": g["dwh_type"], "lineage_status": g["lineage_status"]} if g else {"legacy_id": None, "dwh_target_column": None})})
+        return out
     if "FROM cp_hist_lineage" in s:
         if "HAVING COUNT(DISTINCT lane_id) > 1" in s:
             keys = {}
@@ -236,7 +254,7 @@ def fake_query(sql, params=None):
             for r in LIN:
                 g = out.setdefault(r["target_dat_file"], {"f": r["target_dat_file"], "n": set(), "r": 0, "l": set(), "m": 0})
                 g["n"].add(r["target_field"]); g["r"] += 1; g["l"].add(r["lane_id"]); g["m"] += r["match_status"] == "MATCHED"
-            return [{**g, "n": len(g["n"]), "l": len(g["l"])} for g in out.values()]
+            return [{**g, "n": len(g["n"]), "l": len(g["l"]), "k": g["f"]} for g in out.values()]
         if "GROUP BY" in s:
             return _grp(s, LIN)
         rows = LIN
@@ -329,6 +347,13 @@ ok(rec["record"]["lineage_id"] == "HL-0001" and rec["record"]["transformation_ru
    and [x["lineage_id"] for x in rec["siblings"]] == ["HL-0002"] and len(rec["qc"]) == 1 and rec["seiInput"][0]["sei_field"] == "Account Number" and rec["star"][0]["src_source_column"] == "ACCT_NO" and rec["imds"][0]["dwh_target_column"] == "ACCOUNT_NUMBER"
    and rec["chain"]["lane"] == "ADDVANTAGE_SEI_HIST" and rec["chain"]["sourceObjects"] == ["SGA_DCON_ACCT"] and rec["chain"]["imds"] == 1 and rec["chain"]["statuses"]["approval"] == "DRAFT_REVIEW_REQUIRED",
    "one record end to end: its rule, its source object's meaning, the sibling on the other lane, the QC control, and the operational SEI input, STAR field and IMDS column by exact normalised name", rec["chain"])
+ok(rec["imds"][0]["src_to_stg1_transform"] == "TRIM(ACCT_NO)" and rec["imds"][0]["stg1_to_stg2_transform"].startswith("LPAD") and rec["imds"][0]["stg2_to_dwh_transform"] == "" and rec["imds"][0]["star_map"] == "m1" and rec["imds"][0]["stg2_source_column"] == "ACCOUNT_NUMBER",
+   "the IMDS hop carries the rule on every stage and the STAR map it came through, an unwritten rule as empty text")
+mp = R.lineage_mapping(file="account-basic.dat")
+ok(len(mp["mapping"]) == 2 and mp["mapping"][0]["lineage_id"] == "HL-0001" and mp["mapping"][0]["dwh_target_column"] == "ACCOUNT_NUMBER" and mp["mapping"][0]["src_source_column"] == "ACCT_NO" and mp["mapping"][0]["transformation_rule"] == "TRIM(ACCT_NO)"
+   and {f["key"] for f in mp["files"]} == {"account-basic.dat", "party-basic.dat"}, "the column-level mapping: one row per path from the historical column to the IMDS column, per dat file", mp["mapping"][:1])
+mp2 = R.lineage_mapping(file="party-basic.dat")
+ok(len(mp2["mapping"]) == 1 and mp2["mapping"][0]["dwh_target_column"] is None and mp2["mapping"][0]["lineage_id"] == "HL-0003", "a target with no operational path keeps its row with the right side empty")
 ok(R.lineage_record(id="nope")["record"] is None, "an unknown id is an empty record, not a 500")
 ok(len(R.decon(basis="NAME_DERIVED")["objects"]) == 3 or True, "decon reads back")
 ok(R.rules()["total"] == 2 and R.rules()["rules"][0]["transformation_rule"] and len(R.qc()["controls"]) == 2 and R.qc()["controls"][0]["row"]["NOTE"] == "checked on export", "rules and QC read back with their text and the row JSON")
