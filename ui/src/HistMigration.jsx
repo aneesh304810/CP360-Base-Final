@@ -8,8 +8,9 @@
 // `initial` lets a test hand in the payloads and skip the network.
 import React, { useEffect, useState } from "react";
 import { histMigrationApi as api, emptySummary, HM_RULES, LEVEL_COLOR } from "./histMigrationApi.js";
+import { LineageTab, RulesTab, DeconTab, QcTab } from "./HistLineage.jsx";
 
-const SUB = ["Overview", "Evidence", "Dictionary", "Loads"];
+const SUB = ["Overview", "Lineage", "Rules", "Decon dictionary", "QC", "Evidence", "Dictionary", "Loads"];
 const mono = { fontFamily: "ui-monospace, monospace" };
 
 const Tile = ({ t, n, label, sub, color }) => (
@@ -202,13 +203,17 @@ export default function HistMigration({ t, initial }) {
   return (
     <div>
       <p style={{ fontSize: 12.5, color: t.sub, margin: "0 0 10px", maxWidth: "90ch", lineHeight: 1.55 }}>
-        The historical data migration into SEI: the AddVantage/PB, STAR/IM and UAF lanes, the analyst mapping workbooks and dictionaries they rest on, and every populated cell of the consolidated mapping catalog as row-level evidence, kept exactly as written. Upstream of the operational STAR to IMDS lineage on the Source view.
+        The historical data migration into SEI as a multi-entity package: the AddVantage/PB, STAR/IM and UAF lanes, the final lineage from each historical source through its transformation rule to the SEI target field, the decon source dictionary that gives the source objects their meaning, the rule inventory, the target-field QC, the analyst mapping workbooks the evidence rests on, and every populated cell of the consolidated catalog kept exactly as written. The SEI target field is where it joins the operational SEI to STAR to IMDS lineage, by exact normalised name.
       </p>
       <div style={{ display: "flex", gap: 0, borderBottom: `1px solid ${t.border}`, marginBottom: 12 }}>
         {SUB.map((v) => <div key={v} role="tab" tabIndex={0} aria-selected={sub === v} onClick={() => setSub(v)}
           style={{ padding: "6px 14px", fontSize: 12.5, cursor: "pointer", color: sub === v ? t.accent : t.sub, borderBottom: sub === v ? `2px solid ${t.accent}` : "2px solid transparent", marginBottom: -1 }}>{v}</div>)}
       </div>
       {sub === "Overview" && <Overview t={t} sum={s} lanes={lanes} artifacts={artifacts} onFilter={(f) => { setFilter(f); setSub("Evidence"); }} />}
+      {sub === "Lineage" && <LineageTab t={t} initial={initial?.lineage} />}
+      {sub === "Rules" && <RulesTab t={t} initial={initial?.rules} />}
+      {sub === "Decon dictionary" && <DeconTab t={t} initial={initial?.decon} />}
+      {sub === "QC" && <QcTab t={t} initial={initial?.qc} />}
       {sub === "Evidence" && <Evidence t={t} sum={s} filter={filter} setFilter={setFilter} initial={initial?.evidence} />}
       {sub === "Dictionary" && <Dictionary t={t} columns={dict} />}
       {sub === "Loads" && <Loads t={t} batches={batches} />}

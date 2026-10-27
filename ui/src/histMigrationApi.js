@@ -47,3 +47,41 @@ export const HM_RULES = [
   ["CP360-HM-011", "All four sheets", "Snapshot control", "Batch id, source file, hash, timestamp and active flag on every row.", "Recommendation"],
 ];
 export const LEVEL_COLOR = { Error: "#b42318", Warning: "#c96a12", Pass: "#159943", Recommendation: "#0f4775" };
+
+// ---- the lineage package (sql/87) ----
+export const emptyLineageSummary = () => ({ totals: { lineage: 0, targetFields: 0, datFiles: 0, rules: 0, decon: 0, qc: 0, sharedTargets: 0, matched: 0, unmatched: 0, blankTarget: 0 },
+  byLane: [], byGroup: [], byRuleStatus: [], byApproval: [], byDecon: [], byMatch: [], byFile: [], manifest: [] });
+histMigrationApi.lineage = (params) => _get(`/hist-migration/lineage${qs(params)}`, () => ({ lineage: [], total: 0, page: 1, size: 100 }));
+histMigrationApi.lineageSummary = () => _get("/hist-migration/lineage/summary", emptyLineageSummary);
+histMigrationApi.lineageRecord = (id) => _get(`/hist-migration/lineage/record${qs({ id })}`, () => ({ record: null }));
+histMigrationApi.decon = (params) => _get(`/hist-migration/decon${qs(params)}`, () => ({ objects: [], byStatus: [], byBasis: [], byDomain: [], byPrefix: [] }));
+histMigrationApi.rules = (params) => _get(`/hist-migration/rules${qs(params)}`, () => ({ rules: [], total: 0, page: 1, size: 100, byType: [], byStatus: [], byApproval: [], byFile: [] }));
+histMigrationApi.qc = () => _get("/hist-migration/qc", () => ({ controls: [] }));
+
+// The four statuses on a lineage record are different controls and are
+// never folded into one. A rule can be Complete and still unapproved.
+export const STATUS_KINDS = [
+  ["rule", "Rule status", "RULE_STATUS from the mapping workbook: whether the analyst finished the rule"],
+  ["approval", "Approval", "APPROVAL_STATUS: whether the mapping has been approved; DRAFT_REVIEW_REQUIRED until it is"],
+  ["dictionary", "Dictionary", "DECON_DICTIONARY_STATUS: CURATED, REVIEW_REQUIRED, PARTIAL_REVIEW_REQUIRED or NO_TECHNICAL_OBJECT"],
+  ["match", "Lineage match", "MATCH_STATUS: EXACT_NORMALIZED_FIELD_MATCH against the operational SEI input lineage; UNMATCHED is flagged for review"],
+];
+export const STATUS_COLOR = (v) => {
+  const s = String(v || "").toUpperCase();
+  if (!s) return "#6b7884";
+  if (/^(COMPLETE|APPROVED|CURATED|MATCHED)$/.test(s)) return "#159943";
+  if (/UNMATCHED|BLOCKED|NO_TECHNICAL|ERROR|FAIL/.test(s)) return "#b42318";
+  if (/DRAFT|REVIEW|PARTIAL|PENDING|OPEN|NOT_CHECKED/.test(s)) return "#c96a12";
+  return "#0f4775";
+};
+export const LANE_LABEL = { ADDVANTAGE_SEI_HIST: "AddVantage / PB → SEI", STAR_SEI_HIST: "STAR / IM → SEI", UAF_SEI_HIST: "UAF → SEI", COMMON: "Common PB-IM-UAF → SEI", UNCLASSIFIED: "unclassified" };
+export const HL_RULES = [
+  ["CP360-HL-001", "FINAL_HIST_MIGRATION_LINEAGE", "Target", "Every row names a TARGET_DAT_FILE and a TARGET_FIELD; the stable key is SEI::<dat file>::<field>.", "Error"],
+  ["CP360-HL-002", "FINAL_HIST_MIGRATION_LINEAGE", "Lane", "The source system or path resolves to a registered lane; PB and IM/UAF rows stay on their own lanes.", "Warning"],
+  ["CP360-HL-003", "HIST_MIGRATION_RULE", "Rule", "A lineage row has a rule on its catalog id or its target field.", "Warning"],
+  ["CP360-HL-004", "FINAL_HIST_MIGRATION_LINEAGE", "Common target", "A SEI field reached from more than one lane stays as separate rows; the target key is shared, the source is not.", "Recommendation"],
+  ["CP360-HL-005", "DECON_SOURCE_DICTIONARY", "Governed status", "DECON_DICTIONARY_STATUS is one of four values, never free text.", "Error"],
+  ["CP360-HL-006", "DECON_SOURCE_DICTIONARY", "Basis", "A name-derived meaning is marked as such and never treated as curated.", "Error"],
+  ["CP360-HL-007", "FINAL_HIST_MIGRATION_LINEAGE", "Independence", "Rule status, approval, dictionary status and lineage match are kept apart.", "Error"],
+  ["CP360-HL-008", "FINAL_HIST_MIGRATION_LINEAGE", "Match", "EXACT_NORMALIZED_FIELD_MATCH against the operational SEI input lineage; unmatched rows are flagged for review.", "Warning"],
+];

@@ -8,7 +8,8 @@ import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { tLight, tDark } from "../src/bbhTheme.js";
 import HistMigration from "../src/HistMigration.jsx";
-import { HM_RULES, emptySummary } from "../src/histMigrationApi.js";
+import { HM_RULES, HL_RULES, STATUS_COLOR, STATUS_KINDS, emptySummary, emptyLineageSummary } from "../src/histMigrationApi.js";
+import { HistChainFig, LineageTab, RulesTab, DeconTab, QcTab } from "../src/HistLineage.jsx";
 import DataAnalysis from "../src/DataAnalysis.jsx";
 
 let bad = 0;
@@ -29,10 +30,53 @@ const evidence = { evidence: [{ source_mapping_workbook: "DSR_Mapping.xlsx", sou
   row: { lane: "AddVantage / PB to SEI", domain: "Static", system: "AddVantage / PB", group: "Static Merge", cells: [{ original_source_column_number: 5, original_source_column: "Column_1", evidence_attribute: "Source-Specific Attribute 5", evidence_category: "Source-Specific Mapping Attribute", evidence_value: "Subfirm Logic" }] } };
 const batches = [summary.latest];
 
+const lineageSummary = { totals: { lineage: 2270, targetFields: 1180, datFiles: 14, rules: 1507, decon: 212, qc: 9, sharedTargets: 96, matched: 1904, unmatched: 366, blankTarget: 0 },
+  byLane: [{ key: "ADDVANTAGE_SEI_HIST", n: 1402 }, { key: "STAR_SEI_HIST", n: 612 }, { key: "UAF_SEI_HIST", n: 256 }], byGroup: [{ key: "Account", n: 900 }], byRuleStatus: [{ key: "Complete", n: 1800 }, { key: "Open", n: 470 }],
+  byApproval: [{ key: "DRAFT_REVIEW_REQUIRED", n: 2270 }], byDecon: [{ key: "CURATED", n: 1500 }, { key: "REVIEW_REQUIRED", n: 770 }], byMatch: [{ key: "MATCHED", n: 1904 }, { key: "UNMATCHED", n: 366 }],
+  byFile: [{ file: "account-basic.dat", fields: 120, rows: 240, lanes: 3, matched: 200 }], manifest: [{ manifest_key: "WORKBOOK_VERSION", manifest_value: "v12" }] };
+const rec = { lineage_id: "HL-0001", catalog_id: "SEI-ACCOUNT-BASIC-001-ACCOUNTNUMBER", functional_group: "Account", source_path: "AddVantage / PB -> SEI", source_system: "AddVantage / PB", lane_id: "ADDVANTAGE_SEI_HIST",
+  source_object_field: "SGA_DCON_ACCT.ACCT_NO", decon_dictionary_meaning: "Deconversion account master", decon_business_domain: "Account", decon_dictionary_status: "CURATED", decon_status_text: "Curated", source_dependencies: "",
+  transformation_rule_source: "merged catalog", transformation_rule: "TRIM(ACCT_NO)", rule_status: "Complete", target_system: "SEI", target_dat_file: "account-basic.dat", target_field: "ACCOUNT_NUMBER", target_field_norm: "ACCOUNT_NUMBER",
+  target_key: "SEI::account-basic.dat::ACCOUNT_NUMBER", target_data_type: "CHAR", target_max_length: "20", mandatory: "Yes", validation_rule: "numeric", source_workbook: "DSR_Mapping.xlsx", source_sheet: "AV_DSR_MAP", source_row: 2,
+  recon_key: "AddVantage / PB -> SEI|DSR_Mapping.xlsx|AV_DSR_MAP|2|account-basic.dat|ACCOUNT_NUMBER", match_method: "EXACT_NORMALIZED_FIELD_MATCH", match_status: "MATCHED", approval_status: "DRAFT_REVIEW_REQUIRED" };
+const record = { record: rec, rules: [{ rule_id: "R-0001", rule_type: "DIRECT", transformation_rule: "TRIM(ACCT_NO)", validation_rule: "", mapping_status: "Complete", approval_status: "DRAFT_REVIEW_REQUIRED", source_objects_fields: "SGA_DCON_ACCT.ACCT_NO" }],
+  decon: [{ technical_object: "SGA_DCON_ACCT", business_meaning: "Deconversion account master", basis_class: "CURATED", dictionary_status: "CURATED", lineage_usage_count: 12, business_domain: "Account" }],
+  siblings: [{ lineage_id: "HL-0002", lane_id: "STAR_SEI_HIST", source_object_field: "IM_ACCOUNT.ACCOUNT_ID", rule_status: "Complete", approval_status: "DRAFT_REVIEW_REQUIRED", decon_dictionary_status: "REVIEW_REQUIRED", match_status: "MATCHED" }],
+  qc: [{ qc_id: "QC-0002", control_name: "ACCOUNT_NUMBER present in SEI catalog", expected: "1", actual: "1", result: "PASS" }],
+  seiInput: [{ input_id: "i1", sei_target_file: "account-basic.dat", sei_field: "Account Number", published_type: "CHAR", mapping_status: "Mapped", upstream_object: "STAR_ACCT", upstream_field: "ACCT_NO" }],
+  star: [{ map_id: "m1", src_file_key: "ACDDIFI1", src_source_column: "ACCT_NO", sei_feed: "account", sei_entity: "basic", map_kind: "DIRECT" }],
+  imds: [{ lineage_id: "l1", dwh_target_table: "DIM_ACCOUNT", dwh_target_column: "ACCOUNT_NUMBER", lineage_status: "VERIFIED", source_system: "STAR" }],
+  chain: { lane: "ADDVANTAGE_SEI_HIST", sourceObjects: ["SGA_DCON_ACCT"], rule: "R-0001", datFile: "account-basic.dat", targetField: "ACCOUNT_NUMBER", targetKey: "SEI::account-basic.dat::ACCOUNT_NUMBER", seiInput: 1, star: 1, imds: 1,
+    statuses: { rule: "Complete", approval: "DRAFT_REVIEW_REQUIRED", dictionary: "CURATED", match: "MATCHED" } } };
+const lineage = { summary: lineageSummary, list: { lineage: [rec, { ...rec, lineage_id: "HL-0002", lane_id: "STAR_SEI_HIST", source_object_field: "IM_ACCOUNT.ACCOUNT_ID", decon_dictionary_status: "REVIEW_REQUIRED", common_target_indicator: "Y" }], total: 2 }, record };
+const rules = { rules: record.rules.map((r) => ({ ...r, sei_target_file: "account-basic.dat", sei_target_field: "ACCOUNT_NUMBER", rule_source_column: "Other Mapping Logic" })), total: 1507, byType: [{ key: "DIRECT", n: 900 }], byStatus: [], byApproval: [], byFile: [] };
+const decon = { objects: record.decon.map((d) => ({ ...d, source_prefix: "SGA_DCON", source_type: "table", migration_function: "account conversion", definition_basis: "Curated", example_target_fields: "ACCOUNT_NUMBER" })), byStatus: [{ key: "CURATED", n: 150 }], byBasis: [{ key: "NAME_DERIVED", n: 62 }], byDomain: [], byPrefix: [{ key: "SGA_DCON", n: 80 }] };
+const qc = { controls: [{ qc_id: "QC-0001", control_name: "No blank TARGET_FIELD", applies_to: "FINAL_HIST_MIGRATION_LINEAGE", expected: "0", actual: "0", result: "PASS", detail: "", row: { CONTROL: "No blank TARGET_FIELD", NOTE: "checked on export" } }] };
+
+console.log("-- the lineage package");
+const chain = renderToStaticMarkup(<HistChainFig t={tLight} d={record} />);
+ok(/HISTORICAL MIGRATION LINEAGE · HL-0001/.test(chain) && /Historical lane/.test(chain) && /Source objects/.test(chain) && /Transformation rule/.test(chain) && /SEI dat file/.test(chain) && /SEI target field/.test(chain) && /SEI input lineage/.test(chain) && /STAR contract field/.test(chain) && /IMDS column/.test(chain)
+   && /rule Complete · approval DRAFT_REVIEW_REQUIRED · dictionary CURATED · match MATCHED/.test(chain) && /1 other lane/.test(chain) && (chain.match(/stroke-dasharray="4 3"/g) || []).length === 3,
+   "the chain figure: eight boxes left to right, the four statuses apart, the sibling lane named, the operational hops dashed");
+for (const [tn, t] of [["light", tLight], ["dark", tDark]]) {
+  const parts = [renderToStaticMarkup(<LineageTab t={t} initial={lineage} />), renderToStaticMarkup(<RulesTab t={t} initial={rules} />), renderToStaticMarkup(<DeconTab t={t} initial={decon} />), renderToStaticMarkup(<QcTab t={t} initial={qc} />)];
+  ok(parts.every((p) => p.length > 800 && !/NaN|undefined|\[object Object\]/.test(p)), `lineage, rules, decon and QC sub-tabs render cleanly in ${tn}`, parts.map((p) => p.length).join(","));
+}
+const lt = renderToStaticMarkup(<LineageTab t={tLight} initial={lineage} />);
+ok(/2,270/.test(lt) && /1,180/.test(lt) && /fields on 2\+ lanes/.test(lt) && /366/.test(lt) && /the workbook records zero/.test(lt) && /Same target, other lanes/.test(lt) && /HL-0002/.test(lt) && /never merges a PB source/.test(lt)
+   && /→ STAR/.test(lt) && /ACDDIFI1/.test(lt) && /DIM_ACCOUNT\.ACCOUNT_NUMBER/.test(lt) && /Reconciliation key/.test(lt) && /CP360-HL-004/.test(lt) && /WORKBOOK_VERSION/.test(lt) && /common<\/span>/.test(lt),
+   "the lineage sub-tab: the tiles, the record end to end with its sibling lane, the STAR and IMDS hops, the reconciliation key, the rules and the manifest");
+ok(/Transformation rules/.test(renderToStaticMarkup(<RulesTab t={tLight} initial={rules} />)) && /1,507 rules/.test(renderToStaticMarkup(<RulesTab t={tLight} initial={rules} />)) && /Decon source dictionary/.test(renderToStaticMarkup(<DeconTab t={tLight} initial={decon} />)) && /NAME_DERIVED/.test(renderToStaticMarkup(<DeconTab t={tLight} initial={decon} />)) && /checked on export/.test(renderToStaticMarkup(<QcTab t={tLight} initial={qc} />)),
+   "rules, decon and QC sub-tabs show their counts, the basis and the row cells");
+ok(HL_RULES.length === 8 && STATUS_KINDS.length === 4 && STATUS_COLOR("MATCHED") === "#159943" && STATUS_COLOR("DRAFT_REVIEW_REQUIRED") === "#c96a12" && STATUS_COLOR("UNMATCHED") === "#b42318" && emptyLineageSummary().totals.lineage === 0,
+   "eight HL rules, four independent status kinds, and the colours read the status words");
+const emptyLin = renderToStaticMarkup(<LineageTab t={tLight} initial={{ summary: emptyLineageSummary(), list: { lineage: [], total: 0 } }} />);
+ok(/No lineage loaded/.test(emptyLin) && /sql\/87_hist_lineage\.sql/.test(emptyLin), "the lineage empty state names sql/87 and the load script");
+
 console.log("-- the tab");
 for (const [tn, t] of [["light", tLight], ["dark", tDark]]) {
-  const parts = ["Overview", "Evidence", "Dictionary", "Loads"].map((sub) => renderToStaticMarkup(<HistMigration t={t} initial={{ sub, summary, lanes, artifacts, dictionary, evidence, batches }} />));
-  ok(parts.every((p) => p.length > 1200 && !/NaN|undefined|\[object Object\]/.test(p)), `all four sub-tabs render cleanly in ${tn}`, parts.map((p) => p.length).join(","));
+  const parts = ["Overview", "Lineage", "Rules", "Decon dictionary", "QC", "Evidence", "Dictionary", "Loads"].map((sub) => renderToStaticMarkup(<HistMigration t={t} initial={{ sub, summary, lanes, artifacts, dictionary, evidence, batches, lineage, rules, decon, qc }} />));
+  ok(parts.every((p) => p.length > 1200 && !/NaN|undefined|\[object Object\]/.test(p)), `all eight sub-tabs render cleanly in ${tn}`, parts.map((p) => p.length).join(","));
 }
 const ov = renderToStaticMarkup(<HistMigration t={tLight} initial={{ sub: "Overview", summary, lanes, artifacts, dictionary, evidence, batches }} />);
 ok(/214,622/.test(ov) && /15,880/.test(ov) && /unresolved lanes/.test(ov) && /ADDVANTAGE_SEI_HIST/.test(ov) && /DCONCUS10_20210727\.docx/.test(ov) && /REFERENCE/.test(ov) && /CP360-HM-007/.test(ov) && /Warning/.test(ov),

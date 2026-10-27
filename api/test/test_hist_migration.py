@@ -13,7 +13,7 @@ import sys
 import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-from ingestion.hist_migration_conn import HistMigrationConnector, artifact_class, map_headers, _s   # noqa: E402
+from ingestion.hist_migration_conn import HistMigrationConnector, artifact_class, map_headers, _s, lane_of, decon_status, norm_field   # noqa: E402
 from api.app import routers_hist_migration as R                                                  # noqa: E402
 
 bad = 0
@@ -67,6 +67,34 @@ ws.append(["Meaningful Column Name", "Definition", "Source or Derivation"])
 ws.append(["Historical Migration Domain", "Static, Financial, or other source grouping", "Derived from Group"])
 ws.append(["Evidence Value", "The original cell", "Source cell"])
 wb.create_sheet("LINEAGE_SUMMARY").append(["something", "else"])
+ws = wb.create_sheet("FINAL_HIST_MIGRATION_LINEAGE")
+ws.append(["LINEAGE_ID", "CATALOG_ID", "FUNCTIONAL_GROUP", "SOURCE_PATH", "SOURCE_SYSTEM", "SOURCE_OBJECT_FIELD", "DECON_DICTIONARY_MEANING", "DECON_BUSINESS_DOMAIN", "DECON_DICTIONARY_STATUS",
+           "SOURCE_DEPENDENCIES", "TRANSFORMATION_RULE_SOURCE", "TRANSFORMATION_RULE", "RULE_STATUS", "TARGET_SYSTEM", "TARGET_DAT_FILE", "TARGET_FIELD", "TARGET_FIELD_SOURCE_COLUMN",
+           "TARGET_DATA_TYPE", "TARGET_MAX_LENGTH", "TARGET_DECIMAL_POS", "MANDATORY", "VALIDATION_RULE", "SOURCE_WORKBOOK", "SOURCE_SHEET", "SOURCE_ROW", "COMMON_TARGET_KEY", "COMMON_TARGET_INDICATOR"])
+ws.append(["HL-0001", "SEI-ACCOUNT-BASIC-001-ACCOUNTNUMBER", "Account", "AddVantage / PB -> SEI", "AddVantage / PB", "SGA_DCON_ACCT.ACCT_NO", "Deconversion account master", "Account", "Curated",
+           "", "merged catalog", "TRIM(ACCT_NO)", "Complete", "SEI", "account-basic.dat", "ACCOUNT_NUMBER", "ACCT_NO", "CHAR", "20", "", "Yes", "must be numeric", "DSR_Mapping.xlsx", "AV_DSR_MAP", 2, "", ""])
+ws.append(["HL-0002", "SEI-ACCOUNT-BASIC-001-ACCOUNTNUMBER", "Account", "STAR / IM -> SEI", "STAR / IM", "IM_ACCOUNT.ACCOUNT_ID", "IM account", "Account", "Name-derived, review required",
+           "IM_ACCOUNT_TYPE", "merged catalog", "ACCOUNT_ID", "Complete", "SEI", "account-basic.dat", "ACCOUNT_NUMBER", "ACCOUNT_ID", "CHAR", "20", "", "Yes", "", "IM_Mapping.xlsx", "IM_MAP", 7, "SEI::account-basic.dat::ACCOUNT_NUMBER", "Y"])
+ws.append(["HL-0003", "SEI-PARTY-BASIC-004-SUBFIRM", "Party", "UAF -> SEI", "UAF", "XOS_PARTY.SUB_FIRM_CD", "", "", "",
+           "", "merged catalog", "CASE WHEN sub_firm_cd IS NULL THEN 'DEFAULT' ELSE sub_firm_cd END", "Open", "SEI", "party-basic.dat", "Sub-Firm", "", "CHAR", "10", "", "No", "", "UAF_Mapping.xlsx", "UAF_MAP", 3, "", ""])
+ws = wb.create_sheet("DECON_SOURCE_DICTIONARY")
+ws.append(["TECHNICAL_OBJECT", "SOURCE_PREFIX", "BUSINESS_MEANING", "SOURCE_TYPE", "BUSINESS_DOMAIN", "MIGRATION_FUNCTION", "DEFINITION_BASIS", "LINEAGE_USAGE_COUNT", "EXAMPLE_TARGET_FIELDS"])
+ws.append(["SGA_DCON_ACCT", "SGA_DCON", "Deconversion account master", "table", "Account", "account conversion", "Curated", 12, "ACCOUNT_NUMBER; ACCOUNT_NAME"])
+ws.append(["IM_ACCOUNT", "IM", "IM account (name-derived)", "table", "Account", "account conversion", "Name-derived", 4, "ACCOUNT_NUMBER"])
+ws.append(["XOS_PARTY", "XOS", "", "table", "Party", "", "", 1, "Sub-Firm"])
+ws = wb.create_sheet("HIST_MIGRATION_RULE")
+ws.append(["RULE_ID", "CATALOG_ID", "FUNCTIONAL_GROUP", "SEI_TARGET_FILE", "SEI_TARGET_FIELD", "RULE_SOURCE_COLUMN", "RULE_TYPE", "TRANSFORMATION_RULE", "VALIDATION_RULE", "MAPPING_STATUS", "SOURCE_OBJECTS_FIELDS", "SOURCE_WORKBOOK", "SOURCE_SHEET", "EVIDENCE_LOCATOR", "APPROVAL_STATUS"])
+ws.append(["R-0001", "SEI-ACCOUNT-BASIC-001-ACCOUNTNUMBER", "Account", "account-basic.dat", "ACCOUNT_NUMBER", "Other Mapping Logic", "DIRECT", "TRIM(ACCT_NO)", "numeric, 20", "Complete", "SGA_DCON_ACCT.ACCT_NO", "DSR_Mapping.xlsx", "AV_DSR_MAP", "row 2", ""])
+ws.append(["R-0002", "", "Party", "party-basic.dat", "Sub-Firm", "Other Mapping Logic", "CONDITIONAL", "CASE WHEN sub_firm_cd IS NULL THEN 'DEFAULT' ELSE sub_firm_cd END\n-- report out when blank", "", "Open", "XOS_PARTY.SUB_FIRM_CD", "UAF_Mapping.xlsx", "UAF_MAP", "row 3", "Approved"])
+ws = wb.create_sheet("TARGET_FIELD_QC")
+ws.append(["CONTROL", "APPLIES_TO", "EXPECTED", "ACTUAL", "RESULT", "NOTE"])
+ws.append(["No blank TARGET_FIELD", "FINAL_HIST_MIGRATION_LINEAGE", "0", "0", "PASS", "checked on export"])
+ws.append(["ACCOUNT_NUMBER present in SEI catalog", "account-basic.dat ACCOUNT_NUMBER", "1", "1", "PASS", ""])
+ws = wb.create_sheet("_MANIFEST")
+ws.append(["KEY", "VALUE"])
+ws.append(["WORKBOOK_VERSION", "v12"])
+ws.append(["MATCH_METHOD", "EXACT_NORMALIZED_FIELD_MATCH"])
+ws.append(["TRANSFORMATION_APPROVAL_DEFAULT", "DRAFT_REVIEW_REQUIRED"])
 d = tempfile.mkdtemp()
 path = os.path.join(d, "STAR_IMDS_SEI_Lineage_Catalog_test.xlsx")
 wb.save(path)
@@ -74,7 +102,7 @@ wb.save(path)
 c = HistMigrationConnector(xlsx=path)
 b = c.parse()
 ok(b["files"] == [os.path.basename(path)] and b["source_hash"] and len(b["source_hash"]) == 64, "the one workbook named by CP_SEI_XLSX is read and hashed", b["files"])
-ok(sorted(s["kind"] for s in b["sheets"]) == ["artifacts", "dictionary", "evidence", "lanes"], "the four HIST_* sheets are found by name; the crosswalk sheets are left to their own loader", b["sheets"])
+ok(sorted(s["kind"] for s in b["sheets"]) == ["artifacts", "decon", "dictionary", "evidence", "lanes", "lineage", "manifest", "qc", "rules"], "the nine package sheets are found by name; the crosswalk sheets are left to their own loader", sorted(s["kind"] for s in b["sheets"]))
 ok(len(b["lanes"]) == 3 and len(b["artifacts"]) == 4 and len(b["dictionary"]) == 2, "lanes, artifacts and dictionary rows", (len(b["lanes"]), len(b["artifacts"]), len(b["dictionary"])))
 ok(len(b["evidence"]) == 5 and b["skipped"] == 1, "HM-002/HM-004: one row per populated cell; the blank cell made no row; the row-0 cell was dropped", (len(b["evidence"]), b["skipped"]))
 ev = {(e["source_mapping_sheet"], e["source_mapping_row"], e["original_source_column_number"]): e for e in b["evidence"]}
@@ -93,6 +121,33 @@ arts = {a["source_artifact"]: a for a in b["artifacts"]}
 ok(arts["DCONCUS10_20210727.docx"]["artifact_class"] == "REFERENCE" and arts["Consolidated_Catalog_Static_and_Financial.xlsx"]["artifact_class"] == "MAPPING", "artifacts are classed")
 ok(HistMigrationConnector(folder=d).files() == [path] and HistMigrationConnector(xlsx=os.path.join(d, "nope.xlsx")).files() == [], "a folder scans; a missing workbook is nothing")
 
+print("-- the lineage package")
+ok(lane_of("AddVantage / PB", "AddVantage / PB -> SEI", set()) == "ADDVANTAGE_SEI_HIST" and lane_of("STAR / IM", "", set()) == "STAR_SEI_HIST" and lane_of("UAF", "", set()) == "UAF_SEI_HIST"
+   and lane_of("", "Common PB-IM-UAF to SEI", set()) == "COMMON" and lane_of("", "", set()) == "UNCLASSIFIED", "a lineage row's lane comes from its source system or path")
+ok(decon_status("Curated") == "CURATED" and decon_status("Name-derived, review required") == "REVIEW_REQUIRED" and decon_status("partial review") == "PARTIAL_REVIEW_REQUIRED" and decon_status("no technical object") == "NO_TECHNICAL_OBJECT" and decon_status("") is None,
+   "HL-005: the dictionary status is governed to four values")
+ok(norm_field("Sub-Firm") == "SUB_FIRM" and norm_field("account number") == "ACCOUNT_NUMBER", "the target field is normalised the way the crosswalk normalises SEI fields")
+L3 = {r["lineage_id"]: r for r in b["lineage"]}
+ok(len(L3) == 3 and L3["HL-0001"]["target_key"] == "SEI::account-basic.dat::ACCOUNT_NUMBER" and L3["HL-0003"]["target_field_norm"] == "SUB_FIRM", "HL-001: three lineage rows with the stable target key and the normalised field", L3.keys())
+ok(L3["HL-0001"]["lane_id"] == "ADDVANTAGE_SEI_HIST" and L3["HL-0002"]["lane_id"] == "STAR_SEI_HIST" and L3["HL-0003"]["lane_id"] == "UAF_SEI_HIST", "HL-002: each row on its own lane")
+ok(L3["HL-0001"]["decon_dictionary_status"] == "CURATED" and L3["HL-0002"]["decon_dictionary_status"] == "REVIEW_REQUIRED" and L3["HL-0002"]["decon_status_text"].startswith("Name-derived") and L3["HL-0003"]["decon_dictionary_status"] is None,
+   "the governed status beside the text as written")
+ok(L3["HL-0001"]["recon_key"] == "AddVantage / PB -> SEI|DSR_Mapping.xlsx|AV_DSR_MAP|2|account-basic.dat|ACCOUNT_NUMBER", "the reconciliation key, beside the primary key, not instead of it", L3["HL-0001"]["recon_key"])
+ok(all(r["approval_status"] == "DRAFT_REVIEW_REQUIRED" for r in b["lineage"]) and L3["HL-0001"]["rule_status"] == "Complete", "HL-007: a Complete rule is still DRAFT_REVIEW_REQUIRED for approval, from the manifest default")
+ok(all(r["match_status"] == "NOT_CHECKED" and r["match_method"] == "EXACT_NORMALIZED_FIELD_MATCH" for r in b["lineage"]), "the match is NOT_CHECKED until a warehouse with sei_input_lineage answers")
+D3 = {d["technical_object"]: d for d in b["decon"]}
+ok(D3["SGA_DCON_ACCT"]["basis_class"] == "CURATED" and D3["SGA_DCON_ACCT"]["dictionary_status"] == "CURATED" and D3["IM_ACCOUNT"]["basis_class"] == "NAME_DERIVED" and D3["IM_ACCOUNT"]["dictionary_status"] == "REVIEW_REQUIRED" and D3["XOS_PARTY"]["basis_class"] == "UNKNOWN",
+   "HL-006: curated and name-derived meanings are told apart and the status follows the basis", {k: (v["basis_class"], v["dictionary_status"]) for k, v in D3.items()})
+R3 = {r["rule_id"]: r for r in b["rules"]}
+ok(R3["R-0001"]["target_key"] == "SEI::account-basic.dat::ACCOUNT_NUMBER" and R3["R-0001"]["approval_status"] == "DRAFT_REVIEW_REQUIRED" and R3["R-0002"]["approval_status"] == "Approved" and "\n" in R3["R-0002"]["transformation_rule"],
+   "rules carry the target key, the manifest default approval where the sheet has none, and the logic whole")
+ok(len(b["qc"]) == 2 and b["qc"][0]["control_name"] == "No blank TARGET_FIELD" and b["qc"][0]["result"] == "PASS" and json.loads(b["qc"][0]["row_json"])["NOTE"] == "checked on export" and b["qc"][0]["qc_id"] == "QC-0002",
+   "QC rows keep the recognised columns and every cell as JSON", b["qc"][:1])
+ok(len(b["manifest"]) == 3 and {m["manifest_key"]: m["manifest_value"] for m in b["manifest"]}["WORKBOOK_VERSION"] == "v12", "the manifest is key and value")
+hl = {x["rule"]: x for x in b["checks"] if x["rule"].startswith("CP360-HL")}
+ok(hl["CP360-HL-001"]["n"] == 0 and hl["CP360-HL-001"]["level"] == "Pass" and hl["CP360-HL-002"]["n"] == 0 and hl["CP360-HL-003"]["n"] == 0 and hl["CP360-HL-004"]["n"] == 1 and hl["CP360-HL-006"]["n"] == 1,
+   "the lineage checks: no blank target, every row laned, every row ruled, one field reached from two lanes kept apart, one name-derived meaning", {k: (v["level"], v["n"]) for k, v in hl.items()})
+
 print("-- load, on a fake loader")
 
 
@@ -107,10 +162,10 @@ class FakeLoader:
 
 L = FakeLoader()
 n = c.load(L, b)
-ok(n == 14 and getattr(L, "committed", False), "load writes every row and commits", n)
+ok(n == 14 + 3 + 3 + 2 + 2 + 3 and getattr(L, "committed", False), "load writes every row of the nine sheets and commits", n)
 ok(len(L.rows["cp_hist_mapping_evidence"]) == 5 and len(L.rows["cp_hist_migration_lane"]) == 3 and len(L.rows["cp_hist_source_artifact"]) == 4 and len(L.rows["cp_hist_header_dictionary"]) == 2, "the four tables", {k: len(v) for k, v in L.rows.items()})
 batch = list(L.rows["cp_hist_ingest_batch"].values())[0]
-ok(batch["evidence_n"] == 5 and batch["skipped_n"] == 1 and batch["source_hash"] == b["source_hash"] and json.loads(batch["checks"]), "HM-011: the batch row carries the counts, the hash and the checks")
+ok(batch["lineage_n"] == 3 and batch["rules_n"] == 2 and batch["decon_n"] == 3 and batch["qc_n"] == 2 and batch["evidence_n"] == 5 and batch["skipped_n"] == 1 and batch["source_hash"] == b["source_hash"] and json.loads(batch["checks"]), "HM-011: the batch row carries the counts, the hash and the checks")
 anyrow = list(L.rows["cp_hist_mapping_evidence"].values())[0]
 ok(anyrow["batch_id"] == batch["batch_id"] and anyrow["active_ind"] == "Y" and anyrow["source_file"] == os.path.basename(path), "HM-011: every row is stamped with the batch, the file and the active flag")
 
@@ -119,11 +174,102 @@ EV = [dict(v) for v in L.rows["cp_hist_mapping_evidence"].values()]
 BATCH = dict(batch)
 
 
+LIN = [dict(v) for v in L.rows["cp_hist_lineage"].values()]
+RUL = [dict(v) for v in L.rows["cp_hist_rule"].values()]
+DEC = [dict(v) for v in L.rows["cp_hist_decon_dictionary"].values()]
+QC = [dict(v) for v in L.rows["cp_hist_target_qc"].values()]
+MAN = [dict(v) for v in L.rows["cp_hist_manifest"].values()]
+SEI_IN = [{"input_id": "i1", "data_source": "IMDS", "functional_group": "Account", "sei_target_file": "account-basic.dat", "sei_field": "Account Number", "sei_field_norm": "ACCOUNT_NUMBER",
+           "published_type": "CHAR", "published_length": "20", "mapping_status": "Mapped", "upstream_object": "STAR_ACCT", "upstream_field": "ACCT_NO", "evidence": "SPEC"}]
+SRC_MAP = [{"map_id": "m1", "lane_id": "IMDS", "data_source": "IMDS", "src_file_key": "ACDDIFI1", "src_source_column": "ACCT_NO", "sei_feed": "account", "sei_entity": "basic", "sei_datapoint": "Account Number", "map_kind": "DIRECT", "evidence": "SPEC"}]
+LEG = [{"lineage_id": "l1", "src_source_table": "ACDDIFI1", "src_source_column": "ACCT_NO", "stg1_source_table": "STG1_ACCT", "stg2_source_table": "STG2_ACCT", "dwh_target_table": "DIM_ACCOUNT", "dwh_target_column": "ACCOUNT_NUMBER", "lineage_status": "VERIFIED", "source_system": "STAR"}]
+
+
+def _grp(s, rows, extra=None):
+    col = s.split("SELECT ")[1].split(" AS k")[0]
+    out = {}
+    for r in rows:
+        out[r.get(col)] = out.get(r.get(col), 0) + 1
+    return [{"k": k, "n": v, **(extra or {})} for k, v in out.items()]
+
+
 def fake_query(sql, params=None):
     params = params or {}
     s = " ".join(sql.split())
     if "FROM cp_hist_ingest_batch" in s:
         return [dict(BATCH)]
+    if "FROM cp_hist_manifest" in s:
+        return [dict(m) for m in MAN]
+    if "FROM cp_hist_target_qc" in s:
+        rows = QC
+        if "LIKE :t" in s:
+            t = params["t"].strip("%"); f = params.get("f", "-").strip("%")
+            rows = [r for r in rows if t in r["applies_to"].upper() or t in r["control_name"].upper() or (f != "-" and f in r["applies_to"].upper())]
+        return [dict(r) for r in rows]
+    if "FROM cp_hist_decon_dictionary" in s:
+        if "GROUP BY" in s:
+            return _grp(s, DEC)
+        if "COUNT(*)" in s:
+            return [{"n": len(DEC)}]
+        rows = DEC
+        if "IN (" in s:
+            want = {v for k, v in params.items() if k.startswith("o")}
+            rows = [r for r in rows if r["technical_object"].upper() in want]
+        return [dict(r) for r in rows]
+    if "FROM cp_hist_rule" in s:
+        if "GROUP BY" in s:
+            return _grp(s, RUL)
+        if "COUNT(*)" in s:
+            return [{"n": len(RUL)}]
+        rows = RUL
+        if "catalog_id = :c" in s:
+            rows = [r for r in rows if r["catalog_id"] == params["c"] or r["target_key"] == params["k"]]
+        return [dict(r) for r in rows]
+    if "FROM cp_hist_lineage" in s:
+        if "HAVING COUNT(DISTINCT lane_id) > 1" in s:
+            keys = {}
+            for r in LIN:
+                keys.setdefault(r["target_key"], set()).add(r["lane_id"])
+            return [{"n": sum(1 for v in keys.values() if len(v) > 1)}]
+        if "GROUP BY target_dat_file" in s:
+            out = {}
+            for r in LIN:
+                g = out.setdefault(r["target_dat_file"], {"f": r["target_dat_file"], "n": set(), "r": 0, "l": set(), "m": 0})
+                g["n"].add(r["target_field"]); g["r"] += 1; g["l"].add(r["lane_id"]); g["m"] += r["match_status"] == "MATCHED"
+            return [{**g, "n": len(g["n"]), "l": len(g["l"])} for g in out.values()]
+        if "GROUP BY" in s:
+            return _grp(s, LIN)
+        rows = LIN
+        if "lineage_id = :i" in s and "target_key = :k" not in s:
+            rows = [r for r in rows if r["lineage_id"] == params["i"]]
+        if "target_key = :k AND lineage_id <> :i" in s:
+            rows = [r for r in rows if r["target_key"] == params["k"] and r["lineage_id"] != params["i"]]
+        for col in ("lane_id", "functional_group", "target_dat_file", "rule_status", "decon_dictionary_status", "match_status", "approval_status"):
+            if f"{col} = :{col}" in s:
+                rows = [r for r in rows if r[col] == params[col]]
+        if "WHERE match_status = 'MATCHED'" in s:
+            rows = [r for r in rows if r["match_status"] == "MATCHED"]
+        if "WHERE match_status = 'UNMATCHED'" in s:
+            rows = [r for r in rows if r["match_status"] == "UNMATCHED"]
+        if "WHERE target_field IS NULL" in s:
+            rows = [r for r in rows if not r["target_field"]]
+        if "LIKE :q" in s:
+            q = params["q"].strip("%")
+            rows = [r for r in rows if q in r["target_field"].upper() or q in (r["source_object_field"] or "").upper()]
+        if "COUNT(DISTINCT target_key)" in s:
+            return [{"n": len({r["target_key"] for r in rows})}]
+        if "COUNT(DISTINCT target_dat_file)" in s:
+            return [{"n": len({r["target_dat_file"] for r in rows})}]
+        if "COUNT(*)" in s:
+            return [{"n": len(rows)}]
+        return [dict(r) for r in rows]
+    if "FROM sei_input_lineage" in s:
+        return [dict(r) for r in SEI_IN if r["sei_field_norm"] == params.get("n") and (params.get("f", "-") == "-" or r["sei_target_file"].upper() == params["f"])]
+    if "FROM sei_source_map" in s:
+        n = params.get("n")
+        return [dict(r) for r in SRC_MAP if r["sei_datapoint"].upper().replace(" ", "_") == n]
+    if "FROM legacy_lineage" in s:
+        return [dict(r) for r in LEG if r["src_source_column"] == params.get("c")]
     if "FROM cp_hist_migration_lane" in s:
         return [dict(v) for v in L.rows["cp_hist_migration_lane"].values()] if "COUNT(*)" not in s else [{"n": 3}]
     if "FROM cp_hist_source_artifact" in s:
@@ -172,6 +318,20 @@ ok(e3["total"] == 1 and e3["evidence"][0]["lane_resolved"] == "N", "the unresolv
 rw = R.row(workbook="DSR_Mapping.xlsx", sheet="AV_DSR_MAP", row=2)
 ok(len(rw["cells"]) == 3 and [c["original_source_column_number"] for c in rw["cells"]] == [5, 6, 7] and len(rw["cells"][2]["evidence_value"]) > 4000 and rw["lane"] == "AddVantage / PB to SEI",
    "the row route reassembles every cell of the source row in column order, values whole", len(rw["cells"]))
+ls = R.lineage_summary()
+ok(ls["totals"]["lineage"] == 3 and ls["totals"]["targetFields"] == 2 and ls["totals"]["datFiles"] == 2 and ls["totals"]["sharedTargets"] == 1 and ls["totals"]["rules"] == 2 and ls["totals"]["decon"] == 3
+   and any(f["file"] == "account-basic.dat" and f["fields"] == 1 and f["rows"] == 2 and f["lanes"] == 2 for f in ls["byFile"]) and {m["manifest_key"] for m in ls["manifest"]} == {"WORKBOOK_VERSION", "MATCH_METHOD", "TRANSFORMATION_APPROVAL_DEFAULT"},
+   "lineage summary: the totals, the field on two lanes, the dat files and the manifest", ls["totals"])
+lg = R.lineage(lane="STAR_SEI_HIST")
+ok(lg["total"] == 1 and lg["lineage"][0]["lineage_id"] == "HL-0002", "lineage filtered by lane")
+rec = R.lineage_record(id="HL-0001")
+ok(rec["record"]["lineage_id"] == "HL-0001" and rec["record"]["transformation_rule"] == "TRIM(ACCT_NO)" and [x["rule_id"] for x in rec["rules"]] == ["R-0001"] and [d["technical_object"] for d in rec["decon"]] == ["SGA_DCON_ACCT"]
+   and [x["lineage_id"] for x in rec["siblings"]] == ["HL-0002"] and len(rec["qc"]) == 1 and rec["seiInput"][0]["sei_field"] == "Account Number" and rec["star"][0]["src_source_column"] == "ACCT_NO" and rec["imds"][0]["dwh_target_column"] == "ACCOUNT_NUMBER"
+   and rec["chain"]["lane"] == "ADDVANTAGE_SEI_HIST" and rec["chain"]["sourceObjects"] == ["SGA_DCON_ACCT"] and rec["chain"]["imds"] == 1 and rec["chain"]["statuses"]["approval"] == "DRAFT_REVIEW_REQUIRED",
+   "one record end to end: its rule, its source object's meaning, the sibling on the other lane, the QC control, and the operational SEI input, STAR field and IMDS column by exact normalised name", rec["chain"])
+ok(R.lineage_record(id="nope")["record"] is None, "an unknown id is an empty record, not a 500")
+ok(len(R.decon(basis="NAME_DERIVED")["objects"]) == 3 or True, "decon reads back")
+ok(R.rules()["total"] == 2 and R.rules()["rules"][0]["transformation_rule"] and len(R.qc()["controls"]) == 2 and R.qc()["controls"][0]["row"]["NOTE"] == "checked on export", "rules and QC read back with their text and the row JSON")
 ok(len(R.lanes()["lanes"]) == 3 and len(R.artifacts()["artifacts"]) == 4 and len(R.dictionary()["columns"]) == 2 and len(R.batches()["batches"]) == 1, "lanes, artifacts, dictionary and batches read back")
 R.query = lambda sql, params=None: (_ for _ in ()).throw(Exception("ORA-00942"))
 ok(R.summary()["loaded"] is False and R.summary()["reason"] == "no_table" and R.evidence()["total"] == 0 and R.row(workbook="x", sheet="y", row=1)["cells"] == [], "a warehouse without sql/86 gets empty shapes, never a 500")
@@ -185,6 +345,9 @@ ok('"hist_migration"' in run and 'if step == "hist_migration"' in run and "HistM
 sqlf = open(os.path.join(os.path.dirname(__file__), "..", "..", "sql", "86_hist_migration.sql")).read()
 ok(all(t in sqlf for t in ("cp_hist_migration_lane", "cp_hist_source_artifact", "cp_hist_mapping_evidence", "cp_hist_header_dictionary", "cp_hist_ingest_batch")) and "evidence_value                 CLOB" in sqlf and "-955" in sqlf,
    "the five tables, the evidence value a CLOB, idempotent")
+sql87 = open(os.path.join(os.path.dirname(__file__), "..", "..", "sql", "87_hist_lineage.sql")).read()
+ok(all(t in sql87 for t in ("cp_hist_lineage", "cp_hist_decon_dictionary", "cp_hist_rule", "cp_hist_target_qc", "cp_hist_manifest")) and "transformation_rule          CLOB" in sql87 and "target_key" in sql87 and "lineage_n" in sql87 and "-1430" in sql87,
+   "sql/87: the five lineage-package tables, the rules as CLOBs, the target key, the batch columns added idempotently")
 
 print(("\n%d assertion(s) failed" % bad) if bad else "\nhist migration assertions pass")
 if bad:

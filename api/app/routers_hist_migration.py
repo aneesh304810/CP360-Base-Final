@@ -7,6 +7,14 @@
     GET /hist-migration/evidence     the evidence, filtered and paged
     GET /hist-migration/row          every cell of one source row, in column order
     GET /hist-migration/batches      every load
+    GET /hist-migration/lineage          FINAL_HIST_MIGRATION_LINEAGE, filtered and paged (sql/87)
+    GET /hist-migration/lineage/summary  totals, the statuses kept apart, the dat files, the manifest
+    GET /hist-migration/lineage/record   one record end to end: lane, source objects with their decon
+                                         meaning, the rules, the SEI target, the operational SEI input
+                                         lineage it matches, the STAR contract field and the IMDS column
+    GET /hist-migration/decon            the decon source dictionary
+    GET /hist-migration/rules            the transformation rules, filtered and paged
+    GET /hist-migration/qc               the TARGET_FIELD_QC controls
 
 Reads cp_hist_* (sql/86), written by ingestion/hist_migration_conn.py. The
 evidence values are the analysts' mapping logic as they wrote it; the API
@@ -18,6 +26,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 
 from fastapi import APIRouter
 
@@ -167,3 +176,192 @@ def row(workbook: str, sheet: str, row: int):
 def batches():
     return {"batches": [_batch(r) for r in _safe("SELECT batch_id, source_file, source_hash, lanes_n, artifacts_n, evidence_n, dictionary_n, skipped_n, checks, loaded_at "
                                                  "FROM cp_hist_ingest_batch ORDER BY loaded_at DESC")]}
+
+
+# ------------------------------------------------ the lineage (sql/87)
+def _canon(col):
+    return (f"REGEXP_REPLACE(UPPER(TRIM('_' FROM REGEXP_REPLACE({col}, '[[:space:]/.-]+', '_'))), '_L([0-9]+)', '_\\1')")
+
+
+LINEAGE_SLIM = ("lineage_id, catalog_id, functional_group, source_path, source_system, lane_id, source_object_field, decon_business_domain, "
+                "decon_dictionary_status, rule_status, target_system, target_dat_file, target_field, target_key, target_data_type, target_max_length, "
+                "mandatory, source_workbook, source_sheet, source_row, common_target_indicator, match_method, match_status, approval_status")
+
+
+def _lineage_where(lane, group, file, status, decon, match, approval, q):
+    where, p = [], {}
+    for col, val in (("lane_id", lane), ("functional_group", group), ("target_dat_file", file), ("rule_status", status),
+                     ("decon_dictionary_status", decon), ("match_status", match), ("approval_status", approval)):
+        if val:
+            where.append(f"{col} = :{col}")
+            p[col] = val
+    if q and q.strip():
+        where.append("(UPPER(target_field) LIKE :q OR UPPER(source_object_field) LIKE :q OR UPPER(catalog_id) LIKE :q OR UPPER(lineage_id) LIKE :q)")
+        p["q"] = f"%{q.strip().upper()}%"
+    return (" WHERE " + " AND ".join(where)) if where else "", p
+
+
+@router.get("/lineage")
+def lineage(lane: str = "", group: str = "", file: str = "", status: str = "", decon: str = "", match: str = "", approval: str = "",
+            q: str = "", page: int = 1, size: int = 100):
+    page, size = max(1, int(page or 1)), min(1000, max(1, int(size or 100)))
+    w, p = _lineage_where(lane, group, file, status, decon, match, approval, q)
+    total = _safe(f"SELECT COUNT(*) AS n FROM cp_hist_lineage{w}", p)
+    rows = _safe(f"SELECT {LINEAGE_SLIM} FROM cp_hist_lineage{w} ORDER BY target_dat_file, target_field, lane_id, lineage_id "
+                 "OFFSET :off ROWS FETCH NEXT :lim ROWS ONLY", {**p, "off": (page - 1) * size, "lim": size})
+    return {"lineage": [dict(r) for r in rows], "total": int((total[0] or {}).get("n", 0) or 0) if total else 0, "page": page, "size": size}
+
+
+@router.get("/lineage/summary")
+def lineage_summary():
+    by = lambda col, lim=100: [{"key": r.get("k") or "(blank)", "n": int(r.get("n") or 0)}   # noqa: E731
+                               for r in _safe(f"SELECT {col} AS k, COUNT(*) AS n FROM cp_hist_lineage GROUP BY {col} ORDER BY COUNT(*) DESC FETCH FIRST {lim} ROWS ONLY")]
+    files = [{"file": r.get("f"), "fields": int(r.get("n") or 0), "rows": int(r.get("r") or 0), "lanes": int(r.get("l") or 0), "matched": int(r.get("m") or 0)}
+             for r in _safe("SELECT target_dat_file AS f, COUNT(DISTINCT target_field) AS n, COUNT(*) AS r, COUNT(DISTINCT lane_id) AS l, "
+                            "SUM(CASE WHEN match_status = 'MATCHED' THEN 1 ELSE 0 END) AS m FROM cp_hist_lineage GROUP BY target_dat_file ORDER BY target_dat_file")]
+    shared = _safe("SELECT COUNT(*) AS n FROM (SELECT target_key FROM cp_hist_lineage GROUP BY target_key HAVING COUNT(DISTINCT lane_id) > 1)")
+    n = lambda sql: int(((_safe(sql) or [{}])[0] or {}).get("n", 0) or 0)   # noqa: E731
+    return {"totals": {"lineage": n("SELECT COUNT(*) AS n FROM cp_hist_lineage"), "targetFields": n("SELECT COUNT(DISTINCT target_key) AS n FROM cp_hist_lineage"),
+                       "datFiles": n("SELECT COUNT(DISTINCT target_dat_file) AS n FROM cp_hist_lineage"), "rules": n("SELECT COUNT(*) AS n FROM cp_hist_rule"),
+                       "decon": n("SELECT COUNT(*) AS n FROM cp_hist_decon_dictionary"), "qc": n("SELECT COUNT(*) AS n FROM cp_hist_target_qc"),
+                       "sharedTargets": int(((shared or [{}])[0] or {}).get("n", 0) or 0),
+                       "matched": n("SELECT COUNT(*) AS n FROM cp_hist_lineage WHERE match_status = 'MATCHED'"),
+                       "unmatched": n("SELECT COUNT(*) AS n FROM cp_hist_lineage WHERE match_status = 'UNMATCHED'"),
+                       "blankTarget": n("SELECT COUNT(*) AS n FROM cp_hist_lineage WHERE target_field IS NULL")},
+            "byLane": by("lane_id"), "byGroup": by("functional_group"), "byRuleStatus": by("rule_status"), "byApproval": by("approval_status"),
+            "byDecon": by("decon_dictionary_status"), "byMatch": by("match_status"), "byFile": files,
+            "manifest": [dict(r) for r in _safe("SELECT manifest_key, manifest_value FROM cp_hist_manifest ORDER BY manifest_key")]}
+
+
+def _tokens(text):
+    """The technical objects named in a source-object-field cell: words
+    that look like OBJECT or OBJECT.FIELD, upper-cased."""
+    out = []
+    for m in re.finditer(r"[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)?", str(text or "")):
+        tok = m.group(0).upper()
+        if len(tok) >= 4 and "_" in tok:
+            out.append(tok)
+    seen, uniq = set(), []
+    for t in out:
+        if t not in seen:
+            seen.add(t)
+            uniq.append(t)
+    return uniq[:40]
+
+
+@router.get("/lineage/record")
+def lineage_record(id: str):
+    rows = _safe("SELECT * FROM cp_hist_lineage WHERE lineage_id = :i", {"i": id})
+    if not rows:
+        return {"record": None}
+    r = dict(rows[0])
+    for c in ("transformation_rule", "validation_rule"):
+        r[c] = _clob(r.get(c)) or ""
+    r["loaded_at"] = _ts(r.get("loaded_at"))
+    key, norm, file = r.get("target_key"), r.get("target_field_norm") or "", (r.get("target_dat_file") or "").upper()
+    # the rules on this catalog id or target field
+    rules = []
+    for x in _safe("SELECT rule_id, catalog_id, functional_group, sei_target_file, sei_target_field, rule_source_column, rule_type, transformation_rule, "
+                   "validation_rule, mapping_status, source_objects_fields, source_workbook, source_sheet, evidence_locator, approval_status "
+                   "FROM cp_hist_rule WHERE (catalog_id = :c AND catalog_id IS NOT NULL) OR target_key = :k ORDER BY rule_id", {"c": r.get("catalog_id") or "-", "k": key}):
+        d = dict(x)
+        d["transformation_rule"], d["validation_rule"] = _clob(x.get("transformation_rule")) or "", _clob(x.get("validation_rule")) or ""
+        rules.append(d)
+    # the decon dictionary entries for the source objects this row names
+    toks = _tokens(r.get("source_object_field")) + _tokens(r.get("source_dependencies"))
+    objs = [t.split(".")[0] for t in toks]
+    decon = []
+    if objs:
+        binds = {f"o{i}": o for i, o in enumerate(sorted(set(objs))[:30])}
+        decon = [dict(x) for x in _safe("SELECT technical_object, source_prefix, business_meaning, source_type, business_domain, migration_function, definition_basis, basis_class, "
+                                        f"dictionary_status, lineage_usage_count FROM cp_hist_decon_dictionary WHERE UPPER(technical_object) IN ({', '.join(':' + k for k in binds)}) ORDER BY technical_object", binds)]
+    # the same SEI field reached from other lanes: separate rows, by design
+    siblings = [dict(x) for x in _safe(f"SELECT {LINEAGE_SLIM} FROM cp_hist_lineage WHERE target_key = :k AND lineage_id <> :i ORDER BY lane_id, lineage_id", {"k": key, "i": id})]
+    # the QC controls that name this field or file
+    qc = [dict(x) for x in _safe("SELECT qc_id, control_name, applies_to, expected, actual, result, detail FROM cp_hist_target_qc "
+                                 "WHERE UPPER(applies_to) LIKE :f OR UPPER(applies_to) LIKE :t OR UPPER(control_name) LIKE :t ORDER BY qc_id",
+                                 {"f": f"%{file}%" if file else "-", "t": f"%{(r.get('target_field') or '-').upper()}%"})]
+    # downstream: the operational SEI input lineage, the SEI datapoint to the STAR contract field, STAR to IMDS
+    sei_in = [dict(x) for x in _safe("SELECT input_id, data_source, functional_group, sei_target_file, sei_field, published_type, published_length, mapping_status, "
+                                     "upstream_object, upstream_field, evidence FROM sei_input_lineage WHERE sei_field_norm = :n AND (UPPER(sei_target_file) = :f OR :f = '-') "
+                                     "ORDER BY sei_target_file", {"n": norm or "-", "f": file or "-"})]
+    if not sei_in and norm:
+        sei_in = [dict(x) for x in _safe("SELECT input_id, data_source, functional_group, sei_target_file, sei_field, published_type, published_length, mapping_status, "
+                                         "upstream_object, upstream_field, evidence FROM sei_input_lineage WHERE sei_field_norm = :n ORDER BY sei_target_file", {"n": norm})]
+    star = [dict(x) for x in _safe(f"SELECT map_id, lane_id, data_source, src_file_key, src_source_column, sei_feed, sei_entity, sei_datapoint, map_kind, evidence "
+                                   f"FROM sei_source_map WHERE {_canon('sei_datapoint')} = :n ORDER BY data_source, src_file_key", {"n": norm or "-"})]
+    imds = []
+    seen = set()
+    for m in star[:20]:
+        if not m.get("src_source_column"):
+            continue
+        for x in _safe("SELECT l.lineage_id, l.src_source_table, l.src_source_column, l.stg1_source_table, l.stg2_source_table, l.dwh_target_table, l.dwh_target_column, "
+                       "l.lineage_status, n.source_system FROM legacy_lineage l LEFT JOIN legacy_lineage_lane n ON n.lineage_id = l.lineage_id "
+                       f"WHERE {_canon('l.src_source_column')} = {_canon(':c')} AND (UPPER(l.src_source_table) LIKE :t OR :t = '%') FETCH FIRST 20 ROWS ONLY",
+                       {"c": m["src_source_column"], "t": f"%{(m.get('src_file_key') or '').upper()}%" if m.get("src_file_key") else "%"}):
+            if x["lineage_id"] in seen:
+                continue
+            seen.add(x["lineage_id"])
+            imds.append(dict(x))
+    chain = {
+        "lane": r.get("lane_id"), "sourceObjects": sorted(set(objs))[:30], "rule": rules[0]["rule_id"] if rules else None, "datFile": r.get("target_dat_file"),
+        "targetField": r.get("target_field"), "targetKey": key, "seiInput": len(sei_in), "star": len(star), "imds": len(imds),
+        "statuses": {"rule": r.get("rule_status"), "approval": r.get("approval_status"), "dictionary": r.get("decon_dictionary_status"), "match": r.get("match_status")},
+    }
+    return {"record": r, "rules": rules, "decon": decon, "siblings": siblings, "qc": qc, "seiInput": sei_in, "star": star, "imds": imds, "chain": chain}
+
+
+@router.get("/decon")
+def decon(q: str = "", status: str = "", basis: str = "", domain: str = ""):
+    where, p = [], {}
+    if status:
+        where.append("dictionary_status = :s"); p["s"] = status
+    if basis:
+        where.append("basis_class = :b"); p["b"] = basis
+    if domain:
+        where.append("business_domain = :d"); p["d"] = domain
+    if q.strip():
+        where.append("(UPPER(technical_object) LIKE :q OR UPPER(business_meaning) LIKE :q)"); p["q"] = f"%{q.strip().upper()}%"
+    w = (" WHERE " + " AND ".join(where)) if where else ""
+    rows = _safe("SELECT technical_object, source_prefix, business_meaning, source_type, business_domain, migration_function, definition_basis, basis_class, "
+                 f"dictionary_status, lineage_usage_count, example_target_fields FROM cp_hist_decon_dictionary{w} ORDER BY lineage_usage_count DESC NULLS LAST, technical_object FETCH FIRST 2000 ROWS ONLY", p)
+    by = lambda col: [{"key": r.get("k") or "(blank)", "n": int(r.get("n") or 0)} for r in _safe(f"SELECT {col} AS k, COUNT(*) AS n FROM cp_hist_decon_dictionary GROUP BY {col} ORDER BY COUNT(*) DESC")]   # noqa: E731
+    return {"objects": [dict(r) for r in rows], "byStatus": by("dictionary_status"), "byBasis": by("basis_class"), "byDomain": by("business_domain"), "byPrefix": by("source_prefix")}
+
+
+@router.get("/rules")
+def rules(q: str = "", file: str = "", rule_type: str = "", status: str = "", approval: str = "", page: int = 1, size: int = 100):
+    page, size = max(1, int(page or 1)), min(1000, max(1, int(size or 100)))
+    where, p = [], {}
+    for col, val in (("sei_target_file", file), ("rule_type", rule_type), ("mapping_status", status), ("approval_status", approval)):
+        if val:
+            where.append(f"{col} = :{col}"); p[col] = val
+    if q.strip():
+        where.append("(UPPER(sei_target_field) LIKE :q OR UPPER(rule_id) LIKE :q OR UPPER(catalog_id) LIKE :q OR UPPER(DBMS_LOB.SUBSTR(transformation_rule, 4000, 1)) LIKE :q)")
+        p["q"] = f"%{q.strip().upper()}%"
+    w = (" WHERE " + " AND ".join(where)) if where else ""
+    total = _safe(f"SELECT COUNT(*) AS n FROM cp_hist_rule{w}", p)
+    out = []
+    for x in _safe("SELECT rule_id, catalog_id, functional_group, sei_target_file, sei_target_field, target_key, rule_source_column, rule_type, transformation_rule, validation_rule, "
+                   f"mapping_status, source_objects_fields, source_workbook, source_sheet, evidence_locator, approval_status FROM cp_hist_rule{w} "
+                   "ORDER BY sei_target_file, sei_target_field, rule_id OFFSET :off ROWS FETCH NEXT :lim ROWS ONLY", {**p, "off": (page - 1) * size, "lim": size}):
+        d = dict(x)
+        d["transformation_rule"], d["validation_rule"] = _clob(x.get("transformation_rule")) or "", _clob(x.get("validation_rule")) or ""
+        out.append(d)
+    by = lambda col: [{"key": r.get("k") or "(blank)", "n": int(r.get("n") or 0)} for r in _safe(f"SELECT {col} AS k, COUNT(*) AS n FROM cp_hist_rule GROUP BY {col} ORDER BY COUNT(*) DESC")]   # noqa: E731
+    return {"rules": out, "total": int((total[0] or {}).get("n", 0) or 0) if total else 0, "page": page, "size": size,
+            "byType": by("rule_type"), "byStatus": by("mapping_status"), "byApproval": by("approval_status"), "byFile": by("sei_target_file")}
+
+
+@router.get("/qc")
+def qc():
+    out = []
+    for x in _safe("SELECT qc_id, control_name, applies_to, expected, actual, result, detail, row_json FROM cp_hist_target_qc ORDER BY qc_id"):
+        d = dict(x)
+        try:
+            d["row"] = json.loads(_clob(x.get("row_json")) or "{}")
+        except Exception:                                    # noqa: BLE001
+            d["row"] = {}
+        d.pop("row_json", None)
+        out.append(d)
+    return {"controls": out}
