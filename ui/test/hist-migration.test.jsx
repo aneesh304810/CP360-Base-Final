@@ -11,6 +11,7 @@ import HistMigration from "../src/HistMigration.jsx";
 import { HM_RULES, HL_RULES, STATUS_COLOR, STATUS_KINDS, emptySummary, emptyLineageSummary } from "../src/histMigrationApi.js";
 import { HistChainFig, LineageTab, MappingTab, RulesTab, DeconTab, QcTab } from "../src/HistLineage.jsx";
 import { HistLineageDiagram, HistHopChain, MappingTable, histSources } from "../src/HistLineageFigs.jsx";
+import HistCanvas, { canvasRows, toCsv } from "../src/HistCanvas.jsx";
 import DataAnalysis from "../src/DataAnalysis.jsx";
 
 let bad = 0;
@@ -54,6 +55,31 @@ const rules = { rules: record.rules.map((r) => ({ ...r, sei_target_file: "accoun
 const decon = { objects: record.decon.map((d) => ({ ...d, source_prefix: "SGA_DCON", source_type: "table", migration_function: "account conversion", definition_basis: "Curated", example_target_fields: "ACCOUNT_NUMBER" })), byStatus: [{ key: "CURATED", n: 150 }], byBasis: [{ key: "NAME_DERIVED", n: 62 }], byDomain: [], byPrefix: [{ key: "SGA_DCON", n: 80 }] };
 const qc = { controls: [{ qc_id: "QC-0001", control_name: "No blank TARGET_FIELD", applies_to: "FINAL_HIST_MIGRATION_LINEAGE", expected: "0", actual: "0", result: "PASS", detail: "", row: { CONTROL: "No blank TARGET_FIELD", NOTE: "checked on export" } }] };
 
+console.log("-- the lineage picture");
+const canvas = { file: "account-basic.dat", lane: "", truncated: false, files: [{ key: "account-basic.dat", n: 3 }, { key: "party-basic.dat", n: 1 }],
+  lanes: [{ lane: "ADDVANTAGE_SEI_HIST", n: 2, x: 2, cols: [{ name: "SGA_DCON_ACCT.ACCT_NO", n: 1 }, { name: "SGA_DCON_ACCT.ACCT_NM", n: 1 }] }, { lane: "STAR_SEI_HIST", n: 1, x: 0, cols: [{ name: "IM_ACCOUNT.ACCOUNT_ID", n: 1 }] }],
+  targets: [{ table: "account-basic.dat", cols: [
+    { col: "ACCOUNT_NUMBER", src: "SGA_DCON_ACCT.ACCT_NO", lineage_id: "HL-0001", lane: "ADDVANTAGE_SEI_HIST", src_system: "AddVantage / PB", type: "CHAR", length: "20", mandatory: "Yes", t1: "TRIM(ACCT_NO)", status: "Complete", rule_status: "Complete", approval: "DRAFT_REVIEW_REQUIRED", dictionary: "CURATED", match: "MATCHED", sei: { has: true, files: ["DIM_ACCOUNT"], fields: [{ file: "DIM_ACCOUNT", field: "ACCOUNT_NUMBER" }], source: "ACDDIFI1.ACCT_NO", status: "MATCHED" } },
+    { col: "ACCOUNT_NAME", src: "SGA_DCON_ACCT.ACCT_NM", lineage_id: "HL-0004", lane: "ADDVANTAGE_SEI_HIST", src_system: "AddVantage / PB", type: "CHAR", length: "60", mandatory: "No", t1: "CASE WHEN acct_nm IS NULL THEN 'UNKNOWN' ELSE UPPER(acct_nm) END", status: "Open", rule_status: "Open", approval: "DRAFT_REVIEW_REQUIRED", dictionary: "CURATED", match: "UNMATCHED", sei: { has: false, files: [], fields: [], source: null, status: "UNMATCHED" } },
+    { col: "ACCOUNT_NUMBER", src: "IM_ACCOUNT.ACCOUNT_ID", lineage_id: "HL-0002", lane: "STAR_SEI_HIST", src_system: "STAR / IM", type: "CHAR", length: "20", mandatory: "Yes", t1: "", status: "Complete", rule_status: "Complete", approval: "DRAFT_REVIEW_REQUIRED", dictionary: "REVIEW_REQUIRED", match: "MATCHED", sei: { has: true, files: ["DIM_ACCOUNT"], fields: [{ file: "DIM_ACCOUNT", field: "ACCOUNT_NUMBER" }], source: "ACDDIFI1.ACCT_NO", status: "MATCHED" } }] }],
+  sei_files: [{ file: "DIM_ACCOUNT", n: 2, fields: [{ name: "ACCOUNT_NUMBER", type: "VARCHAR2", used_by: 2 }] }] };
+const rowsC = canvasRows(canvas.targets);
+ok(rowsC.length === 3 && rowsC[0].operation === "trim" && rowsC[0].transformed === "Y" && rowsC[1].operation === "derived" && rowsC[2].operation === "direct" && rowsC[2].transformed === "N" && rowsC[0].imds_columns === "DIM_ACCOUNT.ACCOUNT_NUMBER" && rowsC[0].star_field === "ACDDIFI1.ACCT_NO",
+   "the export rows read the same classifier as the operational canvas: trim, derived, direct, with the STAR and IMDS side", rowsC.map((r) => r.operation));
+const csv = toCsv(rowsC);
+ok(csv.split("\n").length === 4 && csv.startsWith("lane,source_system,source_column,transformation,operation") && /CASE WHEN acct_nm IS NULL THEN 'UNKNOWN' ELSE UPPER\(acct_nm\) END,derived,Y/.test(csv) && /"DIM_ACCOUNT\.ACCOUNT_NUMBER"|DIM_ACCOUNT\.ACCOUNT_NUMBER/.test(csv), "the CSV has one row per field link with the rule as written and its operation");
+const pic = renderToStaticMarkup(<HistCanvas t={tLight} file="account-basic.dat" initial={{ ...canvas, open: ["t:account-basic.dat", "l:ADDVANTAGE_SEI_HIST", "s:DIM_ACCOUNT"] }} />);
+ok(/Where it lands/.test(pic) && /2 lanes · 1 dat file · 3 field links/.test(pic) && /2 transformed/.test(pic) && /1 branch or join/.test(pic) && /Find a column/.test(pic) && /only transformed/.test(pic) && /IMDS today · 2 of 3/.test(pic) && /export CSV/.test(pic) && /open all/.test(pic) && /full screen/.test(pic),
+   "the picture's control bar: Picture and Table, where it lands with the counts, find, only transformed, IMDS today, export, open all, fit, full screen");
+ok(/AddVantage \/ PB → SEI/.test(pic) && /SGA_DCON_ACCT\.ACCT_NO/.test(pic) && /account-basic\.dat/.test(pic) && /2 of 3 computed/.test(pic) && /ACCOUNT_NAME/.test(pic) && /DIM_ACCOUNT/.test(pic) && /IMDS today · 2 fields/.test(pic) && (pic.match(/<path /g) || []).length >= 4 && /stroke-dasharray="6 4"/.test(pic),
+   "the nodes: the lane open with its columns, the dat file open with its fields and the mix bar, the IMDS table open, wires drawn with the operational ones dashed");
+const tbl = renderToStaticMarkup(<HistCanvas t={tLight} file="account-basic.dat" initial={{ ...canvas, mode: "table" }} />);
+ok(/Transformation rule/.test(tbl) && /TRIM\(ACCT_NO\)/.test(tbl) && /CASE WHEN acct_nm IS NULL/.test(tbl) && /no rule written/.test(tbl) && /DIM_ACCOUNT\.ACCOUNT_NUMBER/.test(tbl) && /ACDDIFI1\.ACCT_NO/.test(tbl) && (tbl.match(/<tr>/g) || []).length === 4 && /derived/.test(tbl) && /UNMATCHED/.test(tbl),
+   "the Table reads the same payload as rows: the rule whole, the operation, the statuses, the STAR field and the IMDS column, an unwritten rule called out");
+const picEmpty = renderToStaticMarkup(<HistCanvas t={tLight} file="x.dat" initial={{ lanes: [], targets: [], sei_files: [], files: [] }} />);
+ok(/No lineage rows for/.test(picEmpty) && /x\.dat/.test(picEmpty), "an empty selection says so and names the file");
+ok(!/NaN|undefined|\[object Object\]/.test(pic + tbl + renderToStaticMarkup(<HistCanvas t={tDark} file="account-basic.dat" initial={{ ...canvas, open: ["t:account-basic.dat"] }} />)), "nothing undefined in the picture, light or dark");
+
 console.log("-- the lineage diagram and the column chain");
 const srcs = histSources(record);
 ok(srcs.length === 1 && srcs[0].object === "SGA_DCON_ACCT" && srcs[0].fields.join() === "ACCT_NO" && srcs[0].meaning && srcs[0].meaning.basis_class === "CURATED", "the source objects and fields are read off the row and matched to the decon dictionary", srcs);
@@ -96,8 +122,8 @@ ok(/No lineage loaded/.test(emptyLin) && /sql\/87_hist_lineage\.sql/.test(emptyL
 
 console.log("-- the tab");
 for (const [tn, t] of [["light", tLight], ["dark", tDark]]) {
-  const parts = ["Overview", "Lineage", "Lineage mapping", "Rules", "Decon dictionary", "QC", "Evidence", "Dictionary", "Loads"].map((sub) => renderToStaticMarkup(<HistMigration t={t} initial={{ sub, summary, lanes, artifacts, dictionary, evidence, batches, lineage, mapping, rules, decon, qc }} />));
-  ok(parts.every((p) => p.length > 1200 && !/NaN|undefined|\[object Object\]/.test(p)), `all nine sub-tabs render cleanly in ${tn}`, parts.map((p) => p.length).join(","));
+  const parts = ["Overview", "Lineage picture", "Lineage", "Lineage mapping", "Rules", "Decon dictionary", "QC", "Evidence", "Dictionary", "Loads"].map((sub) => renderToStaticMarkup(<HistMigration t={t} initial={{ sub, summary, lanes, artifacts, dictionary, evidence, batches, lineage, mapping, rules, decon, qc, picture: { file: "account-basic.dat", files: canvas.files, canvas: { ...canvas, open: ["t:account-basic.dat"] } } }} />));
+  ok(parts.every((p) => p.length > 1200 && !/NaN|undefined|\[object Object\]/.test(p)), `all ten sub-tabs render cleanly in ${tn}`, parts.map((p) => p.length).join(","));
 }
 const ov = renderToStaticMarkup(<HistMigration t={tLight} initial={{ sub: "Overview", summary, lanes, artifacts, dictionary, evidence, batches }} />);
 ok(/214,622/.test(ov) && /15,880/.test(ov) && /unresolved lanes/.test(ov) && /ADDVANTAGE_SEI_HIST/.test(ov) && /DCONCUS10_20210727\.docx/.test(ov) && /REFERENCE/.test(ov) && /CP360-HM-007/.test(ov) && /Warning/.test(ov),

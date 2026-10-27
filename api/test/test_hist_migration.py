@@ -354,6 +354,11 @@ ok(len(mp["mapping"]) == 2 and mp["mapping"][0]["lineage_id"] == "HL-0001" and m
    and {f["key"] for f in mp["files"]} == {"account-basic.dat", "party-basic.dat"}, "the column-level mapping: one row per path from the historical column to the IMDS column, per dat file", mp["mapping"][:1])
 mp2 = R.lineage_mapping(file="party-basic.dat")
 ok(len(mp2["mapping"]) == 1 and mp2["mapping"][0]["dwh_target_column"] is None and mp2["mapping"][0]["lineage_id"] == "HL-0003", "a target with no operational path keeps its row with the right side empty")
+cv = R.canvas(file="account-basic.dat")
+ok(len(cv["targets"]) == 1 and cv["targets"][0]["table"] == "account-basic.dat" and len(cv["targets"][0]["cols"]) == 2 and {c["lane"] for c in cv["targets"][0]["cols"]} == {"ADDVANTAGE_SEI_HIST", "STAR_SEI_HIST"}
+   and cv["targets"][0]["cols"][0]["t1"] == "TRIM(ACCT_NO)" and cv["targets"][0]["cols"][0]["sei"]["has"] and cv["targets"][0]["cols"][0]["sei"]["fields"] == [{"file": "DIM_ACCOUNT", "field": "ACCOUNT_NUMBER"}] and cv["targets"][0]["cols"][0]["sei"]["source"] == "ACDDIFI1.ACCT_NO"
+   and {l["lane"] for l in cv["lanes"]} == {"ADDVANTAGE_SEI_HIST", "STAR_SEI_HIST"} and cv["sei_files"][0]["file"] == "DIM_ACCOUNT" and cv["sei_files"][0]["n"] == 2 and {f["key"] for f in cv["files"]} == {"account-basic.dat", "party-basic.dat"},
+   "the canvas payload: the lanes with their source columns, the dat file with one link per lineage row carrying the rule, and the IMDS tables the fields reach today", cv["targets"])
 ok(R.lineage_record(id="nope")["record"] is None, "an unknown id is an empty record, not a 500")
 ok(len(R.decon(basis="NAME_DERIVED")["objects"]) == 3 or True, "decon reads back")
 ok(R.rules()["total"] == 2 and R.rules()["rules"][0]["transformation_rule"] and len(R.qc()["controls"]) == 2 and R.qc()["controls"][0]["row"]["NOTE"] == "checked on export", "rules and QC read back with their text and the row JSON")

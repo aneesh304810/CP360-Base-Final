@@ -9,8 +9,9 @@
 import React, { useEffect, useState } from "react";
 import { histMigrationApi as api, emptySummary, HM_RULES, LEVEL_COLOR } from "./histMigrationApi.js";
 import { LineageTab, MappingTab, RulesTab, DeconTab, QcTab } from "./HistLineage.jsx";
+import HistCanvas from "./HistCanvas.jsx";
 
-const SUB = ["Overview", "Lineage", "Lineage mapping", "Rules", "Decon dictionary", "QC", "Evidence", "Dictionary", "Loads"];
+const SUB = ["Overview", "Lineage picture", "Lineage", "Lineage mapping", "Rules", "Decon dictionary", "QC", "Evidence", "Dictionary", "Loads"];
 const mono = { fontFamily: "ui-monospace, monospace" };
 
 const Tile = ({ t, n, label, sub, color }) => (
@@ -181,6 +182,25 @@ function Loads({ t, batches }) {
   </>);
 }
 
+// The picture: a dat file picked at the top, the canvas under it.
+function PictureTab({ t, initial }) {
+  const [file, setFile] = useState(initial?.file || "");
+  const [lane, setLane] = useState("");
+  const [files, setFiles] = useState(initial?.files || null);
+  useEffect(() => { if (initial) return undefined; let on = true; api.lineageSummary().then((d) => { if (on) setFiles((d.byFile || []).map((f) => ({ key: f.file, n: f.rows }))); }); return () => { on = false; }; }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const sel = { font: "inherit", fontSize: 11.5, padding: "3px 6px", border: `1px solid ${t.border}`, borderRadius: 4, background: t.panel, color: t.text, maxWidth: 280 };
+  return (<>
+    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", margin: "4px 0 10px" }}>
+      <label style={{ fontSize: 11.5, color: t.sub, display: "inline-flex", gap: 4, alignItems: "center" }}>SEI dat file
+        <select value={file} onChange={(e) => setFile(e.target.value)} style={sel}><option value="">all dat files</option>{(files || []).map((f) => <option key={f.key} value={f.key}>{f.key} ({f.n})</option>)}</select></label>
+      <label style={{ fontSize: 11.5, color: t.sub, display: "inline-flex", gap: 4, alignItems: "center" }}>lane
+        <select value={lane} onChange={(e) => setLane(e.target.value)} style={sel}><option value="">all lanes</option>{["ADDVANTAGE_SEI_HIST", "STAR_SEI_HIST", "UAF_SEI_HIST", "COMMON", "UNCLASSIFIED"].map((k) => <option key={k} value={k}>{k}</option>)}</select></label>
+      <span style={{ fontSize: 11, color: t.textMuted }}>left to right: historical lane and its source columns → SEI dat file and its target fields, the rule on the wire → the IMDS table the field reaches today. Click a node to open it, a wire for its rule; Table reads the same rows.</span>
+    </div>
+    <HistCanvas t={t} file={file} lane={lane} initial={initial?.canvas} onPickFile={(f) => setFile(f)} />
+  </>);
+}
+
 export default function HistMigration({ t, initial }) {
   const [sub, setSub] = useState(initial?.sub || "Overview");
   const [sum, setSum] = useState(initial?.summary || null);
@@ -210,6 +230,7 @@ export default function HistMigration({ t, initial }) {
           style={{ padding: "6px 14px", fontSize: 12.5, cursor: "pointer", color: sub === v ? t.accent : t.sub, borderBottom: sub === v ? `2px solid ${t.accent}` : "2px solid transparent", marginBottom: -1 }}>{v}</div>)}
       </div>
       {sub === "Overview" && <Overview t={t} sum={s} lanes={lanes} artifacts={artifacts} onFilter={(f) => { setFilter(f); setSub("Evidence"); }} />}
+      {sub === "Lineage picture" && <PictureTab t={t} initial={initial?.picture} />}
       {sub === "Lineage" && <LineageTab t={t} initial={initial?.lineage} />}
       {sub === "Lineage mapping" && <MappingTab t={t} initial={initial?.mapping} />}
       {sub === "Rules" && <RulesTab t={t} initial={initial?.rules} />}

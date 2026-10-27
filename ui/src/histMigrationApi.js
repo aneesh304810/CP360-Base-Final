@@ -57,6 +57,7 @@ histMigrationApi.lineageRecord = (id) => _get(`/hist-migration/lineage/record${q
 histMigrationApi.decon = (params) => _get(`/hist-migration/decon${qs(params)}`, () => ({ objects: [], byStatus: [], byBasis: [], byDomain: [], byPrefix: [] }));
 histMigrationApi.rules = (params) => _get(`/hist-migration/rules${qs(params)}`, () => ({ rules: [], total: 0, page: 1, size: 100, byType: [], byStatus: [], byApproval: [], byFile: [] }));
 histMigrationApi.qc = () => _get("/hist-migration/qc", () => ({ controls: [] }));
+histMigrationApi.canvas = (params) => _get(`/hist-migration/canvas${qs(params)}`, () => ({ lanes: [], targets: [], sei_files: [], files: [], truncated: false }));
 histMigrationApi.lineageMapping = (params) => _get(`/hist-migration/lineage/mapping${qs(params)}`, () => ({ mapping: [], files: [], limit: 500 }));
 
 // The four statuses on a lineage record are different controls and are

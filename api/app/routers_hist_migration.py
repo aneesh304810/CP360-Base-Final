@@ -409,3 +409,75 @@ def lineage_mapping(file: str = "", lane: str = "", q: str = "", limit: int = 50
         out.append(d)
     files = [{"key": r.get("k"), "n": int(r.get("n") or 0)} for r in _safe("SELECT target_dat_file AS k, COUNT(*) AS n FROM cp_hist_lineage GROUP BY target_dat_file ORDER BY target_dat_file")]
     return {"mapping": out, "files": files, "limit": limit}
+
+
+@router.get("/canvas")
+def canvas(file: str = "", lane: str = ""):
+    """The historical lineage as the Source view draws a feed: the lanes'
+    source columns on the left, the SEI dat files with their target fields
+    in the middle with the transformation on every wire, and on the right
+    the IMDS tables those fields reach today by exact normalised name. One
+    payload the picture and the table both read."""
+    where, p = [], {}
+    if file:
+        where.append("l.target_dat_file = :f"); p["f"] = file
+    if lane:
+        where.append("l.lane_id = :l"); p["l"] = lane
+    w = (" WHERE " + " AND ".join(where)) if where else ""
+    rows = _safe(f"""
+        SELECT l.lineage_id, l.lane_id, l.source_system, l.source_object_field, l.transformation_rule, l.rule_status, l.approval_status,
+               l.decon_dictionary_status, l.target_dat_file, l.target_field, l.target_data_type, l.target_max_length, l.mandatory, l.match_status,
+               m.map_id, m.src_file_key, m.src_source_column, m.map_kind,
+               g.dwh_target_table, g.dwh_target_column, g.dwh_type, g.lineage_status
+        FROM   cp_hist_lineage l
+        LEFT   JOIN sei_source_map m ON {_canon('m.sei_datapoint')} = l.target_field_norm
+        LEFT   JOIN legacy_lineage g ON {_canon('g.src_source_column')} = {_canon('m.src_source_column')}
+                                     AND (m.src_file_key IS NULL OR UPPER(g.src_source_table) LIKE '%' || UPPER(m.src_file_key) || '%')
+        {w}
+        ORDER BY l.target_dat_file, l.target_field, l.lane_id, l.lineage_id
+        FETCH FIRST 4000 ROWS ONLY""", p)
+    lanes: dict = {}
+    targets: dict = {}
+    sei_files: dict = {}
+    seen_links = set()
+    for r in rows:
+        lid = r.get("lineage_id")
+        lane_id = r.get("lane_id") or "UNCLASSIFIED"
+        src = (r.get("source_object_field") or "").split("\n")[0].strip()
+        tbl = r.get("target_dat_file") or "(no file)"
+        col = r.get("target_field") or "(blank)"
+        key = (lid, tbl, col)
+        if key not in seen_links:
+            seen_links.add(key)
+            tg = targets.setdefault(tbl, {"table": tbl, "cols": []})
+            link = {"col": col, "src": src, "lineage_id": lid, "lane": lane_id, "src_system": r.get("source_system"),
+                    "type": r.get("target_data_type"), "length": r.get("target_max_length"), "mandatory": r.get("mandatory"),
+                    "t1": (_clob(r.get("transformation_rule")) or ""), "status": "UNMAPPED" if not src else (r.get("rule_status") or ""),
+                    "rule_status": r.get("rule_status"), "approval": r.get("approval_status"), "dictionary": r.get("decon_dictionary_status"),
+                    "match": r.get("match_status"), "sei": {"has": False, "files": [], "fields": [], "source": None, "status": r.get("match_status")}}
+            tg["cols"].append(link)
+            ln = lanes.setdefault(lane_id, {"lane": lane_id, "n": 0, "x": 0, "cols": {}})
+            if src:
+                ln["cols"][src] = ln["cols"].get(src, 0) + 1
+            ln["n"] += 1
+            if link["t1"].strip():
+                ln["x"] += 1
+        link = next(c for c in targets[tbl]["cols"] if c["lineage_id"] == lid and c["col"] == col)
+        if r.get("dwh_target_table") and r.get("dwh_target_column"):
+            f = r["dwh_target_table"]
+            if f not in link["sei"]["files"]:
+                link["sei"]["files"].append(f)
+            link["sei"]["fields"].append({"file": f, "field": r["dwh_target_column"]})
+            link["sei"]["has"] = True
+            link["sei"]["source"] = f"{r.get('src_file_key') or ''}.{r.get('src_source_column') or ''}".strip(".")
+            sf = sei_files.setdefault(f, {"file": f, "n": 0, "fields": {}})
+            sf["n"] += 1
+            sf["fields"][r["dwh_target_column"]] = {"name": r["dwh_target_column"], "type": r.get("dwh_type"), "used_by": sf["fields"].get(r["dwh_target_column"], {}).get("used_by", 0) + 1}
+        elif r.get("src_source_column"):
+            link["sei"]["source"] = f"{r.get('src_file_key') or ''}.{r.get('src_source_column') or ''}".strip(".")
+    return {"file": file, "lane": lane,
+            "lanes": [{"lane": v["lane"], "n": v["n"], "x": v["x"], "cols": [{"name": k, "n": n} for k, n in sorted(v["cols"].items(), key=lambda kv: -kv[1])]} for v in lanes.values()],
+            "targets": list(targets.values()),
+            "sei_files": [{"file": v["file"], "n": v["n"], "fields": list(v["fields"].values())} for v in sei_files.values()],
+            "files": [{"key": r.get("k"), "n": int(r.get("n") or 0)} for r in _safe("SELECT target_dat_file AS k, COUNT(*) AS n FROM cp_hist_lineage GROUP BY target_dat_file ORDER BY target_dat_file")],
+            "truncated": len(rows) >= 4000}
