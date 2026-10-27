@@ -12,6 +12,7 @@ import { HM_RULES, HL_RULES, STATUS_COLOR, STATUS_KINDS, emptySummary, emptyLine
 import { HistChainFig, LineageTab, MappingTab, RulesTab, DeconTab, QcTab } from "../src/HistLineage.jsx";
 import { HistLineageDiagram, HistHopChain, MappingTable, histSources } from "../src/HistLineageFigs.jsx";
 import HistCanvas, { canvasRows, toCsv } from "../src/HistCanvas.jsx";
+import { classifyRule } from "../src/histMigrationApi.js";
 import DataAnalysis from "../src/DataAnalysis.jsx";
 
 let bad = 0;
@@ -69,13 +70,20 @@ ok(rowsC.length === 3 && rowsC[0].operation === "trim" && rowsC[0].transformed =
 const csv = toCsv(rowsC);
 ok(csv.split("\n").length === 4 && csv.startsWith("lane,source_system,source_column,transformation,operation") && /CASE WHEN acct_nm IS NULL THEN 'UNKNOWN' ELSE UPPER\(acct_nm\) END,derived,Y/.test(csv) && /"DIM_ACCOUNT\.ACCOUNT_NUMBER"|DIM_ACCOUNT\.ACCOUNT_NUMBER/.test(csv), "the CSV has one row per field link with the rule as written and its operation");
 const pic = renderToStaticMarkup(<HistCanvas t={tLight} file="account-basic.dat" initial={{ ...canvas, open: ["t:account-basic.dat", "l:ADDVANTAGE_SEI_HIST", "s:DIM_ACCOUNT"] }} />);
-ok(/Where it lands/.test(pic) && /2 lanes · 1 dat file · 3 field links/.test(pic) && /2 transformed/.test(pic) && /1 branch or join/.test(pic) && /Find a column/.test(pic) && /only transformed/.test(pic) && /IMDS today · 2 of 3/.test(pic) && /export CSV/.test(pic) && /open all/.test(pic) && /full screen/.test(pic),
+ok(/Reading/.test(pic) && /Where it lands/.test(pic) && /2 lanes · 1 dat file · 3 field links/.test(pic) && /2 transformed/.test(pic) && /1 branch or join/.test(pic) && /Find a column/.test(pic) && /only transformed/.test(pic) && /IMDS today · 2 of 3/.test(pic) && /export CSV/.test(pic) && /open all/.test(pic) && /full screen/.test(pic),
    "the picture's control bar: Picture and Table, where it lands with the counts, find, only transformed, IMDS today, export, open all, fit, full screen");
 ok(/AddVantage \/ PB → SEI/.test(pic) && /SGA_DCON_ACCT\.ACCT_NO/.test(pic) && /account-basic\.dat/.test(pic) && /2 of 3 computed/.test(pic) && /ACCOUNT_NAME/.test(pic) && /DIM_ACCOUNT/.test(pic) && /IMDS today · 2 fields/.test(pic) && (pic.match(/<path /g) || []).length >= 4 && /stroke-dasharray="6 4"/.test(pic),
    "the nodes: the lane open with its columns, the dat file open with its fields and the mix bar, the IMDS table open, wires drawn with the operational ones dashed");
 const tbl = renderToStaticMarkup(<HistCanvas t={tLight} file="account-basic.dat" initial={{ ...canvas, mode: "table" }} />);
 ok(/Transformation rule/.test(tbl) && /TRIM\(ACCT_NO\)/.test(tbl) && /CASE WHEN acct_nm IS NULL/.test(tbl) && /no rule written/.test(tbl) && /DIM_ACCOUNT\.ACCOUNT_NUMBER/.test(tbl) && /ACDDIFI1\.ACCT_NO/.test(tbl) && (tbl.match(/<tr>/g) || []).length === 4 && /derived/.test(tbl) && /UNMATCHED/.test(tbl),
    "the Table reads the same payload as rows: the rule whole, the operation, the statuses, the STAR field and the IMDS column, an unwritten rule called out");
+const rd = renderToStaticMarkup(<HistCanvas t={tLight} file="account-basic.dat" initial={{ ...canvas, mode: "reading" }} />);
+ok(/In sentences/.test(rd) && /is filled from <b>3 historical source columns<\/b> on 2 lanes, into <b>3 SEI target fields<\/b>/.test(rd) && /<b>2<\/b> of those are changed on the way \(67%\)/.test(rd) && /<b>2<\/b> reach an IMDS column today/.test(rd) && /<b>1<\/b> match nothing/.test(rd) && /<b>3<\/b> still want approval/.test(rd),
+   "the Reading lead paragraph: the counts as a sentence, from the same payload");
+ok(/change on the way/.test(rd) && /match nothing today/.test(rd) && /still want approval/.test(rd) && /Show only these/.test(rd) && /AddVantage \/ PB → SEI/.test(rd) && /STAR \/ IM → SEI/.test(rd) && /arrives, then/.test(rd) && /lands in SEI unchanged/.test(rd)
+   && /IMDS today → DIM_ACCOUNT/.test(rd) && /unmatched/.test(rd) && /awaiting approval/.test(rd) && /the journey/.test(rd) && /SGA_DCON_ACCT\.ACCT_NO → account-basic\.dat\.ACCOUNT_NUMBER/.test(rd),
+   "the Reading rows: grouped by lane, a verb from the classifier, the IMDS-today, unmatched and approval chips, and the journey to open");
+ok(!/NaN|undefined|\[object Object\]/.test(rd), "nothing undefined in the reading");
 const picEmpty = renderToStaticMarkup(<HistCanvas t={tLight} file="x.dat" initial={{ lanes: [], targets: [], sei_files: [], files: [] }} />);
 ok(/No lineage rows for/.test(picEmpty) && /x\.dat/.test(picEmpty), "an empty selection says so and names the file");
 ok(!/NaN|undefined|\[object Object\]/.test(pic + tbl + renderToStaticMarkup(<HistCanvas t={tDark} file="account-basic.dat" initial={{ ...canvas, open: ["t:account-basic.dat"] }} />)), "nothing undefined in the picture, light or dark");

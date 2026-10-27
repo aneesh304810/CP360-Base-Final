@@ -11,24 +11,15 @@
 // everything untouched looks different from one that computes half of it
 // before anything is opened. Picture and Table read one payload.
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { histMigrationApi as api, LANE_LABEL, STATUS_COLOR } from "./histMigrationApi.js";
+import { histMigrationApi as api, LANE_LABEL, STATUS_COLOR, classifyRule } from "./histMigrationApi.js";
 import { classifyLink, summarise, OP_META } from "./linkOps.js";
+import HistReading from "./HistReading.jsx";
 
 const MONO = "'Roboto Mono', ui-monospace, Menlo, monospace";
 const LANE_C = { ADDVANTAGE_SEI_HIST: "#7c3aed", STAR_SEI_HIST: "#0f4775", UAF_SEI_HIST: "#c96a12", COMMON: "#159943", UNCLASSIFIED: "#6b7884" };
 const SEI_C = "#0091bf", DWH_C = "#233240";
 const HEAD = 40, ROW = 22, GAPY = 14, PAD = 20, CAP0 = 15, NW_MAX = 420, GAP_MAX = 380;
 
-// THE ANALYSTS WRITE SQL CASE; THE PARSER READS IF/THEN/ELSE. The shared
-// classifier (the one the operational canvas draws from) understands the
-// mapping documents' IF a THEN b ELSE c, not CASE WHEN … END, and would
-// read a CASE as "direct". The historical rules are analyst text and use
-// CASE, so the text is turned into the parser's form before it is
-// classified; the rule as written is what the table and the detail show.
-export function classifyRule(text) {
-  const s = String(text || "").replace(/\bEND\b/gi, " ").replace(/\bCASE\s+WHEN\b/gi, "IF ").replace(/\bWHEN\b/gi, "ELSE IF ");
-  return s.replace(/\s+/g, " ").trim();
-}
 const withLogic = (c) => ({ ...c, logic: classifyRule(c.t1) });
 
 export function canvasRows(targets) {
@@ -210,9 +201,9 @@ export default function HistCanvas({ t, file, lane, initial, onPickFile }) {
 
   const modeBar = (
     <span role="group" aria-label="How to read this" style={{ display: "inline-flex", borderRadius: 3, overflow: "hidden", border: `1px solid ${t.border}`, flexShrink: 0 }}>
-      {[["picture", "Picture"], ["table", "Table"]].map(([k, label]) => (
-        <button key={k} type="button" aria-pressed={mode === k} onClick={() => { setMode(k); if (k === "table") setFull(false); }}
-          title={k === "picture" ? "The wiring: which SEI fields each lane feeds, and what is computed on the way" : "The same lineage as rows: source column, transformation, SEI field, where it goes today"}
+      {[["picture", "Picture"], ["reading", "Reading"], ["table", "Table"]].map(([k, label]) => (
+        <button key={k} type="button" aria-pressed={mode === k} onClick={() => { setMode(k); if (k !== "picture") setFull(false); }}
+          title={k === "picture" ? "The wiring: which SEI fields each lane feeds, and what is computed on the way" : k === "reading" ? "The same mapping in sentences — what arrives, what changes on the way, what still wants approval" : "The same lineage as rows: source column, transformation, SEI field, where it goes today"}
           style={{ font: "inherit", fontSize: 10.5, padding: "3px 11px", border: 0, cursor: "pointer", background: mode === k ? t.accent : t.panel, color: mode === k ? "#fff" : t.accent }}>{label}</button>))}
     </span>);
 
@@ -239,6 +230,13 @@ export default function HistCanvas({ t, file, lane, initial, onPickFile }) {
       </span>}
     </div>);
 
+  if (mode === "reading") {
+    return (
+      <div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>{modeBar}<span style={{ fontSize: 10.5, color: t.textMuted }}>In sentences. Switch to Picture for the wiring, Table for the rows.</span></div>
+        <HistReading t={t} data={{ ...data, targets }} file={file} />
+      </div>);
+  }
   if (mode === "table") {
     const rows = canvasRows(targets).filter((r) => (!onlyX || r.transformed === "Y") && (!q || `${r.target_field} ${r.source_column} ${r.star_field}`.toLowerCase().includes(q.toLowerCase())));
     const th = { textAlign: "left", fontSize: 9.5, fontWeight: 800, letterSpacing: .5, textTransform: "uppercase", color: t.textMuted, padding: "0 10px 6px 0", borderBottom: `1px solid ${t.border}`, verticalAlign: "bottom" };

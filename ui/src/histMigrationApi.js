@@ -87,3 +87,14 @@ export const HL_RULES = [
   ["CP360-HL-007", "FINAL_HIST_MIGRATION_LINEAGE", "Independence", "Rule status, approval, dictionary status and lineage match are kept apart.", "Error"],
   ["CP360-HL-008", "FINAL_HIST_MIGRATION_LINEAGE", "Match", "EXACT_NORMALIZED_FIELD_MATCH against the operational SEI input lineage; unmatched rows are flagged for review.", "Warning"],
 ];
+
+// THE ANALYSTS WRITE SQL CASE; THE PARSER READS IF/THEN/ELSE. The shared
+// classifier (the one the operational canvas draws from) understands the
+// mapping documents' IF a THEN b ELSE c, not CASE WHEN … END, and would
+// read a CASE as "direct". The historical rules are analyst text and use
+// CASE, so the text is turned into the parser's form before it is
+// classified; the rule as written is what the table and the detail show.
+export function classifyRule(text) {
+  const s = String(text || "").replace(/\bEND\b/gi, " ").replace(/\bCASE\s+WHEN\b/gi, "IF ").replace(/\bWHEN\b/gi, "ELSE IF ");
+  return s.replace(/\s+/g, " ").trim();
+}
