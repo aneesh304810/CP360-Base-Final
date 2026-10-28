@@ -185,7 +185,7 @@ export function MappingTable({ t, rows }) {
   return (
     <div style={{ overflowX: "auto" }}>
       <table style={{ borderCollapse: "collapse", width: "100%" }}>
-        <thead><tr>{["Lane", "Historical source column", "Transformation", "SEI dat file · field", "Match", "STAR contract field", "STG1 · STG2", "IMDS column", "Statuses"].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+        <thead><tr>{["Lane", "Historical source column", "Transformation", "SEI dat file · field", "Match", "STAR contract field", "STG1 · STG2", "IMDS column", "Statuses"].map((h, i) => <th key={i} style={th}>{h}</th>)}</tr></thead>
         <tbody>{rows.map((r, i) => (
           <tr key={`${r.lineage_id}-${r.legacy_id || i}`}>
             <td style={td(true)}><span style={{ fontSize: 9.5, fontWeight: 800, color: LANE_C[r.lane_id] || "#6b7884", border: `1px solid ${LANE_C[r.lane_id] || "#6b7884"}`, borderRadius: 3, padding: "0 5px", whiteSpace: "nowrap" }}>{LANE_LABEL[r.lane_id] || r.lane_id}</span><div style={{ fontSize: 10, color: t.textMuted, fontFamily: MONO }}>{r.lineage_id}</div></td>

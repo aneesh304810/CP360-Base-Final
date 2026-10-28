@@ -132,7 +132,7 @@ function Evidence({ t, sum, filter, setFilter, initial }) {
     </div>
     <div style={{ overflowX: "auto" }}>
       <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 11.5 }}>
-        <thead><tr>{["Workbook · sheet · row", "Lane", "Domain", "Category", "Attribute", "Evidence value", "Original column", ""].map((h) => <th key={h} style={{ textAlign: "left", fontSize: 9.5, fontWeight: 800, letterSpacing: .5, textTransform: "uppercase", color: t.textMuted, padding: "0 10px 6px 0", borderBottom: `1px solid ${t.border}` }}>{h}</th>)}</tr></thead>
+        <thead><tr>{["Workbook · sheet · row", "Lane", "Domain", "Category", "Attribute", "Evidence value", "Original column", ""].map((h, i) => <th key={i} style={{ textAlign: "left", fontSize: 9.5, fontWeight: 800, letterSpacing: .5, textTransform: "uppercase", color: t.textMuted, padding: "0 10px 6px 0", borderBottom: `1px solid ${t.border}` }}>{h}</th>)}</tr></thead>
         <tbody>{rows.map((r) => { const key = `${r.source_mapping_workbook}|${r.source_mapping_sheet}|${r.source_mapping_row}`; return (
           <React.Fragment key={key + r.original_source_column_number}>
             <tr>

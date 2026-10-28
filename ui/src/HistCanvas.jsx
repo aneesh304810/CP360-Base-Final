@@ -246,7 +246,7 @@ export default function HistCanvas({ t, file, lane, initial, onPickFile }) {
         {head}
         <div style={{ overflowX: "auto" }}>
           <table style={{ borderCollapse: "collapse", width: "100%" }}>
-            <thead><tr>{["Lane", "Source column", "Transformation rule", "Operation", "SEI dat file · field", "Type", "Rule · approval · dictionary", "Match", "STAR field today", "IMDS column today"].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+            <thead><tr>{["Lane", "Source column", "Transformation rule", "Operation", "SEI dat file · field", "Type", "Rule · approval · dictionary", "Match", "STAR field today", "IMDS column today"].map((h, i) => <th key={i} style={th}>{h}</th>)}</tr></thead>
             <tbody>{rows.map((r) => (
               <tr key={`${r.lineage_id}-${r.imds_columns}`}>
                 <td style={td}><span style={{ fontSize: 9.5, fontWeight: 800, color: LANE_C[r.lane] || "#6b7884", border: `1px solid ${LANE_C[r.lane] || "#6b7884"}`, borderRadius: 3, padding: "0 5px", whiteSpace: "nowrap" }}>{LANE_LABEL[r.lane] || r.lane}</span><div style={{ fontSize: 10, color: t.textMuted, fontFamily: MONO }}>{r.lineage_id}</div></td>

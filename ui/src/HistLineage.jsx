@@ -85,7 +85,7 @@ function Record({ t, d }) {
         </div>
         {(d.decon || []).length > 0 && (<>
           <H t={t} sub="The decon dictionary entries for the objects this row names. A name-derived meaning is marked; it is not approved metadata.">Source objects in the dictionary</H>
-          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}><thead><tr>{["Object", "Meaning", "Basis", "Status", "Used by"].map((h) => <th key={h} style={th(t)}>{h}</th>)}</tr></thead>
+          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}><thead><tr>{["Object", "Meaning", "Basis", "Status", "Used by"].map((h, i) => <th key={i} style={th(t)}>{h}</th>)}</tr></thead>
             <tbody>{d.decon.map((o) => <tr key={o.technical_object}><td style={td(t, true)}><span style={mono}>{o.technical_object}</span></td><td style={td(t)}>{o.business_meaning}{o.business_domain ? <span style={{ color: t.textMuted }}> · {o.business_domain}</span> : null}</td>
               <td style={td(t)}><Pill c={o.basis_class === "CURATED" ? "#159943" : "#c96a12"}>{o.basis_class}</Pill></td><td style={td(t)}><Pill c={STATUS_COLOR(o.dictionary_status)}>{o.dictionary_status}</Pill></td><td style={td(t)}>{o.lineage_usage_count ?? "—"}</td></tr>)}</tbody></table>
         </>)}
@@ -113,7 +113,7 @@ function Record({ t, d }) {
         </div>
         {(d.siblings || []).length > 0 && (<>
           <H t={t} sub="Other lanes reaching the same SEI field. By design each is its own lineage row; a common SEI DAT field never merges a PB source with an IM or UAF source.">Same target, other lanes</H>
-          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}><thead><tr>{["Lineage", "Lane", "Source", "Statuses"].map((h) => <th key={h} style={th(t)}>{h}</th>)}</tr></thead>
+          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}><thead><tr>{["Lineage", "Lane", "Source", "Statuses"].map((h, i) => <th key={i} style={th(t)}>{h}</th>)}</tr></thead>
             <tbody>{d.siblings.map((s) => <tr key={s.lineage_id}><td style={td(t, true)}><span style={mono}>{s.lineage_id}</span></td><td style={td(t)}>{LANE_LABEL[s.lane_id] || s.lane_id}</td><td style={td(t)}><span style={mono}>{s.source_object_field}</span></td><td style={td(t)}><Statuses r={s} /></td></tr>)}</tbody></table>
         </>)}
         <H t={t} sub="The operational SEI input lineage this target field matches by exact normalised name, then where that SEI datapoint goes today: the STAR contract field and the IMDS column.">Downstream · operational lineage</H>
@@ -126,7 +126,7 @@ function Record({ t, d }) {
         </div>
         {(d.qc || []).length > 0 && (<>
           <H t={t}>QC controls on this target</H>
-          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}><thead><tr>{["Control", "Expected", "Actual", "Result"].map((h) => <th key={h} style={th(t)}>{h}</th>)}</tr></thead>
+          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}><thead><tr>{["Control", "Expected", "Actual", "Result"].map((h, i) => <th key={i} style={th(t)}>{h}</th>)}</tr></thead>
             <tbody>{d.qc.map((c) => <tr key={c.qc_id}><td style={td(t, true)}>{c.control_name}</td><td style={td(t)}>{c.expected}</td><td style={td(t)}>{c.actual}</td><td style={td(t)}><Pill c={STATUS_COLOR(c.result)}>{c.result || "—"}</Pill></td></tr>)}</tbody></table>
         </>)}
       </div>
@@ -179,7 +179,7 @@ export function LineageTab({ t, initial }) {
     {detail && detail.record && <div style={{ margin: "6px 0 14px" }}><Record t={t} d={detail} /></div>}
     <div style={{ overflowX: "auto" }}>
       <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 11.5 }}>
-        <thead><tr>{["Lineage", "Lane", "Source object · field", "SEI dat file", "Target field", "Type", "Rule · approval · dictionary · match", "Audit"].map((h) => <th key={h} style={th(t)}>{h}</th>)}</tr></thead>
+        <thead><tr>{["Lineage", "Lane", "Source object · field", "SEI dat file", "Target field", "Type", "Rule · approval · dictionary · match", "Audit"].map((h, i) => <th key={i} style={th(t)}>{h}</th>)}</tr></thead>
         <tbody>{rows.map((r) => (
           <tr key={r.lineage_id} style={{ background: picked === r.lineage_id ? t.bg : undefined }}>
             <td style={td(t, true)}><span role="button" tabIndex={0} style={{ ...mono, color: t.accent, cursor: "pointer" }} onClick={() => setPicked(picked === r.lineage_id ? null : r.lineage_id)}>{r.lineage_id}</span></td>
@@ -195,12 +195,12 @@ export function LineageTab({ t, initial }) {
       {rows.length === 0 && <div style={{ fontSize: 12, color: t.textMuted, padding: "10px 0" }}>{data ? "No lineage matches." : "Loading…"}</div>}
     </div>
     <H t={t} sub="The SEI dat files the historical mappings land in, with how many fields, lanes and operational matches each has.">By SEI dat file</H>
-    <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12, maxWidth: 860 }}><thead><tr>{["Dat file", "Target fields", "Lineage rows", "Lanes", "Matched"].map((h) => <th key={h} style={th(t)}>{h}</th>)}</tr></thead>
+    <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12, maxWidth: 860 }}><thead><tr>{["Dat file", "Target fields", "Lineage rows", "Lanes", "Matched"].map((h, i) => <th key={i} style={th(t)}>{h}</th>)}</tr></thead>
       <tbody>{(s.byFile || []).map((f) => <tr key={f.file}><td style={td(t, true)}><span role="button" tabIndex={0} style={{ ...mono, color: t.accent, cursor: "pointer" }} onClick={() => { setPage(1); setFilter({ ...filter, file: f.file }); }}>{f.file}</span></td><td style={td(t)}>{f.fields}</td><td style={td(t)}>{f.rows}</td><td style={td(t)}>{f.lanes}</td><td style={td(t)}>{f.matched}</td></tr>)}</tbody></table>
     {(s.manifest || []).length > 0 && (<><H t={t}>Workbook manifest</H>
       <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12, maxWidth: 860 }}><tbody>{s.manifest.map((m) => <tr key={m.manifest_key}><td style={td(t, true)}><span style={mono}>{m.manifest_key}</span></td><td style={td(t)}>{m.manifest_value}</td></tr>)}</tbody></table></>)}
     <H t={t} sub="The rules the loader applies to the lineage package, beside the CP360-HM rules on the Dictionary sub-tab.">Lineage rules</H>
-    <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 11.5 }}><thead><tr>{["Rule", "Applies to", "Category", "Detail", "Severity"].map((h) => <th key={h} style={th(t)}>{h}</th>)}</tr></thead>
+    <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 11.5 }}><thead><tr>{["Rule", "Applies to", "Category", "Detail", "Severity"].map((h, i) => <th key={i} style={th(t)}>{h}</th>)}</tr></thead>
       <tbody>{HL_RULES.map(([id, a, c, d, sv]) => <tr key={id}><td style={td(t, true)}>{id}</td><td style={td(t)}>{a}</td><td style={td(t)}>{c}</td><td style={td(t)}>{d}</td><td style={td(t)}><Pill c={LEVEL_COLOR[sv] || t.sub}>{sv}</Pill></td></tr>)}</tbody></table>
   </>);
 }
@@ -223,7 +223,7 @@ export function RulesTab({ t, initial }) {
       <input aria-label="search rules" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") setFilter({ ...filter, q }); }} placeholder="field, rule id or logic, Enter" style={{ font: "inherit", fontSize: 11.5, padding: "3px 8px", border: `1px solid ${t.border}`, borderRadius: 4, background: t.panel, color: t.text, minWidth: 220 }} />
       <span style={{ flex: 1 }} /><span style={{ fontSize: 11.5, color: t.textMuted }}>{(d.total || 0).toLocaleString()} rules</span>
     </div>
-    <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 11.5 }}><thead><tr>{["Rule", "SEI file · field", "Type", "Source column", "Mapping · approval", "Rule"].map((h) => <th key={h} style={th(t)}>{h}</th>)}</tr></thead>
+    <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 11.5 }}><thead><tr>{["Rule", "SEI file · field", "Type", "Source column", "Mapping · approval", "Logic"].map((h, i) => <th key={i} style={th(t)}>{h}</th>)}</tr></thead>
       <tbody>{(d.rules || []).map((r) => (
         <React.Fragment key={r.rule_id}>
           <tr><td style={td(t, true)}><span role="button" tabIndex={0} style={{ ...mono, color: t.accent, cursor: "pointer" }} onClick={() => setOpen(open === r.rule_id ? null : r.rule_id)}>{r.rule_id}</span></td>
@@ -258,7 +258,7 @@ export function DeconTab({ t, initial }) {
       <input aria-label="search decon" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") setFilter({ ...filter, q }); }} placeholder="object or meaning, Enter" style={{ font: "inherit", fontSize: 11.5, padding: "3px 8px", border: `1px solid ${t.border}`, borderRadius: 4, background: t.panel, color: t.text, minWidth: 220 }} />
       <span style={{ flex: 1 }} />{(d.byPrefix || []).slice(0, 8).map((p) => <Pill key={p.key} c={t.sub}>{p.key} · {p.n}</Pill>)}
     </div>
-    <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 11.5 }}><thead><tr>{["Technical object", "Prefix", "Meaning", "Type", "Domain", "Function", "Basis", "Status", "Used by", "Example targets"].map((h) => <th key={h} style={th(t)}>{h}</th>)}</tr></thead>
+    <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 11.5 }}><thead><tr>{["Technical object", "Prefix", "Meaning", "Type", "Domain", "Function", "Basis", "Status", "Used by", "Example targets"].map((h, i) => <th key={i} style={th(t)}>{h}</th>)}</tr></thead>
       <tbody>{(d.objects || []).map((o) => <tr key={o.technical_object}><td style={td(t, true)}><span style={mono}>{o.technical_object}</span></td><td style={td(t)}>{o.source_prefix}</td><td style={td(t)}>{o.business_meaning}</td><td style={td(t)}>{o.source_type}</td><td style={td(t)}>{o.business_domain}</td><td style={td(t)}>{o.migration_function}</td>
         <td style={td(t)}><Pill c={o.basis_class === "CURATED" ? "#159943" : "#c96a12"} title={o.definition_basis}>{o.basis_class}</Pill></td><td style={td(t)}><Pill c={STATUS_COLOR(o.dictionary_status)}>{o.dictionary_status}</Pill></td><td style={td(t)}>{o.lineage_usage_count ?? "—"}</td><td style={{ ...td(t), fontSize: 10.5, ...mono }}>{o.example_target_fields}</td></tr>)}</tbody></table>
     {(d.objects || []).length === 0 && <div style={{ fontSize: 12, color: t.textMuted, padding: "10px 0" }}>{data ? "No objects match." : "Loading…"}</div>}
@@ -273,7 +273,7 @@ export function QcTab({ t, initial }) {
   return (<>
     <H t={t} sub="TARGET_FIELD_QC: the reconciliation controls on the SEI target fields, as the workbook carries them. Every column of the sheet is kept.">Target-field QC</H>
     {controls.length === 0 && <div style={{ fontSize: 12, color: t.textMuted }}>{data ? "No controls loaded." : "Loading…"}</div>}
-    {controls.length > 0 && <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 11.5 }}><thead><tr>{["Control", "Applies to", "Expected", "Actual", "Result", ...keys.filter((k) => !/control|applies|expected|actual|result|status/i.test(k))].map((h) => <th key={h} style={th(t)}>{h}</th>)}</tr></thead>
+    {controls.length > 0 && <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 11.5 }}><thead><tr>{["Control", "Applies to", "Expected", "Actual", "Result", ...keys.filter((k) => !/control|applies|expected|actual|result|status/i.test(k))].map((h, i) => <th key={i} style={th(t)}>{h}</th>)}</tr></thead>
       <tbody>{controls.map((c) => <tr key={c.qc_id}><td style={td(t, true)}>{c.control_name}</td><td style={td(t)}>{c.applies_to}</td><td style={td(t)}>{c.expected}</td><td style={td(t)}>{c.actual}</td><td style={td(t)}><Pill c={STATUS_COLOR(c.result)}>{c.result || "—"}</Pill></td>
         {keys.filter((k) => !/control|applies|expected|actual|result|status/i.test(k)).map((k) => <td key={k} style={{ ...td(t), fontSize: 11 }}>{(c.row || {})[k]}</td>)}</tr>)}</tbody></table>}
   </>);
