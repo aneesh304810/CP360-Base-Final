@@ -169,6 +169,24 @@ ok(b["timing"]["pings"] >= 4 and b["timing"]["rtt_median"] >= 0.003 and b["timin
 # round trips: opening ping 3, deletes 2, a probe before each of the 3 batches + the 3 inserts, batch row 1 = 12 (force skips the hash read; no lineage, no match)
 ok(L.db["trips"] == 12 and took >= 12 * 0.003, "twelve round trips, each paid for once", (L.db["trips"], round(took, 3)))
 
+print("-- a failing insert")
+
+
+FakeCursor_executemany = FakeCursor.executemany
+def _boom(cur, sql, rows):
+    if "cp_hist_mapping_evidence" in sql:
+        raise RuntimeError("ORA-12899: value too large for column X (actual: 105, maximum: 60)")
+    return FakeCursor_executemany(cur, sql, rows)
+FakeCursor.executemany = _boom
+buf.truncate(0); buf.seek(0)
+try:
+    c.load(FakeLoader(0.001), b)
+    ok(False, "the ORA error is raised through")
+except RuntimeError:
+    ok("failed at step 4 of 6, insert cp_hist_mapping_evidence 1/2 (2,000 rows)" in buf.getvalue() and "ORA-12899" in buf.getvalue(), "a failing insert ends the bar and names its step, batch and rows before the traceback", buf.getvalue()[-400:])
+FakeCursor.executemany = FakeCursor_executemany
+ok(b["lineage"] == [] or all(len(r["approval_status"]) <= 400 for r in b["lineage"]), "approval_status is clipped to the 400-character column")
+
 print("-- estimate only")
 os.environ["CP_HIST_ESTIMATE"] = "1"
 L2 = FakeLoader(0.001)

@@ -111,14 +111,14 @@ COLS = {
                 "target_data_type": (60, False), "target_max_length": (30, False), "target_decimal_pos": (30, False), "mandatory": (4000, False),
                 "validation_rule": (0, False), "source_workbook": (400, False), "source_sheet": (200, False), "source_row": (None, False),
                 "common_target_key": (500, False), "common_target_indicator": (40, False), "match_method": (60, False), "match_status": (30, False),
-                "approval_status": (60, False)},
+                "approval_status": (400, False)},
     "decon": {"technical_object": (400, True), "source_prefix": (100, False), "business_meaning": (4000, False), "source_type": (200, False),
               "business_domain": (2000, False), "migration_function": (1000, False), "definition_basis": (100, False),
               "dictionary_status": (40, False), "lineage_usage_count": (None, False), "example_target_fields": (2000, False)},
     "rules": {"rule_id": (200, True), "catalog_id": (200, False), "functional_group": (200, False), "sei_target_file": (200, False),
               "sei_target_field": (200, False), "rule_source_column": (400, False), "rule_type": (100, False), "transformation_rule": (0, False),
               "validation_rule": (0, False), "mapping_status": (100, False), "source_objects_fields": (4000, False), "source_workbook": (400, False),
-              "source_sheet": (200, False), "evidence_locator": (1000, False), "approval_status": (60, False)},
+              "source_sheet": (200, False), "evidence_locator": (1000, False), "approval_status": (400, False)},
     "qc": {}, "manifest": {},
 }
 # A header the sheet may use instead of the physical name.
@@ -437,7 +437,7 @@ class HistMigrationConnector(BaseConnector):
         if b["lineage"]:
             lane_ids = {l["historical_lane_id"] for l in b["lanes"]}
             manifest = {m["manifest_key"].upper(): m["manifest_value"] for m in b["manifest"]}
-            default_approval = next((v for k, v in manifest.items() if "APPROVAL" in k), "") or "DRAFT_REVIEW_REQUIRED"
+            default_approval = (next((v for k, v in manifest.items() if "APPROVAL" in k), "") or "DRAFT_REVIEW_REQUIRED")[:400]   # the column's width
             rules_by_cat, rules_by_key = {}, {}
             for r in b["rules"]:
                 if r["catalog_id"]:
@@ -548,9 +548,21 @@ class HistMigrationConnector(BaseConnector):
             return 0
         batch_id = f"hm{int(time.time() * 1000)}{uuid.uuid4().hex[:6]}"
         stamp = {"batch_id": batch_id, "source_file": (b["source_file"] or "")[:260], "source_hash": b["source_hash"], "active_ind": "Y"}
-        total = 0
-        si = 0                                                                            # the step index into prog.steps
         every = prog.ping_every()
+        try:
+            total = self._write_steps(b, cur, loader, prog, stamp, batch_id, every)
+        except Exception as e:                               # noqa: BLE001
+            prog.fail(e)
+            raise
+        timing = prog.finish()
+        b["timing"] = timing
+        log.info("hist_migration: batch %s: %s rows in nine tables", batch_id, f"{total:,}")
+        return total
+
+    def _write_steps(self, b, cur, loader, prog, stamp, batch_id, every):
+        """The deletes, the insert batches, the batch row and the commit,
+        each ticked on the bar."""
+        total, si = 0, 0
         if cur is not None:
             for kind in reversed(LOAD_ORDER):
                 if not b[kind]:
@@ -605,7 +617,4 @@ class HistMigrationConnector(BaseConnector):
         t = time.perf_counter()
         loader.commit()
         prog.note(time.perf_counter() - t)
-        timing = prog.finish()
-        b["timing"] = timing
-        log.info("hist_migration: batch %s: %s rows in nine tables", batch_id, f"{total:,}")
         return total

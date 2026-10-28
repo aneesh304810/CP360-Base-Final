@@ -67,7 +67,7 @@ BEGIN
       recon_key                    VARCHAR2(1500 CHAR),     -- path | workbook | sheet | row | dat file | field
       match_method                 VARCHAR2(60),            -- EXACT_NORMALIZED_FIELD_MATCH
       match_status                 VARCHAR2(30),            -- MATCHED | UNMATCHED | NOT_CHECKED, against sei_input_lineage
-      approval_status              VARCHAR2(60),            -- independent of rule_status
+      approval_status              VARCHAR2(400 CHAR),      -- independent of rule_status; the manifest's default is a sentence
       batch_id                     VARCHAR2(40),
       source_file                  VARCHAR2(260),
       source_hash                  VARCHAR2(64),
@@ -130,7 +130,7 @@ BEGIN
       source_workbook        VARCHAR2(400 CHAR),
       source_sheet           VARCHAR2(200 CHAR),
       evidence_locator       VARCHAR2(1000 CHAR),
-      approval_status        VARCHAR2(60),
+      approval_status        VARCHAR2(400 CHAR),
       batch_id               VARCHAR2(40),
       source_file            VARCHAR2(260),
       source_hash            VARCHAR2(64),
@@ -188,5 +188,12 @@ EXCEPTION WHEN e_dup THEN NULL; END;
 BEGIN
   EXECUTE IMMEDIATE 'ALTER TABLE cp_hist_lineage MODIFY (decon_business_domain VARCHAR2(2000 CHAR))';
   EXECUTE IMMEDIATE 'ALTER TABLE cp_hist_decon_dictionary MODIFY (business_domain VARCHAR2(2000 CHAR), migration_function VARCHAR2(1000 CHAR))';
+EXCEPTION WHEN OTHERS THEN IF SQLCODE NOT IN (-1441, -1440) THEN RAISE; END IF; END;
+/
+-- The approval status is a sentence when it comes from the manifest default
+-- ("Draft - review required ..."), not a code; 60 bytes cut it (ORA-12899).
+BEGIN
+  EXECUTE IMMEDIATE 'ALTER TABLE cp_hist_lineage MODIFY (approval_status VARCHAR2(400 CHAR))';
+  EXECUTE IMMEDIATE 'ALTER TABLE cp_hist_rule MODIFY (approval_status VARCHAR2(400 CHAR))';
 EXCEPTION WHEN OTHERS THEN IF SQLCODE NOT IN (-1441, -1440) THEN RAISE; END IF; END;
 /

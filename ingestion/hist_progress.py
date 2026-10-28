@@ -248,6 +248,16 @@ class LoadProgress:
         """Time spent outside the steps: connect, hash, match, commit."""
         self.other_s += seconds
 
+    def fail(self, err):
+        """A step raised: end the bar line so the traceback starts clean,
+        and say which step it was."""
+        if self._dirty:
+            self._write("", final=True)
+        i = len(self.obs)
+        s = self.steps[i] if i < len(self.steps) else None
+        what = (f"{s['kind']} {s['table']}" + (f" {s['batch']}/{s['batches']} ({s['rows']:,} rows)" if s["kind"] == "insert" else "")) if s else "commit"
+        log.error("hist_migration: failed at step %s of %s, %s, after %s: %s", i + 1, len(self.steps), what, fmt_dur(time.perf_counter() - self.t0), str(err).splitlines()[0][:200])
+
     def finish(self):
         if self._dirty:
             self._write("", final=True)
