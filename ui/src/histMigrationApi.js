@@ -17,7 +17,7 @@ const qs = (o) => {
   return p.length ? `?${p.join("&")}` : "";
 };
 
-export const emptySummary = () => ({ loaded: false, totals: { lanes: 0, artifacts: 0, evidence: 0, dictionary: 0, sourceRows: 0, unresolvedLanes: 0 },
+export const emptySummary = () => ({ loaded: false, totals: { lanes: 0, artifacts: 0, evidence: 0, lineage: 0, rules: 0, dictionary: 0, sourceRows: 0, unresolvedLanes: 0 },
   byLane: [], byDomain: [], bySourceSystem: [], byCategory: [], byAttribute: [], bySheet: [], latest: null });
 
 export const histMigrationApi = {

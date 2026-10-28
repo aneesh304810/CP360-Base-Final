@@ -87,13 +87,18 @@ def summary():
     sheets = [{"workbook": r.get("w"), "sheet": r.get("s"), "n": int(r.get("n") or 0), "rows": int(r.get("r") or 0)}
               for r in _safe("SELECT source_mapping_workbook AS w, source_mapping_sheet AS s, COUNT(*) AS n, COUNT(DISTINCT source_mapping_row) AS r "
                              "FROM cp_hist_mapping_evidence GROUP BY source_mapping_workbook, source_mapping_sheet ORDER BY COUNT(*) DESC")]
-    loaded = n("SELECT COUNT(*) AS n FROM cp_hist_mapping_evidence") > 0
+    evidence = n("SELECT COUNT(*) AS n FROM cp_hist_mapping_evidence")
+    lineage = n("SELECT COUNT(*) AS n FROM cp_hist_lineage")
+    rules = n("SELECT COUNT(*) AS n FROM cp_hist_rule")
+    # loaded: the v12 package carries the lineage and the rules and no
+    # evidence sheet at all; any of the three means a batch is there
+    loaded = (evidence + lineage + rules) > 0
     if reason is None and not loaded:
         reason = "no_rows"
     return {"loaded": loaded, "reason": None if loaded else reason,
             "totals": {"lanes": n("SELECT COUNT(*) AS n FROM cp_hist_migration_lane"),
                        "artifacts": n("SELECT COUNT(*) AS n FROM cp_hist_source_artifact"),
-                       "evidence": n("SELECT COUNT(*) AS n FROM cp_hist_mapping_evidence"),
+                       "evidence": evidence, "lineage": lineage, "rules": rules,
                        "dictionary": n("SELECT COUNT(*) AS n FROM cp_hist_header_dictionary"),
                        "sourceRows": n("SELECT COUNT(DISTINCT source_mapping_workbook || '|' || source_mapping_sheet || '|' || source_mapping_row) AS n FROM cp_hist_mapping_evidence"),
                        "unresolvedLanes": n("SELECT COUNT(*) AS n FROM cp_hist_mapping_evidence WHERE lane_resolved = 'N'")},

@@ -338,7 +338,7 @@ def fake_query(sql, params=None):
 
 R.query = fake_query
 sm = R.summary()
-ok(sm["loaded"] and sm["reason"] is None and sm["totals"]["evidence"] == 5 and sm["totals"]["sourceRows"] == 3 and sm["totals"]["unresolvedLanes"] == 1 and sm["latest"]["batchId"] == batch["batch_id"] and len(sm["latest"]["checks"]) > 5,
+ok(sm["loaded"] and sm["reason"] is None and sm["totals"]["evidence"] == 5 and sm["totals"]["lineage"] == 3 and sm["totals"]["rules"] == 2 and sm["totals"]["sourceRows"] == 3 and sm["totals"]["unresolvedLanes"] == 1 and sm["latest"]["batchId"] == batch["batch_id"] and len(sm["latest"]["checks"]) > 5,
    "summary: the totals, the source rows, the unresolved count and the latest batch with its checks", sm["totals"])
 ok(any(x["key"] == "AddVantage / PB to SEI" and x["n"] == 3 for x in sm["byLane"]) and any(x["key"] == "Historical source to SEI" and x["unresolved"] == 1 for x in sm["byLane"]), "by lane, with the unresolved count on the broader lane", sm["byLane"])
 e = R.evidence(lane="AddVantage / PB to SEI")

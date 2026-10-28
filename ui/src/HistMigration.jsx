@@ -56,12 +56,14 @@ function Overview({ t, sum, lanes, artifacts, onFilter }) {
   const tot = sum.totals || {};
   return (<>
     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-      <Tile t={t} n={tot.evidence || 0} label="evidence rows" sub="one per populated mapping cell" />
-      <Tile t={t} n={tot.sourceRows || 0} label="source rows" sub="workbook · sheet · row" />
+      <Tile t={t} n={tot.lineage || 0} label="lineage rows" sub="historical source to SEI field" />
+      <Tile t={t} n={tot.rules || 0} label="transformation rules" />
       <Tile t={t} n={tot.lanes || 0} label="lanes into SEI" />
       <Tile t={t} n={tot.artifacts || 0} label="registered artifacts" />
       <Tile t={t} n={tot.dictionary || 0} label="dictionary columns" />
       <Tile t={t} n={tot.unresolvedLanes || 0} label="unresolved lanes" sub="CP360-HM-007" color={tot.unresolvedLanes ? "#c96a12" : undefined} />
+      {tot.evidence > 0 && <Tile t={t} n={tot.evidence || 0} label="evidence rows" sub="one per populated mapping cell" />}
+      {tot.sourceRows > 0 && <Tile t={t} n={tot.sourceRows || 0} label="source rows" sub="workbook · sheet · row" />}
     </div>
     {!sum.loaded && <div style={{ fontSize: 12.5, color: t.sub, margin: "12px 0", maxWidth: "80ch", lineHeight: 1.6, border: `1px solid ${t.border}`, borderLeft: "3px solid #c96a12", borderRadius: 6, padding: "10px 14px", background: t.panel }}>
       <b style={{ color: t.text }}>Nothing loaded yet.</b>{" "}

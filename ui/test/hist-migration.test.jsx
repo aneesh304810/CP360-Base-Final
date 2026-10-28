@@ -18,7 +18,7 @@ import DataAnalysis from "../src/DataAnalysis.jsx";
 let bad = 0;
 const ok = (c, m, got) => { console.log(`${c ? "ok  " : "FAIL"} ${m}${c ? "" : `  -> ${String(got).slice(0, 220)}`}`); if (!c) bad++; };
 
-const summary = { loaded: true, totals: { lanes: 3, artifacts: 4, evidence: 214622, dictionary: 14, sourceRows: 15880, unresolvedLanes: 1203 },
+const summary = { loaded: true, totals: { lanes: 3, artifacts: 4, evidence: 214622, lineage: 2270, rules: 1507, dictionary: 14, sourceRows: 15880, unresolvedLanes: 1203 },
   byLane: [{ key: "AddVantage / PB to SEI", n: 120000, unresolved: 0 }, { key: "Historical source to SEI", n: 1203, unresolved: 1203 }],
   byDomain: [{ key: "Static", n: 150000, unresolved: 0 }, { key: "Financial", n: 64622, unresolved: 1203 }],
   bySourceSystem: [{ key: "AddVantage / PB", n: 120000, unresolved: 0 }], byCategory: [{ key: "Source-Specific Mapping Attribute", n: 90000, unresolved: 0 }],
