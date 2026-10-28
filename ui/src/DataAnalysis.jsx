@@ -485,7 +485,7 @@ function Lookups({ t }) {
 export default function DataAnalysis({ t, initial }) {
   return (
     <div>
-      <h1 style={{ fontSize: 24, fontWeight: 500, color: t.accent, borderBottom: `2px solid ${t.accent}`, paddingBottom: 14, margin: "0 0 14px" }}>Data Analysis</h1>
+      <h1 style={{ fontSize: 24, fontWeight: 500, color: t.accent, borderBottom: `2px solid ${t.accent}`, paddingBottom: 14, margin: "0 0 14px" }}>Historical Data Analysis Migration</h1>
       <HistMigration t={t} initial={initial?.hist} />
     </div>);
 }

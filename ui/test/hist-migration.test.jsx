@@ -150,7 +150,7 @@ ok(!/@[a-z0-9-]+\.[a-z]{2,}/i.test(scrubbed) && !/\b\d{7,}\b/.test(scrubbed), "n
 
 console.log("-- wiring");
 const page = renderToStaticMarkup(<DataAnalysis t={tLight} initial={{ tab: "Historical data migration", overview: { totals: { fields: 0 }, by_file: [] }, status: { fields: 0 }, hist: { sub: "Overview", summary, lanes, artifacts, dictionary, evidence, batches } }} />);
-ok(/Data Analysis/.test(page) && /aria-selected="true"/.test(page) && /214,622/.test(page) && !/>Lookups</.test(page), "Data Analysis is the historical data migration, rendered with its sub-tabs and no catalog tabs");
+ok(/Historical Data Analysis Migration/.test(page) && /aria-selected="true"/.test(page) && /214,622/.test(page) && !/>Lookups</.test(page), "the page is the historical data migration, rendered with its sub-tabs and no catalog tabs");
 const SRC = fs.existsSync("src/HistMigration.jsx") ? "src" : path.join("ui", "src");
 const api = fs.readFileSync(path.join(SRC, "histMigrationApi.js"), "utf8");
 ok(/\/hist-migration/.test(api) && !/from ["']\.\/api\.js["']/.test(api) && !/api\.js/.test(fs.readFileSync(path.join(SRC, "HistMigration.jsx"), "utf8")), "the client is self-contained: api.js untouched");

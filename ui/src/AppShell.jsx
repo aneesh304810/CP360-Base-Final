@@ -25,7 +25,7 @@ const NAV_GROUPS = [
  { group: 'Utilities', items: [
  ['mapper', 'Auto Mapper', '\u21F2'],
  ['compare', 'Compare', '\u29C9'],
- ['dataanalysis', 'Data Analysis', '\u2AF6'],
+ ['dataanalysis', 'Historical Data Analysis Migration', '\u2AF6'],
  ] },
  {
  group: 'Governance',

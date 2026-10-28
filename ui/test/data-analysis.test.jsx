@@ -91,13 +91,13 @@ ok(/previous/.test(page) && /next ▸/.test(page), "step through the file");
 const emptyPage = renderToStaticMarkup(<SeiCatalogAnalysis t={tLight} initial={{ overview: { totals: { fields: 0 }, by_file: [] }, status: { fields: 0 } }} />);
 ok(/nothing loaded yet/.test(emptyPage) && /load\.ps1 sei_migration/.test(emptyPage), "an empty warehouse says how to load");
 const routed = renderToStaticMarkup(<DataAnalysis t={tLight} initial={{ hist: { sub: "Overview", summary: { loaded: false, reason: "no_table", totals: { lanes: 0, artifacts: 0, evidence: 0, dictionary: 0, sourceRows: 0, unresolvedLanes: 0 }, lanes: [], artifacts: [], checks: [], batches: [] }, lanes: [], artifacts: [], dictionary: [], evidence: { rows: [], total: 0, page: 1, size: 50 }, batches: [] } }} />);
-ok(/Data Analysis/.test(routed) && /Historical data migration|historical data migration/i.test(routed) && !/SEI is the target/.test(routed) && !/>Lookups</.test(routed),
+ok(/Historical Data Analysis Migration/.test(routed) && /Historical data migration|historical data migration/i.test(routed) && !/SEI is the target/.test(routed) && !/>Lookups</.test(routed),
    "the routed page is the historical data migration alone: no catalog tabs, no catalog fetch");
 
 console.log("-- wired in");
 const shell = fs.readFileSync(path.join(SRC, "AppShell.jsx"), "utf8");
 const app = fs.readFileSync(path.join(SRC, "App.jsx"), "utf8");
-ok(/\['dataanalysis', 'Data Analysis'/.test(shell) && /group: 'Utilities'[\s\S]*?dataanalysis[\s\S]*?\]\s*\}/.test(shell), "Data Analysis sits under Utilities in the nav");
+ok(/\['dataanalysis', 'Historical Data Analysis Migration'/.test(shell) && /group: 'Utilities'[\s\S]*?dataanalysis[\s\S]*?\]\s*\}/.test(shell), "Historical Data Analysis Migration sits under Utilities in the nav");
 ok(/import DataAnalysis from "\.\/DataAnalysis\.jsx"/.test(app) && /dataanalysis: <DataAnalysis t=\{t\} \/>/.test(app), "and routes to the page");
 ok(!/from ['"]\.\/api\.js['"]/.test(fs.readFileSync(path.join(SRC, "seiMigrationApi.js"), "utf8")), "the client never touches api.js");
 
