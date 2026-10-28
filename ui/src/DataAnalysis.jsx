@@ -479,7 +479,18 @@ function Lookups({ t }) {
 }
 
 // ------------------------------------------------------------------- page
+// Data Analysis is the historical data migration. The SEI merged-catalog
+// screens below (SeiCatalogAnalysis) are kept whole but no longer routed;
+// nothing on this page fetches the catalog, so it costs no round trips.
 export default function DataAnalysis({ t, initial }) {
+  return (
+    <div>
+      <h1 style={{ fontSize: 24, fontWeight: 500, color: t.accent, borderBottom: `2px solid ${t.accent}`, paddingBottom: 14, margin: "0 0 14px" }}>Data Analysis</h1>
+      <HistMigration t={t} initial={initial?.hist} />
+    </div>);
+}
+
+export function SeiCatalogAnalysis({ t, initial }) {
   const [tab, setTab] = useState(initial?.tab || "Overview");
   const [ov, setOv] = useState(initial?.overview || null);
   const [status, setStatus] = useState(initial?.status || null);

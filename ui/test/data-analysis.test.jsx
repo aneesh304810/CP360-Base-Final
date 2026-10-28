@@ -12,7 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { tLight } from "../src/bbhTheme.js";
-import DataAnalysis, { LineageDiagram } from "../src/DataAnalysis.jsx";
+import DataAnalysis, { LineageDiagram, SeiCatalogAnalysis } from "../src/DataAnalysis.jsx";
 import { buildLineage, describeRule, RULE_CLASSES, SYSTEMS, ruleColor } from "../src/seiMigrationApi.js";
 
 let bad = 0;
@@ -83,13 +83,16 @@ const empty = renderToStaticMarkup(<LineageDiagram t={tLight} lin={bare} />);
 ok(/no BBH source named/.test(empty) && /the rule needs none/.test(empty), "an empty source column explains itself for a constant or null");
 
 console.log("-- the page");
-const page = renderToStaticMarkup(<DataAnalysis t={tLight} initial={{ tab: "Lineage", detail, overview: { totals: { fields: 6 }, by_file: [{ source_object: "account-basic.dat" }] }, status: { fields: 6, sources: 12, targets: 9 } }} />);
+const page = renderToStaticMarkup(<SeiCatalogAnalysis t={tLight} initial={{ tab: "Lineage", detail, overview: { totals: { fields: 6 }, by_file: [{ source_object: "account-basic.dat" }] }, status: { fields: 6, sources: 12, targets: 9 } }} />);
 ok(/Data Analysis/.test(page) && /SEI is the target/.test(page), "the page says what it is and which side is the target");
 for (const tab of ["Overview", "Fields", "Lineage", "Sources", "Findings", "Lookups"]) ok(new RegExp(`>${tab}<`).test(page), `tab ${tab}`);
 ok(/BBH mapping rule/.test(page) && /Use StarId from IM_ACCOUNT_CLASSIFICATION/.test(page) && /SEI processing logic/.test(page), "the rule text panels");
 ok(/previous/.test(page) && /next ▸/.test(page), "step through the file");
-const emptyPage = renderToStaticMarkup(<DataAnalysis t={tLight} initial={{ overview: { totals: { fields: 0 }, by_file: [] }, status: { fields: 0 } }} />);
+const emptyPage = renderToStaticMarkup(<SeiCatalogAnalysis t={tLight} initial={{ overview: { totals: { fields: 0 }, by_file: [] }, status: { fields: 0 } }} />);
 ok(/nothing loaded yet/.test(emptyPage) && /load\.ps1 sei_migration/.test(emptyPage), "an empty warehouse says how to load");
+const routed = renderToStaticMarkup(<DataAnalysis t={tLight} initial={{ hist: { sub: "Overview", summary: { loaded: false, reason: "no_table", totals: { lanes: 0, artifacts: 0, evidence: 0, dictionary: 0, sourceRows: 0, unresolvedLanes: 0 }, lanes: [], artifacts: [], checks: [], batches: [] }, lanes: [], artifacts: [], dictionary: [], evidence: { rows: [], total: 0, page: 1, size: 50 }, batches: [] } }} />);
+ok(/Data Analysis/.test(routed) && /Historical data migration|historical data migration/i.test(routed) && !/SEI is the target/.test(routed) && !/>Lookups</.test(routed),
+   "the routed page is the historical data migration alone: no catalog tabs, no catalog fetch");
 
 console.log("-- wired in");
 const shell = fs.readFileSync(path.join(SRC, "AppShell.jsx"), "utf8");
