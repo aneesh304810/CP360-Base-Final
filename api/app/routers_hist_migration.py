@@ -179,8 +179,112 @@ def batches():
 
 
 # ------------------------------------------------ the lineage (sql/87)
-def _canon(col):
-    return (f"REGEXP_REPLACE(UPPER(TRIM('_' FROM REGEXP_REPLACE({col}, '[[:space:]/.-]+', '_'))), '_L([0-9]+)', '_\\1')")
+
+
+def _norm(f):
+    """The same normalisation the loader applies to target_field_norm
+    (hist_migration_conn.norm_field), so a SEI datapoint, a historical
+    target field and a legacy source column compare in Python."""
+    if not f:
+        return ""
+    c = re.sub(r"[\s/.\-]+", "_", str(f).strip())
+    c = re.sub(r"_{2,}", "_", c).strip("_").upper()
+    return re.sub(r"_L(\d+)", r"_\1", c)
+
+
+LEGACY_COLS = ("l.lineage_id, l.src_source_table, l.src_source_column, l.src_type, l.src_length, l.src_to_stg1_transform, "
+               "l.stg1_source_table, l.stg1_source_column, l.stg1_type, l.stg1_to_stg2_transform, l.stg2_source_table, l.stg2_source_column, l.stg2_type, "
+               "l.stg2_to_dwh_transform, l.dwh_target_table, l.dwh_target_column, l.dwh_type, l.dwh_length, l.lineage_status, n.source_system")
+
+
+def _maps():
+    """Every SEI datapoint to STAR contract field, once, keyed by the
+    normalised datapoint. One plain scan, cached by the db layer."""
+    out = {}
+    for m in _safe("SELECT map_id, lane_id, data_source, src_file_key, src_source_column, sei_feed, sei_entity, sei_datapoint, map_kind, evidence "
+                   "FROM sei_source_map WHERE sei_datapoint IS NOT NULL ORDER BY data_source, src_file_key"):
+        out.setdefault(_norm(m.get("sei_datapoint")), []).append(dict(m))
+    return out
+
+
+def _legacy_for(columns):
+    """The legacy (STAR to IMDS) rows whose source column normalises to one
+    of the given names: the distinct column names once, then the rows by
+    their raw spelling in IN lists of 500, so the join never asks Oracle
+    to normalise a column per candidate. Keyed by the normalised name."""
+    want = {_norm(c) for c in columns if c}
+    if not want:
+        return {}
+    raw = [x.get("src_source_column") for x in _safe("SELECT DISTINCT src_source_column FROM legacy_lineage WHERE src_source_column IS NOT NULL")]
+    raw = sorted({c for c in raw if c and _norm(c) in want})
+    out = {}
+    for i in range(0, len(raw), 500):
+        chunk = raw[i:i + 500]
+        binds = {f"c{j}": c for j, c in enumerate(chunk)}
+        rows = _safe(f"SELECT {LEGACY_COLS} FROM legacy_lineage l LEFT JOIN legacy_lineage_lane n ON n.lineage_id = l.lineage_id "
+                     f"WHERE l.src_source_column IN ({', '.join(':' + k for k in binds)}) ORDER BY l.dwh_target_table, l.dwh_target_column", binds)
+        for x in rows:
+            d = dict(x)
+            for c in ("src_to_stg1_transform", "stg1_to_stg2_transform", "stg2_to_dwh_transform"):
+                d[c] = _clob(x.get(c)) or ""
+            out.setdefault(_norm(d.get("src_source_column")), []).append(d)
+    return out
+
+
+def _legacy_matches(legacy, m):
+    """The legacy rows for one map row: same normalised source column and,
+    when the map names a feed key, that key inside the legacy source table."""
+    key = (m.get("src_file_key") or "").upper()
+    return [g for g in legacy.get(_norm(m.get("src_source_column")), []) if not key or key in (g.get("src_source_table") or "").upper()]
+
+
+def _hist_paths(file="", lane="", q="", limit=500):
+    """One row per historical mapping and operational path: the lineage
+    row, the STAR contract field it joins by normalised name, and the
+    legacy row that carries that field to IMDS; a target with no match
+    keeps its row with the right side empty. Three plain queries and a
+    join here, instead of one statement that normalised every legacy row
+    per candidate and ran for minutes on a far database."""
+    import time
+    t0 = time.perf_counter()
+    where, p = [], {}
+    if file:
+        where.append("target_dat_file = :target_dat_file"); p["target_dat_file"] = file
+    if lane:
+        where.append("lane_id = :lane_id"); p["lane_id"] = lane
+    if q.strip():
+        where.append("(UPPER(target_field) LIKE :q OR UPPER(source_object_field) LIKE :q)"); p["q"] = f"%{q.strip().upper()}%"
+    w = (" WHERE " + " AND ".join(where)) if where else ""
+    lin = _safe(f"SELECT lineage_id, lane_id, source_system, source_object_field, transformation_rule, rule_status, approval_status, decon_dictionary_status, "
+                f"target_dat_file, target_field, target_field_norm, target_data_type, target_max_length, mandatory, match_status FROM cp_hist_lineage{w} "
+                f"ORDER BY target_dat_file, target_field, lane_id, lineage_id FETCH FIRST {int(limit)} ROWS ONLY", p)
+    maps = _maps() if lin else {}
+    norms = {(r.get("target_field_norm") or _norm(r.get("target_field"))) for r in lin}
+    hit = {n: ms for n, ms in maps.items() if n in norms}
+    legacy = _legacy_for([m.get("src_source_column") for ms in hit.values() for m in ms]) if hit else {}
+    blank_m = {"map_id": None, "src_file_key": None, "src_source_column": None, "map_kind": None}
+    blank_g = {"legacy_id": None, "src_source_table": None, "stg1_source_table": None, "stg1_source_column": None, "stg2_source_table": None, "stg2_source_column": None,
+               "dwh_target_table": None, "dwh_target_column": None, "dwh_type": None, "lineage_status": None}
+    out = []
+    for r in lin:
+        base = {k: r.get(k) for k in ("lineage_id", "lane_id", "source_system", "source_object_field", "transformation_rule", "rule_status", "approval_status",
+                                       "decon_dictionary_status", "target_dat_file", "target_field", "target_data_type", "target_max_length", "mandatory", "match_status")}
+        ms = hit.get(r.get("target_field_norm") or _norm(r.get("target_field")), [])
+        if not ms:
+            out.append({**base, **blank_m, **blank_g})
+            continue
+        for m in ms:
+            mm = {"map_id": m.get("map_id"), "src_file_key": m.get("src_file_key"), "src_source_column": m.get("src_source_column"), "map_kind": m.get("map_kind")}
+            gs = _legacy_matches(legacy, m)
+            if not gs:
+                out.append({**base, **mm, **blank_g})
+                continue
+            for g in gs:
+                out.append({**base, **mm, "legacy_id": g.get("lineage_id"), "src_source_table": g.get("src_source_table"), "stg1_source_table": g.get("stg1_source_table"),
+                            "stg1_source_column": g.get("stg1_source_column"), "stg2_source_table": g.get("stg2_source_table"), "stg2_source_column": g.get("stg2_source_column"),
+                            "dwh_target_table": g.get("dwh_target_table"), "dwh_target_column": g.get("dwh_target_column"), "dwh_type": g.get("dwh_type"), "lineage_status": g.get("lineage_status")})
+    info = {"seconds": round(time.perf_counter() - t0, 2), "lineage_rows": len(lin), "maps": sum(len(v) for v in hit.values()), "legacy_rows": sum(len(v) for v in legacy.values())}
+    return out, info
 
 
 LINEAGE_SLIM = ("lineage_id, catalog_id, functional_group, source_path, source_system, lane_id, source_object_field, decon_business_domain, "
@@ -288,25 +392,18 @@ def lineage_record(id: str):
     if not sei_in and norm:
         sei_in = [dict(x) for x in _safe("SELECT input_id, data_source, functional_group, sei_target_file, sei_field, published_type, published_length, mapping_status, "
                                          "upstream_object, upstream_field, evidence FROM sei_input_lineage WHERE sei_field_norm = :n ORDER BY sei_target_file", {"n": norm})]
-    star = [dict(x) for x in _safe(f"SELECT map_id, lane_id, data_source, src_file_key, src_source_column, sei_feed, sei_entity, sei_datapoint, map_kind, evidence "
-                                   f"FROM sei_source_map WHERE {_canon('sei_datapoint')} = :n ORDER BY data_source, src_file_key", {"n": norm or "-"})]
+    star = _maps().get(norm, []) if norm else []
+    legacy = _legacy_for([m.get("src_source_column") for m in star[:20]]) if star else {}
     imds = []
     seen = set()
     for m in star[:20]:
         if not m.get("src_source_column"):
             continue
-        for x in _safe("SELECT l.lineage_id, l.src_source_table, l.src_source_column, l.src_type, l.src_length, l.src_to_stg1_transform, "
-                       "l.stg1_source_table, l.stg1_source_column, l.stg1_type, l.stg1_to_stg2_transform, l.stg2_source_table, l.stg2_source_column, l.stg2_type, "
-                       "l.stg2_to_dwh_transform, l.dwh_target_table, l.dwh_target_column, l.dwh_type, l.dwh_length, l.lineage_status, n.source_system "
-                       "FROM legacy_lineage l LEFT JOIN legacy_lineage_lane n ON n.lineage_id = l.lineage_id "
-                       f"WHERE {_canon('l.src_source_column')} = {_canon(':c')} AND (UPPER(l.src_source_table) LIKE :t OR :t = '%') FETCH FIRST 20 ROWS ONLY",
-                       {"c": m["src_source_column"], "t": f"%{(m.get('src_file_key') or '').upper()}%" if m.get("src_file_key") else "%"}):
+        for x in _legacy_matches(legacy, m)[:20]:
             if x["lineage_id"] in seen:
                 continue
             seen.add(x["lineage_id"])
             d = dict(x)
-            for c in ("src_to_stg1_transform", "stg1_to_stg2_transform", "stg2_to_dwh_transform"):
-                d[c] = _clob(x.get(c)) or ""
             d["star_map"] = m["map_id"]
             imds.append(d)
     chain = {
@@ -381,34 +478,14 @@ def lineage_mapping(file: str = "", lane: str = "", q: str = "", limit: int = 50
     One row per historical mapping and operational path; a target with no
     operational match keeps its row with the right side empty."""
     limit = min(5000, max(1, int(limit or 500)))
-    where, p = [], {}
-    if file:
-        where.append("l.target_dat_file = :f"); p["f"] = file
-    if lane:
-        where.append("l.lane_id = :l"); p["l"] = lane
-    if q.strip():
-        where.append("(UPPER(l.target_field) LIKE :q OR UPPER(l.source_object_field) LIKE :q)"); p["q"] = f"%{q.strip().upper()}%"
-    w = (" WHERE " + " AND ".join(where)) if where else ""
-    rows = _safe(f"""
-        SELECT l.lineage_id, l.lane_id, l.source_system, l.source_object_field, l.transformation_rule, l.rule_status, l.approval_status,
-               l.decon_dictionary_status, l.target_dat_file, l.target_field, l.target_data_type, l.target_max_length, l.match_status,
-               m.map_id, m.src_file_key, m.src_source_column, m.map_kind,
-               g.lineage_id AS legacy_id, g.src_source_table, g.stg1_source_table, g.stg1_source_column, g.stg2_source_table, g.stg2_source_column,
-               g.dwh_target_table, g.dwh_target_column, g.dwh_type, g.lineage_status
-        FROM   cp_hist_lineage l
-        LEFT   JOIN sei_source_map m ON {_canon('m.sei_datapoint')} = l.target_field_norm
-        LEFT   JOIN legacy_lineage g ON {_canon('g.src_source_column')} = {_canon('m.src_source_column')}
-                                     AND (m.src_file_key IS NULL OR UPPER(g.src_source_table) LIKE '%' || UPPER(m.src_file_key) || '%')
-        {w}
-        ORDER BY l.target_dat_file, l.target_field, l.lane_id, l.lineage_id, g.dwh_target_table
-        FETCH FIRST {limit} ROWS ONLY""", p)
+    rows, info = _hist_paths(file, lane, q, limit)
     out = []
-    for r in rows:
+    for r in rows[:limit]:
         d = dict(r)
         d["transformation_rule"] = (_clob(r.get("transformation_rule")) or "")[:600]
         out.append(d)
     files = [{"key": r.get("k"), "n": int(r.get("n") or 0)} for r in _safe("SELECT target_dat_file AS k, COUNT(*) AS n FROM cp_hist_lineage GROUP BY target_dat_file ORDER BY target_dat_file")]
-    return {"mapping": out, "files": files, "limit": limit}
+    return {"mapping": out, "files": files, "limit": limit, "info": info, "truncated": len(rows) > limit}
 
 
 @router.get("/canvas")
@@ -418,24 +495,7 @@ def canvas(file: str = "", lane: str = ""):
     in the middle with the transformation on every wire, and on the right
     the IMDS tables those fields reach today by exact normalised name. One
     payload the picture and the table both read."""
-    where, p = [], {}
-    if file:
-        where.append("l.target_dat_file = :f"); p["f"] = file
-    if lane:
-        where.append("l.lane_id = :l"); p["l"] = lane
-    w = (" WHERE " + " AND ".join(where)) if where else ""
-    rows = _safe(f"""
-        SELECT l.lineage_id, l.lane_id, l.source_system, l.source_object_field, l.transformation_rule, l.rule_status, l.approval_status,
-               l.decon_dictionary_status, l.target_dat_file, l.target_field, l.target_data_type, l.target_max_length, l.mandatory, l.match_status,
-               m.map_id, m.src_file_key, m.src_source_column, m.map_kind,
-               g.dwh_target_table, g.dwh_target_column, g.dwh_type, g.lineage_status
-        FROM   cp_hist_lineage l
-        LEFT   JOIN sei_source_map m ON {_canon('m.sei_datapoint')} = l.target_field_norm
-        LEFT   JOIN legacy_lineage g ON {_canon('g.src_source_column')} = {_canon('m.src_source_column')}
-                                     AND (m.src_file_key IS NULL OR UPPER(g.src_source_table) LIKE '%' || UPPER(m.src_file_key) || '%')
-        {w}
-        ORDER BY l.target_dat_file, l.target_field, l.lane_id, l.lineage_id
-        FETCH FIRST 4000 ROWS ONLY""", p)
+    rows, info = _hist_paths(file, lane, "", 4000)
     lanes: dict = {}
     targets: dict = {}
     sei_files: dict = {}
@@ -480,4 +540,4 @@ def canvas(file: str = "", lane: str = ""):
             "targets": list(targets.values()),
             "sei_files": [{"file": v["file"], "n": v["n"], "fields": list(v["fields"].values())} for v in sei_files.values()],
             "files": [{"key": r.get("k"), "n": int(r.get("n") or 0)} for r in _safe("SELECT target_dat_file AS k, COUNT(*) AS n FROM cp_hist_lineage GROUP BY target_dat_file ORDER BY target_dat_file")],
-            "truncated": len(rows) >= 4000}
+            "truncated": info["lineage_rows"] >= 4000, "info": info}

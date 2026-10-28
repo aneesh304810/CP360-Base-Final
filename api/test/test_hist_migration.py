@@ -292,9 +292,15 @@ def fake_query(sql, params=None):
     if "FROM sei_input_lineage" in s:
         return [dict(r) for r in SEI_IN if r["sei_field_norm"] == params.get("n") and (params.get("f", "-") == "-" or r["sei_target_file"].upper() == params["f"])]
     if "FROM sei_source_map" in s:
+        if "n" not in params:                                                            # the whole map, joined in Python
+            return [dict(r) for r in SRC_MAP]
         n = params.get("n")
         return [dict(r) for r in SRC_MAP if r["sei_datapoint"].upper().replace(" ", "_") == n]
     if "FROM legacy_lineage" in s:
+        if "DISTINCT src_source_column" in s:
+            return [{"src_source_column": c} for c in sorted({r["src_source_column"] for r in LEG})]
+        if "IN (" in s:
+            return [{**r, "source_system": r.get("source_system")} for r in LEG if r["src_source_column"] in set(params.values())]
         return [dict(r) for r in LEG if r["src_source_column"] == params.get("c")]
     if "FROM cp_hist_migration_lane" in s:
         return [dict(v) for v in L.rows["cp_hist_migration_lane"].values()] if "COUNT(*)" not in s else [{"n": 3}]
