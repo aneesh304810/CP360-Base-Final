@@ -15,7 +15,7 @@ import logging
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from .db import query, get_pool
+from .db import query, get_pool, cache_clear
 
 log = logging.getLogger("cp.api.impact")
 router = APIRouter(prefix="/impact", tags=["impact"])
@@ -45,6 +45,7 @@ def _exec(sql, params=None):
         cur = conn.cursor()
         cur.execute(sql, params or {})
         conn.commit()
+        cache_clear()
         cur.close()
 
 
@@ -129,7 +130,7 @@ def scan():
 
         def commit(self):
             self.conn.commit()
-
+            cache_clear()
         def _merge(self, table, pk, values, protect=()):
             cols = list(values.keys())
             sel = ", ".join(f":{c} AS {c}" for c in cols)

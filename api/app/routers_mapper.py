@@ -16,7 +16,7 @@ import time
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from .db import query, get_pool
+from .db import query, get_pool, cache_clear
 from .mapper_scoring import score_field
 
 log = logging.getLogger("cp.api.mapper")
@@ -194,6 +194,7 @@ def commit(body: CommitBody):
                                       f"(conf {m.confidence}) — pending review",
                     "source": "auto_mapper", "model_key": run_id})
             conn.commit()
+            cache_clear()
             cur.close()
         return {"ok": True, "run_id": run_id,
                 "committed": len(accepted), "audited": len(body.mappings)}
