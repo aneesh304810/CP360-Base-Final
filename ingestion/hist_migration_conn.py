@@ -40,6 +40,8 @@ Env:
     CP_HIST_MIGRATION_XLSX     a different workbook for these sheets
     CP_HIST_MIGRATION_DIR      a folder to scan instead of one file
     CP_HIST_MIGRATION_FORCE    "1" to reload an unchanged workbook
+    CP_HIST_ESTIMATE           "1" to ping, plan and print the time estimate only
+    CP_HIST_PROGRESS           "0" to silence the progress bar (hist_progress.py)
     CP_HIST_WITH_CROSSWALK     "0" to keep the sheets out of the sei_crosswalk step
 """
 from __future__ import annotations
@@ -53,6 +55,7 @@ import time
 import uuid
 
 from .base import BaseConnector
+from .hist_progress import LoadProgress, fmt_dur, ping, plan_steps
 
 log = logging.getLogger("cp.hist_migration")
 
@@ -274,19 +277,25 @@ class HistMigrationConnector(BaseConnector):
 
     def parse(self):
         b = {"lanes": [], "artifacts": [], "evidence": [], "dictionary": [], "lineage": [], "decon": [], "rules": [], "qc": [], "manifest": [],
-             "files": [], "checks": [], "skipped": 0, "source_file": None, "source_hash": None, "sheets": []}
+             "files": [], "checks": [], "skipped": 0, "source_file": None, "source_hash": None, "sheets": [], "parse_seconds": 0.0}
         from openpyxl import load_workbook
+        t_parse = time.perf_counter()
         for path in self.files():
+            t_open = time.perf_counter()
             wb = load_workbook(path, read_only=True, data_only=True)
+            log.info("hist_migration: opened %s in %s", os.path.basename(path), fmt_dur(time.perf_counter() - t_open))
             hit = False
             for ws in wb.worksheets:
                 kind = SHEETS.get(_fold(ws.title))
                 if not kind:
                     continue
                 hit = True
+                t_sheet = time.perf_counter()
                 rows = [list(r) for r in ws.iter_rows(values_only=True)]
                 n = self._take(b, kind, rows)
-                b["sheets"].append({"workbook": os.path.basename(path), "sheet": ws.title, "kind": kind, "rows": n})
+                sec = time.perf_counter() - t_sheet
+                b["sheets"].append({"workbook": os.path.basename(path), "sheet": ws.title, "kind": kind, "rows": n, "seconds": round(sec, 2)})
+                log.info("hist_migration: read %s: %s rows in %s", ws.title, f"{n:,}", fmt_dur(sec))
             if not hit:
                 log.warning("hist_migration: %s has no HIST_* sheet; its sheets are: %s", os.path.basename(path), ", ".join(wb.sheetnames))
             if hit:
@@ -298,6 +307,7 @@ class HistMigrationConnector(BaseConnector):
         if not b["files"]:
             return b
         self._checks(b)
+        b["parse_seconds"] = round(time.perf_counter() - t_parse, 2)
         log.info("hist_migration: %s lanes, %s artifacts, %s evidence rows, %s dictionary rows, %s lineage rows, %s decon objects, %s rules, %s QC rows from %s; %s blank cells skipped",
                  len(b["lanes"]), len(b["artifacts"]), len(b["evidence"]), len(b["dictionary"]), len(b["lineage"]), len(b["decon"]), len(b["rules"]), len(b["qc"]), b["files"], b["skipped"])
         return b
@@ -510,9 +520,13 @@ class HistMigrationConnector(BaseConnector):
                             "detail": f"{matched} target fields match the operational SEI input lineage by exact normalised name; {unmatched} do not and are flagged for review"})
 
     def load(self, loader, bundle=None):
+        """Write the bundle, one DELETE per table then executemany batches
+        of 2,000 rows, with a progress bar that times every round trip
+        (hist_progress.py). CP_HIST_ESTIMATE=1 stops after the plan."""
         b = bundle or self.parse()
         if not b["files"]:
             return 0
+        t_load = time.perf_counter()
         conn = getattr(loader, "conn", None)
         cur = conn.cursor() if conn is not None and hasattr(conn, "cursor") else None
         if cur is not None and not self.force and b["source_hash"] and self._last_hash(conn) == b["source_hash"]:
@@ -521,12 +535,31 @@ class HistMigrationConnector(BaseConnector):
             return 0
         if cur is not None and b["lineage"]:
             self._match(cur, b)
+        rtt = ping(cur) if cur is not None else None
+        steps = plan_steps(b, LOAD_ORDER, TABLE, deletes=cur is not None)
+        prog = LoadProgress(steps, rtt=rtt, parse_s=b.get("parse_seconds") or 0.0)
+        prog.note(time.perf_counter() - t_load)
+        plan = prog.start()
+        if os.environ.get("CP_HIST_ESTIMATE", "").strip().lower() in ("1", "true", "yes"):
+            log.info("hist_migration: CP_HIST_ESTIMATE is set; nothing deleted or inserted. Expect about %s for the load plus the %s parse already done",
+                     fmt_dur(plan["seconds"]), fmt_dur(b.get("parse_seconds") or 0.0))
+            if cur is not None:
+                cur.close()
+            return 0
         batch_id = f"hm{int(time.time() * 1000)}{uuid.uuid4().hex[:6]}"
         stamp = {"batch_id": batch_id, "source_file": (b["source_file"] or "")[:260], "source_hash": b["source_hash"], "active_ind": "Y"}
         total = 0
+        si = 0                                                                            # the step index into prog.steps
+        every = prog.ping_every()
         if cur is not None:
             for kind in reversed(LOAD_ORDER):
+                if not b[kind]:
+                    continue
+                t = time.perf_counter()
                 cur.execute(f"DELETE FROM {TABLE[kind]}")
+                prog.tick(si, time.perf_counter() - t)
+                si += 1
+        n_ins = 0
         for kind in LOAD_ORDER:                                                           # HM-009
             rows = [{**r, **stamp} for r in b[kind]]
             if not rows:
@@ -541,23 +574,38 @@ class HistMigrationConnector(BaseConnector):
                     except Exception:                        # noqa: BLE001
                         pass
                 for i in range(0, len(rows), 2000):
+                    lat = ping(cur, 1) if n_ins % every == 0 else None                    # this insert's own latency
+                    t = time.perf_counter()
                     cur.executemany(sql, rows[i:i + 2000])
+                    prog.tick(si, time.perf_counter() - t, lat)
+                    si += 1
+                    n_ins += 1
                 if kind in CLOBS:
                     cur.setinputsizes()
             else:
+                t = time.perf_counter()
                 for r in rows:
                     loader._merge(TABLE[kind], PK[kind], r)
+                for i in range(0, len(rows), 2000):                                       # one tick per planned batch
+                    prog.tick(si, (time.perf_counter() - t) / max(1, (len(rows) + 1999) // 2000))
+                    si += 1
             total += len(rows)
         batch = {"batch_id": batch_id, "source_file": stamp["source_file"], "source_hash": b["source_hash"],
                  "lanes_n": len(b["lanes"]), "artifacts_n": len(b["artifacts"]), "evidence_n": len(b["evidence"]),
                  "dictionary_n": len(b["dictionary"]), "skipped_n": b["skipped"], "checks": json.dumps(b["checks"]),
                  "lineage_n": len(b["lineage"]), "decon_n": len(b["decon"]), "rules_n": len(b["rules"]), "qc_n": len(b["qc"])}
+        t = time.perf_counter()
         if cur is not None:
             cur.execute("INSERT INTO cp_hist_ingest_batch (batch_id, source_file, source_hash, lanes_n, artifacts_n, evidence_n, dictionary_n, skipped_n, checks, lineage_n, decon_n, rules_n, qc_n) "
                         "VALUES (:batch_id, :source_file, :source_hash, :lanes_n, :artifacts_n, :evidence_n, :dictionary_n, :skipped_n, :checks, :lineage_n, :decon_n, :rules_n, :qc_n)", batch)
             cur.close()
         else:
             loader._merge("cp_hist_ingest_batch", ("batch_id",), batch)
+        prog.tick(si, time.perf_counter() - t)
+        t = time.perf_counter()
         loader.commit()
-        log.info("hist_migration: batch %s: %s rows in four tables", batch_id, total)
+        prog.note(time.perf_counter() - t)
+        timing = prog.finish()
+        b["timing"] = timing
+        log.info("hist_migration: batch %s: %s rows in nine tables", batch_id, f"{total:,}")
         return total

@@ -336,12 +336,10 @@ def _run_step(step, conn, loader, resolver) -> None:
         if not b["files"]:
             log.warning("hist_migration: no HIST_* sheets in %s (set CP_SEI_XLSX or CP_HIST_MIGRATION_XLSX); skipped", c.where)
             return
-        for sh in b["sheets"]:
-            log.info("hist_migration: %s / %s: %s rows", sh["workbook"], sh["sheet"], sh["rows"])
         for ck in b["checks"]:
             if ck["level"] != "Pass":
                 log.warning("hist_migration: %s %s: %s", ck["rule"], ck["level"], ck["detail"])
-        n = c.load(loader, b)
+        n = c.load(loader, b)                         # the parse logged each sheet; load prints the bar and the timing
         log.info("hist_migration: %s rows loaded", n)
         return
     if step == "legacy_source_file":

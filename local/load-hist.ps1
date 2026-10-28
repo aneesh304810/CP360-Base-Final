@@ -8,6 +8,14 @@
 #   .\local\load-hist.ps1            # load if the workbook changed
 #   .\local\load-hist.ps1 -Force     # load even if the workbook is unchanged
 #   .\local\load-hist.ps1 -Xlsx "D:\path\to\other.xlsx"
+#   .\local\load-hist.ps1 -Estimate  # ping the database, print the plan and
+#                                     # the time estimate; write nothing
+#
+# While it loads, a progress bar on stderr shows every DELETE and every
+# INSERT batch with its measured round-trip latency, rows per second,
+# time elapsed, time left and the projected total; a timing summary
+# follows (parse, deletes, inserts, commit, latency median, transfer
+# rate). CP_HIST_PROGRESS=0 silences the bar.
 #
 # Same rules as load-all.ps1: passwords come from local\secrets.ps1,
 # PYTHONPATH is this repo, and the workbook path is the one load-all uses
@@ -15,6 +23,7 @@
 # =====================================================================
 param(
   [switch]$Force,
+  [switch]$Estimate,
   [string]$Xlsx
 )
 $ErrorActionPreference = "Stop"
@@ -45,6 +54,8 @@ Write-Host ">>> Workbook: $Target" -ForegroundColor Cyan
 
 if ($Force) { $env:CP_HIST_MIGRATION_FORCE = "1"; Write-Host ">>> Force: reloading even if the workbook is unchanged" -ForegroundColor Yellow }
 else        { Remove-Item Env:CP_HIST_MIGRATION_FORCE -ErrorAction SilentlyContinue }
+if ($Estimate) { $env:CP_HIST_ESTIMATE = "1"; $env:CP_HIST_MIGRATION_FORCE = "1"; Write-Host ">>> Estimate only: ping, plan and time estimate; nothing is written" -ForegroundColor Yellow }
+else           { Remove-Item Env:CP_HIST_ESTIMATE -ErrorAction SilentlyContinue }
 
 Write-Host "`n=== Running ingestion step: hist_migration ===" -ForegroundColor Cyan
 Set-Location $Root
