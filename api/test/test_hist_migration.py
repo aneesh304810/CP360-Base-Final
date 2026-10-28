@@ -75,7 +75,7 @@ ws.append(["HL-0001", "SEI-ACCOUNT-BASIC-001-ACCOUNTNUMBER", "Account", "AddVant
            "", "merged catalog", "TRIM(ACCT_NO)", "Complete", "SEI", "account-basic.dat", "ACCOUNT_NUMBER", "ACCT_NO", "CHAR", "20", "", "Yes", "must be numeric", "DSR_Mapping.xlsx", "AV_DSR_MAP", 2, "", ""])
 ws.append(["HL-0002", "SEI-ACCOUNT-BASIC-001-ACCOUNTNUMBER", "Account", "STAR / IM -> SEI", "STAR / IM", "IM_ACCOUNT.ACCOUNT_ID", "IM account", "Account", "Name-derived, review required",
            "IM_ACCOUNT_TYPE", "merged catalog", "ACCOUNT_ID", "Complete", "SEI", "account-basic.dat", "ACCOUNT_NUMBER", "ACCOUNT_ID", "CHAR", "20", "", "Yes", "", "IM_Mapping.xlsx", "IM_MAP", 7, "SEI::account-basic.dat::ACCOUNT_NUMBER", "Y"])
-ws.append(["HL-0003", "SEI-PARTY-BASIC-004-SUBFIRM", "Party", "UAF -> SEI", "UAF", "XOS_PARTY.SUB_FIRM_CD", "", "", "",
+ws.append(["HL-0003", "SEI-PARTY-BASIC-004-SUBFIRM", "Party", "UAF -> SEI", "UAF", "UAF_PARTY.SUB_FIRM_CD", "", "", "",
            "", "merged catalog", "CASE WHEN sub_firm_cd IS NULL THEN 'DEFAULT' ELSE sub_firm_cd END", "Open", "SEI", "party-basic.dat", "Sub-Firm", "", "CHAR", "10", "", "No", "", "UAF_Mapping.xlsx", "UAF_MAP", 3, "", ""])
 ws = wb.create_sheet("DECON_SOURCE_DICTIONARY")
 ws.append(["TECHNICAL_OBJECT", "SOURCE_PREFIX", "BUSINESS_MEANING", "SOURCE_TYPE", "BUSINESS_DOMAIN", "MIGRATION_FUNCTION", "DEFINITION_BASIS", "LINEAGE_USAGE_COUNT", "EXAMPLE_TARGET_FIELDS"])
@@ -95,6 +95,8 @@ ws.append(["KEY", "VALUE"])
 ws.append(["WORKBOOK_VERSION", "v12"])
 ws.append(["MATCH_METHOD", "EXACT_NORMALIZED_FIELD_MATCH"])
 ws.append(["TRANSFORMATION_APPROVAL_DEFAULT", "DRAFT_REVIEW_REQUIRED"])
+ws.append(["SHEET", "FINAL_HIST_MIGRATION_LINEAGE · 2270 rows"])
+ws.append(["SHEET", "HIST_MIGRATION_RULE · 1507 rows"])
 d = tempfile.mkdtemp()
 path = os.path.join(d, "STAR_IMDS_SEI_Lineage_Catalog_test.xlsx")
 wb.save(path)
@@ -124,6 +126,10 @@ ok(HistMigrationConnector(folder=d).files() == [path] and HistMigrationConnector
 print("-- the lineage package")
 ok(lane_of("AddVantage / PB", "AddVantage / PB -> SEI", set()) == "ADDVANTAGE_SEI_HIST" and lane_of("STAR / IM", "", set()) == "STAR_SEI_HIST" and lane_of("UAF", "", set()) == "UAF_SEI_HIST"
    and lane_of("", "Common PB-IM-UAF to SEI", set()) == "COMMON" and lane_of("", "", set()) == "UNCLASSIFIED", "a lineage row's lane comes from its source system or path")
+ok(lane_of("", "", set(), "SGA_DCON_ACCT.ACCT_NO") == "ADDVANTAGE_SEI_HIST" and lane_of("", "", set(), "XOS_PARTY.SUB_FIRM_CD") == "ADDVANTAGE_SEI_HIST" and lane_of("", "", set(), "IM_ACCOUNT.ACCOUNT_ID") == "STAR_SEI_HIST"
+   and lane_of("", "", set(), "UAF_HOLD.QTY") == "UAF_SEI_HIST" and lane_of("", "", set(), "SGA_DCON_ACCT.A; IM_ACCOUNT.B") == "COMMON" and lane_of("Unclassified Historical Source", "", set(), "ZZ_THING.X") == "UNCLASSIFIED"
+   and lane_of("", "", set(), "QQ_OBJ.F", (("QQ", "UAF_SEI_HIST"),)) == "UAF_SEI_HIST",
+   "the lane comes first from the technical object's prefix (SGA_DCON, AV, AVX, XOS are AddVantage/PB; IM is STAR/IM; UAF is UAF), two systems on one row is COMMON, and the decon dictionary's own prefixes count")
 ok(decon_status("Curated") == "CURATED" and decon_status("Name-derived, review required") == "REVIEW_REQUIRED" and decon_status("partial review") == "PARTIAL_REVIEW_REQUIRED" and decon_status("no technical object") == "NO_TECHNICAL_OBJECT" and decon_status("") is None,
    "HL-005: the dictionary status is governed to four values")
 ok(norm_field("Sub-Firm") == "SUB_FIRM" and norm_field("account number") == "ACCOUNT_NUMBER", "the target field is normalised the way the crosswalk normalises SEI fields")
@@ -143,7 +149,8 @@ ok(R3["R-0001"]["target_key"] == "SEI::account-basic.dat::ACCOUNT_NUMBER" and R3
    "rules carry the target key, the manifest default approval where the sheet has none, and the logic whole")
 ok(len(b["qc"]) == 2 and b["qc"][0]["control_name"] == "No blank TARGET_FIELD" and b["qc"][0]["result"] == "PASS" and json.loads(b["qc"][0]["row_json"])["NOTE"] == "checked on export" and b["qc"][0]["qc_id"] == "QC-0002",
    "QC rows keep the recognised columns and every cell as JSON", b["qc"][:1])
-ok(len(b["manifest"]) == 3 and {m["manifest_key"]: m["manifest_value"] for m in b["manifest"]}["WORKBOOK_VERSION"] == "v12", "the manifest is key and value")
+ok(len(b["manifest"]) == 5 and {m["manifest_key"]: m["manifest_value"] for m in b["manifest"]}["WORKBOOK_VERSION"] == "v12" and [m["manifest_key"] for m in b["manifest"] if m["manifest_key"].startswith("SHEET")] == ["SHEET", "SHEET [2]"],
+   "the manifest is key and value, and a repeated key is numbered rather than refused by the primary key", [m["manifest_key"] for m in b["manifest"]])
 hl = {x["rule"]: x for x in b["checks"] if x["rule"].startswith("CP360-HL")}
 ok(hl["CP360-HL-001"]["n"] == 0 and hl["CP360-HL-001"]["level"] == "Pass" and hl["CP360-HL-002"]["n"] == 0 and hl["CP360-HL-003"]["n"] == 0 and hl["CP360-HL-004"]["n"] == 1 and hl["CP360-HL-006"]["n"] == 1,
    "the lineage checks: no blank target, every row laned, every row ruled, one field reached from two lanes kept apart, one name-derived meaning", {k: (v["level"], v["n"]) for k, v in hl.items()})
@@ -162,7 +169,7 @@ class FakeLoader:
 
 L = FakeLoader()
 n = c.load(L, b)
-ok(n == 14 + 3 + 3 + 2 + 2 + 3 and getattr(L, "committed", False), "load writes every row of the nine sheets and commits", n)
+ok(n == 14 + 3 + 3 + 2 + 2 + 5 and getattr(L, "committed", False), "load writes every row of the nine sheets and commits", n)
 ok(len(L.rows["cp_hist_mapping_evidence"]) == 5 and len(L.rows["cp_hist_migration_lane"]) == 3 and len(L.rows["cp_hist_source_artifact"]) == 4 and len(L.rows["cp_hist_header_dictionary"]) == 2, "the four tables", {k: len(v) for k, v in L.rows.items()})
 batch = list(L.rows["cp_hist_ingest_batch"].values())[0]
 ok(batch["lineage_n"] == 3 and batch["rules_n"] == 2 and batch["decon_n"] == 3 and batch["qc_n"] == 2 and batch["evidence_n"] == 5 and batch["skipped_n"] == 1 and batch["source_hash"] == b["source_hash"] and json.loads(batch["checks"]), "HM-011: the batch row carries the counts, the hash and the checks")
@@ -338,7 +345,7 @@ ok(len(rw["cells"]) == 3 and [c["original_source_column_number"] for c in rw["ce
    "the row route reassembles every cell of the source row in column order, values whole", len(rw["cells"]))
 ls = R.lineage_summary()
 ok(ls["totals"]["lineage"] == 3 and ls["totals"]["targetFields"] == 2 and ls["totals"]["datFiles"] == 2 and ls["totals"]["sharedTargets"] == 1 and ls["totals"]["rules"] == 2 and ls["totals"]["decon"] == 3
-   and any(f["file"] == "account-basic.dat" and f["fields"] == 1 and f["rows"] == 2 and f["lanes"] == 2 for f in ls["byFile"]) and {m["manifest_key"] for m in ls["manifest"]} == {"WORKBOOK_VERSION", "MATCH_METHOD", "TRANSFORMATION_APPROVAL_DEFAULT"},
+   and any(f["file"] == "account-basic.dat" and f["fields"] == 1 and f["rows"] == 2 and f["lanes"] == 2 for f in ls["byFile"]) and {"WORKBOOK_VERSION", "MATCH_METHOD", "TRANSFORMATION_APPROVAL_DEFAULT", "SHEET", "SHEET [2]"} <= {m["manifest_key"] for m in ls["manifest"]},
    "lineage summary: the totals, the field on two lanes, the dat files and the manifest", ls["totals"])
 lg = R.lineage(lane="STAR_SEI_HIST")
 ok(lg["total"] == 1 and lg["lineage"][0]["lineage_id"] == "HL-0002", "lineage filtered by lane")

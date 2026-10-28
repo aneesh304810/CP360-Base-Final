@@ -79,6 +79,12 @@ CLOBS = {"evidence": ("evidence_value",), "lineage": ("transformation_rule", "va
          "rules": ("transformation_rule", "validation_rule"), "qc": ("row_json",)}
 LANE_OF = (("UAF", "UAF_SEI_HIST"), ("ADDVANTAGE", "ADDVANTAGE_SEI_HIST"), ("ADVANTAGE", "ADDVANTAGE_SEI_HIST"), ("PB", "ADDVANTAGE_SEI_HIST"),
            ("STAR", "STAR_SEI_HIST"), ("IM", "STAR_SEI_HIST"))
+# The technical object's prefix says which legacy system it came from: the
+# SGA_DCON_*, AV_*, AVX_* and XOS_* objects are AddVantage/PB deconversion
+# structures, IM_* is STAR/IM, UAF_* is UAF. The prefix is on the row even
+# when SOURCE_SYSTEM and SOURCE_PATH say nothing a text rule can read.
+PREFIX_LANE = (("SGA_DCON", "ADDVANTAGE_SEI_HIST"), ("AVX", "ADDVANTAGE_SEI_HIST"), ("AV", "ADDVANTAGE_SEI_HIST"), ("XOS", "ADDVANTAGE_SEI_HIST"),
+               ("ADV", "ADDVANTAGE_SEI_HIST"), ("PB", "ADDVANTAGE_SEI_HIST"), ("IM", "STAR_SEI_HIST"), ("STAR", "STAR_SEI_HIST"), ("UAF", "UAF_SEI_HIST"), ("UA", "UAF_SEI_HIST"))
 DECON_STATUS = ("CURATED", "REVIEW_REQUIRED", "PARTIAL_REVIEW_REQUIRED", "NO_TECHNICAL_OBJECT")
 
 # column -> (width, required). A width of None is a number; 0 is a CLOB.
@@ -96,7 +102,7 @@ COLS = {
     "dictionary": {"meaningful_column_name": (200, True), "definition": (1000, True), "source_or_derivation": (1000, True)},
     "lineage": {"lineage_id": (200, True), "catalog_id": (200, False), "functional_group": (200, False), "source_path": (400, False),
                 "source_system": (200, False), "source_object_field": (2000, False), "decon_dictionary_meaning": (4000, False),
-                "decon_business_domain": (200, False), "decon_dictionary_status": (400, False), "source_dependencies": (4000, False),
+                "decon_business_domain": (2000, False), "decon_dictionary_status": (400, False), "source_dependencies": (4000, False),
                 "transformation_rule_source": (400, False), "transformation_rule": (0, False), "rule_status": (100, False),
                 "target_system": (100, False), "target_dat_file": (200, True), "target_field": (200, True), "target_field_source_column": (400, False),
                 "target_data_type": (60, False), "target_max_length": (30, False), "target_decimal_pos": (30, False), "mandatory": (4000, False),
@@ -104,7 +110,7 @@ COLS = {
                 "common_target_key": (500, False), "common_target_indicator": (40, False), "match_method": (60, False), "match_status": (30, False),
                 "approval_status": (60, False)},
     "decon": {"technical_object": (400, True), "source_prefix": (100, False), "business_meaning": (4000, False), "source_type": (200, False),
-              "business_domain": (200, False), "migration_function": (400, False), "definition_basis": (100, False),
+              "business_domain": (2000, False), "migration_function": (1000, False), "definition_basis": (100, False),
               "dictionary_status": (40, False), "lineage_usage_count": (None, False), "example_target_fields": (2000, False)},
     "rules": {"rule_id": (200, True), "catalog_id": (200, False), "functional_group": (200, False), "sei_target_file": (200, False),
               "sei_target_field": (200, False), "rule_source_column": (400, False), "rule_type": (100, False), "transformation_rule": (0, False),
@@ -167,12 +173,25 @@ def norm_field(f):
     return re.sub(r"_L(\d+)", r"_\1", c)
 
 
-def lane_of(source_system, source_path, lanes):
-    """Which registered lane a lineage row belongs to, from its source system
-    or path. PB and IM/UAF sources that reach the same SEI field stay on
-    their own lanes; COMMON only when the row itself says so."""
+def lane_of(source_system, source_path, lanes, source_object_field=None, prefixes=None):
+    """Which registered lane a lineage row belongs to: first from the prefix
+    of the technical object it names (the decon dictionary's SOURCE_PREFIX
+    when the sheet carries one), then from the source system or path text.
+    PB and IM/UAF sources that reach the same SEI field stay on their own
+    lanes; COMMON only when the row itself says so."""
     s = f"{source_path or ''} {source_system or ''}".upper()
     if "COMMON" in s:
+        return "COMMON"
+    objs = re.findall(r"[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)*", str(source_object_field or "").upper())
+    found = set()
+    for o in objs:
+        for prefix, lane in (prefixes or ()) + PREFIX_LANE:
+            if o == prefix or o.startswith(prefix + "_"):
+                found.add(lane)
+                break
+    if len(found) == 1:
+        return found.pop()
+    if len(found) > 1:
         return "COMMON"
     for hint, lane in LANE_OF:
         if re.search(rf"(^|[^A-Z]){hint}([^A-Z]|$)", s):
@@ -285,11 +304,19 @@ class HistMigrationConnector(BaseConnector):
         headers = [_s(c) for c in rows[0]]
         n = 0
         if kind == "manifest":
+            # The manifest is a configuration log, not a dictionary: the same
+            # key appears once per sheet or per version. Every row is kept;
+            # a repeated key is numbered so the primary key holds.
+            seen = {}
             for row in rows[1:]:
                 cells = [_s(c) for c in row]
                 if not cells or not cells[0]:
                     continue
-                b["manifest"].append({"manifest_key": cells[0][:200], "manifest_value": (" · ".join(c for c in cells[1:] if c))[:4000]})
+                key = cells[0][:190]
+                seen[key] = seen.get(key, 0) + 1
+                if seen[key] > 1:
+                    key = f"{key} [{seen[key]}]"
+                b["manifest"].append({"manifest_key": key[:200], "manifest_value": (" · ".join(c for c in cells[1:] if c))[:4000]})
                 n += 1
             return n
         hint = lambda *ws: next((i for i, h in enumerate(headers) if any(w in _fold(h) for w in ws)), None)   # noqa: E731
@@ -404,10 +431,17 @@ class HistMigrationConnector(BaseConnector):
                     rules_by_key.setdefault(r["target_key"], []).append(r["rule_id"])
                 r["approval_status"] = r["approval_status"] or default_approval
             blank_target = sum(1 for r in b["lineage"] if not r["target_field"] or not r["target_dat_file"])
-            unlaned, no_rule, by_key = 0, 0, {}
+            # the decon dictionary's own prefixes, classed by the lane rule
+            prefixes = tuple((d["source_prefix"].upper().rstrip("_"), lane_of("", "", set(), d["source_prefix"].upper() + "_X") or "UNCLASSIFIED")
+                             for d in b["decon"] if d.get("source_prefix"))
+            prefixes = tuple((p, l) for p, l in prefixes if l != "UNCLASSIFIED")
+            unlaned, no_rule, by_key, unresolved_text = 0, 0, {}, {}
             for r in b["lineage"]:
-                r["lane_id"] = lane_of(r["source_system"], r["source_path"], lane_ids)
-                unlaned += r["lane_id"] in ("UNCLASSIFIED",)
+                r["lane_id"] = lane_of(r["source_system"], r["source_path"], lane_ids, r["source_object_field"], prefixes)
+                if r["lane_id"] == "UNCLASSIFIED":
+                    unlaned += 1
+                    k = f"{r['source_system'] or '(blank system)'} | {r['source_path'] or '(blank path)'} | {(r['source_object_field'] or '(blank object)')[:40]}"
+                    unresolved_text[k] = unresolved_text.get(k, 0) + 1
                 r["approval_status"] = r["approval_status"] or default_approval
                 if not (rules_by_cat.get(r["catalog_id"]) or rules_by_key.get(r["target_key"])):
                     no_rule += 1
@@ -415,8 +449,12 @@ class HistMigrationConnector(BaseConnector):
             shared = sum(1 for k, v in by_key.items() if len(v) > 1)
             b["checks"].append({"rule": "CP360-HL-001", "level": "Error" if blank_target else "Pass", "sheet": "lineage", "n": blank_target,
                                 "detail": f"{blank_target} lineage rows with a blank TARGET_DAT_FILE or TARGET_FIELD (the workbook records zero)"})
+            top = sorted(unresolved_text.items(), key=lambda kv: -kv[1])[:5]
             b["checks"].append({"rule": "CP360-HL-002", "level": "Warning" if unlaned else "Pass", "sheet": "lineage", "n": unlaned,
-                                "detail": f"{unlaned} lineage rows whose source system or path resolves to no registered lane"})
+                                "detail": f"{unlaned} lineage rows whose source object, system or path resolves to no registered lane"
+                                          + (("; most common: " + "; ".join(f"{k} ({n})" for k, n in top)) if top else "")})
+            if top:
+                log.warning("hist_migration: unresolved lane, most common system | path | object: %s", "; ".join(f"{k} ({n})" for k, n in top))
             b["checks"].append({"rule": "CP360-HL-003", "level": "Warning" if no_rule else "Pass", "sheet": "lineage", "n": no_rule,
                                 "detail": f"{no_rule} lineage rows with no HIST_MIGRATION_RULE on their catalog id or target field"})
             b["checks"].append({"rule": "CP360-HL-004", "level": "Pass", "sheet": "lineage", "n": shared,

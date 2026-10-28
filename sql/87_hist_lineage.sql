@@ -41,7 +41,7 @@ BEGIN
       lane_id                      VARCHAR2(100 CHAR),     -- derived: ADDVANTAGE_SEI_HIST | STAR_SEI_HIST | UAF_SEI_HIST | COMMON | UNCLASSIFIED
       source_object_field          VARCHAR2(2000 CHAR),
       decon_dictionary_meaning     VARCHAR2(4000 CHAR),
-      decon_business_domain        VARCHAR2(200 CHAR),
+      decon_business_domain        VARCHAR2(2000 CHAR),
       decon_dictionary_status      VARCHAR2(40),            -- governed: CURATED | REVIEW_REQUIRED | PARTIAL_REVIEW_REQUIRED | NO_TECHNICAL_OBJECT
       decon_status_text            VARCHAR2(400 CHAR),      -- as written
       source_dependencies          VARCHAR2(4000 CHAR),
@@ -95,8 +95,8 @@ BEGIN
       source_prefix          VARCHAR2(100 CHAR),
       business_meaning       VARCHAR2(4000 CHAR),
       source_type            VARCHAR2(200 CHAR),
-      business_domain        VARCHAR2(200 CHAR),
-      migration_function     VARCHAR2(400 CHAR),
+      business_domain        VARCHAR2(2000 CHAR),
+      migration_function     VARCHAR2(1000 CHAR),
       definition_basis       VARCHAR2(100 CHAR),         -- curated | name-derived, as written
       basis_class            VARCHAR2(20),               -- CURATED | NAME_DERIVED | UNKNOWN
       dictionary_status      VARCHAR2(40),               -- governed, as cp_hist_lineage.decon_dictionary_status
@@ -181,4 +181,12 @@ DECLARE e_dup EXCEPTION; PRAGMA EXCEPTION_INIT(e_dup, -1430);
 BEGIN
   EXECUTE IMMEDIATE 'ALTER TABLE cp_hist_ingest_batch ADD (lineage_n NUMBER(10), decon_n NUMBER(10), rules_n NUMBER(10), qc_n NUMBER(10))';
 EXCEPTION WHEN e_dup THEN NULL; END;
+/
+-- The decon business domain is a list on some rows; wider than first cut.
+-- Widening a VARCHAR2 never fails on existing data; a narrower target does,
+-- so the guard only swallows "already at least this wide".
+BEGIN
+  EXECUTE IMMEDIATE 'ALTER TABLE cp_hist_lineage MODIFY (decon_business_domain VARCHAR2(2000 CHAR))';
+  EXECUTE IMMEDIATE 'ALTER TABLE cp_hist_decon_dictionary MODIFY (business_domain VARCHAR2(2000 CHAR), migration_function VARCHAR2(1000 CHAR))';
+EXCEPTION WHEN OTHERS THEN IF SQLCODE NOT IN (-1441, -1440) THEN RAISE; END IF; END;
 /
