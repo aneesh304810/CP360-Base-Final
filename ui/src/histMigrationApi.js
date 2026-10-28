@@ -76,7 +76,7 @@ export const STATUS_COLOR = (v) => {
   if (/DRAFT|REVIEW|PARTIAL|PENDING|OPEN|NOT_CHECKED/.test(s)) return "#c96a12";
   return "#0f4775";
 };
-export const LANE_LABEL = { ADDVANTAGE_SEI_HIST: "AddVantage / PB → SEI", STAR_SEI_HIST: "STAR / IM → SEI", UAF_SEI_HIST: "UAF → SEI", COMMON: "Common PB-IM-UAF → SEI", UNCLASSIFIED: "unclassified" };
+export const LANE_LABEL = { ADDVANTAGE_SEI_HIST: "AddVantage / PB → SEI", STAR_SEI_HIST: "STAR / IM → SEI", UAF_SEI_HIST: "UAF → SEI", COMMON: "Common PB-IM-UAF → SEI", CONFIG: "Configuration / constant → SEI", UNCLASSIFIED: "unclassified" };
 export const HL_RULES = [
   ["CP360-HL-001", "FINAL_HIST_MIGRATION_LINEAGE", "Target", "Every row names a TARGET_DAT_FILE and a TARGET_FIELD; the stable key is SEI::<dat file>::<field>.", "Error"],
   ["CP360-HL-002", "FINAL_HIST_MIGRATION_LINEAGE", "Lane", "The source system or path resolves to a registered lane; PB and IM/UAF rows stay on their own lanes.", "Warning"],

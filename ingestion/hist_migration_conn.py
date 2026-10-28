@@ -182,6 +182,11 @@ def lane_of(source_system, source_path, lanes, source_object_field=None, prefixe
     s = f"{source_path or ''} {source_system or ''}".upper()
     if "COMMON" in s:
         return "COMMON"
+    # 2,070 of the v12 workbook's 2,270 rows: the SEI field is a constant or
+    # a configuration value, with no legacy source object. A lane of its
+    # own, so the count of what still needs a legacy lane is honest.
+    if "CONFIG" in s or "CONSTANT" in s:
+        return "CONFIG"
     objs = re.findall(r"[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)*", str(source_object_field or "").upper())
     found = set()
     for o in objs:
@@ -451,7 +456,7 @@ class HistMigrationConnector(BaseConnector):
                                 "detail": f"{blank_target} lineage rows with a blank TARGET_DAT_FILE or TARGET_FIELD (the workbook records zero)"})
             top = sorted(unresolved_text.items(), key=lambda kv: -kv[1])[:5]
             b["checks"].append({"rule": "CP360-HL-002", "level": "Warning" if unlaned else "Pass", "sheet": "lineage", "n": unlaned,
-                                "detail": f"{unlaned} lineage rows whose source object, system or path resolves to no registered lane"
+                                "detail": f"{unlaned} lineage rows whose source object, system or path resolves to no registered lane (constants and configuration values are the CONFIG lane and are not counted)"
                                           + (("; most common: " + "; ".join(f"{k} ({n})" for k, n in top)) if top else "")})
             if top:
                 log.warning("hist_migration: unresolved lane, most common system | path | object: %s", "; ".join(f"{k} ({n})" for k, n in top))

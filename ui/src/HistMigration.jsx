@@ -194,7 +194,7 @@ function PictureTab({ t, initial }) {
       <label style={{ fontSize: 11.5, color: t.sub, display: "inline-flex", gap: 4, alignItems: "center" }}>SEI dat file
         <select value={file} onChange={(e) => setFile(e.target.value)} style={sel}><option value="">all dat files</option>{(files || []).map((f) => <option key={f.key} value={f.key}>{f.key} ({f.n})</option>)}</select></label>
       <label style={{ fontSize: 11.5, color: t.sub, display: "inline-flex", gap: 4, alignItems: "center" }}>lane
-        <select value={lane} onChange={(e) => setLane(e.target.value)} style={sel}><option value="">all lanes</option>{["ADDVANTAGE_SEI_HIST", "STAR_SEI_HIST", "UAF_SEI_HIST", "COMMON", "UNCLASSIFIED"].map((k) => <option key={k} value={k}>{k}</option>)}</select></label>
+        <select value={lane} onChange={(e) => setLane(e.target.value)} style={sel}><option value="">all lanes</option>{["ADDVANTAGE_SEI_HIST", "STAR_SEI_HIST", "UAF_SEI_HIST", "COMMON", "CONFIG", "UNCLASSIFIED"].map((k) => <option key={k} value={k}>{k}</option>)}</select></label>
       <span style={{ fontSize: 11, color: t.textMuted }}>left to right: historical lane and its source columns → SEI dat file and its target fields, the rule on the wire → the IMDS table the field reaches today. Click a node to open it, a wire for its rule; Table reads the same rows.</span>
     </div>
     <HistCanvas t={t} file={file} lane={lane} initial={initial?.canvas} onPickFile={(f) => setFile(f)} />

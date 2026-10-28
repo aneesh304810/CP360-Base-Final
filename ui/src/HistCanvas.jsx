@@ -16,7 +16,7 @@ import { classifyLink, summarise, OP_META } from "./linkOps.js";
 import HistReading from "./HistReading.jsx";
 
 const MONO = "'Roboto Mono', ui-monospace, Menlo, monospace";
-const LANE_C = { ADDVANTAGE_SEI_HIST: "#7c3aed", STAR_SEI_HIST: "#0f4775", UAF_SEI_HIST: "#c96a12", COMMON: "#159943", UNCLASSIFIED: "#6b7884" };
+const LANE_C = { ADDVANTAGE_SEI_HIST: "#7c3aed", STAR_SEI_HIST: "#0f4775", UAF_SEI_HIST: "#c96a12", COMMON: "#159943", CONFIG: "#b45309", UNCLASSIFIED: "#6b7884" };
 const SEI_C = "#0091bf", DWH_C = "#233240";
 const HEAD = 40, ROW = 22, GAPY = 14, PAD = 20, CAP0 = 15, NW_MAX = 420, GAP_MAX = 380;
 

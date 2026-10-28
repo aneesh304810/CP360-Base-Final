@@ -10,7 +10,7 @@ import React from "react";
 import { LANE_LABEL, STATUS_COLOR } from "./histMigrationApi.js";
 
 const MONO = "ui-monospace, Menlo, monospace";
-const LANE_C = { ADDVANTAGE_SEI_HIST: "#7c3aed", STAR_SEI_HIST: "#0f4775", UAF_SEI_HIST: "#c96a12", COMMON: "#159943", UNCLASSIFIED: "#6b7884" };
+const LANE_C = { ADDVANTAGE_SEI_HIST: "#7c3aed", STAR_SEI_HIST: "#0f4775", UAF_SEI_HIST: "#c96a12", COMMON: "#159943", CONFIG: "#b45309", UNCLASSIFIED: "#6b7884" };
 const STAGE_C = { HIST: "#7c3aed", RULE: "#0f4775", SEI: "#0091bf", STAR: "#233240", STG1: "#00a3a3", STG2: "#0091bf", DWH: "#0f4775" };
 const COL = [{ x: 0, w: 300 }, { x: 380, w: 250 }, { x: 710, w: 230 }, { x: 1020, w: 280 }];
 const W = 1300, NODE_H = 44, ROW = 14;

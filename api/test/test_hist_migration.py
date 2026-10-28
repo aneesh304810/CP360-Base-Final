@@ -128,7 +128,8 @@ ok(lane_of("AddVantage / PB", "AddVantage / PB -> SEI", set()) == "ADDVANTAGE_SE
    and lane_of("", "Common PB-IM-UAF to SEI", set()) == "COMMON" and lane_of("", "", set()) == "UNCLASSIFIED", "a lineage row's lane comes from its source system or path")
 ok(lane_of("", "", set(), "SGA_DCON_ACCT.ACCT_NO") == "ADDVANTAGE_SEI_HIST" and lane_of("", "", set(), "XOS_PARTY.SUB_FIRM_CD") == "ADDVANTAGE_SEI_HIST" and lane_of("", "", set(), "IM_ACCOUNT.ACCOUNT_ID") == "STAR_SEI_HIST"
    and lane_of("", "", set(), "UAF_HOLD.QTY") == "UAF_SEI_HIST" and lane_of("", "", set(), "SGA_DCON_ACCT.A; IM_ACCOUNT.B") == "COMMON" and lane_of("Unclassified Historical Source", "", set(), "ZZ_THING.X") == "UNCLASSIFIED"
-   and lane_of("", "", set(), "QQ_OBJ.F", (("QQ", "UAF_SEI_HIST"),)) == "UAF_SEI_HIST",
+   and lane_of("", "", set(), "QQ_OBJ.F", (("QQ", "UAF_SEI_HIST"),)) == "UAF_SEI_HIST" and lane_of("Configuration / Constant", "CONFIG / CONSTANT -> SEI", set(), "") == "CONFIG"
+   and lane_of("Configuration / Constant", "CONFIG / CONSTANT -> SEI", set(), "XM_PROJECT") == "CONFIG",
    "the lane comes first from the technical object's prefix (SGA_DCON, AV, AVX, XOS are AddVantage/PB; IM is STAR/IM; UAF is UAF), two systems on one row is COMMON, and the decon dictionary's own prefixes count")
 ok(decon_status("Curated") == "CURATED" and decon_status("Name-derived, review required") == "REVIEW_REQUIRED" and decon_status("partial review") == "PARTIAL_REVIEW_REQUIRED" and decon_status("no technical object") == "NO_TECHNICAL_OBJECT" and decon_status("") is None,
    "HL-005: the dictionary status is governed to four values")
