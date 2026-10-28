@@ -67,7 +67,7 @@ BEGIN
       recon_key                    VARCHAR2(1500 CHAR),     -- path | workbook | sheet | row | dat file | field
       match_method                 VARCHAR2(60),            -- EXACT_NORMALIZED_FIELD_MATCH
       match_status                 VARCHAR2(30),            -- MATCHED | UNMATCHED | NOT_CHECKED, against sei_input_lineage
-      approval_status              VARCHAR2(400 CHAR),      -- independent of rule_status; the manifest's default is a sentence
+      approval_status              VARCHAR2(400 CHAR),      -- independent of rule_status; the manifest default is a sentence
       batch_id                     VARCHAR2(40),
       source_file                  VARCHAR2(260),
       source_hash                  VARCHAR2(64),
