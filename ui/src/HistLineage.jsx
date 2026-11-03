@@ -93,6 +93,7 @@ function Record({ t, d }) {
         <div style={{ fontSize: 11, color: t.textMuted }}>{r.transformation_rule_source ? `from ${r.transformation_rule_source}` : "rule as the lineage sheet carries it"} · rule {r.rule_status || "—"} · approval {r.approval_status || "—"}</div>
         <Pre t={t} text={r.transformation_rule} />
         {r.validation_rule && <><div style={{ fontSize: 11, color: t.textMuted }}>validation rule</div><Pre t={t} text={r.validation_rule} /></>}
+        {r.addvantage_pb_mapping_logic && <><div style={{ fontSize: 11, color: t.textMuted, marginTop: 6 }}>AddVantage / PB mapping logic · the lane's own logic, as written</div><Pre t={t} text={r.addvantage_pb_mapping_logic} /></>}
         {(d.rules || []).map((x) => (
           <div key={x.rule_id} style={{ border: `1px solid ${t.border}`, borderLeft: "3px solid #0f4775", borderRadius: 6, padding: "8px 12px", margin: "6px 0", background: t.bg }}>
             <div style={{ fontSize: 12, color: t.text }}><b style={mono}>{x.rule_id}</b> · {x.rule_type || "rule"} · <Pill c={STATUS_COLOR(x.mapping_status)}>{x.mapping_status || "—"}</Pill> <Pill c={STATUS_COLOR(x.approval_status)}>{x.approval_status || "—"}</Pill></div>

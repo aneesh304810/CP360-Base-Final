@@ -68,6 +68,7 @@ BEGIN
       match_method                 VARCHAR2(60),            -- EXACT_NORMALIZED_FIELD_MATCH
       match_status                 VARCHAR2(30),            -- MATCHED | UNMATCHED | NOT_CHECKED, against sei_input_lineage
       approval_status              VARCHAR2(400 CHAR),      -- independent of rule_status; the manifest default is a sentence
+      addvantage_pb_mapping_logic  CLOB,                    -- the AddVantage/PB lane logic as written, beside the transformation rule
       batch_id                     VARCHAR2(40),
       source_file                  VARCHAR2(260),
       source_hash                  VARCHAR2(64),
@@ -190,6 +191,13 @@ BEGIN
   EXECUTE IMMEDIATE 'ALTER TABLE cp_hist_decon_dictionary MODIFY (business_domain VARCHAR2(2000 CHAR), migration_function VARCHAR2(1000 CHAR))';
 EXCEPTION WHEN OTHERS THEN IF SQLCODE NOT IN (-1441, -1440) THEN RAISE; END IF; END;
 /
+-- v12 ALL_ADDVANTAGE_PB_LOGIC adds the AddVantage/PB lane logic column (ORA-01430: already there).
+DECLARE e_dup EXCEPTION; PRAGMA EXCEPTION_INIT(e_dup, -1430);
+BEGIN
+  EXECUTE IMMEDIATE 'ALTER TABLE cp_hist_lineage ADD (addvantage_pb_mapping_logic CLOB)';
+EXCEPTION WHEN e_dup THEN NULL; END;
+/
+
 -- The approval status is a sentence when it comes from the manifest default
 -- ("Draft - review required ..."), not a code; 60 bytes cut it (ORA-12899).
 BEGIN

@@ -70,9 +70,9 @@ wb.create_sheet("LINEAGE_SUMMARY").append(["something", "else"])
 ws = wb.create_sheet("FINAL_HIST_MIGRATION_LINEAGE")
 ws.append(["LINEAGE_ID", "CATALOG_ID", "FUNCTIONAL_GROUP", "SOURCE_PATH", "SOURCE_SYSTEM", "SOURCE_OBJECT_FIELD", "DECON_DICTIONARY_MEANING", "DECON_BUSINESS_DOMAIN", "DECON_DICTIONARY_STATUS",
            "SOURCE_DEPENDENCIES", "TRANSFORMATION_RULE_SOURCE", "TRANSFORMATION_RULE", "RULE_STATUS", "TARGET_SYSTEM", "TARGET_DAT_FILE", "TARGET_FIELD", "TARGET_FIELD_SOURCE_COLUMN",
-           "TARGET_DATA_TYPE", "TARGET_MAX_LENGTH", "TARGET_DECIMAL_POS", "MANDATORY", "VALIDATION_RULE", "SOURCE_WORKBOOK", "SOURCE_SHEET", "SOURCE_ROW", "COMMON_TARGET_KEY", "COMMON_TARGET_INDICATOR"])
+           "TARGET_DATA_TYPE", "TARGET_MAX_LENGTH", "TARGET_DECIMAL_POS", "MANDATORY", "VALIDATION_RULE", "SOURCE_WORKBOOK", "SOURCE_SHEET", "SOURCE_ROW", "COMMON_TARGET_KEY", "COMMON_TARGET_INDICATOR", "ADDVANTAGE_PB_MAPPING_LOGIC"])
 ws.append(["HL-0001", "SEI-ACCOUNT-BASIC-001-ACCOUNTNUMBER", "Account", "AddVantage / PB -> SEI", "AddVantage / PB", "SGA_DCON_ACCT.ACCT_NO", "Deconversion account master", "Account", "Curated",
-           "", "merged catalog", "TRIM(ACCT_NO)", "Complete", "SEI", "account-basic.dat", "ACCOUNT_NUMBER", "ACCT_NO", "CHAR", "20", "", "Yes", "must be numeric", "DSR_Mapping.xlsx", "AV_DSR_MAP", 2, "", ""])
+           "", "merged catalog", "TRIM(ACCT_NO)", "Complete", "SEI", "account-basic.dat", "ACCOUNT_NUMBER", "ACCT_NO", "CHAR", "20", "", "Yes", "must be numeric", "DSR_Mapping.xlsx", "AV_DSR_MAP", 2, "", "", "SGA_DCON_ACCT_MST_BASIC.ACCOUNT_NUMBER\nNote:\n1. Moving the account number as is\n2. Exclude accounts listed in XOS_NON_MIGRATING_ACCTS"])
 ws.append(["HL-0002", "SEI-ACCOUNT-BASIC-001-ACCOUNTNUMBER", "Account", "STAR / IM -> SEI", "STAR / IM", "IM_ACCOUNT.ACCOUNT_ID", "IM account", "Account", "Name-derived, review required",
            "IM_ACCOUNT_TYPE", "merged catalog", "ACCOUNT_ID", "Complete", "SEI", "account-basic.dat", "ACCOUNT_NUMBER", "ACCOUNT_ID", "CHAR", "20", "", "Yes", "", "IM_Mapping.xlsx", "IM_MAP", 7, "SEI::account-basic.dat::ACCOUNT_NUMBER", "Y"])
 ws.append(["HL-0003", "SEI-PARTY-BASIC-004-SUBFIRM", "Party", "UAF -> SEI", "UAF", "UAF_PARTY.SUB_FIRM_CD", "", "", "",
@@ -153,6 +153,9 @@ ok(len(b["qc"]) == 2 and b["qc"][0]["control_name"] == "No blank TARGET_FIELD" a
 ok(len(b["manifest"]) == 5 and {m["manifest_key"]: m["manifest_value"] for m in b["manifest"]}["WORKBOOK_VERSION"] == "v12" and [m["manifest_key"] for m in b["manifest"] if m["manifest_key"].startswith("SHEET")] == ["SHEET", "SHEET [2]"],
    "the manifest is key and value, and a repeated key is numbered rather than refused by the primary key", [m["manifest_key"] for m in b["manifest"]])
 hl = {x["rule"]: x for x in b["checks"] if x["rule"].startswith("CP360-HL")}
+ok(L3["HL-0001"]["addvantage_pb_mapping_logic"].startswith("SGA_DCON_ACCT_MST_BASIC.ACCOUNT_NUMBER") and "XOS_NON_MIGRATING_ACCTS" in L3["HL-0001"]["addvantage_pb_mapping_logic"] and not L3["HL-0002"]["addvantage_pb_mapping_logic"],
+   "ADDVANTAGE_PB_MAPPING_LOGIC rides the lineage row whole, as written, and is blank where the sheet is blank")
+ok(hl["CP360-HL-009"]["n"] == 1 and hl["CP360-HL-009"]["level"] == "Pass", "HL-009: the AddVantage/PB rows carry their lane logic", hl.get("CP360-HL-009"))
 ok(hl["CP360-HL-001"]["n"] == 0 and hl["CP360-HL-001"]["level"] == "Pass" and hl["CP360-HL-002"]["n"] == 0 and hl["CP360-HL-003"]["n"] == 0 and hl["CP360-HL-004"]["n"] == 1 and hl["CP360-HL-006"]["n"] == 1,
    "the lineage checks: no blank target, every row laned, every row ruled, one field reached from two lanes kept apart, one name-derived meaning", {k: (v["level"], v["n"]) for k, v in hl.items()})
 
@@ -273,6 +276,8 @@ def fake_query(sql, params=None):
         for col in ("lane_id", "functional_group", "target_dat_file", "rule_status", "decon_dictionary_status", "match_status", "approval_status"):
             if f"{col} = :{col}" in s:
                 rows = [r for r in rows if r[col] == params[col]]
+        if "WHERE addvantage_pb_mapping_logic IS NOT NULL" in s:
+            rows = [r for r in rows if r.get("addvantage_pb_mapping_logic")]
         if "WHERE match_status = 'MATCHED'" in s:
             rows = [r for r in rows if r["match_status"] == "MATCHED"]
         if "WHERE match_status = 'UNMATCHED'" in s:
@@ -369,6 +374,9 @@ ok(len(mp["mapping"]) == 2 and mp["mapping"][0]["lineage_id"] == "HL-0001" and m
 mp2 = R.lineage_mapping(file="party-basic.dat")
 ok(len(mp2["mapping"]) == 1 and mp2["mapping"][0]["dwh_target_column"] is None and mp2["mapping"][0]["lineage_id"] == "HL-0003", "a target with no operational path keeps its row with the right side empty")
 cv = R.canvas(file="account-basic.dat")
+ok(rec["record"]["addvantage_pb_mapping_logic"].startswith("SGA_DCON_ACCT_MST_BASIC") and mp["mapping"][0]["addvantage_pb_mapping_logic"].startswith("SGA_DCON_ACCT_MST_BASIC")
+   and next(c for c in cv["targets"][0]["cols"] if c["lineage_id"] == "HL-0001")["pb"].startswith("SGA_DCON_ACCT_MST_BASIC") and ls["totals"]["pbLogic"] == 1,
+   "the record, the mapping, the canvas link and the lineage summary carry the AddVantage/PB logic")
 ok(len(cv["targets"]) == 1 and cv["targets"][0]["table"] == "account-basic.dat" and len(cv["targets"][0]["cols"]) == 2 and {c["lane"] for c in cv["targets"][0]["cols"]} == {"ADDVANTAGE_SEI_HIST", "STAR_SEI_HIST"}
    and cv["targets"][0]["cols"][0]["t1"] == "TRIM(ACCT_NO)" and cv["targets"][0]["cols"][0]["sei"]["has"] and cv["targets"][0]["cols"][0]["sei"]["fields"] == [{"file": "DIM_ACCOUNT", "field": "ACCOUNT_NUMBER"}] and cv["targets"][0]["cols"][0]["sei"]["source"] == "ACDDIFI1.ACCT_NO"
    and {l["lane"] for l in cv["lanes"]} == {"ADDVANTAGE_SEI_HIST", "STAR_SEI_HIST"} and cv["sei_files"][0]["file"] == "DIM_ACCOUNT" and cv["sei_files"][0]["n"] == 2 and {f["key"] for f in cv["files"]} == {"account-basic.dat", "party-basic.dat"},

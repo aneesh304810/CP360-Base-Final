@@ -38,7 +38,7 @@ export default function HistReading({ t, data, file }) {
   const rows = useMemo(() => {
     const out = [];
     (data?.targets || []).forEach((tg) => (tg.cols || []).forEach((c) => {
-      const link = { ...c, logic: classifyRule(c.t1) };
+      const link = { ...c, logic: classifyRule(c.t1 || c.pb) };
       const op = c.__op || classifyLink(link);
       out.push({ ...link, __op: op, table: tg.table, group: LANE_LABEL[c.lane] || c.lane || "unclassified", name: c.col, sentence: sentenceFor(link), id: c.lineage_id || `${tg.table}.${c.col}` });
     }));

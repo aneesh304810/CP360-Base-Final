@@ -86,6 +86,7 @@ export const HL_RULES = [
   ["CP360-HL-006", "DECON_SOURCE_DICTIONARY", "Basis", "A name-derived meaning is marked as such and never treated as curated.", "Error"],
   ["CP360-HL-007", "FINAL_HIST_MIGRATION_LINEAGE", "Independence", "Rule status, approval, dictionary status and lineage match are kept apart.", "Error"],
   ["CP360-HL-008", "FINAL_HIST_MIGRATION_LINEAGE", "Match", "EXACT_NORMALIZED_FIELD_MATCH against the operational SEI input lineage; unmatched rows are flagged for review.", "Warning"],
+  ["CP360-HL-009", "FINAL_HIST_MIGRATION_LINEAGE", "PB logic", "ADDVANTAGE_PB_MAPPING_LOGIC is the AddVantage/PB lane's own logic, kept whole beside the transformation rule; an AddVantage/PB row without it is flagged.", "Warning"],
 ];
 
 // THE ANALYSTS WRITE SQL CASE; THE PARSER READS IF/THEN/ELSE. The shared

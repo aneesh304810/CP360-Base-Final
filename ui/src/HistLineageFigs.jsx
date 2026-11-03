@@ -64,7 +64,7 @@ export function HistLineageDiagram({ t, d }) {
   const mid = (h) => (H - h) / 2;
   const ruleY = mid(ruleH), seiY = mid(seiH);
   const curve = (x1, y1, x2, y2) => `M ${x1} ${y1} C ${x1 + (x2 - x1) / 2} ${y1}, ${x1 + (x2 - x1) / 2} ${y2}, ${x2} ${y2}`;
-  const ruleText = oneLine(r.transformation_rule) || (rules[0] && oneLine(rules[0].transformation_rule)) || "";
+  const ruleText = oneLine(r.transformation_rule) || (rules[0] && oneLine(rules[0].transformation_rule)) || oneLine(r.addvantage_pb_mapping_logic) || "";
   const ruleKind = (rules[0] && rules[0].rule_type) || (ruleText ? "RULE" : "NOT WRITTEN");
   return (
     <div style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: t.radius.md, padding: "12px 14px 8px", marginBottom: 12, overflowX: "auto" }}>
@@ -158,7 +158,7 @@ export function HistHopChain({ t, d }) {
         return (
           <div key={g ? g.lineage_id : "none"} style={{ display: "flex", alignItems: "stretch", flexWrap: "nowrap", gap: 2, marginBottom: 10, overflowX: "auto", paddingBottom: 4 }}>
             <Box t={t} stage="HIST" label="Historical source" column={srcField || srcObj} table={srcField ? srcObj : r.source_system} note={LANE_LABEL[r.lane_id] || r.lane_id} />
-            <Hop t={t} rule={r.transformation_rule || (d.rules && d.rules[0] && d.rules[0].transformation_rule)} kind="transformation" />
+            <Hop t={t} rule={r.transformation_rule || (d.rules && d.rules[0] && d.rules[0].transformation_rule) || r.addvantage_pb_mapping_logic} kind="transformation" />
             <Box t={t} stage="SEI" label="SEI target" column={r.target_field} table={r.target_dat_file} note={`${r.target_data_type || ""}${r.target_max_length ? `(${r.target_max_length})` : ""} · ${r.match_status || ""}`} />
             {star && <><Hop t={t} rule={`${r.match_method || "EXACT_NORMALIZED_FIELD_MATCH"} · ${star.map_kind || "mapped"}`} kind="name match" dashed />
               <Box t={t} stage="STAR" label="STAR contract" column={star.src_source_column} table={star.src_file_key} note={star.sei_feed ? `${star.sei_feed}${star.sei_entity ? ` / ${star.sei_entity}` : ""}` : ""} /></>}
@@ -185,12 +185,13 @@ export function MappingTable({ t, rows }) {
   return (
     <div style={{ overflowX: "auto" }}>
       <table style={{ borderCollapse: "collapse", width: "100%" }}>
-        <thead><tr>{["Lane", "Historical source column", "Transformation", "SEI dat file · field", "Match", "STAR contract field", "STG1 · STG2", "IMDS column", "Statuses"].map((h, i) => <th key={i} style={th}>{h}</th>)}</tr></thead>
+        <thead><tr>{["Lane", "Historical source column", "Transformation", "AddVantage / PB logic", "SEI dat file · field", "Match", "STAR contract field", "STG1 · STG2", "IMDS column", "Statuses"].map((h, i) => <th key={i} style={th}>{h}</th>)}</tr></thead>
         <tbody>{rows.map((r, i) => (
           <tr key={`${r.lineage_id}-${r.legacy_id || i}`}>
             <td style={td(true)}><span style={{ fontSize: 9.5, fontWeight: 800, color: LANE_C[r.lane_id] || "#6b7884", border: `1px solid ${LANE_C[r.lane_id] || "#6b7884"}`, borderRadius: 3, padding: "0 5px", whiteSpace: "nowrap" }}>{LANE_LABEL[r.lane_id] || r.lane_id}</span><div style={{ fontSize: 10, color: t.textMuted, fontFamily: MONO }}>{r.lineage_id}</div></td>
             <td style={{ ...td(), fontFamily: MONO, fontSize: 11 }}>{r.source_object_field}</td>
             <td style={{ ...td(), fontFamily: MONO, fontSize: 10.5, maxWidth: 320, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{trunc(oneLine(r.transformation_rule), 180) || <span style={{ color: "#c96a12" }}>no rule written</span>}</td>
+            <td style={{ ...td(), fontFamily: MONO, fontSize: 10.5, maxWidth: 300, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{trunc(oneLine(r.addvantage_pb_mapping_logic), 180) || <span style={{ color: t.textMuted }}>—</span>}</td>
             <td style={{ ...td(), fontFamily: MONO, fontSize: 11 }}>{r.target_dat_file}<div style={{ fontWeight: 700, color: t.text }}>{r.target_field}</div><div style={{ fontSize: 10, color: t.textMuted }}>{r.target_data_type}{r.target_max_length ? `(${r.target_max_length})` : ""}</div></td>
             <td style={td()}><span style={{ fontSize: 9.5, fontWeight: 800, color: STATUS_COLOR(r.match_status), border: `1px solid ${STATUS_COLOR(r.match_status)}`, borderRadius: 3, padding: "0 5px" }}>{r.match_status || "—"}</span></td>
             <td style={{ ...td(), fontFamily: MONO, fontSize: 11 }}>{r.src_source_column ? <>{r.src_source_column}<div style={{ fontSize: 10, color: t.textMuted }}>{r.src_file_key}{r.map_kind ? ` · ${r.map_kind}` : ""}</div></> : <span style={{ color: t.textMuted }}>—</span>}</td>

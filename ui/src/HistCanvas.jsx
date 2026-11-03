@@ -20,13 +20,13 @@ const LANE_C = { ADDVANTAGE_SEI_HIST: "#7c3aed", STAR_SEI_HIST: "#0f4775", UAF_S
 const SEI_C = "#0091bf", DWH_C = "#233240";
 const HEAD = 40, ROW = 22, GAPY = 14, PAD = 20, CAP0 = 15, NW_MAX = 420, GAP_MAX = 380;
 
-const withLogic = (c) => ({ ...c, logic: classifyRule(c.t1) });
+const withLogic = (c) => ({ ...c, logic: classifyRule(c.t1 || c.pb) });   // the lane's own logic stands in when no rule is written
 
 export function canvasRows(targets) {
   const out = [];
   (targets || []).forEach((tg) => (tg.cols || []).forEach((c) => {
     const op = c.__op || classifyLink(withLogic(c));
-    out.push({ lane: c.lane, source_system: c.src_system || "", source_column: c.src || "", transformation: c.t1 || "", operation: OP_META[op.op] ? OP_META[op.op].label : op.op,
+    out.push({ lane: c.lane, source_system: c.src_system || "", source_column: c.src || "", transformation: c.t1 || "", addvantage_pb_logic: c.pb || "", operation: OP_META[op.op] ? OP_META[op.op].label : op.op,
       transformed: op.transformed ? "Y" : "N", dat_file: tg.table, target_field: c.col, type: c.type || "", length: c.length || "", mandatory: c.mandatory || "",
       rule_status: c.rule_status || "", approval: c.approval || "", dictionary: c.dictionary || "", match: c.match || "",
       star_field: (c.sei && c.sei.source) || "", imds_columns: c.sei && c.sei.has ? c.sei.fields.map((f) => `${f.file}.${f.field}`).join("; ") : "", lineage_id: c.lineage_id });
@@ -246,12 +246,13 @@ export default function HistCanvas({ t, file, lane, initial, onPickFile }) {
         {head}
         <div style={{ overflowX: "auto" }}>
           <table style={{ borderCollapse: "collapse", width: "100%" }}>
-            <thead><tr>{["Lane", "Source column", "Transformation rule", "Operation", "SEI dat file · field", "Type", "Rule · approval · dictionary", "Match", "STAR field today", "IMDS column today"].map((h, i) => <th key={i} style={th}>{h}</th>)}</tr></thead>
+            <thead><tr>{["Lane", "Source column", "Transformation rule", "AddVantage / PB logic", "Operation", "SEI dat file · field", "Type", "Rule · approval · dictionary", "Match", "STAR field today", "IMDS column today"].map((h, i) => <th key={i} style={th}>{h}</th>)}</tr></thead>
             <tbody>{rows.map((r) => (
               <tr key={`${r.lineage_id}-${r.imds_columns}`}>
                 <td style={td}><span style={{ fontSize: 9.5, fontWeight: 800, color: LANE_C[r.lane] || "#6b7884", border: `1px solid ${LANE_C[r.lane] || "#6b7884"}`, borderRadius: 3, padding: "0 5px", whiteSpace: "nowrap" }}>{LANE_LABEL[r.lane] || r.lane}</span><div style={{ fontSize: 10, color: t.textMuted, fontFamily: MONO }}>{r.lineage_id}</div></td>
                 <td style={{ ...td, fontFamily: MONO, fontSize: 11, color: t.text }}>{r.source_column || <span style={{ color: "#c1113a" }}>no source</span>}</td>
                 <td style={{ ...td, fontFamily: MONO, fontSize: 10.5, maxWidth: 360, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{r.transformation || <span style={{ color: "#c96a12" }}>no rule written</span>}</td>
+                <td style={{ ...td, fontFamily: MONO, fontSize: 10.5, maxWidth: 320, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{r.addvantage_pb_logic || <span style={{ color: t.textMuted }}>—</span>}</td>
                 <td style={td}><span style={{ fontSize: 9.5, fontWeight: 800, textTransform: "uppercase", color: (OP_META[Object.keys(OP_META).find((k) => OP_META[k].label === r.operation)] || {}).c || t.sub }}>{r.operation}</span></td>
                 <td style={{ ...td, fontFamily: MONO, fontSize: 11 }}>{r.dat_file}<div style={{ fontWeight: 700, color: t.text }}>{r.target_field}</div></td>
                 <td style={td}>{r.type}{r.length ? `(${r.length})` : ""}{r.mandatory ? <div style={{ fontSize: 10, color: t.textMuted }}>mandatory {r.mandatory}</div> : null}</td>
@@ -400,6 +401,8 @@ export default function HistCanvas({ t, file, lane, initial, onPickFile }) {
               </div>
               <div style={{ fontSize: 10.5, color: t.textMuted, margin: "4px 0" }}>{OP_META[selected.__op.op].note}</div>
               <pre style={{ fontFamily: MONO, fontSize: 11, whiteSpace: "pre-wrap", overflowWrap: "anywhere", background: t.bg, border: `1px solid ${t.border}`, borderRadius: 4, padding: "8px 10px", margin: "6px 0", color: t.text, maxHeight: 220, overflow: "auto" }}>{selected.t1 || "no rule written on this mapping"}</pre>
+              {selected.pb && <><div style={{ fontSize: 10.5, color: t.textMuted }}>AddVantage / PB mapping logic</div>
+                <pre style={{ fontFamily: MONO, fontSize: 11, whiteSpace: "pre-wrap", overflowWrap: "anywhere", background: t.bg, border: `1px solid ${t.border}`, borderRadius: 4, padding: "8px 10px", margin: "6px 0", color: t.text, maxHeight: 220, overflow: "auto" }}>{selected.pb}</pre></>}
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 11 }}>
                 {[["rule", selected.rule_status], ["approval", selected.approval], ["dictionary", selected.dictionary], ["match", selected.match]].map(([k, v]) => <span key={k}>{k} <b style={{ color: STATUS_COLOR(v) }}>{v || "—"}</b></span>)}
                 <span>type <b style={{ color: t.text }}>{selected.type || "?"}{selected.length ? `(${selected.length})` : ""}</b></span>

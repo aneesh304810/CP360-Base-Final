@@ -78,7 +78,7 @@ PK = {"lanes": ("historical_lane_id",), "artifacts": ("source_artifact",),
 # decon dictionary, rules, the final lineage, QC; the evidence last because
 # it is the big one and nothing else waits on it.
 LOAD_ORDER = ("lanes", "artifacts", "dictionary", "manifest", "decon", "rules", "lineage", "qc", "evidence")
-CLOBS = {"evidence": ("evidence_value",), "lineage": ("transformation_rule", "validation_rule"),
+CLOBS = {"evidence": ("evidence_value",), "lineage": ("transformation_rule", "validation_rule", "addvantage_pb_mapping_logic"),
          "rules": ("transformation_rule", "validation_rule"), "qc": ("row_json",)}
 LANE_OF = (("UAF", "UAF_SEI_HIST"), ("ADDVANTAGE", "ADDVANTAGE_SEI_HIST"), ("ADVANTAGE", "ADDVANTAGE_SEI_HIST"), ("PB", "ADDVANTAGE_SEI_HIST"),
            ("STAR", "STAR_SEI_HIST"), ("IM", "STAR_SEI_HIST"))
@@ -111,7 +111,7 @@ COLS = {
                 "target_data_type": (60, False), "target_max_length": (30, False), "target_decimal_pos": (30, False), "mandatory": (4000, False),
                 "validation_rule": (0, False), "source_workbook": (400, False), "source_sheet": (200, False), "source_row": (None, False),
                 "common_target_key": (500, False), "common_target_indicator": (40, False), "match_method": (60, False), "match_status": (30, False),
-                "approval_status": (400, False)},
+                "approval_status": (400, False), "addvantage_pb_mapping_logic": (0, False)},
     "decon": {"technical_object": (400, True), "source_prefix": (100, False), "business_meaning": (4000, False), "source_type": (200, False),
               "business_domain": (2000, False), "migration_function": (1000, False), "definition_basis": (100, False),
               "dictionary_status": (40, False), "lineage_usage_count": (None, False), "example_target_fields": (2000, False)},
@@ -125,7 +125,8 @@ COLS = {
 ALIASES = {"HISTORICALLANEID": "historical_lane_id", "CP360TREATMENT": "cp_360_treatment",
            "LINEAGEMATCHSTATUS": "match_status", "DICTIONARYSTATUS": "dictionary_status", "DECONSTATUS": "decon_dictionary_status",
            "SOURCEOBJECTSFIELDS": "source_objects_fields", "SOURCEOBJECTFIELD": "source_object_field", "SEITARGETFILE": "sei_target_file",
-           "TARGETFILE": "target_dat_file", "DATFILE": "target_dat_file"}
+           "TARGETFILE": "target_dat_file", "DATFILE": "target_dat_file",
+           "ADDVANTAGEPBLOGIC": "addvantage_pb_mapping_logic", "PBMAPPINGLOGIC": "addvantage_pb_mapping_logic", "ADDVANTAGEMAPPINGLOGIC": "addvantage_pb_mapping_logic"}
 REFERENCE_HINTS = ("DCONCUS", "DICTIONARY", "SPECIFICATION", ".DOCX", ".TXT")                      # HM-008
 
 
@@ -458,10 +459,13 @@ class HistMigrationConnector(BaseConnector):
                     k = f"{r['source_system'] or '(blank system)'} | {r['source_path'] or '(blank path)'} | {(r['source_object_field'] or '(blank object)')[:40]}"
                     unresolved_text[k] = unresolved_text.get(k, 0) + 1
                 r["approval_status"] = r["approval_status"] or default_approval
-                if not (rules_by_cat.get(r["catalog_id"]) or rules_by_key.get(r["target_key"])):
+                if not (rules_by_cat.get(r["catalog_id"]) or rules_by_key.get(r["target_key"]) or (r.get("addvantage_pb_mapping_logic") or "").strip()):
                     no_rule += 1
                 by_key.setdefault(r["target_key"], set()).add(r["lane_id"])
             shared = sum(1 for k, v in by_key.items() if len(v) > 1)
+            pb_logic = sum(1 for r in b["lineage"] if (r.get("addvantage_pb_mapping_logic") or "").strip())
+            pb_rows = sum(1 for r in b["lineage"] if r["lane_id"] == "ADDVANTAGE_SEI_HIST")
+            pb_missing = sum(1 for r in b["lineage"] if r["lane_id"] == "ADDVANTAGE_SEI_HIST" and not (r.get("addvantage_pb_mapping_logic") or "").strip())
             b["checks"].append({"rule": "CP360-HL-001", "level": "Error" if blank_target else "Pass", "sheet": "lineage", "n": blank_target,
                                 "detail": f"{blank_target} lineage rows with a blank TARGET_DAT_FILE or TARGET_FIELD (the workbook records zero)"})
             top = sorted(unresolved_text.items(), key=lambda kv: -kv[1])[:5]
@@ -472,6 +476,9 @@ class HistMigrationConnector(BaseConnector):
                 log.warning("hist_migration: unresolved lane, most common system | path | object: %s", "; ".join(f"{k} ({n})" for k, n in top))
             b["checks"].append({"rule": "CP360-HL-003", "level": "Warning" if no_rule else "Pass", "sheet": "lineage", "n": no_rule,
                                 "detail": f"{no_rule} lineage rows with no HIST_MIGRATION_RULE on their catalog id or target field"})
+            b["checks"].append({"rule": "CP360-HL-009", "level": "Warning" if pb_missing else "Pass", "sheet": "lineage", "n": pb_logic,
+                                "detail": f"{pb_logic} lineage rows carry ADDVANTAGE_PB_MAPPING_LOGIC, the AddVantage/PB lane's own logic beside the transformation rule; "
+                                          f"{pb_missing} of the {pb_rows} AddVantage/PB rows have none"})
             b["checks"].append({"rule": "CP360-HL-004", "level": "Pass", "sheet": "lineage", "n": shared,
                                 "detail": f"{shared} SEI target fields reached from more than one lane; kept as separate lineage rows, never merged (PB and IM/UAF stay apart)"})
             ungoverned = sum(1 for r in b["lineage"] if r["decon_status_text"] and r["decon_dictionary_status"] not in DECON_STATUS)

@@ -260,7 +260,7 @@ def _hist_paths(file="", lane="", q="", limit=500):
     if q.strip():
         where.append("(UPPER(target_field) LIKE :q OR UPPER(source_object_field) LIKE :q)"); p["q"] = f"%{q.strip().upper()}%"
     w = (" WHERE " + " AND ".join(where)) if where else ""
-    lin = _safe(f"SELECT lineage_id, lane_id, source_system, source_object_field, transformation_rule, rule_status, approval_status, decon_dictionary_status, "
+    lin = _safe(f"SELECT lineage_id, lane_id, source_system, source_object_field, transformation_rule, addvantage_pb_mapping_logic, rule_status, approval_status, decon_dictionary_status, "
                 f"target_dat_file, target_field, target_field_norm, target_data_type, target_max_length, mandatory, match_status FROM cp_hist_lineage{w} "
                 f"ORDER BY target_dat_file, target_field, lane_id, lineage_id FETCH FIRST {int(limit)} ROWS ONLY", p)
     maps = _maps() if lin else {}
@@ -274,6 +274,7 @@ def _hist_paths(file="", lane="", q="", limit=500):
     for r in lin:
         base = {k: r.get(k) for k in ("lineage_id", "lane_id", "source_system", "source_object_field", "transformation_rule", "rule_status", "approval_status",
                                        "decon_dictionary_status", "target_dat_file", "target_field", "target_data_type", "target_max_length", "mandatory", "match_status")}
+        base["addvantage_pb_mapping_logic"] = _clob(r.get("addvantage_pb_mapping_logic")) or ""
         ms = hit.get(r.get("target_field_norm") or _norm(r.get("target_field")), [])
         if not ms:
             out.append({**base, **blank_m, **blank_g})
@@ -334,6 +335,7 @@ def lineage_summary():
                        "datFiles": n("SELECT COUNT(DISTINCT target_dat_file) AS n FROM cp_hist_lineage"), "rules": n("SELECT COUNT(*) AS n FROM cp_hist_rule"),
                        "decon": n("SELECT COUNT(*) AS n FROM cp_hist_decon_dictionary"), "qc": n("SELECT COUNT(*) AS n FROM cp_hist_target_qc"),
                        "sharedTargets": int(((shared or [{}])[0] or {}).get("n", 0) or 0),
+                       "pbLogic": n("SELECT COUNT(*) AS n FROM cp_hist_lineage WHERE addvantage_pb_mapping_logic IS NOT NULL"),
                        "matched": n("SELECT COUNT(*) AS n FROM cp_hist_lineage WHERE match_status = 'MATCHED'"),
                        "unmatched": n("SELECT COUNT(*) AS n FROM cp_hist_lineage WHERE match_status = 'UNMATCHED'"),
                        "blankTarget": n("SELECT COUNT(*) AS n FROM cp_hist_lineage WHERE target_field IS NULL")},
@@ -364,7 +366,7 @@ def lineage_record(id: str):
     if not rows:
         return {"record": None}
     r = dict(rows[0])
-    for c in ("transformation_rule", "validation_rule"):
+    for c in ("transformation_rule", "validation_rule", "addvantage_pb_mapping_logic"):
         r[c] = _clob(r.get(c)) or ""
     r["loaded_at"] = _ts(r.get("loaded_at"))
     key, norm, file = r.get("target_key"), r.get("target_field_norm") or "", (r.get("target_dat_file") or "").upper()
@@ -488,6 +490,7 @@ def lineage_mapping(file: str = "", lane: str = "", q: str = "", limit: int = 50
     for r in rows[:limit]:
         d = dict(r)
         d["transformation_rule"] = (_clob(r.get("transformation_rule")) or "")[:600]
+        d["addvantage_pb_mapping_logic"] = (r.get("addvantage_pb_mapping_logic") or "")[:600]
         out.append(d)
     files = [{"key": r.get("k"), "n": int(r.get("n") or 0)} for r in _safe("SELECT target_dat_file AS k, COUNT(*) AS n FROM cp_hist_lineage GROUP BY target_dat_file ORDER BY target_dat_file")]
     return {"mapping": out, "files": files, "limit": limit, "info": info, "truncated": len(rows) > limit}
@@ -517,7 +520,7 @@ def canvas(file: str = "", lane: str = ""):
             tg = targets.setdefault(tbl, {"table": tbl, "cols": []})
             link = {"col": col, "src": src, "lineage_id": lid, "lane": lane_id, "src_system": r.get("source_system"),
                     "type": r.get("target_data_type"), "length": r.get("target_max_length"), "mandatory": r.get("mandatory"),
-                    "t1": (_clob(r.get("transformation_rule")) or ""), "status": "UNMAPPED" if not src else (r.get("rule_status") or ""),
+                    "t1": (_clob(r.get("transformation_rule")) or ""), "pb": r.get("addvantage_pb_mapping_logic") or "", "status": "UNMAPPED" if not src else (r.get("rule_status") or ""),
                     "rule_status": r.get("rule_status"), "approval": r.get("approval_status"), "dictionary": r.get("decon_dictionary_status"),
                     "match": r.get("match_status"), "sei": {"has": False, "files": [], "fields": [], "source": None, "status": r.get("match_status")}}
             tg["cols"].append(link)
