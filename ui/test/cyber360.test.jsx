@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import fs from "node:fs";
 import path from "node:path";
 import Cyber360, { AppForm, ReviewTab } from "../src/Cyber360.jsx";
-import { SEED, summarise, unscannedMarkdown, toCsv, applyLocal, blankApp, CLASSES, SCAN, CONSTRAINTS, VALID, DEVSECOPS, POLICY } from "../src/cyber360Api.js";
+import { SEED, summarise, unscannedMarkdown, toCsv, applyLocal, blankApp, starterFromSystems, appFromSystem, CLASSES, SCAN, CONSTRAINTS, VALID, DEVSECOPS, POLICY } from "../src/cyber360Api.js";
 
 let BAD = 0;
 const ok = (c, m, got = "") => { console.log((c ? "ok   " : "FAIL ") + m + (c ? "" : `  -> ${String(got).slice(0, 220)}`)); if (!c) BAD += 1; };
@@ -39,14 +39,27 @@ ok(next.apps.length === 13 && next.apps[8].scan_status === "SCANNED" && next.log
 const added = applyLocal(SEED, [], { ...blankApp(), app_name: "Client portal", app_class: "SAAS", scan_status: "SCANNED" }, "pb-team");
 ok(added.apps.length === 14 && added.apps[13].app_id && summarise(added.apps).byClass.SAAS === 1, "a new application gets an id and counts in its class");
 
+console.log("-- the starter from Interface 360");
+const SYS = [{ system: "STAR", party: "INTERNAL", owner: "Core Platform", ownerSource: "interfaces", interfaces: 40, inbound: 10, outbound: 30, projectId: "P1", carriesPii: true, appId: null },
+  { system: "Vendor Feed", party: "VENDOR", owner: "", interfaces: 2, inbound: 2, outbound: 0, carriesPii: false, appId: null },
+  { system: "SharePoint", party: "INTERNAL", owner: "Collab", ownerSource: "interfaces", interfaces: 2, inbound: 1, outbound: 1, carriesPii: false, appId: null }];
+const star = starterFromSystems(SYS);
+ok(star.length === 2 + 13 && star[0].app_id === "IF-STAR" && star[0].scan_status === "UNKNOWN" && star[0].owner_team === "Core Platform" && /40 interfaces \(10 in, 30 out\); project P1; carries PII/.test(star[0].notes)
+   && star[1].app_class === "VENDOR_PACKAGE" && star[2].app_name === "SharePoint" && star[2].source_ref === "Interface 360 system; owner from interfaces",
+   "every Interface 360 system is a starter row with its owner, counts, project and PII, not yet declared; a vendor party is a vendor package; a thread row with the same name gives way to the system", star.slice(0, 3).map((a) => [a.app_id, a.app_class, a.owner_team]));
+ok(appFromSystem({ system: "A/B C" }).app_id === "IF-ABC" && summarise(star).unknown === 3, "ids are the name folded; the undeclared count follows");
+
 console.log("-- the page");
-const page = renderToStaticMarkup(<Cyber360 t={tLight} initial={{ apps: SEED, log: next.log, live: true, seeded: true, tab: "Inventory", name: "pb-team" }} />);
-ok(/Cyber Security 360/.test(page) && /starter inventory from the Application Scans thread, not yet saved/.test(page) && />live</.test(page), "the page says what it is and that the starter is unsaved");
-ok(/Add an application/.test(page) && /Download Excel/.test(page) && /Upload Excel/.test(page) && /Copy the link for developers/.test(page) && /Copy the not-scanned list/.test(page) && /Save the starter inventory/.test(page), "the actions: add, download, upload, the developers' link, the list for the reply, save the starter");
-ok(/13<\/div>/.test(page) && /not scanned/.test(page) && /not yet declared/.test(page) && /constraints to review/.test(page) && /to scan/.test(page), "the tiles");
+const page = renderToStaticMarkup(<Cyber360 t={tLight} initial={{ apps: star, log: next.log, live: true, seeded: true, tab: "Inventory", name: "pb-team", starter: { systems: 3, thread: 12 } }} />);
+ok(/Cyber Security 360/.test(page) && /starter inventory: 3 systems from Interface 360 and 12 from the Application Scans thread, not yet saved/.test(page) && />live</.test(page), "the page says what it is and where the unsaved starter came from");
+ok(/Add an application/.test(page) && /Download Excel/.test(page) && /Upload Excel/.test(page) && /Save the starter inventory/.test(page) && !/Copy the link for developers/.test(page) && !/Copy the not-scanned list/.test(page),
+   "the actions sit in the inventory tab: add, download, upload, save the starter; no copy buttons");
+ok(/change a row and Save it, or Edit for every field/.test(page) && (page.match(/>Edit</g) || []).length === 15 && /<select[^>]*>[^]*?Not yet declared/.test(page) && /placeholder="owner team"/.test(page) && /placeholder="why a scan is not required"/.test(page),
+   "every row is editable in place: runtime, scan status, constraint and why, DevSecOps, owner, lifecycle, with Edit for the whole form (class and surface are in the form)");
+ok(/15<\/div>/.test(page) && /not scanned/.test(page) && /not yet declared/.test(page) && /constraints to review/.test(page) && /to scan/.test(page), "the tiles");
 ok(/Scan policy, as stated by the scan group/.test(page) && /SharePoint goes through the server scan only/.test(page), "the policy card");
-for (const n of ["Quarterly Tax Program (QTP)", "BBH_PB_Interfaces", "Email Tool", "EFTPS", "Universal Client", "SharePoint"]) ok(page.includes(n), `row ${n}`);
-ok(/No web or API surface/.test(page) && /Legacy stack, retiring/.test(page) && /To review/.test(page) && /Not integrated/.test(page) && /Not applicable/.test(page) && />Declare</.test(page), "the why, the decision, the DevSecOps column and a Declare button on every row");
+for (const n of ["STAR", "Vendor Feed", "Quarterly Tax Program (QTP)", "BBH_PB_Interfaces", "Email Tool", "EFTPS", "Universal Client", "SharePoint"]) ok(page.includes(n), `row ${n}`);
+ok(/Core Platform/.test(page) && /No web or API surface/.test(page) && /Legacy stack, retiring/.test(page) && /To review/.test(page) && /Not integrated/.test(page) && /Not applicable/.test(page), "the owner from Interface 360, the why, the decision and the DevSecOps column");
 ok(/apps\.xlsx/.test(page), "the Excel download points at the API workbook when live");
 const local = renderToStaticMarkup(<Cyber360 t={tLight} initial={{ apps: SEED, log: [], live: false, seeded: false, name: "" }} />);
 ok(/local only/.test(local) && /Download CSV/.test(local) && !/apps\.xlsx/.test(local) && /your name/.test(local), "off the API the page says local only, offers CSV and asks who you are");
@@ -54,14 +67,12 @@ const opened = renderToStaticMarkup(<Cyber360 t={tLight} initial={{ apps: SEED, 
 ok(/Declare · Email Tool/.test(opened) && /Is it scanned\?/.test(opened) && /why a scan is not required/.test(opened) && /DevSecOps integration/.test(opened) && /Scan group decision/.test(opened) && /Filled by the scan group, not the developer/.test(opened),
    "opening a row shows the declaration form: the application, the scan, the constraint, DevSecOps, and the scan group's own section");
 const review = renderToStaticMarkup(<Cyber360 t={tDark} initial={{ apps: [...SEED, { ...blankApp(), app_id: "IF-X", app_name: "Imported system", scan_status: "UNKNOWN" }], log: [], live: true, seeded: false, tab: "Not scanned review", name: "x" }} />);
-ok(/Applications not covered by the application scan · 13/.test(review) && /1 application not yet declared by their owners/.test(review) && /No web or API surface/.test(review), "the review tab is the grouped list and says what is still undeclared");
-const sys = renderToStaticMarkup(<Cyber360 t={tLight} initial={{ apps: SEED, log: [], live: true, seeded: false, tab: "Interface 360 systems", name: "x",
-  systems: { total: 2, inInventory: 1, systems: [{ system: "STAR", owner: "Core Platform", ownerSource: "interfaces", interfaces: 40, inbound: 10, outbound: 30, projectId: "P1", carriesPii: true, appId: null }, { system: "SharePoint", owner: "", interfaces: 2, inbound: 1, outbound: 1, carriesPii: false, appId: "CS-013" }] } }} />);
-ok(/Systems from Interface 360/.test(sys) && /STAR/.test(sys) && /Core Platform/.test(sys) && /from interfaces/.test(sys) && /1 of 2 already in the inventory/.test(sys) && /CS-013/.test(sys) && /Select all not yet in/.test(sys), "the Interface 360 tab lists systems with the derived owner and which are already in");
+ok(/Applications not covered by the application scan · 13/.test(review) && /1 application not yet declared by their owners/.test(review) && /No web or API surface/.test(review) && /Copy this list as Markdown/.test(review), "the review tab is the grouped list, says what is still undeclared, and copies itself as Markdown");
 const logp = renderToStaticMarkup(<Cyber360 t={tLight} initial={{ apps: next.apps, log: next.log, live: true, seeded: false, tab: "Change log", name: "x" }} />);
 ok(/Change log/.test(logp) && /scan_status/.test(logp) && /NOT_SCANNED/.test(logp) && /pb-team/.test(logp), "the change log shows field, before, after and who");
-ok(!/NaN|undefined|\[object Object\]/.test(page + local + opened + review + sys + logp), "nothing undefined in any tab, light or dark");
-ok(!/[\w.+-]+@[\w-]+\.[\w.-]+/.test(page + opened + review + sys) && !/testbbh|\.bbh\.com|https?:\/\/[a-z]/i.test(page + opened + review + sys), "no address and no host on any screen");
+ok(!/Interface 360 systems/.test(page) && (page.match(/role="tab"/g) || []).length === 3, "three tabs: the inventory, the review, the log; the Interface 360 list is the starter, not a tab");
+ok(!/NaN|undefined|\[object Object\]/.test(page + local + opened + review + logp), "nothing undefined in any tab, light or dark");
+ok(!/[\w.+-]+@[\w-]+\.[\w.-]+/.test(page + opened + review) && !/testbbh|\.bbh\.com|https?:\/\/[a-z]/i.test(page + opened + review), "no address and no host on any screen");
 const form = renderToStaticMarkup(<AppForm t={tLight} app={blankApp()} onSave={() => {}} onCancel={() => {}} who="x" />);
 ok(/Add an application/.test(form) && Object.values(VALID).every((v) => form.includes(v)) && Object.values(DEVSECOPS).every((v) => form.includes(v)) && /Save declaration/.test(form), "the blank form offers every decision and DevSecOps value");
 ok(/Applications not covered/.test(renderToStaticMarkup(<ReviewTab t={tLight} apps={SEED} />)), "the review tab renders alone");

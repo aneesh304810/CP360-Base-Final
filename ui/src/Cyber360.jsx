@@ -7,10 +7,11 @@
 // the link is handed to every team, each team declares what it runs, what
 // is scanned, and why a scan is not required where it is not.
 //
-// WHERE THE ROWS COME FROM. The starter rows ship with the page, read from
-// the Application Scans thread. The Interface 360 system list adds the
-// rest, with the owner the interfaces name. A developer adds or edits an
-// application here, or fills in the downloaded workbook and uploads it.
+// WHERE THE ROWS COME FROM. The starter inventory is every system Interface
+// 360 knows, with the owner its interfaces name, plus the applications the
+// Application Scans thread listed. A developer edits a row in place or in
+// the full form, adds an application, or fills in the downloaded workbook
+// and uploads it.
 //
 // EVERY NUMBER IN THE HEADER IS DERIVED FROM THE ROWS, never stored.
 // NO PERSON'S NAME, ADDRESS OR HOST IS ON A ROW: owners are teams, runtime
@@ -20,14 +21,14 @@
 //
 // `initial` lets a test hand in the state and skip the network.
 import React, { useEffect, useMemo, useState } from "react";
-import api, { SEED, CLASSES, SURFACES, SCAN, CONSTRAINTS, VALID, LIFECYCLE, DEVSECOPS, SCAN_COLOR, VALID_COLOR, DEVSECOPS_COLOR, POLICY,
+import api, { CLASSES, SURFACES, SCAN, CONSTRAINTS, VALID, LIFECYCLE, DEVSECOPS, SCAN_COLOR, VALID_COLOR, DEVSECOPS_COLOR, POLICY,
   blankApp, summarise, unscannedMarkdown, toCsv, applyLocal } from "./cyber360Api.js";
 
-const TABS = ["Inventory", "Not scanned review", "Interface 360 systems", "Change log"];
+const TABS = ["Inventory", "Not scanned review", "Change log"];
 const MONO = "ui-monospace, SFMono-Regular, Menlo, monospace";
 
 const Tile = ({ t, n, label, sub, color }) => (
-  <div style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: 6, padding: "12px 16px", minWidth: 128, flex: "1 1 128px" }}>
+  <div style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: 6, padding: "10px 14px", minWidth: 104, flex: "1 1 104px" }}>
     <div style={{ fontSize: 24, fontWeight: 800, color: color || t.navy, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{n.toLocaleString()}</div>
     <div style={{ fontSize: 10, color: t.textMuted, textTransform: "uppercase", letterSpacing: ".6px", marginTop: 6 }}>{label}</div>
     {sub && <div style={{ fontSize: 11, color: t.sub, marginTop: 3 }}>{sub}</div>}
@@ -115,29 +116,28 @@ export default function Cyber360({ t, initial }) {
   const [log, setLog] = useState(initial?.log || []);
   const [live, setLive] = useState(initial ? !!initial.live : false);
   const [seeded, setSeeded] = useState(initial ? !!initial.seeded : false);
+  const [starter, setStarter] = useState(initial?.starter || null);
   const [loaded, setLoaded] = useState(!!initial);
   const [who, setWho] = useState(initial?.who || { verified: false });
   const [name, setName] = useState(initial?.name || api.reviewerName());
   const [tab, setTab] = useState(initial?.tab || "Inventory");
   const [open, setOpen] = useState(initial?.open || null);       // app_id, "new", or null
   const [filter, setFilter] = useState({ cls: "", scan: "", decision: "", q: "", owner: "" });
-  const [systems, setSystems] = useState(initial?.systems || null);
-  const [picked, setPicked] = useState(new Set());
   const [msg, setMsg] = useState(initial?.msg || null);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState(null);
+  const [drafts, setDrafts] = useState({});                        // app_id -> the fields changed in the row, unsaved
 
   useEffect(() => {
     if (initial) return undefined;
     let on = true;
-    api.load().then((r) => { if (!on) return; setApps(r.apps); setLog(r.log); setLive(r.live); setSeeded(r.seeded); setLoaded(true); });
+    api.load().then((r) => { if (!on) return; setApps(r.apps); setLog(r.log); setLive(r.live); setSeeded(r.seeded); setStarter(r.starter || null); setLoaded(true); });
     api.whoami().then((w) => { if (on) setWho(w || { verified: false }); });
     const q = (typeof window !== "undefined" ? window.location.hash.split("?")[1] : "") || "";
     const m = /(?:^|&)app=([^&]+)/.exec(q);
     if (m) setOpen(decodeURIComponent(m[1]));
     return () => { on = false; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (tab === "Interface 360 systems" && !systems && !initial) api.systems().then(setSystems); }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const actor = who.verified && who.lanId ? who.lanId : name;
   const sum = useMemo(() => summarise(apps), [apps]);
@@ -146,37 +146,30 @@ export default function Cyber360({ t, initial }) {
   const applyResult = (r) => { if (r && r.apps) { setApps(r.apps); setLog(r.log || []); setSeeded(false); setLive(true); } };
   const needName = () => { if (!actor) { setErr("say who you are first: sign-in is off, so the name you type is recorded with the save"); return true; } api.setReviewerName(name); return false; };
   const saveApp = async (a) => {
-    if (needName()) return;
+    if (needName()) return false;
     setSaving(true); setErr(null);
     if (live && !seeded) {
       const r = await api.save(a, actor);
       setSaving(false);
-      if (r.error) { setErr(r.error); return; }
+      if (r.error) { setErr(r.error); return false; }
       applyResult(r); setOpen(null); setMsg(`saved ${a.app_name}`);
-      return;
+      return true;
     }
     if (live && seeded) {
       // the first save on an empty warehouse writes the starter rows first, then this one
-      const s = await api.seed(SEED, actor);
-      if (!s.error) { const r = await api.save(a, actor); setSaving(false); if (r.error) { setErr(r.error); return; } applyResult(r); setOpen(null); setMsg(`starter inventory saved, then ${a.app_name}`); return; }
+      const s = await api.seed(apps, actor);
+      if (!s.error) { const r = await api.save(a, actor); setSaving(false); if (r.error) { setErr(r.error); return false; } applyResult(r); setOpen(null); setMsg(`starter inventory saved, then ${a.app_name}`); return true; }
     }
     const next = applyLocal(apps, log, a, actor);
     setApps(next.apps); setLog(next.log); api.saveLocal(next.apps, next.log); setSeeded(false);
     setSaving(false); setOpen(null); setMsg(`saved ${a.app_name} on this browser only`);
+    return true;
   };
   const saveSeed = async () => {
     if (needName()) return;
-    const r = await api.seed(SEED, actor);
+    const r = await api.seed(apps, actor);
     if (r.error) { setErr(r.error); return; }
     applyResult(r); setMsg(`${r.added} starter applications saved to the warehouse`);
-  };
-  const importPicked = async () => {
-    if (needName() || !picked.size) return;
-    const r = await api.importSystems([...picked], actor);
-    if (r.error) { setErr(r.error); return; }
-    applyResult(r); setPicked(new Set()); setSystems(null);
-    setMsg(`${(r.added || []).length} systems added from Interface 360${(r.skipped || []).length ? `, ${r.skipped.length} skipped` : ""}`);
-    api.systems().then(setSystems);
   };
   const upload = async (file) => {
     if (!file || needName()) return;
@@ -191,7 +184,6 @@ export default function Cyber360({ t, initial }) {
     try { const u = URL.createObjectURL(new Blob([text], { type })); const el = document.createElement("a"); el.href = u; el.download = fname; el.click(); setTimeout(() => URL.revokeObjectURL(u), 500); } catch { /* not a browser */ }
   };
   const copy = (text, what) => { try { navigator.clipboard.writeText(text); setMsg(`${what} copied`); } catch { setMsg(`could not copy ${what}`); } };
-  const devLink = () => (typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}#cyber360` : "#cyber360");
 
   const rows = apps.filter((a) => (!filter.cls || a.app_class === filter.cls) && (!filter.scan || (a.scan_status || "UNKNOWN") === filter.scan)
     && (!filter.decision || (a.constraint_valid || "TBD") === filter.decision) && (!filter.owner || a.owner_team === filter.owner)
@@ -208,20 +200,11 @@ export default function Cyber360({ t, initial }) {
       </p>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", fontSize: 11.5, color: t.sub, marginBottom: 10 }}>
         <Chip c={live ? "#159943" : "#b45309"}>{live ? "live" : "local only"}</Chip>
-        {seeded && <span>starter inventory from the Application Scans thread, not yet saved</span>}
+        {seeded && <span>starter inventory{starter ? `: ${starter.systems} systems from Interface 360 and ${starter.thread} from the Application Scans thread` : " from the Application Scans thread"}, not yet saved</span>}
         {!loaded && <span>loading…</span>}
         <span style={{ flex: 1 }} />
         {who.verified ? <span>you are <b style={{ color: t.text }}>{who.lanId}</b> ({who.source})</span>
           : <label style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>your name <input value={name} onChange={(e) => setName(e.target.value)} placeholder="team or name" style={{ ...inp(t), width: 160 }} /></label>}
-      </div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-        <button type="button" style={btn(t, true)} onClick={() => { setOpen("new"); setTab("Inventory"); }}>Add an application</button>
-        {seeded && live && <button type="button" style={btn(t)} onClick={saveSeed}>Save the starter inventory</button>}
-        {live ? <a href={api.xlsxUrl()} style={{ ...btn(t), textDecoration: "none", display: "inline-block" }} download>Download Excel</a>
-          : <button type="button" style={btn(t)} onClick={() => download(toCsv(apps), "cyber-security-360-inventory.csv", "text/csv")}>Download CSV</button>}
-        <label style={{ ...btn(t), display: "inline-block" }}>Upload Excel<input type="file" accept=".xlsx" style={{ display: "none" }} onChange={(e) => { upload(e.target.files && e.target.files[0]); e.target.value = ""; }} /></label>
-        <button type="button" style={btn(t)} onClick={() => copy(devLink(), "the developers' link")}>Copy the link for developers</button>
-        <button type="button" style={btn(t)} onClick={() => copy(unscannedMarkdown(apps), "the not-scanned list")}>Copy the not-scanned list</button>
       </div>
       {msg && <div style={{ fontSize: 12, color: t.text, background: t.panel, border: `1px solid ${t.border}`, borderLeft: "3px solid #159943", borderRadius: 4, padding: "6px 10px", marginBottom: 10 }}>{msg}</div>}
       {err && <div style={{ fontSize: 12, color: "#c1113a", background: t.panel, border: "1px solid #c1113a", borderRadius: 4, padding: "6px 10px", marginBottom: 10 }}>{err}</div>}
@@ -248,6 +231,13 @@ export default function Cyber360({ t, initial }) {
       </div>
 
       {tab === "Inventory" && (<>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "2px 0 10px" }}>
+          <button type="button" style={btn(t, true)} onClick={() => { setOpen("new"); setErr(null); }}>Add an application</button>
+          {seeded && live && <button type="button" style={btn(t)} onClick={saveSeed}>Save the starter inventory</button>}
+          {live ? <a href={api.xlsxUrl()} style={{ ...btn(t), textDecoration: "none", display: "inline-block" }} download>Download Excel</a>
+            : <button type="button" style={btn(t)} onClick={() => download(toCsv(apps), "cyber-security-360-inventory.csv", "text/csv")}>Download CSV</button>}
+          <label style={{ ...btn(t), display: "inline-block" }}>Upload Excel<input type="file" accept=".xlsx" style={{ display: "none" }} onChange={(e) => { upload(e.target.files && e.target.files[0]); e.target.value = ""; }} /></label>
+        </div>
         {current && <AppForm t={t} app={current} who={actor} saving={saving} error={err} onCancel={() => { setOpen(null); setErr(null); }} onSave={saveApp} />}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", margin: "4px 0 10px" }}>
           <select value={filter.cls} onChange={(e) => setFilter({ ...filter, cls: e.target.value })} style={{ ...inp(t), width: "auto" }}><option value="">every class</option>{Object.entries(CLASSES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
@@ -255,58 +245,40 @@ export default function Cyber360({ t, initial }) {
           <select value={filter.decision} onChange={(e) => setFilter({ ...filter, decision: e.target.value })} style={{ ...inp(t), width: "auto" }}><option value="">any decision</option>{Object.entries(VALID).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
           <select value={filter.owner} onChange={(e) => setFilter({ ...filter, owner: e.target.value })} style={{ ...inp(t), width: "auto" }}><option value="">any owner</option>{owners.map((o) => <option key={o} value={o}>{o}</option>)}</select>
           <input value={filter.q} onChange={(e) => setFilter({ ...filter, q: e.target.value })} placeholder="find an application, runtime, stack…" style={{ ...inp(t), width: 260 }} />
-          <span style={{ fontSize: 11.5, color: t.sub }}>{rows.length} of {apps.length}</span>
+          <span style={{ fontSize: 11.5, color: t.sub }}>{rows.length} of {apps.length} · change a row and Save it, or Edit for every field</span>
         </div>
         <div style={{ overflowX: "auto" }}>
           <table style={{ borderCollapse: "collapse", width: "100%" }}>
-            <thead><tr>{["Application", "Class", "Runtime", "Surface", "Scan", "Why not scanned", "Decision", "DevSecOps", "Owner", "Lifecycle", ""].map((h, i) => <th key={i} style={th(t)}>{h}</th>)}</tr></thead>
-            <tbody>{rows.map((a) => (
-              <tr key={a.app_id} onClick={() => { setOpen(a.app_id); setErr(null); }} style={{ cursor: "pointer", background: open === a.app_id ? t.bg : undefined }}>
-                <td style={{ ...td(t), color: t.text, fontWeight: 600 }}>{a.app_name}<div style={{ fontSize: 10.5, color: t.textMuted, fontWeight: 400 }}>{a.category}</div></td>
-                <td style={td(t)}>{CLASSES[a.app_class] || a.app_class}</td>
-                <td style={td(t)}>{a.runtime}<div style={{ fontSize: 10.5, color: t.textMuted }}>{a.tech_stack}</div></td>
-                <td style={td(t)}>{SURFACES[a.surface] || "—"}</td>
-                <td style={td(t)}><Chip c={SCAN_COLOR[a.scan_status] || "#6b7884"}>{SCAN[a.scan_status] || SCAN.UNKNOWN}</Chip></td>
-                <td style={{ ...td(t), maxWidth: 320 }}>{a.scan_status === "SCANNED" ? "—" : <><div style={{ fontSize: 10.5, fontWeight: 700, color: t.text }}>{CONSTRAINTS[a.constraint_kind] || "—"}</div>{trunc(a.constraint_text, 140)}</>}</td>
+            <thead><tr>{["Application", "Runtime", "Scan", "Why not scanned", "Decision", "DevSecOps", "Owner", "Lifecycle"].map((h, i) => <th key={i} style={th(t)}>{h}</th>)}</tr></thead>
+            <tbody>{rows.map((a0) => {
+              const d = drafts[a0.app_id]; const a = d ? { ...a0, ...d } : a0;
+              const edit = (k) => (v) => setDrafts((x) => ({ ...x, [a0.app_id]: { ...(x[a0.app_id] || {}), [k]: v } }));
+              const cell = { ...inp(t), width: "auto", minWidth: 96, fontSize: 11.5, padding: "3px 6px" };
+              const sel = (k, options) => <select value={a[k] || ""} onChange={(e) => edit(k)(e.target.value)} style={cell}>{Object.entries(options).map(([kk, v]) => <option key={kk} value={kk}>{v}</option>)}</select>;
+              return (
+              <tr key={a0.app_id} style={{ background: d ? "#fffaf0" : (open === a0.app_id ? t.bg : undefined) }}>
+                <td style={{ ...td(t), color: t.text, fontWeight: 600, minWidth: 170 }}>{a.app_name}<div style={{ fontSize: 10.5, color: t.textMuted, fontWeight: 400 }}>{CLASSES[a.app_class] || a.app_class}{a.category ? ` · ${a.category}` : ""}{a.surface ? ` · ${SURFACES[a.surface]}` : ""}</div>
+                  <div style={{ display: "flex", gap: 4, marginTop: 5, flexWrap: "wrap" }}>
+                    {d && <button type="button" style={{ ...btn(t, true), padding: "3px 9px", fontSize: 11.5 }} disabled={saving} onClick={() => saveApp(a).then(() => setDrafts((x) => { const n = { ...x }; delete n[a0.app_id]; return n; }))}>Save</button>}
+                    {d && <button type="button" style={{ ...btn(t), padding: "3px 9px", fontSize: 11.5 }} onClick={() => setDrafts((x) => { const n = { ...x }; delete n[a0.app_id]; return n; })}>Undo</button>}
+                    <button type="button" style={{ ...btn(t), padding: "3px 9px", fontSize: 11.5 }} onClick={() => { setOpen(a0.app_id); setErr(null); }}>Edit</button>
+                  </div></td>
+                <td style={td(t)}><input value={a.runtime || ""} onChange={(e) => edit("runtime")(e.target.value)} placeholder="runtime" style={{ ...cell, minWidth: 110 }} /><div style={{ fontSize: 10.5, color: t.textMuted }}>{a.tech_stack}</div></td>
+                <td style={td(t)}>{sel("scan_status", SCAN)}</td>
+                <td style={{ ...td(t), maxWidth: 300 }}>{a.scan_status === "SCANNED" ? "—" : <>{sel("constraint_kind", CONSTRAINTS)}
+                  <textarea value={a.constraint_text || ""} onChange={(e) => edit("constraint_text")(e.target.value)} rows={2} placeholder="why a scan is not required" style={{ ...cell, width: "100%", minWidth: 200, marginTop: 4, fontFamily: "inherit", resize: "vertical" }} /></>}</td>
                 <td style={td(t)}>{a.scan_status === "SCANNED" ? "—" : <Chip c={VALID_COLOR[a.constraint_valid] || "#b45309"}>{VALID[a.constraint_valid] || VALID.TBD}</Chip>}</td>
-                <td style={td(t)}><Chip c={DEVSECOPS_COLOR[a.devsecops_integration] || "#c1113a"}>{DEVSECOPS[a.devsecops_integration] || DEVSECOPS.NONE}</Chip></td>
-                <td style={td(t)}>{a.owner_team || <span style={{ color: "#b45309" }}>unowned</span>}</td>
-                <td style={td(t)}>{LIFECYCLE[a.lifecycle] || a.lifecycle}</td>
-                <td style={td(t)}><button type="button" style={btn(t)} onClick={(e) => { e.stopPropagation(); setOpen(a.app_id); }}>Declare</button></td>
-              </tr>))}
+                <td style={td(t)}>{sel("devsecops_integration", DEVSECOPS)}</td>
+                <td style={td(t)}><input value={a.owner_team || ""} onChange={(e) => edit("owner_team")(e.target.value)} placeholder="owner team" style={{ ...cell, minWidth: 100 }} /></td>
+                <td style={td(t)}>{sel("lifecycle", LIFECYCLE)}</td>
+              </tr>); })}
               {rows.length === 0 && <tr><td colSpan={11} style={{ ...td(t), padding: 18 }}>No applications match. Add one, import from Interface 360, or upload the workbook.</td></tr>}
             </tbody>
           </table>
         </div>
       </>)}
 
-      {tab === "Not scanned review" && <ReviewTab t={t} apps={apps} onOpen={(id) => { setOpen(id); setTab("Inventory"); }} />}
-
-      {tab === "Interface 360 systems" && (<>
-        <H t={t} sub="Every system Interface 360 knows, with the owner its interfaces name most often, else the API catalog's owner. Tick the ones that are applications and add them; each starts as not yet declared for its owner to fill in.">Systems from Interface 360</H>
-        {!systems && <div style={{ fontSize: 12, color: t.sub }}>loading the system list…</div>}
-        {systems && systems.error && <div style={{ fontSize: 12, color: "#b45309" }}>Interface 360 is not reachable from here ({systems.error}); the import needs the API.</div>}
-        {systems && !systems.error && (<>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, fontSize: 12, color: t.sub }}>
-            <button type="button" style={btn(t, true)} disabled={!picked.size || !live} onClick={importPicked}>Add {picked.size || ""} selected to the inventory</button>
-            <button type="button" style={btn(t)} onClick={() => setPicked(new Set(systems.systems.filter((x) => !x.appId).map((x) => x.system)))}>Select all not yet in</button>
-            <span>{systems.inInventory} of {systems.total} already in the inventory</span>
-          </div>
-          <table style={{ borderCollapse: "collapse", width: "100%" }}>
-            <thead><tr>{["", "System", "Owner", "Interfaces", "Project", "PII", "In the inventory"].map((h, i) => <th key={i} style={th(t)}>{h}</th>)}</tr></thead>
-            <tbody>{systems.systems.map((x) => (
-              <tr key={x.system}>
-                <td style={td(t)}>{!x.appId && <input type="checkbox" checked={picked.has(x.system)} onChange={(e) => { const n = new Set(picked); if (e.target.checked) n.add(x.system); else n.delete(x.system); setPicked(n); }} />}</td>
-                <td style={{ ...td(t), color: t.text, fontWeight: 600 }}>{x.system}</td>
-                <td style={td(t)}>{x.owner || <span style={{ color: "#b45309" }}>none named</span>}{x.ownerSource && <div style={{ fontSize: 10.5, color: t.textMuted }}>from {x.ownerSource}</div>}</td>
-                <td style={td(t)}>{x.interfaces} <span style={{ color: t.textMuted }}>({x.inbound} in · {x.outbound} out)</span></td>
-                <td style={td(t)}>{x.projectId || "—"}</td>
-                <td style={td(t)}>{x.carriesPii ? <Chip c="#c1113a">PII</Chip> : "—"}</td>
-                <td style={td(t)}>{x.appId ? <span style={{ fontFamily: MONO, fontSize: 11 }}>{x.appId}</span> : <span style={{ color: t.textMuted }}>not yet</span>}</td>
-              </tr>))}</tbody>
-          </table>
-        </>)}
-      </>)}
+      {tab === "Not scanned review" && <ReviewTab t={t} apps={apps} onOpen={(id) => { setOpen(id); setTab("Inventory"); }} onCopy={() => copy(unscannedMarkdown(apps), "the not-scanned list")} />}
 
       {tab === "Change log" && (<>
         <H t={t} sub="Every changed field, who changed it and what it replaced. A decision on a constraint is evidence, so it is never overwritten silently.">Change log</H>
@@ -325,11 +297,12 @@ export default function Cyber360({ t, initial }) {
 // The list the thread asks for: every application not scanned, grouped by
 // the constraint behind it, each with the owner's reason, the decision and
 // what covers it instead.
-export function ReviewTab({ t, apps, onOpen }) {
+export function ReviewTab({ t, apps, onOpen, onCopy }) {
   const rows = apps.filter((a) => (a.scan_status === "NOT_SCANNED" || a.scan_status === "SERVER_ONLY") && a.lifecycle !== "RETIRED");
   const pending = apps.filter((a) => !a.scan_status || a.scan_status === "UNKNOWN");
   return (<>
-    <H t={t} sub="For each application not covered by the application scan: why, whether the scan group accepts that, and what covers it instead. No constraint, or one not accepted, means the application gets scanned. Copy the list above for the reply.">Applications not covered by the application scan · {rows.length}</H>
+    <H t={t} sub="For each application not covered by the application scan: why, whether the scan group accepts that, and what covers it instead. No constraint, or one not accepted, means the application gets scanned.">Applications not covered by the application scan · {rows.length}</H>
+    {onCopy && <button type="button" style={btn(t)} onClick={onCopy}>Copy this list as Markdown</button>}
     {pending.length > 0 && <div style={{ fontSize: 12, color: "#b45309", marginBottom: 8 }}>{pending.length} application{pending.length === 1 ? "" : "s"} not yet declared by their owners are not in this list.</div>}
     {Object.keys(CONSTRAINTS).map((k) => {
       const g = rows.filter((a) => (a.constraint_kind || "NONE") === k);

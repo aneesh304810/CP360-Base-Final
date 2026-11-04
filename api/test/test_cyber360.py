@@ -110,7 +110,7 @@ ROWS["SELECT app_id, app_name FROM cyber_app"] = [{"app_id": "CS-013", "app_name
 ROWS["FROM interface360_interfaces WHERE update_owner IS NOT NULL"] = [{"system_name": "STAR", "update_owner": "Core Platform", "n": 12}, {"system_name": "STAR", "update_owner": "Other", "n": 2}, {"system_name": "IMDS", "update_owner": "ops@example.com", "n": 3}]
 ROWS["FROM api_systems WHERE owner IS NOT NULL"] = [{"display_name": "IMDS", "system_code": "IMDS", "owner": "Data Platform"}]
 ROWS["FROM interface360_systems ORDER BY"] = [{"system_name": "STAR", "project_id": "P1", "party": "INTERNAL", "inbound_count": 10, "outbound_count": 30, "total_count": 40, "carries_pii": "Y"},
-                                             {"system_name": "IMDS", "project_id": None, "party": "INTERNAL", "inbound_count": 5, "outbound_count": 1, "total_count": 6, "carries_pii": "N"},
+                                             {"system_name": "IMDS", "project_id": None, "party": "VENDOR", "inbound_count": 5, "outbound_count": 1, "total_count": 6, "carries_pii": "N"},
                                              {"system_name": "SharePoint", "project_id": None, "party": "VENDOR", "inbound_count": 1, "outbound_count": 1, "total_count": 2, "carries_pii": "N"}]
 sy = R.systems()
 by = {x["system"]: x for x in sy["systems"]}
@@ -118,9 +118,10 @@ ok(sy["total"] == 3 and sy["inInventory"] == 1 and by["STAR"]["owner"] == "Core 
    "systems carry the owner the interfaces name most often, PII, and the inventory id where there is one", by)
 ok(by["IMDS"]["owner"] == "Data Platform" and by["IMDS"]["ownerSource"] == "api catalog", "an owner that is an address is dropped and the API catalog's owner stands in", by["IMDS"])
 SENT.clear()
-im = R.import_systems(R.ImportBody(systems=["STAR", "SharePoint", "Nope"], actor="pb-team"), Req())
-ok(im["added"] == ["IF-STAR"] and len(im["skipped"]) == 2 and SENT[0][1]["scan_status"] == "UNKNOWN" and SENT[0][1]["owner_team"] == "Core Platform" and "40 interfaces" in SENT[0][1]["notes"] and "carries PII" in SENT[0][1]["notes"]
-   and SENT[0][1]["source_ref"].startswith("Interface 360 system"), "an import adds the system as not yet declared with its owner and interface counts; one already in and one unknown are skipped", (im["added"], im["skipped"]))
+im = R.import_systems(R.ImportBody(systems=["STAR", "IMDS", "SharePoint", "Nope"], actor="pb-team"), Req())
+ok(im["added"] == ["IF-IMDS", "IF-STAR"] and len(im["skipped"]) == 2 and SENT[2][1]["scan_status"] == "UNKNOWN" and SENT[2][1]["owner_team"] == "Core Platform" and "40 interfaces" in SENT[2][1]["notes"] and "carries PII" in SENT[2][1]["notes"]
+   and SENT[2][1]["source_ref"].startswith("Interface 360 system") and SENT[0][1]["app_class"] == "VENDOR_PACKAGE" and SENT[0][1]["category"] == "Interface 360 system (VENDOR)",
+   "an import adds systems as not yet declared with owner, counts and class from the party; one already in and one unknown are skipped", (im["added"], im["skipped"]))
 
 print("-- the workbook, out and back in")
 data = R.workbook_bytes(R._state())

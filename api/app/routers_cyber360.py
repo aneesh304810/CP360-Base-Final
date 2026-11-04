@@ -298,7 +298,9 @@ def import_systems(body: ImportBody, request: Request):
         if x["appId"]:
             skipped.append({"system": x["system"], "why": f"already in the inventory as {x['appId']}"})
             continue
-        row = clean({"app_name": x["system"], "app_class": "HOME_GROWN", "surface": "", "scan_status": "UNKNOWN", "constraint_kind": "NONE",
+        cls = "VENDOR_PACKAGE" if re.search(r"VENDOR|EXTERNAL|THIRD", str(x.get("party") or ""), re.I) else "HOME_GROWN"
+        row = clean({"app_name": x["system"], "app_class": cls, "category": f"Interface 360 system ({x['party']})" if x.get("party") else "Interface 360 system",
+                     "surface": "", "scan_status": "UNKNOWN", "constraint_kind": "NONE",
                      "constraint_valid": "TBD", "lifecycle": "ACTIVE", "owner_team": x["owner"],
                      "notes": f"Interface 360: {x['interfaces']} interfaces ({x['inbound']} in, {x['outbound']} out)" + (f"; project {x['projectId']}" if x.get("projectId") else "") + ("; carries PII" if x["carriesPii"] else ""),
                      "source_ref": "Interface 360 system" + (f"; owner from {x['ownerSource']}" if x.get("ownerSource") else "")})

@@ -127,6 +127,24 @@ export function toCsv(apps) {
   return [cols.join(","), ...apps.map((a) => cols.map((c) => esc(a[c])).join(","))].join("\n");
 }
 
+// THE STARTER INVENTORY IS INTERFACE 360. Every system Interface 360 knows
+// becomes a row with what it knows: the owner its interfaces name, the
+// project, the interface counts, whether it carries PII; scan status not
+// yet declared. The thread's rows are added where no system has the same
+// name. A system named VENDOR or EXTERNAL by its party is a vendor package.
+export const classForParty = (party) => (/VENDOR|EXTERNAL|THIRD/i.test(String(party || "")) ? "VENDOR_PACKAGE" : "HOME_GROWN");
+export function appFromSystem(x) {
+  return { ...blankApp(), app_id: "IF-" + String(x.system || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 36), app_name: x.system, app_class: classForParty(x.party),
+    category: x.party ? `Interface 360 system (${x.party})` : "Interface 360 system", surface: "", scan_status: "UNKNOWN", owner_team: x.owner || "",
+    notes: `Interface 360: ${x.interfaces || 0} interfaces (${x.inbound || 0} in, ${x.outbound || 0} out)` + (x.projectId ? `; project ${x.projectId}` : "") + (x.carriesPii ? "; carries PII" : ""),
+    source_ref: "Interface 360 system" + (x.ownerSource ? `; owner from ${x.ownerSource}` : "") };
+}
+export function starterFromSystems(systems, seed = SEED) {
+  const fromSystems = (systems || []).map(appFromSystem);
+  const names = new Set(fromSystems.map((a) => a.app_name.toUpperCase()));
+  return [...fromSystems, ...seed.filter((a) => !names.has(a.app_name.toUpperCase())).map((a) => ({ ...a }))];
+}
+
 export function loadLocal() {
   try { const raw = localStorage.getItem(KEY); const j = raw ? JSON.parse(raw) : null; return j && Array.isArray(j.apps) ? j : null; } catch { return null; }
 }
@@ -144,7 +162,9 @@ export async function load() {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const j = await r.json();
     if ((j.apps || []).length) return { apps: j.apps, log: j.log || [], live: true, seeded: false };
-    return { apps: SEED.map((a) => ({ ...a })), log: [], live: true, seeded: true };
+    const sy = await systems();
+    const apps = starterFromSystems(sy.systems || []);
+    return { apps, log: [], live: true, seeded: true, starter: { systems: (sy.systems || []).length, thread: apps.length - (sy.systems || []).length } };
   } catch {
     const local = loadLocal();
     if (local) return { apps: local.apps, log: local.log || [], live: false, seeded: false };
@@ -182,4 +202,4 @@ export function applyLocal(apps, log, app, actor) {
   return { apps: before ? apps.map((a) => (a.app_id === id ? next : a)) : [...apps, next], log: [...lines, ...(log || [])].slice(0, 500) };
 }
 
-export default { load, save, seed, importSystems, uploadXlsx, systems, xlsxUrl, whoami, loadLocal, saveLocal, reviewerName, setReviewerName, applyLocal, summarise, unscannedMarkdown, toCsv, SEED, blankApp };
+export default { load, save, seed, importSystems, uploadXlsx, systems, xlsxUrl, whoami, starterFromSystems, appFromSystem, loadLocal, saveLocal, reviewerName, setReviewerName, applyLocal, summarise, unscannedMarkdown, toCsv, SEED, blankApp };
