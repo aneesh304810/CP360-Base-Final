@@ -225,18 +225,23 @@ def seed_apps(body: SeedBody, request: Request):
     actor, source = _actor(request, body.actor)
     have = {r["app_id"] for r in _safe("SELECT app_id FROM cyber_app")}
     st, added = [], 0
-    for a in body.apps[:200]:
+    errors = []
+    for a in body.apps[:500]:
         app_id = _app_id(a.get("app_id"))
         if app_id in have:
             continue
-        row = clean(a)
+        try:
+            row = clean(a)
+        except HTTPException as e:
+            errors.append({"app": a.get("app_name") or app_id, "error": e.detail})
+            continue
         st.append(_merge(app_id, row, actor, source))
         st.append(("INSERT INTO cyber_app_log (log_id, app_id, field, before_v, after_v, author, id_source) VALUES (:i, :a, 'seed', NULL, :v, :u, :o)",
                    {"i": _nid("l"), "a": app_id, "v": (row.get("source_ref") or "starter inventory")[:2000], "u": actor, "o": source}))
         added += 1
     if st and not _write(st):
-        raise HTTPException(503, "the inventory tables are not reachable; nothing was saved")
-    return {**_state(), "persisted": True, "added": added}
+        raise HTTPException(503, "the inventory tables are not reachable (apply sql/88_cyber360.sql and restart the API); nothing was saved")
+    return {**_state(), "persisted": True, "added": added, "errors": errors}
 
 
 # ------------------------------------------------------------ Interface 360
@@ -322,15 +327,32 @@ XLSX_COLS = [("app_id", "ID"), ("app_name", "Application"), ("app_class", "Class
              ("lifecycle", "Lifecycle"), ("notes", "Notes"), ("source_ref", "Source"), ("updated_by", "Updated by"), ("updated_at", "Updated at")]
 
 
+BLANK_ROWS = 300          # rows under the inventory that carry the dropdowns, for developers to add applications
+
+
 def workbook_bytes(state):
-    """The inventory as a workbook: every application, the ones not scanned
-    with the review columns first, and the change log."""
+    """The inventory as a workbook developers fill in: every application,
+    a dropdown on each enumerated column fed from the Lists sheet (the
+    same values the form offers), three hundred blank rows under the data
+    with the same dropdowns, the ones not scanned with the review columns
+    first, the change log, and the Values sheet that explains each list."""
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font, PatternFill
     from openpyxl.utils import get_column_letter
+    from openpyxl.worksheet.datavalidation import DataValidation
     wb = Workbook()
+    lists = wb.create_sheet("Lists")
+    refs = {}
+    for j, (f, opts) in enumerate(ENUMS.items(), 1):
+        col = get_column_letter(j)
+        lists[f"{col}1"] = f
+        lists[f"{col}1"].font = Font(bold=True)
+        for i, v in enumerate(opts, 2):
+            lists[f"{col}{i}"] = v
+        refs[f] = f"Lists!${col}$2:${col}${len(opts) + 1}"
+        lists.column_dimensions[col].width = 26
 
-    def sheet(ws, cols, rows):
+    def sheet(ws, cols, rows, dropdowns=False):
         ws.append([h for _, h in cols])
         for c in ws[1]:
             c.font = Font(bold=True, color="FFFFFF")
@@ -346,9 +368,17 @@ def workbook_bytes(state):
                 c.alignment = Alignment(vertical="top", wrap_text=True)
         ws.freeze_panes = "B2"
         ws.auto_filter.ref = ws.dimensions
+        if dropdowns:
+            last = len(rows) + 1 + BLANK_ROWS
+            for i, (k, _) in enumerate(cols, 1):
+                if k in refs:
+                    dv = DataValidation(type="list", formula1=refs[k], allow_blank=True, showErrorMessage=True,
+                                        errorTitle="Not a listed value", error=f"Pick one of the values in the dropdown (see the Values sheet for {k}).")
+                    dv.add(f"{get_column_letter(i)}2:{get_column_letter(i)}{last}")
+                    ws.add_data_validation(dv)
 
     apps = state["apps"]
-    sheet(wb.active, XLSX_COLS, apps)
+    sheet(wb.active, XLSX_COLS, apps, dropdowns=True)
     wb.active.title = "Inventory"
     un = [a for a in apps if a.get("scan_status") in ("SERVER_ONLY", "NOT_SCANNED", "UNKNOWN") and a.get("lifecycle") != "RETIRED"]
     review_cols = [("app_name", "Application"), ("app_class", "Class"), ("runtime", "Runtime"), ("scan_status", "Scan status"), ("constraint_kind", "Constraint"),
@@ -356,7 +386,7 @@ def workbook_bytes(state):
                    ("owner_team", "Owner"), ("devsecops_integration", "DevSecOps integration"), ("lifecycle", "Lifecycle"), ("app_id", "ID")]
     sheet(wb.create_sheet("Not scanned"), review_cols, un)
     log_cols = [("at", "When"), ("appId", "ID"), ("field", "Field"), ("before", "Before"), ("after", "After"), ("author", "By")]
-    sheet(wb.create_sheet("Change log"), log_cols, state["log"])
+    sheet(wb.create_sheet("Change log"), log_cols, state.get("log") or [])
     # the values a developer may type, so a filled-in workbook uploads clean
     vals = wb.create_sheet("Values")
     vals.append(["Column", "Allowed values", "Meaning"])
@@ -366,15 +396,39 @@ def workbook_bytes(state):
     vals.append(["app_name", "required", "the application as developers and the scan group know it; no hosts, no addresses"])
     for col, w in (("A", 24), ("B", 70), ("C", 80)):
         vals.column_dimensions[col].width = w
+    wb.move_sheet("Lists", offset=len(wb.sheetnames))      # the dropdown source last, where nobody edits it
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
 
 
+XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
 @router.get("/apps.xlsx")
 def apps_xlsx():
-    data = workbook_bytes(_state())
-    return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    """The saved inventory as a workbook."""
+    return Response(content=workbook_bytes(_state()), media_type=XLSX_TYPE,
+                    headers={"Content-Disposition": 'attachment; filename="cyber-security-360-inventory.xlsx"'})
+
+
+class ExportBody(BaseModel):
+    apps: list[dict]
+
+
+@router.post("/apps/export")
+def apps_export(body: ExportBody):
+    """The rows the page shows, saved or not, as the same workbook: the
+    starter inventory can be handed to developers before anyone saves it.
+    Rows are written as given, clipped to their columns, never validated
+    away; a blank page still gets the headers and the dropdowns."""
+    rows = []
+    for a in body.apps[:2000]:
+        d = {k: ("" if a.get(k) is None else str(a.get(k)))[:w] for k, w in FIELDS.items()}
+        d["app_id"] = _app_id(a.get("app_id")) if a.get("app_id") else ""
+        d["updated_by"], d["updated_at"] = a.get("updated_by") or "", a.get("updated_at") or ""
+        rows.append(d)
+    return Response(content=workbook_bytes({"apps": rows, "log": []}), media_type=XLSX_TYPE,
                     headers={"Content-Disposition": 'attachment; filename="cyber-security-360-inventory.xlsx"'})
 
 

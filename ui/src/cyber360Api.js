@@ -184,6 +184,14 @@ export const seed = (apps, actor) => post("/apps/seed", { apps, actor });
 export const importSystems = (systems, actor) => post("/apps/import", { systems, actor });
 export const uploadXlsx = (filename, content_b64, actor) => post("/apps/upload", { filename, content_b64, actor });
 export const xlsxUrl = () => `${API_BASE}${PATH}/apps.xlsx`;
+// The workbook for the rows the page shows, saved or not; null when the API cannot answer.
+export async function exportXlsx(apps) {
+  try {
+    const r = await fetch(`${API_BASE}${PATH}/apps/export`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ apps }), signal: AbortSignal.timeout(20000) });
+    if (!r.ok) return null;
+    return await r.blob();
+  } catch { return null; }
+}
 export async function systems() {
   try { const r = await fetch(`${API_BASE}${PATH}/systems`, { signal: AbortSignal.timeout(T) }); return r.ok ? await r.json() : { systems: [], error: `HTTP ${r.status}` }; }
   catch (e) { return { systems: [], error: String((e && e.message) || e) }; }
@@ -202,4 +210,4 @@ export function applyLocal(apps, log, app, actor) {
   return { apps: before ? apps.map((a) => (a.app_id === id ? next : a)) : [...apps, next], log: [...lines, ...(log || [])].slice(0, 500) };
 }
 
-export default { load, save, seed, importSystems, uploadXlsx, systems, xlsxUrl, whoami, starterFromSystems, appFromSystem, loadLocal, saveLocal, reviewerName, setReviewerName, applyLocal, summarise, unscannedMarkdown, toCsv, SEED, blankApp };
+export default { load, save, seed, importSystems, uploadXlsx, exportXlsx, systems, xlsxUrl, whoami, starterFromSystems, appFromSystem, loadLocal, saveLocal, reviewerName, setReviewerName, applyLocal, summarise, unscannedMarkdown, toCsv, SEED, blankApp };

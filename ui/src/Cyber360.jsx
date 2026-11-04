@@ -167,9 +167,11 @@ export default function Cyber360({ t, initial }) {
   };
   const saveSeed = async () => {
     if (needName()) return;
+    setErr(null);
     const r = await api.seed(apps, actor);
     if (r.error) { setErr(r.error); return; }
-    applyResult(r); setMsg(`${r.added} starter applications saved to the warehouse`);
+    applyResult(r);
+    setMsg(`${r.added} starter applications saved to the warehouse` + ((r.errors || []).length ? `; ${r.errors.length} refused: ` + r.errors.slice(0, 3).map((e) => `${e.app}: ${e.error}`).join("; ") : ""));
   };
   const upload = async (file) => {
     if (!file || needName()) return;
@@ -180,8 +182,13 @@ export default function Cyber360({ t, initial }) {
     applyResult(r);
     setMsg(`${file.name}: ${(r.added || []).length} added, ${(r.updated || []).length} updated${(r.errors || []).length ? `, ${r.errors.length} rows refused: ` + r.errors.slice(0, 3).map((e) => `row ${e.row} ${e.error}`).join("; ") : ""}`);
   };
-  const download = (text, fname, type) => {
-    try { const u = URL.createObjectURL(new Blob([text], { type })); const el = document.createElement("a"); el.href = u; el.download = fname; el.click(); setTimeout(() => URL.revokeObjectURL(u), 500); } catch { /* not a browser */ }
+  const download = (data, fname, type) => {
+    try { const u = URL.createObjectURL(data instanceof Blob ? data : new Blob([data], { type })); const el = document.createElement("a"); el.href = u; el.download = fname; el.click(); setTimeout(() => URL.revokeObjectURL(u), 500); } catch { /* not a browser */ }
+  };
+  const downloadExcel = async () => {
+    const blob = await api.exportXlsx(apps);
+    if (blob) { download(blob, "cyber-security-360-inventory.xlsx"); setMsg(`workbook with ${apps.length} applications and the dropdowns, ready to share`); return; }
+    download(toCsv(apps), "cyber-security-360-inventory.csv", "text/csv"); setMsg("the API did not answer, so this is the CSV without dropdowns");
   };
   const copy = (text, what) => { try { navigator.clipboard.writeText(text); setMsg(`${what} copied`); } catch { setMsg(`could not copy ${what}`); } };
 
@@ -234,8 +241,7 @@ export default function Cyber360({ t, initial }) {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "2px 0 10px" }}>
           <button type="button" style={btn(t, true)} onClick={() => { setOpen("new"); setErr(null); }}>Add an application</button>
           {seeded && live && <button type="button" style={btn(t)} onClick={saveSeed}>Save the starter inventory</button>}
-          {live ? <a href={api.xlsxUrl()} style={{ ...btn(t), textDecoration: "none", display: "inline-block" }} download>Download Excel</a>
-            : <button type="button" style={btn(t)} onClick={() => download(toCsv(apps), "cyber-security-360-inventory.csv", "text/csv")}>Download CSV</button>}
+          <button type="button" style={btn(t)} onClick={downloadExcel} title="the rows shown, with a dropdown on every listed column, for developers to fill in">Download Excel</button>
           <label style={{ ...btn(t), display: "inline-block" }}>Upload Excel<input type="file" accept=".xlsx" style={{ display: "none" }} onChange={(e) => { upload(e.target.files && e.target.files[0]); e.target.value = ""; }} /></label>
         </div>
         {current && <AppForm t={t} app={current} who={actor} saving={saving} error={err} onCancel={() => { setOpen(null); setErr(null); }} onSave={saveApp} />}

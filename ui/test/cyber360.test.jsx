@@ -60,9 +60,9 @@ ok(/15<\/div>/.test(page) && /not scanned/.test(page) && /not yet declared/.test
 ok(/Scan policy, as stated by the scan group/.test(page) && /SharePoint goes through the server scan only/.test(page), "the policy card");
 for (const n of ["STAR", "Vendor Feed", "Quarterly Tax Program (QTP)", "BBH_PB_Interfaces", "Email Tool", "EFTPS", "Universal Client", "SharePoint"]) ok(page.includes(n), `row ${n}`);
 ok(/Core Platform/.test(page) && /No web or API surface/.test(page) && /Legacy stack, retiring/.test(page) && /To review/.test(page) && /Not integrated/.test(page) && /Not applicable/.test(page), "the owner from Interface 360, the why, the decision and the DevSecOps column");
-ok(/apps\.xlsx/.test(page), "the Excel download points at the API workbook when live");
+ok(/Download Excel/.test(page) && !/apps\.xlsx/.test(page) && /with a dropdown on every listed column/.test(page), "Download Excel builds the workbook from the rows shown, saved or not, with the dropdowns");
 const local = renderToStaticMarkup(<Cyber360 t={tLight} initial={{ apps: SEED, log: [], live: false, seeded: false, name: "" }} />);
-ok(/local only/.test(local) && /Download CSV/.test(local) && !/apps\.xlsx/.test(local) && /your name/.test(local), "off the API the page says local only, offers CSV and asks who you are");
+ok(/local only/.test(local) && /Download Excel/.test(local) && /your name/.test(local), "off the API the page says local only and asks who you are");
 const opened = renderToStaticMarkup(<Cyber360 t={tLight} initial={{ apps: SEED, log: [], live: true, seeded: false, open: "CS-009", name: "pb-team" }} />);
 ok(/Declare · Email Tool/.test(opened) && /Is it scanned\?/.test(opened) && /why a scan is not required/.test(opened) && /DevSecOps integration/.test(opened) && /Scan group decision/.test(opened) && /Filled by the scan group, not the developer/.test(opened),
    "opening a row shows the declaration form: the application, the scan, the constraint, DevSecOps, and the scan group's own section");

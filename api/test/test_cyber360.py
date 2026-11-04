@@ -127,7 +127,18 @@ print("-- the workbook, out and back in")
 data = R.workbook_bytes(R._state())
 from openpyxl import load_workbook
 wb = load_workbook(io.BytesIO(data), read_only=True)
-ok(wb.sheetnames == ["Inventory", "Not scanned", "Change log", "Values"], "four sheets: the inventory, the not-scanned review, the log, the allowed values", wb.sheetnames)
+ok(wb.sheetnames == ["Inventory", "Not scanned", "Change log", "Values", "Lists"], "five sheets: the inventory, the not-scanned review, the log, the allowed values, the dropdown lists", wb.sheetnames)
+wbf = load_workbook(io.BytesIO(data))                        # validations need the full reader
+inv_ws = wbf["Inventory"]
+dvs = inv_ws.data_validations.dataValidation
+heads = [c.value for c in inv_ws[1]]
+cols_with_dv = sorted({str(d.sqref).split(":")[0].rstrip("0123456789") for d in dvs})
+want = sorted({__import__("openpyxl.utils", fromlist=["get_column_letter"]).get_column_letter(heads.index(lab) + 1) for f, lab in R.XLSX_COLS if f in R.ENUMS})
+ok(len(dvs) == len(R.ENUMS) and cols_with_dv == want and all(d.type == "list" and str(d.formula1).startswith("Lists!$") and str(d.sqref).endswith(str(5 + 1 + R.BLANK_ROWS)) for d in dvs),
+   "every enumerated column has a list dropdown fed from the Lists sheet, over the rows and three hundred blank ones under them", (cols_with_dv, want, [str(d.sqref) for d in dvs][:2]))
+lists = {r[0]: [v for v in r[1:] if v] for r in zip(*[[c.value for c in col] for col in wbf["Lists"].iter_cols()])} if False else None
+lst = wbf["Lists"]
+ok(lst["A1"].value == "app_class" and [lst.cell(row=i, column=1).value for i in range(2, 6)] == list(R.CLASSES) and lst["C1"].value == "scan_status" and lst["C2"].value == "UNKNOWN", "the Lists sheet holds the form's values, one column per field", (lst["A1"].value, lst["C1"].value))
 inv = list(wb["Inventory"].iter_rows(values_only=True))
 ok(inv[0][:3] == ("ID", "Application", "Class") and "DevSecOps integration" in inv[0] and len(inv) == 6, "the Inventory sheet is a labelled header and every row", inv[0])
 ns = list(wb["Not scanned"].iter_rows(values_only=True))
@@ -158,6 +169,19 @@ try:
     ok(False, "a file that is not a workbook is refused")
 except HTTPException as e:
     ok(e.status_code == 422, "a file that is not a workbook is refused", e.detail)
+
+print("-- the export of unsaved rows, and a seed with a bad row")
+ex = R.apps_export(R.ExportBody(apps=[{"app_name": "Starter one", "app_class": "HOME_GROWN", "scan_status": "UNKNOWN", "owner_team": "Core"}, {"app_id": "CS-001", "app_name": "QTP", "app_class": "HOME_GROWN", "scan_status": "NOT_SCANNED"}]))
+wbe = load_workbook(io.BytesIO(ex.body), read_only=True)
+rows_e = list(wbe["Inventory"].iter_rows(values_only=True))
+ok(ex.media_type == R.XLSX_TYPE and len(rows_e) == 3 and rows_e[1][1] == "Starter one" and rows_e[1][0] in ("", None) and rows_e[2][0] == "CS-001" and wbe.sheetnames[-1] == "Lists",
+   "the export writes the rows it is given, saved or not, into the same workbook with the dropdowns", [r[:2] for r in rows_e])
+empty = load_workbook(io.BytesIO(R.apps_export(R.ExportBody(apps=[])).body))
+ok(len(empty["Inventory"].data_validations.dataValidation) == len(R.ENUMS) and empty["Inventory"]["B1"].value == "Application", "an empty inventory still exports the headers and the dropdowns, a template")
+ROWS["SELECT app_id FROM cyber_app"] = []
+SENT.clear()
+sd = R.seed_apps(R.SeedBody(apps=[{"app_id": "A", "app_name": "Good", "app_class": "SAAS", "scan_status": "SCANNED"}, {"app_id": "B", "app_name": "Bad", "app_class": "SAAS", "scan_status": "SCANNED", "notes": "mail someone@example.com"}], actor="x"), Req())
+ok(sd["added"] == 1 and len(sd["errors"]) == 1 and sd["errors"][0]["app"] == "Bad" and "address" in sd["errors"][0]["error"], "a seed writes the good rows and reports the refused one instead of failing", sd.get("errors"))
 
 print("-- wiring")
 main = open(os.path.join(os.path.dirname(__file__), "..", "app", "main.py")).read()
