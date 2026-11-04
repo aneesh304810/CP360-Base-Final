@@ -30,6 +30,8 @@ export const CONSTRAINTS = {
 };
 export const VALID = { YES: "Accepted", NO: "Not accepted: scan it", TBD: "To review" };
 export const LIFECYCLE = { ACTIVE: "Active", RETIRING: "Retiring", RETIRED: "Retired" };
+// On the BBH DevSecOps security pipeline (the shared Jenkins library: checkout,
+// unit tests, Nexus IQ, SonarQube, AppScan SAST, DAST where there is a web surface)?
 export const DEVSECOPS = { NONE: "Not integrated", PARTIAL: "Partly integrated", INTEGRATED: "Integrated", NOT_APPLICABLE: "Not applicable" };
 export const DEVSECOPS_COLOR = { NONE: "#c1113a", PARTIAL: "#b45309", INTEGRATED: "#159943", NOT_APPLICABLE: "#6b7884" };
 export const SCAN_COLOR = { UNKNOWN: "#6b7884", SCANNED: "#159943", SERVER_ONLY: "#b45309", NOT_SCANNED: "#c1113a" };

@@ -93,9 +93,9 @@ export function AppForm({ t, app, onSave, onCancel, saving, error, who }) {
         <Field t={t} label="Covering control" hint="what covers it instead, or the scan to schedule">{text("recommended_control")}</Field>
         <Field t={t} label="Why, in your words" span>{area("constraint_text")}</Field>
 
-        {group("DevSecOps integration", "Is the code in the DevSecOps pipeline: SAST, dependency (SCA) and secrets scans in the build, DAST where there is a web surface.")}
-        <Field t={t} label="Integration"><Select t={t} value={a.devsecops_integration} onChange={set("devsecops_integration")} options={DEVSECOPS} /></Field>
-        <Field t={t} label="Pipeline and checks" hint="which pipeline builds it and which checks run">{text("devsecops_detail")}</Field>
+        {group("DevSecOps integration", "Is the application on the BBH DevSecOps security pipeline (the shared Jenkins library): checkout, unit tests with coverage, Nexus IQ, SonarQube, AppScan SAST, and DAST where there is a web surface.")}
+        <Field t={t} label="Integration" hint="integrated: on the shared library with every stage green; partial: some stages or a local pipeline; not applicable: vendor binaries or SaaS"><Select t={t} value={a.devsecops_integration} onChange={set("devsecops_integration")} options={DEVSECOPS} /></Field>
+        <Field t={t} label="Pipeline and stages" hint="the Jenkins job and which stages run, e.g. unit tests, Nexus IQ, SonarQube, SAST, DAST">{text("devsecops_detail")}</Field>
 
         {group("Scan group decision", "Filled by the scan group, not the developer.")}
         <Field t={t} label="Decision on the constraint"><Select t={t} value={a.constraint_valid} onChange={set("constraint_valid")} options={VALID} /></Field>

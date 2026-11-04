@@ -67,7 +67,7 @@ HELP = {"app_class": "home-grown; vendor application whose code we manage; vendo
         "constraint_kind": "why the application scan does not apply; NONE means it should be scanned",
         "constraint_valid": "the scan group's decision on the constraint: YES accepted, NO scan it, TBD to review",
         "lifecycle": "ACTIVE, RETIRING (date in notes), RETIRED",
-        "devsecops_integration": "is the code in the DevSecOps pipeline: NONE, PARTIAL (some checks), INTEGRATED (SAST, SCA, secrets, DAST where it applies), NOT_APPLICABLE (vendor or SaaS)"}
+        "devsecops_integration": "on the BBH DevSecOps security pipeline (shared Jenkins library: checkout, unit tests, Nexus IQ, SonarQube, AppScan SAST, DAST for a web surface): NONE, PARTIAL (some stages or a local pipeline), INTEGRATED (every stage green), NOT_APPLICABLE (vendor binaries or SaaS)"}
 # a row must never carry an address or a host: the inventory names applications, not machines
 FORBIDDEN = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+|https?://|\b\d{1,3}(\.\d{1,3}){3}\b", re.I)
 
