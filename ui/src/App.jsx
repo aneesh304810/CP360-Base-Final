@@ -28,6 +28,7 @@ import Integration360Design from "./Integration360Design.jsx";
 import SecurityAdmin from "./SecurityAdmin.jsx";
 import Compare from "./Compare.jsx";
 import DataAnalysis from "./DataAnalysis.jsx";
+import Cyber360 from "./Cyber360.jsx";
 import ReleaseDelivery from "./ReleaseDelivery.jsx";
 import Login from "./Login.jsx";
 import { securityApi, allowed } from "./securityApi.js";
@@ -82,6 +83,7 @@ export default function App() {
  devops360: <DevOps360 t={t} />,
  odi360: <Odi360 t={t} />,
  pbnotify: <PbNotifications t={t} />,
+ cyber360: <Cyber360 t={t} />,
  release: <ReleaseDelivery t={t} />,
  variance: <Variance360 t={t} />,
  datasources: <AdminDatasources t={t} />,
