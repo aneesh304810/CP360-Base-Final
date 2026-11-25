@@ -33,6 +33,7 @@ const NAV_GROUPS = [
  ['pii', 'PII Explorer', '⚑'],
  ['guardrails', 'Quality Guardrails', '⚠'],
  ['cyber360', 'Cyber Security 360', '\u26E8'],
+ ['codereview', 'Code Review 360', '\u2611'],
  ['impact', 'Impact Analysis', '⚡'],
  ['variance', 'Variance 360', '≍'],
  ['recon', 'Recon 360', '⇄'],

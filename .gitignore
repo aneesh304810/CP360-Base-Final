@@ -11,3 +11,6 @@ local/secrets.ps1
 # the ODI repository export is BBH material — never committed, wherever it is put
 sample-artifacts/odi_export/
 **/odi_export/
+
+# CP 360 code review: local reviews and Copilot packs
+.codereview/

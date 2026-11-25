@@ -1,0 +1,7 @@
+version: 2
+models:
+  - name: fct_positions
+    columns:
+      - name: position_id
+      - name: quantity
+        description: Quantity held
