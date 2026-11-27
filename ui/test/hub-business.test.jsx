@@ -11,6 +11,7 @@ import path from "node:path";
 import HubBusiness, { HubViewToggle, PipelineCatalog } from "../src/HubBusiness.jsx";
 import HubDesign from "../src/HubDesign.jsx";
 import HubErrorPlay from "../src/HubErrorPlay.jsx";
+import HubSlides, { SLIDES, WITHOUT_HUB, WITH_HUB } from "../src/HubSlides.jsx";
 import { PLAYS, MOOD } from "../src/hubErrorPlays.js";
 import { ROLE, USES, GOVERNS, SOLVES, WITHOUT, I360, PIPELINE, STEP_DETAIL, DAG_DETAIL, POSITIONS_LINEAGE, SCENARIOS, businessMarkdown } from "../src/hubBusiness.js";
 import * as P from "../src/hubPipelines.js";
@@ -48,15 +49,24 @@ ok(PLAYS.length === 8 && playProblems.length === 0, "eight plays: every frame la
 ok(new Set(PLAYS.map((p) => p.channel)).size === 3 && PLAYS.some((p) => p.id === "silent-loader") && PLAYS.some((p) => p.id === "event-gap"), "files, events and the outbound loader each have a play");
 ok(!/testbbh|apps\.ocp|https?:\/\/|CPACC|PBDWHDBT|\.internal|[\w.+-]+@[\w-]+\.[\w.-]+/.test(JSON.stringify(PLAYS)), "no host, schema owner, link or address in the plays");
 
-console.log("-- the business view");
+console.log("-- the business view: a presentation");
+ok(SLIDES.length === 4 && SLIDES.map((x) => x.key).join() === "without,with,does,governs", "four slides: without a hub, with it, what it does, what it governs");
+ok(WITHOUT_HUB.jobs.length === 8 && ["RMJ schedule", "cron job", "shell script", "scheduler task", "interface app"].every((j) => WITHOUT_HUB.jobs.some((x) => x[0] === j)) && WITHOUT_HUB.callouts.length === 4, "the world without a hub names the RMJ schedules, cron jobs, scripts, schedulers and interface applications");
+ok(WITH_HUB.channels.length === 4 && WITH_HUB.inside.some((x) => /Error handling/.test(x[0])) && WITH_HUB.inside.some((x) => /Translation and contracts/.test(x[0])) && WITH_HUB.callouts.some((x) => /Plug and play/.test(x[0])) && WITH_HUB.callouts.some((x) => /One place to change/.test(x[0])) && WITH_HUB.callouts.some((x) => /Many to many/.test(x[0])), "the hub slide carries the four channels, error handling, translation and contracts, plug and play, one place to change, many to many");
 for (const [name, t] of [["light", tLight], ["dark", tDark]]) {
   const html = renderToStaticMarkup(<HubBusiness t={t} />);
-  ok(/business view/.test(html) && /The problem it solves/.test(html) && /WITHOUT A HUB/.test(html) && /WITH CP INTEGRATION HUB/.test(html) && /What it does/.test(html) && /Where it is used/.test(html) && /What it governs/.test(html), `${name}: purpose, problem and solution, what it does, where used, what it governs`);
-  ok((html.match(/<svg /g) || []).length === 2 && /sixteen connections/.test(html) && /CP INTEGRATION HUB/.test(html) && /1\. receive/.test(html) && /5\. publish/.test(html), `${name}: two diagrams (without, with) and the five verbs`);
-  ok(!/data-list="pipelines"/.test(html) && !/How the data moves|Where in the flow|Column lineage/.test(html) && !/data-play=/.test(html), `${name}: no pipeline list, flow, lineage or play on the first tab`);
+  ok(/business view/.test(html) && /data-slide="without"/.test(html) && /Without a hub/.test(html) && /RMJ schedule/.test(html) && /cron job/.test(html) && /interface app/.test(html) && /8 jobs for 5 sources and 5 destinations/.test(html), `${name}: opens on the without-a-hub slide with the jobs drawn`);
+  ok((html.match(/<svg /g) || []).length === 1 && /1 \/ 4/.test(html) && /Every pair is its own job/.test(html), `${name}: one diagram per slide, the slide counter and the callouts`);
+  ok(!/data-list="pipelines"/.test(html) && !/Where in the flow|Where in the data/.test(html) && !/data-play=/.test(html), `${name}: no pipeline list, flow, lineage or play on the first tab`);
   ok(/aria-selected="true"[^>]*>What it is/.test(html) && /Error handling</.test(html) && /Copy as Markdown/.test(html), `${name}: the two tabs and the copy button`);
   ok(!/\\u00b7/.test(html) && /\u00b7 business view/.test(html), `${name}: the middle dot is a character, not an escape`);
 }
+const s2 = renderToStaticMarkup(<HubSlides t={tLight} initial={{ slide: 1 }} />);
+ok(/data-slide="with"/.test(s2) && /INGESTION CHANNELS/.test(s2) && /Outbound loaders/.test(s2) && /Error handling/.test(s2) && /Translation and contracts/.test(s2) && /plug and play · one place to change · governed/.test(s2) && /Plug and play/.test(s2), "slide 2: the hub with its channels, error handling and translation inside, and the plug-and-play callouts");
+const s3 = renderToStaticMarkup(<HubSlides t={tLight} initial={{ slide: 2 }} />);
+ok(/data-slide="does"/.test(s3) && /1\. receive/.test(s3) && /5\. publish/.test(s3) && /Sensors and scheduling/.test(s3), "slide 3: the five verbs and where it is used");
+const s4 = renderToStaticMarkup(<HubSlides t={tLight} initial={{ slide: 3 }} />);
+ok(/data-slide="governs"/.test(s4) && /Shapes and change control/.test(s4) && /Governed/.test(s4) && /Code Review 360/.test(s4), "slide 4: what it governs and how");
 const errTab = renderToStaticMarkup(<HubBusiness t={tLight} initial={{ tab: "Error handling" }} />);
 ok(/data-tab="errors"/.test(errTab) && /data-play="quarantine"/.test(errTab) && /data-frame="0"/.test(errTab) && !/data-tab="what"/.test(errTab) && (errTab.match(/role="tab"/g) || []).length === 2 + PLAYS.length, "the Error handling tab opens on the first play with a tab per scenario");
 const mid = renderToStaticMarkup(<HubErrorPlay t={tLight} initial={{ play: "quarantine", frame: 2, running: false }} />);
@@ -115,7 +125,7 @@ ok(!/testbbh|apps\.ocp|https?:\/\/|CPACC|PBDWHDBT|\.internal|billing-sftp/.test(
 
 console.log("-- nothing that should not be shared, and the nav");
 const FORBID = /testbbh|apps\.ocp|https?:\/\/|CPACC|PBDWHDBT|:2483|\b2483\b|[\w.+-]+@[\w-]+\.[\w.-]+|ORACLE_PASSWORD/;
-const srcs = ["hubBusiness.js", "HubBusiness.jsx", "hubPipelines.js", "hubErrorPlays.js", "HubErrorPlay.jsx", "HubWires.jsx"].map((f) => fs.readFileSync(path.join(SRC, f), "utf8"));
+const srcs = ["hubBusiness.js", "HubBusiness.jsx", "hubPipelines.js", "hubErrorPlays.js", "HubErrorPlay.jsx", "HubWires.jsx", "HubSlides.jsx"].map((f) => fs.readFileSync(path.join(SRC, f), "utf8"));
 ok(srcs.every((s) => !FORBID.test(s)) && !FORBID.test(md), "no host, schema owner, database link, port, address or credential in the sources or the note", srcs.map((s) => (s.match(FORBID) || [""])[0]).join("|"));
 const shell = fs.readFileSync(path.join(SRC, "AppShell.jsx"), "utf8"), app = fs.readFileSync(path.join(SRC, "App.jsx"), "utf8"), gr = fs.readFileSync(path.join(SRC, "Guardrails.jsx"), "utf8");
 ok(!/Quality Guardrails/.test(shell) && /\['guardrails', 'Integration 360 - Run'/.test(shell) && /\['integration360', 'Integration 360 - Design'/.test(shell) && !/hubbusiness/.test(shell) && !/hubbusiness/.test(app), "Quality Guardrails is Integration 360 - Run; the readiness page is Integration 360 - Design; the business view is not a separate item");
@@ -127,9 +137,9 @@ const tog = renderToStaticMarkup(<HubViewToggle t={tLight} mode="business" onPic
 ok(/Technical view/.test(tog) && /aria-selected="true"[^>]*>Business view/.test(tog), "the hub page's toggle offers both views");
 store["cp360-hub-view"] = "business";
 const asBusiness = renderToStaticMarkup(<HubDesign t={tLight} />);
-ok(/The problem it solves/.test(asBusiness) && /Technical view/.test(asBusiness), "CP Integration Hub remembers the business view and shows it");
+ok(/Without a hub/.test(asBusiness) && /Technical view/.test(asBusiness), "CP Integration Hub remembers the business view and shows it");
 store["cp360-hub-view"] = "technical";
-ok(!/The problem it solves/.test(renderToStaticMarkup(<HubDesign t={tLight} />)), "and opens on the technical view otherwise");
+ok(!/Without a hub/.test(renderToStaticMarkup(<HubDesign t={tLight} />)), "and opens on the technical view otherwise");
 
 if (BAD) { console.log(`\n${BAD} assertion(s) failed`); process.exit(1); }
 console.log("\nhub-business assertions pass");

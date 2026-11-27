@@ -2,8 +2,9 @@ import React, { useState, useMemo } from "react";
 import { SectionHeader } from "./AppShell.jsx";
 import HubWires from "./HubWires.jsx";
 import HubErrorPlay from "./HubErrorPlay.jsx";
+import HubSlides from "./HubSlides.jsx";
 import { PLAYS } from "./hubErrorPlays.js";
-import { ROLE, USES, GOVERNS, SOLVES, WITHOUT, SEVERITY_COLOR, businessMarkdown } from "./hubBusiness.js";
+import { ROLE, SEVERITY_COLOR, businessMarkdown } from "./hubBusiness.js";
 import { PIPELINES, CHANNELS, byChannel, counts, statusOf, STATUS_COLOR, STATUS_WORD, pipelineView } from "./hubPipelines.js";
 
 // HubBusiness: CP Integration Hub for a business audience. Diagrams and tiles
@@ -227,72 +228,6 @@ export default function HubBusiness({ t, initial }) {
     setCopied("copied"); setTimeout(() => setCopied(""), 1500);
   };
 
-  /* without the hub: every source to every destination */
-  const Without = () => {
-    const L = WITHOUT.sources, R = WITHOUT.destinations;
-    return (
-      <svg viewBox="0 0 480 300" width="100%" style={{ display: "block" }} role="img" aria-label="without a hub: every source wired to every destination">
-        <Defs />
-        {L.map((l, i) => <Box key={l} x={16} y={30 + i * 62} w={140} h={40} label={l} kind="ext" />)}
-        {R.map((l, i) => <Box key={l} x={324} y={30 + i * 62} w={140} h={40} label={l} kind="acc" />)}
-        {L.map((_, i) => R.map((__, j) => <path key={`${i}-${j}`} d={`M156,${50 + i * 62} C240,${50 + i * 62} 240,${50 + j * 62} 324,${50 + j * 62}`} fill="none" stroke={(i + j) % 3 === 0 ? RED : MUTE} strokeWidth={1} opacity={0.55} strokeDasharray={(i + j) % 4 === 0 ? "3 3" : undefined} />))}
-        <text x={240} y={292} fontSize="9" fill={RED} textAnchor="middle">{WITHOUT.line}</text>
-      </svg>);
-  };
-  /* with the hub */
-  const Context = () => {
-    const W = 980, hubX = 330, hubW = 320, hubY = 20, hubH = 250;
-    return (
-      <svg viewBox={`0 0 ${W} 300`} width="100%" style={{ display: "block" }} role="img" aria-label="with the hub: sources, the hub and its consumers">
-        <Defs />
-        {ROLE.sources.map(([l, s], i) => <Box key={l} x={20} y={28 + i * 60} w={200} label={l} s={s} kind="ext" />)}
-        {ROLE.sources.map((_, i) => <Line key={i} d={`M220,${51 + i * 60} L${hubX},${51 + i * 60}`} m={i === 3 ? "hbArr" : "hbAcc"} dash={i === 2} />)}
-        <rect x={hubX} y={hubY} width={hubW} height={hubH} rx="10" fill={NAVY} />
-        <text x={hubX + hubW / 2} y={hubY + 24} fontSize="13" fontWeight="800" fill="#fff" textAnchor="middle">CP INTEGRATION HUB</text>
-        <text x={hubX + hubW / 2} y={hubY + 40} fontSize="9" fill="#a9c1de" textAnchor="middle">{ROLE.verbs.join(" \u00b7 ")}</text>
-        {ROLE.lanes.map(([l, d, c], i) => (
-          <g key={l}>
-            <rect x={hubX + 16} y={hubY + 54 + i * 46} width={hubW - 32} height={38} rx="6" fill="#ffffff14" stroke="#a9c1de55" />
-            <text x={hubX + 28} y={hubY + 70 + i * 46} fontSize="11" fontWeight="700" fill="#fff">{l}</text>
-            <text x={hubX + 28} y={hubY + 84 + i * 46} fontSize="8.5" fill="#a9c1de">{d}</text>
-            <text x={hubX + hubW - 28} y={hubY + 78 + i * 46} fontSize="9" fontWeight="700" fill="#8fd3c6" textAnchor="end">{c}</text>
-          </g>))}
-        {ROLE.consumers.map(([l, s], i) => <Box key={l} x={760} y={18 + i * 52} w={200} label={l} s={s} kind={i === 4 ? "mute" : "acc"} />)}
-        {ROLE.consumers.map((_, i) => <Line key={i} d={`M${hubX + hubW},${41 + i * 52} L760,${41 + i * 52}`} m={i === 4 ? "hbArr" : "hbAcc"} dash={i === 4} />)}
-        <text x={hubX + hubW / 2} y={292} fontSize="9" fill={MUTE} textAnchor="middle">every movement has a record: received, validated, loaded, reconciled, published</text>
-      </svg>);
-  };
-  /* what it does: five verbs */
-  const VERB_LINES = { receive: "events, files, loader requests and API calls, each with a record", validate: "structure, counts and required fields, at the door", translate: "SEI's shapes into BBH's, by one set of versioned rules", reconcile: "rows promised against rows loaded; the date closes only when complete", publish: "one stable shape per consumer: PBDW, Pivotal, IMDS, SEI" };
-  const Verbs = () => (
-    <div style={{ display: "grid", gridTemplateColumns: `repeat(${ROLE.verbs.length}, minmax(0,1fr))`, gap: 0 }}>
-      {ROLE.verbs.map((v, i) => (
-        <div key={v} style={{ position: "relative", padding: "12px 18px 12px 26px", background: i % 2 ? "#15224f" : NAVY, color: "#fff", clipPath: i === ROLE.verbs.length - 1 ? "polygon(0 0, 100% 0, 100% 100%, 0 100%, 12px 50%)" : "polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%)" }}>
-          <div style={{ fontSize: 13, fontWeight: 800, textTransform: "capitalize" }}>{i + 1}. {v}</div>
-          <div style={{ fontSize: 10.5, color: "#a9c1de", marginTop: 3, lineHeight: 1.4 }}>{VERB_LINES[v]}</div>
-        </div>))}
-    </div>);
-  const Tiles = ({ rows, cols = 3, icon }) => (
-    <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))`, gap: 12 }}>
-      {rows.map((r) => {
-        const [ic, h, b] = icon ? r : ["", r[0], r[1]];
-        return (
-          <div key={h} style={{ border: `1px solid ${th.border}`, borderRadius: 10, padding: "14px 16px", background: th.panel, display: "flex", gap: 12 }}>
-            {icon && <div style={{ width: 38, height: 38, borderRadius: 10, background: NAVY, color: "#fff", display: "grid", placeItems: "center", fontSize: 18, flex: "0 0 auto" }}>{ic}</div>}
-            <div><div style={{ fontWeight: 700, color: th.text, fontSize: 13 }}>{h}</div>
-              <div style={{ fontSize: 11.5, color: th.sub, marginTop: 3, lineHeight: 1.45 }}>{b}</div></div>
-          </div>);
-      })}
-    </div>);
-  const Solves = () => (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 12 }}>
-      {SOLVES.map(([problem, how]) => (
-        <div key={problem} style={{ border: `1px solid ${th.border}`, borderRadius: 10, background: th.panel, overflow: "hidden" }}>
-          <div style={{ padding: "10px 14px", background: "#fae0e2", color: "#8e1b2b", fontSize: 11.5, fontWeight: 700, lineHeight: 1.4 }}>{"\u2716"} {problem}</div>
-          <div style={{ padding: "10px 14px", fontSize: 11.5, color: th.text, lineHeight: 1.45 }}><span style={{ color: TEAL, fontWeight: 800 }}>{"\u2714"} </span>{how}</div>
-        </div>))}
-    </div>);
-
   return (
     <div>
       <SectionHeader t={t}>{ROLE.title}{" \u00b7 business view"}</SectionHeader>
@@ -306,23 +241,7 @@ export default function HubBusiness({ t, initial }) {
           {copied || "Copy as Markdown"}</span>
       </div>
 
-      {tab === "What it is" && <div data-tab="what">
-        <H t={t} hint="left: without a hub; right: with it">The problem it solves</H>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 12 }}>
-          <div style={{ border: `1px solid ${RED}55`, borderRadius: 12, padding: 12, background: th.panel }}><div style={{ fontSize: 11, fontWeight: 800, color: RED, marginBottom: 4 }}>WITHOUT A HUB</div><Without /></div>
-          <div style={{ border: `1px solid ${TEAL}`, borderRadius: 12, padding: 12, background: th.panel }}><div style={{ fontSize: 11, fontWeight: 800, color: TEAL, marginBottom: 4 }}>WITH CP INTEGRATION HUB</div><Context /></div>
-        </div>
-        <div style={{ marginTop: 12 }}><Solves /></div>
-
-        <H t={t} hint="five things, in order, to every movement">What it does</H>
-        <Verbs />
-
-        <H t={t}>Where it is used</H>
-        <Tiles rows={USES} icon />
-
-        <H t={t} hint="the hub is the source of truth for these; Lineage, Impact Analysis and Variance 360 read from it">What it governs</H>
-        <Tiles rows={GOVERNS} cols={4} />
-      </div>}
+      {tab === "What it is" && <div data-tab="what"><HubSlides t={t} initial={initial?.slide !== undefined ? { slide: initial.slide } : undefined} /></div>}
 
       {tab === "Error handling" && <div data-tab="errors">
         <H t={t} hint="pick a scenario and watch it play: where it goes wrong, how the hub handles it, how it is replayed">Error handling</H>
