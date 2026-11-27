@@ -1,0 +1,39 @@
+# Integration 360 poller: pull mode. Runs in the CP 360 namespace every few
+# minutes, asks Airflow's REST API over its in-cluster service, reads dbt's
+# artifacts from a shared volume, and posts to the CP 360 API. Placeholders in
+# angle brackets; nothing here is a real name or secret. Secrets come from a
+# Secret object, never from this file.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: i360-poller
+  namespace: <cp360-namespace>
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: poller
+              image: <cp360-api-image>
+              command: ["python", "integration/poll/i360_poller.py"]
+              env:
+                - { name: I360_API_URL, value: "http://<cp360-api-service>:8000" }
+                - { name: AIRFLOW_API_URL, value: "http://<airflow-webserver-service>.<airflow-namespace>.svc:8080/api/v1" }
+                - { name: I360_DAGS, value: "" }                      # empty: every active dag
+                - { name: I360_DBT_ARTIFACTS, value: "/artifacts" }   # the volume the dbt task writes target/ to
+                - { name: I360_POLL_STATE, value: "/state/i360_poll.json" }
+                - { name: AIRFLOW_API_USER, valueFrom: { secretKeyRef: { name: i360-poller, key: airflow-user } } }
+                - { name: AIRFLOW_API_PASSWORD, valueFrom: { secretKeyRef: { name: i360-poller, key: airflow-password } } }
+                - { name: I360_WEBHOOK_SECRET, valueFrom: { secretKeyRef: { name: i360-poller, key: webhook-secret } } }
+              volumeMounts:
+                - { name: artifacts, mountPath: /artifacts, readOnly: true }
+                - { name: state, mountPath: /state }
+          volumes:
+            - name: artifacts
+              persistentVolumeClaim: { claimName: <dbt-artifacts-pvc> }
+            - name: state
+              persistentVolumeClaim: { claimName: <i360-poller-state-pvc> }

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { SectionHeader } from "./AppShell.jsx";
 import HubWires from "./HubWires.jsx";
 import HubErrorPlay from "./HubErrorPlay.jsx";
@@ -6,6 +6,7 @@ import HubSlides from "./HubSlides.jsx";
 import { PLAYS } from "./hubErrorPlays.js";
 import { ROLE, SEVERITY_COLOR, businessMarkdown } from "./hubBusiness.js";
 import { PIPELINES, CHANNELS, byChannel, counts, statusOf, STATUS_COLOR, STATUS_WORD, pipelineView } from "./hubPipelines.js";
+import { integration360Api, mergeLive, caseFromFinding } from "./integration360Api.js";
 
 // HubBusiness: CP Integration Hub for a business audience. Diagrams and tiles
 // with one-line captions, then the pipeline catalogue (PipelineCatalog, also
@@ -65,13 +66,17 @@ const Dot = ({ status, size = 10 }) => <span style={{ display: "inline-block", w
 const Chip = ({ bg, fg, children }) => <span style={{ fontSize: 9.5, fontWeight: 800, padding: "2px 8px", borderRadius: 999, background: bg, color: fg, whiteSpace: "nowrap" }}>{children}</span>;
 
 /* ------------------------------------------------------------------ the catalogue */
-export function PipelineList({ t, open, onOpen }) {
+export function PipelineList({ t, open, onOpen, live }) {
   const th = useTheme(t);
-  const c = counts();
+  const merged = mergeLive(PIPELINES, live);
+  const liveStatusOf = (p) => { const m = merged.find((x) => x.id === p.id); return m && m.live ? m.live.status : null; };
+  const c = merged.reduce((a, p) => { const st = p.live ? p.live.status : statusOf(p); a[st] = (a[st] || 0) + 1; return a; }, { green: 0, amber: 0, red: 0, planned: 0 });
+  const nLive = merged.filter((p) => p.live).length;
   return (
     <div data-list="pipelines">
       <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", marginBottom: 10, fontSize: 11.5, color: th.sub }}>
         <b style={{ color: th.text }}>{PIPELINES.length} pipelines</b>
+        {nLive > 0 ? <Chip bg="#e6f4f2" fg={TEAL}>{nLive} LIVE</Chip> : <Chip bg="#f6f8fa" fg={MUTE}>illustrative until the first run reports</Chip>}
         {["green", "red", "amber", "planned"].filter((k) => c[k]).map((k) => <span key={k} style={{ display: "inline-flex", gap: 6, alignItems: "center" }}><Dot status={k} /> {c[k]} {STATUS_WORD[k]}</span>)}
         <span style={{ marginLeft: "auto" }}>click a pipeline to open it</span>
       </div>
@@ -83,8 +88,8 @@ export function PipelineList({ t, open, onOpen }) {
               <span style={{ marginLeft: "auto", fontSize: 10, color: "#a9c1de" }}>{ch.pipelines.length}</span>
             </div>
             {ch.pipelines.map((p) => {
-              const st = statusOf(p), on = open === p.id;
-              const cs = p.cases.map((x) => x.id);
+              const ls = liveStatusOf(p), st = ls || statusOf(p), on = open === p.id;
+              const cs = ls ? [] : p.cases.map((x) => x.id);
               return (
                 <div key={p.id} role="button" tabIndex={0} aria-pressed={on} data-pipeline={p.id} onClick={() => onOpen(p.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onOpen(p.id); }}
                   style={{ display: "grid", gridTemplateColumns: "14px 1fr auto", gap: 10, alignItems: "start", padding: "9px 12px", borderTop: `1px solid ${th.border}`, cursor: "pointer", background: on ? "#eaf1fb" : "transparent" }}>
@@ -94,6 +99,7 @@ export function PipelineList({ t, open, onOpen }) {
                       <b style={{ fontSize: 12.5, color: th.text }}>{p.name}</b>
                       <Chip bg={p.domain === "Accounting" ? "#e6f4f2" : "#f2eefa"} fg={p.domain === "Accounting" ? TEAL : "#6d3ac0"}>{p.domain}</Chip>
                       {p.planned && <Chip bg="#f6f8fa" fg={MUTE}>later</Chip>}
+                      {ls && <Chip bg="#e6f4f2" fg={TEAL}>LIVE</Chip>}
                     </div>
                     <div style={{ fontSize: 10.5, color: th.sub, marginTop: 2 }}>{p.source} <span style={{ color: TEAL }}>{"\u2192"}</span> {p.destination}{" \u00b7 "}{p.cadence}</div>
                     {cs.length > 0 && <div style={{ fontSize: 10.5, color: st === "amber" ? AMBER : RED, marginTop: 2, fontFamily: MONO }}>{cs.join(", ")}</div>}
@@ -109,12 +115,29 @@ export function PipelineList({ t, open, onOpen }) {
 export function PipelineCatalog({ t, initial }) {
   const th = useTheme(t);
   const [pid, setPid] = useState(initial?.pipeline || "file-pos");
+  const [live, setLive] = useState(initial?.live || null);          // /integration360/pipelines
+  const [findings, setFindings] = useState(initial?.findings || {}); // dag_id -> findings
+  useEffect(() => { if (initial?.live) return; integration360Api.pipelines().then(setLive).catch(() => setLive(null)); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const p = PIPELINES.find((x) => x.id === pid) || PIPELINES[0];
   const view = useMemo(() => pipelineView(p), [p]);
-  const status = statusOf(p);
+  const L = live && live.dags && p.dag_id ? live.dags[p.dag_id] : null;
+  useEffect(() => {
+    if (!L || !p.dag_id || findings[p.dag_id]) return;
+    integration360Api.findings(p.dag_id, { business_date: L.run && L.run.business_date }).then((r) => setFindings((f) => ({ ...f, [p.dag_id]: r.findings || [] }))).catch(() => {});
+  }, [L, p.dag_id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const liveCases = useMemo(() => {
+    if (!L) return [];
+    const fs = (findings[p.dag_id] || []).filter((f) => ["fail", "failed", "error", "warn"].includes(String(f.status)));
+    const ts = (L.failed_tasks || []).map((t) => ({ ...t, rule_kind: "airflow", status: t.state }));
+    const base = fs.length ? fs : (L.failing || []).concat(L.warnings || []);
+    return base.concat(ts).map((f) => caseFromFinding(f, p, view));
+  }, [L, findings, p, view]);
+  const status = L ? L.status : statusOf(p);
+  const cases = L ? liveCases : view.cases;
   const [scen, setScen] = useState(initial?.scenario || (view.cases[0] && view.cases[0].id) || null);
-  const S = view.cases.find((x) => x.id === scen) || view.cases[0] || null;
+  const S = cases.find((x) => x.id === scen) || cases[0] || null;
   const openPipeline = (id) => { const nv = pipelineView(PIPELINES.find((x) => x.id === id)); setPid(id); setScen(nv.cases[0] ? nv.cases[0].id : null); };
+  const lastRun = L && L.run ? `${L.run.state || ""}${L.run.business_date ? ` \u00b7 business date ${L.run.business_date}` : ""}${L.run.ended_at ? ` \u00b7 ended ${String(L.run.ended_at).slice(0, 16).replace("T", " ")}` : ""}` : "";
   const ch = CHANNELS[p.channel];
   const f = S ? S.flow : -1, fd = S ? S.dagTask : -1;
 
@@ -125,6 +148,8 @@ export function PipelineCatalog({ t, initial }) {
         <Chip bg="#eaf1fb" fg={BLUE}>{ch.name}</Chip>
         <Chip bg={p.domain === "Accounting" ? "#e6f4f2" : "#f2eefa"} fg={p.domain === "Accounting" ? TEAL : "#6d3ac0"}>{p.domain}</Chip>
         <span style={{ fontSize: 11, fontWeight: 700, color: STATUS_COLOR[status] }}>{STATUS_WORD[status]}</span>
+        {L ? <Chip bg="#e6f4f2" fg={TEAL}>LIVE</Chip> : <Chip bg="#f6f8fa" fg={MUTE}>illustrative</Chip>}
+        {L && <span data-last-run style={{ fontSize: 10.5, color: th.sub }}>last run {lastRun}{L.failed_tasks && L.failed_tasks.length ? ` \u00b7 ${L.failed_tasks.length} task${L.failed_tasks.length === 1 ? "" : "s"} failed` : ""}{L.failing && L.failing.length ? ` \u00b7 ${L.failing.length} check${L.failing.length === 1 ? "" : "s"} failing` : ""}</span>}
         <span style={{ marginLeft: "auto", fontSize: 11, color: th.sub }}>{p.source} <span style={{ color: TEAL }}>{"\u2192"}</span> {p.destination}{" \u00b7 "}{p.cadence}</span>
       </div>
       <div style={{ fontSize: 12.5, color: th.text, marginTop: 8, lineHeight: 1.5 }}>{p.business}</div>
@@ -177,8 +202,8 @@ export function PipelineCatalog({ t, initial }) {
         <Chip bg={SEVERITY_COLOR[S.severity]} fg="#fff">{S.severity.toUpperCase()}</Chip>
         <Chip bg="#ffffff22" fg="#fff">{S.kind}</Chip>
         <span style={{ fontSize: 10.5, color: "#a9c1de" }}>{S.engine}{" \u00b7 "}{S.dag}</span>
-        {view.cases.length > 1 && <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>{view.cases.map((x) => (
-          <span key={x.id} role="button" tabIndex={0} aria-pressed={x.id === S.id} onClick={() => setScen(x.id)} style={{ fontSize: 10, fontWeight: 700, padding: "2px 9px", borderRadius: 999, cursor: "pointer", background: x.id === S.id ? "#fff" : "transparent", color: x.id === S.id ? NAVY : "#fff", border: "1px solid #a9c1de" }}>{x.id}</span>))}</span>}
+        {cases.length > 1 && <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>{cases.map((x) => (
+          <span key={x.id} role="button" tabIndex={0} aria-pressed={x.id === S.id} onClick={() => setScen(x.id)} style={{ fontSize: 10, fontWeight: 700, padding: "2px 9px", borderRadius: 999, cursor: "pointer", background: x.id === S.id ? "#fff" : "transparent", color: x.id === S.id ? NAVY : "#fff", border: "1px solid #a9c1de", fontFamily: x.live ? MONO : "inherit" }}>{x.live ? (x.rule || x.id).slice(0, 40) : x.id}</span>))}</span>}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1.2fr", gap: 1, background: th.border }}>
         {col("The error", <div>
@@ -191,7 +216,7 @@ export function PipelineCatalog({ t, initial }) {
           <div><b>Column:</b> <span style={{ fontFamily: MONO }}>{S.column.split(":").slice(1).join(".")}</span> <span style={{ color: th.sub }}>(traced in the lineage below)</span></div>
           <div><b>Record:</b> {S.registry}</div></div>, AMBER)}
         {col("The issue, and what to do", <div style={{ fontSize: 11.5, color: th.text, lineHeight: 1.5 }}>
-          <div><b>Root cause.</b> {S.cause}</div>
+          <div><b>Root cause.</b> {S.cause || (S.live ? "Not written yet: type it against this finding and it is kept with the run." : "")}</div>
           <div style={{ marginTop: 6, color: TEAL, fontWeight: 600 }}>{S.i360}</div>
           <table style={{ borderCollapse: "collapse", fontSize: 10, fontFamily: MONO, marginTop: 8 }}>
             <thead><tr>{Object.keys(S.sample[0]).map((k) => <th key={k} style={{ textAlign: "left", color: th.sub, padding: "2px 8px 3px 0", fontWeight: 600 }}>{k}</th>)}</tr></thead>
@@ -200,7 +225,7 @@ export function PipelineCatalog({ t, initial }) {
       </div>
     </div>) : (
     <div data-healthy={p.id} style={{ border: `1px solid ${TEAL}`, borderLeft: `6px solid ${TEAL}`, borderRadius: 10, marginTop: 12, padding: "12px 16px", background: th.panel, fontSize: 12, color: th.text }}>
-      <b style={{ color: TEAL }}>{p.planned ? "Not live yet." : "Nothing wrong today."}</b> {p.planned ? "Shown so the shape is agreed before it is built." : "Every step on the path completed and reconciled; the latest business date is closed."}
+      <b style={{ color: TEAL }}>{p.planned ? "Not live yet." : "Nothing wrong today."}</b> {p.planned ? "Shown so the shape is agreed before it is built." : L ? `The latest run ${lastRun}: every task completed and every check passed.` : "Every step on the path completed and reconciled; the latest business date is closed."}
     </div>);
 
   const BadRecords = () => {
@@ -231,7 +256,7 @@ export function PipelineCatalog({ t, initial }) {
   return (
     <div>
       <H t={t} hint="green is healthy; red says what is wrong, where, and why">Pipelines</H>
-      <PipelineList t={t} open={p.id} onOpen={openPipeline} />
+      <PipelineList t={t} open={p.id} onOpen={openPipeline} live={live} />
       <Header />
       <Record />
       <BadRecords />

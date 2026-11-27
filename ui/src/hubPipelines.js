@@ -161,7 +161,7 @@ const fileEdges = (cols, stg, stgMap, required) => [
 /* ---------------- the catalogue ---------------- */
 const CASE = (id, flow, dagTask, column) => ({ id, flow, dagTask, column });
 export const PIPELINES = [
-  { id: "evt-txn", name: "Intraday transactions", channel: "event", domain: "Accounting", source: "SEI SDC Event Hub", destination: "PBDW, IMDS", cadence: "continuous micro-batches", volume: "about 40k events a day", owner: "CP Data Ops", consumers: ["PBDW", "IMDS"],
+  { id: "evt-txn", dag_id: "swp_transactions_events", name: "Intraday transactions", channel: "event", domain: "Accounting", source: "SEI SDC Event Hub", destination: "PBDW, IMDS", cadence: "continuous micro-batches", volume: "about 40k events a day", owner: "CP Data Ops", consumers: ["PBDW", "IMDS"],
     business: "Every trade, settlement and cash movement SEI books reaches BBH within minutes, so the books, the client reporting and the intraday cash view agree with SEI during the day, not only after the overnight file.",
     raw: "STG1_TRANSACTION", stg: "stg_transaction_header", int: "int_transaction", target: "PBDW TRANSACTION", targetShort: "PBDW", required: ["transaction_id", "transaction_type", "trade_date", "settlement_date", "transaction_currency"],
     join: "Joined to the account and the instrument the other feeds described.", intFail: ["account not found", "The transaction carries forward without its account and is counted.", "Visible in the counts, never invented."],
@@ -178,7 +178,7 @@ export const PIPELINES = [
         ["C:int_transaction.transaction_id", "T:TRANSACTION_KEY", "ren", "surrogate", "PBDW key from the sequence"], ["C:int_transaction.account_id", "T:ACCOUNT_ID", "phys"], ["C:int_transaction.amount", "T:AMOUNT", "phys"], ["C:int_transaction.trade_date", "T:TRADE_DATE", "phys"]] },
     focus: "C:stg_transaction_header.amount", cases: [] },
 
-  { id: "evt-acct", name: "Account changes", channel: "event", domain: "Non-accounting", source: "SEI SDC Event Hub", destination: "IMDS, PBDW", cadence: "continuous micro-batches", volume: "about 2k events a day", owner: "CP Data Ops", consumers: ["IMDS", "PBDW"],
+  { id: "evt-acct", dag_id: "swp_account_events", name: "Account changes", channel: "event", domain: "Non-accounting", source: "SEI SDC Event Hub", destination: "IMDS, PBDW", cadence: "continuous micro-batches", volume: "about 2k events a day", owner: "CP Data Ops", consumers: ["IMDS", "PBDW"],
     business: "When an account opens, closes, changes name, base currency or disposition method at SEI, BBH's reference data follows the same day, so onboarding, statements and entitlements work from the current picture.",
     raw: "STG1_ACCOUNT", stg: "stg_account", int: "int_account", target: "IMDS ACCOUNT", targetShort: "IMDS", required: ["account_number", "account_display_name", "account_id", "account_base_currency", "default_disposition_method"],
     join: "Linked to the client and the portfolio group.", intFail: ["client not found", "The account is kept with the client empty and counted.", "Visible, not invented."],
@@ -194,13 +194,13 @@ export const PIPELINES = [
         ["C:int_account.account_id", "T:ACCOUNT_ID", "phys"], ["C:int_account.account_number", "T:ACCOUNT_NUMBER", "phys"], ["C:int_account.base_currency", "T:BASE_CCY", "ren", "renamed"]] },
     focus: "C:int_account.account_id", cases: [] },
 
-  { id: "file-pos", name: "End-of-day positions", channel: "file", domain: "Accounting", source: "SEI SWP file EOD_POSITIONS", destination: "IMDS holding", cadence: "daily, standby to the events", volume: "about 210k rows a day", owner: "CP Data Ops", consumers: ["IMDS", "PBDW"], files: 38,
+  { id: "file-pos", dag_id: "swp_positions_processing", name: "End-of-day positions", channel: "file", domain: "Accounting", source: "SEI SWP file EOD_POSITIONS", destination: "IMDS holding", cadence: "daily, standby to the events", volume: "about 210k rows a day", owner: "CP Data Ops", consumers: ["IMDS", "PBDW"], files: 38,
     business: "The authoritative end-of-day position per account and instrument, the baseline the daily reconciliation and the client valuations are measured against.",
     file: "EOD_POSITIONS_<yyyymmdd>.out", raw: "RAW_EOD_POSITIONS", stg: "stg_eod_positions", int: "int_position", target: "IMDS holding", targetShort: "IMDS", required: ["account_number", "taxlot_portfolio_id", "instrument_id", "trd_instrument_id"],
     join: "Joined to accounts, assets and tax lots.", intFail: ["account not found", "The join leaves the account empty; the row is held or carried, as the model decides.", "Visible in the counts."], rows: [],
     cases: [CASE("soda-001", 0, 1, "DWH:IMDS holding:AS_OF_DATE"), CASE("dbt-002", 4, 5, "STG2:int_position:account_id")] },
 
-  { id: "file-cash", name: "Cash balances", channel: "file", domain: "Accounting", source: "SEI SWP file RECCASHACTIVITIES", destination: "IMDS cash summary", cadence: "daily", volume: "about 15k rows a day", owner: "CP Data Ops", consumers: ["IMDS", "Treasury reporting"], files: 1,
+  { id: "file-cash", dag_id: "swp_cash_processing", name: "Cash balances", channel: "file", domain: "Accounting", source: "SEI SWP file RECCASHACTIVITIES", destination: "IMDS cash summary", cadence: "daily", volume: "about 15k rows a day", owner: "CP Data Ops", consumers: ["IMDS", "Treasury reporting"], files: 1,
     business: "Each account's cash by currency, converted to USD with the day's rates, so cash reporting, overdraft checks and the client statements show one agreed balance.",
     file: "RECCASHACTIVITIES_<yyyymmdd>.out", raw: "RAW_REC_CASH_ACTIVITIES", stg: "stg_cash_activity", int: "int_cash_balance", target: "IMDS gld_cash_summary", targetShort: "IMDS", required: ["account_number", "currency", "cash_balance_local"],
     join: "Joined to the day's FX rates to express every balance in USD.", intFail: ["no FX rate for the currency", "cash_balance_usd is NULL for those rows; the not-null check fails on the gold table.", "Three accounts in an exotic currency show no USD balance until the rate arrives."],
@@ -215,7 +215,7 @@ export const PIPELINES = [
         ["C:int_cash_balance.account_number", "T:ACCOUNT_NUMBER", "phys"], ["C:int_cash_balance.cash_balance_usd", "T:CASH_BALANCE_USD", "phys", "", "NOT NULL expected here"], ["C:stg_cash_activity.business_date", "T:AS_OF_DATE", "ren", "renamed"]] },
     focus: "C:int_cash_balance.cash_balance_usd", cases: [CASE("ge-001", 4, 5, "C:int_cash_balance.cash_balance_usd")] },
 
-  { id: "file-fee", name: "Fee accrual", channel: "file", domain: "Accounting", source: "SEI SWP file FEECOMPUTATION", destination: "IMDS fee accrual", cadence: "daily", volume: "about 9k rows a day", owner: "CP Data Ops", consumers: ["IMDS", "Billing"], files: 1,
+  { id: "file-fee", dag_id: "swp_fee_accrual", name: "Fee accrual", channel: "file", domain: "Accounting", source: "SEI SWP file FEECOMPUTATION", destination: "IMDS fee accrual", cadence: "daily", volume: "about 9k rows a day", owner: "CP Data Ops", consumers: ["IMDS", "Billing"], files: 1,
     business: "The fee each account accrues for the day under its fee schedule, the figure billing invoices from and finance accrues, so it must be right to the basis point.",
     file: "FEECOMPUTATION_<yyyymmdd>.out", raw: "RAW_FEE_COMPUTATION", stg: "stg_fee_computation", int: "int_fee_accrual", target: "IMDS gld_fee_accrual", targetShort: "IMDS", required: ["account_number", "fee_schedule_id", "fee_rate", "fee_base_usd"],
     join: "Rate applied to the fee base from the fee schedule.", intFail: ["rate out of range", "The day's total is outside its 30-day band; the anomaly check fails.", "A schedule loaded as a percentage instead of basis points inflates 47 accounts' fees."],
@@ -229,7 +229,7 @@ export const PIPELINES = [
         ["C:int_fee_accrual.account_number", "T:ACCOUNT_NUMBER", "phys"], ["C:int_fee_accrual.accrued_fee_usd", "T:ACCRUED_FEE_USD", "phys", "", "the daily total is checked against its 30-day band"], ["C:stg_fee_computation.business_date", "T:AS_OF_DATE", "ren", "renamed"]] },
     focus: "C:int_fee_accrual.accrued_fee_usd", cases: [CASE("soda-002", 4, 5, "C:int_fee_accrual.accrued_fee_usd")] },
 
-  { id: "file-acct", name: "Accounts and clients", channel: "file", domain: "Non-accounting", source: "SEI SWP files ACCOUNTS, CLIENTS, CLIENTACCOUNTLINK", destination: "PBDW dim_account", cadence: "daily", volume: "about 48k rows a day", owner: "CP Data Ops", consumers: ["PBDW", "IMDS", "Entitlements"], files: 3,
+  { id: "file-acct", dag_id: "swp_account_processing", name: "Accounts and clients", channel: "file", domain: "Non-accounting", source: "SEI SWP files ACCOUNTS, CLIENTS, CLIENTACCOUNTLINK", destination: "PBDW dim_account", cadence: "daily", volume: "about 48k rows a day", owner: "CP Data Ops", consumers: ["PBDW", "IMDS", "Entitlements"], files: 3,
     business: "The master list of accounts and the clients they belong to, which every other pipeline joins to: a wrong or duplicated account here shows up everywhere.",
     file: "ACCOUNTS_<yyyymmdd>.out", raw: "RAW_ACCOUNTS", stg: "stg_account", int: "int_account", target: "PBDW dim_account", targetShort: "PBDW", required: ["account_number", "account_display_name", "account_id", "account_base_currency", "default_disposition_method"],
     join: "Linked to the client through the client-account link file; deduplicated on the account number.", intFail: ["duplicate account_number", "dbt's uniqueness test fails on the merge key; the model does not publish.", "The same account twice after a mid-day amendment: the dedupe key lacked the amendment sequence."],
@@ -242,7 +242,7 @@ export const PIPELINES = [
         ["C:int_account.account_number", "T:ACCOUNT_NUMBER", "phys", "", "unique(account_number) is tested here"], ["C:int_account.account_id", "T:ACCOUNT_KEY", "ren", "surrogate"], ["C:int_account.service_tier", "T:SERVICE_TIER", "phys"]] },
     focus: "C:int_account.account_number", cases: [CASE("dbt-001", 4, 5, "C:int_account.account_number")] },
 
-  { id: "file-ca", name: "Corporate actions", channel: "file", domain: "Non-accounting", source: "SEI SWP file UPCOMING_ACTIVITIES", destination: "IMDS corporate actions", cadence: "daily", volume: "about 3k rows a day", owner: "CP Data Ops", consumers: ["IMDS", "Operations"], files: 1,
+  { id: "file-ca", dag_id: "swp_corporate_actions", name: "Corporate actions", channel: "file", domain: "Non-accounting", source: "SEI SWP file UPCOMING_ACTIVITIES", destination: "IMDS corporate actions", cadence: "daily", volume: "about 3k rows a day", owner: "CP Data Ops", consumers: ["IMDS", "Operations"], files: 1,
     business: "Dividends, splits, mergers and other events on the instruments clients hold, so operations can act on them and valuations reflect them on the right date.",
     file: "UPCOMING_ACTIVITIES_<yyyymmdd>.out", raw: "RAW_UPCOMING_ACTIVITIES", stg: "stg_corporate_action", int: "int_corporate_action", target: "IMDS corporate_action", targetShort: "IMDS", required: ["asset_id", "action_type", "ex_date"],
     join: "The action type is mapped through the accepted set; the asset is joined to the instrument.", intFail: ["action type outside the set", "The rows are flagged for review; the model builds without them.", "A new type from SEI waits for the mapping table."],
@@ -255,7 +255,7 @@ export const PIPELINES = [
         ["C:int_corporate_action.instrument_id", "T:INSTRUMENT_ID", "phys"], ["C:int_corporate_action.action_type_cd", "T:ACTION_TYPE", "phys"], ["C:int_corporate_action.ex_date", "T:EX_DATE", "phys"]] },
     focus: "C:stg_corporate_action.action_type", cases: [CASE("ge-002", 3, 4, "C:stg_corporate_action.action_type")] },
 
-  { id: "file-taxlot", name: "Tax lots", channel: "file", domain: "Accounting", source: "SEI SWP file TAXLOTS", destination: "IMDS tax lot", cadence: "daily", volume: "about 400k rows a day", owner: "CP Data Ops", consumers: ["IMDS", "Tax reporting"], files: 1,
+  { id: "file-taxlot", dag_id: "swp_taxlots_processing", name: "Tax lots", channel: "file", domain: "Accounting", source: "SEI SWP file TAXLOTS", destination: "IMDS tax lot", cadence: "daily", volume: "about 400k rows a day", owner: "CP Data Ops", consumers: ["IMDS", "Tax reporting"], files: 1,
     business: "Every open lot with its cost basis and acquisition date, which realised gains, tax reporting and the disposition method depend on.",
     file: "TAXLOTS_<yyyymmdd>.out", raw: "RAW_TAXLOT", stg: "stg_taxlot", int: "int_taxlot", target: "IMDS taxlot", targetShort: "IMDS", required: ["taxlot_id", "portfolio_id", "trade_date", "instrument_id"],
     join: "Joined to the portfolio and the instrument.", intFail: ["instrument not found", "The lot is kept with the instrument empty and counted.", "Visible, not invented."],
@@ -268,7 +268,7 @@ export const PIPELINES = [
         ["C:int_taxlot.taxlot_id", "T:TAXLOT_ID", "phys"], ["C:int_taxlot.account_id", "T:ACCOUNT_ID", "phys"], ["C:int_taxlot.cost_basis", "T:COST_BASIS", "phys"], ["C:int_taxlot.acquired", "T:ACQUIRED_DATE", "ren", "renamed"]] },
     focus: "C:int_taxlot.cost_basis", cases: [] },
 
-  { id: "api-status", name: "Loader status callback", channel: "api", domain: "Non-accounting", source: "SEI (calls the hub's endpoint)", destination: "submission registry; Integration 360", cadence: "per submission, as SEI processes it", volume: "a few hundred calls a day", owner: "Integration Hub", consumers: ["Integration 360", "the submitting consumer"],
+  { id: "api-status", dag_id: "loader_status_callback", name: "Loader status callback", channel: "api", domain: "Non-accounting", source: "SEI (calls the hub's endpoint)", destination: "submission registry; Integration 360", cadence: "per submission, as SEI processes it", volume: "a few hundred calls a day", owner: "Integration Hub", consumers: ["Integration 360", "the submitting consumer"],
     business: "The first API in production: SEI tells BBH what happened to each file BBH sent. It is how a consumer learns a batch was accepted, partly rejected or refused without anyone watching a mailbox.",
     requestLine: "SEI posts a status transition for a submission id, with counts and an error summary",
     rows: [{ submission_id: "SUB-20261127-0007", status: "PARTIALLY_PROCESSED", processed: "1,180", rejected: "60", message_id: "M-99812" }, { submission_id: "SUB-20261127-0007 (known)", status: "PARTIALLY_PROCESSED (valid transition)", schema: "ok" }, { submission_id: "SUB-20261127-0007", status: "PARTIALLY_PROCESSED", source: "notify", message_id: "M-99812", received_at: "14:21:07" }, { response: "202 Accepted", correlation: "SUB-20261127-0007", next: "poll confirms; detail file expected" }],
@@ -281,14 +281,14 @@ export const PIPELINES = [
         ["C:submission_status.message_id", "T:http_status", "direct", "202", "after the durable write"], ["C:submission_status.submission_id", "T:correlation_id", "phys"]] },
     focus: "C:submission.current_status", cases: [] },
 
-  { id: "api-lookup", name: "Account lookup (SWP API)", channel: "api", domain: "Non-accounting", source: "BBH screens (call SEI through the gateway)", destination: "the calling screen", cadence: "on demand", volume: "not yet", owner: "Integration Hub", consumers: ["CP 360", "Operations screens"], planned: true,
+  { id: "api-lookup", dag_id: "", name: "Account lookup (SWP API)", channel: "api", domain: "Non-accounting", source: "BBH screens (call SEI through the gateway)", destination: "the calling screen", cadence: "on demand", volume: "not yet", owner: "Integration Hub", consumers: ["CP 360", "Operations screens"], planned: true,
     business: "Later: look up an account's current state at SEI on demand instead of waiting for the next file or event. Not Day 1.",
     requestLine: "a BBH screen asks for an account by number", rows: [{ account_number: "ACCT-0001" }, { account_number: "ACCT-0001", schema: "ok" }, { request_id: "R-1", cached_until: "+5 min" }, { response: "200", fields: "name, base currency, status" }],
     spec: { labels: { SRC: "Request", STG1: "Gateway", STG2: "Cache", DWH: "Response" }, src: ["lookup request", [Tx("account_number")]], landing: ["gateway log", [V("caller", 40), V("route", 60), V("decision", 10)]], conformed: [["lookup_cache", [V("account_number"), D("cached_until")]]], target: ["response", [Nn("http_status"), V("account_display_name", 200), ["base_currency", "CHAR", 3]]],
       edges: [["S:account_number", "C:lookup_cache.account_number", "direct", "", "cached for a few minutes"], ["C:lookup_cache.account_number", "T:account_display_name", "phys", "", "from SEI's answer"], ["C:lookup_cache.account_number", "T:base_currency", "phys"], ["L:decision", "T:http_status", "direct"]] },
     focus: "T:account_display_name", cases: [] },
 
-  { id: "out-fee", name: "Fee file to billing", channel: "outbound", domain: "Accounting", source: "Billing (BBH consumer)", destination: "SEI, through the gateway", cadence: "daily after the fee accrual closes", volume: "about 9k rows a day", owner: "Integration Hub", consumers: ["Billing"], consumer: "Billing", template: "FEE_ACCRUAL loader template",
+  { id: "out-fee", dag_id: "swp_fee_loader_outbound", name: "Fee file to billing", channel: "outbound", domain: "Accounting", source: "Billing (BBH consumer)", destination: "SEI, through the gateway", cadence: "daily after the fee accrual closes", volume: "about 9k rows a day", owner: "Integration Hub", consumers: ["Billing"], consumer: "Billing", template: "FEE_ACCRUAL loader template",
     business: "The day's accrued fees go back to SEI as a loader file so SEI's billing agrees with BBH's accrual. Billing learns per record what SEI accepted.",
     rows: [{ account_number: "ACC-33021", accrued_fee_usd: "421.88", business_date: "2026-11-27" }, { ACCOUNT: "ACC-33021", FEE_AMT: "421.88", CCY: "USD", template_version: "v1.24" }, { submission_id: "SUB-20261127-0007", state: "SUBMITTED" }, { submission_id: "SUB-20261127-0007", status: "ACCEPTED", source: "notify" }, { record: "ACC-33021", outcome: "ACCEPTED" }, { callback: "Billing", outcome: "PROCESSED 8,900 of 8,900" }],
     spec: { labels: CHANNELS.outbound.labels, src: ["billing request", [Tx("account_number"), Tx("accrued_fee_usd"), Tx("business_date")]], landing: ["FEE_ACCRUAL loader file", [V("ACCOUNT"), V("FEE_AMT", 40), ["CCY", "CHAR", 3], V("TEMPLATE_VERSION", 10)]],
@@ -300,7 +300,7 @@ export const PIPELINES = [
         ["C:submission.submission_id", "T:submission_id", "phys"], ["C:submission.current_status", "T:outcome", "phys"], ["C:submission.rows_sent", "T:accepted", "ren", "sent minus rejected"], ["C:submission.rows_rejected", "T:rejected", "phys"]] },
     focus: "C:submission.submission_id", cases: [CASE("af-001", 2, 2, "C:submission.submission_id")] },
 
-  { id: "out-model", name: "Model allocation instructions", channel: "outbound", domain: "Non-accounting", source: "Portfolio management (BBH consumer)", destination: "SEI, through the gateway", cadence: "on request", volume: "a few batches a week", owner: "Integration Hub", consumers: ["Portfolio management"], consumer: "Portfolio management", template: "MODELALLOC loader template",
+  { id: "out-model", dag_id: "swp_modelalloc_loader_outbound", name: "Model allocation instructions", channel: "outbound", domain: "Non-accounting", source: "Portfolio management (BBH consumer)", destination: "SEI, through the gateway", cadence: "on request", volume: "a few batches a week", owner: "Integration Hub", consumers: ["Portfolio management"], consumer: "Portfolio management", template: "MODELALLOC loader template",
     business: "Target allocations for model portfolios go to SEI as a loader file; portfolio managers learn per model which allocations SEI accepted before trading on them.",
     rows: [{ model_id: "MDL-12", instrument_id: "INS-7781", target_pct: "12.5" }, { MODEL: "MDL-12", SECURITY: "INS-7781", PCT: "12.50", template_version: "v9" }, { submission_id: "SUB-20261127-0012", state: "SUBMITTED" }, { submission_id: "SUB-20261127-0012", status: "PROCESSED", source: "notify" }, { record: "MDL-12 / INS-7781", outcome: "ACCEPTED" }, { callback: "Portfolio management", outcome: "PROCESSED 48 of 48" }],
     spec: { labels: CHANNELS.outbound.labels, src: ["allocation request", [Tx("model_id"), Tx("instrument_id"), Tx("target_pct")]], landing: ["MODELALLOC loader file", [V("MODEL", 40), V("SECURITY"), V("PCT", 10), V("TEMPLATE_VERSION", 10)]],

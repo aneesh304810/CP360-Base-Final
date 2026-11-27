@@ -16,6 +16,7 @@ import { PLAYS, MOOD } from "../src/hubErrorPlays.js";
 import { ROLE, USES, GOVERNS, SOLVES, WITHOUT, I360, PIPELINE, STEP_DETAIL, DAG_DETAIL, POSITIONS_LINEAGE, SCENARIOS, businessMarkdown } from "../src/hubBusiness.js";
 import * as P from "../src/hubPipelines.js";
 import HubWires, { wireLayout, tracePath, hopsFor, wiresCsv } from "../src/HubWires.jsx";
+import { mergeLive, caseFromFinding } from "../src/integration360Api.js";
 
 let BAD = 0;
 const ok = (c, m, got = "") => { console.log((c ? "ok   " : "FAIL ") + m + (c ? "" : `  -> ${String(got).slice(0, 220)}`)); if (!c) BAD += 1; };
@@ -132,9 +133,34 @@ const green = renderToStaticMarkup(<PipelineCatalog t={tLight} initial={{ pipeli
 ok(/data-healthy="evt-txn"/.test(green) && /Nothing wrong today/.test(green) && !/data-record=/.test(green) && !/data-bad-records=/.test(green) && !/failed here/.test(green), "a green pipeline says nothing is wrong, shows no bad records and its path clean");
 ok(!/testbbh|apps\.ocp|https?:\/\/|CPACC|PBDWHDBT|\.internal|billing-sftp/.test(JSON.stringify(P.PIPELINES)), "no host, schema owner, link or address in the catalogue");
 
+console.log("-- live records from Airflow and dbt");
+ok(P.PIPELINES.filter((p) => p.dag_id).length === 11 && P.PIPELINES.find((p) => p.id === "file-pos").dag_id === "swp_positions_processing", "every live pipeline has the dag id the ingest keys on; the planned API has none");
+const LIVE = { dags: { swp_positions_processing: { status: "red", run: { run_key: "swp_positions_processing:r1", state: "failed", business_date: "2026-11-27", ended_at: "2026-11-27T22:10:00" },
+  failed_tasks: [{ task_key: "k1", task_id: "load_file", state: "failed", try_number: 2, error_code: "TRAILER_COUNT_MISMATCH", error_detail: "ValueError: TRAILER_COUNT_MISMATCH trailer=12480 rows=12479" }], failing: [], warnings: [], tasks_total: 8, tests_total: 0 },
+  swp_transactions_events: { status: "green", run: { run_key: "swp_transactions_events:r9", state: "success", business_date: "2026-11-27" }, failed_tasks: [], failing: [], warnings: [], tasks_total: 8, tests_total: 12 } } };
+const merged = mergeLive(P.PIPELINES, LIVE);
+ok(merged.find((p) => p.id === "file-pos").live.status === "red" && merged.find((p) => p.id === "evt-txn").live.status === "green" && merged.find((p) => p.id === "file-cash").live === null, "live status lays over the pipelines that have reported; the rest stay illustrative");
+const posView = P.pipelineView(P.PIPELINES.find((p) => p.id === "file-pos"));
+const finding = { test_key: "swp_positions_processing:inv1:test.x", run_key: "swp_positions_processing:inv1", rule_kind: "dbt_test", model_name: "stg_eod_positions", test_name: "not_null", column_name: "account_number", status: "fail", failures: 3, total_rows: 12480, expected: "not_null(account_number)", observed: "3 failing rows", threshold: "0", message: "Got 3 results", business_date: "2026-11-27", bad_rows: [{ FILE_ROW_NUMBER: 41, ACCOUNT_NUMBER: null, INSTRUMENT_ID: "INS-1" }] };
+const lc = caseFromFinding(finding, P.PIPELINES.find((p) => p.id === "file-pos"), posView);
+ok(lc.live && lc.rule === "not_null" && lc.column === "STG2:stg_eod_positions:account_number" && lc.kind === "Transformation tests" && lc.records.rows.length === 1 && lc.records.columns[0] === "FILE_ROW_NUMBER" && lc.bad === 3 && lc.total === 12480, "a dbt finding becomes a case: the column found in the pipeline's graph, the rows it carried as bad records", JSON.stringify(lc).slice(0, 200));
+const tc = caseFromFinding({ ...LIVE.dags.swp_positions_processing.failed_tasks[0], rule_kind: "airflow", status: "failed", run_key: "swp_positions_processing:r1" }, P.PIPELINES.find((p) => p.id === "file-pos"), posView);
+ok(tc.rule === "TRAILER_COUNT_MISMATCH" && tc.dagTask === 2 && tc.kind === "Orchestration" && /none/.test(Object.keys(tc.records).join()), "a failed task becomes a case on its DAG task with the loader's code");
+const liveHtml = renderToStaticMarkup(<PipelineCatalog t={tLight} initial={{ pipeline: "file-pos", live: LIVE, findings: { swp_positions_processing: [finding] } }} />);
+ok(/2 LIVE/.test(liveHtml) && /data-last-run/.test(liveHtml) && /business date 2026-11-27/.test(liveHtml) && /1 task failed/.test(liveHtml) && /not_null/.test(liveHtml) && /TRAILER_COUNT_MISMATCH/.test(liveHtml) && /row 41/.test(liveHtml) && !/soda-001/.test(liveHtml),
+   "with live records the page shows LIVE, the last run, the dbt finding and the failed task as cases, and the bad row by file row number; the illustrative case is gone");
+const liveGreen = renderToStaticMarkup(<PipelineCatalog t={tLight} initial={{ pipeline: "evt-txn", live: LIVE }} />);
+ok(/data-healthy="evt-txn"/.test(liveGreen) && /The latest run success/.test(liveGreen), "a live green pipeline says its latest run was clean");
+const noLive = renderToStaticMarkup(<PipelineCatalog t={tLight} initial={{ pipeline: "file-cash", live: LIVE }} />);
+ok(/data-record="ge-001"/.test(noLive) && /illustrative/.test(noLive), "a pipeline that has not reported keeps its illustrative case and says so");
+const ing = fs.readFileSync(path.join(SRC, "..", "..", "api", "app", "routers_integration360.py"), "utf8"), main = fs.readFileSync(path.join(SRC, "..", "..", "api", "app", "main.py"), "utf8"), sql = fs.readFileSync(path.join(SRC, "..", "..", "sql", "90_integration360.sql"), "utf8");
+ok(/routers_integration360/.test(main) && /\/ingest\/airflow/.test(ing) && /\/ingest\/dbt/.test(ing) && /\/badrows/.test(ing) && /CREATE TABLE i360_run/.test(sql) && /CREATE TABLE i360_test/.test(sql) && /EXCEPTION_INIT\(e_exists, -955\)/.test(sql), "the API is mounted, the ingest endpoints exist, the tables are guarded");
+const cb = fs.readFileSync(path.join(SRC, "..", "..", "integration", "airflow", "i360_callbacks.py"), "utf8"), poll = fs.readFileSync(path.join(SRC, "..", "..", "integration", "poll", "i360_poller.py"), "utf8"), np = fs.readFileSync(path.join(SRC, "..", "..", "deploy", "openshift", "i360-allow-airflow.yaml"), "utf8");
+ok(!/testbbh|apps\.ocp|\.bbh\.com|@bbh/.test(cb + poll + np + ing) && /<cp360-namespace>/.test(np) && /<airflow-namespace>/.test(np), "no real host, namespace or address in the hooks, the poller or the network policy: placeholders only");
+
 console.log("-- nothing that should not be shared, and the nav");
 const FORBID = /testbbh|apps\.ocp|https?:\/\/|CPACC|PBDWHDBT|:2483|\b2483\b|[\w.+-]+@[\w-]+\.[\w.-]+|ORACLE_PASSWORD/;
-const srcs = ["hubBusiness.js", "HubBusiness.jsx", "hubPipelines.js", "hubErrorPlays.js", "HubErrorPlay.jsx", "HubWires.jsx", "HubSlides.jsx"].map((f) => fs.readFileSync(path.join(SRC, f), "utf8"));
+const srcs = ["hubBusiness.js", "HubBusiness.jsx", "hubPipelines.js", "hubErrorPlays.js", "HubErrorPlay.jsx", "HubWires.jsx", "HubSlides.jsx", "integration360Api.js"].map((f) => fs.readFileSync(path.join(SRC, f), "utf8"));
 ok(srcs.every((s) => !FORBID.test(s)) && !FORBID.test(md), "no host, schema owner, database link, port, address or credential in the sources or the note", srcs.map((s) => (s.match(FORBID) || [""])[0]).join("|"));
 const shell = fs.readFileSync(path.join(SRC, "AppShell.jsx"), "utf8"), app = fs.readFileSync(path.join(SRC, "App.jsx"), "utf8"), gr = fs.readFileSync(path.join(SRC, "Guardrails.jsx"), "utf8");
 ok(!/Quality Guardrails/.test(shell) && /\['guardrails', 'Integration 360 - Run'/.test(shell) && /\['integration360', 'Integration 360 - Design'/.test(shell) && !/hubbusiness/.test(shell) && !/hubbusiness/.test(app), "Quality Guardrails is Integration 360 - Run; the readiness page is Integration 360 - Design; the business view is not a separate item");

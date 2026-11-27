@@ -1,0 +1,24 @@
+# Integration 360 ingest: let the Airflow namespace reach the CP 360 API.
+# Same cluster, different namespaces: the callbacks post to the API's Service
+# by its in-cluster name (http://<cp360-api-service>.<cp360-namespace>.svc:8000),
+# so no Route and no external exposure. Only needed when the CP 360 namespace
+# has a default-deny ingress policy. Replace the three placeholders; nothing
+# here is a real name.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: i360-allow-airflow
+  namespace: <cp360-namespace>
+spec:
+  podSelector:
+    matchLabels:
+      app: <cp360-api-app-label>
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: <airflow-namespace>
+      ports:
+        - protocol: TCP
+          port: 8000

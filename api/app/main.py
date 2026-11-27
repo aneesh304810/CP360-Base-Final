@@ -88,6 +88,7 @@ for _mod in (
         "routers_pbnotify_review",
         "routers_cyber360",
         "routers_codereview",
+        "routers_integration360",
         ):
     try:
         _m = __import__(f"app.{_mod}", fromlist=["router"])
