@@ -119,8 +119,17 @@ const tr = tracePath(cashView.graph, "STG2:int_cash_balance:cash_balance_usd");
 ok(tr.up.has("SRC:RECCASHACTIVITIES file:CASH_BALANCE_LOCAL") && tr.up.has("STG2:stg_fx_rate:fx_rate") && tr.down.has("DWH:IMDS gld_cash_summary:CASH_BALANCE_USD") && !tr.ns.has("STG2:stg_cash_activity.dq_status_cd"), "the trace reaches back to the file column and the FX rate and forward to the published column, and leaves the rest dim");
 const csv = wiresCsv(cashView.graph);
 ok(csv.split("\n").length === cashView.graph.edges.length + 1 && /^from_table,from_column,to_table,to_column,operation,label,rule/.test(csv), "export CSV: one row per column link");
+console.log("-- the bad records");
+ok(SCENARIOS.every((x) => x.records && (x.records.none || (x.records.rows && x.records.rows.length && x.records.columns[0] === "FILE_ROW_NUMBER" && x.records.rows.every((r) => r.length === x.records.columns.length) && x.records.bad.every((b) => x.records.columns.includes(b)) && x.records.table && x.records.total))),
+   "every case carries its bad records: the rows with the loader's row number, the failing field named, the table and the file total; or says why there are none");
+ok(/data-bad-records="ge-001"/.test(cash) && /Bad records from the file/.test(cash) && /row 2,114/.test(cash) && /row 12,090/.test(cash) && /RAW_REC_CASH_ACTIVITIES/.test(cash) && /FILE_REGISTRY_ID 4471/.test(cash) && /no FX rate for XPF/.test(cash) && /of 15,204 rows/.test(cash) && /copy as CSV/.test(cash),
+   "the cash case lists its three bad rows by file row number from the RAW table, with the reason and the total");
+const noFile = renderToStaticMarkup(<PipelineCatalog t={tLight} initial={{ pipeline: "file-pos", scenario: "soda-001" }} />);
+ok(/data-bad-records="soda-001"/.test(noFile) && /No file arrived, so there are no records to show/.test(noFile) && !/copy as CSV/.test(noFile), "a missing file says there are no records, and why");
+const dup = renderToStaticMarkup(<PipelineCatalog t={tLight} initial={{ pipeline: "file-acct" }} />);
+ok(/row 3,310/.test(dup) && /row 3,311/.test(dup) && /8 more pairs/.test(dup) && /later amendment/.test(dup), "the duplicate-account case shows the pairs with the amendment sequence and how many more there are");
 const green = renderToStaticMarkup(<PipelineCatalog t={tLight} initial={{ pipeline: "evt-txn" }} />);
-ok(/data-healthy="evt-txn"/.test(green) && /Nothing wrong today/.test(green) && !/data-record=/.test(green) && !/failed here/.test(green), "a green pipeline says nothing is wrong and shows its path clean");
+ok(/data-healthy="evt-txn"/.test(green) && /Nothing wrong today/.test(green) && !/data-record=/.test(green) && !/data-bad-records=/.test(green) && !/failed here/.test(green), "a green pipeline says nothing is wrong, shows no bad records and its path clean");
 ok(!/testbbh|apps\.ocp|https?:\/\/|CPACC|PBDWHDBT|\.internal|billing-sftp/.test(JSON.stringify(P.PIPELINES)), "no host, schema owner, link or address in the catalogue");
 
 console.log("-- nothing that should not be shared, and the nav");

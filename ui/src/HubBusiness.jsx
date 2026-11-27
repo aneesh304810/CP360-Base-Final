@@ -203,12 +203,38 @@ export function PipelineCatalog({ t, initial }) {
       <b style={{ color: TEAL }}>{p.planned ? "Not live yet." : "Nothing wrong today."}</b> {p.planned ? "Shown so the shape is agreed before it is built." : "Every step on the path completed and reconciled; the latest business date is closed."}
     </div>);
 
+  const BadRecords = () => {
+    if (!S || !S.records) return null;
+    const R = S.records;
+    const copyCsv = () => { try { navigator.clipboard?.writeText([R.columns.join(",")].concat(R.rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))).join("\n")); } catch { /* no clipboard */ } };
+    return (
+      <div data-bad-records={S.id} style={{ border: `1px solid ${th.border}`, borderLeft: `6px solid ${RED}`, borderRadius: 10, marginTop: 12, background: th.panel, overflow: "hidden" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 14px", borderBottom: `1px solid ${th.border}`, flexWrap: "wrap" }}>
+          <b style={{ fontSize: 12.5, color: th.text }}>Bad records from the file</b>
+          {R.rows && <><span style={{ fontSize: 11, color: th.sub }}><b style={{ color: RED }}>{S.bad.toLocaleString()}</b> of {R.total.toLocaleString()} rows{R.more ? ` \u00b7 showing ${R.rows.length}, ${R.more}` : ""}</span>
+            <span style={{ fontSize: 10.5, color: th.sub, fontFamily: MONO }}>{R.table}{" \u00b7 "}{R.registry}</span>
+            <span role="button" tabIndex={0} onClick={copyCsv} style={{ marginLeft: "auto", fontSize: 10.5, fontWeight: 700, padding: "4px 10px", borderRadius: 5, border: `1px solid ${th.border}`, cursor: "pointer", color: th.text }}>copy as CSV</span></>}
+        </div>
+        {R.none ? <div style={{ padding: "12px 14px", fontSize: 12, color: th.text }}>{R.none}</div> : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: MONO }}>
+              <thead><tr>{R.columns.map((c) => <th key={c} style={{ textAlign: "left", padding: "6px 10px", color: th.sub, fontWeight: 700, fontSize: 9.5, textTransform: c === "reason" ? "uppercase" : "none", letterSpacing: c === "reason" ? 0.4 : 0, borderBottom: `1px solid ${th.border}`, background: R.bad.includes(c) ? "#fae0e2" : "transparent" }}>{c}</th>)}</tr></thead>
+              <tbody>{R.rows.map((r, i) => (
+                <tr key={i}>{r.map((v, j) => { const c = R.columns[j]; const isBad = R.bad.includes(c) || /^null$/.test(String(v)); return (
+                  <td key={j} style={{ padding: "6px 10px", borderBottom: `1px solid ${th.border}`, color: isBad ? RED : c === "reason" ? th.sub : th.text, fontWeight: isBad ? 700 : j === 0 ? 400 : 500, fontFamily: c === "reason" ? "inherit" : MONO, fontSize: c === "reason" ? 11 : 11, background: isBad ? "#fae0e21a" : "transparent" }}>{j === 0 ? `row ${Number(v).toLocaleString()}` : String(v)}</td>); })}</tr>))}</tbody>
+            </table>
+          </div>)}
+        {R.rows && <div style={{ padding: "6px 14px 10px", fontSize: 10.5, color: th.sub }}>Row numbers are the loader's FILE_ROW_NUMBER, so each record is found in the file and in RAW. The rows are kept with their reason; nothing is dropped.</div>}
+      </div>);
+  };
+
   return (
     <div>
       <H t={t} hint="green is healthy; red says what is wrong, where, and why">Pipelines</H>
       <PipelineList t={t} open={p.id} onOpen={openPipeline} />
       <Header />
       <Record />
+      <BadRecords />
       <H t={t} hint="the step that failed is red; everything after it waits">Where in the flow</H>
       <div style={{ border: `1px solid ${th.border}`, borderRadius: 12, padding: "12px 12px 0", background: th.panel }}><Flow /><Dag /></div>
       <H t={t} hint="one box per table, a wire per column; the failed column is red and its path is lit">Where in the data</H>
