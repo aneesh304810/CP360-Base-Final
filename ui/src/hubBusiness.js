@@ -32,6 +32,14 @@ export const GOVERNS = [
   ["Data variance", "Promised against loaded, today against yesterday, pushed status against poll."],
 ];
 
+export const SOLVES = [
+  ["Every system wired to every other", "One doorway. SEI's events, files and loaders meet BBH's systems in one place, so a change at either end is absorbed once, not once per connection."],
+  ["Nobody can say whether the day is complete", "Every movement has a record and a business date. A date closes only when every expected interface is in, loaded and reconciled."],
+  ["Each consumer translates for itself", "One set of rules, versioned and tested in the hub. Consumers read a stable published shape; Lineage, Impact and Variance read the same rules."],
+  ["Errors found by the consumer, after the fact", "Caught at the door with a reason code: quarantined, held or failed, never published short. Integration 360 shows what, where and why."],
+];
+export const WITHOUT = { sources: ["SEI events", "SEI files", "SEI APIs", "BBH consumers"], destinations: ["PBDW", "Pivotal DB", "IMDS", "SEI"], line: "sixteen connections, sixteen translations, sixteen places to break; no one record of the day" };
+
 export const I360 = {
   line: "Integration 360 - Run takes the place of Quality Guardrails, and the readiness view becomes Integration 360 - Design under Architecture. Run shows the same four signals, from the hub's own records, by interface and business date.",
   rows: [
@@ -87,18 +95,21 @@ export const PIPELINE = {
 };
 
 /** The page as Markdown, for a note to the business. */
-export function businessMarkdown() {
+export function businessMarkdown(plays) {
   const o = [`# ${ROLE.title}: the business view`, "", ROLE.line, "", `What it does: ${ROLE.verbs.join(" \u00b7 ")}.`, ""];
-  o.push("## Where it is used", "");
+  o.push("## The problem it solves", "");
+  SOLVES.forEach(([h, b]) => o.push(`- **${h}.** ${b}`));
+  o.push("", "## Where it is used", "");
   USES.forEach(([, h, b]) => o.push(`- **${h}.** ${b}`));
   o.push("", "## What it governs", "");
   GOVERNS.forEach(([h, b]) => o.push(`- **${h}.** ${b}`));
   o.push("", "## Integration 360 - Run in place of Quality Guardrails", "", I360.line, "");
   I360.rows.forEach(([h, b]) => o.push(`- **${h}:** ${b}`));
-  o.push("", `## ${PIPELINE.title}`, "", `File: ${PIPELINE.file}`, "", "Flow: " + PIPELINE.flow.map((f) => f[0]).join(" \u2192 "), "",
-    "DAG: " + PIPELINE.dag.map((d) => d[0]).join(" \u2192 "), "", "Lineage: " + PIPELINE.lineage.map((l) => l[0]).join(" \u2192 "), "",
-    "| Scenario | State and reason | The business sees | Integration 360 shows |", "|---|---|---|---|");
-  PIPELINE.errors.forEach((e) => o.push(`| ${e[0]} | ${e[1]} | ${e[2]} | ${e[3]} |`));
+  if (plays && plays.length) {
+    o.push("", "## Error handling", "");
+    plays.forEach((p) => o.push(`- **${p.title}.** ${p.summary}`));
+  }
+  o.push("");
   return o.join("\n");
 }
 

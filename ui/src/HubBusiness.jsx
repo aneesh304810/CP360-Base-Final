@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from "react";
 import { SectionHeader } from "./AppShell.jsx";
 import LineageGraph from "./LineageGraph.jsx";
-import { ROLE, USES, GOVERNS, I360, SEVERITY_COLOR, businessMarkdown } from "./hubBusiness.js";
+import HubErrorPlay from "./HubErrorPlay.jsx";
+import { PLAYS } from "./hubErrorPlays.js";
+import { ROLE, USES, GOVERNS, SOLVES, WITHOUT, SEVERITY_COLOR, businessMarkdown } from "./hubBusiness.js";
 import { PIPELINES, CHANNELS, byChannel, counts, statusOf, STATUS_COLOR, STATUS_WORD, pipelineView } from "./hubPipelines.js";
 
 // HubBusiness: CP Integration Hub for a business audience. Diagrams and tiles
@@ -109,20 +111,13 @@ export function PipelineCatalog({ t, initial }) {
   const p = PIPELINES.find((x) => x.id === pid) || PIPELINES[0];
   const view = useMemo(() => pipelineView(p), [p]);
   const status = statusOf(p);
-  const [sel, setSel] = useState(initial?.sel || { kind: "flow", i: (initial?.scenario && view.cases.find((x) => x.id === initial.scenario)?.flow) ?? 1 });
-  const [fail, setFail] = useState(!!initial?.fail || !!initial?.scenario);
-  const [scen, setScen] = useState(initial?.scenario || null);
-  const S = scen ? view.cases.find((x) => x.id === scen) : null;
-  const openPipeline = (id) => { const np = PIPELINES.find((x) => x.id === id); const nv = pipelineView(np); const first = nv.cases[0]; setPid(id); setScen(first ? first.id : null); setFail(!!first); setSel({ kind: "flow", i: first ? first.flow : 1 }); };
-  const pickFlow = (i) => { setSel({ kind: "flow", i }); setScen(null); };
-  const pickDag = (i) => { setSel({ kind: "dag", i }); setScen(null); };
-  const pickScen = (id) => { const x = view.cases.find((y) => y.id === id); if (!x) return; setScen(id); setFail(true); setSel({ kind: "flow", i: x.flow }); };
-  const isSel = (kind, i) => sel.kind === kind && sel.i === i;
-  const failedAt = (kind) => S ? (kind === "flow" ? S.flow : S.dagTask) : (fail && sel.kind === kind ? sel.i : -1);
+  const [scen, setScen] = useState(initial?.scenario || (view.cases[0] && view.cases[0].id) || null);
+  const S = view.cases.find((x) => x.id === scen) || view.cases[0] || null;
+  const openPipeline = (id) => { const nv = pipelineView(PIPELINES.find((x) => x.id === id)); setPid(id); setScen(nv.cases[0] ? nv.cases[0].id : null); };
   const graph = useMemo(() => (S ? { ...view.graph, focus: S.column } : view.graph), [S, view]);
   const ch = CHANNELS[p.channel];
+  const f = S ? S.flow : -1, fd = S ? S.dagTask : -1;
 
-  /* ---- header: the business details ---- */
   const Header = () => (
     <div data-pipeline-open={p.id} style={{ border: `1px solid ${th.border}`, borderLeft: `6px solid ${STATUS_COLOR[status]}`, borderRadius: 10, background: th.panel, padding: "14px 18px", marginTop: 14 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -130,244 +125,126 @@ export function PipelineCatalog({ t, initial }) {
         <Chip bg="#eaf1fb" fg={BLUE}>{ch.name}</Chip>
         <Chip bg={p.domain === "Accounting" ? "#e6f4f2" : "#f2eefa"} fg={p.domain === "Accounting" ? TEAL : "#6d3ac0"}>{p.domain}</Chip>
         <span style={{ fontSize: 11, fontWeight: 700, color: STATUS_COLOR[status] }}>{STATUS_WORD[status]}</span>
+        <span style={{ marginLeft: "auto", fontSize: 11, color: th.sub }}>{p.source} <span style={{ color: TEAL }}>{"\u2192"}</span> {p.destination}{" \u00b7 "}{p.cadence}</span>
       </div>
-      <div style={{ fontSize: 13, color: th.text, margin: "8px 0 10px", lineHeight: 1.5 }}>{p.business}</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0,1fr))", gap: 10, fontSize: 11 }}>
-        {[["From", p.source], ["To", p.destination], ["How", `${ch.dir} \u00b7 ${p.cadence}`], ["Volume", p.volume], ["Read by", p.consumers.join(", ")]].map(([k, v]) => (
-          <div key={k}><div style={{ fontSize: 9.5, fontWeight: 800, color: th.sub, textTransform: "uppercase", letterSpacing: 0.4 }}>{k}</div><div style={{ color: th.text }}>{v}</div></div>))}
-      </div>
+      <div style={{ fontSize: 12.5, color: th.text, marginTop: 8, lineHeight: 1.5 }}>{p.business}</div>
     </div>);
 
-  /* ---- the flow ---- */
   const Flow = () => {
     const n = view.flow.length, w = 120, gap = 20, x0 = 20;
     const X = (i) => x0 + i * (w + gap);
-    const f = failedAt("flow");
-    const kindOf = (i) => f >= 0 && i === f ? "bad" : f >= 0 && i > f ? "mute" : i === 0 || i === n - 1 ? "ext" : i === 2 ? "acc" : "box";
+    const kindOf = (i) => f >= 0 && i === f ? "bad" : f >= 0 && i > f ? "mute" : "acc";
     return (
-      <svg viewBox="0 0 1000 230" width="100%" style={{ display: "block" }} role="img" aria-label="pipeline flow">
+      <svg viewBox="0 0 1000 140" width="100%" style={{ display: "block" }} role="img" aria-label="where in the flow">
         <Defs />
         {view.flow.map(([l, s], i) => (
           <g key={l}>
-            <Box x={X(i)} y={30} w={w} h={52} label={l} s={f >= 0 && i > f ? "waits" : f === i ? "failed here" : ""} kind={kindOf(i)} on={() => pickFlow(i)} selected={isSel("flow", i)} />
-            <foreignObject x={X(i) - 6} y={88} width={w + 12} height={44}>
+            <Box x={X(i)} y={20} w={w} h={52} label={l} s={f >= 0 && i > f ? "waits" : f === i ? "failed here" : "ok"} kind={kindOf(i)} />
+            <foreignObject x={X(i) - 6} y={78} width={w + 12} height={56}>
               <div style={{ fontSize: 8.5, color: MUTE, textAlign: "center", lineHeight: 1.3 }}>{s}</div></foreignObject>
-            {i < n - 1 && <Line d={`M${X(i) + w},56 L${X(i + 1)},56`} m={f >= 0 && i >= f ? "hbArr" : "hbAcc"} dash={f >= 0 && i >= f} />}
+            {i < n - 1 && <Line d={`M${X(i) + w},46 L${X(i + 1)},46`} m={f >= 0 && i >= f ? "hbArr" : "hbAcc"} dash={f >= 0 && i >= f} />}
           </g>))}
-        {view.branches.map(([at, l, s], i) => (
-          <g key={l}>
-            <Line d={`M${X(at) + w / 2},126 L${X(at) + w / 2},152`} m={i === 0 ? "hbRed" : "hbAmb"} dash />
-            <Box x={X(at)} y={152} w={w} h={36} label={l} kind={i === 0 ? "bad" : "warn"} selected={f === at} />
-            <foreignObject x={X(at) - 6} y={192} width={w + 12} height={36}>
-              <div style={{ fontSize: 8.5, color: i === 0 ? RED : AMBER, textAlign: "center", lineHeight: 1.3 }}>{s}</div></foreignObject>
-          </g>))}
-        <text x={X(0)} y={18} fontSize="9" fill={MUTE}>{p.file || p.requestLine || p.template || ""}</text>
-        <text x={980} y={18} fontSize="9" fill={MUTE} textAnchor="end">click a box</text>
       </svg>);
   };
-
-  /* ---- the DAG ---- */
   const Dag = () => {
     const n = view.dag.length, w = Math.min(104, Math.floor((960 - (n - 1) * 20) / n)), gap = 20, x0 = 20;
     const X = (i) => x0 + i * (w + gap);
-    const f = failedAt("dag");
-    const fill = (i) => f === i ? "#fae0e2" : f >= 0 && i > f ? "#f6f8fa" : /wait|sensor|box_microbatch/.test(view.dag[i][0] + view.dag[i][1]) ? "#fdf1d8" : /load|pull/.test(view.dag[i][0]) ? "#e6f4f2" : /dbt/.test(view.dag[i][0]) ? "#eaf1fb" : "#fff";
-    const stroke = (i) => f === i ? RED : f >= 0 && i > f ? "#b8c4ce" : /wait|sensor|box_microbatch/.test(view.dag[i][0] + view.dag[i][1]) ? AMBER : /load|pull/.test(view.dag[i][0]) ? TEAL : BLUE;
     return (
-      <svg viewBox="0 0 1000 128" width="100%" style={{ display: "block" }} role="img" aria-label="airflow dag">
+      <svg viewBox="0 0 1000 70" width="100%" style={{ display: "block" }} role="img" aria-label="which task">
         <Defs />
-        {view.dag.map(([l, s], i) => (
-          <g key={l} onClick={() => pickDag(i)} style={{ cursor: "pointer" }} role="button">
-            <rect x={X(i)} y={20} width={w} height={40} rx="20" fill={fill(i)} stroke={isSel("dag", i) ? NAVY : stroke(i)} strokeWidth={isSel("dag", i) ? 2.6 : 1.4} strokeDasharray={f >= 0 && i > f ? "5 4" : undefined} />
-            <text x={X(i) + w / 2} y={f === i || (f >= 0 && i > f) ? 40 : 44} fontSize="9.5" fontWeight="700" fill={NAVY} textAnchor="middle">{l}</text>
-            {f === i && <text x={X(i) + w / 2} y={52} fontSize="8" fontWeight="700" fill={RED} textAnchor="middle">failed</text>}
-            {f >= 0 && i > f && <text x={X(i) + w / 2} y={52} fontSize="8" fill={MUTE} textAnchor="middle">upstream_failed</text>}
-            <foreignObject x={X(i) - 8} y={66} width={w + 16} height={56}>
-              <div style={{ fontSize: 8.5, color: MUTE, textAlign: "center", lineHeight: 1.3 }}>{s}</div></foreignObject>
-            {i < n - 1 && <Line d={`M${X(i) + w},40 L${X(i + 1)},40`} dash={f >= 0 && i >= f} />}
+        {view.dag.map(([l], i) => (
+          <g key={l}>
+            <rect x={X(i)} y={14} width={w} height={40} rx="20" fill={fd === i ? "#fae0e2" : fd >= 0 && i > fd ? "#f6f8fa" : "#e6f4f2"} stroke={fd === i ? RED : fd >= 0 && i > fd ? "#b8c4ce" : TEAL} strokeWidth={fd === i ? 2.2 : 1.4} strokeDasharray={fd >= 0 && i > fd ? "5 4" : undefined} />
+            <text x={X(i) + w / 2} y={fd === i || (fd >= 0 && i > fd) ? 32 : 38} fontSize="9.5" fontWeight="700" fill={NAVY} textAnchor="middle">{l}</text>
+            {fd === i && <text x={X(i) + w / 2} y={46} fontSize="8" fontWeight="700" fill={RED} textAnchor="middle">failed</text>}
+            {fd >= 0 && i > fd && <text x={X(i) + w / 2} y={46} fontSize="8" fill={MUTE} textAnchor="middle">upstream_failed</text>}
+            {i < n - 1 && <Line d={`M${X(i) + w},34 L${X(i + 1)},34`} dash={fd >= 0 && i >= fd} />}
           </g>))}
       </svg>);
   };
 
-  /* ---- the panel under a selected box ---- */
-  const KV = ({ row, dim }) => (
-    <table style={{ borderCollapse: "collapse", fontSize: 10.5, fontFamily: MONO, width: "100%" }}><tbody>
-      {Object.entries(row || {}).map(([k, v]) => (
-        <tr key={k}><td style={{ padding: "2px 8px 2px 0", color: dim ? MUTE : th.sub, whiteSpace: "nowrap", verticalAlign: "top" }}>{k}</td>
-          <td style={{ padding: "2px 0", color: dim ? MUTE : th.text, fontWeight: dim ? 400 : 600 }}>{String(v)}</td></tr>))}
+  const KVs = ({ rows }) => (
+    <table style={{ fontSize: 10.5, borderCollapse: "collapse" }}><tbody>
+      {rows.map(([k, v]) => <tr key={k}><td style={{ color: th.sub, padding: "2px 10px 2px 0", textTransform: "uppercase", fontSize: 9.5, letterSpacing: 0.3, whiteSpace: "nowrap", verticalAlign: "top" }}>{k}</td><td style={{ color: th.text, fontFamily: MONO }}>{v}</td></tr>)}
     </tbody></table>);
-  const Panel = () => {
-    const head = (title, right) => (
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: NAVY, color: "#fff", borderRadius: "10px 10px 0 0" }}>
-        <b style={{ fontSize: 12.5 }}>{title}</b><span style={{ flex: 1 }} />{right}</div>);
-    const failSwitch = (
-      <span role="switch" aria-checked={fail} tabIndex={0} onClick={() => { setFail(!fail); if (fail) setScen(null); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setFail(!fail); }}
-        style={{ fontSize: 11, fontWeight: 700, padding: "4px 12px", borderRadius: 999, cursor: "pointer", background: fail ? RED : "#ffffff22", border: `1px solid ${fail ? RED : "#a9c1de"}`, color: "#fff" }}>
-        {S ? `${S.id}: ${S.rule}` : fail ? "showing a failure here" : "show a failure here"}</span>);
-    const col = (title, body, bg) => (
-      <div style={{ padding: "12px 14px", background: bg || th.panel, minWidth: 0 }}>
-        <div style={{ fontSize: 10, fontWeight: 800, color: th.sub, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>{title}</div>{body}</div>);
-    if (sel.kind === "dag") {
-      const d = view.dagDetail[sel.i];
-      return (
-        <div data-panel="dag" style={{ border: `1px solid ${th.border}`, borderRadius: 10, overflow: "hidden", marginTop: 10 }}>
-          {head(`Task ${sel.i + 1} of ${view.dagDetail.length}: ${d.task}`, failSwitch)}
-          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr", gap: 1, background: th.border }}>
-            {col("What the task does", <div style={{ fontSize: 11.5, color: th.text, lineHeight: 1.5 }}>{d.does}</div>)}
-            {col("If it fails", <div style={{ fontSize: 11.5, color: th.text, lineHeight: 1.5 }}><span style={{ color: RED, fontWeight: 700 }}>task failed. </span>{d.onFail}</div>, fail ? "#fae0e21a" : undefined)}
-            {col("Then", <div style={{ fontSize: 11.5, color: th.text, lineHeight: 1.5 }}><div><b>Retry:</b> {d.retry}</div><div style={{ marginTop: 4 }}><b>Downstream:</b> <span style={{ color: MUTE }}>{d.downstream}</span></div></div>)}
-          </div>
-        </div>);
-    }
-    const d = view.steps[sel.i], prev = sel.i > 0 ? view.steps[sel.i - 1] : null;
-    if (!d) return null;
-    return (
-      <div data-panel="flow" style={{ border: `1px solid ${th.border}`, borderRadius: 10, overflow: "hidden", marginTop: 10 }}>
-        {head(`Step ${sel.i + 1} of ${view.steps.length}: ${d.step}`, failSwitch)}
-        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.1fr 1.1fr", gap: 1, background: th.border }}>
-          {col("What happens here", <div>
-            <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11.5, color: th.text, lineHeight: 1.5 }}>{d.does.map((x) => <li key={x}>{x}</li>)}</ul>
-            <div style={{ fontSize: 10.5, color: th.sub, marginTop: 8 }}><b>In:</b> {d.in}</div>
-            <div style={{ fontSize: 10.5, color: th.sub }}><b>Out:</b> {d.out}</div></div>)}
-          {col("The sample row, before and after", <div>
-            {prev && prev.row && <><div style={{ fontSize: 9.5, color: MUTE, marginBottom: 2 }}>before ({prev.step})</div><KV row={prev.row} dim /><div style={{ color: TEAL, fontSize: 14, margin: "4px 0" }}>{"\u2193"}</div></>}
-            <div style={{ fontSize: 9.5, color: TEAL, marginBottom: 2 }}>after ({d.step})</div><KV row={d.row} /></div>)}
-          {col("If it fails here", <div style={{ fontSize: 11.5, lineHeight: 1.45 }}>
-            {d.fails.map(([code, then, biz], i) => (
-              <div key={code} style={{ marginBottom: 8, paddingLeft: 8, borderLeft: `3px solid ${fail && i === 0 ? RED : th.border}` }}>
-                <div style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: RED }}>{code}</div>
-                <div style={{ color: th.text }}>{then}</div>
-                <div style={{ color: th.sub, fontSize: 11 }}>{biz}</div></div>))}
-          </div>, fail ? "#fae0e21a" : undefined)}
-        </div>
-      </div>);
-  };
-
-  /* ---- the cases and the record ---- */
-  const Cases = () => view.cases.length > 0 && (
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", margin: "10px 0 0" }}>
-      <span style={{ fontSize: 11, color: th.sub, fontWeight: 700 }}>Replay a Quality Guardrails case on this pipeline:</span>
-      {view.cases.map((x) => (
-        <span key={x.id} role="button" tabIndex={0} aria-pressed={scen === x.id} onClick={() => pickScen(x.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") pickScen(x.id); }}
-          style={{ fontSize: 10.5, padding: "4px 10px", borderRadius: 999, cursor: "pointer", border: `1px solid ${scen === x.id ? NAVY : th.border}`, background: scen === x.id ? NAVY : th.panel, color: scen === x.id ? "#fff" : th.text, display: "inline-flex", gap: 6, alignItems: "center" }}>
-          <span style={{ width: 8, height: 8, borderRadius: 4, background: x.status === "warning" ? AMBER : SEVERITY_COLOR[x.severity] }} />
-          <b>{x.id}</b><span style={{ fontFamily: MONO }}>{x.rule}</span></span>))}
-      {scen && <span role="button" tabIndex={0} onClick={() => { setScen(null); setFail(false); }} style={{ fontSize: 10.5, color: th.sub, cursor: "pointer", textDecoration: "underline" }}>clear</span>}
-    </div>);
-  const Record = () => S && (
-    <div data-record={S.id} style={{ border: `1px solid ${SEVERITY_COLOR[S.severity]}`, borderLeft: `6px solid ${S.status === "warning" ? AMBER : SEVERITY_COLOR[S.severity]}`, borderRadius: 10, marginTop: 10, background: th.panel, overflow: "hidden" }}>
-      <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 14px", borderBottom: `1px solid ${th.border}`, flexWrap: "wrap" }}>
-        <b style={{ fontSize: 12.5, color: th.text }}>Integration 360 record</b>
+  const col = (title, body, accent) => (
+    <div style={{ padding: "12px 14px", background: th.panel, minWidth: 0, borderTop: `3px solid ${accent}` }}>
+      <div style={{ fontSize: 10, fontWeight: 800, color: accent, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>{title}</div>{body}</div>);
+  const Record = () => S ? (
+    <div data-record={S.id} style={{ border: `1px solid ${th.border}`, borderRadius: 10, marginTop: 12, background: th.panel, overflow: "hidden" }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 14px", background: NAVY, color: "#fff", flexWrap: "wrap" }}>
+        <b style={{ fontSize: 12.5 }}>What went wrong</b>
         <Chip bg={SEVERITY_COLOR[S.severity]} fg="#fff">{S.severity.toUpperCase()}</Chip>
-        <Chip bg="#eaf1fb" fg={BLUE}>{S.kind}</Chip>
-        <span style={{ fontSize: 10.5, color: th.sub }}>{S.engine}{" \u00b7 "}{S.dag}{" \u00b7 "}{S.status}</span>
-        <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 10.5, color: RED }}>{S.rule}</span>
+        <Chip bg="#ffffff22" fg="#fff">{S.kind}</Chip>
+        <span style={{ fontSize: 10.5, color: "#a9c1de" }}>{S.engine}{" \u00b7 "}{S.dag}</span>
+        {view.cases.length > 1 && <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>{view.cases.map((x) => (
+          <span key={x.id} role="button" tabIndex={0} aria-pressed={x.id === S.id} onClick={() => setScen(x.id)} style={{ fontSize: 10, fontWeight: 700, padding: "2px 9px", borderRadius: 999, cursor: "pointer", background: x.id === S.id ? "#fff" : "transparent", color: x.id === S.id ? NAVY : "#fff", border: "1px solid #a9c1de" }}>{x.id}</span>))}</span>}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr 1fr", gap: 1, background: th.border }}>
-        <div style={{ padding: "12px 14px", background: th.panel }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: th.text }}>{S.message}</div>
-          <table style={{ fontSize: 10.5, marginTop: 8, borderCollapse: "collapse" }}><tbody>
-            {[["expected", S.expectation], ["observed", S.observed], ["threshold", S.threshold], ["rows", S.total ? `${S.bad.toLocaleString()} of ${S.total.toLocaleString()}` : "n/a"]].map(([k, v]) => (
-              <tr key={k}><td style={{ color: th.sub, padding: "2px 10px 2px 0", textTransform: "uppercase", fontSize: 9.5, letterSpacing: 0.3 }}>{k}</td><td style={{ color: th.text, fontFamily: MONO }}>{v}</td></tr>))}
-          </tbody></table>
-          <div style={{ fontSize: 11, color: th.sub, marginTop: 8 }}><b style={{ color: th.text }}>Root cause.</b> {S.cause}</div>
-        </div>
-        <div style={{ padding: "12px 14px", background: th.panel }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: th.sub, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>The rows</div>
-          <table style={{ borderCollapse: "collapse", fontSize: 10, fontFamily: MONO, width: "100%" }}>
-            <thead><tr>{Object.keys(S.sample[0]).map((k) => <th key={k} style={{ textAlign: "left", color: th.sub, padding: "2px 6px 4px 0", fontWeight: 600 }}>{k}</th>)}</tr></thead>
-            <tbody>{S.sample.map((r, i) => <tr key={i}>{Object.values(r).map((v, j) => <td key={j} style={{ padding: "2px 6px 2px 0", color: /^null$|MISSING|REORG/.test(String(v)) ? RED : th.text }}>{String(v)}</td>)}</tr>)}</tbody>
-          </table>
-        </div>
-        <div style={{ padding: "12px 14px", background: th.panel }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: th.sub, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>Where it shows here</div>
-          <div style={{ fontSize: 11, color: th.text, lineHeight: 1.55 }}>
-            <div><b>Flow:</b> {view.flow[S.flow][0]} <span style={{ color: RED }}>failed here</span></div>
-            <div><b>DAG:</b> <span style={{ fontFamily: MONO }}>{view.dag[S.dagTask][0]}</span> red, the tasks after it upstream_failed</div>
-            <div><b>Lineage:</b> <span style={{ fontFamily: MONO }}>{S.column.split(":").slice(1).join(".")}</span> traced</div>
-            <div><b>Registry:</b> {S.registry}</div>
-            <div style={{ marginTop: 6, color: TEAL, fontWeight: 600 }}>{S.i360}</div>
-          </div>
-        </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1.2fr", gap: 1, background: th.border }}>
+        {col("The error", <div>
+          <div style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 700, color: RED }}>{S.rule}</div>
+          <div style={{ fontSize: 12, color: th.text, margin: "6px 0 8px", lineHeight: 1.45 }}>{S.message}</div>
+          <KVs rows={[["expected", S.expectation], ["observed", S.observed], ["threshold", S.threshold], ["rows", S.total ? `${S.bad.toLocaleString()} of ${S.total.toLocaleString()}` : "n/a"]]} /></div>, RED)}
+        {col("Where it happened", <div style={{ fontSize: 11.5, color: th.text, lineHeight: 1.6 }}>
+          <div><b>Step:</b> {view.flow[S.flow][0]} <span style={{ color: RED, fontWeight: 700 }}>failed here</span>; everything after it waits</div>
+          <div><b>Task:</b> <span style={{ fontFamily: MONO }}>{view.dag[S.dagTask][0]}</span></div>
+          <div><b>Column:</b> <span style={{ fontFamily: MONO }}>{S.column.split(":").slice(1).join(".")}</span> <span style={{ color: th.sub }}>(traced in the lineage below)</span></div>
+          <div><b>Record:</b> {S.registry}</div></div>, AMBER)}
+        {col("The issue, and what to do", <div style={{ fontSize: 11.5, color: th.text, lineHeight: 1.5 }}>
+          <div><b>Root cause.</b> {S.cause}</div>
+          <div style={{ marginTop: 6, color: TEAL, fontWeight: 600 }}>{S.i360}</div>
+          <table style={{ borderCollapse: "collapse", fontSize: 10, fontFamily: MONO, marginTop: 8 }}>
+            <thead><tr>{Object.keys(S.sample[0]).map((k) => <th key={k} style={{ textAlign: "left", color: th.sub, padding: "2px 8px 3px 0", fontWeight: 600 }}>{k}</th>)}</tr></thead>
+            <tbody>{S.sample.map((r, i) => <tr key={i}>{Object.values(r).map((v, j) => <td key={j} style={{ padding: "2px 8px 2px 0", color: /^null$|MISSING|REORG/.test(String(v)) ? RED : th.text }}>{String(v)}</td>)}</tr>)}</tbody>
+          </table></div>, TEAL)}
       </div>
+    </div>) : (
+    <div data-healthy={p.id} style={{ border: `1px solid ${TEAL}`, borderLeft: `6px solid ${TEAL}`, borderRadius: 10, marginTop: 12, padding: "12px 16px", background: th.panel, fontSize: 12, color: th.text }}>
+      <b style={{ color: TEAL }}>{p.planned ? "Not live yet." : "Nothing wrong today."}</b> {p.planned ? "Shown so the shape is agreed before it is built." : "Every step on the path completed and reconciled; the latest business date is closed."}
     </div>);
-
-  /* ---- states ---- */
-  const States = () => {
-    const colX = (c) => 30 + c * 230;
-    const main = view.states.filter((s) => !s[2]), side = view.states.filter((s) => s[2]);
-    return (
-      <svg viewBox="0 0 980 150" width="100%" style={{ display: "block" }} role="img" aria-label="lifecycle states">
-        <Defs />
-        {main.map(([l, c], i) => (
-          <g key={l}>
-            <Box x={colX(c)} y={20} w={170} h={40} label={l} kind={i === main.length - 1 ? "acc" : "box"} />
-            {i < main.length - 1 && <Line d={`M${colX(c) + 170},40 L${colX(c + 1)},40`} m="hbAcc" />}
-          </g>))}
-        {side.map(([l, c], i) => (
-          <g key={l}>
-            <Line d={`M${colX(c - 1) + 190},60 L${colX(c) + 60},100`} m={i === side.length - 1 ? "hbAmb" : "hbRed"} dash />
-            <Box x={colX(c)} y={100} w={170} h={40} label={l} kind={i === side.length - 1 ? "warn" : "bad"} />
-          </g>))}
-        {(view.loops || []).map(([c, label], i) => (
-          i === 0
-            ? <Line key={label} d={`M${colX(1) + 40},100 L${colX(0) + 120},60`} m="hbArr" dash label={label} lx={colX(0) + 150} ly={92} />
-            : <Line key={label} d={`M${colX(c) + 40 + (i === 2 ? 45 : 0)},100 L${colX(c) + 40 + (i === 2 ? 45 : 0)},60`} m="hbArr" dash label={label} lx={colX(c) + 46 + (i === 2 ? 45 : 0)} ly={84} />))}
-        {view.stateNote && <text x={30} y={142} fontSize="9" fill={MUTE}>{view.stateNote}</text>}
-      </svg>);
-  };
-  const Errors = () => (
-    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11.5 }}>
-      <thead><tr style={{ textAlign: "left", color: th.sub, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.4 }}>
-        {["Scenario", "State and reason", "The business sees", "Integration 360 shows"].map((h) => <th key={h} style={{ padding: "6px 10px", borderBottom: `1px solid ${th.border}` }}>{h}</th>)}</tr></thead>
-      <tbody>{(view.errors || []).map((e, i) => (
-        <tr key={i}>
-          <td style={{ padding: "8px 10px", borderBottom: `1px solid ${th.border}`, fontWeight: 700, color: th.text }}>{e[0]}</td>
-          <td style={{ padding: "8px 10px", borderBottom: `1px solid ${th.border}`, fontFamily: MONO, fontSize: 10.5, color: /QUARANTINED|FAIL/.test(e[1]) ? RED : /ARCHIVE_FAILED/.test(e[1]) ? AMBER : th.text }}>{e[1]}</td>
-          <td style={{ padding: "8px 10px", borderBottom: `1px solid ${th.border}`, color: th.sub }}>{e[2]}</td>
-          <td style={{ padding: "8px 10px", borderBottom: `1px solid ${th.border}`, color: TEAL, fontWeight: 600 }}>{e[3] || "the step's state and reason, per interface and date"}</td>
-        </tr>))}</tbody>
-    </table>);
 
   return (
     <div>
-      <H t={t} hint="green is healthy, red carries a failing Quality Guardrails case, amber a warning">Pipelines</H>
+      <H t={t} hint="green is healthy; red says what is wrong, where, and why">Pipelines</H>
       <PipelineList t={t} open={p.id} onOpen={openPipeline} />
       <Header />
-
-      <H t={t} hint="click a box to see what happens inside it, the sample row before and after, and what a failure there looks like">{p.name}: how the data moves</H>
-      <div style={{ border: `1px solid ${th.border}`, borderRadius: 12, padding: 12, background: th.panel }}><Flow /></div>
-      <Cases />
       <Record />
-      {sel.kind === "flow" && <Panel />}
-
-      <H t={t} hint={p.channel === "api" ? "service steps, not an Airflow run; click one to see what it does and what happens when it fails" : "one run per business date or box; click a task to see what it does and what happens when it fails"}>The DAG</H>
-      <div style={{ border: `1px solid ${th.border}`, borderRadius: 12, padding: 12, background: th.panel }}><Dag /></div>
-      {sel.kind === "dag" && <Panel />}
-
-      <H t={t} hint="column level, drawn by the Lineage page's own graph: click a column to trace it, hover an edge for the transform">Data lineage</H>
+      <H t={t} hint="the step that failed is red; everything after it waits">Where in the flow</H>
+      <div style={{ border: `1px solid ${th.border}`, borderRadius: 12, padding: "12px 12px 0", background: th.panel }}><Flow /><Dag /></div>
+      <H t={t} hint="the column the error is about, traced through the transformations">Where in the data</H>
       <LineageGraph t={t} graph={graph} dataSource="IMDS" />
-
-      <H t={t} hint="every unit of work has one of these states; red leaves the path, amber is housekeeping or waiting">Error handling</H>
-      <div style={{ border: `1px solid ${th.border}`, borderRadius: 12, padding: 12, background: th.panel }}><States /></div>
-      <div style={{ marginTop: 12, border: `1px solid ${th.border}`, borderRadius: 12, overflow: "hidden", background: th.panel }}><Errors /></div>
     </div>);
 }
 
 /* ------------------------------------------------------------------ the business view */
+const TABS = ["What it is", "Error handling"];
 export default function HubBusiness({ t, initial }) {
   const th = useTheme(t);
+  const [tab, setTab] = useState(initial?.tab || TABS[0]);
   const [copied, setCopied] = useState("");
   const copy = () => {
-    const md = businessMarkdown();
+    const md = businessMarkdown(PLAYS);
     try { navigator.clipboard?.writeText(md); } catch { /* no clipboard: nothing to do */ }
     setCopied("copied"); setTimeout(() => setCopied(""), 1500);
   };
 
+  /* without the hub: every source to every destination */
+  const Without = () => {
+    const L = WITHOUT.sources, R = WITHOUT.destinations;
+    return (
+      <svg viewBox="0 0 480 300" width="100%" style={{ display: "block" }} role="img" aria-label="without a hub: every source wired to every destination">
+        <Defs />
+        {L.map((l, i) => <Box key={l} x={16} y={30 + i * 62} w={140} h={40} label={l} kind="ext" />)}
+        {R.map((l, i) => <Box key={l} x={324} y={30 + i * 62} w={140} h={40} label={l} kind="acc" />)}
+        {L.map((_, i) => R.map((__, j) => <path key={`${i}-${j}`} d={`M156,${50 + i * 62} C240,${50 + i * 62} 240,${50 + j * 62} 324,${50 + j * 62}`} fill="none" stroke={(i + j) % 3 === 0 ? RED : MUTE} strokeWidth={1} opacity={0.55} strokeDasharray={(i + j) % 4 === 0 ? "3 3" : undefined} />))}
+        <text x={240} y={292} fontSize="9" fill={RED} textAnchor="middle">{WITHOUT.line}</text>
+      </svg>);
+  };
+  /* with the hub */
   const Context = () => {
     const W = 980, hubX = 330, hubW = 320, hubY = 20, hubH = 250;
     return (
-      <svg viewBox={`0 0 ${W} 300`} width="100%" style={{ display: "block", maxHeight: 340 }} role="img" aria-label="sources, the hub and its consumers">
+      <svg viewBox={`0 0 ${W} 300`} width="100%" style={{ display: "block" }} role="img" aria-label="with the hub: sources, the hub and its consumers">
         <Defs />
         {ROLE.sources.map(([l, s], i) => <Box key={l} x={20} y={28 + i * 60} w={200} label={l} s={s} kind="ext" />)}
         {ROLE.sources.map((_, i) => <Line key={i} d={`M220,${51 + i * 60} L${hubX},${51 + i * 60}`} m={i === 3 ? "hbArr" : "hbAcc"} dash={i === 2} />)}
@@ -386,6 +263,16 @@ export default function HubBusiness({ t, initial }) {
         <text x={hubX + hubW / 2} y={292} fontSize="9" fill={MUTE} textAnchor="middle">every movement has a record: received, validated, loaded, reconciled, published</text>
       </svg>);
   };
+  /* what it does: five verbs */
+  const VERB_LINES = { receive: "events, files, loader requests and API calls, each with a record", validate: "structure, counts and required fields, at the door", translate: "SEI's shapes into BBH's, by one set of versioned rules", reconcile: "rows promised against rows loaded; the date closes only when complete", publish: "one stable shape per consumer: PBDW, Pivotal, IMDS, SEI" };
+  const Verbs = () => (
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${ROLE.verbs.length}, minmax(0,1fr))`, gap: 0 }}>
+      {ROLE.verbs.map((v, i) => (
+        <div key={v} style={{ position: "relative", padding: "12px 18px 12px 26px", background: i % 2 ? "#15224f" : NAVY, color: "#fff", clipPath: i === ROLE.verbs.length - 1 ? "polygon(0 0, 100% 0, 100% 100%, 0 100%, 12px 50%)" : "polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%)" }}>
+          <div style={{ fontSize: 13, fontWeight: 800, textTransform: "capitalize" }}>{i + 1}. {v}</div>
+          <div style={{ fontSize: 10.5, color: "#a9c1de", marginTop: 3, lineHeight: 1.4 }}>{VERB_LINES[v]}</div>
+        </div>))}
+    </div>);
   const Tiles = ({ rows, cols = 3, icon }) => (
     <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))`, gap: 12 }}>
       {rows.map((r) => {
@@ -398,33 +285,49 @@ export default function HubBusiness({ t, initial }) {
           </div>);
       })}
     </div>);
+  const Solves = () => (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 12 }}>
+      {SOLVES.map(([problem, how]) => (
+        <div key={problem} style={{ border: `1px solid ${th.border}`, borderRadius: 10, background: th.panel, overflow: "hidden" }}>
+          <div style={{ padding: "10px 14px", background: "#fae0e2", color: "#8e1b2b", fontSize: 11.5, fontWeight: 700, lineHeight: 1.4 }}>{"\u2716"} {problem}</div>
+          <div style={{ padding: "10px 14px", fontSize: 11.5, color: th.text, lineHeight: 1.45 }}><span style={{ color: TEAL, fontWeight: 800 }}>{"\u2714"} </span>{how}</div>
+        </div>))}
+    </div>);
 
   return (
     <div>
       <SectionHeader t={t}>{ROLE.title}{" \u00b7 business view"}</SectionHeader>
       <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-        <div style={{ fontSize: 15, color: th.text, flex: 1, minWidth: 280 }}>{ROLE.line}</div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {TABS.map((k) => <span key={k} role="tab" tabIndex={0} aria-selected={tab === k} onClick={() => setTab(k)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setTab(k); }}
+            style={{ fontSize: 12, fontWeight: 700, padding: "7px 16px", borderRadius: 6, cursor: "pointer", background: tab === k ? NAVY : "transparent", color: tab === k ? "#fff" : th.sub, border: `1px solid ${tab === k ? NAVY : th.border}` }}>{k}</span>)}
+        </div>
+        <div style={{ fontSize: 14, color: th.text, flex: 1, minWidth: 280 }}>{ROLE.line}</div>
         <span role="button" tabIndex={0} onClick={copy} style={{ fontSize: 11.5, fontWeight: 700, padding: "7px 14px", borderRadius: 6, background: NAVY, color: "#fff", cursor: "pointer" }}>
           {copied || "Copy as Markdown"}</span>
       </div>
 
-      <H t={t} hint="sources on the left, consumers on the right, four lanes through the middle">What it does</H>
-      <div style={{ border: `1px solid ${th.border}`, borderRadius: 12, padding: 12, background: th.panel }}><Context /></div>
-
-      <H t={t}>Where it is used</H>
-      <Tiles rows={USES} icon />
-
-      <H t={t} hint="the hub is the source of truth for these; Lineage, Impact Analysis and Variance 360 read from it">What it governs</H>
-      <Tiles rows={GOVERNS} cols={4} />
-
-      <div style={{ marginTop: 28, border: `1px solid ${TEAL}`, borderLeft: `6px solid ${TEAL}`, borderRadius: 10, padding: "14px 18px", background: "#e6f4f20f" }}>
-        <div style={{ fontWeight: 700, color: th.text, fontSize: 13 }}>Integration 360 - Run in place of Quality Guardrails</div>
-        <div style={{ fontSize: 11.5, color: th.sub, margin: "4px 0 10px" }}>{I360.line}</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 10 }}>
-          {I360.rows.map(([h, b]) => <div key={h} style={{ fontSize: 11 }}><b style={{ color: TEAL }}>{h}</b><div style={{ color: th.sub }}>{b}</div></div>)}
+      {tab === "What it is" && <div data-tab="what">
+        <H t={t} hint="left: without a hub; right: with it">The problem it solves</H>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 12 }}>
+          <div style={{ border: `1px solid ${RED}55`, borderRadius: 12, padding: 12, background: th.panel }}><div style={{ fontSize: 11, fontWeight: 800, color: RED, marginBottom: 4 }}>WITHOUT A HUB</div><Without /></div>
+          <div style={{ border: `1px solid ${TEAL}`, borderRadius: 12, padding: 12, background: th.panel }}><div style={{ fontSize: 11, fontWeight: 800, color: TEAL, marginBottom: 4 }}>WITH CP INTEGRATION HUB</div><Context /></div>
         </div>
-      </div>
+        <div style={{ marginTop: 12 }}><Solves /></div>
 
-      <PipelineCatalog t={t} initial={initial} />
+        <H t={t} hint="five things, in order, to every movement">What it does</H>
+        <Verbs />
+
+        <H t={t}>Where it is used</H>
+        <Tiles rows={USES} icon />
+
+        <H t={t} hint="the hub is the source of truth for these; Lineage, Impact Analysis and Variance 360 read from it">What it governs</H>
+        <Tiles rows={GOVERNS} cols={4} />
+      </div>}
+
+      {tab === "Error handling" && <div data-tab="errors">
+        <H t={t} hint="pick a scenario and watch it play: where it goes wrong, how the hub handles it, how it is replayed">Error handling</H>
+        <HubErrorPlay t={t} initial={initial?.play ? { play: initial.play, frame: initial.frame, running: initial.running } : undefined} />
+      </div>}
     </div>);
 }
