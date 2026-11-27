@@ -1,4 +1,4 @@
-// Quality Guardrails — Overview, then one tab per environment.
+// Integration 360 - Run (formerly Quality Guardrails) — Overview, then one tab per environment.
 //
 // THE SHAPE, AND WHY. Three regions that do different work, so three tabs
 // rather than one board with a region column:
@@ -64,7 +64,7 @@ export default function Guardrails({ t, selection }) {
 
   return (
     <div>
-      <SectionHeader t={t}>Quality Guardrails</SectionHeader>
+      <SectionHeader t={t}>{"Integration 360 \u00b7 Run"}</SectionHeader>
 
       <SyntheticBanner t={t} payload={rels} />
 

@@ -88,7 +88,7 @@ export default function Integration360Design({ t }) {
  if (view === "SCREENS")
   return (
    <div>
-    <SectionHeader t={t}>Integration360</SectionHeader>
+    <SectionHeader t={t}>{"Integration 360 \u00b7 Design"}</SectionHeader>
     <Integration360Screens t={t}
      onBack={backBtn("← planes", () => setView("L2"))} />
    </div>);
@@ -100,7 +100,7 @@ export default function Integration360Design({ t }) {
   const rd = readiness(plane);
   return (
    <div>
-    <SectionHeader t={t}>Integration360</SectionHeader>
+    <SectionHeader t={t}>{"Integration 360 \u00b7 Design"}</SectionHeader>
     {backBtn("← planes", () => { setView("L2"); setOpen(null); })}
     <div style={{ display: "flex", alignItems: "center", gap: 12, background: navy,
      color: "#fff", borderRadius: 10, padding: "14px 20px", marginBottom: 12 }}>
@@ -184,7 +184,7 @@ export default function Integration360Design({ t }) {
   };
   return (
    <div>
-    <SectionHeader t={t}>Integration360</SectionHeader>
+    <SectionHeader t={t}>{"Integration 360 \u00b7 Design"}</SectionHeader>
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
      {backBtn("← context + readiness", () => setView("L1"))}
      <span onClick={() => setView("SCREENS")} style={{ fontSize: 11.5, fontWeight: 700,
@@ -295,7 +295,7 @@ export default function Integration360Design({ t }) {
  const o = readiness(null);
  return (
   <div>
-   <SectionHeader t={t}>Integration360</SectionHeader>
+   <SectionHeader t={t}>{"Integration 360 \u00b7 Design"}</SectionHeader>
    <div style={{ fontSize: 11.5, color: sub, maxWidth: 860, marginBottom: 12 }}>
     {I360_SUMMARY.line}</div>
 

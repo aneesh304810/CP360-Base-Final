@@ -10,6 +10,7 @@ import { AR_FINDINGS, AR_VERDICTS, AR_ASSUMPTIONS, AR_BOTTLENECKS, AR_ERRORS,
 import { FM_SUMMARY, FM_AREAS, FM_STATE, FM_PROVIDED, FM_TABLES, FM_REC }
  from "./hubFoundationModel.js";
 import SourceReference, { citationsFor } from "./SourceReference.jsx";
+import HubBusiness, { HubViewToggle } from "./HubBusiness.jsx";
 import SeiDocModal from "./SeiDocModal.jsx";
 import { DBTDOC_ALIGN, DBTDOC_VERDICTS, DBTDOC_MISSING, DBTDOC_SELF_CONFLICT, DBTDOC_NAME,
  DBTDOC_SOURCE, dbtDocFor, dbtDocCount } from "./hubDbtDocAlignment.js";
@@ -87,7 +88,7 @@ const loadStore = () => {
 };
 const API = "/design/status";
 
-export default function HubDesign({ t }) {
+function HubTechnical({ t }) {
  const [view, setView] = useState("L1");
  const [cont, setCont] = useState(null);
  const [doc, setDoc] = useState(null);          // {key, from}
@@ -2527,5 +2528,22 @@ export default function HubDesign({ t }) {
       </div>);
     })}
    </div>
+  </div>);
+}
+
+// The hub page opens on one of two views: the technical view (everything
+// above: C4 levels, components, tracker, discussion) or the business view
+// (HubBusiness: what the hub does, where it is used, one real pipeline).
+// The choice is remembered per browser.
+const HUB_VIEW_KEY = "cp360-hub-view";
+export default function HubDesign({ t }) {
+ const [mode, setMode] = useState(() => {
+  try { return localStorage.getItem(HUB_VIEW_KEY) === "business" ? "business" : "technical"; } catch { return "technical"; }
+ });
+ const pick = (m) => { setMode(m); try { localStorage.setItem(HUB_VIEW_KEY, m); } catch { /* no storage */ } };
+ return (
+  <div>
+   <HubViewToggle t={t} mode={mode} onPick={pick} />
+   {mode === "business" ? <HubBusiness t={t} /> : <HubTechnical t={t} />}
   </div>);
 }

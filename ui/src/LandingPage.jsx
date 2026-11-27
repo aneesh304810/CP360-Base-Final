@@ -20,7 +20,7 @@ const MODULES = [
   { key: "pii", label: "PII Explorer", glyph: "\u2691", color: "#c1113a",
     desc: "Where sensitive data lives, classified for NYDFS 500 governance.",
     stats: (s) => [[s.pii?.attributes, "PII Attrs"], [s.pii?.affected_fields, "Carry PII"]] },
-  { key: "guardrails", label: "Quality Guardrails", glyph: "\u26A0", color: "#e67e22",
+  { key: "guardrails", label: "Integration 360 - Run", glyph: "\u26A0", color: "#e67e22",
     desc: "Failed and at-risk jobs across validation, monitoring, tests and orchestration.",
     stats: (s) => [[s.gr?.attention, "Alerts"], [s.gr?.critical, "Critical"]] },
 ];

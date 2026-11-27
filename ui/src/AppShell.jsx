@@ -31,7 +31,7 @@ const NAV_GROUPS = [
  group: 'Governance',
  items: [
  ['pii', 'PII Explorer', '⚑'],
- ['guardrails', 'Quality Guardrails', '⚠'],
+ ['guardrails', 'Integration 360 - Run', '\u25C9'],
  ['cyber360', 'Cyber Security 360', '\u26E8'],
  ['codereview', 'Code Review 360', '\u2611'],
  ['impact', 'Impact Analysis', '⚡'],
@@ -47,7 +47,6 @@ const NAV_GROUPS = [
  ['datasources', 'Data Sources', '⛭'],
  ['apicatalog', 'API Catalog Admin', '\u2699'],
  ["hub", "CP Integration Hub", "🏛"],
-      ["integration360", "Integration 360", "◉"],
       ['environment', 'Environment 360', '🖧'],
       ['security', 'Security Entitlement', '\u26BF'],
  ]
@@ -56,6 +55,7 @@ const NAV_GROUPS = [
  group: 'Architecture',
  items: [
  ['system', 'System Design', '⛬'],
+ ['integration360', 'Integration 360 - Design', '\u25CE'],
  ['devops360', 'DevOps 360', '⚙'],
  ['pbnotify', 'PB Notifications', '\u2709'],
  ]
