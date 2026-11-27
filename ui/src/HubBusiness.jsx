@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { SectionHeader } from "./AppShell.jsx";
-import LineageGraph from "./LineageGraph.jsx";
+import HubWires from "./HubWires.jsx";
 import HubErrorPlay from "./HubErrorPlay.jsx";
 import { PLAYS } from "./hubErrorPlays.js";
 import { ROLE, USES, GOVERNS, SOLVES, WITHOUT, SEVERITY_COLOR, businessMarkdown } from "./hubBusiness.js";
@@ -114,7 +114,6 @@ export function PipelineCatalog({ t, initial }) {
   const [scen, setScen] = useState(initial?.scenario || (view.cases[0] && view.cases[0].id) || null);
   const S = view.cases.find((x) => x.id === scen) || view.cases[0] || null;
   const openPipeline = (id) => { const nv = pipelineView(PIPELINES.find((x) => x.id === id)); setPid(id); setScen(nv.cases[0] ? nv.cases[0].id : null); };
-  const graph = useMemo(() => (S ? { ...view.graph, focus: S.column } : view.graph), [S, view]);
   const ch = CHANNELS[p.channel];
   const f = S ? S.flow : -1, fd = S ? S.dagTask : -1;
 
@@ -211,8 +210,8 @@ export function PipelineCatalog({ t, initial }) {
       <Record />
       <H t={t} hint="the step that failed is red; everything after it waits">Where in the flow</H>
       <div style={{ border: `1px solid ${th.border}`, borderRadius: 12, padding: "12px 12px 0", background: th.panel }}><Flow /><Dag /></div>
-      <H t={t} hint="the column the error is about, traced through the transformations">Where in the data</H>
-      <LineageGraph t={t} graph={graph} dataSource="IMDS" />
+      <H t={t} hint="one box per table, a wire per column; the failed column is red and its path is lit">Where in the data</H>
+      <HubWires t={t} graph={view.graph} failed={S ? S.column : null} title={`${p.name}: where it lands`} />
     </div>);
 }
 

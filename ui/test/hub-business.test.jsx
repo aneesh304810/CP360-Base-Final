@@ -14,6 +14,7 @@ import HubErrorPlay from "../src/HubErrorPlay.jsx";
 import { PLAYS, MOOD } from "../src/hubErrorPlays.js";
 import { ROLE, USES, GOVERNS, SOLVES, WITHOUT, I360, PIPELINE, STEP_DETAIL, DAG_DETAIL, POSITIONS_LINEAGE, SCENARIOS, businessMarkdown } from "../src/hubBusiness.js";
 import * as P from "../src/hubPipelines.js";
+import HubWires, { wireLayout, tracePath, hopsFor, wiresCsv } from "../src/HubWires.jsx";
 
 let BAD = 0;
 const ok = (c, m, got = "") => { console.log((c ? "ok   " : "FAIL ") + m + (c ? "" : `  -> ${String(got).slice(0, 220)}`)); if (!c) BAD += 1; };
@@ -87,14 +88,34 @@ const list = renderToStaticMarkup(<PipelineCatalog t={tLight} />);
 ok((list.match(/data-pipeline="/g) || []).length === 12 && /12 pipelines/.test(list) && /6 failing/.test(list) && /data-pipeline-open="file-pos"/.test(list) && /data-record="soda-001"/.test(list), "the list shows all twelve with the counts; positions opens on its first case");
 const cash = renderToStaticMarkup(<PipelineCatalog t={tLight} initial={{ pipeline: "file-cash" }} />);
 ok(/What went wrong/.test(cash) && /The error/.test(cash) && /Where it happened/.test(cash) && /The issue, and what to do/.test(cash) && /expect_column_values_to_not_be_null/.test(cash) && /Intermediate <[^>]*>failed here/.test(cash) && /dbt_int/.test(cash) && /ACC-88213/.test(cash), "an open red pipeline says what, where and why: the rule, the step, the task, the rows");
-ok(/Where in the flow/.test(cash) && /Where in the data/.test(cash) && /Follow[\s\S]{0,80}cash_balance_usd/.test(cash) && (cash.match(/>upstream_failed<\/text>/g) || []).length === 2 && !/data-panel=/.test(cash) && !/Step \d of \d:/.test(cash) && !/lifecycle states/.test(cash), "the flow and the task are painted, the column is traced, and there are no step panels or state diagrams here");
+ok(/Where in the flow/.test(cash) && /Where in the data/.test(cash) && /data-failed="STG2:int_cash_balance:cash_balance_usd"/.test(cash) && /cash_balance_usd failed here/.test(cash) && (cash.match(/>upstream_failed<\/text>/g) || []).length === 2 && !/data-panel=/.test(cash) && !/Step \d of \d:/.test(cash) && !/Column lineage/.test(cash), "the flow and the task are painted, the failed column is marked in the wires, and there are no step panels or state diagrams here");
+console.log("-- where in the data: the wires");
+const wireProbs = [];
+for (const p of P.PIPELINES) {
+  const v = P.pipelineView(p), L = wireLayout(v.graph);
+  if (L.levels < 3 || !v.graph.nodes.every((n) => L.pos[n.id])) wireProbs.push(`${p.id} layout ${L.levels}`);
+  const byId = Object.fromEntries(v.graph.nodes.map((n) => [n.id, n]));
+  const sameCol = v.graph.edges.filter((e) => { const a = byId[e.from], b = byId[e.to]; return L.pos[e.from].x === L.pos[e.to].x && a.table !== b.table; });
+  if (sameCol.length) wireProbs.push(`${p.id} ${sameCol.length} wires inside one column`);
+  v.cases.forEach((c) => { const h = hopsFor(v.graph, c.column); if (!h.length || !h.some((x) => x.to.id === c.column || x.from.id === c.column)) wireProbs.push(`${p.id} ${c.id} no hops`); });
+  const html = renderToStaticMarkup(<HubWires t={tLight} graph={v.graph} failed={v.cases[0] ? v.cases[0].column : null} />);
+  if (!/data-wires=/.test(html) || (v.cases[0] && !/failed here/.test(html)) || !/export CSV/.test(html)) wireProbs.push(`${p.id} render`);
+}
+ok(wireProbs.length === 0, "every pipeline draws the same way: tables laid out by flow so no wire stays inside a column, every column placed, the failed column's path has hops, and the picture renders", wireProbs.join("; "));
+const cashView = P.pipelineView(P.PIPELINES.find((p) => p.id === "file-cash"));
+const cashHops = hopsFor(cashView.graph, "STG2:int_cash_balance:cash_balance_usd");
+ok(cashHops.some((h) => h.from.column === "CASH_BALANCE_LOCAL" && h.op.label === "CAST / RENAME") && cashHops.some((h) => h.from.table === "stg_fx_rate" && h.op.label === "JOIN / DERIVE") && cashHops.some((h) => h.to.column === "CASH_BALANCE_USD" && h.op.label === "PUBLISH"), "the cash column's hops read source to target: the cast, the FX join and the publish");
+const tr = tracePath(cashView.graph, "STG2:int_cash_balance:cash_balance_usd");
+ok(tr.up.has("SRC:RECCASHACTIVITIES file:CASH_BALANCE_LOCAL") && tr.up.has("STG2:stg_fx_rate:fx_rate") && tr.down.has("DWH:IMDS gld_cash_summary:CASH_BALANCE_USD") && !tr.ns.has("STG2:stg_cash_activity.dq_status_cd"), "the trace reaches back to the file column and the FX rate and forward to the published column, and leaves the rest dim");
+const csv = wiresCsv(cashView.graph);
+ok(csv.split("\n").length === cashView.graph.edges.length + 1 && /^from_table,from_column,to_table,to_column,operation,label,rule/.test(csv), "export CSV: one row per column link");
 const green = renderToStaticMarkup(<PipelineCatalog t={tLight} initial={{ pipeline: "evt-txn" }} />);
 ok(/data-healthy="evt-txn"/.test(green) && /Nothing wrong today/.test(green) && !/data-record=/.test(green) && !/failed here/.test(green), "a green pipeline says nothing is wrong and shows its path clean");
 ok(!/testbbh|apps\.ocp|https?:\/\/|CPACC|PBDWHDBT|\.internal|billing-sftp/.test(JSON.stringify(P.PIPELINES)), "no host, schema owner, link or address in the catalogue");
 
 console.log("-- nothing that should not be shared, and the nav");
 const FORBID = /testbbh|apps\.ocp|https?:\/\/|CPACC|PBDWHDBT|:2483|\b2483\b|[\w.+-]+@[\w-]+\.[\w.-]+|ORACLE_PASSWORD/;
-const srcs = ["hubBusiness.js", "HubBusiness.jsx", "hubPipelines.js", "hubErrorPlays.js", "HubErrorPlay.jsx"].map((f) => fs.readFileSync(path.join(SRC, f), "utf8"));
+const srcs = ["hubBusiness.js", "HubBusiness.jsx", "hubPipelines.js", "hubErrorPlays.js", "HubErrorPlay.jsx", "HubWires.jsx"].map((f) => fs.readFileSync(path.join(SRC, f), "utf8"));
 ok(srcs.every((s) => !FORBID.test(s)) && !FORBID.test(md), "no host, schema owner, database link, port, address or credential in the sources or the note", srcs.map((s) => (s.match(FORBID) || [""])[0]).join("|"));
 const shell = fs.readFileSync(path.join(SRC, "AppShell.jsx"), "utf8"), app = fs.readFileSync(path.join(SRC, "App.jsx"), "utf8"), gr = fs.readFileSync(path.join(SRC, "Guardrails.jsx"), "utf8");
 ok(!/Quality Guardrails/.test(shell) && /\['guardrails', 'Integration 360 - Run'/.test(shell) && /\['integration360', 'Integration 360 - Design'/.test(shell) && !/hubbusiness/.test(shell) && !/hubbusiness/.test(app), "Quality Guardrails is Integration 360 - Run; the readiness page is Integration 360 - Design; the business view is not a separate item");
