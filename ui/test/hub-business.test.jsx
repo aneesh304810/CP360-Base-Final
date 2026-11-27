@@ -35,8 +35,8 @@ console.log("-- the page");
 for (const [name, t] of [["light", tLight], ["dark", tDark]]) {
   const html = renderToStaticMarkup(<HubBusiness t={t} />);
   ok(/business view/.test(html) && /What it does/.test(html) && /Where it is used/.test(html) && /What it governs/.test(html) && /Integration 360 - Run in place of Quality Guardrails/.test(html), `${name}: the five sections above the example`);
-  ok(/One real pipeline: end-of-day positions/.test(html) && /The DAG/.test(html) && /Data lineage/.test(html) && /Error handling/.test(html), `${name}: the example, its DAG, lineage and error handling`);
-  ok((html.match(/<svg /g) || []).length === 4, `${name}: four diagrams (context, flow, DAG, states)`, (html.match(/<svg /g) || []).length);
+  ok(/End-of-day positions: how the data moves/.test(html) && /The DAG/.test(html) && /Data lineage/.test(html) && /Error handling/.test(html) && /data-list="pipelines"/.test(html), `${name}: the pipeline list, the open pipeline, its DAG, lineage and error handling`);
+  ok((html.match(/<svg /g) || []).length === 5, `${name}: five diagrams (context, flow, DAG, column lineage, states)`, (html.match(/<svg /g) || []).length);
   ok(/CP INTEGRATION HUB/.test(html) && /SEI Event Hub/.test(html) && /IMDS/.test(html) && /CP DW Canonical/.test(html), `${name}: the context diagram names the sources, the hub and the consumers`);
   ok(/EOD_POSITIONS_&lt;yyyymmdd&gt;\.out|EOD_POSITIONS_<yyyymmdd>\.out/.test(html) && /RAW_EOD_POSITIONS/.test(html) && /QUARANTINED/.test(html) && /wait_for_files/.test(html), `${name}: the file, the RAW table, the states and the DAG tasks are on the page`);
   ok(/Copy as Markdown/.test(html), `${name}: the copy button`);
@@ -74,5 +74,69 @@ store["cp360-hub-view"] = "technical";
 const asTechnical = renderToStaticMarkup(<HubDesign t={tLight} />);
 ok(/Business view/.test(asTechnical) && !/Where it is used/.test(asTechnical), "and opens on the technical view otherwise, with the toggle to switch");
 
-if (BAD) { console.log(`\n${BAD} assertion(s) failed`); process.exit(1); }
-console.log("\nhub-business assertions pass");
+console.log("-- inside each box");
+import("../src/hubBusiness.js").then(({ STEP_DETAIL, DAG_DETAIL, POSITIONS_LINEAGE, SCENARIOS }) => {
+  console.log("-- the Quality Guardrails cases, replayed");
+  const lid = new Set(POSITIONS_LINEAGE.nodes.map((n) => n.id));
+  ok(SCENARIOS.length === 7 && ["ge-001", "soda-001", "dbt-001", "af-001", "soda-002", "dbt-002", "ge-002"].every((id) => SCENARIOS.some((x) => x.id === id)), "the seven synthetic Guardrails events, by their ids");
+  ok(SCENARIOS.every((x) => x.flow >= 0 && x.flow < 7 && x.dagTask >= 0 && x.dagTask < 8 && lid.has(x.column) && x.rule && x.observed && x.cause && x.sample.length && x.i360 && x.registry), "each case lands on a flow step, a DAG task, a lineage column and carries its rule, observation, cause, rows and what Integration 360 shows", SCENARIOS.filter((x) => !lid.has(x.column)).map((x) => x.column).join());
+  ok(!/\.internal|billing-sftp|\/inbound|\.bbh|sftp_folder/i.test(JSON.stringify(SCENARIOS)), "no host or path from the synthetic file is carried");
+  const replay = renderToStaticMarkup(<HubBusiness t={tLight} initial={{ pipeline: "file-cash", scenario: "ge-001" }} />);
+  ok(/data-record="ge-001"/.test(replay) && /expect_column_values_to_not_be_null/.test(replay) && /3 nulls in 15,204 rows/.test(replay) && /ACC-88213/.test(replay) && /XPF/.test(replay), "replaying the cash not-null case shows the Integration 360 record with its rows");
+  ok(/Step 5 of 7: Intermediate/.test(replay) && /failed here/.test(replay) && (replay.match(/>upstream_failed<\/text>/g) || []).length === 2 && /aria-pressed="true"/.test(replay), "it paints Intermediate as failed in the flow, dbt_int as failed in the DAG with the two tasks after it upstream_failed, and the case pressed");
+  ok(/Follow[\s\S]{0,80}cash_balance_usd/.test(replay), "and traces cash_balance_usd in the column lineage");
+  const fresh = renderToStaticMarkup(<HubBusiness t={tLight} initial={{ scenario: "soda-001" }} />);
+  ok(/data-record="soda-001"/.test(fresh) && /Step 1 of 7: Landing/.test(fresh) && /Follow[\s\S]{0,80}AS_OF_DATE/.test(fresh) && (fresh.match(/>waits</g) || []).length === 6, "the positions freshness case lands on Landing: the whole path waits, the sensor task is red, AS_OF_DATE traced");
+
+  console.log("-- column lineage in the Lineage page's shape");
+  const ids = new Set(POSITIONS_LINEAGE.nodes.map((n) => n.id));
+  ok(POSITIONS_LINEAGE.nodes.every((n) => /^(SRC|STG1|STG2|DWH):/.test(n.id) && n.stage && n.table && n.column) && ids.size === POSITIONS_LINEAGE.nodes.length, "nodes carry stage, table and column with unique stage:table:column ids");
+  ok(POSITIONS_LINEAGE.edges.every((e) => ids.has(e.from) && ids.has(e.to) && ["direct", "ren", "trim", "merge", "phys"].includes(e.kind)), "every edge joins two known columns with one of the graph's edge kinds", POSITIONS_LINEAGE.edges.filter((e) => !ids.has(e.from) || !ids.has(e.to)).map((e) => e.from + ">" + e.to).join());
+  const fanIn = {}; POSITIONS_LINEAGE.edges.forEach((e) => { fanIn[e.to] = (fanIn[e.to] || 0) + 1; });
+  ok(fanIn["STG2:stg_eod_positions:dq_status_cd"] === 4 && fanIn["STG2:int_position:account_id"] === 2, "the DQ flag fans in from the four required fields and account_id from the position and the account");
+  const graphHtml = renderToStaticMarkup(<HubBusiness t={tLight} />);
+  ok(/Column lineage/.test(graphHtml) && /RAW_EOD_POSITIONS/.test(graphHtml) && /dq_status_cd/.test(graphHtml) && /IMDS holding/.test(graphHtml) && />4 in</.test(graphHtml) && />2 in</.test(graphHtml), "the page draws it with LineageGraph: the four stages, the DQ fan-in badge and the account join badge", [/Column lineage/, /RAW_EOD_POSITIONS/, /dq_status_cd/, /IMDS holding/, />4 in</, />2 in</].map((r) => r.test(graphHtml)).join());
+  ok(/TO_NUMBER/.test(graphHtml) && /Follow[\s\S]{0,80}quantity/.test(graphHtml), "quantity is the focused column, so its path is traced and its transform labels show", [/TO_NUMBER/.test(graphHtml), /Follow[\s\S]{0,80}quantity/.test(graphHtml)].join());
+
+  ok(STEP_DETAIL.map((s) => s.step).join() === PIPELINE.flow.map((f) => f[0]).join() && DAG_DETAIL.map((d) => d.task).join() === PIPELINE.dag.map((d) => d[0]).join(), "every flow box and every DAG task has its detail, in the same order");
+  ok(STEP_DETAIL.every((s) => s.does.length >= 2 && s.in && s.out && Object.keys(s.row).length >= 1 && s.fails.length >= 1 && s.fails.every((f) => f.length === 3)), "each step says what it does, in and out, the row after it, and at least one failure with what happens and what the business sees");
+  ok(STEP_DETAIL[2].row.FILE_ROW_NUMBER === "1" && STEP_DETAIL[2].row.BUSINESS_DATE === "2026-11-27" && STEP_DETAIL[3].row.dq_status_cd === "PASS" && /number/.test(STEP_DETAIL[3].row.quantity), "the sample row gains the loader's stamps in RAW and becomes typed with a DQ flag in staging");
+  ok(DAG_DETAIL.every((d) => d.does && d.onFail && d.retry && d.downstream) && /upstream_failed/.test(DAG_DETAIL[0].downstream) && /37 finish/.test(DAG_DETAIL[2].onFail), "each task says what it does, what a failure looks like, how it is retried and what happens downstream");
+  ok(!/\b\d{6,}\b/.test(JSON.stringify(STEP_DETAIL).replace(/2026-11-27|20261127/g, "")), "no long digit runs in the sample row: nothing that could be a real account or instrument");
+  const open = renderToStaticMarkup(<HubBusiness t={tLight} initial={{ sel: { kind: "flow", i: 2 }, fail: true }} />);
+  ok(/data-panel="flow"/.test(open) && /Step 3 of 7: RAW/.test(open) && /before \(Validate\)/.test(open) && /after \(RAW\)/.test(open) && /FILE_REGISTRY_ID/.test(open), "clicking RAW opens its panel with the row before and after");
+  ok(/RAW_LOAD_FAILED/.test(open) && /showing a failure here/.test(open) && /failed here/.test(open) && (open.match(/>waits</g) || []).length === 4, "with a failure shown, RAW is marked failed and the four boxes after it wait");
+  const dag = renderToStaticMarkup(<HubBusiness t={tLight} initial={{ sel: { kind: "dag", i: 3 }, fail: true }} />);
+  ok(/data-panel="dag"/.test(dag) && /Task 4 of 8: completeness/.test(dag) && (dag.match(/>upstream_failed<\/text>/g) || []).length === 4 && /task failed\. /.test(dag) && !/data-panel="flow"/.test(dag), "clicking a DAG task opens its panel; a failure there greys the four tasks after it as upstream_failed");
+  const plain = renderToStaticMarkup(<HubBusiness t={tLight} />);
+  ok(/Step 2 of 7: Validate/.test(plain) && /show a failure here/.test(plain) && !/failed here/.test(plain), "the page opens on Validate with the failure switch off");
+  import("../src/hubPipelines.js").then((P) => {
+    console.log("-- the pipeline catalogue");
+    const chans = new Set(P.PIPELINES.map((p) => p.channel)), domains = new Set(P.PIPELINES.map((p) => p.domain));
+    ok(P.PIPELINES.length === 12 && chans.size === 4 && ["event", "file", "api", "outbound"].every((c) => chans.has(c)) && domains.has("Accounting") && domains.has("Non-accounting"), "twelve pipelines across Events, Inbound Files, API and Outbound File, accounting and non-accounting");
+    const c = P.counts();
+    ok(c.red === 6 && c.green === 5 && c.planned === 1 && P.statusOf(P.PIPELINES.find((p) => p.id === "file-cash")) === "red" && P.statusOf(P.PIPELINES.find((p) => p.id === "evt-txn")) === "green", "status comes from the cases: six red, five green, one not yet live", JSON.stringify(c));
+    const probs = [];
+    for (const p of P.PIPELINES) {
+      const v = P.pipelineView(p), ids = new Set(v.graph.nodes.map((n) => n.id));
+      v.graph.edges.forEach((e) => { if (!ids.has(e.from) || !ids.has(e.to)) probs.push(`${p.id} edge`); });
+      v.cases.forEach((x) => { if (!ids.has(x.column) || x.flow >= v.flow.length || x.dagTask >= v.dag.length || !x.rule) probs.push(`${p.id} case ${x.id}`); });
+      if (!ids.has(v.graph.focus) || v.steps.length !== v.flow.length || v.dagDetail.length !== v.dag.length || v.states.length !== 7 || !p.business || !p.source || !p.destination) probs.push(`${p.id} view`);
+      if (!v.graph.stage_labels || !v.graph.stage_labels.SRC) probs.push(`${p.id} labels`);
+    }
+    ok(probs.length === 0, "every pipeline's column graph is closed, its cases land on real boxes and columns, and its steps, tasks and states are complete", probs.join());
+    ok(P.pipelineView(P.PIPELINES.find((p) => p.id === "api-status")).flow.length === 5 && P.pipelineView(P.PIPELINES.find((p) => p.id === "out-fee")).states.map((s) => s[0]).includes("STATUS_UNRESOLVED") && P.pipelineView(P.PIPELINES.find((p) => p.id === "evt-txn")).flow[0][0] === "Listen", "each channel has its own shape: five API steps, the loader's own states outbound, events start by listening");
+    const list = renderToStaticMarkup(<HubBusiness t={tLight} />);
+    ok((list.match(/data-pipeline="/g) || []).length === 12 && /12 pipelines/.test(list) && /6 failing/.test(list) && /5 healthy/.test(list) && /Intraday transactions/.test(list) && /Fee file to billing/.test(list) && /Loader status callback/.test(list), "the list shows all twelve with the counts and the channel groups");
+    const cash = renderToStaticMarkup(<HubBusiness t={tLight} initial={{ pipeline: "file-cash", scenario: "ge-001" }} />);
+    ok(/data-pipeline-open="file-cash"/.test(cash) && /Cash balances: how the data moves/.test(cash) && /data-record="ge-001"/.test(cash) && /Step 5 of 7: Intermediate/.test(cash) && /RAW_REC_CASH_ACTIVITIES/.test(cash) && /cash_balance_usd/.test(cash) && /Follow[\s\S]{0,80}cash_balance_usd/.test(cash) && /stg_fx_rate/.test(cash),
+       "opening Cash balances on its case shows its business header, the Intermediate step failed, the record, and the FX join traced in its own column graph");
+    const out = renderToStaticMarkup(<HubBusiness t={tLight} initial={{ pipeline: "out-fee", scenario: "af-001" }} />);
+    ok(/data-record="af-001"/.test(out) && /Step 3 of 7: Submit/.test(out) && /FEE_ACCRUAL loader file/.test(out) && /STATUS_UNRESOLVED/.test(out) && /submit_gateway/.test(out) && />upstream_failed<\/text>/.test(out), "the outbound fee file fails at Submit: its loader-file lineage, the submission states and the DAG after submit_gateway");
+    const api = renderToStaticMarkup(<HubBusiness t={tLight} initial={{ pipeline: "api-status" }} />);
+    ok(/data-pipeline-open="api-status"/.test(api) && /Step 2 of 5: Gateway/.test(api) && /poll_reconcile/.test(api) && /GATEWAY/.test(api) && /REGISTRY/.test(api), "the status callback API: five steps, service steps instead of a DAG, and its own lane labels");
+    ok(!/testbbh|apps\.ocp|https?:\/\/|CPACC|PBDWHDBT|\.internal|billing-sftp/.test(JSON.stringify(P.PIPELINES)), "no host, schema owner, link or address in the catalogue");
+    if (BAD) { console.log(`\n${BAD} assertion(s) failed`); process.exit(1); }
+    console.log("\nhub-business assertions pass");
+  });
+});

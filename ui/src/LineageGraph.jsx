@@ -33,6 +33,7 @@ import { lineageApi } from "./lineage_api_additions.js";
 //   code        alternatively address by field code (BI/2-1)
 //   dataSource  PBDW / IMDS — scopes every fetch
 //   onOpenColumn(table, column)  jump the outer page to another column
+//   graph       optional {nodes, edges, stats, focus, stage_labels?}: drawn as handed in, no fetch
 // =====================================================================
 
 const STAGE_C = { SRC: "#7c3aed", STG1: "#00a3a3", STG2: "#0091bf", DWH: "#0f4775" };
@@ -65,10 +66,12 @@ const HDR_H = 22, ROW_H = 21, BOX_PAD = 5, BOX_GAP = 13, TOP = 34, BOT = 10;
 const NARROW = 780;        // below this the gaps tighten before lanes shrink
 
 export default function LineageGraph({ t, table, column, code, dataSource = "PBDW",
-                                       onOpenColumn }) {
-  const [data, setData] = useState(null);
+                                       onOpenColumn, graph }) {
+  // A handed-in graph is the initial state as well, so a server render (no
+  // effects) draws it rather than "Building column graph…".
+  const [data, setData] = useState(graph || null);
   const [err, setErr] = useState(null);
-  const [focus, setFocus] = useState(null);
+  const [focus, setFocus] = useState((graph && graph.focus) || null);
   const [parallel, setParallel] = useState(true);
   const [legendOn, setLegendOn] = useState(false);
 
@@ -93,12 +96,16 @@ export default function LineageGraph({ t, table, column, code, dataSource = "PBD
   useEffect(() => {
     let dead = false;
     setData(null); setErr(null);
+    if (graph) {  // a graph handed in (a worked example): drawn as is, nothing fetched
+      setData(graph); setFocus(graph.focus || null);
+      return () => { dead = true; };
+    }
     lineageApi.lineageGraph({ table, column, code, data_source: ds,
                               include_parallel: parallel })
       .then((d) => { if (dead) return; setData(d); setFocus(d && d.focus); })
       .catch((e) => { if (!dead) setErr(String(e && e.message ? e.message : e)); });
     return () => { dead = true; };
-  }, [table, column, code, ds, parallel]);
+  }, [table, column, code, ds, parallel, graph]);
 
   const nodes = (data && data.nodes) || [];
   const edges = (data && data.edges) || [];
@@ -292,7 +299,7 @@ export default function LineageGraph({ t, table, column, code, dataSource = "PBD
           {activeStages.map((s, i) => (
             <text key={s} x={i * (LANE_W + LANE_GAP)} y={16} fill={STAGE_C[s]}
                   style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".09em" }}>
-              {STAGE_LABEL[s].toUpperCase()}{s === "DWH" ? ` · ${ds}` : ""}
+              {((data.stage_labels && data.stage_labels[s]) || STAGE_LABEL[s]).toUpperCase()}{s === "DWH" && !(data.stage_labels && data.stage_labels[s]) ? ` · ${ds}` : ""}
             </text>
           ))}
 

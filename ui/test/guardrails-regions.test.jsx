@@ -66,8 +66,8 @@ const API_ADDITIONS = strip("ui/src/guardrails_api_additions.js");
 const DDL3 = fs.readFileSync(path.join(ROOT, "sql/69_guardrail_changeset.sql"), "utf8");
 
 // ---- four tabs, and SIT/UAT share one component ----------------------
-ok(/const TABS = \["Overview", "Releases", "SIT", "UAT", "PROD"\]/.test(GJSX),
-   "Overview, Releases, SIT, UAT, PROD", "");
+ok(/const TABS = \["Pipelines", "Overview", "Releases", "SIT", "UAT", "PROD"\]/.test(GJSX),
+   "Pipelines (Integration 360), then Overview, Releases, SIT, UAT, PROD", "");
 
 // ---- the release dashboard answers the INVERSE question ------------
 // /promotion says how far a release has got; a release dashboard asks
@@ -223,7 +223,7 @@ ok(!/NaN|undefined/.test(fd), "with no NaN", fd.slice(0, 200));
 let top = "";
 try {
   top = renderToStaticMarkup(<Guardrails t={t} />);
-  ok(top.length > 500, "Guardrails mounts and opens on Overview", top.length);
+  ok(top.length > 500 && /data-list="pipelines"/.test(top), "Integration 360 - Run mounts and opens on the pipeline list", top.length);
 } catch (e) { ok(false, "Guardrails mounts", e && e.stack); }
 ok(!/NaN|undefined/.test(top), "cleanly", (top.match(/.{0,60}(NaN|undefined).{0,60}/) || [])[0]);
 

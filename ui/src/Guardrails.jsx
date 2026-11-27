@@ -31,6 +31,7 @@
 
 import React, { useState, useEffect } from "react";
 import { SectionHeader } from "./AppShell.jsx";
+import { PipelineCatalog } from "./HubBusiness.jsx";
 import { api } from "./api.js";
 import { promotionApi, STAGE, GATE_STATUS, REGION, LANE, CHANGE_TYPE }
   from "./guardrails_api_additions.js";
@@ -50,12 +51,12 @@ const engineOf = (k) => ENGINE[k] || { label: k || "Other", color: "#5f6f8f" };
 export const GLYPH = { passed: "✓", failed: "✗", warning: "!",
                        running: "◴", not_run: "·", skipped: "·" };
 
-const TABS = ["Overview", "Releases", "SIT", "UAT", "PROD"];
+const TABS = ["Pipelines", "Overview", "Releases", "SIT", "UAT", "PROD"];
 // The stage columns of the matrix, in pipeline order.
 const STAGE_COLS = ["governance", "performance", "testing", "security", "promotion"];
 
 export default function Guardrails({ t, selection }) {
-  const [tab, setTab] = useState("Overview");
+  const [tab, setTab] = useState("Pipelines");
   const [rels, setRels] = useState(null);
   const [regions, setRegions] = useState(null);
 
@@ -83,6 +84,7 @@ export default function Guardrails({ t, selection }) {
                   {" \u00b7 "}{REGION[k].alias}</span> : null}</button>))}
       </div>
 
+      {tab === "Pipelines" && <PipelineCatalog t={t} />}
       {tab === "Overview" && <Overview t={t} rels={rels} regions={regions} />}
       {tab === "Releases" && <Releases t={t} />}
       {(tab === "SIT" || tab === "UAT") &&
