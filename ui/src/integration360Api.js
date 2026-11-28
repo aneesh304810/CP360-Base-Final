@@ -13,6 +13,8 @@ export const integration360Api = {
   health: () => _call("/integration360/health"),
   pipelines: (days = 14) => _call(`/integration360/pipelines?days=${days}`),
   runs: (dag) => _call(`/integration360/runs/${encodeURIComponent(dag)}`),
+  history: (days = 31) => _call(`/integration360/history?days=${days}`),
+  search: (q) => _call(`/integration360/search?q=${encodeURIComponent(q)}`),
   findings: (dag, q = {}) => _call(`/integration360/findings/${encodeURIComponent(dag)}${q.business_date ? `?business_date=${q.business_date}` : ""}`),
   badrows: (stg, raw, business_date, cols = []) => _call(`/integration360/badrows?stg=${encodeURIComponent(stg)}&raw=${encodeURIComponent(raw)}&business_date=${business_date}&cols=${encodeURIComponent(cols.join(","))}`),
   note: (n) => _call("/integration360/note", { method: "POST", body: n }),

@@ -223,7 +223,7 @@ ok(!/NaN|undefined/.test(fd), "with no NaN", fd.slice(0, 200));
 let top = "";
 try {
   top = renderToStaticMarkup(<Guardrails t={t} />);
-  ok(top.length > 500 && /data-list="pipelines"/.test(top), "Integration 360 - Run mounts and opens on the pipeline list", top.length);
+  ok(top.length > 500 && /data-level="dash"/.test(top), "Integration 360 - Run mounts and opens on the dashboard", top.length);
 } catch (e) { ok(false, "Guardrails mounts", e && e.stack); }
 ok(!/NaN|undefined/.test(top), "cleanly", (top.match(/.{0,60}(NaN|undefined).{0,60}/) || [])[0]);
 

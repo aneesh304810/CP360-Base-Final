@@ -4,6 +4,8 @@
     POST /integration360/ingest/dbt          {run_results, manifest?, sources?, dag_id?, business_date?} (integration/dbt/i360_post_run.py)
     POST /integration360/ingest/check        one Great Expectations, Soda or loader check record, with bad_rows
     GET  /integration360/pipelines           per dag: the latest run, its failed tasks, its failing checks, a status
+    GET  /integration360/history?days=31     per dag, per business date: the latest run, failed task, failing checks, bad rows, note
+    GET  /integration360/search?q=           identifiers across runs, tasks and findings
     GET  /integration360/runs/{dag_id}       recent runs with their tasks
     GET  /integration360/findings/{dag_id}   checks for the dag (?business_date=, ?status=)
     GET  /integration360/badrows             a staging model's FAIL rows joined back to RAW by the loader's stamps
@@ -164,6 +166,29 @@ def _recent(days: int):
 def pipelines(days: int = Query(14, ge=1, le=120)):
     runs, tasks, tests = _recent(days)
     return {"dags": I.summarise(runs, tasks, tests), "runs": len(runs), "days": days}
+
+
+@router.get("/history")
+def history(days: int = Query(31, ge=1, le=400)):
+    """Per dag, per business date: the latest run and what it carried, for the dashboard and the history tab."""
+    runs, tasks, tests = _recent(days)
+    notes = _safe("SELECT note_id, dag_id, finding_key, root_cause, action, author, created_at FROM i360_note WHERE created_at >= SYSTIMESTAMP - :d", {"d": days})
+    return {"days": days, "dags": I.history(runs, tasks, tests, notes)}
+
+
+@router.get("/search")
+def search(q: str = Query(..., min_length=2, max_length=80), limit: int = Query(50, ge=1, le=200)):
+    """Identifiers only: dag, task, error code, test, column, model, business date, run id. Nothing from logs."""
+    like = f"%{q.strip().upper()}%"
+    p = {"q": like, "n": limit}
+    runs = _safe("SELECT run_key, dag_id, run_id, business_date, state FROM i360_run WHERE UPPER(dag_id) LIKE :q OR UPPER(run_id) LIKE :q OR business_date LIKE :q "
+                 "ORDER BY received_at DESC FETCH FIRST :n ROWS ONLY", p)
+    tasks = _safe("SELECT task_key, run_key, dag_id, task_id, state, error_code FROM i360_task WHERE UPPER(task_id) LIKE :q OR UPPER(error_code) LIKE :q "
+                  "ORDER BY received_at DESC FETCH FIRST :n ROWS ONLY", p)
+    tests = _safe("SELECT test_key, run_key, dag_id, business_date, rule_kind, model_name, test_name, column_name, status, failures FROM i360_test "
+                  "WHERE UPPER(test_name) LIKE :q OR UPPER(column_name) LIKE :q OR UPPER(model_name) LIKE :q OR UPPER(node_id) LIKE :q "
+                  "ORDER BY received_at DESC FETCH FIRST :n ROWS ONLY", p)
+    return {"q": q, "runs": runs, "tasks": tasks, "findings": tests}
 
 
 @router.get("/runs/{dag_id}")

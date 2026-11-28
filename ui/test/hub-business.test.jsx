@@ -168,7 +168,7 @@ const srcs = ["hubBusiness.js", "HubBusiness.jsx", "hubPipelines.js", "hubErrorP
 ok(srcs.every((s) => !FORBID.test(s)) && !FORBID.test(md), "no host, schema owner, database link, port, address or credential in the sources or the note", srcs.map((s) => (s.match(FORBID) || [""])[0]).join("|"));
 const shell = fs.readFileSync(path.join(SRC, "AppShell.jsx"), "utf8"), app = fs.readFileSync(path.join(SRC, "App.jsx"), "utf8"), gr = fs.readFileSync(path.join(SRC, "Guardrails.jsx"), "utf8");
 ok(!/Quality Guardrails/.test(shell) && /\['guardrails', 'Integration 360 - Run'/.test(shell) && /\['integration360', 'Integration 360 - Design'/.test(shell) && !/hubbusiness/.test(shell) && !/hubbusiness/.test(app), "Quality Guardrails is Integration 360 - Run; the readiness page is Integration 360 - Design; the business view is not a separate item");
-ok(/<PipelineCatalog t=\{t\} \/>/.test(gr) && /"Pipelines", "Overview"/.test(gr), "Integration 360 - Run opens on the pipelines");
+ok(/<Integration360Console t=\{t\} \/>/.test(gr) && /"Pipelines", "Overview"/.test(gr), "Integration 360 - Run opens on the console");
 const store = {};
 globalThis.localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } };
 globalThis.window = globalThis.window || { localStorage: globalThis.localStorage, addEventListener() {}, removeEventListener() {} };

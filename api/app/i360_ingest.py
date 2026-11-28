@@ -257,3 +257,41 @@ def summarise(runs: list[dict], tasks: list[dict], tests: list[dict]) -> dict:
                     "failing": bad, "warnings": warn, "status": status,
                     "tasks_total": len([t for t in tasks if t.get("run_key") == rk]), "tests_total": len([t for t in tests if t.get("run_key") == rk])}
     return out
+
+
+def history(runs: list[dict], tasks: list[dict], tests: list[dict], notes: list[dict] | None = None) -> dict:
+    """Per dag, per business date: the latest run that day and what it carried.
+    {dag_id: [{business_date, run_key, state, status, started_at, ended_at, duration_s, failed_task, error_code,
+               failing_checks, warnings, bad_rows, note}]}, newest first."""
+    by_run_tasks, by_run_tests = {}, {}
+    for t in tasks:
+        by_run_tasks.setdefault(t.get("run_key"), []).append(t)
+    for t in tests:
+        by_run_tests.setdefault(t.get("run_key"), []).append(t)
+    noted = {(n.get("dag_id"), (n.get("finding_key") or "").split(":")[1] if ":" in (n.get("finding_key") or "") else None) for n in (notes or [])}
+    noted_dates = {(n.get("dag_id"), n.get("business_date")) for n in (notes or []) if n.get("business_date")}
+    latest = {}
+    for r in sorted(runs, key=lambda x: (x.get("received_at") or datetime.min)):
+        bd = r.get("business_date") or (r.get("started_at").date().isoformat() if r.get("started_at") else None)
+        if not bd:
+            continue
+        latest[(r["dag_id"], bd)] = r
+    out = {}
+    for (dag, bd), r in latest.items():
+        rk = r["run_key"]
+        ft = [t for t in by_run_tasks.get(rk, []) if str(t.get("state")) in ("failed", "up_for_retry")]
+        bad = [t for t in by_run_tests.get(rk, []) if str(t.get("status")) in ("fail", "failed", "error")]
+        warn = [t for t in by_run_tests.get(rk, []) if str(t.get("status")) == "warn"]
+        st, en = r.get("started_at"), r.get("ended_at")
+        dur = (en - st).total_seconds() if st and en else None
+        status = "red" if r.get("state") == "failed" or ft or bad else ("amber" if warn or r.get("state") in ("running", "queued") else "green")
+        out.setdefault(dag, []).append({
+            "business_date": bd, "run_key": rk, "state": r.get("state"), "status": status, "started_at": st, "ended_at": en, "duration_s": dur,
+            "failed_task": ft[0].get("task_id") if ft else None, "error_code": (ft[0].get("error_code") or None) if ft else None,
+            "failing_checks": len(bad), "check_names": [t.get("test_name") for t in bad][:3], "warnings": len(warn),
+            "bad_rows": sum(int(t.get("failures") or 0) for t in bad + warn),
+            "note": (dag, bd) in noted_dates or (dag, rk.split(":", 1)[1] if ":" in rk else None) in noted,
+        })
+    for dag in out:
+        out[dag].sort(key=lambda x: x["business_date"], reverse=True)
+    return out

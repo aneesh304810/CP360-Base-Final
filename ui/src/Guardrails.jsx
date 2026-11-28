@@ -31,7 +31,7 @@
 
 import React, { useState, useEffect } from "react";
 import { SectionHeader } from "./AppShell.jsx";
-import { PipelineCatalog } from "./HubBusiness.jsx";
+import Integration360Console from "./Integration360Console.jsx";
 import { api } from "./api.js";
 import { promotionApi, STAGE, GATE_STATUS, REGION, LANE, CHANGE_TYPE }
   from "./guardrails_api_additions.js";
@@ -84,7 +84,7 @@ export default function Guardrails({ t, selection }) {
                   {" \u00b7 "}{REGION[k].alias}</span> : null}</button>))}
       </div>
 
-      {tab === "Pipelines" && <PipelineCatalog t={t} />}
+      {tab === "Pipelines" && <Integration360Console t={t} />}
       {tab === "Overview" && <Overview t={t} rels={rels} regions={regions} />}
       {tab === "Releases" && <Releases t={t} />}
       {(tab === "SIT" || tab === "UAT") &&

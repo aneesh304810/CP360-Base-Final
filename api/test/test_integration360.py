@@ -88,6 +88,14 @@ sp = summ["swp_positions_processing"]
 ok(sp["run"]["run_key"] == r["run"]["run_key"] and sp["status"] == "red" and len(sp["failed_tasks"]) == 1 and any(x["test_name"] == "not_null" for x in sp["failing"]), "the latest run per dag, its failed task, and the failing test on the same business date make it red", sp)
 ok(I.summarise([{"run_key": "a:1", "dag_id": "a", "state": "success", "received_at": datetime.now()}], [], [])["a"]["status"] == "green", "a clean run is green")
 
+print("-- history per dag and date")
+h = I.history(runs, tasks, d["tests"], [{"dag_id": "swp_positions_processing", "finding_key": "k", "business_date": "2026-11-27"}])
+hp = h["swp_positions_processing"]
+ok(len(hp) == 1 and hp[0]["business_date"] == "2026-11-27" and hp[0]["status"] == "red" and hp[0]["failed_task"] == "load_file" and hp[0]["error_code"] == "TRAILER_COUNT_MISMATCH" and hp[0]["note"] is True, "one row per business date: the latest run, its failed task with the loader's code, and whether a note exists", hp)
+h2 = I.history([{"run_key": "swp_cash_processing:a", "dag_id": "swp_cash_processing", "business_date": "2026-11-26", "state": "success", "received_at": datetime(2026, 11, 26, 22), "started_at": datetime(2026, 11, 26, 22), "ended_at": datetime(2026, 11, 26, 22, 11)},
+                 {"run_key": "swp_cash_processing:b", "dag_id": "swp_cash_processing", "business_date": "2026-11-27", "state": "failed", "received_at": datetime(2026, 11, 27, 22)}], [], [{"run_key": "swp_cash_processing:b", "status": "fail", "failures": 3, "test_name": "not_null"}])
+ok([x["business_date"] for x in h2["swp_cash_processing"]] == ["2026-11-27", "2026-11-26"] and h2["swp_cash_processing"][1]["duration_s"] == 660 and h2["swp_cash_processing"][0]["bad_rows"] == 3 and h2["swp_cash_processing"][0]["check_names"] == ["not_null"], "newest first, duration from the dates, bad rows from the failing checks")
+
 print("-- bad rows by file row number")
 rows_sql, count_sql = I.bad_rows_sql("stg_eod_positions", "raw_eod_positions", ["ACCOUNT_NUMBER", "INSTRUMENT_ID", "QUANTITY"])
 ok("FROM STG_EOD_POSITIONS s JOIN RAW_EOD_POSITIONS r ON r.FILE_REGISTRY_ID = s.FILE_REGISTRY_ID AND r.FILE_ROW_NUMBER = s.FILE_ROW_NUMBER" in rows_sql and "s.DQ_STATUS_CD = 'FAIL'" in rows_sql and "r.ACCOUNT_NUMBER, r.INSTRUMENT_ID, r.QUANTITY" in rows_sql and ":bd" in count_sql, "the FAIL rows joined to RAW on the loader's stamps, for a date")
@@ -158,6 +166,10 @@ try:
     R.badrows("stg_x; drop", "raw_x", "2026-11-27", "", limit=50); ok(False, "a bad identifier is refused")
 except Exception as e:  # noqa: BLE001
     ok(getattr(e, "status_code", None) == 400, "a bad identifier is refused with 400", e)
+hist = R.history(days=31)
+ok("dags" in hist and any("FROM i360_note" in q for q, _ in reads), "history reads runs, tasks, tests and notes")
+sr = R.search(q="trailer", limit=50)
+ok(set(sr.keys()) >= {"runs", "tasks", "findings"} and any("%TRAILER%" == (pp or {}).get("q") for _, pp in reads), "search is an upper-cased LIKE over identifier columns")
 h = R.health()
 ok(h["ok"] is True and h["signature"] is False and h["token"] is False, "health says what is configured")
 

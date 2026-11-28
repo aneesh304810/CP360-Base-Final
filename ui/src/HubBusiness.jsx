@@ -57,13 +57,13 @@ const Line = ({ d, m = "hbArr", dash, label, lx, ly, c }) => (
     <path d={d} fill="none" stroke={c || (m === "hbAcc" ? TEAL : m === "hbRed" ? RED : m === "hbAmb" ? AMBER : MUTE)} strokeWidth={1.3} strokeDasharray={dash ? "4 4" : undefined} markerEnd={`url(#${m})`} />
     {label && <text x={lx} y={ly} fontSize="8.5" fontStyle="italic" fill={c || MUTE}>{label}</text>}
   </g>);
-const H = ({ t, children, hint }) => (
+export const H = ({ t, children, hint }) => (
   <div style={{ display: "flex", alignItems: "baseline", gap: 12, margin: "34px 0 12px", flexWrap: "wrap" }}>
     <h2 style={{ fontSize: 17, fontWeight: 700, color: t.text || "#1a1a1a", margin: 0 }}>{children}</h2>
     {hint && <span style={{ fontSize: 11.5, color: t.sub || "#4a5560" }}>{hint}</span>}
   </div>);
-const Dot = ({ status, size = 10 }) => <span style={{ display: "inline-block", width: size, height: size, borderRadius: size, background: STATUS_COLOR[status], flex: "0 0 auto" }} />;
-const Chip = ({ bg, fg, children }) => <span style={{ fontSize: 9.5, fontWeight: 800, padding: "2px 8px", borderRadius: 999, background: bg, color: fg, whiteSpace: "nowrap" }}>{children}</span>;
+export const Dot = ({ status, size = 10 }) => <span style={{ display: "inline-block", width: size, height: size, borderRadius: size, background: STATUS_COLOR[status], flex: "0 0 auto" }} />;
+export const Chip = ({ bg, fg, children }) => <span style={{ fontSize: 9.5, fontWeight: 800, padding: "2px 8px", borderRadius: 999, background: bg, color: fg, whiteSpace: "nowrap" }}>{children}</span>;
 
 /* ------------------------------------------------------------------ the catalogue */
 export function PipelineList({ t, open, onOpen, live }) {
@@ -112,82 +112,62 @@ export function PipelineList({ t, open, onOpen, live }) {
     </div>);
 }
 
-export function PipelineCatalog({ t, initial }) {
-  const th = useTheme(t);
-  const [pid, setPid] = useState(initial?.pipeline || "file-pos");
-  const [live, setLive] = useState(initial?.live || null);          // /integration360/pipelines
-  const [findings, setFindings] = useState(initial?.findings || {}); // dag_id -> findings
-  useEffect(() => { if (initial?.live) return; integration360Api.pipelines().then(setLive).catch(() => setLive(null)); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const p = PIPELINES.find((x) => x.id === pid) || PIPELINES[0];
-  const view = useMemo(() => pipelineView(p), [p]);
-  const L = live && live.dags && p.dag_id ? live.dags[p.dag_id] : null;
-  useEffect(() => {
-    if (!L || !p.dag_id || findings[p.dag_id]) return;
-    integration360Api.findings(p.dag_id, { business_date: L.run && L.run.business_date }).then((r) => setFindings((f) => ({ ...f, [p.dag_id]: r.findings || [] }))).catch(() => {});
-  }, [L, p.dag_id]); // eslint-disable-line react-hooks/exhaustive-deps
-  const liveCases = useMemo(() => {
-    if (!L) return [];
-    const fs = (findings[p.dag_id] || []).filter((f) => ["fail", "failed", "error", "warn"].includes(String(f.status)));
-    const ts = (L.failed_tasks || []).map((t) => ({ ...t, rule_kind: "airflow", status: t.state }));
-    const base = fs.length ? fs : (L.failing || []).concat(L.warnings || []);
-    return base.concat(ts).map((f) => caseFromFinding(f, p, view));
-  }, [L, findings, p, view]);
-  const status = L ? L.status : statusOf(p);
-  const cases = L ? liveCases : view.cases;
-  const [scen, setScen] = useState(initial?.scenario || (view.cases[0] && view.cases[0].id) || null);
-  const S = cases.find((x) => x.id === scen) || cases[0] || null;
-  const openPipeline = (id) => { const nv = pipelineView(PIPELINES.find((x) => x.id === id)); setPid(id); setScen(nv.cases[0] ? nv.cases[0].id : null); };
-  const lastRun = L && L.run ? `${L.run.state || ""}${L.run.business_date ? ` \u00b7 business date ${L.run.business_date}` : ""}${L.run.ended_at ? ` \u00b7 ended ${String(L.run.ended_at).slice(0, 16).replace("T", " ")}` : ""}` : "";
-  const ch = CHANNELS[p.channel];
-  const f = S ? S.flow : -1, fd = S ? S.dagTask : -1;
+/* ------------------------------------------------------------------ run-level pieces (shared by the catalogue and the Integration 360 console) */
+export const lastRunLine = (L) => L && L.run ? `${L.run.state || ""}${L.run.business_date ? ` · business date ${L.run.business_date}` : ""}${L.run.ended_at ? ` · ended ${String(L.run.ended_at).slice(0, 16).replace("T", " ")}` : ""}` : "";
 
-  const Header = () => (
-    <div data-pipeline-open={p.id} style={{ border: `1px solid ${th.border}`, borderLeft: `6px solid ${STATUS_COLOR[status]}`, borderRadius: 10, background: th.panel, padding: "14px 18px", marginTop: 14 }}>
+export function PipelineHeader({ t, p, status, L, compact }) {
+  const th = useTheme(t), ch = CHANNELS[p.channel], lastRun = lastRunLine(L);
+  return (
+    <div data-pipeline-open={p.id} style={{ border: `1px solid ${th.border}`, borderLeft: `6px solid ${STATUS_COLOR[status]}`, borderRadius: 10, background: th.panel, padding: compact ? "10px 16px" : "14px 18px", marginTop: compact ? 0 : 14 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <Dot status={status} size={12} /><b style={{ fontSize: 16, color: th.text }}>{p.name}</b>
         <Chip bg="#eaf1fb" fg={BLUE}>{ch.name}</Chip>
         <Chip bg={p.domain === "Accounting" ? "#e6f4f2" : "#f2eefa"} fg={p.domain === "Accounting" ? TEAL : "#6d3ac0"}>{p.domain}</Chip>
         <span style={{ fontSize: 11, fontWeight: 700, color: STATUS_COLOR[status] }}>{STATUS_WORD[status]}</span>
         {L ? <Chip bg="#e6f4f2" fg={TEAL}>LIVE</Chip> : <Chip bg="#f6f8fa" fg={MUTE}>illustrative</Chip>}
-        {L && <span data-last-run style={{ fontSize: 10.5, color: th.sub }}>last run {lastRun}{L.failed_tasks && L.failed_tasks.length ? ` \u00b7 ${L.failed_tasks.length} task${L.failed_tasks.length === 1 ? "" : "s"} failed` : ""}{L.failing && L.failing.length ? ` \u00b7 ${L.failing.length} check${L.failing.length === 1 ? "" : "s"} failing` : ""}</span>}
-        <span style={{ marginLeft: "auto", fontSize: 11, color: th.sub }}>{p.source} <span style={{ color: TEAL }}>{"\u2192"}</span> {p.destination}{" \u00b7 "}{p.cadence}</span>
+        {L && <span data-last-run style={{ fontSize: 10.5, color: th.sub }}>last run {lastRun}{L.failed_tasks && L.failed_tasks.length ? ` · ${L.failed_tasks.length} task${L.failed_tasks.length === 1 ? "" : "s"} failed` : ""}{L.failing && L.failing.length ? ` · ${L.failing.length} check${L.failing.length === 1 ? "" : "s"} failing` : ""}</span>}
+        <span style={{ marginLeft: "auto", fontSize: 11, color: th.sub }}>{p.source} <span style={{ color: TEAL }}>{"→"}</span> {p.destination}{" · "}{p.cadence}</span>
       </div>
-      <div style={{ fontSize: 12.5, color: th.text, marginTop: 8, lineHeight: 1.5 }}>{p.business}</div>
+      {!compact && <div style={{ fontSize: 12.5, color: th.text, marginTop: 8, lineHeight: 1.5 }}>{p.business}</div>}
     </div>);
+}
 
-  const Flow = () => {
-    const n = view.flow.length, w = 120, gap = 20, x0 = 20;
-    const X = (i) => x0 + i * (w + gap);
-    const kindOf = (i) => f >= 0 && i === f ? "bad" : f >= 0 && i > f ? "mute" : "acc";
-    return (
-      <svg viewBox="0 0 1000 140" width="100%" style={{ display: "block" }} role="img" aria-label="where in the flow">
-        <Defs />
-        {view.flow.map(([l, s], i) => (
-          <g key={l}>
-            <Box x={X(i)} y={20} w={w} h={52} label={l} s={f >= 0 && i > f ? "waits" : f === i ? "failed here" : "ok"} kind={kindOf(i)} />
-            <foreignObject x={X(i) - 6} y={78} width={w + 12} height={56}>
-              <div style={{ fontSize: 8.5, color: MUTE, textAlign: "center", lineHeight: 1.3 }}>{s}</div></foreignObject>
-            {i < n - 1 && <Line d={`M${X(i) + w},46 L${X(i + 1)},46`} m={f >= 0 && i >= f ? "hbArr" : "hbAcc"} dash={f >= 0 && i >= f} />}
-          </g>))}
-      </svg>);
-  };
-  const Dag = () => {
-    const n = view.dag.length, w = Math.min(104, Math.floor((960 - (n - 1) * 20) / n)), gap = 20, x0 = 20;
-    const X = (i) => x0 + i * (w + gap);
-    return (
-      <svg viewBox="0 0 1000 70" width="100%" style={{ display: "block" }} role="img" aria-label="which task">
-        <Defs />
-        {view.dag.map(([l], i) => (
-          <g key={l}>
-            <rect x={X(i)} y={14} width={w} height={40} rx="20" fill={fd === i ? "#fae0e2" : fd >= 0 && i > fd ? "#f6f8fa" : "#e6f4f2"} stroke={fd === i ? RED : fd >= 0 && i > fd ? "#b8c4ce" : TEAL} strokeWidth={fd === i ? 2.2 : 1.4} strokeDasharray={fd >= 0 && i > fd ? "5 4" : undefined} />
-            <text x={X(i) + w / 2} y={fd === i || (fd >= 0 && i > fd) ? 32 : 38} fontSize="9.5" fontWeight="700" fill={NAVY} textAnchor="middle">{l}</text>
-            {fd === i && <text x={X(i) + w / 2} y={46} fontSize="8" fontWeight="700" fill={RED} textAnchor="middle">failed</text>}
-            {fd >= 0 && i > fd && <text x={X(i) + w / 2} y={46} fontSize="8" fill={MUTE} textAnchor="middle">upstream_failed</text>}
-            {i < n - 1 && <Line d={`M${X(i) + w},34 L${X(i + 1)},34`} dash={fd >= 0 && i >= fd} />}
-          </g>))}
-      </svg>);
-  };
+export function FlowStrip({ view, f }) {
+  const n = view.flow.length, w = 120, gap = 20, x0 = 20;
+  const X = (i) => x0 + i * (w + gap);
+  const kindOf = (i) => f >= 0 && i === f ? "bad" : f >= 0 && i > f ? "mute" : "acc";
+  return (
+    <svg viewBox="0 0 1000 140" width="100%" style={{ display: "block" }} role="img" aria-label="where in the flow">
+      <Defs />
+      {view.flow.map(([l, s], i) => (
+        <g key={l}>
+          <Box x={X(i)} y={20} w={w} h={52} label={l} s={f >= 0 && i > f ? "waits" : f === i ? "failed here" : "ok"} kind={kindOf(i)} />
+          <foreignObject x={X(i) - 6} y={78} width={w + 12} height={56}>
+            <div style={{ fontSize: 8.5, color: MUTE, textAlign: "center", lineHeight: 1.3 }}>{s}</div></foreignObject>
+          {i < n - 1 && <Line d={`M${X(i) + w},46 L${X(i + 1)},46`} m={f >= 0 && i >= f ? "hbArr" : "hbAcc"} dash={f >= 0 && i >= f} />}
+        </g>))}
+    </svg>);
+}
 
+export function DagStrip({ view, fd }) {
+  const n = view.dag.length, w = Math.min(104, Math.floor((960 - (n - 1) * 20) / n)), gap = 20, x0 = 20;
+  const X = (i) => x0 + i * (w + gap);
+  return (
+    <svg viewBox="0 0 1000 70" width="100%" style={{ display: "block" }} role="img" aria-label="which task">
+      <Defs />
+      {view.dag.map(([l], i) => (
+        <g key={l}>
+          <rect x={X(i)} y={14} width={w} height={40} rx="20" fill={fd === i ? "#fae0e2" : fd >= 0 && i > fd ? "#f6f8fa" : "#e6f4f2"} stroke={fd === i ? RED : fd >= 0 && i > fd ? "#b8c4ce" : TEAL} strokeWidth={fd === i ? 2.2 : 1.4} strokeDasharray={fd >= 0 && i > fd ? "5 4" : undefined} />
+          <text x={X(i) + w / 2} y={fd === i || (fd >= 0 && i > fd) ? 32 : 38} fontSize="9.5" fontWeight="700" fill={NAVY} textAnchor="middle">{l}</text>
+          {fd === i && <text x={X(i) + w / 2} y={46} fontSize="8" fontWeight="700" fill={RED} textAnchor="middle">failed</text>}
+          {fd >= 0 && i > fd && <text x={X(i) + w / 2} y={46} fontSize="8" fill={MUTE} textAnchor="middle">upstream_failed</text>}
+          {i < n - 1 && <Line d={`M${X(i) + w},34 L${X(i + 1)},34`} dash={fd >= 0 && i >= fd} />}
+        </g>))}
+    </svg>);
+}
+
+export function Record({ t, p, view, S, cases, onPickCase, L }) {
+  const th = useTheme(t), lastRun = lastRunLine(L);
   const KVs = ({ rows }) => (
     <table style={{ fontSize: 10.5, borderCollapse: "collapse" }}><tbody>
       {rows.map(([k, v]) => <tr key={k}><td style={{ color: th.sub, padding: "2px 10px 2px 0", textTransform: "uppercase", fontSize: 9.5, letterSpacing: 0.3, whiteSpace: "nowrap", verticalAlign: "top" }}>{k}</td><td style={{ color: th.text, fontFamily: MONO }}>{v}</td></tr>)}
@@ -195,15 +175,19 @@ export function PipelineCatalog({ t, initial }) {
   const col = (title, body, accent) => (
     <div style={{ padding: "12px 14px", background: th.panel, minWidth: 0, borderTop: `3px solid ${accent}` }}>
       <div style={{ fontSize: 10, fontWeight: 800, color: accent, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>{title}</div>{body}</div>);
-  const Record = () => S ? (
+  if (!S) return (
+    <div data-healthy={p.id} style={{ border: `1px solid ${TEAL}`, borderLeft: `6px solid ${TEAL}`, borderRadius: 10, marginTop: 12, padding: "12px 16px", background: th.panel, fontSize: 12, color: th.text }}>
+      <b style={{ color: TEAL }}>{p.planned ? "Not live yet." : "Nothing wrong today."}</b> {p.planned ? "Shown so the shape is agreed before it is built." : L ? `The latest run ${lastRun}: every task completed and every check passed.` : "Every step on the path completed and reconciled; the latest business date is closed."}
+    </div>);
+  return (
     <div data-record={S.id} style={{ border: `1px solid ${th.border}`, borderRadius: 10, marginTop: 12, background: th.panel, overflow: "hidden" }}>
       <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 14px", background: NAVY, color: "#fff", flexWrap: "wrap" }}>
         <b style={{ fontSize: 12.5 }}>What went wrong</b>
         <Chip bg={SEVERITY_COLOR[S.severity]} fg="#fff">{S.severity.toUpperCase()}</Chip>
         <Chip bg="#ffffff22" fg="#fff">{S.kind}</Chip>
-        <span style={{ fontSize: 10.5, color: "#a9c1de" }}>{S.engine}{" \u00b7 "}{S.dag}</span>
-        {cases.length > 1 && <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>{cases.map((x) => (
-          <span key={x.id} role="button" tabIndex={0} aria-pressed={x.id === S.id} onClick={() => setScen(x.id)} style={{ fontSize: 10, fontWeight: 700, padding: "2px 9px", borderRadius: 999, cursor: "pointer", background: x.id === S.id ? "#fff" : "transparent", color: x.id === S.id ? NAVY : "#fff", border: "1px solid #a9c1de", fontFamily: x.live ? MONO : "inherit" }}>{x.live ? (x.rule || x.id).slice(0, 40) : x.id}</span>))}</span>}
+        <span style={{ fontSize: 10.5, color: "#a9c1de" }}>{S.engine}{" · "}{S.dag}</span>
+        {cases && cases.length > 1 && <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>{cases.map((x) => (
+          <span key={x.id} role="button" tabIndex={0} aria-pressed={x.id === S.id} onClick={() => onPickCase && onPickCase(x.id)} style={{ fontSize: 10, fontWeight: 700, padding: "2px 9px", borderRadius: 999, cursor: "pointer", background: x.id === S.id ? "#fff" : "transparent", color: x.id === S.id ? NAVY : "#fff", border: "1px solid #a9c1de", fontFamily: x.live ? MONO : "inherit" }}>{x.live ? (x.rule || x.id).slice(0, 40) : x.id}</span>))}</span>}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1.2fr", gap: 1, background: th.border }}>
         {col("The error", <div>
@@ -223,47 +207,106 @@ export function PipelineCatalog({ t, initial }) {
             <tbody>{S.sample.map((r, i) => <tr key={i}>{Object.values(r).map((v, j) => <td key={j} style={{ padding: "2px 8px 2px 0", color: /^null$|MISSING|REORG/.test(String(v)) ? RED : th.text }}>{String(v)}</td>)}</tr>)}</tbody>
           </table></div>, TEAL)}
       </div>
-    </div>) : (
-    <div data-healthy={p.id} style={{ border: `1px solid ${TEAL}`, borderLeft: `6px solid ${TEAL}`, borderRadius: 10, marginTop: 12, padding: "12px 16px", background: th.panel, fontSize: 12, color: th.text }}>
-      <b style={{ color: TEAL }}>{p.planned ? "Not live yet." : "Nothing wrong today."}</b> {p.planned ? "Shown so the shape is agreed before it is built." : L ? `The latest run ${lastRun}: every task completed and every check passed.` : "Every step on the path completed and reconciled; the latest business date is closed."}
     </div>);
+}
 
-  const BadRecords = () => {
-    if (!S || !S.records) return null;
-    const R = S.records;
-    const copyCsv = () => { try { navigator.clipboard?.writeText([R.columns.join(",")].concat(R.rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))).join("\n")); } catch { /* no clipboard */ } };
-    return (
-      <div data-bad-records={S.id} style={{ border: `1px solid ${th.border}`, borderLeft: `6px solid ${RED}`, borderRadius: 10, marginTop: 12, background: th.panel, overflow: "hidden" }}>
-        <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 14px", borderBottom: `1px solid ${th.border}`, flexWrap: "wrap" }}>
-          <b style={{ fontSize: 12.5, color: th.text }}>Bad records from the file</b>
-          {R.rows && <><span style={{ fontSize: 11, color: th.sub }}><b style={{ color: RED }}>{S.bad.toLocaleString()}</b> of {R.total.toLocaleString()} rows{R.more ? ` \u00b7 showing ${R.rows.length}, ${R.more}` : ""}</span>
-            <span style={{ fontSize: 10.5, color: th.sub, fontFamily: MONO }}>{R.table}{" \u00b7 "}{R.registry}</span>
-            <span role="button" tabIndex={0} onClick={copyCsv} style={{ marginLeft: "auto", fontSize: 10.5, fontWeight: 700, padding: "4px 10px", borderRadius: 5, border: `1px solid ${th.border}`, cursor: "pointer", color: th.text }}>copy as CSV</span></>}
-        </div>
-        {R.none ? <div style={{ padding: "12px 14px", fontSize: 12, color: th.text }}>{R.none}</div> : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: MONO }}>
-              <thead><tr>{R.columns.map((c) => <th key={c} style={{ textAlign: "left", padding: "6px 10px", color: th.sub, fontWeight: 700, fontSize: 9.5, textTransform: c === "reason" ? "uppercase" : "none", letterSpacing: c === "reason" ? 0.4 : 0, borderBottom: `1px solid ${th.border}`, background: R.bad.includes(c) ? "#fae0e2" : "transparent" }}>{c}</th>)}</tr></thead>
-              <tbody>{R.rows.map((r, i) => (
-                <tr key={i}>{r.map((v, j) => { const c = R.columns[j]; const isBad = R.bad.includes(c) || /^null$/.test(String(v)); return (
-                  <td key={j} style={{ padding: "6px 10px", borderBottom: `1px solid ${th.border}`, color: isBad ? RED : c === "reason" ? th.sub : th.text, fontWeight: isBad ? 700 : j === 0 ? 400 : 500, fontFamily: c === "reason" ? "inherit" : MONO, fontSize: c === "reason" ? 11 : 11, background: isBad ? "#fae0e21a" : "transparent" }}>{j === 0 ? `row ${Number(v).toLocaleString()}` : String(v)}</td>); })}</tr>))}</tbody>
-            </table>
-          </div>)}
-        {R.rows && <div style={{ padding: "6px 14px 10px", fontSize: 10.5, color: th.sub }}>Row numbers are the loader's FILE_ROW_NUMBER, so each record is found in the file and in RAW. The rows are kept with their reason; nothing is dropped.</div>}
-      </div>);
-  };
+export function BadRecords({ t, S }) {
+  const th = useTheme(t);
+  if (!S || !S.records) return null;
+  const R = S.records;
+  const copyCsv = () => { try { navigator.clipboard?.writeText([R.columns.join(",")].concat(R.rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))).join("\n")); } catch { /* no clipboard */ } };
+  return (
+    <div data-bad-records={S.id} style={{ border: `1px solid ${th.border}`, borderLeft: `6px solid ${RED}`, borderRadius: 10, marginTop: 12, background: th.panel, overflow: "hidden" }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 14px", borderBottom: `1px solid ${th.border}`, flexWrap: "wrap" }}>
+        <b style={{ fontSize: 12.5, color: th.text }}>Bad records from the file</b>
+        {R.rows && <><span style={{ fontSize: 11, color: th.sub }}><b style={{ color: RED }}>{S.bad.toLocaleString()}</b> of {R.total.toLocaleString()} rows{R.more ? ` · showing ${R.rows.length}, ${R.more}` : ""}</span>
+          <span style={{ fontSize: 10.5, color: th.sub, fontFamily: MONO }}>{R.table}{" · "}{R.registry}</span>
+          <span role="button" tabIndex={0} onClick={copyCsv} style={{ marginLeft: "auto", fontSize: 10.5, fontWeight: 700, padding: "4px 10px", borderRadius: 5, border: `1px solid ${th.border}`, cursor: "pointer", color: th.text }}>copy as CSV</span></>}
+      </div>
+      {R.none ? <div style={{ padding: "12px 14px", fontSize: 12, color: th.text }}>{R.none}</div> : (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: MONO }}>
+            <thead><tr>{R.columns.map((c) => <th key={c} style={{ textAlign: "left", padding: "6px 10px", color: th.sub, fontWeight: 700, fontSize: 9.5, textTransform: c === "reason" ? "uppercase" : "none", letterSpacing: c === "reason" ? 0.4 : 0, borderBottom: `1px solid ${th.border}`, background: R.bad.includes(c) ? "#fae0e2" : "transparent" }}>{c}</th>)}</tr></thead>
+            <tbody>{R.rows.map((r, i) => (
+              <tr key={i}>{r.map((v, j) => { const c = R.columns[j]; const isBad = R.bad.includes(c) || /^null$/.test(String(v)); return (
+                <td key={j} style={{ padding: "6px 10px", borderBottom: `1px solid ${th.border}`, color: isBad ? RED : c === "reason" ? th.sub : th.text, fontWeight: isBad ? 700 : j === 0 ? 400 : 500, fontFamily: c === "reason" ? "inherit" : MONO, fontSize: 11, background: isBad ? "#fae0e21a" : "transparent" }}>{j === 0 ? `row ${Number(v).toLocaleString()}` : String(v)}</td>); })}</tr>))}</tbody>
+          </table>
+        </div>)}
+      {R.rows && <div style={{ padding: "6px 14px 10px", fontSize: 10.5, color: th.sub }}>Row numbers are the loader's FILE_ROW_NUMBER, so each record is found in the file and in RAW. The rows are kept with their reason; nothing is dropped.</div>}
+    </div>);
+}
 
+/** A folding section with a one-line summary; open by default or not. */
+export function Fold({ t, title, summary, open: open0 = true, children, id }) {
+  const th = useTheme(t);
+  const [open, setOpen] = useState(open0);
+  return (
+    <div data-fold={id} data-open={open} style={{ border: `1px solid ${th.border}`, borderRadius: 10, background: th.panel, overflow: "hidden", marginTop: 10 }}>
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} style={{ width: "100%", textAlign: "left", font: "inherit", display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", border: 0, background: "transparent", cursor: "pointer", color: th.text }}>
+        <span style={{ fontSize: 10, color: th.sub }}>{open ? "▼" : "▶"}</span><b style={{ fontSize: 12.5 }}>{title}</b><span style={{ fontSize: 11.5, color: th.sub, minWidth: 0 }}>{summary}</span></button>
+      {open && <div style={{ padding: "0 12px 12px" }}>{children}</div>}
+    </div>);
+}
+
+/** Everything under the header for one run: what went wrong, bad records, where in the flow, where in the data. */
+export function RunDetail({ t, p, view, S, cases, onPickCase, L, folded }) {
+  const f = S ? S.flow : -1, fd = S ? S.dagTask : -1;
+  const flowSummary = S ? `${view.flow[S.flow][0]} failed; everything after it waits · DAG: ${view.dag[S.dagTask][0]} failed, ${view.dag.length - 1 - S.dagTask} task${view.dag.length - 1 - S.dagTask === 1 ? "" : "s"} after it upstream_failed` : "every step on the path completed";
+  const dataSummary = `${new Set(view.graph.nodes.map((n) => n.table)).size} tables · ${view.graph.edges.length} column links${S ? ` · ${S.column.split(":").slice(1).join(".")} failed` : ""}`;
+  return (
+    <div>
+      <Record t={t} p={p} view={view} S={S} cases={cases} onPickCase={onPickCase} L={L} />
+      <BadRecords t={t} S={S} />
+      {folded ? (
+        <>
+          <Fold t={t} id="flow" title="Where in the flow" summary={flowSummary} open><FlowStrip view={view} f={f} /><DagStrip view={view} fd={fd} /></Fold>
+          <Fold t={t} id="data" title="Where in the data" summary={dataSummary} open={false}><HubWires t={t} graph={view.graph} failed={S ? S.column : null} title={`${p.name}: where it lands`} /></Fold>
+        </>
+      ) : (
+        <>
+          <H t={t} hint="the step that failed is red; everything after it waits">Where in the flow</H>
+          <div style={{ border: `1px solid ${t.border || "#d9dee3"}`, borderRadius: 12, padding: "12px 12px 0", background: t.panel || "#fff" }}><FlowStrip view={view} f={f} /><DagStrip view={view} fd={fd} /></div>
+          <H t={t} hint="one box per table, a wire per column; the failed column is red and its path is lit">Where in the data</H>
+          <HubWires t={t} graph={view.graph} failed={S ? S.column : null} title={`${p.name}: where it lands`} />
+        </>
+      )}
+    </div>);
+}
+
+/** The cases for a pipeline: live findings and failed tasks when it has reported, else the illustrative ones. */
+export function useLiveCases(p, view, L, findings) {
+  return useMemo(() => {
+    if (!L) return view.cases;
+    const fs = (findings[p.dag_id] || []).filter((f) => ["fail", "failed", "error", "warn"].includes(String(f.status)));
+    const ts = (L.failed_tasks || []).map((t) => ({ ...t, rule_kind: "airflow", status: t.state }));
+    const base = fs.length ? fs : (L.failing || []).concat(L.warnings || []);
+    return base.concat(ts).map((f) => caseFromFinding(f, p, view));
+  }, [L, findings, p, view]);
+}
+
+export function PipelineCatalog({ t, initial }) {
+  const [pid, setPid] = useState(initial?.pipeline || "file-pos");
+  const [live, setLive] = useState(initial?.live || null);          // /integration360/pipelines
+  const [findings, setFindings] = useState(initial?.findings || {}); // dag_id -> findings
+  useEffect(() => { if (initial?.live) return; integration360Api.pipelines().then(setLive).catch(() => setLive(null)); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const p = PIPELINES.find((x) => x.id === pid) || PIPELINES[0];
+  const view = useMemo(() => pipelineView(p), [p]);
+  const L = live && live.dags && p.dag_id ? live.dags[p.dag_id] : null;
+  useEffect(() => {
+    if (!L || !p.dag_id || findings[p.dag_id]) return;
+    integration360Api.findings(p.dag_id, { business_date: L.run && L.run.business_date }).then((r) => setFindings((f) => ({ ...f, [p.dag_id]: r.findings || [] }))).catch(() => {});
+  }, [L, p.dag_id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const cases = useLiveCases(p, view, L, findings);
+  const status = L ? L.status : statusOf(p);
+  const [scen, setScen] = useState(initial?.scenario || (view.cases[0] && view.cases[0].id) || null);
+  const S = cases.find((x) => x.id === scen) || cases[0] || null;
+  const openPipeline = (id) => { const nv = pipelineView(PIPELINES.find((x) => x.id === id)); setPid(id); setScen(nv.cases[0] ? nv.cases[0].id : null); };
   return (
     <div>
       <H t={t} hint="green is healthy; red says what is wrong, where, and why">Pipelines</H>
       <PipelineList t={t} open={p.id} onOpen={openPipeline} live={live} />
-      <Header />
-      <Record />
-      <BadRecords />
-      <H t={t} hint="the step that failed is red; everything after it waits">Where in the flow</H>
-      <div style={{ border: `1px solid ${th.border}`, borderRadius: 12, padding: "12px 12px 0", background: th.panel }}><Flow /><Dag /></div>
-      <H t={t} hint="one box per table, a wire per column; the failed column is red and its path is lit">Where in the data</H>
-      <HubWires t={t} graph={view.graph} failed={S ? S.column : null} title={`${p.name}: where it lands`} />
+      <PipelineHeader t={t} p={p} status={status} L={L} />
+      <RunDetail t={t} p={p} view={view} S={S} cases={cases} onPickCase={setScen} L={L} />
     </div>);
 }
 
