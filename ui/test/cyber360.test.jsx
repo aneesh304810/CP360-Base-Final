@@ -80,7 +80,7 @@ ok(/Applications not covered/.test(renderToStaticMarkup(<ReviewTab t={tLight} ap
 console.log("-- wired in");
 const SRC = fs.existsSync("src/Cyber360.jsx") ? "src" : path.join("ui", "src");
 const shell = fs.readFileSync(path.join(SRC, "AppShell.jsx"), "utf8"), app = fs.readFileSync(path.join(SRC, "App.jsx"), "utf8"), client = fs.readFileSync(path.join(SRC, "cyber360Api.js"), "utf8");
-ok(/\['cyber360', 'Cyber Security 360'/.test(shell) && /group: 'Governance'[\s\S]*?cyber360/.test(shell), "Cyber Security 360 sits under Governance in the nav");
+ok(/\['cyber360', 'Cyber Security 360'/.test(shell) && /group: 'Govern'[\s\S]*?cyber360/.test(shell), "Cyber Security 360 sits under Govern in the nav");
 ok(/import Cyber360 from "\.\/Cyber360\.jsx"/.test(app) && /cyber360: <Cyber360 t=\{t\} \/>/.test(app), "and routes to the page");
 ok(!/from "\.\/api\.js"/.test(client) && !/[\w.+-]+@[\w-]+\.[\w.-]+/.test(client), "the client is self-contained and carries no address");
 const sql = fs.readFileSync(path.join(SRC, "..", "..", "sql", "88_cyber360.sql"), "utf8");

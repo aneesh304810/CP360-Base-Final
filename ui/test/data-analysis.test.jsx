@@ -97,7 +97,7 @@ ok(/Historical Data Analysis Migration/.test(routed) && /Historical data migrati
 console.log("-- wired in");
 const shell = fs.readFileSync(path.join(SRC, "AppShell.jsx"), "utf8");
 const app = fs.readFileSync(path.join(SRC, "App.jsx"), "utf8");
-ok(/\['dataanalysis', 'Historical Data Analysis Migration'/.test(shell) && /group: 'Utilities'[\s\S]*?dataanalysis[\s\S]*?\]\s*\}/.test(shell), "Historical Data Analysis Migration sits under Utilities in the nav");
+ok(/\['dataanalysis', 'Historical Data Analysis'/.test(shell) && /group: 'Lineage & Analysis'[\s\S]*?dataanalysis[\s\S]*?\]\s*\}/.test(shell), "Historical Data Analysis sits under Lineage & Analysis in the nav");
 ok(/import DataAnalysis from "\.\/DataAnalysis\.jsx"/.test(app) && /dataanalysis: <DataAnalysis t=\{t\} \/>/.test(app), "and routes to the page");
 ok(!/from ['"]\.\/api\.js['"]/.test(fs.readFileSync(path.join(SRC, "seiMigrationApi.js"), "utf8")), "the client never touches api.js");
 

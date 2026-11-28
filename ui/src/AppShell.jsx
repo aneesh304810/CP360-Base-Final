@@ -1,65 +1,56 @@
 import React, { useState, useEffect } from 'react';
 import { api } from './api.js';
 import GlobalSearch from "./GlobalSearch.jsx";
-import { NavBadge, NavLegend, MODULE_STATUS } from './navStatus.jsx';
+import { NavBadge } from './navStatus.jsx';
+import NavRail, { sectionOf, labelOf } from './NavRail.jsx';
 import { filterNav } from './securityApi.js';
-// Grouped, viewport-aware collapsing sidebar navigation.
+// Grouped, viewport-aware collapsing sidebar navigation (drawn by NavRail).
 const BREAKPOINT = 1200;
 const GRAPH_ROUTES = new Set(['data']);
 
 const NAV_GROUPS = [
  { group: null, items: [['home', 'Home', '\u2302']] },
- { group: 'Catalog', items: [
+ // Sections by what the user is doing. Keys name the section icon in NavRail.
+ { group: 'Catalog', key: 'catalog', items: [
  ['interface', 'Interface 360', '\u21C4'],
  ['api', 'API 360', '\u25C8'],
  ['data', 'Data 360', '\u25A4'],
  ['datapoint', 'Datapoint 360', '\u25C9'],
+ ['event360', 'Event 360', '\u25D0'],
  ['odi360', 'ODI 360', '\u27F2'],
  ] },
- { group: 'Lineage', items: [
+ { group: 'Lineage & Analysis', key: 'lineage', items: [
  ['lineage', 'Lineage', '\u{1F9EC}'],
- ] },
- { group: 'Events', items: [
- ['event360', 'Event 360', '\u25D0'],
- ] },
- { group: 'Utilities', items: [
- ['mapper', 'Auto Mapper', '\u21F2'],
- ['compare', 'Compare', '\u29C9'],
- ['dataanalysis', 'Historical Data Analysis Migration', '\u2AF6'],
- ] },
- {
- group: 'Governance',
- items: [
- ['pii', 'PII Explorer', '⚑'],
- ['guardrails', 'Integration 360 - Run', '\u25C9'],
- ['cyber360', 'Cyber Security 360', '\u26E8'],
- ['codereview', 'Code Review 360', '\u2611'],
  ['impact', 'Impact Analysis', '⚡'],
  ['variance', 'Variance 360', '≍'],
- ['recon', 'Recon 360', '⇄'],
+ ['compare', 'Compare', '\u29C9'],
+ ['mapper', 'Auto Mapper', '\u21F2'],
+ ['dataanalysis', 'Historical Data Analysis', '\u2AF6'],
+ ] },
+ { group: 'Build', key: 'build', items: [
+ ['hub', 'CP Integration Hub', '🏛'],
+ ['integration360', 'Integration 360 - Design', '\u25CE'],
+ ['system', 'System Design', '⛬'],
+ ['devops360', 'DevOps 360', '⚙'],
  ['release', 'Release Delivery', '\u25B3'],
+ ['codereview', 'Code Review 360', '\u2611'],
+ ] },
+ { group: 'Operate', key: 'operate', items: [
+ ['guardrails', 'Integration 360 - Run', '\u25C9'],
+ ['recon', 'Recon 360', '⇄'],
+ ['pbnotify', 'PB Notifications', '\u2709'],
  ['apiconsole', 'API Console', '\u2318'],
- ]
-},
-{
- group: 'Admin',
- items: [
+ ] },
+ { group: 'Govern', key: 'govern', items: [
+ ['pii', 'PII Explorer', '⚑'],
+ ['cyber360', 'Cyber Security 360', '\u26E8'],
+ ['security', 'Security Entitlement', '\u26BF'],
+ ] },
+ { group: 'Admin', key: 'admin', items: [
  ['datasources', 'Data Sources', '⛭'],
  ['apicatalog', 'API Catalog Admin', '\u2699'],
- ["hub", "CP Integration Hub", "🏛"],
-      ['environment', 'Environment 360', '🖧'],
-      ['security', 'Security Entitlement', '\u26BF'],
- ]
-},
-{
- group: 'Architecture',
- items: [
- ['system', 'System Design', '⛬'],
- ['integration360', 'Integration 360 - Design', '\u25CE'],
- ['devops360', 'DevOps 360', '⚙'],
- ['pbnotify', 'PB Notifications', '\u2709'],
- ]
-},
+ ['environment', 'Environment 360', '🖧'],
+ ] },
 ];
 
 // `me` is the payload from /auth/me. When enforcement is off it carries
@@ -128,8 +119,9 @@ export default function AppShell({ t, route, onNav, live, onSearch, onOpenHit,
  }
  };
 
- const railW = collapsed ? 54 : 216;
  const groups = filterNav(NAV_GROUPS, me ? me.modules : null);
+ const section = groups.find((g) => g.key === sectionOf(groups, route));
+ const pageLabel = labelOf(groups, route);
  const who = me && me.user ? me.user : null;
 
  return (
@@ -170,57 +162,18 @@ export default function AppShell({ t, route, onNav, live, onSearch, onOpenHit,
  </div>
 
  <div style={{ display: 'flex', minHeight: 'calc(100vh - 56px)' }}>
- <nav style={{ width: railW, flexShrink: 0, background: t.navy,
- transition: 'width 0.18s ease', padding: '8px 8px', overflowY: 'auto',
- display: 'flex', flexDirection: 'column' }}>
- <div onClick={() => setManual(!collapsed)}
- title={collapsed ? 'Expand' : 'Collapse'}
- style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
- color: '#7f8fb0', fontSize: 12, padding: collapsed ? '8px 0' : '8px 12px',
- justifyContent: collapsed ? 'center' : 'flex-start', borderRadius: t.radius.md,
- marginBottom: 6 }}>
- <span>{collapsed ? '\u00BB' : '\u00AB'}</span>
- {!collapsed && <span>Collapse</span>}
- </div>
- {groups.map((grp, gi) => (
- <div key={gi}>
- {grp.group && !collapsed && (
- <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
- letterSpacing: '.5px', color: '#5f6f8f', padding: '12px 12px 5px' }}>{grp.group}</div>
- )}
- {grp.group && collapsed && (
- <div style={{ textAlign: 'center', color: '#3a4767', padding: '10px 0 4px', fontSize: 10 }}>{'\u2022\u2022\u2022'}</div>
- )}
- {grp.items.map(([k, label, icon]) => {
- const active = route === k;
- const st = MODULE_STATUS[k];
- return (
- <a key={k} onClick={() => onNav(k)}
- title={collapsed ? label + (st ? ' \u00b7 IN BUILD' : '') : ''}
- style={{ display: 'flex', alignItems: 'center', gap: 10,
- padding: collapsed ? '10px 0' : '9px 12px',
- justifyContent: collapsed ? 'center' : 'flex-start',
- borderRadius: t.radius.md, cursor: 'pointer', marginBottom: 1,
- fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden',
- color: active ? '#fff' : '#c5d2e4',
- background: active ? t.accent : 'transparent' }}>
- <span style={{ width: 16, textAlign: 'center', flexShrink: 0, opacity: 0.9,
- position: 'relative' }}>{icon}
- {collapsed && st && <span style={{ position: 'absolute', top: -2,
- right: -4, width: 6, height: 6, borderRadius: '50%',
- background: '#e67e22' }} />}
- </span>
- {!collapsed && <span style={{ flex: 1, overflow: 'hidden',
- textOverflow: 'ellipsis' }}>{label}</span>}
- {!collapsed && <NavBadge id={k} />}
- </a>
- );
- })}
- </div>
- ))}
- {!collapsed && <NavLegend />}
- </nav>
+ <NavRail t={t} groups={groups} route={route} onNav={onNav} collapsed={collapsed}
+ onToggle={() => setManual(!collapsed)} />
  <div style={{ flex: 1, minWidth: 0, padding: '26px 34px 60px' }}>
+ {route !== 'home' && pageLabel && (
+ <div data-breadcrumb style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12,
+ color: t.sub, marginBottom: 10, flexWrap: 'wrap' }}>
+ {section && <span>{section.group}</span>}
+ {section && <span aria-hidden="true" style={{ color: t.border }}>{'\u203A'}</span>}
+ <span style={{ color: t.text, fontWeight: 600 }}>{pageLabel}</span>
+ <span style={{ display: 'inline-block' }}><NavBadge id={route} /></span>
+ </div>
+ )}
  {children}
  </div>
  </div>

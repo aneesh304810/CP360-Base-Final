@@ -196,7 +196,7 @@ const APP = fs.readFileSync(path.join(SRC, "App.jsx"), "utf8"), NAV = fs.readFil
 const SEC = fs.readFileSync(path.join(SRC, "..", "..", "sql", "64_security.sql"), "utf8");
 ok(/import PbNotifications from "\.\/PbNotifications\.jsx"/.test(APP) && /pbnotify: <PbNotifications t=\{t\} \/>/.test(APP), "App.jsx routes it");
 const groupOf = (key) => { const i = NAV.indexOf(`['${key}'`); const m = [...NAV.slice(0, i).matchAll(/group: '([^']+)'/g)]; return m.length ? m[m.length - 1][1] : null; };
-ok(groupOf("pbnotify") === "Architecture", "it sits under Architecture with System Design and DevOps 360", groupOf("pbnotify"));
+ok(groupOf("pbnotify") === "Operate", "it sits under Operate: a notification utility is day-to-day running", groupOf("pbnotify"));
 ok(/'pbnotify','PB Notifications','Architecture'/.test(SEC), "the security module is seeded under Architecture");
 const MAIN = fs.readFileSync(path.join(SRC, "..", "..", "api", "app", "main.py"), "utf8");
 ok(/"routers_pbnotify_review"/.test(MAIN) && fs.existsSync(path.join(SRC, "..", "..", "sql", "84_pbnotify_review.sql")) && fs.existsSync(path.join(SRC, "..", "..", "sql", "85_pbnotify_design_doc.sql")), "the review router is mounted and its tables have SQL files");

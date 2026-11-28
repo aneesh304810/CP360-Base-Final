@@ -52,7 +52,7 @@ ok(!/[\w.+-]+@[\w-]+\.[\w.-]+/.test(page + std + how) && !/testbbh|\.bbh\.com/i.
 console.log("-- wired in");
 const SRC = fs.existsSync("src/CodeReview360.jsx") ? "src" : path.join("ui", "src");
 const shell = fs.readFileSync(path.join(SRC, "AppShell.jsx"), "utf8"), app = fs.readFileSync(path.join(SRC, "App.jsx"), "utf8"), client = fs.readFileSync(path.join(SRC, "codeReviewApi.js"), "utf8");
-ok(/\['codereview', 'Code Review 360'/.test(shell) && /group: 'Governance'[\s\S]*?codereview/.test(shell), "Code Review 360 sits under Governance");
+ok(/\['codereview', 'Code Review 360'/.test(shell) && /group: 'Build'[\s\S]*?codereview[\s\S]*?group: 'Operate'/.test(shell), "Code Review 360 sits under Build");
 ok(/import CodeReview360 from "\.\/CodeReview360\.jsx"/.test(app) && /codereview: <CodeReview360 t=\{t\} \/>/.test(app), "and routes to the page");
 ok(!/from "\.\/api\.js"/.test(client), "the client is self-contained");
 const root = path.join(SRC, "..", "..");

@@ -114,7 +114,7 @@ const APP = fs.readFileSync(path.join(SRC, "App.jsx"), "utf8"), NAV = fs.readFil
 ok(/import Odi360 from "\.\/Odi360\.jsx"/.test(APP) && /odi360: <Odi360 t=\{t\} \/>/.test(APP), "App.jsx routes it");
 ok(/\['odi360', 'ODI 360'/.test(NAV), "AppShell.jsx has the nav entry");
 const groupOf = (key) => { const i = NAV.indexOf(`['${key}'`); const before = NAV.slice(0, i); const m = [...before.matchAll(/group: '([^']+)'/g)]; return m.length ? m[m.length - 1][1] : null; };
-ok(groupOf("odi360") === "Catalog" && groupOf("devops360") === "Architecture", "and it sits under Catalog, not Architecture", groupOf("odi360"));
+ok(groupOf("odi360") === "Catalog" && groupOf("devops360") === "Build", "and it sits under Catalog, not Build", groupOf("odi360"));
 ok(!/https?:\/\/|testbbh|\.bbh\.com/.test(fs.readFileSync(path.join(SRC, "Odi360.jsx"), "utf8")), "no URL or hostname on the screen");
 
 console.log(bad ? `\n${bad} assertion(s) failed` : "\nodi360 assertions pass");

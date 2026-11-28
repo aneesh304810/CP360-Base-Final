@@ -50,9 +50,9 @@ const SEC = rd("sql/64_security.sql");
 /* ---------------------------------------------------- it actually moved */
 ok(/\['release', 'Release Delivery'/.test(NAV),
    "the nav carries a Release Delivery item", "");
-const gov = NAV.slice(NAV.indexOf("group: 'Governance'"), NAV.indexOf("group: 'Admin'"));
+const gov = NAV.slice(NAV.indexOf("group: 'Build'"), NAV.indexOf("group: 'Operate'"));
 ok(/'release'/.test(gov),
-   "and it sits under Governance, not Architecture",
+   "and it sits under Build, with DevOps 360 and Code Review 360",
    gov.match(/\['[a-z0-9]+'/g).join(" "));
 ok(/release: <ReleaseDelivery t=\{t\} \/>/.test(APP),
    "App routes it", "");
