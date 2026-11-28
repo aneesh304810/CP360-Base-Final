@@ -84,7 +84,50 @@ export function WithHub() {
     </svg>);
 }
 
+export const STORY = {
+  airlines: ["Airline A", "Airline B", "Airline C", "Charter", "Cargo"], crews: ["Fuel", "Baggage", "Gates", "Catering", "Customs"],
+  arrangements: ["own radio", "paper sheet", "a phone call", "a macro"],
+  beats: [
+    ["The airport without a tower", "Every airline made its own arrangements with every crew: a radio frequency, a paper sheet, a phone call. Forty of them, and nobody holds the list.", "RMJ schedules, cron jobs, scripts and small applications, each with its own translation or none"],
+    ["The tower", "Every movement comes through it, is recorded, and is handed on in a form the next crew already understands.", "CP Integration Hub: receive, validate, translate, reconcile, publish"],
+    ["Four approaches", "Scheduled arrivals, the radar feed, a radio call, departures confirmed back down to the last bag.", "inbound files, events, APIs, outbound loaders"],
+    ["The flight strip", "One strip per movement, one state at a time. The day closes when every expected flight is accounted for, not when the clock says so.", "the registry row and the business date"],
+    ["The bad days", "A holding pattern, a go-around, a flight not on time, a plane down with no gate, a plan filed twice. Each has a word and a next step.", "quarantine, retry, missing file, archive failed, duplicate skipped"],
+    ["The radar screen", "One screen: every flight, which one is in trouble, where, and why. No controller reads logs.", "Integration 360: what, where, why, down to the rows"],
+  ],
+  close: "The airport without a tower was not unsafe every day. It was unsafe on the day something changed and nobody knew who was affected.",
+};
+
+/** Slide 0 picture: the airport without a tower on the left, with the tower on the right. */
+export function TowerStory() {
+  const L = STORY.airlines, R = STORY.crews;
+  const y = (i) => 34 + i * 58;
+  const links = [[0, 1], [0, 3], [1, 0], [1, 4, "bad"], [2, 1, "bad", "dash"], [2, 2], [2, 4], [3, 0, "", "dash"], [3, 2, "bad"], [4, 3], [4, 1, "", "dash"], [0, 2, "bad"]];
+  return (
+    <svg viewBox="0 0 760 330" width="100%" style={{ display: "block" }} role="img" aria-label="the airport without a tower and with one">
+      <text x="12" y="20" fontSize="10" fontWeight="800" fill={RED} letterSpacing="1">WITHOUT A TOWER</text>
+      {links.map(([a, b, bad, dash], i) => <path key={i} d={`M104,${y(a) + 15} C180,${y(a) + 15} 180,${y(b) + 15} 256,${y(b) + 15}`} fill="none" stroke={bad ? RED : MUTE} strokeWidth="1.1" strokeDasharray={dash ? "3 3" : undefined} opacity="0.75" />)}
+      {L.map((l, i) => <Box key={l} x={12} y={y(i)} w={92} h={30} label={l} c={VIOLET} fill="#f2eefa" bold={10.5} />)}
+      {R.map((l, i) => <Box key={l} x={256} y={y(i)} w={92} h={30} label={l} c={TEAL} fill="#e6f4f2" bold={10.5} />)}
+      {STORY.arrangements.map((a, i) => <text key={a} x={[150, 152, 150, 150][i]} y={[30, 140, 200, 312][i]} fontSize="8.5" fill={RED} fontFamily="ui-monospace, monospace">{a}</text>)}
+      <text x={180} y={326} fontSize="9" fill={MUTE} textAnchor="middle">12 arrangements, 12 translations, no record of the day</text>
+      <line x1="372" y1="24" x2="372" y2="320" stroke="#d6dce6" strokeDasharray="4 4" />
+      <text x="392" y="20" fontSize="10" fontWeight="800" fill={TEAL} letterSpacing="1">WITH A TOWER</text>
+      {L.map((l, i) => <Box key={l} x={392} y={y(i)} w={92} h={30} label={l} c={VIOLET} fill="#f2eefa" bold={10.5} />)}
+      {R.map((l, i) => <Box key={l} x={656} y={y(i)} w={92} h={30} label={l} c={TEAL} fill="#e6f4f2" bold={10.5} />)}
+      <rect x="534" y="40" width="72" height="250" rx="10" fill={NAVY} />
+      <rect x="520" y="40" width="100" height="44" rx="10" fill={NAVY} />
+      <rect x="528" y="48" width="84" height="28" rx="6" fill="#e8eef6" />
+      <text x="570" y="67" textAnchor="middle" fontSize="10" fontWeight="800" fill={NAVY}>TOWER</text>
+      {["receive", "validate", "translate", "reconcile", "publish"].map((v, i) => <text key={v} x="570" y={118 + i * 30} textAnchor="middle" fontSize="8.5" fill="#a9c1de" fontFamily="ui-monospace, monospace">{v}</text>)}
+      {L.map((_, i) => <path key={`l${i}`} d={`M484,${y(i) + 15} L534,${y(i) + 15}`} stroke={TEAL} strokeWidth="1.4" />)}
+      {R.map((_, i) => <path key={`r${i}`} d={`M606,${y(i) + 15} L656,${y(i) + 15}`} stroke={TEAL} strokeWidth="1.4" />)}
+      <text x={570} y={326} fontSize="9" fill={MUTE} textAnchor="middle">one doorway, one language, one record</text>
+    </svg>);
+}
+
 export const SLIDES = [
+  { key: "story", kicker: "The story", title: "The Tower and the Hub", line: "An airport that grew one gate at a time, and the control tower that made it an airport. Every part of the picture is a part of the hub." },
   { key: "without", kicker: "Today", title: "Without a hub", line: "Every interface is its own job: an RMJ schedule, a cron job, a script, a small application. Each carries its own translation, or none." },
   { key: "with", kicker: "With CP Integration Hub", title: "One doorway, four channels", line: "Events, inbound files, APIs and outbound loaders come through one place that validates, translates, reconciles and publishes, and keeps the record." },
   { key: "does", kicker: "What it does", title: "Five things, to every movement", line: ROLE.line },
@@ -138,6 +181,21 @@ export default function HubSlides({ t, initial }) {
         {nav}
       </div>
       <div style={{ padding: "14px 22px 20px" }}>
+        {S.key === "story" && (
+          <div style={{ display: "grid", gridTemplateColumns: "1.15fr 1fr", gap: 14 }}>
+            <div>
+              <div style={{ border: `1px solid ${border}`, borderRadius: 12, padding: 10, background: "#fff" }}><TowerStory /></div>
+              <div style={{ marginTop: 10, padding: "12px 14px", borderRadius: 10, background: NAVY, color: "#fff", fontSize: 12.5, lineHeight: 1.5 }}><b>{STORY.close}</b> CP Integration Hub exists for that day.</div>
+            </div>
+            <ol style={{ margin: 0, paddingLeft: 0, listStyle: "none", display: "grid", gap: 8, alignContent: "start" }}>
+              {STORY.beats.map(([h, b, m], k) => (
+                <li key={h} style={{ display: "grid", gridTemplateColumns: "26px 1fr", gap: 8, padding: "8px 10px", border: `1px solid ${border}`, borderRadius: 8, background: panel }}>
+                  <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 12, fontWeight: 800, color: k === 0 ? RED : TEAL }}>{k + 1}</span>
+                  <span><b style={{ fontSize: 12.5, color: text }}>{h}.</b> <span style={{ fontSize: 11.5, color: sub }}>{b}</span>
+                    <div style={{ fontSize: 10.5, color: TEAL, marginTop: 2 }}>{"\u2192"} {m}</div></span>
+                </li>))}
+            </ol>
+          </div>)}
         {S.key === "without" && <><div style={{ border: `1px solid ${RED}55`, borderRadius: 12, padding: 10, background: "#fff" }}><WithoutHub /></div><Callouts rows={WITHOUT_HUB.callouts} bad /></>}
         {S.key === "with" && <><div style={{ border: `1px solid ${TEAL}`, borderRadius: 12, padding: 10, background: "#fff" }}><WithHub /></div><Callouts rows={WITH_HUB.callouts} /></>}
         {S.key === "does" && <><Verbs /><Tiles rows={USES} icon /></>}
