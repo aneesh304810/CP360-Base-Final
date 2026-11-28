@@ -224,6 +224,38 @@ export function PlainPicture() {
     </svg>);
 }
 
+
+/* ---- The four doors: one slide per channel, in plain words ---- */
+export const DOORS = [
+  ["File drop", "Inbound files", "every business day", "the day's positions file", "the file is complete, the columns are the ones promised, the counts add up", "the file is quarantined with a reason; nothing downstream reads a half file"],
+  ["Live message", "Events", "the instant something happens", "a transaction booked at SEI", "the message has the fields the contract names and is not a duplicate", "the message is parked and retried; the next ones keep flowing"],
+  ["App call", "APIs", "when a system asks a question", "a loader asking for its status", "the caller is allowed to ask, and the request is well formed", "the caller gets an error code and a reason, never a silent nothing"],
+  ["Outgoing file", "Outbound loaders", "when BBH sends to SEI", "a fee loader submission", "every row the business promised is in the file before it leaves", "the submission is held and shown; it is released when the rows are there"],
+];
+export function DoorsPicture() {
+  const label = (x, y, txt, opt = {}) => <text x={x} y={y} fontSize={opt.size || 10.5} fontWeight={opt.w || 600} fill={opt.c || NAVY} textAnchor={opt.a || "middle"} fontFamily="Inter, system-ui, sans-serif">{txt}</text>;
+  const colors = [BLUE, VIOLET, AMBER, TEAL];
+  return (
+    <svg viewBox="0 0 660 300" width="100%" role="img" aria-label="Four doors into the hub: file drop, live message, app call and outgoing file, all leading to the same sorting floor" style={{ display: "block" }}>
+      <defs><marker id="dr-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5 0 10z" fill={MUTE} /></marker></defs>
+      {label(330, 20, "FOUR DOORS INTO THE SAME BUILDING", { size: 9.5, c: TEAL })}
+      {DOORS.map(([plain, tech, when, ex], k) => { const x = 22 + k * 160, c = colors[k]; return (
+        <g key={plain}>
+          <path d={`M${x} 190 L${x} 70 Q${x} 36 ${x + 70} 36 Q${x + 140} 36 ${x + 140} 70 L${x + 140} 190 Z`} fill="#fff" stroke={c} strokeWidth="1.6" />
+          <rect x={x + 14} y={78} width={112} height={112} rx="4" fill={c} opacity="0.12" />
+          <circle cx={x + 112} cy={140} r="3" fill={c} />
+          {label(x + 70, 60, plain, { size: 12, w: 800, c })}
+          {label(x + 70, 100, tech, { size: 10, w: 700 })}
+          {label(x + 70, 118, when, { size: 8.5, w: 500, c: MUTE })}
+          {label(x + 70, 166, "e.g. " + ex, { size: 8.5, w: 600, c: NAVY })}
+          <line x1={x + 70} y1="192" x2={x + 70} y2="226" stroke={MUTE} strokeWidth="1.2" markerEnd="url(#dr-arr)" />
+        </g>); })}
+      <rect x="22" y="230" width="616" height="52" rx="8" fill={NAVY} />
+      {label(330, 251, "THE SAME SORTING FLOOR BEHIND EVERY DOOR", { size: 9.5, w: 800, c: "#8fd3c6" })}
+      {label(330, 270, "check at the door → translate → deliver → write it down", { size: 11, w: 700, c: "#fff" })}
+    </svg>);
+}
+
 /* ---- What the business gets ---- */
 export const BENEFITS = [
   ["One place to change things", "A vendor changes a file layout and someone chases every script that reads it.", "Change the contract once in the hub; every consumer gets the new shape."],
@@ -235,8 +267,8 @@ export const CHAPTERS = [["problem", "The problem"], ["what", "What it is"], ["h
 
 export const SLIDES = [
   { key: "without", chapter: "problem", kicker: "The problem today", title: "Without a hub", line: "Every interface is its own job: an RMJ schedule, a cron job, a script, a small application. Each carries its own translation, or none." },
-  { key: "context", chapter: "problem", kicker: "I. Context \u00b7 why now", title: "The CP ecosystem today", line: "The books move to SEI: roughly forty interfaces per business date on four channels, each one built and watched on its own, with a partner that keeps changing its templates." },
   { key: "plain", chapter: "what", kicker: "In plain words", title: "The post office for your data", line: "One place every file, message and call passes through on its way from one system to another. It checks, translates, delivers and writes down what happened." },
+  { key: "doors", chapter: "what", kicker: "The four doors", title: "Four doors, one building", line: "Data arrives four ways: a file dropped on a schedule, a message the instant something happens, a system asking a question, and a file BBH sends out. Each has its own door. Behind every door is the same floor." },
   { key: "with", chapter: "how", kicker: "The hub itself", title: "One doorway, four channels", line: "Events, inbound files, APIs and outbound loaders come through one place that validates, translates, reconciles and publishes, and keeps the record." },
   { key: "does", chapter: "how", kicker: "Every movement", title: "Five things, to every movement", line: ROLE.line },
   { key: "governs", chapter: "how", kicker: "Kept under control", title: "One place to change, governed", line: "Contracts, transformations, interface impact and variance live in the hub; Lineage, Impact Analysis and Variance 360 read from it." },
@@ -314,18 +346,21 @@ export default function HubSlides({ t, initial }) {
                 </li>))}
             </ol>
           </div>)}
-        {S.key === "context" && (
+        {S.key === "doors" && (
           <div style={{ display: "grid", gridTemplateColumns: "1.15fr 1fr", gap: 14 }}>
             <div>
-              <div style={{ border: `1px solid ${border}`, borderRadius: 12, padding: 10, background: "#fff" }}><ContextPicture /></div>
-              <div style={{ marginTop: 10, padding: "12px 14px", borderRadius: 10, background: NAVY, color: "#fff", fontSize: 12.5, lineHeight: 1.5 }}><b>{CONTEXT.close}</b></div>
+              <div style={{ border: `1px solid ${border}`, borderRadius: 12, padding: 10, background: "#fff" }}><DoorsPicture /></div>
+              <div style={{ marginTop: 10, padding: "12px 14px", borderRadius: 10, background: NAVY, color: "#fff", fontSize: 12.5, lineHeight: 1.5 }}><b>Why four doors and not one.</b> A nightly file and a message that arrives a thousand times a minute cannot be checked the same way. Each door checks what its traffic needs. What happens after the door is the same for all of them.</div>
             </div>
             <ol style={{ margin: 0, paddingLeft: 0, listStyle: "none", display: "grid", gap: 8, alignContent: "start" }}>
-              {CONTEXT.beats.map(([h, b, m], k) => (
-                <li key={h} style={{ display: "grid", gridTemplateColumns: "26px 1fr", gap: 8, padding: "8px 10px", border: `1px solid ${border}`, borderRadius: 8, background: panel }}>
-                  <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 12, fontWeight: 800, color: k === 2 ? RED : TEAL }}>{k + 1}</span>
-                  <span><b style={{ fontSize: 12.5, color: text }}>{h}.</b> <span style={{ fontSize: 11.5, color: sub }}>{b}</span>
-                    <div style={{ fontSize: 10.5, color: TEAL, marginTop: 2 }}>{"\u2192"} {m}</div></span>
+              {DOORS.map(([plain, tech, when, ex, check, fail], k) => (
+                <li key={plain} style={{ display: "grid", gridTemplateColumns: "26px 1fr", gap: 8, padding: "9px 12px", border: `1px solid ${border}`, borderRadius: 8, background: panel }}>
+                  <span style={{ width: 20, height: 20, borderRadius: 10, background: TEAL, color: "#fff", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 800 }}>{k + 1}</span>
+                  <span>
+                    <b style={{ fontSize: 13, color: text }}>{plain}</b> <span style={{ fontSize: 11, color: sub }}>({tech})</span>
+                    <div style={{ fontSize: 11.5, color: sub, lineHeight: 1.5, marginTop: 2 }}><b style={{ color: TEAL }}>At the door:</b> {check}.</div>
+                    <div style={{ fontSize: 11.5, color: sub, lineHeight: 1.5 }}><b style={{ color: "#8e1b2b" }}>If it fails:</b> {fail}.</div>
+                  </span>
                 </li>))}
             </ol>
           </div>)}
