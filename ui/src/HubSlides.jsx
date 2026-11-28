@@ -126,8 +126,61 @@ export function TowerStory() {
     </svg>);
 }
 
+export const CONTEXT = {
+  beats: [
+    ["The situation", "BBH Capital Partners is moving its books and records onto SEI. From the first business day, almost every number BBH reports, reconciles, bills or shows a client originates at SEI and must reach BBH's own systems, and BBH keeps sending SEI instructions back.", "a two-way relationship of roughly forty interfaces per business date"],
+    ["The channels", "Events from the SDC Event Hub are the primary feed. The thirty-eight SWP files are the daily standby and the reconciliation baseline. Loaders carry BBH's submissions back. APIs are not Day 1.", "four channels at different maturities, each treated by its nature"],
+    ["The obvious approach, and its cost", "One job per interface: a schedule here, a script there. Every job its own copy of the mapping. A layout change is found by whichever job breaks first. Nobody can say whether the day is complete.", "forty jobs and a partner who keeps changing templates: a standing operational risk"],
+    ["The decision", "One controlled doorway. Receive on all four channels, validate at the door, translate by one set of versioned rules, reconcile promised against loaded, publish one stable shape per consumer. Every movement has a record.", "CP Integration Hub; a change is made once, under governance; an added interface is configuration and a contract"],
+    ["What goes with it", "Integration 360 shows what is wrong, where and why, down to the records, fed from Airflow, dbt and the registry. Lineage, Impact Analysis and Variance 360 read the hub's rules.", "one answer to where a number comes from and what a change would break"],
+    ["Scope of this phase", "Events, inbound files and outbound loaders in production; the loader status callback as the first API; PBDW, Pivotal DB and IMDS as destinations. The canonical warehouse is designed forward-compatible, not built.", "13 of the hub's 21 components still depend on an answer from SEI, tracked, not assumed"],
+  ],
+  close: "Build one doorway now, while there are forty interfaces, rather than untangle four hundred arrangements later.",
+};
+
+/** Slide 1 picture: SEI on the left, BBH's systems on the right, the hub between them, the phase drawn solid and later dashed. */
+export function ContextPicture() {
+  const sei = [["SDC Event Hub", "events, intraday", "primary"], ["SWP files", "38 a day", "standby"], ["SWP APIs", "not Day 1", "later"], ["SEI loaders", "BBH's submissions in", "outbound"]];
+  const bbh = [["PBDW", "system of record"], ["Pivotal DB", "existing"], ["IMDS", "existing"], ["Reporting", "reads the published shape"], ["CP DW Canonical", "not this phase"]];
+  return (
+    <svg viewBox="0 0 760 330" width="100%" style={{ display: "block" }} role="img" aria-label="SEI's platform, CP Integration Hub and BBH's systems, with this phase solid and later dashed">
+      <defs><marker id="cxArr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={TEAL} /></marker></defs>
+      <rect x="8" y="8" width="214" height="314" rx="12" fill="#f2eefa" stroke="#d9cdf3" />
+      <text x="20" y="28" fontSize="10" fontWeight="800" fill={VIOLET} letterSpacing="1">SEI PLATFORM</text>
+      {sei.map(([l, s2, tag], i) => (
+        <g key={l}>
+          <rect x="20" y={40 + i * 66} width="190" height="46" rx="8" fill="#fff" stroke={tag === "later" ? "#b8c4ce" : VIOLET} strokeDasharray={tag === "later" ? "5 4" : undefined} />
+          <text x="30" y={59 + i * 66} fontSize="11" fontWeight="700" fill={NAVY}>{l}</text>
+          <text x="30" y={75 + i * 66} fontSize="8.5" fill={MUTE}>{s2}</text>
+          <text x="200" y={59 + i * 66} fontSize="8" fontWeight="800" fill={tag === "primary" ? TEAL : tag === "later" ? MUTE : AMBER} textAnchor="end">{tag.toUpperCase()}</text>
+        </g>))}
+      {sei.map(([, , tag], i) => tag === "outbound"
+        ? <path key={i} d={`M300,${63 + i * 66} L210,${63 + i * 66}`} stroke={VIOLET} strokeWidth="1.4" fill="none" markerEnd="url(#cxArr)" />
+        : <path key={i} d={`M210,${63 + i * 66} L300,${63 + i * 66}`} stroke={tag === "later" ? "#b8c4ce" : TEAL} strokeWidth="1.4" strokeDasharray={tag === "later" ? "4 4" : undefined} fill="none" markerEnd="url(#cxArr)" />)}
+      <rect x="300" y="24" width="160" height="282" rx="12" fill={NAVY} />
+      <text x="380" y="48" fontSize="11" fontWeight="800" fill="#fff" textAnchor="middle">CP INTEGRATION HUB</text>
+      <text x="380" y="63" fontSize="8" fill="#a9c1de" textAnchor="middle">one doorway, both directions</text>
+      {["receive on 4 channels", "validate at the door", "translate by one rule set", "reconcile promised vs loaded", "publish one shape each", "record every movement"].map((v, i) => (
+        <g key={v}><rect x="312" y={78 + i * 36} width="136" height="28" rx="6" fill="#ffffff14" stroke="#a9c1de55" /><text x="380" y={96 + i * 36} fontSize="8.5" fill="#fff" textAnchor="middle">{v}</text></g>))}
+      <text x="380" y="300" fontSize="8" fontWeight="700" fill="#8fd3c6" textAnchor="middle">~40 interfaces per business date</text>
+      <rect x="538" y="8" width="214" height="314" rx="12" fill="#e6f4f2" stroke="#bfe3dc" />
+      <text x="550" y="28" fontSize="10" fontWeight="800" fill={TEAL} letterSpacing="1">BBH SYSTEMS</text>
+      {bbh.map(([l, s2], i) => (
+        <g key={l}>
+          <rect x="550" y={40 + i * 54} width="190" height="42" rx="8" fill="#fff" stroke={i === 4 ? "#b8c4ce" : TEAL} strokeDasharray={i === 4 ? "5 4" : undefined} />
+          <text x="560" y={58 + i * 54} fontSize="11" fontWeight="700" fill={NAVY}>{l}</text>
+          <text x="560" y={73 + i * 54} fontSize="8.5" fill={MUTE}>{s2}</text>
+        </g>))}
+      {bbh.map((_, i) => <path key={i} d={`M460,${61 + i * 54} L550,${61 + i * 54}`} stroke={i === 4 ? "#b8c4ce" : TEAL} strokeWidth="1.4" strokeDasharray={i === 4 ? "4 4" : undefined} fill="none" markerEnd="url(#cxArr)" />)}
+      <rect x="236" y="314" width="288" height="14" rx="4" fill="none" />
+      <text x="230" y="318" fontSize="8" fill={MUTE}>solid: this phase</text>
+      <text x="460" y="318" fontSize="8" fill={MUTE} textAnchor="end">dashed: designed, built later</text>
+    </svg>);
+}
+
 export const SLIDES = [
   { key: "story", kicker: "The story", title: "The Tower and the Hub", line: "An airport that grew one gate at a time, and the control tower that made it an airport. Every part of the picture is a part of the hub." },
+  { key: "context", kicker: "I. Context", title: "Why now: the books move to SEI", line: "A two-way relationship of roughly forty interfaces per business date, on four channels, with a partner who will keep changing its templates." },
   { key: "without", kicker: "Today", title: "Without a hub", line: "Every interface is its own job: an RMJ schedule, a cron job, a script, a small application. Each carries its own translation, or none." },
   { key: "with", kicker: "With CP Integration Hub", title: "One doorway, four channels", line: "Events, inbound files, APIs and outbound loaders come through one place that validates, translates, reconciles and publishes, and keeps the record." },
   { key: "does", kicker: "What it does", title: "Five things, to every movement", line: ROLE.line },
@@ -191,6 +244,21 @@ export default function HubSlides({ t, initial }) {
               {STORY.beats.map(([h, b, m], k) => (
                 <li key={h} style={{ display: "grid", gridTemplateColumns: "26px 1fr", gap: 8, padding: "8px 10px", border: `1px solid ${border}`, borderRadius: 8, background: panel }}>
                   <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 12, fontWeight: 800, color: k === 0 ? RED : TEAL }}>{k + 1}</span>
+                  <span><b style={{ fontSize: 12.5, color: text }}>{h}.</b> <span style={{ fontSize: 11.5, color: sub }}>{b}</span>
+                    <div style={{ fontSize: 10.5, color: TEAL, marginTop: 2 }}>{"\u2192"} {m}</div></span>
+                </li>))}
+            </ol>
+          </div>)}
+        {S.key === "context" && (
+          <div style={{ display: "grid", gridTemplateColumns: "1.15fr 1fr", gap: 14 }}>
+            <div>
+              <div style={{ border: `1px solid ${border}`, borderRadius: 12, padding: 10, background: "#fff" }}><ContextPicture /></div>
+              <div style={{ marginTop: 10, padding: "12px 14px", borderRadius: 10, background: NAVY, color: "#fff", fontSize: 12.5, lineHeight: 1.5 }}><b>{CONTEXT.close}</b></div>
+            </div>
+            <ol style={{ margin: 0, paddingLeft: 0, listStyle: "none", display: "grid", gap: 8, alignContent: "start" }}>
+              {CONTEXT.beats.map(([h, b, m], k) => (
+                <li key={h} style={{ display: "grid", gridTemplateColumns: "26px 1fr", gap: 8, padding: "8px 10px", border: `1px solid ${border}`, borderRadius: 8, background: panel }}>
+                  <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 12, fontWeight: 800, color: k === 2 ? RED : TEAL }}>{k + 1}</span>
                   <span><b style={{ fontSize: 12.5, color: text }}>{h}.</b> <span style={{ fontSize: 11.5, color: sub }}>{b}</span>
                     <div style={{ fontSize: 10.5, color: TEAL, marginTop: 2 }}>{"\u2192"} {m}</div></span>
                 </li>))}

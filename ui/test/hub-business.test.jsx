@@ -11,7 +11,7 @@ import path from "node:path";
 import HubBusiness, { HubViewToggle, PipelineCatalog } from "../src/HubBusiness.jsx";
 import HubDesign from "../src/HubDesign.jsx";
 import HubErrorPlay from "../src/HubErrorPlay.jsx";
-import HubSlides, { SLIDES, WITHOUT_HUB, WITH_HUB, STORY } from "../src/HubSlides.jsx";
+import HubSlides, { SLIDES, WITHOUT_HUB, WITH_HUB, STORY, CONTEXT } from "../src/HubSlides.jsx";
 import { PLAYS, MOOD } from "../src/hubErrorPlays.js";
 import { ROLE, USES, GOVERNS, SOLVES, WITHOUT, I360, PIPELINE, STEP_DETAIL, DAG_DETAIL, POSITIONS_LINEAGE, SCENARIOS, businessMarkdown } from "../src/hubBusiness.js";
 import * as P from "../src/hubPipelines.js";
@@ -51,25 +51,27 @@ ok(new Set(PLAYS.map((p) => p.channel)).size === 3 && PLAYS.some((p) => p.id ===
 ok(!/testbbh|apps\.ocp|https?:\/\/|CPACC|PBDWHDBT|\.internal|[\w.+-]+@[\w-]+\.[\w.-]+/.test(JSON.stringify(PLAYS)), "no host, schema owner, link or address in the plays");
 
 console.log("-- the business view: a presentation");
-ok(SLIDES.length === 5 && SLIDES.map((x) => x.key).join() === "story,without,with,does,governs" && STORY.beats.length === 6, "five slides: the story first, then without a hub, with it, what it does, what it governs");
+ok(SLIDES.length === 6 && SLIDES.map((x) => x.key).join() === "story,context,without,with,does,governs" && STORY.beats.length === 6 && CONTEXT.beats.length === 6, "six slides: the story, the context, without a hub, with it, what it does, what it governs");
 ok(WITHOUT_HUB.jobs.length === 8 && ["RMJ schedule", "cron job", "shell script", "scheduler task", "interface app"].every((j) => WITHOUT_HUB.jobs.some((x) => x[0] === j)) && WITHOUT_HUB.callouts.length === 4, "the world without a hub names the RMJ schedules, cron jobs, scripts, schedulers and interface applications");
 ok(WITH_HUB.channels.length === 4 && WITH_HUB.inside.some((x) => /Error handling/.test(x[0])) && WITH_HUB.inside.some((x) => /Translation and contracts/.test(x[0])) && WITH_HUB.callouts.some((x) => /Plug and play/.test(x[0])) && WITH_HUB.callouts.some((x) => /One place to change/.test(x[0])) && WITH_HUB.callouts.some((x) => /Many to many/.test(x[0])), "the hub slide carries the four channels, error handling, translation and contracts, plug and play, one place to change, many to many");
 for (const [name, t] of [["light", tLight], ["dark", tDark]]) {
   const html = renderToStaticMarkup(<HubBusiness t={t} />);
   ok(/business view/.test(html) && /data-slide="story"/.test(html) && /The Tower and the Hub/.test(html) && /WITHOUT A TOWER/.test(html) && /WITH A TOWER/.test(html) && /The flight strip/.test(html) && /The radar screen/.test(html) && /not unsafe every day/.test(html), `${name}: opens on the story slide: the tower picture, the six beats and the closing line`);
-  ok((html.match(/<svg /g) || []).length === 1 && /1 \/ 5/.test(html) && /Integration 360: what, where, why/.test(html), `${name}: one diagram per slide, the slide counter, the beats mapped to the hub`);
+  ok((html.match(/<svg /g) || []).length === 1 && /1 \/ 6/.test(html) && /Integration 360: what, where, why/.test(html), `${name}: one diagram per slide, the slide counter, the beats mapped to the hub`);
   ok(!/data-list="pipelines"/.test(html) && !/Where in the flow|Where in the data/.test(html) && !/data-play=/.test(html), `${name}: no pipeline list, flow, lineage or play on the first tab`);
   ok(/aria-selected="true"[^>]*>What it is/.test(html) && /Error handling</.test(html) && /Copy as Markdown/.test(html), `${name}: the two tabs and the copy button`);
   ok(!/\\u00b7/.test(html) && /\u00b7 business view/.test(html), `${name}: the middle dot is a character, not an escape`);
 }
-const s1 = renderToStaticMarkup(<HubSlides t={tLight} initial={{ slide: 1 }} />);
-ok(/data-slide="without"/.test(s1) && /RMJ schedule/.test(s1) && /cron job/.test(s1) && /interface app/.test(s1) && /8 jobs for 5 sources and 5 destinations/.test(s1) && /Every pair is its own job/.test(s1), "slide 2: without a hub, with the jobs drawn and the callouts");
-const s2 = renderToStaticMarkup(<HubSlides t={tLight} initial={{ slide: 2 }} />);
-ok(/data-slide="with"/.test(s2) && /INGESTION CHANNELS/.test(s2) && /Outbound loaders/.test(s2) && /Error handling/.test(s2) && /Translation and contracts/.test(s2) && /plug and play · one place to change · governed/.test(s2) && /Plug and play/.test(s2), "slide 3: the hub with its channels, error handling and translation inside, and the plug-and-play callouts");
-const s3 = renderToStaticMarkup(<HubSlides t={tLight} initial={{ slide: 3 }} />);
-ok(/data-slide="does"/.test(s3) && /1\. receive/.test(s3) && /5\. publish/.test(s3) && /Sensors and scheduling/.test(s3), "slide 4: the five verbs and where it is used");
-const s4 = renderToStaticMarkup(<HubSlides t={tLight} initial={{ slide: 4 }} />);
-ok(/data-slide="governs"/.test(s4) && /Shapes and change control/.test(s4) && /Governed/.test(s4) && /Code Review 360/.test(s4), "slide 5: what it governs and how");
+const sc = renderToStaticMarkup(<HubSlides t={tLight} initial={{ slide: 1 }} />);
+ok(/data-slide="context"/.test(sc) && /I\. Context/.test(sc) && /SEI PLATFORM/.test(sc) && /BBH SYSTEMS/.test(sc) && /SDC Event Hub/.test(sc) && /~40 interfaces per business date/.test(sc) && /The obvious approach, and its cost/.test(sc) && /Scope of this phase/.test(sc) && /13 of the hub/.test(sc) && /dashed: designed, built later/.test(sc), "slide 2: the context in the same style: SEI, the hub and BBH's systems drawn, this phase solid and later dashed, the six beats");
+const s1 = renderToStaticMarkup(<HubSlides t={tLight} initial={{ slide: 2 }} />);
+ok(/data-slide="without"/.test(s1) && /RMJ schedule/.test(s1) && /cron job/.test(s1) && /interface app/.test(s1) && /8 jobs for 5 sources and 5 destinations/.test(s1) && /Every pair is its own job/.test(s1), "slide 3: without a hub, with the jobs drawn and the callouts");
+const s2 = renderToStaticMarkup(<HubSlides t={tLight} initial={{ slide: 3 }} />);
+ok(/data-slide="with"/.test(s2) && /INGESTION CHANNELS/.test(s2) && /Outbound loaders/.test(s2) && /Error handling/.test(s2) && /Translation and contracts/.test(s2) && /plug and play · one place to change · governed/.test(s2) && /Plug and play/.test(s2), "slide 4: the hub with its channels, error handling and translation inside, and the plug-and-play callouts");
+const s3 = renderToStaticMarkup(<HubSlides t={tLight} initial={{ slide: 4 }} />);
+ok(/data-slide="does"/.test(s3) && /1\. receive/.test(s3) && /5\. publish/.test(s3) && /Sensors and scheduling/.test(s3), "slide 5: the five verbs and where it is used");
+const s4 = renderToStaticMarkup(<HubSlides t={tLight} initial={{ slide: 5 }} />);
+ok(/data-slide="governs"/.test(s4) && /Shapes and change control/.test(s4) && /Governed/.test(s4) && /Code Review 360/.test(s4), "slide 6: what it governs and how");
 const errTab = renderToStaticMarkup(<HubBusiness t={tLight} initial={{ tab: "Error handling" }} />);
 ok(/data-tab="errors"/.test(errTab) && /data-play="quarantine"/.test(errTab) && /data-frame="0"/.test(errTab) && !/data-tab="what"/.test(errTab) && (errTab.match(/role="tab"/g) || []).length === 2 + PLAYS.length, "the Error handling tab opens on the first play with a tab per scenario");
 const mid = renderToStaticMarkup(<HubErrorPlay t={tLight} initial={{ play: "quarantine", frame: 2, running: false }} />);
