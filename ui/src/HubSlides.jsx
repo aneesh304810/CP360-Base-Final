@@ -1,13 +1,12 @@
 import React, { useState } from "react";
 import { ROLE, USES, GOVERNS } from "./hubBusiness.js";
 
-// HubSlides: the business view as a short presentation. Slide 1 is the world
-// without the hub (RMJ schedules, cron jobs, scripts, schedulers and small
-// interface applications, each wired point to point with its own translation
-// or none). Slide 2 is the hub: ingestion channels, error handling, many
-// sources to many destinations, translation and contracts in one governed
-// place, so an interface is plug and play. Slides 3 and 4: what it does and
-// what it governs.
+// HubSlides: the business view as a short presentation in four chapters.
+// The problem (the tower story, why now, the world without a hub), what it is
+// (the post office for data, in plain words), how it works (one doorway and
+// four channels, the five things it does to every movement, how it is kept
+// under control) and what the business gets. Every slide is one picture and a
+// few lines; nothing on any slide is a host, an account or a credential.
 
 const NAVY = "#10193b", TEAL = "#0e8f7e", RED = "#cc3344", AMBER = "#e0a13d", BLUE = "#1168bd", MUTE = "#5c7c94", VIOLET = "#6d3ac0";
 
@@ -22,11 +21,14 @@ export const WITHOUT_HUB = {
 };
 export const WITH_HUB = {
   channels: [["Events", "real-time"], ["Inbound files", "daily"], ["APIs", "on call"], ["Outbound loaders", "push + poll"]],
-  inside: [["Error handling", "validate at the door · quarantine · retry · replay · held rows"], ["Translation and contracts", "one set of rules, versioned, tested, governed"], ["Record of every movement", "business date · registry · reconciliation · date close"]],
+  inside: [["Error handling", "validate at the door · quarantine · retry · replay · held rows"], ["Translation and contracts", "one set of rules, versioned, tested, governed"], ["Record of every movement", "business date · registry · reconciliation · date close"],
+    ["Security, entitlements and control", "who may see or change what · approvals · audit trail · PII masked · secrets in a vault"]],
+  governedBy: ["Security Entitlement", "Code Review 360", "Release Delivery", "PII Explorer", "Cyber Security 360"],
   callouts: [["Plug and play", "A new interface is a configuration row and a contract, not a new job. It arrives on one of four channels the hub already runs."],
     ["One place to change", "A data contract or a transformation changes in the hub, once, under governance. Consumers keep reading a stable shape."],
     ["Many to many", "Any source to any destination through one doorway: SEI and vendors in, PBDW, Pivotal, IMDS and SEI out."],
-    ["Errors caught, shown, replayed", "Every channel validates, quarantines or holds with a reason code; Integration 360 shows what, where and why; the play is replayed, never patched by hand."]],
+    ["Errors caught, shown, replayed", "Every channel validates, quarantines or holds with a reason code; Integration 360 shows what, where and why; the play is replayed, never patched by hand."],
+    ["Secured and controlled", "Access per person and per module (Security Entitlement). Changes reviewed (Code Review 360), promoted (Release Delivery) and audited. Personal data classified (PII Explorer) and masked outside the hub. Credentials in a vault, never in a job."]],
 };
 
 const Box = ({ x, y, w, h = 38, label, s, c = BLUE, fill = "#fff", dash, bold = 11 }) => (
@@ -57,9 +59,9 @@ export function WithoutHub() {
 
 /** Slide 2 picture: the hub with its channels, what it does inside, and the consumers. */
 export function WithHub() {
-  const hubX = 300, hubW = 380, hubY = 14, hubH = 320;
+  const hubX = 300, hubW = 380, hubY = 14, hubH = 406;
   return (
-    <svg viewBox="0 0 980 360" width="100%" style={{ display: "block" }} role="img" aria-label="with the hub: channels in, consumers out, error handling and translation inside">
+    <svg viewBox="0 0 980 432" width="100%" style={{ display: "block" }} role="img" aria-label="with the hub: channels in, consumers out, error handling, translation, the record and security and control inside">
       <defs><marker id="hsArr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={TEAL} /></marker></defs>
       {ROLE.sources.map(([l, s], i) => <Box key={l} x={20} y={30 + i * 66} w={190} h={44} label={l} s={s} c={VIOLET} fill="#f2eefa" />)}
       {ROLE.sources.map((_, i) => <path key={i} d={`M210,${52 + i * 66} L${hubX},${52 + i * 66}`} stroke={TEAL} strokeWidth="1.4" markerEnd="url(#hsArr)" fill="none" strokeDasharray={i === 2 ? "4 4" : undefined} />)}
@@ -74,11 +76,13 @@ export function WithHub() {
         </g>))}
       {WITH_HUB.inside.map(([l, s], i) => (
         <g key={l}>
-          <rect x={hubX + 16} y={hubY + 108 + i * 56} width={hubW - 32} height={46} rx="6" fill={i === 0 ? "#cc334433" : i === 1 ? "#1168bd44" : "#ffffff14"} stroke={i === 0 ? "#f2a0a8" : i === 1 ? "#8fb8ee" : "#a9c1de66"} />
+          <rect x={hubX + 16} y={hubY + 108 + i * 56} width={hubW - 32} height={46} rx="6" fill={i === 0 ? "#cc334433" : i === 1 ? "#1168bd44" : i === 3 ? "#6d3ac055" : "#ffffff14"} stroke={i === 0 ? "#f2a0a8" : i === 1 ? "#8fb8ee" : i === 3 ? "#c9b3ef" : "#a9c1de66"} />
           <text x={hubX + 28} y={hubY + 127 + i * 56} fontSize="11" fontWeight="700" fill="#fff">{l}</text>
           <text x={hubX + 28} y={hubY + 143 + i * 56} fontSize="8.5" fill="#dbe6f3">{s}</text>
         </g>))}
-      <text x={hubX + hubW / 2} y={hubY + hubH - 14} fontSize="9" fill="#8fd3c6" textAnchor="middle" fontWeight="700">plug and play · one place to change · governed</text>
+      <text x={hubX + hubW / 2} y={hubY + hubH - 42} fontSize="9" fill="#8fd3c6" textAnchor="middle" fontWeight="700">plug and play · one place to change · governed</text>
+      <text x={hubX + hubW / 2} y={hubY + hubH - 26} fontSize="8" fill="#c9b3ef" textAnchor="middle">governed by {WITH_HUB.governedBy.slice(0, 3).join(" · ")}</text>
+      <text x={hubX + hubW / 2} y={hubY + hubH - 13} fontSize="8" fill="#c9b3ef" textAnchor="middle">{WITH_HUB.governedBy.slice(3).join(" · ")}</text>
       {ROLE.consumers.map(([l, s], i) => <Box key={l} x={770} y={20 + i * 60} w={190} h={44} label={l} s={s} c={i === 4 ? "#b8c4ce" : TEAL} fill={i === 4 ? "#f6f8fa" : "#e6f4f2"} dash={i === 4} />)}
       {ROLE.consumers.map((_, i) => <path key={i} d={`M${hubX + hubW},${42 + i * 60} L770,${42 + i * 60}`} stroke={TEAL} strokeWidth="1.4" markerEnd="url(#hsArr)" fill="none" strokeDasharray={i === 4 ? "4 4" : undefined} />)}
     </svg>);
@@ -178,13 +182,66 @@ export function ContextPicture() {
     </svg>);
 }
 
+
+/* ---- What it is, in plain words: the post office for data ---- */
+export const PLAIN = {
+  senders: ["Portfolio accounting", "Custody feed", "Fee system", "Nightly script"],
+  doors: [["File drop", "a file lands on a server"], ["Live message", "fired the instant something happens"], ["App call", "a system asks a question"], ["Outgoing file", "a file to send to a vendor"]],
+  receivers: ["General ledger", "Reporting database", "Vendor", "Client portal"],
+  jobs: [
+    ["It receives", "It knows what each file or message should look like and checks it at the door. A missing column, a wrong date or a duplicate account is caught on arrival, not three systems later.", "Integration 360 shows the check that failed"],
+    ["It translates", "Systems speak different languages: one says acct_no, another AccountId. The hub holds the dictionary and converts, so each system only ever speaks its own.", "the rules live in one place, versioned"],
+    ["It delivers", "One incoming file can go to five destinations. The hub knows who needs what, gets it there, and knows who received it.", "many sources to many destinations"],
+    ["It keeps the record", "Every step is written down: what came in, what changed, where it went, what went wrong and why.", "that record is what Integration 360 shows"],
+  ],
+  analogy: "Today every system that sends data to another builds its own private road, with its own rules, its own checks and its own quiet way of failing. With dozens of roads nobody sees the map. The hub is the one post office every parcel passes through.",
+  close: "The CP Integration Hub is the single, supervised doorway through which all data moves between systems, so moving data is something you can see, control and change in one place.",
+};
+export function PlainPicture() {
+  const box = (x, y, w, h, fill, stroke, r = 7) => <rect x={x} y={y} width={w} height={h} rx={r} fill={fill} stroke={stroke} strokeWidth="1.2" />;
+  const label = (x, y, txt, opt = {}) => <text x={x} y={y} fontSize={opt.size || 10.5} fontWeight={opt.w || 600} fill={opt.c || NAVY} textAnchor={opt.a || "middle"} fontFamily="Inter, system-ui, sans-serif">{txt}</text>;
+  const sy = (k) => 46 + k * 60;
+  return (
+    <svg viewBox="0 0 660 290" width="100%" role="img" aria-label="Systems that send on the left, the CP Integration Hub as a post office in the middle with four doors and four jobs, systems that receive on the right" style={{ display: "block" }}>
+      <defs><marker id="pp-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5 0 10z" fill={MUTE} /></marker></defs>
+      {label(80, 20, "SYSTEMS THAT SEND", { size: 9.5, c: MUTE })}
+      {label(580, 20, "SYSTEMS THAT RECEIVE", { size: 9.5, c: MUTE })}
+      {label(340, 20, "CP INTEGRATION HUB · THE POST OFFICE", { size: 9.5, c: TEAL })}
+      {PLAIN.senders.map((n, k) => <g key={n}>{box(14, sy(k) - 16, 132, 34, "#fff", "#c9d3df")}{label(80, sy(k) + 5, n, { w: 600, size: 10.5 })}
+        <line x1="146" y1={sy(k) + 1} x2="214" y2={sy(k) + 1} stroke={MUTE} strokeWidth="1.2" markerEnd="url(#pp-arr)" /></g>)}
+      {PLAIN.receivers.map((n, k) => <g key={n}>{box(514, sy(k) - 16, 132, 34, "#fff", "#c9d3df")}{label(580, sy(k) + 5, n, { w: 600, size: 10.5 })}
+        <line x1="446" y1={sy(k) + 1} x2="512" y2={sy(k) + 1} stroke={TEAL} strokeWidth="1.4" markerEnd="url(#pp-arr)" /></g>)}
+      {/* the building */}
+      <path d="M216 44 L340 26 L464 44 L464 46 L216 46 Z" fill={NAVY} />
+      {box(216, 46, 248, 230, "#f3f8f7", TEAL, 4)}
+      {PLAIN.doors.map(([d], k) => <g key={d}>{box(216, sy(k) - 13, 70, 28, TEAL, TEAL, 3)}{label(251, sy(k) + 5, d, { c: "#fff", size: 9.5, w: 700 })}</g>)}
+      {["Receive & check", "Translate", "Deliver", "Keep the record"].map((j, k) => <g key={j}>
+        {box(300, sy(k) - 13, 150, 28, "#fff", TEAL, 14)}
+        <circle cx="316" cy={sy(k) + 1} r="8" fill={TEAL} />{label(316, sy(k) + 4.5, String(k + 1), { c: "#fff", size: 9, w: 800 })}
+        {label(382, sy(k) + 5, j, { size: 10.5, w: 700, c: NAVY })}
+      </g>)}
+      {label(340, 266, "one doorway · one dictionary · one record of the day", { size: 9.5, c: TEAL, w: 700 })}
+    </svg>);
+}
+
+/* ---- What the business gets ---- */
+export const BENEFITS = [
+  ["One place to change things", "A vendor changes a file layout and someone chases every script that reads it.", "Change the contract once in the hub; every consumer gets the new shape."],
+  ["Problems are visible", "A report is wrong the next morning and the search for why begins.", "Integration 360 shows which step failed, which record, which column and what the error was."],
+  ["New connections plug in", "Another private road: a new script, a new schedule, a new person who knows it.", "Register the system with the hub. Its channel, checks and translation already exist."],
+  ["It is governed", "Who owns a feed and what changed when lives in people's heads.", "Owner, rules and every change are recorded; Code Review 360 reviews, Lineage and Impact read the same rules."],
+];
+export const CHAPTERS = [["problem", "The problem"], ["what", "What it is"], ["how", "CP Integration Hub"], ["benefits", "What you get"], ["appendix", "Appendix"]];
+
 export const SLIDES = [
-  { key: "story", kicker: "The story", title: "The Tower and the Hub", line: "An airport that grew one gate at a time, and the control tower that made it an airport. Every part of the picture is a part of the hub." },
-  { key: "context", kicker: "I. Context", title: "Why now: the books move to SEI", line: "A two-way relationship of roughly forty interfaces per business date, on four channels, with a partner who will keep changing its templates." },
-  { key: "without", kicker: "Today", title: "Without a hub", line: "Every interface is its own job: an RMJ schedule, a cron job, a script, a small application. Each carries its own translation, or none." },
-  { key: "with", kicker: "With CP Integration Hub", title: "One doorway, four channels", line: "Events, inbound files, APIs and outbound loaders come through one place that validates, translates, reconciles and publishes, and keeps the record." },
-  { key: "does", kicker: "What it does", title: "Five things, to every movement", line: ROLE.line },
-  { key: "governs", kicker: "What it governs", title: "One place to change, governed", line: "Contracts, transformations, interface impact and variance live in the hub; Lineage, Impact Analysis and Variance 360 read from it." },
+  { key: "without", chapter: "problem", kicker: "The problem today", title: "Without a hub", line: "Every interface is its own job: an RMJ schedule, a cron job, a script, a small application. Each carries its own translation, or none." },
+  { key: "context", chapter: "problem", kicker: "I. Context \u00b7 why now", title: "The CP ecosystem today", line: "The books move to SEI: roughly forty interfaces per business date on four channels, each one built and watched on its own, with a partner that keeps changing its templates." },
+  { key: "plain", chapter: "what", kicker: "In plain words", title: "The post office for your data", line: "One place every file, message and call passes through on its way from one system to another. It checks, translates, delivers and writes down what happened." },
+  { key: "with", chapter: "how", kicker: "The hub itself", title: "One doorway, four channels", line: "Events, inbound files, APIs and outbound loaders come through one place that validates, translates, reconciles and publishes, and keeps the record." },
+  { key: "does", chapter: "how", kicker: "Every movement", title: "Five things, to every movement", line: ROLE.line },
+  { key: "governs", chapter: "how", kicker: "Kept under control", title: "One place to change, governed", line: "Contracts, transformations, interface impact and variance live in the hub; Lineage, Impact Analysis and Variance 360 read from it." },
+  { key: "benefits", chapter: "benefits", kicker: "What the business gets", title: "Four things change", line: "Each one is a cost you pay today without noticing, because it is spread across many small jobs and many people." },
+  { key: "story", chapter: "appendix", kicker: "The story", title: "The Tower and the Hub", line: "An airport that grew one gate at a time, and the control tower that made it an airport. Every part of the picture is a part of the hub." },
 ];
 
 export default function HubSlides({ t, initial }) {
@@ -192,7 +249,7 @@ export default function HubSlides({ t, initial }) {
   const [i, setI] = useState(Math.max(0, Math.min(SLIDES.length - 1, initial?.slide ?? 0)));
   const S = SLIDES[i];
   const Callouts = ({ rows, bad }) => (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 10, marginTop: 12 }}>
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${rows.length}, minmax(0,1fr))`, gap: 10, marginTop: 12 }}>
       {rows.map(([h, b]) => (
         <div key={h} style={{ border: `1px solid ${border}`, borderTop: `4px solid ${bad ? RED : TEAL}`, borderRadius: 8, padding: "10px 12px", background: panel }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: bad ? "#8e1b2b" : TEAL }}>{bad ? "✖" : "✔"} {h}</div>
@@ -224,10 +281,18 @@ export default function HubSlides({ t, initial }) {
       <span style={{ fontSize: 10.5, color: sub }}>{i + 1} / {SLIDES.length}</span>
     </div>);
   return (
-    <div data-slide={S.key} style={{ border: `1px solid ${border}`, borderRadius: 14, background: panel, overflow: "hidden", marginTop: 14 }}>
+    <div data-slide={S.key} data-chapter={S.chapter} style={{ border: `1px solid ${border}`, borderRadius: 14, background: panel, overflow: "hidden", marginTop: 14 }}>
+      <div role="tablist" aria-label="chapters" style={{ display: "grid", gridTemplateColumns: CHAPTERS.map((c) => (c[0] === "appendix" ? "minmax(0,.8fr)" : "minmax(0,1fr)")).join(" "), background: NAVY }}>
+        {CHAPTERS.map(([ck, cl], k) => { const on = ck === S.chapter, first = SLIDES.findIndex((x) => x.chapter === ck), n = SLIDES.filter((x) => x.chapter === ck).length; return (
+          <span key={ck} role="tab" aria-selected={on} tabIndex={0} onClick={() => setI(first)} data-chapter-tab={ck}
+            style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 16px", cursor: "pointer", color: on ? "#fff" : "#8fa3bb", background: on ? "#16224a" : "transparent", borderBottom: `3px solid ${on ? TEAL : "transparent"}`, fontSize: 11.5, fontWeight: on ? 800 : 600, letterSpacing: .4, textTransform: "uppercase" }}>
+            <span style={{ width: 18, height: 18, borderRadius: 9, background: on ? TEAL : "#2a3a66", color: "#fff", display: "grid", placeItems: "center", fontSize: 10, fontWeight: 800 }}>{k + 1}</span>{cl}
+            <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 600, whiteSpace: "nowrap", color: on ? "#a9c1de" : "#5f6f8f" }}>{n} slide{n === 1 ? "" : "s"}</span>
+          </span>); })}
+      </div>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, padding: "18px 22px 12px", borderBottom: `1px solid ${border}` }}>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: S.key === "without" ? RED : TEAL }}>{S.kicker}</div>
+          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: S.chapter === "problem" ? RED : S.chapter === "appendix" ? MUTE : TEAL }}>{CHAPTERS.find((c) => c[0] === S.chapter)[1]} · {S.kicker}</div>
           <h2 style={{ fontSize: 24, fontWeight: 800, color: text, margin: "2px 0 4px" }}>{S.title}</h2>
           <div style={{ fontSize: 13, color: sub, maxWidth: 820, lineHeight: 1.5 }}>{S.line}</div>
         </div>
@@ -265,6 +330,52 @@ export default function HubSlides({ t, initial }) {
             </ol>
           </div>)}
         {S.key === "without" && <><div style={{ border: `1px solid ${RED}55`, borderRadius: 12, padding: 10, background: "#fff" }}><WithoutHub /></div><Callouts rows={WITHOUT_HUB.callouts} bad /></>}
+        {S.key === "plain" && (
+          <div style={{ display: "grid", gridTemplateColumns: "1.15fr 1fr", gap: 14 }}>
+            <div>
+              <div style={{ border: `1px solid ${border}`, borderRadius: 12, padding: 10, background: "#fff" }}><PlainPicture /></div>
+              <div style={{ marginTop: 10, padding: "10px 14px", borderRadius: 10, border: `1px solid ${border}`, background: panel, fontSize: 12, color: sub, lineHeight: 1.5 }}>{PLAIN.analogy}</div>
+              <div style={{ marginTop: 10, padding: "12px 14px", borderRadius: 10, background: NAVY, color: "#fff", fontSize: 12.5, lineHeight: 1.5 }}><b>In one sentence.</b> {PLAIN.close}</div>
+            </div>
+            <ol style={{ margin: 0, paddingLeft: 0, listStyle: "none", display: "grid", gap: 8, alignContent: "start" }}>
+              {PLAIN.jobs.map(([h, b, m], k) => (
+                <li key={h} style={{ display: "grid", gridTemplateColumns: "26px 1fr", gap: 8, padding: "10px 12px", border: `1px solid ${border}`, borderRadius: 8, background: panel }}>
+                  <span style={{ width: 20, height: 20, borderRadius: 10, background: TEAL, color: "#fff", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 800 }}>{k + 1}</span>
+                  <span><b style={{ fontSize: 13, color: text }}>{h}.</b> <span style={{ fontSize: 12, color: sub, lineHeight: 1.5 }}>{b}</span>
+                    <div style={{ fontSize: 10.5, color: TEAL, marginTop: 3 }}>{"\u2192"} {m}</div></span>
+                </li>))}
+              <li style={{ padding: "10px 12px", borderRadius: 8, border: `1px dashed ${TEAL}`, fontSize: 11.5, color: sub, lineHeight: 1.5 }}><b style={{ color: text }}>The tower, again.</b> The tower does not fly the planes. It sees all of them, sequences them, and tells you where each one is and which one is in trouble. The hub does not run the business systems; it moves the data between them and keeps the account.</li>
+            </ol>
+          </div>)}
+        {S.key === "benefits" && (
+          <div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 12 }}>
+              {BENEFITS.map(([h, today, after], k) => (
+                <div key={h} style={{ border: `1px solid ${border}`, borderRadius: 12, overflow: "hidden", background: panel, display: "flex", flexDirection: "column" }}>
+                  <div style={{ padding: "12px 14px", background: NAVY, color: "#fff", display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ width: 24, height: 24, borderRadius: 12, background: TEAL, display: "grid", placeItems: "center", fontSize: 12, fontWeight: 800 }}>{k + 1}</span>
+                    <span style={{ fontSize: 13.5, fontWeight: 800 }}>{h}</span>
+                  </div>
+                  <div style={{ padding: "10px 14px", borderBottom: `1px solid ${border}` }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: .8, color: "#8e1b2b" }}>TODAY</div>
+                    <div style={{ fontSize: 11.5, color: sub, lineHeight: 1.5, marginTop: 2 }}>{today}</div>
+                  </div>
+                  <div style={{ padding: "10px 14px", background: "#f3f8f7", flex: 1 }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: .8, color: TEAL }}>WITH THE HUB</div>
+                    <div style={{ fontSize: 11.5, color: text, lineHeight: 1.5, marginTop: 2 }}>{after}</div>
+                  </div>
+                </div>))}
+            </div>
+            <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr auto", gap: 14, alignItems: "stretch" }}>
+              <div style={{ padding: "14px 16px", borderRadius: 10, background: NAVY, color: "#fff", fontSize: 13, lineHeight: 1.55 }}><b>The message.</b> {PLAIN.close} The pages around it, Integration 360, Lineage, Impact Analysis and Variance 360, are the windows onto that one record.</div>
+              <div style={{ padding: "12px 16px", borderRadius: 10, border: `1px solid ${border}`, background: panel, fontSize: 11.5, color: sub, lineHeight: 1.6, minWidth: 240 }}>
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: .8, color: TEAL }}>SEE IT RUNNING</div>
+                <div>Integration 360 - Run: the day's pipelines</div>
+                <div>Error handling tab: each failure, replayed</div>
+                <div>Technical view: the design, piece by piece</div>
+              </div>
+            </div>
+          </div>)}
         {S.key === "with" && <><div style={{ border: `1px solid ${TEAL}`, borderRadius: 12, padding: 10, background: "#fff" }}><WithHub /></div><Callouts rows={WITH_HUB.callouts} /></>}
         {S.key === "does" && <><Verbs /><Tiles rows={USES} icon /></>}
         {S.key === "governs" && <><Tiles rows={GOVERNS} cols={4} /><Callouts rows={WITH_HUB.callouts.slice(0, 2).concat([["Governed", "A change to a contract or a rule is reviewed, versioned and tested in the hub before any consumer sees it; Code Review 360 reviews the code, Integration 360 watches the run."], ["Read by the other pages", "Lineage, Impact Analysis, Variance 360 and the Auto Mapper read the hub's rules, so every page gives the same answer."]])} /></>}
